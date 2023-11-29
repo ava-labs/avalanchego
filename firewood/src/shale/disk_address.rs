@@ -30,6 +30,8 @@ impl DerefMut for DiskAddress {
 }
 
 impl DiskAddress {
+    pub(crate) const MSIZE: u64 = size_of::<Self>() as u64;
+
     /// Return a None DiskAddress
     pub fn null() -> Self {
         DiskAddress(None)
@@ -158,10 +160,6 @@ impl std::ops::BitAnd<usize> for DiskAddress {
     fn bitand(self, rhs: usize) -> Self::Output {
         (self.get() & rhs).into()
     }
-}
-
-impl DiskAddress {
-    const MSIZE: u64 = size_of::<Self>() as u64;
 }
 
 impl Storable for DiskAddress {

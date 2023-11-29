@@ -14,7 +14,7 @@ use thiserror::Error;
 mod node;
 mod trie_hash;
 
-pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, PartialPath, MAX_CHILDREN};
+pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, PartialPath};
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 
 type ObjRef<'a> = shale::ObjRef<'a, Node>;
@@ -81,7 +81,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             .put_item(
                 Node::from_branch(BranchNode {
                     // path: vec![].into(),
-                    children: [None; MAX_CHILDREN],
+                    children: [None; BranchNode::MAX_CHILDREN],
                     value: None,
                     children_encoded: Default::default(),
                 }),
@@ -199,7 +199,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             ));
             let leaf_address = self.put_node(new_node)?.as_ptr();
 
-            let mut chd = [None; MAX_CHILDREN];
+            let mut chd = [None; BranchNode::MAX_CHILDREN];
 
             let last_matching_nibble = matching_path[idx];
             chd[last_matching_nibble as usize] = Some(leaf_address);
@@ -340,7 +340,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 };
 
             // [parent] (-> [ExtNode]) -> [branch with v] -> [Leaf]
-            let mut children = [None; MAX_CHILDREN];
+            let mut children = [None; BranchNode::MAX_CHILDREN];
 
             children[idx] = leaf_address.into();
 
@@ -561,7 +561,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             };
 
             if let Some((idx, more, ext, val)) = info {
-                let mut chd = [None; MAX_CHILDREN];
+                let mut chd = [None; BranchNode::MAX_CHILDREN];
 
                 let c_ptr = if more {
                     u_ptr
@@ -1695,7 +1695,7 @@ mod tests {
     fn branch(value: Vec<u8>, encoded_child: Option<Vec<u8>>) -> Node {
         let children = Default::default();
         let value = Some(Data(value));
-        let mut children_encoded = <[Option<Vec<u8>>; MAX_CHILDREN]>::default();
+        let mut children_encoded = <[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>::default();
 
         if let Some(child) = encoded_child {
             children_encoded[0] = Some(child);

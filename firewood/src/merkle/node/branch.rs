@@ -4,14 +4,21 @@
 use super::{Data, Encoded, Node};
 use crate::{
     merkle::{PartialPath, TRIE_HASH_LEN},
-    shale::DiskAddress,
     shale::ShaleStore,
+    shale::{DiskAddress, Storable},
 };
 use bincode::{Error, Options};
-use std::fmt::{Debug, Error as FmtError, Formatter};
+use std::{
+    fmt::{Debug, Error as FmtError, Formatter},
+    io::{Cursor, Write},
+    mem::size_of,
+    ops::Deref,
+};
 
-pub const MAX_CHILDREN: usize = 16;
-pub const SIZE: usize = MAX_CHILDREN + 1;
+pub type DataLen = u32;
+pub type EncodedChildLen = u8;
+
+const MAX_CHILDREN: usize = 16;
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct BranchNode {
@@ -50,11 +57,14 @@ impl Debug for BranchNode {
 }
 
 impl BranchNode {
+    pub const MAX_CHILDREN: usize = MAX_CHILDREN;
+    pub const MSIZE: usize = Self::MAX_CHILDREN + 1;
+
     pub fn new(
         _path: PartialPath,
-        chd: [Option<DiskAddress>; MAX_CHILDREN],
+        chd: [Option<DiskAddress>; Self::MAX_CHILDREN],
         value: Option<Vec<u8>>,
-        chd_encoded: [Option<Vec<u8>>; MAX_CHILDREN],
+        chd_encoded: [Option<Vec<u8>>; Self::MAX_CHILDREN],
     ) -> Self {
         BranchNode {
             // path,
@@ -68,19 +78,19 @@ impl BranchNode {
         &self.value
     }
 
-    pub fn chd(&self) -> &[Option<DiskAddress>; MAX_CHILDREN] {
+    pub fn chd(&self) -> &[Option<DiskAddress>; Self::MAX_CHILDREN] {
         &self.children
     }
 
-    pub fn chd_mut(&mut self) -> &mut [Option<DiskAddress>; MAX_CHILDREN] {
+    pub fn chd_mut(&mut self) -> &mut [Option<DiskAddress>; Self::MAX_CHILDREN] {
         &mut self.children
     }
 
-    pub fn chd_encode(&self) -> &[Option<Vec<u8>>; MAX_CHILDREN] {
+    pub fn chd_encode(&self) -> &[Option<Vec<u8>>; Self::MAX_CHILDREN] {
         &self.children_encoded
     }
 
-    pub fn chd_encoded_mut(&mut self) -> &mut [Option<Vec<u8>>; MAX_CHILDREN] {
+    pub fn chd_encoded_mut(&mut self) -> &mut [Option<Vec<u8>>; Self::MAX_CHILDREN] {
         &mut self.children_encoded
     }
 
@@ -109,7 +119,7 @@ impl BranchNode {
         let value = Some(data).filter(|data| !data.is_empty());
 
         // encode all children.
-        let mut chd_encoded: [Option<Vec<u8>>; MAX_CHILDREN] = Default::default();
+        let mut chd_encoded: [Option<Vec<u8>>; Self::MAX_CHILDREN] = Default::default();
 
         // we popped the last element, so their should only be NBRANCH items left
         for (i, chd) in items.into_iter().enumerate() {
@@ -122,7 +132,7 @@ impl BranchNode {
 
         Ok(BranchNode::new(
             path,
-            [None; MAX_CHILDREN],
+            [None; Self::MAX_CHILDREN],
             value,
             chd_encoded,
         ))
@@ -130,7 +140,7 @@ impl BranchNode {
 
     pub(super) fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         // TODO: add path to encoded node
-        let mut list = <[Encoded<Vec<u8>>; MAX_CHILDREN + 1]>::default();
+        let mut list = <[Encoded<Vec<u8>>; Self::MAX_CHILDREN + 1]>::default();
 
         for (i, c) in self.children.iter().enumerate() {
             match c {
@@ -170,7 +180,7 @@ impl BranchNode {
         }
 
         if let Some(Data(val)) = &self.value {
-            list[MAX_CHILDREN] =
+            list[Self::MAX_CHILDREN] =
                 Encoded::Data(bincode::DefaultOptions::new().serialize(val).unwrap());
         }
 
@@ -178,4 +188,60 @@ impl BranchNode {
             .serialize(list.as_slice())
             .unwrap()
     }
+}
+
+impl Storable for BranchNode {
+    fn serialized_len(&self) -> u64 {
+        let children_len = Self::MAX_CHILDREN as u64 * DiskAddress::MSIZE;
+        let data_len = optional_data_len::<DataLen, _>(self.value.as_deref());
+        let children_encoded_len = self.children_encoded.iter().fold(0, |len, child| {
+            len + optional_data_len::<EncodedChildLen, _>(child.as_ref())
+        });
+
+        children_len + data_len + children_encoded_len
+    }
+
+    fn serialize(&self, to: &mut [u8]) -> Result<(), crate::shale::ShaleError> {
+        let mut cursor = Cursor::new(to);
+
+        for child in &self.children {
+            let bytes = child.map(|addr| addr.to_le_bytes()).unwrap_or_default();
+            cursor.write_all(&bytes)?;
+        }
+
+        let (value_len, value) = self
+            .value
+            .as_ref()
+            .map(|val| (val.len() as DataLen, val.deref()))
+            .unwrap_or((DataLen::MAX, &[]));
+
+        cursor.write_all(&value_len.to_le_bytes())?;
+        cursor.write_all(value)?;
+
+        for child_encoded in &self.children_encoded {
+            let (child_len, child) = child_encoded
+                .as_ref()
+                .map(|child| (child.len() as EncodedChildLen, child.as_slice()))
+                .unwrap_or((EncodedChildLen::MIN, &[]));
+
+            cursor.write_all(&child_len.to_le_bytes())?;
+            cursor.write_all(child)?;
+        }
+
+        Ok(())
+    }
+
+    fn deserialize<T: crate::shale::CachedStore>(
+        _addr: usize,
+        _mem: &T,
+    ) -> Result<Self, crate::shale::ShaleError>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+}
+
+fn optional_data_len<Len, T: AsRef<[u8]>>(data: Option<T>) -> u64 {
+    size_of::<Len>() as u64 + data.as_ref().map_or(0, |data| data.as_ref().len() as u64)
 }

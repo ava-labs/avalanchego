@@ -22,7 +22,7 @@ mod extension;
 mod leaf;
 mod partial_path;
 
-pub use branch::{BranchNode, MAX_CHILDREN, SIZE as BRANCH_NODE_SIZE};
+pub use branch::BranchNode;
 pub use extension::ExtNode;
 pub use leaf::{LeafNode, SIZE as LEAF_NODE_SIZE};
 pub use partial_path::PartialPath;
@@ -114,7 +114,7 @@ impl NodeType {
                 }
             }
             // TODO: add path
-            BRANCH_NODE_SIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?.into())),
+            BranchNode::MSIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?.into())),
             size => Err(Box::new(bincode::ErrorKind::Custom(format!(
                 "invalid size: {size}"
             )))),
@@ -216,7 +216,7 @@ impl Node {
                 inner: NodeType::Branch(
                     BranchNode {
                         // path: vec![].into(),
-                        children: [Some(DiskAddress::null()); MAX_CHILDREN],
+                        children: [Some(DiskAddress::null()); BranchNode::MAX_CHILDREN],
                         value: Some(Data(Vec::new())),
                         children_encoded: Default::default(),
                     }
@@ -370,7 +370,7 @@ impl Storable for Node {
             NodeTypeId::Branch => {
                 // TODO: add path
                 // TODO: figure out what this size is?
-                let branch_header_size = MAX_CHILDREN as u64 * 8 + 4;
+                let branch_header_size = BranchNode::MAX_CHILDREN as u64 * 8 + 4;
                 let node_raw = mem.get_view(addr + Meta::SIZE, branch_header_size).ok_or(
                     ShaleError::InvalidCacheView {
                         offset: addr + Meta::SIZE,
@@ -379,7 +379,7 @@ impl Storable for Node {
                 )?;
 
                 let mut cur = Cursor::new(node_raw.as_deref());
-                let mut chd = [None; MAX_CHILDREN];
+                let mut chd = [None; BranchNode::MAX_CHILDREN];
                 let mut buff = [0; 8];
 
                 for chd in chd.iter_mut() {
@@ -392,12 +392,13 @@ impl Storable for Node {
 
                 cur.read_exact(&mut buff[..4])?;
 
-                let raw_len =
-                    u32::from_le_bytes(buff[..4].try_into().expect("invalid slice")) as u64;
+                let raw_len = u32::from_le_bytes(buff[..4].try_into().expect("invalid slice"));
 
-                let value = if raw_len == u32::MAX as u64 {
+                let value = if raw_len == u32::MAX {
                     None
                 } else {
+                    let raw_len = raw_len as u64;
+
                     Some(Data(
                         mem.get_view(addr + Meta::SIZE + branch_header_size as usize, raw_len)
                             .ok_or(ShaleError::InvalidCacheView {
@@ -408,9 +409,10 @@ impl Storable for Node {
                     ))
                 };
 
-                let mut chd_encoded: [Option<Vec<u8>>; MAX_CHILDREN] = Default::default();
+                let mut chd_encoded: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] =
+                    Default::default();
 
-                let offset = if raw_len == u32::MAX as u64 {
+                let offset = if raw_len == u32::MAX {
                     addr + Meta::SIZE + branch_header_size as usize
                 } else {
                     addr + Meta::SIZE + branch_header_size as usize + raw_len as usize
@@ -598,20 +600,7 @@ impl Storable for Node {
             + match &self.inner {
                 NodeType::Branch(n) => {
                     // TODO: add path
-                    let mut encoded_len = 0;
-                    for emcoded in n.children_encoded.iter() {
-                        encoded_len += match emcoded {
-                            Some(v) => 1 + v.len() as u64,
-                            None => 1,
-                        }
-                    }
-                    MAX_CHILDREN as u64 * 8
-                        + 4
-                        + match &n.value {
-                            Some(val) => val.len() as u64,
-                            None => 0,
-                        }
-                        + encoded_len
+                    n.serialized_len()
                 }
                 NodeType::Extension(n) => {
                     1 + 8
@@ -654,36 +643,9 @@ impl Storable for Node {
                 // TODO: add path
                 cur.write_all(&[type_id::NodeTypeId::Branch as u8]).unwrap();
 
-                for c in n.children.iter() {
-                    cur.write_all(&match c {
-                        Some(p) => p.to_le_bytes(),
-                        None => 0u64.to_le_bytes(),
-                    })?;
-                }
+                let pos = cur.position() as usize;
 
-                match &n.value {
-                    Some(val) => {
-                        cur.write_all(&(val.len() as u32).to_le_bytes())?;
-                        cur.write_all(val)?
-                    }
-                    None => {
-                        cur.write_all(&u32::MAX.to_le_bytes())?;
-                    }
-                }
-
-                // Since child encoding will only be unset after initialization (only used for range proof),
-                // it is fine to encode its value adjacent to other fields. Same for extention node.
-                for encoded in n.children_encoded.iter() {
-                    match encoded {
-                        Some(v) => {
-                            cur.write_all(&[v.len() as u8])?;
-                            cur.write_all(v)?
-                        }
-                        None => cur.write_all(&0u8.to_le_bytes())?,
-                    }
-                }
-
-                Ok(())
+                n.serialize(&mut cur.get_mut()[pos..])
             }
 
             NodeType::Extension(n) => {
@@ -734,8 +696,8 @@ pub(super) mod tests {
         value: Option<Vec<u8>>,
         repeated_encoded_child: Option<Vec<u8>>,
     ) -> Node {
-        let children: [Option<DiskAddress>; MAX_CHILDREN] = from_fn(|i| {
-            if i < MAX_CHILDREN / 2 {
+        let children: [Option<DiskAddress>; BranchNode::MAX_CHILDREN] = from_fn(|i| {
+            if i < BranchNode::MAX_CHILDREN / 2 {
                 DiskAddress::from(repeated_disk_address).into()
             } else {
                 None
@@ -745,7 +707,7 @@ pub(super) mod tests {
         let children_encoded = repeated_encoded_child
             .map(|child| {
                 from_fn(|i| {
-                    if i < MAX_CHILDREN / 2 {
+                    if i < BranchNode::MAX_CHILDREN / 2 {
                         child.clone().into()
                     } else {
                         None
