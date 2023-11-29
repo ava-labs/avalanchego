@@ -59,16 +59,16 @@ func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.By
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
-func (a *API) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64) (signedMessageBytes hexutil.Bytes, err error) {
+func (a *API) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
 	unsignedMessage, err := a.backend.GetMessage(messageID)
 	if err != nil {
 		return nil, err
 	}
-	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum)
+	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetIDStr)
 }
 
 // GetBlockAggregateSignature fetches the aggregate signature for the requested [blockID]
-func (a *API) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64) (signedMessageBytes hexutil.Bytes, err error) {
+func (a *API) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
 		return nil, err
@@ -78,26 +78,37 @@ func (a *API) GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, qu
 		return nil, err
 	}
 
-	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum)
+	return a.aggregateSignatures(ctx, unsignedMessage, quorumNum, subnetIDStr)
 }
 
-func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64) (hexutil.Bytes, error) {
+func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.UnsignedMessage, quorumNum uint64, subnetIDStr string) (hexutil.Bytes, error) {
+	subnetID := a.sourceSubnetID
+	if len(subnetIDStr) > 0 {
+		sid, err := ids.FromString(subnetIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse subnetID: %q", subnetIDStr)
+		}
+		subnetID = sid
+	}
 	pChainHeight, err := a.state.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Debug("Fetching signature",
-		"a.subnetID", a.sourceSubnetID,
-		"height", pChainHeight,
-	)
-	validators, totalWeight, err := warp.GetCanonicalValidatorSet(ctx, a.state, pChainHeight, a.sourceSubnetID)
+	validators, totalWeight, err := warp.GetCanonicalValidatorSet(ctx, a.state, pChainHeight, subnetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
 	if len(validators) == 0 {
-		return nil, fmt.Errorf("%w (SubnetID: %s, Height: %d)", errNoValidators, a.sourceSubnetID, pChainHeight)
+		return nil, fmt.Errorf("%w (SubnetID: %s, Height: %d)", errNoValidators, subnetID, pChainHeight)
 	}
+
+	log.Debug("Fetching signature",
+		"sourceSubnetID", subnetID,
+		"height", pChainHeight,
+		"numValidators", len(validators),
+		"totalWeight", totalWeight,
+	)
 
 	agg := aggregator.New(aggregator.NewSignatureGetter(a.client), validators, totalWeight)
 	signatureResult, err := agg.AggregateSignatures(ctx, unsignedMessage, quorumNum)
