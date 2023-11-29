@@ -181,6 +181,8 @@ func (n *network) issueTx(tx *txs.Tx) error {
 		return err
 	}
 
+	n.mempool.RequestBuildBlock(false)
+
 	return nil
 }
 
