@@ -125,7 +125,7 @@ func newEnvironment(t *testing.T) *environment {
 	metrics, err := metrics.New("", registerer)
 	r.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	r.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -149,7 +149,6 @@ func newEnvironment(t *testing.T) *environment {
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
-		nil, // toEngine,
 	)
 
 	res.blkManager.SetPreference(genesisID)
