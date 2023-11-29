@@ -357,6 +357,8 @@ func (t *trieView) calculateNodeIDsHelper(n *node) {
 		n.setChildEntry(index, child{
 			compressedKey: n.children[index].compressedKey,
 			id:            updatedChild.id,
+			rlp:           updatedChild.rlp,
+			isValueNode:   updatedChild.isValueNode(),
 			hasValue:      updatedChild.hasValue(),
 		})
 	}
@@ -630,6 +632,18 @@ func getMerkleRoot(hashRoot *node) ids.ID {
 	return hashRoot.id
 }
 
+// GetAltMerkleRoot returns the ID of the root of this trie.
+func (t *trieView) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
+	if err := t.calculateNodeIDs(ctx); err != nil {
+		return ids.Empty, err
+	}
+	hashRoot, err := t.getHashRoot()
+	if err != nil {
+		return ids.Empty, err
+	}
+	return rlpToAltID(hashRoot.rlp), nil
+}
+
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
 	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValues", oteltrace.WithAttributes(
 		attribute.Int("keyCount", len(keys)),
@@ -785,6 +799,8 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 		child{
 			compressedKey: childKey.Skip(parent.key.length + t.tokenSize),
 			id:            childEntry.id,
+			rlp:           childEntry.rlp,
+			isValueNode:   childEntry.isValueNode,
 			hasValue:      childEntry.hasValue,
 		})
 	return t.recordNodeChange(parent)
@@ -932,6 +948,8 @@ func (t *trieView) insert(
 		child{
 			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + t.tokenSize),
 			id:            existingChildEntry.id,
+			rlp:           existingChildEntry.rlp,
+			isValueNode:   existingChildEntry.isValueNode,
 			hasValue:      existingChildEntry.hasValue,
 		})
 

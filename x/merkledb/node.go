@@ -23,6 +23,8 @@ type dbNode struct {
 type child struct {
 	compressedKey Key
 	id            ids.ID
+	rlp           []byte
+	isValueNode   bool
 	hasValue      bool
 }
 
@@ -30,6 +32,7 @@ type child struct {
 type node struct {
 	dbNode
 	id          ids.ID
+	rlp         []byte
 	key         Key
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
@@ -79,6 +82,7 @@ func (n *node) bytes() []byte {
 // for example, node ID and byte representation
 func (n *node) onNodeChanged() {
 	n.id = ids.Empty
+	n.rlp = nil
 	n.nodeBytes = nil
 }
 
@@ -91,6 +95,8 @@ func (n *node) calculateID(metrics merkleMetrics) {
 	metrics.HashCalculated()
 	bytes := codec.encodeHashValues(n)
 	n.id = hashing.ComputeHash256Array(bytes)
+
+	n.calculateRLP() // calculate rlp at the same time
 }
 
 // Set [n]'s value to [val].
@@ -117,6 +123,8 @@ func (n *node) addChild(childNode *node, tokenSize int) {
 		child{
 			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
 			id:            childNode.id,
+			rlp:           childNode.rlp,
+			isValueNode:   childNode.isValueNode(),
 			hasValue:      childNode.hasValue(),
 		},
 	)
@@ -141,6 +149,7 @@ func (n *node) removeChild(child *node, tokenSize int) {
 func (n *node) clone() *node {
 	return &node{
 		id:  n.id,
+		rlp: slices.Clone(n.rlp),
 		key: n.key,
 		dbNode: dbNode{
 			value:    n.value,

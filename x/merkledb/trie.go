@@ -16,6 +16,10 @@ type MerkleRootGetter interface {
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
 }
 
+type AltMerkleRootGetter interface {
+	GetAltMerkleRoot(ctx context.Context) (ids.ID, error)
+}
+
 type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
@@ -24,6 +28,7 @@ type ProofGetter interface {
 
 type ReadOnlyTrie interface {
 	MerkleRootGetter
+	AltMerkleRootGetter
 	ProofGetter
 
 	// GetValue gets the value associated with the specified key

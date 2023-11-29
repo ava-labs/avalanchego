@@ -587,6 +587,20 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 	return db.sentinelNode.id
 }
 
+func (db *merkleDB) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetAltMerkleRoot")
+	defer span.End()
+
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.closed {
+		return ids.Empty, database.ErrClosed
+	}
+
+	return rlpToAltID(db.sentinelNode.rlp), nil
+}
+
 // isSentinelNodeTheRoot returns true if the passed in sentinel node has a value and or multiple child nodes
 // When this is true, the root of the trie is the sentinel node
 // When this is false, the root of the trie is the sentinel node's single child
@@ -774,7 +788,7 @@ func (db *merkleDB) NewView(
 }
 
 func (db *merkleDB) NewViewWithRootPrefix(
-	ctx context.Context,
+	_ context.Context,
 	changes ViewChanges,
 	rootPrefix Key,
 ) (TrieView, error) {
