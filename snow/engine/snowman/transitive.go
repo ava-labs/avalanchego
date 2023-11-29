@@ -34,7 +34,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const nonVerifiedCacheSize = 64 * units.MiB
+const (
+	nonVerifiedCacheSize = 64 * units.MiB
+
+	// putGossipPeriod specifies the number of times Gossip will be called per
+	// Put gossip. This is done to avoid splitting Gossip into multiple
+	// functions and to allow more frequent pull gossip than push gossip.
+	putGossipPeriod = 10
+)
 
 var _ Engine = (*Transitive)(nil)
 
@@ -62,6 +69,8 @@ type Transitive struct {
 	validators.Connector
 
 	requestID uint32
+
+	gossipCounter int
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -149,6 +158,69 @@ func newTransitive(config Config) (*Transitive, error) {
 	}
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
+}
+
+func (t *Transitive) Gossip(ctx context.Context) error {
+	lastAcceptedID, lastAcceptedHeight := t.Consensus.LastAccepted()
+	if numProcessing := t.Consensus.NumProcessing(); numProcessing == 0 {
+		t.Ctx.Log.Verbo("sampling from validators",
+			zap.Stringer("validators", t.Validators),
+		)
+
+		// Uniform sampling is used here to reduce bandwidth requirements of
+		// nodes with a large amount of stake weight.
+		vdrIDs, err := t.Validators.UniformSample(t.Ctx.SubnetID, 1)
+		if err != nil {
+			t.Ctx.Log.Error("skipping block gossip",
+				zap.String("reason", "no validators"),
+				zap.Error(err),
+			)
+			return nil
+		}
+
+		nextHeightToAccept, err := math.Add64(lastAcceptedHeight, 1)
+		if err != nil {
+			t.Ctx.Log.Error("skipping block gossip",
+				zap.String("reason", "block height overflow"),
+				zap.Stringer("blkID", lastAcceptedID),
+				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+				zap.Error(err),
+			)
+			return nil
+		}
+
+		t.requestID++
+		vdrSet := set.Of(vdrIDs...)
+		preferredID := t.Consensus.Preference()
+		t.Sender.SendPullQuery(ctx, vdrSet, t.requestID, preferredID, nextHeightToAccept)
+	} else {
+		t.Ctx.Log.Debug("skipping block gossip",
+			zap.String("reason", "blocks currently processing"),
+			zap.Int("numProcessing", numProcessing),
+		)
+	}
+
+	// TODO: Remove periodic push gossip after v1.11.x is activated
+	t.gossipCounter++
+	t.gossipCounter %= putGossipPeriod
+	if t.gossipCounter > 0 {
+		return nil
+	}
+
+	lastAccepted, err := t.GetBlock(ctx, lastAcceptedID)
+	if err != nil {
+		t.Ctx.Log.Warn("dropping gossip request",
+			zap.String("reason", "block couldn't be loaded"),
+			zap.Stringer("blkID", lastAcceptedID),
+			zap.Error(err),
+		)
+		return nil
+	}
+	t.Ctx.Log.Verbo("gossiping accepted block to the network",
+		zap.Stringer("blkID", lastAcceptedID),
+	)
+	t.Sender.SendGossip(ctx, lastAccepted.Bytes())
+	return nil
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
@@ -380,28 +452,6 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (*Transitive) Timeout(context.Context) error {
-	return nil
-}
-
-func (t *Transitive) Gossip(ctx context.Context) error {
-	blkID, err := t.VM.LastAccepted(ctx)
-	if err != nil {
-		return err
-	}
-
-	blk, err := t.GetBlock(ctx, blkID)
-	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request",
-			zap.String("reason", "block couldn't be loaded"),
-			zap.Stringer("blkID", blkID),
-			zap.Error(err),
-		)
-		return nil
-	}
-	t.Ctx.Log.Verbo("gossiping accepted block to the network",
-		zap.Stringer("blkID", blkID),
-	)
-	t.Sender.SendGossip(ctx, blk.Bytes())
 	return nil
 }
 
@@ -873,6 +923,7 @@ func (t *Transitive) sendQuery(
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
 			zap.Stringer("blkID", blkID),
+			zap.Int("size", t.Params.K),
 		)
 		return
 	}
