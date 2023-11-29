@@ -105,9 +105,6 @@ func TestShutdown(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -246,9 +243,6 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	bootstrapFinished := make(chan struct{}, 1)
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -407,9 +401,6 @@ func TestRouterTimeout(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -886,9 +877,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -1182,9 +1170,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -1634,9 +1619,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},

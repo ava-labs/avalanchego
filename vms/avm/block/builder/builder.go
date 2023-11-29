@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 
@@ -82,7 +82,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		nextTimestamp = preferredTimestamp
 	}
 
-	stateDiff, err := states.NewDiff(preferredID, b.manager)
+	stateDiff, err := state.NewDiff(preferredID, b.manager)
 	if err != nil {
 		return nil, err
 	}
@@ -168,15 +168,15 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 }
 
 type stateGetter struct {
-	state states.Chain
+	state state.Chain
 }
 
-func (s stateGetter) GetState(ids.ID) (states.Chain, bool) {
+func (s stateGetter) GetState(ids.ID) (state.Chain, bool) {
 	return s.state, true
 }
 
-func wrapState(parentState states.Chain) (states.Diff, error) {
-	return states.NewDiff(ids.Empty, stateGetter{
+func wrapState(parentState state.Chain) (state.Diff, error) {
+	return state.NewDiff(ids.Empty, stateGetter{
 		state: parentState,
 	})
 }
