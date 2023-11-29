@@ -542,6 +542,9 @@ func (s *state) GetSubnets() ([]*txs.Tx, error) {
 
 func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	s.addedPermissionedSubnets = append(s.addedPermissionedSubnets, createSubnetTx)
+	if s.permissionedSubnetCache != nil {
+		s.permissionedSubnetCache = append(s.permissionedSubnetCache, createSubnetTx)
+	}
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
