@@ -9,7 +9,7 @@ import (
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -26,7 +26,7 @@ var (
 
 type SemanticVerifier struct {
 	*Backend
-	State states.ReadOnlyChain
+	State state.ReadOnlyChain
 	Tx    *txs.Tx
 }
 
