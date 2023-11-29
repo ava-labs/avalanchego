@@ -517,6 +517,17 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 		Key:   merkleChainTimeKey,
 		Value: encodedChainTime,
 	})
+	batchOps = append(batchOps, database.BatchOp{
+		Key:   merkleLastAcceptedBlkIDKey,
+		Value: nil, // TODO write this block's ID
+	})
+	for subnetID, supply := range d.currentSupply {
+		key := merkleSuppliesKey(subnetID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: database.PackUInt64(supply),
+		})
+	}
 
 	// writePermissionedSubnets
 	for _, subnet := range d.addedSubnets {
