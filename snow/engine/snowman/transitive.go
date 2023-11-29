@@ -163,7 +163,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 			zap.Stringer("validators", t.Validators),
 		)
 
-		vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, 1)
+		vdrIDs, err := t.Validators.UniformSample(t.Ctx.SubnetID, 1)
 		if err != nil {
 			t.Ctx.Log.Error("skipping block gossip",
 				zap.String("reason", "no validators"),
