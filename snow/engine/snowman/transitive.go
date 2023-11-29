@@ -155,7 +155,7 @@ func newTransitive(config Config) (*Transitive, error) {
 			Peers:                          config.Peers,
 			AncestorsMaxContainersSent:     config.AncestorsMaxContainersSent,
 			AncestorsMaxContainersReceived: config.AncestorsMaxContainersReceived,
-			SharedRequestID:                &t.RequestID,
+			SharedRequestID:                &t.requestID,
 		},
 	)
 

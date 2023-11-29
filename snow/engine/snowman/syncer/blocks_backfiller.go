@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -43,17 +44,18 @@ type BlockBackfillerConfig struct {
 type BlockBackfiller struct {
 	BlockBackfillerConfig
 
-	fetchFrom           set.Set[ids.NodeID] // picked from bootstrapper
-	outstandingRequests common.Requests     // tracks which validators were asked for which block in which requests
-	interrupted         bool                // flag to allow backfilling restart after recovering from validators disconnections
+	fetchFrom           set.Set[ids.NodeID]                  // picked from bootstrapper
+	outstandingRequests *bimap.BiMap[common.Request, ids.ID] // tracks which validators were asked for which block in which requests
+	interrupted         bool                                 // flag to allow backfilling restart after recovering from validators disconnections
 }
 
 func NewBlockBackfiller(cfg BlockBackfillerConfig) *BlockBackfiller {
 	return &BlockBackfiller{
 		BlockBackfillerConfig: cfg,
 
-		fetchFrom:   set.Of[ids.NodeID](cfg.Validators.GetValidatorIDs(cfg.Ctx.SubnetID)...),
-		interrupted: len(cfg.Peers.PreferredPeers()) > 0,
+		fetchFrom:           set.Of[ids.NodeID](cfg.Validators.GetValidatorIDs(cfg.Ctx.SubnetID)...),
+		outstandingRequests: bimap.New[common.Request, ids.ID](),
+		interrupted:         len(cfg.Peers.PreferredPeers()) > 0,
 	}
 }
 
@@ -80,7 +82,10 @@ func (bb *BlockBackfiller) Start(ctx context.Context) error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := bb.outstandingRequests.Remove(nodeID, requestID)
+	wantedBlkID, ok := bb.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok { // this message isn't in response to a request we made
 		bb.Ctx.Log.Debug("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -144,7 +149,10 @@ func (bb *BlockBackfiller) Ancestors(ctx context.Context, nodeID ids.NodeID, req
 }
 
 func (bb *BlockBackfiller) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	blkID, ok := bb.outstandingRequests.Remove(nodeID, requestID)
+	blkID, ok := bb.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok {
 		bb.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
@@ -170,7 +178,14 @@ func (bb *BlockBackfiller) fetch(ctx context.Context, blkID ids.ID) error {
 	// We only allow one outbound request at a time from a node
 	bb.markUnavailable(validatorID)
 	*bb.SharedRequestID++
-	bb.outstandingRequests.Add(validatorID, *bb.SharedRequestID, blkID)
+	bb.outstandingRequests.Put(
+		common.Request{
+			NodeID:    validatorID,
+			RequestID: *bb.SharedRequestID,
+		},
+		blkID,
+	)
+
 	bb.Sender.SendGetAncestors(ctx, validatorID, *bb.SharedRequestID, blkID)
 	return nil
 }
