@@ -4,13 +4,13 @@
 use super::{Data, Encoded, Node};
 use crate::{
     merkle::{PartialPath, TRIE_HASH_LEN},
-    shale::ShaleStore,
     shale::{DiskAddress, Storable},
+    shale::{ShaleError, ShaleStore},
 };
 use bincode::{Error, Options};
 use std::{
     fmt::{Debug, Error as FmtError, Formatter},
-    io::{Cursor, Write},
+    io::{Cursor, Read, Write},
     mem::size_of,
     ops::Deref,
 };
@@ -232,13 +232,98 @@ impl Storable for BranchNode {
     }
 
     fn deserialize<T: crate::shale::CachedStore>(
-        _addr: usize,
-        _mem: &T,
-    ) -> Result<Self, crate::shale::ShaleError>
-    where
-        Self: Sized,
-    {
-        todo!()
+        mut addr: usize,
+        mem: &T,
+    ) -> Result<Self, crate::shale::ShaleError> {
+        const DATA_LEN_SIZE: usize = size_of::<DataLen>();
+        const BRANCH_HEADER_SIZE: u64 =
+            BranchNode::MAX_CHILDREN as u64 * DiskAddress::MSIZE + DATA_LEN_SIZE as u64;
+
+        let node_raw =
+            mem.get_view(addr, BRANCH_HEADER_SIZE)
+                .ok_or(ShaleError::InvalidCacheView {
+                    offset: addr,
+                    size: BRANCH_HEADER_SIZE,
+                })?;
+
+        addr += BRANCH_HEADER_SIZE as usize;
+
+        let mut cursor = Cursor::new(node_raw.as_deref());
+        let mut children = [None; BranchNode::MAX_CHILDREN];
+        let mut buf = [0u8; DiskAddress::MSIZE as usize];
+
+        for child in &mut children {
+            cursor.read_exact(&mut buf)?;
+            *child = Some(usize::from_le_bytes(buf))
+                .filter(|addr| *addr != 0)
+                .map(DiskAddress::from);
+        }
+
+        let raw_len = {
+            let mut buf = [0; DATA_LEN_SIZE];
+            cursor.read_exact(&mut buf)?;
+            Some(DataLen::from_le_bytes(buf))
+                .filter(|len| *len != DataLen::MAX)
+                .map(|len| len as u64)
+        };
+
+        let value = match raw_len {
+            Some(len) => {
+                let data = mem
+                    .get_view(addr, len)
+                    .ok_or(ShaleError::InvalidCacheView {
+                        offset: addr,
+                        size: len,
+                    })?;
+
+                addr += len as usize;
+
+                Some(Data(data.as_deref()))
+            }
+            None => None,
+        };
+
+        let mut children_encoded: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
+
+        for child in &mut children_encoded {
+            const ENCODED_CHILD_LEN_SIZE: u64 = size_of::<EncodedChildLen>() as u64;
+
+            let len = mem
+                .get_view(addr, ENCODED_CHILD_LEN_SIZE)
+                .ok_or(ShaleError::InvalidCacheView {
+                    offset: addr,
+                    size: ENCODED_CHILD_LEN_SIZE,
+                })?
+                .as_deref()[0] as u64;
+
+            addr += ENCODED_CHILD_LEN_SIZE as usize;
+
+            if len == 0 {
+                continue;
+            }
+
+            let encoded = mem
+                .get_view(addr, len)
+                .ok_or(ShaleError::InvalidCacheView {
+                    offset: addr,
+                    size: len,
+                })?
+                .as_deref();
+
+            addr += len as usize;
+
+            *child = Some(encoded);
+        }
+
+        let node = BranchNode {
+            // TODO: add path
+            // path: Vec::new().into(),
+            children,
+            value,
+            children_encoded,
+        };
+
+        Ok(node)
     }
 }
 

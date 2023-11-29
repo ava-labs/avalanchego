@@ -340,12 +340,16 @@ use type_id::NodeTypeId;
 
 impl Storable for Node {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+        let mut offset = addr;
+
         let meta_raw =
-            mem.get_view(addr, Meta::SIZE as u64)
+            mem.get_view(offset, Meta::SIZE as u64)
                 .ok_or(ShaleError::InvalidCacheView {
-                    offset: addr,
+                    offset,
                     size: Meta::SIZE as u64,
                 })?;
+
+        offset += Meta::SIZE;
 
         let attrs = NodeAttributes::from_bits_retain(meta_raw.as_deref()[TRIE_HASH_LEN]);
 
@@ -368,96 +372,7 @@ impl Storable for Node {
 
         match meta_raw.as_deref()[TRIE_HASH_LEN + 1].try_into()? {
             NodeTypeId::Branch => {
-                // TODO: add path
-                // TODO: figure out what this size is?
-                let branch_header_size = BranchNode::MAX_CHILDREN as u64 * 8 + 4;
-                let node_raw = mem.get_view(addr + Meta::SIZE, branch_header_size).ok_or(
-                    ShaleError::InvalidCacheView {
-                        offset: addr + Meta::SIZE,
-                        size: branch_header_size,
-                    },
-                )?;
-
-                let mut cur = Cursor::new(node_raw.as_deref());
-                let mut chd = [None; BranchNode::MAX_CHILDREN];
-                let mut buff = [0; 8];
-
-                for chd in chd.iter_mut() {
-                    cur.read_exact(&mut buff)?;
-                    let addr = usize::from_le_bytes(buff);
-                    if addr != 0 {
-                        *chd = Some(DiskAddress::from(addr))
-                    }
-                }
-
-                cur.read_exact(&mut buff[..4])?;
-
-                let raw_len = u32::from_le_bytes(buff[..4].try_into().expect("invalid slice"));
-
-                let value = if raw_len == u32::MAX {
-                    None
-                } else {
-                    let raw_len = raw_len as u64;
-
-                    Some(Data(
-                        mem.get_view(addr + Meta::SIZE + branch_header_size as usize, raw_len)
-                            .ok_or(ShaleError::InvalidCacheView {
-                                offset: addr + Meta::SIZE + branch_header_size as usize,
-                                size: raw_len,
-                            })?
-                            .as_deref(),
-                    ))
-                };
-
-                let mut chd_encoded: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] =
-                    Default::default();
-
-                let offset = if raw_len == u32::MAX {
-                    addr + Meta::SIZE + branch_header_size as usize
-                } else {
-                    addr + Meta::SIZE + branch_header_size as usize + raw_len as usize
-                };
-
-                let mut cur_encoded_len = 0;
-
-                for chd_encoded in chd_encoded.iter_mut() {
-                    let mut buff = [0_u8; 1];
-                    let len_raw = mem.get_view(offset + cur_encoded_len, 1).ok_or(
-                        ShaleError::InvalidCacheView {
-                            offset: offset + cur_encoded_len,
-                            size: 1,
-                        },
-                    )?;
-
-                    cur = Cursor::new(len_raw.as_deref());
-                    cur.read_exact(&mut buff)?;
-
-                    let len = buff[0] as u64;
-                    cur_encoded_len += 1;
-
-                    if len != 0 {
-                        let encoded_raw = mem.get_view(offset + cur_encoded_len, len).ok_or(
-                            ShaleError::InvalidCacheView {
-                                offset: offset + cur_encoded_len,
-                                size: len,
-                            },
-                        )?;
-
-                        let encoded: Vec<u8> = encoded_raw.as_deref()[0..].to_vec();
-                        *chd_encoded = Some(encoded);
-                        cur_encoded_len += len as usize
-                    }
-                }
-
-                let inner = NodeType::Branch(
-                    BranchNode {
-                        // path: vec![].into(),
-                        children: chd,
-                        value,
-                        children_encoded: chd_encoded,
-                    }
-                    .into(),
-                );
+                let inner = NodeType::Branch(Box::new(BranchNode::deserialize(offset, mem)?));
 
                 Ok(Self::new_from_hash(
                     root_hash,
