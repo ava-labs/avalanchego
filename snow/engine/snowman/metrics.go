@@ -10,6 +10,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const (
+	pullGossipSource = "pull_gossip"
+	pushGossipSource = "push_gossip"
+	putGossipSource  = "put_gossip"
+	builtSource      = "built"
+	unknownSource    = "unknown"
+)
+
 type metrics struct {
 	bootstrapFinished                     prometheus.Gauge
 	numRequests                           prometheus.Gauge
@@ -28,6 +36,7 @@ type metrics struct {
 	getAncestorsBlks                      metric.Averager
 	selectedVoteIndex                     metric.Averager
 	issuerStake                           metric.Averager
+	issued                                *prometheus.CounterVec
 }
 
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
@@ -123,6 +132,18 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg,
 		&errs,
 	)
+	m.issued = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "blks_issued",
+		Help:      "number of blocks that have been issued into consensus by discovery mechanism",
+	}, []string{"source"})
+
+	// Register the labels
+	m.issued.WithLabelValues(pullGossipSource)
+	m.issued.WithLabelValues(pushGossipSource)
+	m.issued.WithLabelValues(putGossipSource)
+	m.issued.WithLabelValues(builtSource)
+	m.issued.WithLabelValues(unknownSource)
 
 	errs.Add(
 		reg.Register(m.bootstrapFinished),
@@ -139,6 +160,7 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.numProcessingAncestorFetchesDropped),
 		reg.Register(m.numProcessingAncestorFetchesSucceeded),
 		reg.Register(m.numProcessingAncestorFetchesUnneeded),
+		reg.Register(m.issued),
 	)
 	return errs.Err
 }
