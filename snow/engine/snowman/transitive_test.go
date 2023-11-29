@@ -414,9 +414,10 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk0,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	blk1 := &snowman.TestBlock{
@@ -529,17 +530,19 @@ func TestEngineBlockedIssue(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk1,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	blk0.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk0,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	require.Equal(blk1.ID(), te.Consensus.Preference())
@@ -575,9 +578,10 @@ func TestEngineAbandonResponse(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 	require.NoError(te.QueryFailed(context.Background(), vdr, 1))
 
@@ -819,9 +823,10 @@ func TestVoteCanceling(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		true,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	require.Equal(1, te.polls.Len())
@@ -885,9 +890,10 @@ func TestEngineNoQuery(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 }
 
@@ -993,9 +999,10 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	fakeBlkID := ids.GenerateTestID()
@@ -1053,9 +1060,10 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		true,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	fakeBlkID := ids.GenerateTestID()
@@ -1141,9 +1149,10 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		parentBlk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	sender.CantSendChits = false
@@ -1157,9 +1166,10 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	missingBlk.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		missingBlk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	require.Empty(te.blocked)
@@ -1215,9 +1225,10 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blockingBlk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	queryRequestID := new(uint32)
@@ -1231,9 +1242,10 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		issuedBlk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	sender.SendPushQueryF = nil
@@ -1247,9 +1259,10 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	missingBlk.StatusV = choices.Processing
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		missingBlk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 }
 
@@ -1348,16 +1361,18 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	}
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		validBlk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 	sender.SendPushQueryF = nil
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		invalidBlk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 	require.NoError(te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlkID))
 
@@ -1743,9 +1758,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		false,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -2867,9 +2883,10 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	require.NoError(te.issue(
 		context.Background(),
+		te.Ctx.NodeID,
 		blk,
 		true,
-		te.metrics.providerSource.WithLabelValues(unknownSource),
+		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
