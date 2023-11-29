@@ -274,8 +274,7 @@ type state struct {
 	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
-	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
-	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
+	addedBlockIDs map[uint64]ids.ID // map of height -> blockID
 	blockIDDB     database.Database
 
 	// Txs section
@@ -459,15 +458,6 @@ func newState(
 		return nil, err
 	}
 
-	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
-		metricsReg,
-		&cache.LRU[uint64, ids.ID]{Size: execCfg.BlockIDCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	return &state{
 		validators: validators,
 		ctx:        ctx,
@@ -504,7 +494,6 @@ func newState(
 		blockDB:     blockDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
-		blockIDCache:  blockIDCache,
 		blockIDDB:     blockIDsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
@@ -1415,7 +1404,6 @@ func (s *state) writeBlocks() error {
 		)
 
 		delete(s.addedBlockIDs, blkHeight)
-		s.blockIDCache.Put(blkHeight, blkID)
 		if err := database.PutID(s.blockIDDB, database.PackUInt64(blkHeight), blkID); err != nil {
 			return fmt.Errorf("failed to write block height index: %w", err)
 		}
@@ -1471,26 +1459,17 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
-	if blkID, cached := s.blockIDCache.Get(height); cached {
-		if blkID == ids.Empty {
-			return ids.Empty, database.ErrNotFound
-		}
-
-		return blkID, nil
-	}
 
 	heightKey := database.PackUInt64(height)
 
 	blkID, err := database.GetID(s.blockIDDB, heightKey)
 	if err == database.ErrNotFound {
-		s.blockIDCache.Put(height, ids.Empty)
 		return ids.Empty, database.ErrNotFound
 	}
 	if err != nil {
 		return ids.Empty, err
 	}
 
-	s.blockIDCache.Put(height, blkID)
 	return blkID, nil
 }
 
