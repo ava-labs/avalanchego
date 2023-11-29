@@ -89,7 +89,11 @@ func New(
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
-	defer b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
+	b.Mempool.DisableAdding()
+	defer func() {
+		b.Mempool.EnableAdding()
+		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
+	}()
 
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
