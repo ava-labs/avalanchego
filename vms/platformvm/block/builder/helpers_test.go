@@ -135,7 +135,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.fx = defaultFx(t, res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(t, res.config.Validators, res.ctx, res.baseDB, rewardsCalc)
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
@@ -169,7 +169,7 @@ func newEnvironment(t *testing.T) *environment {
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -193,7 +193,6 @@ func newEnvironment(t *testing.T) *environment {
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
-		nil, // toEngine,
 	)
 
 	res.blkManager.SetPreference(genesisID)
@@ -237,7 +236,7 @@ func addSubnet(t *testing.T, env *environment) {
 
 func defaultState(
 	t *testing.T,
-	cfg *config.Config,
+	validators validators.Manager,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
@@ -250,7 +249,7 @@ func defaultState(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
-		cfg,
+		validators,
 		execCfg,
 		ctx,
 		metrics.Noop,

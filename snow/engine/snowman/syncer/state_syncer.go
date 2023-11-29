@@ -24,7 +24,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// MaxOutstandingBroadcastRequests is the maximum number of requests to have
+// maxOutstandingBroadcastRequests is the maximum number of requests to have
 // outstanding when broadcasting.
 const maxOutstandingBroadcastRequests = 50
 
@@ -620,10 +620,6 @@ func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
 		"vm":        vmIntf,
 	}
 	return intf, vmErr
-}
-
-func (ss *stateSyncer) GetVM() common.VM {
-	return ss.VM
 }
 
 func (ss *stateSyncer) IsEnabled(ctx context.Context) (bool, error) {
