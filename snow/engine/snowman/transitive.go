@@ -173,6 +173,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		if err != nil {
 			t.Ctx.Log.Error("skipping block gossip",
 				zap.String("reason", "no validators"),
+				zap.Error(err),
 			)
 			return nil
 		}
