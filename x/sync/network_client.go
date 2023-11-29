@@ -152,7 +152,6 @@ func (c *networkClient) AppRequestFailed(
 	_ context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	_ error,
 ) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
