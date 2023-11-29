@@ -65,7 +65,7 @@ type NetworkClient interface {
 
 	// Always returns nil because the engine considers errors
 	// returned from this function as fatal.
-	AppRequestFailed(context.Context, ids.NodeID, uint32, error) error
+	AppRequestFailed(context.Context, ids.NodeID, uint32) error
 
 	// Adds the given [nodeID] to the peer
 	// list so that it can receive messages.
