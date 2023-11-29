@@ -58,10 +58,10 @@ type fullVM struct {
 }
 
 func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
-	// we consider more than common.MaxOutstandingBroadcastRequests peers
-	// so to test the effect of cap on number of requests sent out
+	// We consider more than maxOutstandingBroadcastRequests peers to test
+	// capping the number of requests sent out.
 	vdrs := validators.NewManager()
-	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
+	for idx := 0; idx < 2*maxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
 		require.NoError(t, vdrs.AddStaker(subnetID, beaconID, nil, ids.Empty, 1))
 	}
