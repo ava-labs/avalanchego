@@ -18,7 +18,7 @@ type issuer struct {
 	t            *Transitive
 	nodeID       ids.NodeID // nodeID of the peer that provided this block
 	blk          snowman.Block
-	sourceMetric prometheus.Counter
+	issuedMetric prometheus.Counter
 	abandoned    bool
 	deps         set.Set[ids.ID]
 	push         bool
@@ -55,5 +55,5 @@ func (i *issuer) Update(ctx context.Context) {
 		return
 	}
 	// Issue the block into consensus
-	i.t.errs.Add(i.t.deliver(ctx, i.nodeID, i.blk, i.push, i.sourceMetric))
+	i.t.errs.Add(i.t.deliver(ctx, i.nodeID, i.blk, i.push, i.issuedMetric))
 }
