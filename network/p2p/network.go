@@ -5,6 +5,7 @@ package p2p
 
 import (
 	"context"
+	"encoding/binary"
 	"sync"
 	"time"
 
@@ -116,15 +117,23 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	return nil
 }
 
+// NewAppProtocol reserves an identifier for an application protocol handler and
+// returns a Client that can be used to send messages for the corresponding
+// protocol.
 func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...ClientOption) (*Client, error) {
-	client, err := n.router.newAppProtocol(handlerID, handler)
-	if err != nil {
+	if err := n.router.addHandler(handlerID, handler); err != nil {
 		return nil, err
 	}
 
-	client.options = &clientOptions{
-		nodeSampler: &peerSampler{
-			peers: n.Peers,
+	client := &Client{
+		handlerID:     handlerID,
+		handlerPrefix: binary.AppendUvarint(nil, handlerID),
+		sender:        n.sender,
+		router:        n.router,
+		options: &clientOptions{
+			nodeSampler: &peerSampler{
+				peers: n.Peers,
+			},
 		},
 	}
 

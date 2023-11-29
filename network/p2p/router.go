@@ -91,15 +91,12 @@ func newRouter(
 	}
 }
 
-// newAppProtocol reserves an identifier for an application protocol and
-// returns a Client that can be used to send messages for the corresponding
-// protocol.
-func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, error) {
+func (r *router) addHandler(handlerID uint64, handler Handler) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
 	if _, ok := r.handlers[handlerID]; ok {
-		return nil, fmt.Errorf("failed to register handler id %d: %w", handlerID, ErrExistingAppProtocol)
+		return fmt.Errorf("failed to register handler id %d: %w", handlerID, ErrExistingAppProtocol)
 	}
 
 	appRequestTime, err := metric.NewAverager(
@@ -109,7 +106,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app request metric for handler_%d: %w", handlerID, err)
+		return fmt.Errorf("failed to register app request metric for handler_%d: %w", handlerID, err)
 	}
 
 	appRequestFailedTime, err := metric.NewAverager(
@@ -119,7 +116,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app request failed metric for handler_%d: %w", handlerID, err)
+		return fmt.Errorf("failed to register app request failed metric for handler_%d: %w", handlerID, err)
 	}
 
 	appResponseTime, err := metric.NewAverager(
@@ -129,7 +126,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app response metric for handler_%d: %w", handlerID, err)
+		return fmt.Errorf("failed to register app response metric for handler_%d: %w", handlerID, err)
 	}
 
 	appGossipTime, err := metric.NewAverager(
@@ -139,7 +136,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register app gossip metric for handler_%d: %w", handlerID, err)
+		return fmt.Errorf("failed to register app gossip metric for handler_%d: %w", handlerID, err)
 	}
 
 	crossChainAppRequestTime, err := metric.NewAverager(
@@ -149,7 +146,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app request metric for handler_%d: %w", handlerID, err)
+		return fmt.Errorf("failed to register cross-chain app request metric for handler_%d: %w", handlerID, err)
 	}
 
 	crossChainAppRequestFailedTime, err := metric.NewAverager(
@@ -159,7 +156,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app request failed metric for handler_%d: %w", handlerID, err)
+		return fmt.Errorf("failed to register cross-chain app request failed metric for handler_%d: %w", handlerID, err)
 	}
 
 	crossChainAppResponseTime, err := metric.NewAverager(
@@ -169,7 +166,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		r.metrics,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register cross-chain app response metric for handler_%d: %w", handlerID, err)
+		return fmt.Errorf("failed to register cross-chain app response metric for handler_%d: %w", handlerID, err)
 	}
 
 	r.handlers[handlerID] = &meteredHandler{
@@ -190,12 +187,7 @@ func (r *router) newAppProtocol(handlerID uint64, handler Handler) (*Client, err
 		},
 	}
 
-	return &Client{
-		handlerID:     handlerID,
-		handlerPrefix: binary.AppendUvarint(nil, handlerID),
-		sender:        r.sender,
-		router:        r,
-	}, nil
+	return nil
 }
 
 // AppRequest routes an AppRequest to a Handler based on the handler prefix. The
