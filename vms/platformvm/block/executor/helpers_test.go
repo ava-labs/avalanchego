@@ -57,8 +57,6 @@ const (
 )
 
 var (
-	_ mempool.BlockTimer = (*environment)(nil)
-
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
@@ -102,10 +100,6 @@ type environment struct {
 	utxosHandler   utxo.Handler
 	txBuilder      p_tx_builder.Builder
 	backend        *executor.Backend
-}
-
-func (*environment) ResetBlockTimer() {
-	// dummy call, do nothing for now
 }
 
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
@@ -172,7 +166,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
