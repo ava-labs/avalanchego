@@ -248,6 +248,7 @@ func buildBlock(
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 	)
+
 	for {
 		tx := builder.Mempool.Peek(remainingSize)
 		if tx == nil {
@@ -293,7 +294,9 @@ func buildBlock(
 		blockTxs = append(blockTxs, tx)
 	}
 
+	// If there is no reason to build a block, don't.
 	if len(blockTxs) == 0 && !forceAdvanceTime {
+		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
 
