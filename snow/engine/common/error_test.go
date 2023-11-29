@@ -21,12 +21,10 @@ func TestAppErrorEqual(t *testing.T) {
 		{
 			name: "is - equal",
 			err1: &AppError{
-				Code:    1,
-				Message: "foo",
+				Code: 1,
 			},
 			err2: &AppError{
-				Code:    1,
-				Message: "foo",
+				Code: 1,
 			},
 			expected: true,
 		},
