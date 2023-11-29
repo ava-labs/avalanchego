@@ -257,8 +257,7 @@ type state struct {
 
 	// Subnets section
 	// Subnet ID --> Owner of the subnet
-	subnetOwners     map[ids.ID]fx.Owner
-	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwners map[ids.ID]fx.Owner
 
 	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
 	permissionedSubnetCache  []*txs.Tx                     // nil if the subnets haven't been loaded
@@ -330,11 +329,6 @@ type txBytesAndStatus struct {
 type txAndStatus struct {
 	tx     *txs.Tx
 	status status.Status
-}
-
-type fxOwnerAndSize struct {
-	owner fx.Owner
-	size  int
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -448,30 +442,10 @@ func newState(
 		return nil, err
 	}
 
-	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
-		"subnet_owner_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
-			return ids.IDLen + f.size
-		}),
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	supplyCache, err := metercacher.New[ids.ID, *uint64](
-		"supply_cache",
-		metricsReg,
-		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -525,8 +499,7 @@ func newState(
 
 		modifiedSupplies: make(map[ids.ID]uint64),
 
-		subnetOwners:     make(map[ids.ID]fx.Owner),
-		subnetOwnerCache: subnetOwnerCache,
+		subnetOwners: make(map[ids.ID]fx.Owner),
 
 		addedPermissionedSubnets: make([]*txs.Tx, 0),
 		permissionedSubnetCache:  nil, // created first time GetSubnets is called
@@ -676,13 +649,6 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return owner, nil
 	}
 
-	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
-		if ownerAndSize.owner == nil {
-			return nil, database.ErrNotFound
-		}
-		return ownerAndSize.owner, nil
-	}
-
 	subnetIDKey := merkleSubnetOwnersKey(subnetID)
 	ownerBytes, err := s.merkleDB.Get(subnetIDKey)
 	if err == nil {
@@ -690,10 +656,6 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
 			return nil, err
 		}
-		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
-			owner: owner,
-			size:  len(ownerBytes),
-		})
 		return owner, nil
 	}
 	if err != database.ErrNotFound {
@@ -702,9 +664,6 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
-		if err == database.ErrNotFound {
-			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
-		}
 		return nil, err
 	}
 
@@ -1982,11 +1941,6 @@ func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
-
-		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
-			owner: owner,
-			size:  len(ownerBytes),
-		})
 
 		key := merkleSubnetOwnersKey(subnetID)
 		*batchOps = append(*batchOps, database.BatchOp{
