@@ -42,8 +42,7 @@ func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common
 
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
-	err := engCfg.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp)
-	require.NoError(err)
+	require.NoError(engCfg.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp))
 
 	vals.RegisterCallbackListener(engCfg.Ctx.SubnetID, engCfg.ConnectedValidators)
 
