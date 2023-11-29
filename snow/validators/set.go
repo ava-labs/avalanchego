@@ -263,22 +263,6 @@ func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 	return list, nil
 }
 
-func (s *vdrSet) uniformSample(size int) ([]ids.NodeID, error) {
-	uniform := sampler.NewUniform()
-	uniform.Initialize(uint64(len(s.vdrSlice)))
-
-	indices, err := uniform.Sample(size)
-	if err != nil {
-		return nil, err
-	}
-
-	list := make([]ids.NodeID, size)
-	for i, index := range indices {
-		list[i] = s.vdrSlice[index].NodeID
-	}
-	return list, nil
-}
-
 func (s *vdrSet) TotalWeight() (uint64, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
