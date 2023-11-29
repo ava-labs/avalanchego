@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +28,7 @@ func TestTrieViewWithRootPrefix(t *testing.T) {
 	tvs := []TrieView{db}
 
 	prefixes := [][]byte{[]byte("prefix1"), []byte("prefix2")}
-	prefixRoots := []ids.ID{}
+	// prefixRoots := []ids.ID{}
 
 	numKeys := 1000
 	keys := make([][]byte, numKeys)
@@ -59,7 +59,7 @@ func TestTrieViewWithRootPrefix(t *testing.T) {
 		fmt.Printf("root: %v, hashCount: %d\n", root, hashCount)
 
 		tvs = append(tvs, tv)
-		prefixRoots = append(prefixRoots, root)
+		// prefixRoots = append(prefixRoots, root)
 	}
 
 	parent := tvs[len(tvs)-1]
@@ -77,8 +77,7 @@ func TestTrieViewWithRootPrefix(t *testing.T) {
 	tvs = append(tvs, tv)
 
 	for _, tv := range tvs {
-		err := tv.CommitToDB(ctx)
-		require.NoError(err)
+		require.NoError(tv.CommitToDB(ctx))
 	}
 	{
 		root, err := db.GetMerkleRoot(ctx)
