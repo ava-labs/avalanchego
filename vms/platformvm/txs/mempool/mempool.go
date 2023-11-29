@@ -45,6 +45,11 @@ var (
 )
 
 type Mempool interface {
+	// we may want to be able to stop valid transactions
+	// from entering the mempool, e.g. during blocks creation
+	EnableAdding()
+	DisableAdding()
+
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
@@ -76,6 +81,9 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
+	// If true, drop transactions added to the mempool via Add.
+	dropIncoming bool
+
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
@@ -116,6 +124,8 @@ func New(
 
 	bytesAvailableMetric.Set(maxMempoolSize)
 	return &mempool{
+		dropIncoming: false, // enable tx adding by default
+
 		bytesAvailableMetric: bytesAvailableMetric,
 		bytesAvailable:       maxMempoolSize,
 
@@ -128,7 +138,19 @@ func New(
 	}, nil
 }
 
+func (m *mempool) EnableAdding() {
+	m.dropIncoming = false
+}
+
+func (m *mempool) DisableAdding() {
+	m.dropIncoming = true
+}
+
 func (m *mempool) Add(tx *txs.Tx) error {
+	if m.dropIncoming {
+		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
+	}
+
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return errCantIssueAdvanceTimeTx
