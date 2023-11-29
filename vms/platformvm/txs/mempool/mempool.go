@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -43,13 +44,6 @@ var (
 	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
-type BlockTimer interface {
-	// ResetBlockTimer schedules a timer to notify the consensus engine once
-	// there is a block ready to be built. If a block is ready to be built when
-	// this function is called, the engine will be notified directly.
-	ResetBlockTimer()
-}
-
 type Mempool interface {
 	// we may want to be able to stop valid transactions
 	// from entering the mempool, e.g. during blocks creation
@@ -74,6 +68,13 @@ type Mempool interface {
 	//
 	// TODO: Remove once [StartTime] field is ignored in staker txs
 	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
+
+	// RequestBuildBlock notifies the consensus engine that a block should be
+	// built. If [emptyBlockPermitted] is true, the notification will be sent
+	// regardless of whether there are no transactions in the mempool. If not,
+	// a notification will only be sent if there is at least one transaction in
+	// the mempool.
+	RequestBuildBlock(emptyBlockPermitted bool)
 
 	// Note: dropped txs are added to droppedTxIDs but are not evicted from
 	// unissued decision/staker txs. This allows previously dropped txs to be
@@ -100,13 +101,13 @@ type mempool struct {
 
 	consumedUTXOs set.Set[ids.ID]
 
-	blkTimer BlockTimer
+	toEngine chan<- common.Message
 }
 
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	blkTimer BlockTimer,
+	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -137,7 +138,7 @@ func New(
 		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
 		dropIncoming:  false, // enable tx adding by default
-		blkTimer:      blkTimer,
+		toEngine:      toEngine,
 	}, nil
 }
 
@@ -202,7 +203,6 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	// An explicitly added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
 
-	m.blkTimer.ResetBlockTimer()
 	return nil
 }
 
@@ -257,6 +257,17 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
+}
+
+func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
+	if !emptyBlockPermitted && !m.HasTxs() {
+		return
+	}
+
+	select {
+	case m.toEngine <- common.PendingTxs:
+	default:
+	}
 }
 
 // Drops all [txs.Staker] transactions whose [StartTime] is before
