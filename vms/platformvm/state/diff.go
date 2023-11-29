@@ -87,7 +87,7 @@ func (d *diff) NewView() (merkledb.TrieView, error) {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	ops, err := d.GetMerkleChanges()
+	ops, err := d.getMerkleChanges()
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +502,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 	}
 }
 
-func (d *diff) GetMerkleChanges() ([]database.BatchOp, error) {
+func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 	batchOps := []database.BatchOp{}
 
 	// writeMetadata
