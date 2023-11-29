@@ -239,8 +239,8 @@ type state struct {
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
-	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64 // (nodeID, subnetID) --> delegatee amount
-	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]   // tracks (nodeID, subnetID) pairs updated after last commit
+	// Node ID --> Subnet ID --> Delegatee Reward on that subnet for that node ID.
+	modifiedDelegateeReward map[ids.NodeID]map[ids.ID]uint64
 
 	// UTXOs section
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of UTXO ID -> *UTXO
@@ -401,8 +401,7 @@ func newState(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		delegateeRewardCache:    make(map[ids.NodeID]map[ids.ID]uint64),
-		modifiedDelegateeReward: make(map[ids.NodeID]set.Set[ids.ID]),
+		modifiedDelegateeReward: make(map[ids.NodeID]map[ids.ID]uint64),
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 
@@ -1377,11 +1376,10 @@ func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[
 }
 
 func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
-	nodeDelegateeRewards, exists := s.delegateeRewardCache[vdrID]
-	if exists {
-		delegateeReward, exists := nodeDelegateeRewards[subnetID]
-		if exists {
-			return delegateeReward, nil
+	// check if we have a modified value
+	if updatedDelegateeRewards, ok := s.modifiedDelegateeReward[vdrID]; ok {
+		if amount, ok := updatedDelegateeRewards[subnetID]; ok {
+			return amount, nil
 		}
 	}
 
@@ -1391,33 +1389,16 @@ func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, e
 	if err != nil {
 		return 0, err
 	}
-	delegateeReward, err := database.ParseUInt64(amountBytes)
-	if err != nil {
-		return 0, err
-	}
-
-	if _, found := s.delegateeRewardCache[vdrID]; !found {
-		s.delegateeRewardCache[vdrID] = make(map[ids.ID]uint64)
-	}
-	s.delegateeRewardCache[vdrID][subnetID] = delegateeReward
-	return delegateeReward, nil
+	return database.ParseUInt64(amountBytes)
 }
 
 func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uint64) error {
-	nodeDelegateeRewards, exists := s.delegateeRewardCache[vdrID]
-	if !exists {
-		nodeDelegateeRewards = make(map[ids.ID]uint64)
-		s.delegateeRewardCache[vdrID] = nodeDelegateeRewards
-	}
-	nodeDelegateeRewards[subnetID] = amount
-
-	// track diff
 	updatedDelegateeRewards, ok := s.modifiedDelegateeReward[vdrID]
 	if !ok {
-		updatedDelegateeRewards = set.Set[ids.ID]{}
+		updatedDelegateeRewards = make(map[ids.ID]uint64)
 		s.modifiedDelegateeReward[vdrID] = updatedDelegateeRewards
 	}
-	updatedDelegateeRewards.Add(subnetID)
+	updatedDelegateeRewards[subnetID] = amount
 	return nil
 }
 
@@ -1637,15 +1618,12 @@ func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[
 }
 
 func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for nodeID, nodeDelegateeRewards := range s.modifiedDelegateeReward {
-		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
-		for _, subnetID := range nodeDelegateeRewardsList {
-			delegateeReward := s.delegateeRewardCache[nodeID][subnetID]
-
+	for nodeID, subnetIDToAmount := range s.modifiedDelegateeReward {
+		for subnetID, amount := range subnetIDToAmount {
 			key := merkleDelegateeRewardsKey(nodeID, subnetID)
 			*batchOps = append(*batchOps, database.BatchOp{
 				Key:   key,
-				Value: database.PackUInt64(delegateeReward),
+				Value: database.PackUInt64(amount),
 			})
 		}
 		delete(s.modifiedDelegateeReward, nodeID)
