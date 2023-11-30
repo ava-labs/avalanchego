@@ -23,8 +23,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
-	"go.uber.org/mock/gomock"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/coreth/core"
@@ -61,12 +59,11 @@ func TestEthTxGossip(t *testing.T) {
 	<-txPoolNewHeads
 
 	// sender for the peer requesting gossip from [vm]
-	ctrl := gomock.NewController(t)
-	peerSender := common.NewMockSender(ctrl)
-	router := p2p.NewRouter(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
+	peerSender := &common.SenderTest{}
+	router := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
 
 	// we're only making client requests, so we don't need a server handler
-	client, err := router.RegisterAppProtocol(ethTxGossipProtocol, nil, nil)
+	client, err := router.NewAppProtocol(ethTxGossipProtocol, nil)
 	require.NoError(err)
 
 	emptyBloomFilter, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
@@ -84,11 +81,12 @@ func TestEthTxGossip(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	requestingNodeID := ids.GenerateTestNodeID()
-	peerSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) {
+	peerSender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 		go func() {
 			require.NoError(vm.AppRequest(ctx, requestingNodeID, requestID, time.Time{}, appRequestBytes))
 		}()
-	}).AnyTimes()
+		return nil
+	}
 
 	sender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 		go func() {
@@ -98,6 +96,7 @@ func TestEthTxGossip(t *testing.T) {
 	}
 
 	// we only accept gossip requests from validators
+	require.NoError(vm.Network.Connected(context.Background(), requestingNodeID, nil))
 	mockValidatorSet, ok := vm.ctx.ValidatorState.(*validators.TestState)
 	require.True(ok)
 	mockValidatorSet.GetCurrentHeightF = func(context.Context) (uint64, error) {
@@ -167,12 +166,11 @@ func TestAtomicTxGossip(t *testing.T) {
 	}()
 
 	// sender for the peer requesting gossip from [vm]
-	ctrl := gomock.NewController(t)
-	peerSender := common.NewMockSender(ctrl)
-	router := p2p.NewRouter(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
+	peerSender := &common.SenderTest{}
+	network := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
 
 	// we're only making client requests, so we don't need a server handler
-	client, err := router.RegisterAppProtocol(atomicTxGossipProtocol, nil, nil)
+	client, err := network.NewAppProtocol(atomicTxGossipProtocol, nil)
 	require.NoError(err)
 
 	emptyBloomFilter, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
@@ -188,20 +186,22 @@ func TestAtomicTxGossip(t *testing.T) {
 
 	requestingNodeID := ids.GenerateTestNodeID()
 	wg := &sync.WaitGroup{}
-	peerSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) {
+	peerSender.SendAppRequestF = func(ctx context.Context, _ set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 		go func() {
 			require.NoError(vm.AppRequest(ctx, requestingNodeID, requestID, time.Time{}, appRequestBytes))
 		}()
-	}).AnyTimes()
+		return nil
+	}
 
 	sender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 		go func() {
-			require.NoError(router.AppResponse(ctx, nodeID, requestID, appResponseBytes))
+			require.NoError(network.AppResponse(ctx, nodeID, requestID, appResponseBytes))
 		}()
 		return nil
 	}
 
 	// we only accept gossip requests from validators
+	require.NoError(vm.Network.Connected(context.Background(), requestingNodeID, nil))
 	mockValidatorSet, ok := vm.ctx.ValidatorState.(*validators.TestState)
 	require.True(ok)
 	mockValidatorSet.GetCurrentHeightF = func(context.Context) (uint64, error) {
