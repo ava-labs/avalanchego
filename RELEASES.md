@@ -62,6 +62,8 @@ The plugin version is unchanged at `30` and is compatible with versions `v1.10.1
 - Remove method `CappedList` from `set.Set` by @danlaine in https://github.com/ava-labs/avalanchego/pull/2395
 - Periodically PullGossip only from connected validators by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2399
 - Update bootstrap IPs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2396
+- Rename `testnet` fixture to `tmpnet` by @marun in https://github.com/ava-labs/avalanchego/pull/2307
+- Add `p2p.Network` component by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2283
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.16...v1.10.17
 
