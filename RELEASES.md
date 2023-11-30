@@ -28,7 +28,7 @@ The plugin version is unchanged at `30` and is compatible with versions `v1.10.1
   - `--consensus-accepted-frontier-gossip-validator-size`
   - `--consensus-accepted-frontier-gossip-non-validator-size`
   - `--consensus-accepted-frontier-gossip-peer-size`
-    - Updated the default value to 1 to align with the default change in gossip frequency
+    - Updated the default value to 1 to align with the change in default gossip frequency
   - `--consensus-on-accept-gossip-validator-size`
   - `--consensus-on-accept-gossip-non-validator-size`
   - `--consensus-on-accept-gossip-peer-size`
