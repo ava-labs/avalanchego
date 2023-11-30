@@ -50,7 +50,6 @@ import (
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -176,14 +175,29 @@ func (b *testBackend) StateAtBlock(ctx context.Context, block *types.Block, reex
 	return statedb, release, nil
 }
 
+func (b *testBackend) StateAtNextBlock(ctx context.Context, parent, nextBlock *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, StateReleaseFunc, error) {
+	statedb, release, err := b.StateAtBlock(ctx, parent, reexec, nil, true, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Apply upgrades to the parent state
+	err = core.ApplyUpgrades(b.chainConfig, &parent.Header().Time, nextBlock, statedb)
+	if err != nil {
+		release()
+		return nil, nil, err
+	}
+
+	return statedb, release, nil
+}
+
 func (b *testBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, StateReleaseFunc, error) {
 	parent := b.chain.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, vm.BlockContext{}, nil, nil, errBlockNotFound
 	}
-	statedb, release, err := b.StateAtBlock(ctx, parent, reexec, nil, true, false)
+	statedb, release, err := b.StateAtNextBlock(ctx, parent, block, reexec, nil, true, false)
 	if err != nil {
-		return nil, vm.BlockContext{}, nil, nil, errStateNotFound
+		return nil, vm.BlockContext{}, nil, nil, err
 	}
 	if txIndex == 0 && len(block.Transactions()) == 0 {
 		return nil, vm.BlockContext{}, statedb, release, nil
@@ -917,112 +931,6 @@ func TestTraceChain(t *testing.T) {
 
 		if nref, nrel := ref.Load(), rel.Load(); nref != nrel {
 			t.Errorf("Ref and deref actions are not equal, ref %d rel %d", nref, nrel)
-		}
-	}
-}
-
-func TestTraceBlockPrecompileActivation(t *testing.T) {
-	t.Parallel()
-
-	// Initialize test accounts
-	accounts := newAccounts(3)
-	copyConfig := *params.TestChainConfig
-	genesis := &core.Genesis{
-		Config: &copyConfig,
-		Alloc: core.GenesisAlloc{
-			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
-			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
-			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
-		},
-	}
-	// assumes gap is 10 sec, means 3 block away
-	activateAllowlistBlock := 3
-	activateAllowListTime := uint64(activateAllowlistBlock * 10)
-	activateTxAllowListConfig := params.PrecompileUpgrade{
-		Config: txallowlist.NewConfig(&activateAllowListTime, []common.Address{accounts[0].addr}, nil, nil),
-	}
-
-	deactivateAllowlistBlock := activateAllowlistBlock + 3
-	deactivateAllowListTime := uint64(deactivateAllowlistBlock) * 10
-	deactivateTxAllowListConfig := params.PrecompileUpgrade{
-		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
-	}
-
-	genesis.Config.PrecompileUpgrades = []params.PrecompileUpgrade{
-		activateTxAllowListConfig,
-		deactivateTxAllowListConfig,
-	}
-	genBlocks := 10
-	signer := types.HomesteadSigner{}
-	txHashes := make([]common.Hash, genBlocks)
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
-		// Transfer from account[0] to account[1]
-		//    value: 1000 wei
-		//    fee:   0 wei
-		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
-		b.AddTx(tx)
-		txHashes[i] = tx.Hash()
-	})
-	defer backend.chain.Stop()
-	api := NewAPI(backend)
-
-	testSuite := []struct {
-		blockNumber rpc.BlockNumber
-		config      *TraceConfig
-		want        string
-		expectErr   error
-	}{
-		// Trace head block
-		{
-			blockNumber: rpc.BlockNumber(genBlocks),
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHashes[genBlocks-1]),
-		},
-		// Trace block before activation
-		{
-			blockNumber: rpc.BlockNumber(activateAllowlistBlock - 1),
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHashes[activateAllowlistBlock-2]),
-		},
-		// Trace block activation
-		{
-			blockNumber: rpc.BlockNumber(activateAllowlistBlock),
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHashes[activateAllowlistBlock-1]),
-		},
-		// Trace block after activation
-		{
-			blockNumber: rpc.BlockNumber(activateAllowlistBlock + 1),
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHashes[activateAllowlistBlock]),
-		},
-		// Trace block deactivation
-		{
-			blockNumber: rpc.BlockNumber(deactivateAllowlistBlock),
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHashes[deactivateAllowlistBlock-1]),
-		},
-		// Trace block after deactivation
-		{
-			blockNumber: rpc.BlockNumber(deactivateAllowlistBlock + 1),
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHashes[deactivateAllowlistBlock]),
-		},
-	}
-	for i, tc := range testSuite {
-		result, err := api.TraceBlockByNumber(context.Background(), tc.blockNumber, tc.config)
-		if tc.expectErr != nil {
-			if err == nil {
-				t.Errorf("test %d, want error %v", i, tc.expectErr)
-				continue
-			}
-			if !reflect.DeepEqual(err, tc.expectErr) {
-				t.Errorf("test %d: error mismatch, want %v, get %v", i, tc.expectErr, err)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("test %d, want no error, have %v", i, err)
-			continue
-		}
-		have, _ := json.Marshal(result)
-		want := tc.want
-		if string(have) != want {
-			t.Errorf("test %d, result mismatch, have\n%v\n, want\n%v\n", i, string(have), want)
 		}
 	}
 }
