@@ -29,7 +29,11 @@ import (
 func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
-	_, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -54,7 +58,7 @@ func TestCoreVMNotRemote(t *testing.T) {
 
 func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -200,7 +204,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{})
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -558,7 +562,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -679,7 +683,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{})
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()

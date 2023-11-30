@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -33,8 +34,11 @@ import (
 func TestInvalidByzantineProposerParent(t *testing.T) {
 	require := require.New(t)
 
-	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -103,7 +107,11 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -211,8 +219,11 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	require := require.New(t)
 
-	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -300,7 +311,11 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -399,7 +414,11 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -586,7 +605,11 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 func TestGetBlock_MutatedSignature(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()

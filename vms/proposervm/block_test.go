@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -93,7 +94,11 @@ func TestValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -226,7 +231,11 @@ func TestNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = mockable.MaxTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
