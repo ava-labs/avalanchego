@@ -203,37 +203,15 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	delay := newTimestamp.Sub(parentTimestamp)
-	if delay < proposer.MaxBuildDelay {
-		parentHeight := p.innerBlk.Height()
-		proposerID := p.vm.ctx.NodeID
-		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
-		if err != nil {
-			p.vm.ctx.Log.Error("unexpected build block failure",
-				zap.String("reason", "failed to calculate required timestamp delay"),
-				zap.Stringer("parentID", parentID),
-				zap.Error(err),
-			)
-			return nil, err
-		}
-
-		if delay < minDelay {
-			// It's not our turn to propose a block yet. This is likely caused
-			// by having previously notified the consensus engine to attempt to
-			// build a block on top of a block that is no longer the preferred
-			// block.
-			p.vm.ctx.Log.Debug("build block dropped",
-				zap.Time("parentTimestamp", parentTimestamp),
-				zap.Duration("minDelay", minDelay),
-				zap.Time("blockTimestamp", newTimestamp),
-			)
-
-			// In case the inner VM only issued one pendingTxs message, we
-			// should attempt to re-handle that once it is our turn to build the
-			// block.
-			p.vm.notifyInnerBlockReady()
-			return nil, errProposerWindowNotStarted
-		}
+	buildUnsignedBlock, err := p.shouldBuildBlock(
+		ctx,
+		parentID,
+		parentTimestamp,
+		parentPChainHeight,
+		newTimestamp,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	var innerBlock snowman.Block
@@ -250,7 +228,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if delay >= proposer.MaxVerifyDelay {
+	if buildUnsignedBlock {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
@@ -381,4 +359,48 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	}
 
 	return nil
+}
+
+func (p *postForkCommonComponents) shouldBuildBlock(
+	ctx context.Context,
+	parentID ids.ID,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	newTimestamp time.Time,
+) (bool, error) {
+	delay := newTimestamp.Sub(parentTimestamp)
+	if delay >= proposer.MaxBuildDelay {
+		return true, nil
+	}
+
+	parentHeight := p.innerBlk.Height()
+	proposerID := p.vm.ctx.NodeID
+	minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
+	if err != nil {
+		p.vm.ctx.Log.Error("unexpected build block failure",
+			zap.String("reason", "failed to calculate required timestamp delay"),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return false, err
+	}
+
+	if delay < minDelay {
+		// It's not our turn to propose a block yet. This is likely caused
+		// by having previously notified the consensus engine to attempt to
+		// build a block on top of a block that is no longer the preferred
+		// block.
+		p.vm.ctx.Log.Debug("build block dropped",
+			zap.Time("parentTimestamp", parentTimestamp),
+			zap.Duration("minDelay", minDelay),
+			zap.Time("blockTimestamp", newTimestamp),
+		)
+
+		// In case the inner VM only issued one pendingTxs message, we
+		// should attempt to re-handle that once it is our turn to build the
+		// block.
+		p.vm.notifyInnerBlockReady()
+		return false, errProposerWindowNotStarted
+	}
+	return delay >= proposer.MaxVerifyDelay, nil
 }
