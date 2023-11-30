@@ -1025,6 +1025,7 @@ func initTestRemoteProposerVM(
 	proVM := New(
 		Config{
 			ActivationTime:      proBlkStartTime,
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,

@@ -23,3 +23,7 @@ type Config struct {
 	// block certificate
 	StakingCertLeaf *staking.Certificate
 }
+
+func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.DurangoTime)
+}

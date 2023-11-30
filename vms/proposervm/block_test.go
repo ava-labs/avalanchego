@@ -62,6 +62,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require.NoError(err)
 	vm := &VM{
 		Config: Config{
+			DurangoTime:       mockable.MaxTime,
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 		},

@@ -35,6 +35,7 @@ var (
 	errPChainHeightNotReached   = errors.New("block P-chain height larger than current P-chain height")
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
+	errUnexpectedProposer       = errors.New("unexpected proposer for current window")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
 )
@@ -124,13 +125,39 @@ func (p *postForkCommonComponents) Verify(
 	// If the node is currently syncing - we don't assume that the P-chain has
 	// been synced up to this point yet.
 	if p.vm.consensusState == snow.NormalOp {
-		delay, minDelay, err := p.verifyBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
+		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
+			p.vm.ctx.Log.Error("block verification failed",
+				zap.String("reason", "failed to get current P-Chain height"),
+				zap.Stringer("blkID", child.ID()),
+				zap.Error(err),
+			)
 			return err
+		}
+		if childPChainHeight > currentPChainHeight {
+			return fmt.Errorf("%w: %d > %d",
+				errPChainHeightNotReached,
+				childPChainHeight,
+				currentPChainHeight,
+			)
+		}
+
+		shouldHaveProposer := true // post Durango this is always the case
+		if p.vm.IsDurangoActivated(parentTimestamp) {
+			err := p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
+			if err != nil {
+				return err
+			}
+		} else {
+			delay, err := p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
+			if err != nil {
+				return err
+			}
+
+			shouldHaveProposer = delay < proposer.MaxVerifyDelay
 		}
 
 		// Verify the signature of the node
-		shouldHaveProposer := delay < proposer.MaxVerifyDelay
 		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
 			return err
 		}
@@ -138,7 +165,6 @@ func (p *postForkCommonComponents) Verify(
 		p.vm.ctx.Log.Debug("verified post-fork block",
 			zap.Stringer("blkID", child.ID()),
 			zap.Time("parentTimestamp", parentTimestamp),
-			zap.Duration("minDelay", minDelay),
 			zap.Time("blockTimestamp", childTimestamp),
 		)
 	}
@@ -310,45 +336,49 @@ func verifyIsNotOracleBlock(ctx context.Context, b snowman.Block) error {
 	}
 }
 
-func (p *postForkCommonComponents) verifyBlockDelay(
+func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 	ctx context.Context,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
 	blk *postForkBlock,
-) (time.Duration, time.Duration, error) {
+) (time.Duration, error) {
 	var (
-		blkID           = blk.ID()
-		blkPChainHeight = blk.PChainHeight()
-		blkTimestamp    = blk.Timestamp()
+		blkTimestamp = blk.Timestamp()
+		childHeight  = blk.Height()
+		proposerID   = blk.Proposer()
 	)
-	currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
-	if err != nil {
-		p.vm.ctx.Log.Error("block verification failed",
-			zap.String("reason", "failed to get current P-Chain height"),
-			zap.Stringer("blkID", blkID),
-			zap.Error(err),
-		)
-		return 0, 0, err
-	}
-	if blkPChainHeight > currentPChainHeight {
-		return 0, 0, fmt.Errorf("%w: %d > %d",
-			errPChainHeightNotReached,
-			blkPChainHeight,
-			currentPChainHeight,
-		)
-	}
-
-	childHeight := blk.Height()
-	proposerID := blk.Proposer()
 	minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 
 	delay := blkTimestamp.Sub(parentTimestamp)
 	if delay < minDelay {
-		return 0, 0, errProposerWindowNotStarted
+		return 0, errProposerWindowNotStarted
 	}
 
-	return delay, minDelay, nil
+	return delay, nil
+}
+
+func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
+	ctx context.Context,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	blk *postForkBlock,
+) error {
+	var (
+		blkTimestamp = blk.Timestamp()
+		blkHeight    = blk.Height()
+		proposerID   = blk.Proposer()
+	)
+
+	expectedProposerID, err := p.vm.Windower.ExpectedProposer(ctx, blkHeight, parentPChainHeight, blkTimestamp, parentTimestamp)
+	if err != nil {
+		return err
+	}
+	if expectedProposerID != proposerID {
+		return errUnexpectedProposer
+	}
+
+	return nil
 }

@@ -686,6 +686,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	proVM = New(
 		Config{
 			ActivationTime:      time.Time{},
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
