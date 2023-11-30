@@ -151,6 +151,7 @@ func (n *node) clone() *node {
 		result.children[key] = &child{
 			compressedKey: existing.compressedKey,
 			id:            existing.id,
+			rlp:           existing.rlp,
 			hasValue:      existing.hasValue,
 		}
 	}
