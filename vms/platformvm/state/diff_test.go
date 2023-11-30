@@ -274,7 +274,7 @@ func TestDiffSubnet(t *testing.T) {
 	diff, err := NewDiff(lastAcceptedID, states)
 	require.NoError(err)
 
-	// Add a subnet to the diff
+	// Put a subnet
 	createSubnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
 			Owner: fx.NewMockOwner(ctrl),
