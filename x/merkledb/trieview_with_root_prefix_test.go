@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ func TestTrieViewWithRootPrefix(t *testing.T) {
 	tvs := []TrieView{db}
 
 	prefixes := [][]byte{[]byte("prefix1"), []byte("prefix2")}
-	// prefixRoots := []ids.ID{}
+	prefixAltRoots := []ids.ID{}
 
 	numKeys := 1000
 	keys := make([][]byte, numKeys)
@@ -55,11 +56,18 @@ func TestTrieViewWithRootPrefix(t *testing.T) {
 		require.NoError(err)
 		root, err := tv.GetMerkleRoot(ctx)
 		require.NoError(err)
+		altRoot, err := tv.GetAltMerkleRoot(ctx)
+		require.NoError(err)
 		hashCount := db.metrics.(*mockMetrics).hashCount
-		fmt.Printf("root: %v, hashCount: %d\n", root, hashCount)
+		fmt.Printf("root: %v, altRoot: %v, hashCount: %d\n", root, altRoot, hashCount)
 
 		tvs = append(tvs, tv)
-		// prefixRoots = append(prefixRoots, root)
+		prefixAltRoots = append(prefixAltRoots, altRoot)
+	}
+
+	// Ensure that the alt roots are the same
+	for i := 1; i < len(prefixes); i++ {
+		require.Equal(prefixAltRoots[i], prefixAltRoots[i-1])
 	}
 
 	parent := tvs[len(tvs)-1]
