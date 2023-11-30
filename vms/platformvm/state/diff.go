@@ -47,10 +47,8 @@ type diff struct {
 	subnetOwners map[ids.ID]fx.Owner
 	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
-	cachedSubnets      []*txs.Tx
 
-	addedChains  map[ids.ID][]*txs.Tx
-	cachedChains map[ids.ID][]*txs.Tx
+	addedChains map[ids.ID][]*txs.Tx
 
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO
 
@@ -261,9 +259,6 @@ func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
 
 func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	d.addedSubnets = append(d.addedSubnets, createSubnetTx)
-	if d.cachedSubnets != nil {
-		d.cachedSubnets = append(d.cachedSubnets, createSubnetTx)
-	}
 }
 
 func (d *diff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
@@ -318,12 +313,6 @@ func (d *diff) AddChain(createChainTx *txs.Tx) {
 	} else {
 		d.addedChains[tx.SubnetID] = append(d.addedChains[tx.SubnetID], createChainTx)
 	}
-
-	cachedChains, cached := d.cachedChains[tx.SubnetID]
-	if !cached {
-		return
-	}
-	d.cachedChains[tx.SubnetID] = append(cachedChains, createChainTx)
 }
 
 func (d *diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {

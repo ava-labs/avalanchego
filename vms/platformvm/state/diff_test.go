@@ -246,6 +246,103 @@ func TestDiffPendingDelegator(t *testing.T) {
 	require.False(gotPendingDelegatorIter.Next())
 }
 
+func TestDiffSubnetCreation(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state, _ := newInitializedState(require)
+
+	// Initialize parent with one subnet
+	parentStateCreateSubnetTx := &txs.Tx{
+		Unsigned: &txs.CreateSubnetTx{
+			Owner: fx.NewMockOwner(ctrl),
+		},
+	}
+	state.AddSubnet(parentStateCreateSubnetTx)
+
+	// Verify parent returns one subnet
+	subnets, err := state.GetSubnets()
+	require.NoError(err)
+	require.Equal([]*txs.Tx{
+		parentStateCreateSubnetTx,
+	}, subnets)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	diff, err := NewDiff(lastAcceptedID, states)
+	require.NoError(err)
+
+	// Add a subnet to the diff
+	createSubnetTx := &txs.Tx{
+		Unsigned: &txs.CreateSubnetTx{
+			Owner: fx.NewMockOwner(ctrl),
+		},
+	}
+	diff.AddSubnet(createSubnetTx)
+
+	// Apply diff to parent state
+	require.NoError(diff.Apply(state))
+
+	// Verify parent now returns two subnets
+	subnets, err = state.GetSubnets()
+	require.NoError(err)
+	require.Equal([]*txs.Tx{
+		parentStateCreateSubnetTx,
+		createSubnetTx,
+	}, subnets)
+}
+
+func TestDiffChain(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state, _ := newInitializedState(require)
+	subnetID := ids.GenerateTestID()
+
+	// Initialize parent with one chain
+	parentStateCreateChainTx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID,
+		},
+	}
+	state.AddChain(parentStateCreateChainTx)
+
+	// Verify parent returns one chain
+	chains, err := state.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{
+		parentStateCreateChainTx,
+	}, chains)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	diff, err := NewDiff(lastAcceptedID, states)
+	require.NoError(err)
+
+	// Put a chain
+	createChainTx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID, // note this is the same subnet as [parentStateCreateChainTx]
+		},
+	}
+	diff.AddChain(createChainTx)
+
+	// Apply diff to parent state
+	require.NoError(diff.Apply(state))
+
+	// Verify parent now returns two chains
+	chains, err = state.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{
+		parentStateCreateChainTx,
+		createChainTx,
+	}, chains)
+}
+
 func TestDiffTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -294,6 +391,52 @@ func TestDiffTx(t *testing.T) {
 		require.Equal(status.Committed, gotStatus)
 		require.Equal(parentTx, gotParentTx)
 	}
+}
+
+func TestDiffRewardUTXO(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state, _ := newInitializedState(require)
+
+	txID := ids.GenerateTestID()
+
+	// Initialize parent with one reward UTXO
+	parentRewardUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID},
+	}
+	state.AddRewardUTXO(txID, parentRewardUTXO)
+
+	// Verify parent returns the reward UTXO
+	rewardUTXOs, err := state.GetRewardUTXOs(txID)
+	require.NoError(err)
+	require.Equal([]*avax.UTXO{
+		parentRewardUTXO,
+	}, rewardUTXOs)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	diff, err := NewDiff(lastAcceptedID, states)
+	require.NoError(err)
+
+	// Put a reward UTXO
+	rewardUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID},
+	}
+	diff.AddRewardUTXO(txID, rewardUTXO)
+
+	// Apply diff to parent state
+	require.NoError(diff.Apply(state))
+
+	// Verify parent now returns two reward UTXOs
+	rewardUTXOs, err = state.GetRewardUTXOs(txID)
+	require.NoError(err)
+	require.Equal([]*avax.UTXO{
+		parentRewardUTXO,
+		rewardUTXO,
+	}, rewardUTXOs)
 }
 
 func TestDiffUTXO(t *testing.T) {
