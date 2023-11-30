@@ -102,6 +102,9 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
+	// Returns a view that contains the merkleized portion of the state.
+	NewView() (merkledb.TrieView, error)
+
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
 
@@ -1196,15 +1199,15 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 }
 
 // Load pulls data previously stored on disk that is expected to be in memory.
-func (s *state) load(hasSynced bool) error {
-	return utils.Err(
+func (s *state) load() error {
+	err := utils.Err(
 		s.loadMerkleMetadata(),
 		s.loadCurrentStakers(),
 		s.loadPendingStakers(),
 		s.initValidatorSets(),
-
-		s.logMerkleRoot(!hasSynced), // we already logged if sync has happened
 	)
+	s.logMerkleRoot() // we already logged if sync has happened
+	return err
 }
 
 // Loads the chain time and last accepted block ID from disk
@@ -1421,7 +1424,7 @@ func (s *state) sync(genesis []byte) error {
 		}
 	}
 
-	return s.load(shouldInit)
+	return s.load()
 }
 
 // Creates a genesis from [genesisBytes] and initializes [ms] with it.
@@ -1799,7 +1802,11 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
 	return output, nil
 }
 
-func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
+func (s *state) NewView() (merkledb.TrieView, error) {
+	return s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{})
+}
+
+func (s *state) getMerkleChanges(currentData, pendingData map[ids.ID]*stakersData) ([]database.BatchOp, error) {
 	batchOps := make([]database.BatchOp, 0)
 	err := utils.Err(
 		s.writeMetadata(&batchOps),
@@ -1812,23 +1819,28 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 		s.writeDelegateeRewards(&batchOps),
 		s.writeUTXOs(&batchOps),
 	)
+
+	return batchOps, err
+}
+
+func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
+	changes, err := s.getMerkleChanges(currentData, pendingData)
 	if err != nil {
 		return err
 	}
 
-	if len(batchOps) == 0 {
-		// nothing to commit
-		return nil
+	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{
+		BatchOps: changes,
+	})
+	if err != nil {
+		return err
 	}
 
-	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{BatchOps: batchOps})
-	if err != nil {
-		return fmt.Errorf("failed creating merkleDB view: %w", err)
+	if err := view.CommitToDB(context.Background()); err != nil {
+		return err
 	}
-	if err := view.CommitToDB(context.TODO()); err != nil {
-		return fmt.Errorf("failed committing merkleDB view: %w", err)
-	}
-	return s.logMerkleRoot(len(batchOps) != 0)
+	s.logMerkleRoot()
+	return nil
 }
 
 func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[ids.ID]*stakersData) error {
@@ -2202,38 +2214,26 @@ func (s *state) updateValidatorSet(
 	return nil
 }
 
-func (s *state) logMerkleRoot(hasChanges bool) error {
+func (s *state) logMerkleRoot() {
 	// get current Height
 	blk, err := s.GetStatelessBlock(s.GetLastAccepted())
 	if err != nil {
 		// may happen in tests. Let's just skip
-		return nil
+		s.ctx.Log.Error("failed to get last accepted block", zap.Error(err))
+		return
 	}
 
-	if !hasChanges {
-		s.ctx.Log.Info("merkle root",
-			zap.Uint64("height", blk.Height()),
-			zap.Stringer("blkID", blk.ID()),
-			zap.String("merkle root", "no changes to merkle state"),
-		)
-		return nil
-	}
-
-	view, err := s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{})
+	rootID, err := s.merkleDB.GetMerkleRoot(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed creating merkleDB view: %w", err)
-	}
-	root, err := view.GetMerkleRoot(context.TODO())
-	if err != nil {
-		return fmt.Errorf("failed pulling merkle root: %w", err)
+		s.ctx.Log.Error("failed to get merkle root", zap.Error(err))
+		return
 	}
 
 	s.ctx.Log.Info("merkle root",
 		zap.Uint64("height", blk.Height()),
 		zap.Stringer("blkID", blk.ID()),
-		zap.String("merkle root", root.String()),
+		zap.Stringer("merkle root", rootID),
 	)
-	return nil
 }
 
 func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {

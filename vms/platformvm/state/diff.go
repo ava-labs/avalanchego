@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -11,10 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
+
+const initialTxSliceSize = 8
 
 var (
 	_ Diff = (*diff)(nil)
@@ -74,6 +79,27 @@ func NewDiff(
 		timestamp:     parentState.GetTimestamp(),
 		subnetOwners:  make(map[ids.ID]fx.Owner),
 	}, nil
+}
+
+func (d *diff) NewView() (merkledb.TrieView, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	ops, err := d.getMerkleChanges()
+	if err != nil {
+		return nil, err
+	}
+
+	parentView, err := parentState.NewView()
+	if err != nil {
+		return nil, err
+	}
+
+	return parentView.NewView(context.Background(), merkledb.ViewChanges{
+		BatchOps: ops,
+	})
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -477,6 +503,247 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 	} else {
 		d.modifiedUTXOs[utxoID] = nil
 	}
+}
+
+func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
+	batchOps := []database.BatchOp{}
+
+	// writeMetadata
+	encodedChainTime, err := d.timestamp.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encoding chainTime: %w", err)
+	}
+	batchOps = append(batchOps, database.BatchOp{
+		Key:   merkleChainTimeKey,
+		Value: encodedChainTime,
+	})
+	batchOps = append(batchOps, database.BatchOp{
+		Key:   merkleLastAcceptedBlkIDKey,
+		Value: nil, // TODO write this block's ID
+	})
+	for subnetID, supply := range d.currentSupply {
+		key := merkleSuppliesKey(subnetID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: database.PackUInt64(supply),
+		})
+	}
+
+	// writePermissionedSubnets
+	for _, subnet := range d.addedSubnets {
+		key := merklePermissionedSubnetKey(subnet.ID())
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: subnet.Bytes(),
+		})
+	}
+
+	// writeSubnetOwners
+	for subnetID, owner := range d.subnetOwners {
+		owner := owner
+
+		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal subnet owner: %w", err)
+		}
+
+		key := merkleSubnetOwnersKey(subnetID)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: ownerBytes,
+		})
+	}
+
+	// writeElasticSubnets
+	for _, tx := range d.transformedSubnets {
+		transformSubnetTx := tx.Unsigned.(*txs.TransformSubnetTx)
+		key := merkleElasticSubnetKey(transformSubnetTx.Subnet)
+		batchOps = append(batchOps, database.BatchOp{
+			Key:   key,
+			Value: transformSubnetTx.Bytes(),
+		})
+	}
+
+	// writeChains
+	for _, chains := range d.addedChains {
+		for _, chain := range chains {
+			createChainTx := chain.Unsigned.(*txs.CreateChainTx)
+			subnetID := createChainTx.SubnetID
+			key := merkleChainKey(subnetID, chain.ID())
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: chain.Bytes(),
+			})
+		}
+	}
+
+	type txIDAndReward struct {
+		txID   ids.ID
+		reward uint64
+	}
+
+	// writeCurrentStakers
+	for _, nodeIDToValidatorDiff := range d.currentStakerDiffs.validatorDiffs {
+		toDeleteTxIDs := make([]ids.ID, 0, initialTxSliceSize)
+		toAddTxIDAndRewards := make([]txIDAndReward, 0, initialTxSliceSize)
+
+		for _, validatorDiff := range nodeIDToValidatorDiff {
+			switch validatorDiff.validatorStatus {
+			case deleted:
+				toDeleteTxIDs = append(toDeleteTxIDs, validatorDiff.validator.TxID)
+			case added:
+				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
+					txID:   validatorDiff.validator.TxID,
+					reward: validatorDiff.validator.PotentialReward,
+				})
+			}
+
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
+					txID:   staker.TxID,
+					reward: staker.PotentialReward,
+				})
+			}
+
+			for _, staker := range validatorDiff.deletedDelegators {
+				toDeleteTxIDs = append(toDeleteTxIDs, staker.TxID)
+			}
+
+			for _, txIDAndReward := range toAddTxIDAndRewards {
+				tx, _, err := d.GetTx(txIDAndReward.txID)
+				if err != nil {
+					return nil, err
+				}
+
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+					TxBytes:         tx.Bytes(),
+					PotentialReward: txIDAndReward.reward,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				batchOps = append(batchOps, database.BatchOp{
+					Key:   merkleCurrentStakersKey(txIDAndReward.txID),
+					Value: stakersDataBytes,
+				})
+			}
+
+			for _, txID := range toDeleteTxIDs {
+				batchOps = append(batchOps, database.BatchOp{
+					Key:    merkleCurrentStakersKey(txID),
+					Delete: true,
+				})
+			}
+		}
+	}
+
+	// writePendingStakers
+	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
+		toDeleteTxIDs := make([]ids.ID, 0, initialTxSliceSize)
+		toAddTxIDAndRewards := make([]txIDAndReward, 0, initialTxSliceSize)
+
+		for _, validatorDiff := range subnetValidatorDiffs {
+			// validatorDiff.validator is not guaranteed to be non-nil here.
+			// Access it only if validatorDiff.validatorStatus is added or deleted
+			switch validatorDiff.validatorStatus {
+			case added:
+				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
+					txID:   validatorDiff.validator.TxID,
+					reward: 0,
+				})
+			case deleted:
+				toDeleteTxIDs = append(toDeleteTxIDs, validatorDiff.validator.TxID)
+			}
+
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
+					txID:   staker.TxID,
+					reward: 0,
+				})
+			}
+
+			for _, staker := range validatorDiff.deletedDelegators {
+				toDeleteTxIDs = append(toDeleteTxIDs, staker.TxID)
+			}
+
+			for _, txID := range toDeleteTxIDs {
+				batchOps = append(batchOps, database.BatchOp{
+					Key:    merklePendingStakersKey(txID),
+					Delete: true,
+				})
+			}
+
+			for _, txIDAndReward := range toAddTxIDAndRewards {
+				tx, _, err := d.GetTx(txIDAndReward.txID)
+				if err != nil {
+					return nil, err
+				}
+
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+					TxBytes:         tx.Bytes(),
+					PotentialReward: txIDAndReward.reward,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				batchOps = append(batchOps, database.BatchOp{
+					Key:   merklePendingStakersKey(txIDAndReward.txID),
+					Value: stakersDataBytes,
+				})
+			}
+		}
+	}
+
+	// writeDelegateeRewards
+	for subnetID, nodes := range d.modifiedDelegateeRewards {
+		for nodeID, amount := range nodes {
+			key := merkleDelegateeRewardsKey(nodeID, subnetID)
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: database.PackUInt64(amount),
+			})
+		}
+	}
+
+	// writeUTXOs
+	for utxoID, utxo := range d.modifiedUTXOs {
+		key := merkleUtxoIDKey(utxoID)
+
+		if utxo != nil {
+			// Inserting a UTXO
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			if err != nil {
+				return nil, err
+			}
+			batchOps = append(batchOps, database.BatchOp{
+				Key:   key,
+				Value: utxoBytes,
+			})
+			continue
+		}
+
+		// Deleting a UTXO
+		switch _, err := d.GetUTXO(utxoID); err {
+		case nil:
+			batchOps = append(batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
+		case database.ErrNotFound:
+		default:
+			return nil, err
+		}
+	}
+
+	return batchOps, nil
 }
 
 func (d *diff) Apply(baseState Chain) error {
