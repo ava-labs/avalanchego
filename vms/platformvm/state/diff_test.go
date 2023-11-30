@@ -246,7 +246,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	require.False(gotPendingDelegatorIter.Next())
 }
 
-func TestDiffSubnetCreation(t *testing.T) {
+func TestDiffSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
