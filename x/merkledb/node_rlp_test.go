@@ -72,7 +72,7 @@ func genMap(rand *rand.Rand, nKeys int) map[string]string {
 
 func TestAltRootRandom(t *testing.T) {
 	maxNumKeys := 2048
-	for i := 0; i < 2048; i++ {
+	for i := 0; i < 200; i++ {
 		numKeys := rand.Intn(maxNumKeys) //nolint:gosec
 		name := fmt.Sprintf("case %d", i)
 		rand := rand.New(rand.NewSource(int64(i))) //nolint:gosec

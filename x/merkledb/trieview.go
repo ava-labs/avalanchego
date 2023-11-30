@@ -297,6 +297,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.changes.rootID = t.calculateNodeIDsHelper(root)
+		t.db.calculateNodeIDsSema.Release(1)
 
 		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
 		if !isSentinelNodeTheRoot(root) {
@@ -337,7 +338,6 @@ func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
 			wg.Add(1)
 			go func() {
 				childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after)
-				childNodeChange.after.calculateRLP()
 				childEntry.rlp = childNodeChange.after.rlp
 				t.db.calculateNodeIDsSema.Release(1)
 				wg.Done()
@@ -345,13 +345,15 @@ func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after)
-			childNodeChange.after.calculateRLP()
 			childEntry.rlp = childNodeChange.after.rlp
 		}
 	}
 
 	// Wait until all descendants of [n] have been updated.
 	wg.Wait()
+
+	// Calculate the RLP of [n] at the same time as its ID.
+	n.calculateRLP()
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
 	return n.calculateID(t.db.metrics)

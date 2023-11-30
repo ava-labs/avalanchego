@@ -592,6 +592,9 @@ func (db *merkleDB) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
 		return ids.Empty, database.ErrClosed
 	}
 
+	if db.sentinelNode.rlp == nil {
+		db.sentinelNode.calculateRLP()
+	}
 	return rlpToAltID(db.sentinelNode.rlp), nil
 }
 
