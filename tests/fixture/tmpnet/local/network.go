@@ -726,7 +726,7 @@ func stakersForNodes(networkID uint32, nodes []*LocalNode) ([]genesis.UnparsedSt
 		return nil, fmt.Errorf("failed to format reward address: %w", err)
 	}
 
-	// Configure provided validator node IDs as initial stakers
+	// Configure provided nodes as initial stakers
 	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
 	for i, node := range nodes {
 		pop, err := node.GetProofOfPosession()
