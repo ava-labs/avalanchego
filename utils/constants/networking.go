@@ -73,7 +73,7 @@ const (
 	// Router
 	DefaultConsensusAppConcurrency                         = 2
 	DefaultConsensusShutdownTimeout                        = time.Minute
-	DefaultFrontierPollFrequency                           = 100 * time.Millisecond
+	DefaultFrontierPollFrequency                           = 24 * time.Hour
 	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
 	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
 	DefaultConsensusGossipAcceptedFrontierPeerSize         = 1
