@@ -1131,7 +1131,8 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.Contains(requestIDs, blkID1)
 
 	// Remove request, so we can restart bootstrapping via startSyncing
-	require.True(bs.OutstandingRequests.RemoveAny(blkID1))
+	_, removed := bs.outstandingRequests.DeleteValue(blkID1)
+	require.True(removed)
 	requestIDs = map[ids.ID]uint32{}
 
 	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID4}))
