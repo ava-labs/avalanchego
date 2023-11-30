@@ -23,6 +23,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
@@ -685,20 +686,14 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 		return nil, nil
 	}
 
-	// We select a random sample of validators to gossip to avoid starving out a
-	// validator from being gossiped for an extended period of time.
-	s := sampler.NewUniform()
-	s.Initialize(uint64(len(unknownValidators)))
+	var bootstrapperIDs set.Set[ids.NodeID]
+	for _, bootstrapper := range genesis.GetBootstrappers(n.config.NetworkID) {
+		bootstrapperIDs.Add(bootstrapper.ID)
+	}
 
 	// Calculate the unknown information we need to send to this peer.
 	validatorIPs := make([]ips.ClaimedIPPort, 0, int(n.config.PeerListNumValidatorIPs))
-	for i := 0; i < len(unknownValidators) && len(validatorIPs) < int(n.config.PeerListNumValidatorIPs); i++ {
-		drawn, err := s.Next()
-		if err != nil {
-			return nil, err
-		}
-
-		validator := unknownValidators[drawn]
+	tryAddValidator := func(validator peer.ValidatorID) {
 		n.peersLock.RLock()
 		_, isConnected := n.connectedPeers.GetByID(validator.NodeID)
 		peerIP := n.peerIPs[validator.NodeID]
@@ -708,7 +703,7 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 				"unable to find validator in connected peers",
 				zap.Stringer("nodeID", validator.NodeID),
 			)
-			continue
+			return
 		}
 
 		// Note: peerIP isn't used directly here because the TxID may be
@@ -722,6 +717,32 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 				TxID:      validator.TxID,
 			},
 		)
+	}
+	for _, validator := range unknownValidators {
+		if !bootstrapperIDs.Contains(validator.NodeID) {
+			continue
+		}
+
+		tryAddValidator(validator)
+	}
+
+	// We select a random sample of validators to gossip to avoid starving out a
+	// validator from being gossiped for an extended period of time.
+	s := sampler.NewUniform()
+	s.Initialize(uint64(len(unknownValidators)))
+
+	for i := 0; i < len(unknownValidators) && len(validatorIPs) < int(n.config.PeerListNumValidatorIPs); i++ {
+		drawn, err := s.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		validator := unknownValidators[drawn]
+		if bootstrapperIDs.Contains(validator.NodeID) {
+			continue
+		}
+
+		tryAddValidator(validator)
 	}
 
 	return validatorIPs, nil

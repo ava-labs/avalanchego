@@ -27,7 +27,7 @@ const (
 
 	MaxContainersLen = int(4 * DefaultMaxMessageSize / 5)
 
-	DefaultNetworkPeerListNumValidatorIPs        = 15
+	DefaultNetworkPeerListNumValidatorIPs        = 30
 	DefaultNetworkPeerListValidatorGossipSize    = 20
 	DefaultNetworkPeerListNonValidatorGossipSize = 0
 	DefaultNetworkPeerListPeersGossipSize        = 10
