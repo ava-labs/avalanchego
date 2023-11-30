@@ -118,27 +118,6 @@ func (s Set[T]) List() []T {
 	return maps.Keys(s)
 }
 
-// CappedList returns a list of length at most [size].
-// Size should be >= 0. If size < 0, returns nil.
-func (s Set[T]) CappedList(size int) []T {
-	if size < 0 {
-		return nil
-	}
-	if l := s.Len(); l < size {
-		size = l
-	}
-	i := 0
-	elts := make([]T, size)
-	for elt := range s {
-		if i >= size {
-			break
-		}
-		elts[i] = elt
-		i++
-	}
-	return elts
-}
-
 // Equals returns true if the sets contain the same elements
 func (s Set[T]) Equals(other Set[T]) bool {
 	return maps.Equal(s, other)
@@ -205,7 +184,7 @@ func (s Set[_]) MarshalJSON() ([]byte, error) {
 	return jsonBuf.Bytes(), errs.Err
 }
 
-// Returns an element. If the set is empty, returns false
+// Returns a random element. If the set is empty, returns false
 func (s *Set[T]) Peek() (T, bool) {
 	for elt := range *s {
 		return elt, true
