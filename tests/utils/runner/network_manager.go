@@ -25,11 +25,11 @@ import (
 // Note: currently assumes one blockchain per subnet
 type Subnet struct {
 	// SubnetID is the txID of the transaction that created the subnet
-	SubnetID ids.ID
+	SubnetID ids.ID `json:"subnetID"`
 	// Current ANR assumes one blockchain per subnet, so we have a single blockchainID here
-	BlockchainID ids.ID
+	BlockchainID ids.ID `json:"blockchainID"`
 	// ValidatorURIs is the base URIs for each participant of the Subnet
-	ValidatorURIs []string
+	ValidatorURIs []string `json:"validatorURIs"`
 }
 
 type ANRConfig struct {
@@ -37,6 +37,7 @@ type ANRConfig struct {
 	AvalancheGoExecPath string
 	PluginDir           string
 	GlobalNodeConfig    string
+	GlobalCChainConfig  string
 }
 
 // NetworkManager is a wrapper around the ANR to simplify the setup and teardown code
@@ -67,6 +68,10 @@ func NewDefaultANRConfig() ANRConfig {
 		GlobalNodeConfig: `{
 			"log-display-level":"info",
 			"proposervm-use-current-height":true
+		}`,
+		GlobalCChainConfig: `{
+			"warp-api-enabled": true,
+			"log-level": "debug"
 		}`,
 	}
 	// If AVALANCHEGO_BUILD_PATH is populated, override location set by GOPATH
@@ -203,11 +208,19 @@ func (n *NetworkManager) StartDefaultNetwork(ctx context.Context) (<-chan struct
 	log.Info("Sending 'start'", "AvalancheGoExecPath", n.ANRConfig.AvalancheGoExecPath)
 
 	// Start cluster
+	opts := []runner_sdk.OpOption{
+		runner_sdk.WithPluginDir(n.ANRConfig.PluginDir),
+		runner_sdk.WithGlobalNodeConfig(n.ANRConfig.GlobalNodeConfig),
+	}
+	if len(n.ANRConfig.GlobalCChainConfig) != 0 {
+		opts = append(opts, runner_sdk.WithChainConfigs(map[string]string{
+			"C": n.ANRConfig.GlobalCChainConfig,
+		}))
+	}
 	resp, err := n.anrClient.Start(
 		ctx,
 		n.ANRConfig.AvalancheGoExecPath,
-		runner_sdk.WithPluginDir(n.ANRConfig.PluginDir),
-		runner_sdk.WithGlobalNodeConfig(n.ANRConfig.GlobalNodeConfig),
+		opts...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start ANR network: %w", err)
@@ -328,6 +341,10 @@ func (n *NetworkManager) GetSubnet(subnetID ids.ID) (*Subnet, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (n *NetworkManager) GetAllURIs(ctx context.Context) ([]string, error) {
+	return n.anrClient.URIs(ctx)
 }
 
 func RegisterFiveNodeSubnetRun() func() *Subnet {

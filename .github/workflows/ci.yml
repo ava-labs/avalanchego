@@ -90,6 +90,9 @@ jobs:
       - name: Run E2E Tests
         shell: bash
         run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/data ./scripts/run_ginkgo.sh
+      - name: Run Warp E2E Tests
+        shell: bash
+        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/data ./scripts/run_ginkgo_warp.sh
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v3
