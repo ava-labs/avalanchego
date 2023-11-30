@@ -606,7 +606,6 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-
 	return t.changes.rootID, nil
 }
 
