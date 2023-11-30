@@ -149,6 +149,7 @@ func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 		ctx,
 		b.ID(),
 		b.Timestamp(),
+		b.Height(),
 		b.PChainHeight(),
 	)
 }

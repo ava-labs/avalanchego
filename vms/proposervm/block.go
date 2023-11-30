@@ -183,6 +183,7 @@ func (p *postForkCommonComponents) buildChild(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
+	parentHeight uint64,
 	parentPChainHeight uint64,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
@@ -203,13 +204,24 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	buildUnsignedBlock, err := p.shouldBuildBlock(
-		ctx,
-		parentID,
-		parentTimestamp,
-		parentPChainHeight,
-		newTimestamp,
-	)
+	buildUnsignedBlock := true
+	if p.vm.IsDurangoActivated(parentTimestamp) {
+		err = p.shouldPostDurangoBuildBlock(
+			ctx,
+			parentTimestamp,
+			parentHeight,
+			parentPChainHeight,
+			newTimestamp,
+		)
+	} else {
+		buildUnsignedBlock, err = p.shouldPreDurangoBuildBlock(
+			ctx,
+			parentID,
+			parentTimestamp,
+			parentPChainHeight,
+			newTimestamp,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +373,25 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	return nil
 }
 
-func (p *postForkCommonComponents) shouldBuildBlock(
+func (p *postForkCommonComponents) shouldPostDurangoBuildBlock(
+	ctx context.Context,
+	parentTimestamp time.Time,
+	parentHeight uint64,
+	parentPChainHeight uint64,
+	newTimestamp time.Time,
+) error {
+	expectedProposerID, err := p.vm.Windower.ExpectedProposer(ctx, parentHeight+1, parentPChainHeight, newTimestamp, parentTimestamp)
+	if err != nil {
+		return err
+	}
+	if expectedProposerID != p.vm.ctx.NodeID {
+		return errProposerWindowNotStarted
+	}
+
+	return nil
+}
+
+func (p *postForkCommonComponents) shouldPreDurangoBuildBlock(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,

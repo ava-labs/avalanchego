@@ -121,6 +121,7 @@ func (b *postForkOption) buildChild(ctx context.Context) (Block, error) {
 		ctx,
 		parentID,
 		b.Timestamp(),
+		b.Height(),
 		parentPChainHeight,
 	)
 }

@@ -40,10 +40,11 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	pChainHeight := uint64(1337)
 	parentID := ids.GenerateTestID()
 	parentTimestamp := time.Now()
+	parentHeight := uint64(1234)
 	blkID := ids.GenerateTestID()
 	innerBlk := snowman.NewMockBlock(ctrl)
 	innerBlk.EXPECT().ID().Return(blkID).AnyTimes()
-	innerBlk.EXPECT().Height().Return(pChainHeight - 1).AnyTimes()
+	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
 	builtBlk := snowman.NewMockBlock(ctrl)
 	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
 	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
@@ -85,6 +86,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		context.Background(),
 		parentID,
 		parentTimestamp,
+		parentHeight,
 		pChainHeight-1,
 	)
 	require.NoError(err)
