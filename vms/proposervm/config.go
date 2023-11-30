@@ -16,6 +16,10 @@ type Config struct {
 	MinimumPChainHeight uint64
 	MinBlkDelay         time.Duration
 	NumHistoricalBlocks uint64
-	StakingLeafSigner   crypto.Signer
-	StakingCertLeaf     *staking.Certificate
+
+	// block signer
+	StakingLeafSigner crypto.Signer
+
+	// block certificate
+	StakingCertLeaf *staking.Certificate
 }

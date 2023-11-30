@@ -124,34 +124,9 @@ func (p *postForkCommonComponents) Verify(
 	// If the node is currently syncing - we don't assume that the P-chain has
 	// been synced up to this point yet.
 	if p.vm.consensusState == snow.NormalOp {
-		childID := child.ID()
-		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
-		if err != nil {
-			p.vm.ctx.Log.Error("block verification failed",
-				zap.String("reason", "failed to get current P-Chain height"),
-				zap.Stringer("blkID", childID),
-				zap.Error(err),
-			)
-			return err
-		}
-		if childPChainHeight > currentPChainHeight {
-			return fmt.Errorf("%w: %d > %d",
-				errPChainHeightNotReached,
-				childPChainHeight,
-				currentPChainHeight,
-			)
-		}
-
-		childHeight := child.Height()
-		proposerID := child.Proposer()
-		minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
+		delay, minDelay, err := p.verifyBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		if err != nil {
 			return err
-		}
-
-		delay := childTimestamp.Sub(parentTimestamp)
-		if delay < minDelay {
-			return errProposerWindowNotStarted
 		}
 
 		// Verify the signature of the node
@@ -161,7 +136,7 @@ func (p *postForkCommonComponents) Verify(
 		}
 
 		p.vm.ctx.Log.Debug("verified post-fork block",
-			zap.Stringer("blkID", childID),
+			zap.Stringer("blkID", child.ID()),
 			zap.Time("parentTimestamp", parentTimestamp),
 			zap.Duration("minDelay", minDelay),
 			zap.Time("blockTimestamp", childTimestamp),
@@ -333,4 +308,47 @@ func verifyIsNotOracleBlock(ctx context.Context, b snowman.Block) error {
 	default:
 		return err
 	}
+}
+
+func (p *postForkCommonComponents) verifyBlockDelay(
+	ctx context.Context,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	blk *postForkBlock,
+) (time.Duration, time.Duration, error) {
+	var (
+		blkID           = blk.ID()
+		blkPChainHeight = blk.PChainHeight()
+		blkTimestamp    = blk.Timestamp()
+	)
+	currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
+	if err != nil {
+		p.vm.ctx.Log.Error("block verification failed",
+			zap.String("reason", "failed to get current P-Chain height"),
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
+		)
+		return 0, 0, err
+	}
+	if blkPChainHeight > currentPChainHeight {
+		return 0, 0, fmt.Errorf("%w: %d > %d",
+			errPChainHeightNotReached,
+			blkPChainHeight,
+			currentPChainHeight,
+		)
+	}
+
+	childHeight := blk.Height()
+	proposerID := blk.Proposer()
+	minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	delay := blkTimestamp.Sub(parentTimestamp)
+	if delay < minDelay {
+		return 0, 0, errProposerWindowNotStarted
+	}
+
+	return delay, minDelay, nil
 }
