@@ -4,7 +4,7 @@ This package implements a simple orchestrator for the avalanchego
 nodes of a local network. Configuration is stored on disk, and nodes
 run as independent processes whose process details are also written to
 disk. Using the filesystem to store configuration and process details
-allows for the `testnetctl` cli and e2e test fixture to orchestrate
+allows for the `tmpnetctl` cli and e2e test fixture to orchestrate
 the same local networks without the use of an rpc daemon.
 
 ## Package details
@@ -27,36 +27,36 @@ abstractions.
 
 ## Usage
 
-### Via testnetctl
+### Via tmpnetctl
 
-A local network can be managed by the `testnetctl` cli tool:
+A local network can be managed by the `tmpnetctl` cli tool:
 
 ```bash
 # From the root of the avalanchego repo
 
-# Build the testnetctl binary
-$ ./scripts/build_testnetctl.sh
+# Build the tmpnetctl binary
+$ ./scripts/build_tmpnetctl.sh
 
 # Start a new network
-$ ./build/testnetctl start-network --avalanchego-path=/path/to/avalanchego
+$ ./build/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
 ...
-Started network 1000 @ /home/me/.testnetctl/networks/1000
+Started network 1000 @ /home/me/.tmpnet/networks/1000
 
-Configure testnetctl to target this network by default with one of the following statements:
- - source /home/me/.testnetctl/networks/1000/network.env
- - export TESTNETCTL_NETWORK_DIR=/home/me/.testnetctl/networks/1000
- - export TESTNETCTL_NETWORK_DIR=/home/me/.testnetctl/networks/latest
+Configure tmpnetctl to target this network by default with one of the following statements:
+ - source /home/me/.tmpnet/networks/1000/network.env
+ - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/1000
+ - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/latest
 
 # Stop the network
-$ ./build/testnetctl stop-network --network-dir=/path/to/network
+$ ./build/tmpnetctl stop-network --network-dir=/path/to/network
 ```
 
 Note the export of the path ending in `latest`. This is a symlink that
-set to the last network created by `testnetctl start-network`. Setting
-the `TESTNETCTL_NETWORK_DIR` env var to this symlink ensures that
-`testnetctl` commands and e2e execution with
-`--use-persistent-network` will target the most recently deployed
-local network.
+is set to the last network created by `tmpnetctl start-network`. Setting
+the `TMPNET_NETWORK_DIR` env var to this symlink ensures that
+`tmpnetctl` commands and e2e execution with
+`--use-existing-network` will target the most recently deployed local
+network.
 
 ### Via code
 
@@ -66,7 +66,7 @@ A local network can be managed in code:
 network, _ := local.StartNetwork(
     ctx,                                       // Context used to limit duration of waiting for network health
     ginkgo.GinkgoWriter,                       // Writer to report progress of network start
-    "",                                        // Use default root dir (~/.testnetctl)
+    "",                                        // Use default root dir (~/.tmpnet)
     &local.LocalNetwork{
         LocalConfig: local.LocalConfig{
             ExecPath: "/path/to/avalanchego",  // Defining the avalanchego exec path is required
@@ -121,7 +121,7 @@ tests](../../../e2e/e2e_test.go).
 
 By default, nodes in a local network will be started with staking and
 API ports set to `0` to ensure that ports will be dynamically
-chosen. The testnet fixture discovers the ports used by a given node
+chosen. The tmpnet fixture discovers the ports used by a given node
 by reading the `[base-data-dir]/process.json` file written by
 avalanchego on node start. The use of dynamic ports supports testing
 with many local networks without having to manually select compatible
@@ -133,7 +133,7 @@ A local network relies on configuration written to disk in the following structu
 
 ```
 HOME
-└── .testnetctl                                          // Root path for tool
+└── .tmpnet                                              // Root path for the temporary network fixture
     └── networks                                         // Default parent directory for local networks
         └── 1000                                         // The networkID is used to name the network dir and starts at 1000
             ├── NodeID-37E8UK3x2YFsHE3RdALmfWcppcZ1eTuj9 // The ID of a node is the name of its data dir
@@ -189,10 +189,10 @@ TODO(marun) Enable configuration of X-Chain and P-Chain.
 
 ### Network env
 
-A shell script that sets the `TESTNETCTL_NETWORK_DIR` env var to the
+A shell script that sets the `TMPNET_NETWORK_DIR` env var to the
 path of the network is stored at `[network-dir]/network.env`. Sourcing
 this file (i.e. `source network.env`) in a shell will configure ginkgo
-e2e and the `testnetctl` cli to target the network path specified in
+e2e and the `tmpnetctl` cli to target the network path specified in
 the env var.
 
 ### Node configuration

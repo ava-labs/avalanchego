@@ -1628,8 +1628,8 @@ func (s *state) writeTxs() error {
 func (s *state) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
-		rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
-		txDB := linkeddb.NewDefault(rawTxDB)
+		rawRewardUTXOsDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
+		rewardUTXOsDB := linkeddb.NewDefault(rawRewardUTXOsDB)
 
 		for _, utxo := range utxos {
 			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
@@ -1637,7 +1637,7 @@ func (s *state) writeRewardUTXOs() error {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}
 			utxoID := utxo.InputID()
-			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
+			if err := rewardUTXOsDB.Put(utxoID[:], utxoBytes); err != nil {
 				return fmt.Errorf("failed to add reward UTXO: %w", err)
 			}
 		}

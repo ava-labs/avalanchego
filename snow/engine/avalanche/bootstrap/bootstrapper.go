@@ -401,8 +401,7 @@ func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
 	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() < maxOutstandingGetAncestorsRequests {
-		vtxID := b.needToFetch.CappedList(1)[0]
-		b.needToFetch.Remove(vtxID)
+		vtxID, _ := b.needToFetch.Pop() // Length checked in predicate above
 
 		// Make sure we haven't already requested this vertex
 		if b.outstandingRequests.HasValue(vtxID) {
