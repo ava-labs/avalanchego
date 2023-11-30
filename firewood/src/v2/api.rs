@@ -1,9 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
-
+pub use crate::merkle::Proof;
 use async_trait::async_trait;
+use std::{fmt::Debug, sync::Arc};
 
 /// A `KeyType` is something that can be xcast to a u8 reference,
 /// and can be sent and shared across threads. References with
@@ -85,12 +85,6 @@ pub struct RangeProof<K, V> {
     pub last_key_proof: Proof<Vec<u8>>,
     pub middle: Vec<(K, V)>,
 }
-
-/// A proof that a single key is present
-///
-/// The generic N represents the storage for the node data
-#[derive(Clone, Debug)]
-pub struct Proof<N>(pub HashMap<HashKey, N>);
 
 /// The database interface, which includes a type for a static view of
 /// the database (the DbView). The most common implementation of the DbView

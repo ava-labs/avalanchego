@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::v2::api;
+use crate::{merkle::Proof, v2::api};
 
 use super::api::{KeyType, ValueType};
 
@@ -124,7 +124,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
     async fn single_key_proof<K: KeyType>(
         &self,
         _key: K,
-    ) -> Result<Option<api::Proof<Vec<u8>>>, api::Error> {
+    ) -> Result<Option<Proof<Vec<u8>>>, api::Error> {
         todo!()
     }
 

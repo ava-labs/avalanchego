@@ -8,14 +8,13 @@ pub use crate::{
 };
 use crate::{
     file,
-    merkle::{Merkle, MerkleError, Node, TrieHash, TRIE_HASH_LEN},
-    proof::ProofError,
+    merkle::{Merkle, MerkleError, Node, Proof, ProofError, TrieHash, TRIE_HASH_LEN},
     storage::{
         buffer::{DiskBuffer, DiskBufferRequester},
         CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut, StoreRevShared,
         ZeroStore, PAGE_SIZE_NBIT,
     },
-    v2::api::{self, HashKey, KeyType, Proof, ValueType},
+    v2::api::{self, HashKey, KeyType, ValueType},
 };
 use crate::{
     merkle,

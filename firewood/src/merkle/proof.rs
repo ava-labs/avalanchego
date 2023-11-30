@@ -2,9 +2,11 @@
 // See the file LICENSE.md for licensing terms.
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::shale::{disk_address::DiskAddress, ShaleError, ShaleStore};
+use crate::v2::api::HashKey;
 use nix::errno::Errno;
 use sha3::Digest;
 use thiserror::Error;
@@ -15,7 +17,6 @@ use crate::{
     db::DbError,
     merkle::{to_nibble_array, Merkle, MerkleError, Node, NodeType},
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
-    v2::api::Proof,
 };
 
 #[derive(Debug, Error)]
@@ -83,6 +84,12 @@ impl From<DbError> for ProofError {
         }
     }
 }
+
+/// A proof that a single key is present
+///
+/// The generic N represents the storage for the node data
+#[derive(Clone, Debug)]
+pub struct Proof<N>(pub HashMap<HashKey, N>);
 
 /// SubProof contains the encoded value and the hash value of a node that maps
 /// to a single proof step. If reaches an end step during proof verification,

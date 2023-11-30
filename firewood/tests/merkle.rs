@@ -2,12 +2,10 @@
 // See the file LICENSE.md for licensing terms.
 
 use firewood::{
-    merkle::Node,
+    merkle::{Node, Proof, ProofError},
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
-    proof::ProofError,
     // TODO: we should not be using shale from an integration test
     shale::{cached::DynamicMem, compact::CompactSpace},
-    v2::api::Proof,
 };
 use rand::Rng;
 use std::collections::HashMap;

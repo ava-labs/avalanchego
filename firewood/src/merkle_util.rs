@@ -1,14 +1,10 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::merkle::{Merkle, Node, Proof, ProofError, Ref, RefMut, TrieHash};
 use crate::shale::{
     self, cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore,
     ShaleStore, StoredView,
-};
-use crate::{
-    merkle::{Merkle, Node, Ref, RefMut, TrieHash},
-    proof::ProofError,
-    v2::api::Proof,
 };
 use std::{num::NonZeroUsize, sync::Arc};
 use thiserror::Error;

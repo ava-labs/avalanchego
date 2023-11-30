@@ -1,12 +1,13 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::sync::Arc;
-
+use super::{
+    api::{Batch, Db, DbView, Error, HashKey, KeyType, RangeProof, ValueType},
+    propose::{Proposal, ProposalBase},
+};
+use crate::merkle::Proof;
 use async_trait::async_trait;
-
-use super::api::{Batch, Db, DbView, Error, HashKey, KeyType, Proof, RangeProof, ValueType};
-use super::propose::{Proposal, ProposalBase};
+use std::sync::Arc;
 
 /// An EmptyDb is a simple implementation of api::Db
 /// that doesn't store any data. It contains a single

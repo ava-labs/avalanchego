@@ -6,6 +6,7 @@ use super::{
     DbHeader, DbInner, DbRev, DbRevInner, SharedStore, Store, Universe, MERKLE_META_SPACE,
     MERKLE_PAYLOAD_SPACE, ROOT_HASH_SPACE,
 };
+use crate::merkle::Proof;
 use crate::shale::CachedStore;
 use crate::{
     merkle::{TrieHash, TRIE_HASH_LEN},
@@ -285,7 +286,7 @@ impl api::DbView for Proposal {
         Ok(self.get_revision().kv_get(key))
     }
 
-    async fn single_key_proof<K>(&self, key: K) -> Result<Option<api::Proof<Vec<u8>>>, api::Error>
+    async fn single_key_proof<K>(&self, key: K) -> Result<Option<Proof<Vec<u8>>>, api::Error>
     where
         K: api::KeyType,
     {
