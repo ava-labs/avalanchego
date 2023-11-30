@@ -1906,7 +1906,7 @@ func (s *state) writeTxs() error {
 		// would not be properly accounted for in the cache sizing.
 		s.txCache.Evict(txID)
 		key := merkleTxKey(txID)
-		if err := s.merkleDB.Put(key[:], txBytes); err != nil {
+		if err := s.merkleDB.Put(key, txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
