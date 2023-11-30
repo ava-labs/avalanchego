@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -42,7 +42,7 @@ type LocalConfig struct {
 
 // Stores the configuration and process details of a node in a local network.
 type LocalNode struct {
-	testnet.NodeConfig
+	tmpnet.NodeConfig
 	LocalConfig
 	node.NodeProcessContext
 
@@ -51,8 +51,8 @@ type LocalNode struct {
 
 func NewLocalNode(dataDir string) *LocalNode {
 	return &LocalNode{
-		NodeConfig: testnet.NodeConfig{
-			Flags: testnet.FlagsMap{
+		NodeConfig: tmpnet.NodeConfig{
+			Flags: tmpnet.FlagsMap{
 				config.DataDirKey: dataDir,
 			},
 		},
@@ -76,7 +76,7 @@ func (n *LocalNode) GetID() ids.NodeID {
 }
 
 // Retrieve backend-agnostic node configuration.
-func (n *LocalNode) GetConfig() testnet.NodeConfig {
+func (n *LocalNode) GetConfig() tmpnet.NodeConfig {
 	return n.NodeConfig
 }
 
@@ -98,11 +98,11 @@ func (n *LocalNode) ReadConfig() error {
 	if err != nil {
 		return fmt.Errorf("failed to read local node config: %w", err)
 	}
-	flags := testnet.FlagsMap{}
+	flags := tmpnet.FlagsMap{}
 	if err := json.Unmarshal(bytes, &flags); err != nil {
 		return fmt.Errorf("failed to unmarshal local node config: %w", err)
 	}
-	config := testnet.NodeConfig{Flags: flags}
+	config := tmpnet.NodeConfig{Flags: flags}
 	if err := config.EnsureNodeID(); err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (n *LocalNode) WriteConfig() error {
 		return fmt.Errorf("failed to create node dir: %w", err)
 	}
 
-	bytes, err := testnet.DefaultJSONMarshal(n.Flags)
+	bytes, err := tmpnet.DefaultJSONMarshal(n.Flags)
 	if err != nil {
 		return fmt.Errorf("failed to marshal local node config: %w", err)
 	}
@@ -265,7 +265,7 @@ func (n *LocalNode) Stop() error {
 	}
 
 	// Wait for the node process to stop
-	ticker := time.NewTicker(testnet.DefaultNodeTickerInterval)
+	ticker := time.NewTicker(tmpnet.DefaultNodeTickerInterval)
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
 	defer cancel()
@@ -295,7 +295,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to determine process status: %w", err)
 	}
 	if proc == nil {
-		return false, testnet.ErrNotRunning
+		return false, tmpnet.ErrNotRunning
 	}
 
 	// Check that the node is reporting healthy
@@ -321,7 +321,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 }
 
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
-	ticker := time.NewTicker(testnet.DefaultNodeTickerInterval)
+	ticker := time.NewTicker(tmpnet.DefaultNodeTickerInterval)
 	defer ticker.Stop()
 
 	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)
