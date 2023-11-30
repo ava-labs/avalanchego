@@ -259,36 +259,6 @@ func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
 	return d.pendingStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
-func (d *diff) GetSubnets() ([]*txs.Tx, error) {
-	if len(d.addedSubnets) == 0 {
-		parentState, ok := d.stateVersions.GetState(d.parentID)
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-		}
-		return parentState.GetSubnets()
-	}
-
-	if len(d.cachedSubnets) != 0 {
-		return d.cachedSubnets, nil
-	}
-
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	subnets, err := parentState.GetSubnets()
-	if err != nil {
-		return nil, err
-	}
-	newSubnets := make([]*txs.Tx, len(subnets)+len(d.addedSubnets))
-	copy(newSubnets, subnets)
-	for i, subnet := range d.addedSubnets {
-		newSubnets[i+len(subnets)] = subnet
-	}
-	d.cachedSubnets = newSubnets
-	return newSubnets, nil
-}
-
 func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	d.addedSubnets = append(d.addedSubnets, createSubnetTx)
 	if d.cachedSubnets != nil {
@@ -339,48 +309,6 @@ func (d *diff) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
 	}
 }
 
-func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
-	addedChains := d.addedChains[subnetID]
-	if len(addedChains) == 0 {
-		// No chains have been added to this subnet
-		parentState, ok := d.stateVersions.GetState(d.parentID)
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-		}
-		return parentState.GetChains(subnetID)
-	}
-
-	// There have been chains added to the requested subnet
-
-	if d.cachedChains == nil {
-		// This is the first time we are going to be caching the subnet chains
-		d.cachedChains = make(map[ids.ID][]*txs.Tx)
-	}
-
-	cachedChains, cached := d.cachedChains[subnetID]
-	if cached {
-		return cachedChains, nil
-	}
-
-	// This chain wasn't cached yet
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	chains, err := parentState.GetChains(subnetID)
-	if err != nil {
-		return nil, err
-	}
-
-	newChains := make([]*txs.Tx, len(chains)+len(addedChains))
-	copy(newChains, chains)
-	for i, chain := range addedChains {
-		newChains[i+len(chains)] = chain
-	}
-	d.cachedChains[subnetID] = newChains
-	return newChains, nil
-}
-
 func (d *diff) AddChain(createChainTx *txs.Tx) {
 	tx := createChainTx.Unsigned.(*txs.CreateChainTx)
 	if d.addedChains == nil {
@@ -423,18 +351,6 @@ func (d *diff) AddTx(tx *txs.Tx, status status.Status) {
 	} else {
 		d.addedTxs[txID] = txStatus
 	}
-}
-
-func (d *diff) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
-	if utxos, exists := d.addedRewardUTXOs[txID]; exists {
-		return utxos, nil
-	}
-
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetRewardUTXOs(txID)
 }
 
 func (d *diff) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
