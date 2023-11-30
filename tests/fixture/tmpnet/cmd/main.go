@@ -13,8 +13,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/local"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -27,8 +27,8 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "testnetctl",
-		Short: "testnetctl commands",
+		Use:   "tmpnetctl",
+		Short: "tmpnetctl commands",
 	}
 
 	versionCmd := &cobra.Command{
@@ -84,7 +84,7 @@ func main() {
 				return err
 			}
 
-			fmt.Fprintf(os.Stdout, "\nConfigure testnetctl to target this network by default with one of the following statements:")
+			fmt.Fprintf(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:")
 			fmt.Fprintf(os.Stdout, "\n - source %s\n", network.EnvFilePath())
 			fmt.Fprintf(os.Stdout, " - %s\n", network.EnvFileContents())
 			fmt.Fprintf(os.Stdout, " - export %s=%s\n", local.NetworkDirEnvName, latestSymlinkPath)
@@ -94,8 +94,8 @@ func main() {
 	}
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
 	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(local.AvalancheGoPathEnvName), "The path to an avalanchego binary")
-	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", testnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
-	startNetworkCmd.PersistentFlags().Uint8Var(&fundedKeyCount, "funded-key-count", testnet.DefaultFundedKeyCount, "Number of funded keys the network should start with")
+	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
+	startNetworkCmd.PersistentFlags().Uint8Var(&fundedKeyCount, "funded-key-count", tmpnet.DefaultFundedKeyCount, "Number of funded keys the network should start with")
 	rootCmd.AddCommand(startNetworkCmd)
 
 	var networkDir string
@@ -117,7 +117,7 @@ func main() {
 	rootCmd.AddCommand(stopNetworkCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "testnetctl failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "tmpnetctl failed: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
