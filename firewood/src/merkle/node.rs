@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 use std::{
     fmt::Debug,
-    io::{Cursor, Read, Write},
+    io::{Cursor, Write},
     mem::size_of,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -27,7 +27,6 @@ pub use extension::ExtNode;
 pub use leaf::{LeafNode, SIZE as LEAF_NODE_SIZE};
 pub use partial_path::PartialPath;
 
-use crate::merkle::to_nibble_array;
 use crate::nibbles::Nibbles;
 
 use super::{TrieHash, TRIE_HASH_LEN};
@@ -339,9 +338,7 @@ mod type_id {
 use type_id::NodeTypeId;
 
 impl Storable for Node {
-    fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
-        let mut offset = addr;
-
+    fn deserialize<T: CachedStore>(mut offset: usize, mem: &T) -> Result<Self, ShaleError> {
         let meta_raw =
             mem.get_view(offset, Meta::SIZE as u64)
                 .ok_or(ShaleError::InvalidCacheView {
@@ -382,80 +379,7 @@ impl Storable for Node {
             }
 
             NodeTypeId::Extension => {
-                let ext_header_size = 1 + 8;
-
-                let node_raw = mem.get_view(addr + Meta::SIZE, ext_header_size).ok_or(
-                    ShaleError::InvalidCacheView {
-                        offset: addr + Meta::SIZE,
-                        size: ext_header_size,
-                    },
-                )?;
-
-                let mut cur = Cursor::new(node_raw.as_deref());
-                let mut buff = [0; 8];
-
-                cur.read_exact(&mut buff[..1])?;
-                let path_len = buff[0] as u64;
-
-                cur.read_exact(&mut buff)?;
-                let ptr = u64::from_le_bytes(buff);
-
-                let nibbles: Vec<u8> = mem
-                    .get_view(addr + Meta::SIZE + ext_header_size as usize, path_len)
-                    .ok_or(ShaleError::InvalidCacheView {
-                        offset: addr + Meta::SIZE + ext_header_size as usize,
-                        size: path_len,
-                    })?
-                    .as_deref()
-                    .into_iter()
-                    .flat_map(to_nibble_array)
-                    .collect();
-
-                let (path, _) = PartialPath::decode(&nibbles);
-
-                let mut buff = [0_u8; 1];
-
-                let encoded_len_raw = mem
-                    .get_view(
-                        addr + Meta::SIZE + ext_header_size as usize + path_len as usize,
-                        1,
-                    )
-                    .ok_or(ShaleError::InvalidCacheView {
-                        offset: addr + Meta::SIZE + ext_header_size as usize + path_len as usize,
-                        size: 1,
-                    })?;
-
-                cur = Cursor::new(encoded_len_raw.as_deref());
-                cur.read_exact(&mut buff)?;
-
-                let encoded_len = buff[0] as u64;
-
-                let encoded: Option<Vec<u8>> = if encoded_len != 0 {
-                    let emcoded_raw = mem
-                        .get_view(
-                            addr + Meta::SIZE + ext_header_size as usize + path_len as usize + 1,
-                            encoded_len,
-                        )
-                        .ok_or(ShaleError::InvalidCacheView {
-                            offset: addr
-                                + Meta::SIZE
-                                + ext_header_size as usize
-                                + path_len as usize
-                                + 1,
-                            size: encoded_len,
-                        })?;
-
-                    Some(emcoded_raw.as_deref()[0..].to_vec())
-                } else {
-                    None
-                };
-
-                let inner = NodeType::Extension(ExtNode {
-                    path,
-                    child: DiskAddress::from(ptr as usize),
-                    child_encoded: encoded,
-                });
-
+                let inner = NodeType::Extension(ExtNode::deserialize(offset, mem)?);
                 let node = Self::new_from_hash(root_hash, is_encoded_longer_than_hash_len, inner);
 
                 Ok(node)

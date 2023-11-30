@@ -5,15 +5,16 @@ use bincode::Options;
 
 use super::{Encoded, Node};
 use crate::{
-    merkle::{from_nibbles, PartialPath, TRIE_HASH_LEN},
-    shale::{DiskAddress, ShaleStore, Storable},
+    merkle::{from_nibbles, to_nibble_array, PartialPath, TRIE_HASH_LEN},
+    shale::{DiskAddress, ShaleError::InvalidCacheView, ShaleStore, Storable},
 };
 use std::{
     fmt::{Debug, Error as FmtError, Formatter},
-    io::{Cursor, Write},
+    io::{Cursor, Read, Write},
     mem::size_of,
 };
 
+type PathLen = u8;
 type DataLen = u8;
 
 #[derive(PartialEq, Eq, Clone)]
@@ -35,6 +36,9 @@ impl Debug for ExtNode {
 }
 
 impl ExtNode {
+    const PATH_LEN_SIZE: u64 = size_of::<PathLen>() as u64;
+    const DATA_LEN_SIZE: u64 = size_of::<DataLen>() as u64;
+
     pub(super) fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         let mut list = <[Encoded<Vec<u8>>; 2]>::default();
         list[0] = Encoded::Data(
@@ -96,10 +100,13 @@ impl ExtNode {
 
 impl Storable for ExtNode {
     fn serialized_len(&self) -> u64 {
-        let path_len_size = size_of::<DataLen>() as u64;
+        let path_len_size = Self::PATH_LEN_SIZE;
         let path_len = self.path.serialized_len();
         let child_len = DiskAddress::MSIZE;
-        let encoded_len_size = size_of::<DataLen>() as u64;
+        // TODO:
+        // this seems wrong to always include this byte even if there isn't a child
+        // but it matches the original implementation
+        let encoded_len_size = Self::DATA_LEN_SIZE;
         let encoded_len = self
             .child_encoded
             .as_ref()
@@ -114,7 +121,7 @@ impl Storable for ExtNode {
 
         let path: Vec<u8> = from_nibbles(&self.path.encode(false)).collect();
 
-        cursor.write_all(&[path.len() as DataLen])?;
+        cursor.write_all(&[path.len() as PathLen])?;
         cursor.write_all(&self.child.to_le_bytes())?;
         cursor.write_all(&path)?;
 
@@ -127,12 +134,88 @@ impl Storable for ExtNode {
     }
 
     fn deserialize<T: crate::shale::CachedStore>(
-        _addr: usize,
-        _mem: &T,
+        mut offset: usize,
+        mem: &T,
     ) -> Result<Self, crate::shale::ShaleError>
     where
         Self: Sized,
     {
-        todo!()
+        let header_size = Self::PATH_LEN_SIZE + DiskAddress::MSIZE;
+
+        let path_and_disk_address = mem
+            .get_view(offset, header_size)
+            .ok_or(InvalidCacheView {
+                offset,
+                size: header_size,
+            })?
+            .as_deref();
+
+        offset += header_size as usize;
+
+        let mut cursor = Cursor::new(path_and_disk_address);
+        let mut buf = [0u8; DiskAddress::MSIZE as usize];
+
+        let path_len = {
+            let buf = &mut buf[..Self::PATH_LEN_SIZE as usize];
+            cursor.read_exact(buf)?;
+            buf[0] as u64
+        };
+
+        let disk_address = {
+            cursor.read_exact(buf.as_mut())?;
+            DiskAddress::from(u64::from_le_bytes(buf) as usize)
+        };
+
+        let path = mem
+            .get_view(offset, path_len)
+            .ok_or(InvalidCacheView {
+                offset,
+                size: path_len,
+            })?
+            .as_deref();
+
+        offset += path_len as usize;
+
+        let path: Vec<u8> = path.into_iter().flat_map(to_nibble_array).collect();
+
+        let path = PartialPath::decode(&path).0;
+
+        let encoded_len_raw = mem
+            .get_view(offset, Self::DATA_LEN_SIZE)
+            .ok_or(InvalidCacheView {
+                offset,
+                size: Self::DATA_LEN_SIZE,
+            })?
+            .as_deref();
+
+        offset += Self::DATA_LEN_SIZE as usize;
+
+        let mut cursor = Cursor::new(encoded_len_raw);
+
+        let encoded_len = {
+            let mut buf = [0u8; Self::DATA_LEN_SIZE as usize];
+            cursor.read_exact(buf.as_mut())?;
+            DataLen::from_le_bytes(buf) as u64
+        };
+
+        let encoded = if encoded_len != 0 {
+            let encoded = mem
+                .get_view(offset, encoded_len)
+                .ok_or(InvalidCacheView {
+                    offset,
+                    size: encoded_len,
+                })?
+                .as_deref();
+
+            encoded.into()
+        } else {
+            None
+        };
+
+        Ok(ExtNode {
+            path,
+            child: disk_address,
+            child_encoded: encoded,
+        })
     }
 }
