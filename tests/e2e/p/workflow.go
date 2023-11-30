@@ -73,7 +73,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			vdrStartTime := time.Now().Add(validatorStartTimeDiff)
 
 			// Use a random node ID to ensure that repeated test runs
-			// will succeed against a persistent network.
+			// will succeed against a network that persists across runs.
 			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
 			require.NoError(err)
 

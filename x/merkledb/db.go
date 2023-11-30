@@ -211,6 +211,8 @@ type merkleDB struct {
 	// Nothing if the trie is empty.
 	root maybe.Maybe[*node]
 
+	rootID ids.ID
+
 	// Valid children of this trie.
 	childViews []*trieView
 
@@ -265,13 +267,13 @@ func newDatabase(
 		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
 	}
 
-	if err := trieDB.initializeRootIfNeeded(); err != nil {
+	if err := trieDB.initializeRoot(); err != nil {
 		return nil, err
 	}
 
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
-		rootID: trieDB.getMerkleRoot(),
+		rootID: trieDB.rootID,
 		rootChange: change[maybe.Maybe[*node]]{
 			after: trieDB.root,
 		},
@@ -303,6 +305,7 @@ func newDatabase(
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	db.root = maybe.Nothing[*node]()
+	db.rootID = ids.Empty
 
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
@@ -585,10 +588,7 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
-	if db.root.IsNothing() {
-		return ids.Empty
-	}
-	return db.root.Value().id
+	return db.rootID
 }
 
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
@@ -978,6 +978,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// Update root in database.
 	db.root = changes.rootChange.after
+	db.rootID = changes.rootID
 
 	if changes.rootChange.after.IsNothing() {
 		return db.baseDB.Delete(rootDBKey)
@@ -1164,7 +1165,7 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 
 // If the root is on disk, set [db.root] to it.
 // Otherwise leave [db.root] as Nothing.
-func (db *merkleDB) initializeRootIfNeeded() error {
+func (db *merkleDB) initializeRoot() error {
 	rootBytes, err := db.baseDB.Get(rootDBKey)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
@@ -1195,7 +1196,8 @@ func (db *merkleDB) initializeRootIfNeeded() error {
 			return err
 		}
 	}
-	root.calculateID(db.metrics)
+
+	db.rootID = root.calculateID(db.metrics)
 	db.root = maybe.Some(root)
 	return nil
 }
@@ -1301,11 +1303,12 @@ func (db *merkleDB) Clear() error {
 
 	// Clear root
 	db.root = maybe.Nothing[*node]()
+	db.rootID = ids.Empty
 
 	// Clear history
 	db.history = newTrieHistory(db.history.maxHistoryLen)
 	db.history.record(&changeSummary{
-		rootID: db.getMerkleRoot(),
+		rootID: db.rootID,
 		values: map[Key]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[Key]*change[*node]{},
 	})

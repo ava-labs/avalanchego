@@ -13,8 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.uber.org/mock/gomock"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -117,10 +115,9 @@ func TestGossiperGossip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
-			responseSender := common.NewMockSender(ctrl)
-			responseRouter := p2p.NewRouter(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
+			responseSender := &common.SenderTest{}
+			responseNetwork := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
 			responseBloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
 			responseSet := testSet{
@@ -130,31 +127,30 @@ func TestGossiperGossip(t *testing.T) {
 			for _, item := range tt.responder {
 				require.NoError(responseSet.Add(item))
 			}
-			peers := &p2p.Peers{}
-			require.NoError(peers.Connected(context.Background(), ids.EmptyNodeID, nil))
 
 			handler, err := NewHandler[*testTx](responseSet, tt.config, prometheus.NewRegistry())
 			require.NoError(err)
-			_, err = responseRouter.RegisterAppProtocol(0x0, handler, peers)
+			_, err = responseNetwork.NewAppProtocol(0x0, handler)
 			require.NoError(err)
 
-			requestSender := common.NewMockSender(ctrl)
-			requestRouter := p2p.NewRouter(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
+			requestSender := &common.SenderTest{
+				SendAppRequestF: func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
+					go func() {
+						require.NoError(responseNetwork.AppRequest(ctx, ids.EmptyNodeID, requestID, time.Time{}, request))
+					}()
+					return nil
+				},
+			}
+
+			requestNetwork := p2p.NewNetwork(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
+			require.NoError(requestNetwork.Connected(context.Background(), ids.EmptyNodeID, nil))
 
 			gossiped := make(chan struct{})
-			requestSender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
-					go func() {
-						require.NoError(responseRouter.AppRequest(ctx, ids.EmptyNodeID, requestID, time.Time{}, request))
-					}()
-				}).AnyTimes()
-
-			responseSender.EXPECT().
-				SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Do(func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) {
-					require.NoError(requestRouter.AppResponse(ctx, nodeID, requestID, appResponseBytes))
-					close(gossiped)
-				}).AnyTimes()
+			responseSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
+				require.NoError(requestNetwork.AppResponse(ctx, nodeID, requestID, appResponseBytes))
+				close(gossiped)
+				return nil
+			}
 
 			bloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
@@ -166,7 +162,7 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(requestSet.Add(item))
 			}
 
-			requestClient, err := requestRouter.RegisterAppProtocol(0x0, nil, peers)
+			requestClient, err := requestNetwork.NewAppProtocol(0x0, nil)
 			require.NoError(err)
 
 			config := Config{
