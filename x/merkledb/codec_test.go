@@ -146,7 +146,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 				numChildren := r.Intn(int(bf)) // #nosec G404
 
-				children := map[byte]child{}
+				children := map[byte]*child{}
 				for i := 0; i < numChildren; i++ {
 					var childID ids.ID
 					_, _ = r.Read(childID[:]) // #nosec G404
@@ -154,7 +154,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					childKeyBytes := make([]byte, r.Intn(32)) // #nosec G404
 					_, _ = r.Read(childKeyBytes)              // #nosec G404
 
-					children[byte(i)] = child{
+					children[byte(i)] = &child{
 						compressedKey: ToKey(childKeyBytes),
 						id:            childID,
 					}
@@ -202,14 +202,14 @@ func FuzzEncodeHashValues(f *testing.F) {
 			for _, bf := range validBranchFactors { // Create a random node
 				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
-				children := map[byte]child{}
+				children := map[byte]*child{}
 				numChildren := r.Intn(int(bf)) // #nosec G404
 				for i := 0; i < numChildren; i++ {
 					compressedKeyLen := r.Intn(32) // #nosec G404
 					compressedKeyBytes := make([]byte, compressedKeyLen)
 					_, _ = r.Read(compressedKeyBytes) // #nosec G404
 
-					children[byte(i)] = child{
+					children[byte(i)] = &child{
 						compressedKey: ToKey(compressedKeyBytes),
 						id:            ids.GenerateTestID(),
 						hasValue:      r.Intn(2) == 1, // #nosec G404
