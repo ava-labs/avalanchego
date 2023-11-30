@@ -36,7 +36,7 @@ type Bootstrapper struct {
 	IP ips.IPDesc `json:"ip"`
 }
 
-// SampleBootstrappers returns all the default bootstrappers for the provided
+// GetBootstrappers returns all the default bootstrappers for the provided
 // network
 func GetBootstrappers(networkID uint32) []Bootstrapper {
 	networkName := constants.NetworkIDToNetworkName[networkID]
