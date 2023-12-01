@@ -855,7 +855,7 @@ func (t *trieView) insert(
 
 		// Neither [key] nor [t.root.key] is a prefix of the other.
 		// Make a new root whose children are the old root and the new node.
-		newRoot.addChild(oldRoot, t.tokenSize)
+		newRoot.addChildWithID(oldRoot, t.tokenSize, oldRootID)
 		newValueNode := newNode(key)
 		newValueNode.setValue(value)
 		newRoot.addChild(newValueNode, t.tokenSize)
