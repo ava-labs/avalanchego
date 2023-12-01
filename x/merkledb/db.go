@@ -980,12 +980,12 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	db.root = changes.rootChange.after
 	db.rootID = changes.rootID
 
-	if changes.rootChange.after.IsNothing() {
+	if db.root.IsNothing() {
 		return db.baseDB.Delete(rootDBKey)
 	}
 
-	rootKeyAndNodeBytes := codec.encodeKey(db.root.Value().key)
-	return db.baseDB.Put(rootDBKey, rootKeyAndNodeBytes)
+	rootKey := codec.encodeKey(db.root.Value().key)
+	return db.baseDB.Put(rootDBKey, rootKey)
 }
 
 // moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
