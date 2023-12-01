@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -71,8 +70,8 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	// create the VM
 	vm := New(
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -605,7 +604,7 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 	// Note: by default proVM is built such that heightIndex will be considered complete
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
