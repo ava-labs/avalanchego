@@ -609,30 +609,24 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 	for utxoID, utxo := range d.modifiedUTXOs {
 		key := merkleUtxoIDKey(utxoID)
 
-		if utxo != nil {
-			// Inserting a UTXO
-			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
-			if err != nil {
-				return merkledb.ViewChanges{}, err
-			}
-			changes.BatchOps = append(changes.BatchOps, database.BatchOp{
-				Key:   key,
-				Value: utxoBytes,
-			})
-			continue
-		}
-
-		// Deleting a UTXO
-		switch _, err := d.GetUTXO(utxoID); err {
-		case nil:
+		if utxo == nil {
+			// Deleting a UTXO
 			changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 				Key:    key,
 				Delete: true,
 			})
-		case database.ErrNotFound:
-		default:
+			continue
+		}
+
+		// Inserting a UTXO
+		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+		if err != nil {
 			return merkledb.ViewChanges{}, err
 		}
+		changes.BatchOps = append(changes.BatchOps, database.BatchOp{
+			Key:   key,
+			Value: utxoBytes,
+		})
 	}
 
 	return changes, nil
