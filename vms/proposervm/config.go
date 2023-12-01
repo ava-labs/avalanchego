@@ -11,14 +11,22 @@ import (
 )
 
 type Config struct {
-	ActivationTime      time.Time
+	// Time at which proposerVM activates its congestion control mechanism
+	ActivationTime time.Time
+
+	// Minimal P-chain height referenced upon block building
 	MinimumPChainHeight uint64
-	MinBlkDelay         time.Duration
+
+	// Configurable minimal delay among blocks issued consecutively
+	MinBlkDelay time.Duration
+
+	// Maximal number of block indexed.
+	// Zero signals all blocks are indexed.
 	NumHistoricalBlocks uint64
 
-	// block signer
+	// Block signer
 	StakingLeafSigner crypto.Signer
 
-	// block certificate
+	// Block certificate
 	StakingCertLeaf *staking.Certificate
 }
