@@ -86,7 +86,6 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		context.Background(),
 		parentID,
 		parentTimestamp,
-		parentHeight,
 		pChainHeight-1,
 	)
 	require.NoError(err)

@@ -183,7 +183,6 @@ func (p *postForkCommonComponents) buildChild(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
-	parentHeight uint64,
 	parentPChainHeight uint64,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
@@ -206,6 +205,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	buildUnsignedBlock := true
 	if p.vm.IsDurangoActivated(parentTimestamp) {
+		parentHeight := p.innerBlk.Height() - 1
 		err = p.shouldPostDurangoBuildBlock(
 			ctx,
 			parentTimestamp,
