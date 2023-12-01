@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use firewood::{
-    merkle::{Node, Proof, ProofError},
+    merkle::{Bincode, Node, Proof, ProofError},
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
     // TODO: we should not be using shale from an integration test
     shale::{cached::DynamicMem, compact::CompactSpace},
@@ -16,7 +16,7 @@ fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Cl
     items: Vec<(K, V)>,
     meta_size: u64,
     compact_size: u64,
-) -> Result<MerkleSetup<Store>, DataStoreError> {
+) -> Result<MerkleSetup<Store, Bincode>, DataStoreError> {
     let mut merkle = new_merkle(meta_size, compact_size);
 
     for (k, v) in items.iter() {

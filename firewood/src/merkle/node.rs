@@ -1,15 +1,19 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::shale::{disk_address::DiskAddress, CachedStore, ShaleError, ShaleStore, Storable};
+use crate::{
+    merkle::from_nibbles,
+    shale::{disk_address::DiskAddress, CachedStore, ShaleError, ShaleStore, Storable},
+};
 use bincode::{Error, Options};
 use bitflags::bitflags;
 use enum_as_inner::EnumAsInner;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, ser::SerializeSeq, Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 use std::{
     fmt::Debug,
     io::{Cursor, Write},
+    marker::PhantomData,
     mem::size_of,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -462,6 +466,203 @@ impl Storable for Node {
                 n.serialize(&mut cur.get_mut()[pos..])
             }
         }
+    }
+}
+
+pub struct EncodedNode<T> {
+    pub(crate) node: EncodedNodeType,
+    pub(crate) phantom: PhantomData<T>,
+}
+
+impl<T> EncodedNode<T> {
+    pub fn new(node: EncodedNodeType) -> Self {
+        Self {
+            node,
+            phantom: PhantomData,
+        }
+    }
+}
+pub enum EncodedNodeType {
+    Leaf(LeafNode),
+    Branch {
+        children: Box<[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>,
+        value: Option<Data>,
+    },
+}
+
+// Note that the serializer passed in should always be the same type as T in EncodedNode<T>.
+impl Serialize for EncodedNode<Bincode> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::Error;
+
+        match &self.node {
+            EncodedNodeType::Leaf(n) => {
+                let list = [
+                    Encoded::Raw(from_nibbles(&n.path.encode(true)).collect()),
+                    Encoded::Raw(n.data.to_vec()),
+                ];
+                let mut seq = serializer.serialize_seq(Some(list.len()))?;
+                for e in list {
+                    seq.serialize_element(&e)?;
+                }
+                seq.end()
+            }
+            EncodedNodeType::Branch { children, value } => {
+                let mut list = <[Encoded<Vec<u8>>; BranchNode::MAX_CHILDREN + 1]>::default();
+
+                for (i, c) in children
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, c)| c.as_ref().map(|c| (i, c)))
+                {
+                    if c.len() >= TRIE_HASH_LEN {
+                        let serialized_hash = Bincode::serialize(&Keccak256::digest(c).to_vec())
+                            .map_err(|e| S::Error::custom(format!("bincode error: {e}")))?;
+                        list[i] = Encoded::Data(serialized_hash);
+                    } else {
+                        list[i] = Encoded::Raw(c.to_vec());
+                    }
+                }
+                if let Some(Data(val)) = &value {
+                    let serialized_val = Bincode::serialize(val)
+                        .map_err(|e| S::Error::custom(format!("bincode error: {e}")))?;
+                    list[BranchNode::MAX_CHILDREN] = Encoded::Data(serialized_val);
+                }
+
+                let mut seq = serializer.serialize_seq(Some(list.len()))?;
+                for e in list {
+                    seq.serialize_element(&e)?;
+                }
+                seq.end()
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let items: Vec<Encoded<Vec<u8>>> = Deserialize::deserialize(deserializer)?;
+        let len = items.len();
+        match len {
+            LEAF_NODE_SIZE => {
+                let mut items = items.into_iter();
+                let Some(Encoded::Raw(path)) = items.next() else {
+                    return Err(D::Error::custom(
+                        "incorrect encoded type for leaf node path",
+                    ));
+                };
+                let Some(Encoded::Raw(data)) = items.next() else {
+                    return Err(D::Error::custom(
+                        "incorrect encoded type for leaf node data",
+                    ));
+                };
+                let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter()).0;
+                let node = EncodedNodeType::Leaf(LeafNode {
+                    path,
+                    data: Data(data),
+                });
+                Ok(Self {
+                    node,
+                    phantom: PhantomData,
+                })
+            }
+            BranchNode::MSIZE => {
+                let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
+                let mut value: Option<Data> = Default::default();
+                let len = items.len();
+
+                for (i, chd) in items.into_iter().enumerate() {
+                    if i == len - 1 {
+                        let data = match chd {
+                            Encoded::Raw(data) => Err(D::Error::custom(format!(
+                                "incorrect encoded type for branch node value {:?}",
+                                data
+                            )))?,
+                            Encoded::Data(data) => Bincode::deserialize(data.as_ref())
+                                .map_err(|e| D::Error::custom(format!("bincode error: {e}")))?,
+                        };
+                        // Extract the value of the branch node and set to None if it's an empty Vec
+                        value = Some(Data(data)).filter(|data| !data.is_empty());
+                    } else {
+                        let chd = match chd {
+                            Encoded::Raw(chd) => chd,
+                            Encoded::Data(chd) => Bincode::deserialize(chd.as_ref())
+                                .map_err(|e| D::Error::custom(format!("bincode error: {e}")))?,
+                        };
+                        children[i] = Some(chd).filter(|chd| !chd.is_empty());
+                    }
+                }
+                let node = EncodedNodeType::Branch {
+                    children: children.into(),
+                    value,
+                };
+                Ok(Self {
+                    node,
+                    phantom: PhantomData,
+                })
+            }
+            size => Err(D::Error::custom(format!("invalid size: {size}"))),
+        }
+    }
+}
+
+pub trait BinarySerde {
+    type SerializeError: serde::ser::Error;
+    type DeserializeError: serde::de::Error;
+
+    fn new() -> Self;
+
+    fn serialize<T: Serialize>(t: &T) -> Result<Vec<u8>, Self::SerializeError>
+    where
+        Self: Sized,
+    {
+        Self::new().serialize_impl(t)
+    }
+
+    fn deserialize<'de, T: Deserialize<'de>>(bytes: &'de [u8]) -> Result<T, Self::DeserializeError>
+    where
+        Self: Sized,
+    {
+        Self::new().deserialize_impl(bytes)
+    }
+
+    fn serialize_impl<T: Serialize>(&self, t: &T) -> Result<Vec<u8>, Self::SerializeError>;
+    fn deserialize_impl<'de, T: Deserialize<'de>>(
+        &self,
+        bytes: &'de [u8],
+    ) -> Result<T, Self::DeserializeError>;
+}
+
+pub struct Bincode(pub bincode::DefaultOptions);
+
+impl Debug for Bincode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "[bincode::DefaultOptions]")
+    }
+}
+
+impl BinarySerde for Bincode {
+    type SerializeError = bincode::Error;
+    type DeserializeError = Self::SerializeError;
+
+    fn new() -> Self {
+        Self(bincode::DefaultOptions::new())
+    }
+
+    fn serialize_impl<T: Serialize>(&self, t: &T) -> Result<Vec<u8>, Self::SerializeError> {
+        self.0.serialize(t)
+    }
+
+    fn deserialize_impl<'de, T: Deserialize<'de>>(
+        &self,
+        bytes: &'de [u8],
+    ) -> Result<T, Self::DeserializeError> {
+        self.0.deserialize(bytes)
     }
 }
 

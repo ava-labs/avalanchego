@@ -8,7 +8,7 @@ pub use crate::{
 };
 use crate::{
     file,
-    merkle::{Merkle, MerkleError, Node, Proof, ProofError, TrieHash, TRIE_HASH_LEN},
+    merkle::{Bincode, Merkle, MerkleError, Node, Proof, ProofError, TrieHash, TRIE_HASH_LEN},
     storage::{
         buffer::{DiskBuffer, DiskBufferRequester},
         CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut, StoreRevShared,
@@ -275,7 +275,7 @@ impl<T: MemStoreR + 'static> Universe<Arc<T>> {
 #[derive(Debug)]
 pub struct DbRev<S> {
     header: shale::Obj<DbHeader>,
-    merkle: Merkle<S>,
+    merkle: Merkle<S, Bincode>,
 }
 
 #[async_trait]
@@ -321,7 +321,7 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     pub fn stream<K: KeyType>(
         &self,
         start_key: Option<K>,
-    ) -> Result<merkle::MerkleKeyValueStream<'_, S>, api::Error> {
+    ) -> Result<merkle::MerkleKeyValueStream<'_, S, Bincode>, api::Error> {
         self.merkle
             .get_iter(start_key, self.header.kv_root)
             .map_err(|e| api::Error::InternalError(Box::new(e)))
@@ -333,7 +333,7 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
         Some(())
     }
 
-    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle<S>) {
+    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle<S, Bincode>) {
         (&mut self.header, &mut self.merkle)
     }
 

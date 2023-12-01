@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::{Merkle, Node, Proof, ProofError, Ref, RefMut, TrieHash};
+use crate::merkle::{BinarySerde, Bincode, Merkle, Node, Proof, ProofError, Ref, RefMut, TrieHash};
 use crate::shale::{
     self, cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore,
     ShaleStore, StoredView,
@@ -31,12 +31,12 @@ pub enum DataStoreError {
     ProofEmptyKeyValuesError,
 }
 
-pub struct MerkleSetup<S> {
+pub struct MerkleSetup<S, T> {
     root: DiskAddress,
-    merkle: Merkle<S>,
+    merkle: Merkle<S, T>,
 }
 
-impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
+impl<S: ShaleStore<Node> + Send + Sync, T: BinarySerde> MerkleSetup<S, T> {
     pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, val: Vec<u8>) -> Result<(), DataStoreError> {
         self.merkle
             .insert(key, val, self.root)
@@ -55,7 +55,10 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
             .map_err(|_err| DataStoreError::GetError)
     }
 
-    pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Result<Option<RefMut<S>>, DataStoreError> {
+    pub fn get_mut<K: AsRef<[u8]>>(
+        &mut self,
+        key: K,
+    ) -> Result<Option<RefMut<S, T>>, DataStoreError> {
         self.merkle
             .get_mut(key, self.root)
             .map_err(|_err| DataStoreError::GetError)
@@ -65,7 +68,7 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
         self.root
     }
 
-    pub fn get_merkle_mut(&mut self) -> &mut Merkle<S> {
+    pub fn get_merkle_mut(&mut self) -> &mut Merkle<S, T> {
         &mut self.merkle
     }
 
@@ -116,7 +119,7 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
 pub fn new_merkle(
     meta_size: u64,
     compact_size: u64,
-) -> MerkleSetup<CompactSpace<Node, DynamicMem>> {
+) -> MerkleSetup<CompactSpace<Node, DynamicMem>, Bincode> {
     const RESERVED: usize = 0x1000;
     assert!(meta_size as usize > RESERVED);
     assert!(compact_size as usize > RESERVED);

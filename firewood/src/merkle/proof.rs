@@ -19,7 +19,7 @@ use crate::{
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
 };
 
-use super::TRIE_HASH_LEN;
+use super::{BinarySerde, TRIE_HASH_LEN};
 
 #[derive(Debug, Error)]
 pub enum ProofError {
@@ -253,11 +253,11 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     /// necessary nodes will be resolved and leave the remaining as hashnode.
     ///
     /// The given edge proof is allowed to be an existent or non-existent proof.
-    fn proof_to_path<KV: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
+    fn proof_to_path<KV: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySerde>(
         &self,
         key: KV,
         root_hash: [u8; 32],
-        merkle_setup: &mut MerkleSetup<S>,
+        merkle_setup: &mut MerkleSetup<S, T>,
         allow_non_existent_node: bool,
     ) -> Result<Option<Vec<u8>>, ProofError> {
         // Start with the sentinel root
@@ -441,9 +441,9 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     ///
     /// * `end_node` - A boolean indicates whether this is the end node to decode, thus no `key`
     ///                to be present.
-    fn decode_node<S: ShaleStore<Node> + Send + Sync>(
+    fn decode_node<S: ShaleStore<Node> + Send + Sync, T: BinarySerde>(
         &self,
-        merkle: &Merkle<S>,
+        merkle: &Merkle<S, T>,
         key: &[u8],
         buf: &[u8],
         end_node: bool,
@@ -583,8 +583,8 @@ fn generate_subproof(encoded: Vec<u8>) -> Result<SubProof, ProofError> {
 //
 // The return value indicates if the fork point is root node. If so, unset the
 // entire trie.
-fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
-    merkle_setup: &mut MerkleSetup<S>,
+fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySerde>(
+    merkle_setup: &mut MerkleSetup<S, T>,
     left: K,
     right: K,
 ) -> Result<bool, ProofError> {
@@ -824,8 +824,8 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
 //     keep the entire branch and return.
 //   - the fork point is a shortnode, the shortnode is excluded in the range,
 //     unset the entire branch.
-fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
-    merkle: &Merkle<S>,
+fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySerde>(
+    merkle: &Merkle<S, T>,
     parent: DiskAddress,
     node: Option<DiskAddress>,
     key: K,
