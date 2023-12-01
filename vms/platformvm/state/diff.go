@@ -480,13 +480,15 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 
 	// writeCurrentStakers
 	for _, nodeIDToValidatorDiff := range d.currentStakerDiffs.validatorDiffs {
-		toDeleteTxIDs := make([]ids.ID, 0, initialTxSliceSize)
-		toAddTxIDAndRewards := make([]txIDAndReward, 0, initialTxSliceSize)
-
 		for _, validatorDiff := range nodeIDToValidatorDiff {
+			toAddTxIDAndRewards := make([]txIDAndReward, 0, initialTxSliceSize)
+
 			switch validatorDiff.validatorStatus {
 			case deleted:
-				toDeleteTxIDs = append(toDeleteTxIDs, validatorDiff.validator.TxID)
+				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
+					Key:    merkleCurrentStakersKey(validatorDiff.validator.TxID),
+					Delete: true,
+				})
 			case added:
 				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
 					txID:   validatorDiff.validator.TxID,
@@ -505,7 +507,10 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 			addedDelegatorIterator.Release()
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				toDeleteTxIDs = append(toDeleteTxIDs, staker.TxID)
+				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
+					Key:    merkleCurrentStakersKey(staker.TxID),
+					Delete: true,
+				})
 			}
 
 			for _, txIDAndReward := range toAddTxIDAndRewards {
@@ -527,22 +532,14 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 					Value: stakersDataBytes,
 				})
 			}
-
-			for _, txID := range toDeleteTxIDs {
-				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
-					Key:    merkleCurrentStakersKey(txID),
-					Delete: true,
-				})
-			}
 		}
 	}
 
 	// writePendingStakers
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
-		toDeleteTxIDs := make([]ids.ID, 0, initialTxSliceSize)
-		toAddTxIDAndRewards := make([]txIDAndReward, 0, initialTxSliceSize)
-
 		for _, validatorDiff := range subnetValidatorDiffs {
+			toAddTxIDAndRewards := make([]txIDAndReward, 0, initialTxSliceSize)
+
 			// validatorDiff.validator is not guaranteed to be non-nil here.
 			// Access it only if validatorDiff.validatorStatus is added or deleted
 			switch validatorDiff.validatorStatus {
@@ -552,7 +549,10 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 					reward: 0,
 				})
 			case deleted:
-				toDeleteTxIDs = append(toDeleteTxIDs, validatorDiff.validator.TxID)
+				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
+					Key:    merklePendingStakersKey(validatorDiff.validator.TxID),
+					Delete: true,
+				})
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
@@ -566,12 +566,8 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				toDeleteTxIDs = append(toDeleteTxIDs, staker.TxID)
-			}
-
-			for _, txID := range toDeleteTxIDs {
 				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
-					Key:    merklePendingStakersKey(txID),
+					Key:    merklePendingStakersKey(staker.TxID),
 					Delete: true,
 				})
 			}
