@@ -85,7 +85,7 @@ func (d *diff) NewView() (merkledb.TrieView, error) {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	ops, err := d.getMerkleChanges()
+	changes, err := d.getMerkleChanges()
 	if err != nil {
 		return nil, err
 	}
@@ -95,9 +95,7 @@ func (d *diff) NewView() (merkledb.TrieView, error) {
 		return nil, err
 	}
 
-	return parentView.NewView(context.Background(), merkledb.ViewChanges{
-		BatchOps: ops,
-	})
+	return parentView.NewView(context.Background(), changes)
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -410,21 +408,21 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 	}
 }
 
-func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
-	batchOps := []database.BatchOp{}
+func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
+	changes := merkledb.ViewChanges{}
 
 	// writeMetadata
 	encodedChainTime, err := d.timestamp.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("failed to encoding chainTime: %w", err)
+		return merkledb.ViewChanges{}, fmt.Errorf("failed to encoding chainTime: %w", err)
 	}
-	batchOps = append(batchOps, database.BatchOp{
+	changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 		Key:   merkleChainTimeKey,
 		Value: encodedChainTime,
 	})
 	for subnetID, supply := range d.currentSupply {
 		key := merkleSuppliesKey(subnetID)
-		batchOps = append(batchOps, database.BatchOp{
+		changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 			Key:   key,
 			Value: database.PackUInt64(supply),
 		})
@@ -433,7 +431,7 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 	// writePermissionedSubnets
 	for _, subnet := range d.addedSubnets {
 		key := merklePermissionedSubnetKey(subnet.ID())
-		batchOps = append(batchOps, database.BatchOp{
+		changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 			Key:   key,
 			Value: subnet.Bytes(),
 		})
@@ -445,11 +443,11 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 
 		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal subnet owner: %w", err)
+			return merkledb.ViewChanges{}, fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
 
 		key := merkleSubnetOwnersKey(subnetID)
-		batchOps = append(batchOps, database.BatchOp{
+		changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 			Key:   key,
 			Value: ownerBytes,
 		})
@@ -459,7 +457,7 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 	for _, tx := range d.transformedSubnets {
 		transformSubnetTx := tx.Unsigned.(*txs.TransformSubnetTx)
 		key := merkleElasticSubnetKey(transformSubnetTx.Subnet)
-		batchOps = append(batchOps, database.BatchOp{
+		changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 			Key:   key,
 			Value: transformSubnetTx.Bytes(),
 		})
@@ -471,7 +469,7 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 			createChainTx := chain.Unsigned.(*txs.CreateChainTx)
 			subnetID := createChainTx.SubnetID
 			key := merkleChainKey(subnetID, chain.ID())
-			batchOps = append(batchOps, database.BatchOp{
+			changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 				Key:   key,
 				Value: chain.Bytes(),
 			})
@@ -516,7 +514,7 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 			for _, txIDAndReward := range toAddTxIDAndRewards {
 				tx, _, err := d.GetTx(txIDAndReward.txID)
 				if err != nil {
-					return nil, err
+					return merkledb.ViewChanges{}, err
 				}
 
 				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
@@ -524,17 +522,17 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 					PotentialReward: txIDAndReward.reward,
 				})
 				if err != nil {
-					return nil, err
+					return merkledb.ViewChanges{}, err
 				}
 
-				batchOps = append(batchOps, database.BatchOp{
+				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 					Key:   merkleCurrentStakersKey(txIDAndReward.txID),
 					Value: stakersDataBytes,
 				})
 			}
 
 			for _, txID := range toDeleteTxIDs {
-				batchOps = append(batchOps, database.BatchOp{
+				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 					Key:    merkleCurrentStakersKey(txID),
 					Delete: true,
 				})
@@ -575,7 +573,7 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 			}
 
 			for _, txID := range toDeleteTxIDs {
-				batchOps = append(batchOps, database.BatchOp{
+				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 					Key:    merklePendingStakersKey(txID),
 					Delete: true,
 				})
@@ -584,7 +582,7 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 			for _, txIDAndReward := range toAddTxIDAndRewards {
 				tx, _, err := d.GetTx(txIDAndReward.txID)
 				if err != nil {
-					return nil, err
+					return merkledb.ViewChanges{}, err
 				}
 
 				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
@@ -592,10 +590,10 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 					PotentialReward: txIDAndReward.reward,
 				})
 				if err != nil {
-					return nil, err
+					return merkledb.ViewChanges{}, err
 				}
 
-				batchOps = append(batchOps, database.BatchOp{
+				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 					Key:   merklePendingStakersKey(txIDAndReward.txID),
 					Value: stakersDataBytes,
 				})
@@ -607,7 +605,7 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 	for subnetID, nodes := range d.modifiedDelegateeRewards {
 		for nodeID, amount := range nodes {
 			key := merkleDelegateeRewardsKey(nodeID, subnetID)
-			batchOps = append(batchOps, database.BatchOp{
+			changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 				Key:   key,
 				Value: database.PackUInt64(amount),
 			})
@@ -622,9 +620,9 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 			// Inserting a UTXO
 			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
 			if err != nil {
-				return nil, err
+				return merkledb.ViewChanges{}, err
 			}
-			batchOps = append(batchOps, database.BatchOp{
+			changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 				Key:   key,
 				Value: utxoBytes,
 			})
@@ -634,17 +632,17 @@ func (d *diff) getMerkleChanges() ([]database.BatchOp, error) {
 		// Deleting a UTXO
 		switch _, err := d.GetUTXO(utxoID); err {
 		case nil:
-			batchOps = append(batchOps, database.BatchOp{
+			changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 				Key:    key,
 				Delete: true,
 			})
 		case database.ErrNotFound:
 		default:
-			return nil, err
+			return merkledb.ViewChanges{}, err
 		}
 	}
 
-	return batchOps, nil
+	return changes, nil
 }
 
 func (d *diff) Apply(baseState Chain) error {
