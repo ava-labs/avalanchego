@@ -27,8 +27,7 @@ fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Cl
 }
 
 #[test]
-#[allow(unused_must_use)]
-fn test_root_hash_simple_insertions() {
+fn test_root_hash_simple_insertions() -> Result<(), DataStoreError> {
     let items = vec![
         ("do", "verb"),
         ("doe", "reindeer"),
@@ -37,13 +36,15 @@ fn test_root_hash_simple_insertions() {
         ("horse", "stallion"),
         ("ddd", "ok"),
     ];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000).unwrap();
-    merkle.dump();
+    let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
+
+    merkle.dump()?;
+
+    Ok(())
 }
 
 #[test]
-#[allow(unused_must_use)]
-fn test_root_hash_fuzz_insertions() {
+fn test_root_hash_fuzz_insertions() -> Result<(), DataStoreError> {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
     let max_len0 = 8;
@@ -62,14 +63,17 @@ fn test_root_hash_fuzz_insertions() {
             .collect();
         key
     };
+
     for _ in 0..10 {
         let mut items = Vec::new();
         for _ in 0..10 {
             let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
             items.push((keygen(), val));
         }
-        merkle_build_test(items, 0x1000000, 0x1000000);
+        merkle_build_test(items, 0x1000000, 0x1000000)?;
     }
+
+    Ok(())
 }
 
 #[test]
