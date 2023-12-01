@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -11,9 +12,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	syncclient "github.com/ava-labs/coreth/sync/client"
@@ -56,7 +59,6 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 	if err != nil {
 		t.Fatal("could not initialize atomic backend", err)
 	}
-	atomicTrie := atomicBackend.AtomicTrie()
 
 	// For each checkpoint, replace the leafsIntercept to shut off the syncer at the correct point and force resume from the checkpoint's
 	// next trie.
@@ -110,14 +112,38 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 
 	// we re-initialise trie DB for asserting the trie to make sure any issues with unflushed writes
 	// are caught here as this will only pass if all trie nodes have been written to the underlying DB
+	atomicTrie := atomicBackend.AtomicTrie()
 	clientTrieDB := atomicTrie.TrieDB()
 	syncutils.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
 
-	// check all commit heights are created
-	for height := uint64(commitInterval); height <= targetHeight; height += commitInterval {
-		root, err := atomicTrie.Root(height)
+	// check all commit heights are created correctly
+	hasher := trie.NewEmpty(trie.NewDatabase(rawdb.NewMemoryDatabase()))
+	assert.NoError(t, err)
+
+	serverTrie, err := trie.New(trie.TrieID(targetRoot), serverTrieDB)
+	assert.NoError(t, err)
+	addAllKeysWithPrefix := func(prefix []byte) error {
+		it := trie.NewIterator(serverTrie.NodeIterator(prefix))
+		for it.Next() {
+			if !bytes.HasPrefix(it.Key, prefix) {
+				return it.Err
+			}
+			err := hasher.Update(it.Key, it.Value)
+			assert.NoError(t, err)
+		}
+		return it.Err
+	}
+
+	for height := uint64(0); height <= targetHeight; height++ {
+		err := addAllKeysWithPrefix(database.PackUInt64(height))
 		assert.NoError(t, err)
-		assert.NotZero(t, root)
+
+		if height%commitInterval == 0 {
+			expected := hasher.Hash()
+			root, err := atomicTrie.Root(height)
+			assert.NoError(t, err)
+			assert.Equal(t, expected, root)
+		}
 	}
 }
 
