@@ -70,13 +70,13 @@ var (
 	merkleBlsKeyDiffPrefix  = []byte{0x08}
 	merkleRewardUtxosPrefix = []byte{0x09}
 
-	initializedKey = []byte("initialized")
+	initializedKey         = []byte{0x00}
+	lastAcceptedBlockIDKey = []byte{0x01}
 
 	// merkle db sections
-	metadataSectionPrefix      = byte(0x00)
-	merkleChainTimeKey         = []byte{metadataSectionPrefix, 0x00}
-	merkleLastAcceptedBlkIDKey = []byte{metadataSectionPrefix, 0x01}
-	merkleSuppliesPrefix       = []byte{metadataSectionPrefix, 0x02}
+	metadataSectionPrefix = byte(0x00)
+	merkleChainTimeKey    = []byte{metadataSectionPrefix, 0x00}
+	merkleSuppliesPrefix  = []byte{metadataSectionPrefix, 0x01}
 
 	permissionedSubnetSectionPrefix = []byte{0x01}
 	elasticSubnetSectionPrefix      = []byte{0x02}
@@ -986,6 +986,19 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load(hasSynced bool) error {
+	// load last accepted block
+	lastAcceptedBlkIDBytes, err := s.singletonDB.Get(lastAcceptedBlockIDKey)
+	if err != nil {
+		return err
+	}
+
+	lastAcceptedBlkID, err := ids.ToID(lastAcceptedBlkIDBytes)
+	if err != nil {
+		return err
+	}
+	s.SetLastAccepted(lastAcceptedBlkID)
+	s.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
+
 	return utils.Err(
 		s.loadMerkleMetadata(),
 		s.loadCurrentStakers(),
@@ -1010,16 +1023,6 @@ func (s *state) loadMerkleMetadata() error {
 	}
 	s.latestComittedChainTime = chainTime
 	s.SetTimestamp(chainTime)
-
-	// load last accepted block
-	blkIDBytes, err := s.merkleDB.Get(merkleLastAcceptedBlkIDKey)
-	if err != nil {
-		return err
-	}
-	lastAcceptedBlkID := ids.Empty
-	copy(lastAcceptedBlkID[:], blkIDBytes)
-	s.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
-	s.SetLastAccepted(lastAcceptedBlkID)
 
 	// We don't need to load supplies. Unlike chain time and last block ID,
 	// which have the persisted* attribute, we signify that a supply hasn't
@@ -1172,6 +1175,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeBlsKeyDiffs(height, blsKeyDiffs),
 		s.writeRewardUTXOs(),
 		s.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
+		s.singletonDB.Put(lastAcceptedBlockIDKey, s.lastAcceptedBlkID[:]), // Write last accepted block ID
 	)
 }
 
@@ -1801,14 +1805,6 @@ func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
 			Value: encodedChainTime,
 		})
 		s.latestComittedChainTime = s.chainTime
-	}
-
-	if s.lastAcceptedBlkID != s.latestCommittedLastAcceptedBlkID {
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   merkleLastAcceptedBlkIDKey,
-			Value: s.lastAcceptedBlkID[:],
-		})
-		s.latestCommittedLastAcceptedBlkID = s.lastAcceptedBlkID
 	}
 
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
