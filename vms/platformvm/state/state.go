@@ -1448,7 +1448,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 		tx, _, err := s.GetTx(txID)
 		if err != nil {
-			return fmt.Errorf("failed loading validator transaction txID %v, %w", txID, err)
+			return fmt.Errorf("failed loading validator transaction txID %s, %w", txID, err)
 		}
 
 		stakerTx, ok := tx.Unsigned.(txs.Staker)
