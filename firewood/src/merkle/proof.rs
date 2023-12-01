@@ -19,6 +19,8 @@ use crate::{
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
 };
 
+use super::TRIE_HASH_LEN;
+
 #[derive(Debug, Error)]
 pub enum ProofError {
     #[error("decoding error")]
@@ -91,15 +93,14 @@ impl From<DbError> for ProofError {
 #[derive(Clone, Debug)]
 pub struct Proof<N>(pub HashMap<HashKey, N>);
 
-/// SubProof contains the encoded value and the hash value of a node that maps
+/// `SubProof` contains the value or the hash of a node that maps
 /// to a single proof step. If reaches an end step during proof verification,
-/// the hash value will be none, and the encoded value will be the value of the
-/// node.
+/// the `SubProof` should be the `Value` variant.
 
 #[derive(Debug)]
-struct SubProof {
-    encoded: Vec<u8>,
-    hash: Option<[u8; 32]>,
+enum SubProof {
+    Data(Vec<u8>),
+    Hash([u8; TRIE_HASH_LEN]),
 }
 
 impl<N: AsRef<[u8]> + Send> Proof<N> {
@@ -118,33 +119,24 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         let mut cur_hash = root_hash;
         let proofs_map = &self.0;
 
-        let value_node = loop {
+        loop {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
 
             let node = NodeType::decode(cur_proof.as_ref())?;
+            // TODO: I think this will currently fail if the key is &[];
             let (sub_proof, traversed_nibbles) = locate_subproof(key_nibbles, node)?;
             key_nibbles = traversed_nibbles;
 
             cur_hash = match sub_proof {
                 // Return when reaching the end of the key.
-                Some(p) if key_nibbles.is_empty() => break p.encoded,
+                Some(SubProof::Data(value)) if key_nibbles.is_empty() => return Ok(Some(value)),
                 // The trie doesn't contain the key.
-                Some(SubProof {
-                    hash: Some(hash), ..
-                }) => hash,
+                Some(SubProof::Hash(hash)) => hash,
                 _ => return Ok(None),
             };
-        };
-
-        let value = match NodeType::decode(&value_node) {
-            Ok(NodeType::Branch(branch)) => branch.value().as_ref().map(|v| v.to_vec()),
-            Ok(NodeType::Leaf(leaf)) => leaf.data().to_vec().into(),
-            _ => return Ok(value_node.into()),
-        };
-
-        Ok(value)
+        }
     }
 
     pub fn concat_proofs(&mut self, other: Proof<N>) {
@@ -354,14 +346,16 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                         let mut data = None;
 
                         // Decode the last subproof to get the value.
-                        if let Some(p_hash) = p.hash.as_ref() {
-                            let proof =
-                                proofs_map.get(p_hash).ok_or(ProofError::ProofNodeMissing)?;
+                        if let SubProof::Hash(p_hash) = p {
+                            let proof = proofs_map
+                                .get(&p_hash)
+                                .ok_or(ProofError::ProofNodeMissing)?;
 
                             chd_ptr = self.decode_node(merkle, cur_key, proof.as_ref(), true)?.0;
 
                             // Link the child to the parent based on the node type.
                             match &u_ref.inner() {
+                                // TODO: add path
                                 NodeType::Branch(n) if n.chd()[branch_index].is_none() => {
                                     // insert the leaf to the empty slot
                                     u_ref
@@ -411,8 +405,12 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                             NodeType::Leaf(n) => {
                                 // Return the value on the node only when the key matches exactly
                                 // (e.g. the length path of subproof node is 0).
-                                if p.hash.is_none() || (p.hash.is_some() && n.path().len() == 0) {
-                                    data = Some(n.data().deref().to_vec());
+                                match p {
+                                    SubProof::Data(_) => data = Some(n.data().deref().to_vec()),
+                                    SubProof::Hash(_) if n.path().len() == 0 => {
+                                        data = Some(n.data().deref().to_vec())
+                                    }
+                                    _ => (),
                                 }
                             }
                             _ => (),
@@ -422,7 +420,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     }
 
                     // The trie doesn't contain the key.
-                    if p.hash.is_none() {
+                    let SubProof::Hash(hash) = p else {
                         return if allow_non_existent_node {
                             Ok(None)
                         } else {
@@ -430,7 +428,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                         };
                     };
 
-                    cur_hash = p.hash.unwrap();
+                    cur_hash = hash;
                     cur_key = &chunks[key_index..];
                 }
             }
@@ -455,17 +453,17 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             .put_node(Node::from(node))
             .map_err(ProofError::InvalidNode)?;
         let addr = new_node.as_ptr();
+
         match new_node.inner() {
             NodeType::Leaf(n) => {
                 let cur_key = n.path().0.as_ref();
+
                 if !key.contains_other(cur_key) {
                     return Ok((addr, None, 0));
                 }
 
-                let subproof = SubProof {
-                    encoded: n.data().to_vec(),
-                    hash: None,
-                };
+                let subproof = SubProof::Data(n.data().to_vec());
+
                 Ok((addr, subproof.into(), cur_key.len()))
             }
             NodeType::Extension(n) => {
@@ -512,12 +510,9 @@ fn locate_subproof(
                 return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
             }
 
-            let encoded = n.data().to_vec();
+            let encoded: Vec<u8> = n.data().to_vec();
 
-            let sub_proof = SubProof {
-                encoded,
-                hash: None,
-            };
+            let sub_proof = SubProof::Data(encoded);
 
             Ok((sub_proof.into(), key_nibbles))
         }
@@ -536,9 +531,15 @@ fn locate_subproof(
 
             Ok((sub_proof.into(), key_nibbles))
         }
-        NodeType::Branch(_) if key_nibbles.is_empty() => Err(ProofError::NoSuchNode),
         NodeType::Branch(n) => {
-            let index = key_nibbles.next().unwrap() as usize;
+            let Some(index) = key_nibbles.next().map(|nib| nib as usize) else {
+                let encoded = n.value;
+
+                let sub_proof = encoded.map(|encoded| SubProof::Data(encoded.into_inner()));
+
+                return Ok((sub_proof, key_nibbles));
+            };
+
             // consume items returning the item at index
             let data = n.chd_encode()[index]
                 .as_ref()
@@ -549,24 +550,18 @@ fn locate_subproof(
     }
 }
 
-fn generate_subproof(data: Vec<u8>) -> Result<SubProof, ProofError> {
-    match data.len() {
+fn generate_subproof(encoded: Vec<u8>) -> Result<SubProof, ProofError> {
+    match encoded.len() {
         0..=31 => {
-            let sub_hash = sha3::Keccak256::digest(&data).into();
-            Ok(SubProof {
-                encoded: data,
-                hash: Some(sub_hash),
-            })
+            let sub_hash = sha3::Keccak256::digest(&encoded).into();
+            Ok(SubProof::Hash(sub_hash))
         }
 
         32 => {
-            let sub_hash: &[u8] = &data;
+            let sub_hash: &[u8] = &encoded;
             let sub_hash = sub_hash.try_into().unwrap();
 
-            Ok(SubProof {
-                encoded: data,
-                hash: Some(sub_hash),
-            })
+            Ok(SubProof::Hash(sub_hash))
         }
 
         len => Err(ProofError::DecodeError(Box::new(

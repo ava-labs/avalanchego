@@ -55,6 +55,12 @@ impl From<Vec<u8>> for Data {
     }
 }
 
+impl Data {
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 enum Encoded<T> {
     Raw(T),

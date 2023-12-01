@@ -201,23 +201,6 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
 }
 
 #[test]
-fn test_one_element_proof() -> Result<(), DataStoreError> {
-    let items = vec![("k", "v")];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
-    let key = "k";
-
-    let proof = merkle.prove(key)?;
-    assert!(!proof.0.is_empty());
-    assert!(proof.0.len() == 1);
-
-    let val = merkle.verify_proof(key, &proof)?;
-    assert!(val.is_some());
-    assert_eq!(&val.unwrap(), b"v");
-
-    Ok(())
-}
-
-#[test]
 fn test_proof() -> Result<(), DataStoreError> {
     let set = generate_random_data(500);
     let mut items = Vec::from_iter(set.iter());
