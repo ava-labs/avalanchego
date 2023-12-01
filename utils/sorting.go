@@ -5,8 +5,9 @@ package utils
 
 import (
 	"bytes"
-	"cmp"
-	"slices"
+
+	"golang.org/x/exp/constraints"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -23,7 +24,10 @@ func Sort[T Sortable[T]](s []T) {
 		if a.Less(b) {
 			return -1
 		}
-		return 1
+		if b.Less(a) {
+			return 1
+		}
+		return 0
 	})
 }
 
@@ -66,7 +70,7 @@ func IsSortedAndUnique[T Sortable[T]](s []T) bool {
 }
 
 // Returns true iff the elements in [s] are unique and sorted.
-func IsSortedAndUniqueOrdered[T cmp.Ordered](s []T) bool {
+func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] >= s[i+1] {
 			return false
