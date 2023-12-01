@@ -542,14 +542,12 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.ScheduledStaker) error {
 	}
 
 	switch priority := staker.Priority; {
-	case priority.IsCurrentValidator():
-		e.State.PutCurrentValidator(staker)
-	case priority.IsCurrentDelegator():
-		e.State.PutCurrentDelegator(staker)
 	case priority.IsPendingValidator():
 		e.State.PutPendingValidator(staker)
 	case priority.IsPendingDelegator():
 		e.State.PutPendingDelegator(staker)
+	default:
+		return fmt.Errorf("staker %s, unexpected priority %d", staker.TxID, priority)
 	}
 	return nil
 }
