@@ -5,9 +5,8 @@ package utils
 
 import (
 	"bytes"
-
-	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
+	"cmp"
+	"slices"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -20,15 +19,20 @@ type Sortable[T any] interface {
 
 // Sorts the elements of [s].
 func Sort[T Sortable[T]](s []T) {
-	slices.SortFunc(s, T.Less)
+	slices.SortFunc(s, func(a, b T) int {
+		if a.Less(b) {
+			return -1
+		}
+		return 1
+	})
 }
 
 // Sorts the elements of [s] based on their hashes.
 func SortByHash[T ~[]byte](s []T) {
-	slices.SortFunc(s, func(i, j T) bool {
+	slices.SortFunc(s, func(i, j T) int {
 		iHash := hashing.ComputeHash256(i)
 		jHash := hashing.ComputeHash256(j)
-		return bytes.Compare(iHash, jHash) == -1
+		return bytes.Compare(iHash, jHash)
 	})
 }
 
@@ -36,8 +40,8 @@ func SortByHash[T ~[]byte](s []T) {
 // Each byte slice is not sorted internally; the byte slices are sorted relative
 // to one another.
 func SortBytes[T ~[]byte](s []T) {
-	slices.SortFunc(s, func(i, j T) bool {
-		return bytes.Compare(i, j) == -1
+	slices.SortFunc(s, func(i, j T) int {
+		return bytes.Compare(i, j)
 	})
 }
 
@@ -62,7 +66,7 @@ func IsSortedAndUnique[T Sortable[T]](s []T) bool {
 }
 
 // Returns true iff the elements in [s] are unique and sorted.
-func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
+func IsSortedAndUniqueOrdered[T cmp.Ordered](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] >= s[i+1] {
 			return false
