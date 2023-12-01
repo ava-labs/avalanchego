@@ -782,7 +782,6 @@ func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 	b.Ctx.Log.Debug("Checking for new frontiers")
 	b.restarted = true
 	b.outstandingRequests = bimap.New[common.Request, ids.ID]()
-
 	return b.startBootstrapping(ctx)
 }
 
