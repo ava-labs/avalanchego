@@ -835,7 +835,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Show that other verify call would not call coreBlk.Verify()
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -902,7 +902,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -969,7 +969,7 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -1021,7 +1021,7 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -1058,7 +1058,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -1177,7 +1177,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 5)
 	proVM.Set(coreGenBlk.Timestamp())
