@@ -1,6 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![allow(clippy::indexing_slicing)]
 #[cfg(test)]
 use async_trait::async_trait;
 use futures::executor::block_on;

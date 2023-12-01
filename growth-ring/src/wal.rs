@@ -289,13 +289,17 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         })
     }
 
-    #[allow(clippy::unwrap_used)]
     async fn read_header(&self) -> Result<Header, WalError> {
-        let bytes = self.header_file.read(0, HEADER_SIZE).await?.unwrap();
-        #[allow(clippy::unwrap_used)]
-        let bytes: [u8; HEADER_SIZE] = (&*bytes).try_into().unwrap();
-        let header: Header = cast_slice(&bytes)[0];
-        Ok(header)
+        let bytes = self
+            .header_file
+            .read(0, HEADER_SIZE)
+            .await?
+            .ok_or(WalError::Other("EOF".to_string()))?;
+        let slice = cast_slice::<_, Header>(&bytes);
+        slice
+            .get(0)
+            .copied()
+            .ok_or(WalError::Other("short read".to_string()))
     }
 
     async fn write_header(&self, header: &Header) -> Result<(), WalError> {
@@ -376,8 +380,11 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         for &(fid, _) in meta.iter() {
             files.push(Box::pin(self.get_file(fid, true)) as Pin<Box<dyn Future<Output = _> + 'a>>)
         }
+        #[allow(clippy::indexing_slicing)]
         let mut fid = writes[0].0 >> file_nbit;
+        #[allow(clippy::indexing_slicing)]
         let mut alloc_start = writes[0].0 & (self.file_size - 1);
+        #[allow(clippy::indexing_slicing)]
         let mut alloc_end = alloc_start + writes[0].1.len() as u64;
         let last_write = unsafe {
             std::mem::replace(&mut *self.last_write.get(), std::mem::MaybeUninit::uninit())
@@ -549,11 +556,13 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
             while rsize > 0 {
                 let remain = self.block_size - bbuff_cur;
 
+                #[allow(clippy::indexing_slicing)] // TODO: remove this to reduce scope
                 if remain > msize {
                     let d = remain - msize;
                     let rs0 = self.state.next + (bbuff_cur - bbuff_start) as u64;
 
                     let blob = unsafe {
+                        #[allow(clippy::indexing_slicing)]
                         &mut *self.block_buffer[bbuff_cur as usize..]
                             .as_mut_ptr()
                             .cast::<WalRingBlob>()
@@ -577,6 +586,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         };
 
                         blob.rtype = rt as u8;
+                        #[allow(clippy::indexing_slicing)]
                         self.block_buffer[bbuff_cur as usize..bbuff_cur as usize + payload.len()]
                             .copy_from_slice(payload);
                         bbuff_cur += rsize;
@@ -593,6 +603,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         ));
                     } else {
                         // the remaining block can only accommodate partial rec
+                        #[allow(clippy::indexing_slicing)]
                         let payload = &rec[..d as usize];
                         blob.counter = self.state.counter;
                         blob.crc32 = CRC32.checksum(payload);
@@ -605,10 +616,12 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                             WalRingType::First
                         } as u8;
 
+                        #[allow(clippy::indexing_slicing)]
                         self.block_buffer[bbuff_cur as usize..bbuff_cur as usize + payload.len()]
                             .copy_from_slice(payload);
                         bbuff_cur += d;
                         rsize -= d;
+                        // TODO: not allowed: #[allow(clippy::indexing_slicing)]
                         rec = &rec[d as usize..];
                     }
                 } else {
@@ -617,6 +630,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                 }
 
                 if bbuff_cur == self.block_size {
+                    #[allow(clippy::indexing_slicing)]
                     writes.push((
                         self.state.next,
                         self.block_buffer[bbuff_start as usize..]
@@ -631,6 +645,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
         }
 
         if bbuff_cur > bbuff_start {
+            #[allow(clippy::indexing_slicing)]
             writes.push((
                 self.state.next,
                 self.block_buffer[bbuff_start as usize..bbuff_cur as usize]
@@ -648,6 +663,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
             let blk_s = *off;
             let blk_e = blk_s + w.len() as u64;
 
+            #[allow(clippy::indexing_slicing)]
             while res[i].0.end <= blk_s {
                 i += 1;
 
@@ -656,6 +672,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                 }
             }
 
+            #[allow(clippy::indexing_slicing)]
             while res[i].0.start < blk_e {
                 res[i].1.push(j);
 
@@ -681,6 +698,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
         res.into_iter()
             .zip(records)
             .map(|((ringid, blks), rec)| {
+                #[allow(clippy::indexing_slicing)]
                 future::try_join_all(blks.into_iter().map(|idx| writes[idx].clone()))
                     .or_else(|_| future::ready(Err(())))
                     .and_then(move |_| future::ready(Ok((rec, ringid))))
@@ -1157,6 +1175,7 @@ impl WalLoader {
                                 let mut payload =
                                     vec![0; chunks.iter().fold(0, |acc, v| acc + v.len())];
                                 let mut ps = &mut payload[..];
+                                #[allow(clippy::indexing_slicing)]
                                 for c in chunks {
                                     ps[..c.len()].copy_from_slice(&c);
                                     ps = &mut ps[c.len()..];
