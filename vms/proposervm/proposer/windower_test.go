@@ -379,3 +379,53 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		require.Equal(validatorIDs[9], proposerID)
 	}
 }
+
+func TestExpectedProposerVariance(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		subnetID = ids.ID{0, 1}
+		chainID  = ids.ID{0, 2}
+
+		validatorsCount = 10
+	)
+
+	validatorIDs := make([]ids.NodeID, validatorsCount)
+	for i := range validatorIDs {
+		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
+	}
+	vdrState := &validators.TestState{
+		T: t,
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
+			for _, id := range validatorIDs {
+				vdrs[id] = &validators.GetValidatorOutput{
+					NodeID: id,
+					Weight: 1,
+				}
+			}
+			return vdrs, nil
+		},
+	}
+
+	w := New(vdrState, subnetID, chainID)
+
+	var (
+		dummyCtx        = context.Background()
+		pChainHeight    = uint64(0)
+		parentBlockTime = time.Now().Truncate(time.Second)
+
+		chainHeight = uint64(10)
+		blockTime   = parentBlockTime.Add(time.Second)
+	)
+
+	proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, blockTime, parentBlockTime)
+	require.NoError(err)
+	require.Equal(validatorIDs[6], proposerID)
+
+	chainHeight += 1
+	blockTime = parentBlockTime.Add(WindowDuration).Add(time.Second)
+	proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, blockTime, parentBlockTime)
+	require.NoError(err)
+	require.Equal(validatorIDs[6], proposerID)
+}

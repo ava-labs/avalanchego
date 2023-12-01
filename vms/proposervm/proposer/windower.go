@@ -116,8 +116,11 @@ func (w *windower) ExpectedProposer(
 		return ids.EmptyNodeID, err
 	}
 
-	numToSample := 1
-	seed := chainHeight ^ w.chainSource ^ uint64((blockTime.Sub(parentBlockTime) / WindowDuration))
+	var (
+		numToSample = 1
+		slot        = blockTime.Sub(parentBlockTime) / WindowDuration
+		seed        = chainHeight ^ w.chainSource ^ uint64(slot)
+	)
 	w.sampler.Seed(int64(seed))
 
 	indices, err := w.sampler.Sample(numToSample)
