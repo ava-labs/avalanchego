@@ -99,7 +99,7 @@ var (
 	CortinaXChainStopVertexID map[uint32]ids.ID
 
 	// TODO: update this before release
-	DTimes = map[uint32]time.Time{
+	DurangoTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
@@ -191,8 +191,8 @@ func GetCortinaTime(networkID uint32) time.Time {
 	return DefaultUpgradeTime
 }
 
-func GetDTime(networkID uint32) time.Time {
-	if upgradeTime, exists := DTimes[networkID]; exists {
+func GetDurangoTime(networkID uint32) time.Time {
+	if upgradeTime, exists := DurangoTimes[networkID]; exists {
 		return upgradeTime
 	}
 	return DefaultUpgradeTime

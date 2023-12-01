@@ -502,8 +502,8 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 }
 
 func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
-	if !e.Backend.Config.IsDActivated(e.State.GetTimestamp()) {
-		return ErrDUpgradeNotActive
+	if !e.Backend.Config.IsDurangoActivated(e.State.GetTimestamp()) {
+		return ErrDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
@@ -542,14 +542,12 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.ScheduledStaker) error {
 	}
 
 	switch priority := staker.Priority; {
-	case priority.IsCurrentValidator():
-		e.State.PutCurrentValidator(staker)
-	case priority.IsCurrentDelegator():
-		e.State.PutCurrentDelegator(staker)
 	case priority.IsPendingValidator():
 		e.State.PutPendingValidator(staker)
 	case priority.IsPendingDelegator():
 		e.State.PutPendingDelegator(staker)
+	default:
+		return fmt.Errorf("staker %s, unexpected priority %d", staker.TxID, priority)
 	}
 	return nil
 }
