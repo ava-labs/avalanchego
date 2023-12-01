@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -182,10 +181,13 @@ func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error
 		return common.Hash{}, 0, nil
 	case err != nil:
 		return common.Hash{}, 0, err
-	case len(lastCommittedHeightBytes) != wrappers.LongLen:
-		return common.Hash{}, 0, fmt.Errorf("expected value of lastCommittedKey to be %d but was %d", wrappers.LongLen, len(lastCommittedHeightBytes))
 	}
-	height := binary.BigEndian.Uint64(lastCommittedHeightBytes)
+
+	height, err := database.ParseUInt64(lastCommittedHeightBytes)
+	if err != nil {
+		return common.Hash{}, 0, fmt.Errorf("expected value at lastCommittedKey to be a valid uint64: %w", err)
+	}
+
 	hash, err := db.Get(lastCommittedHeightBytes)
 	if err != nil {
 		return common.Hash{}, 0, fmt.Errorf("committed hash does not exist for committed height: %d: %w", height, err)
@@ -240,8 +242,7 @@ func (a *atomicTrie) LastCommitted() (common.Hash, uint64) {
 // updateLastCommitted adds [height] -> [root] to the index and marks it as the last committed
 // root/height pair.
 func (a *atomicTrie) updateLastCommitted(root common.Hash, height uint64) error {
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
+	heightBytes := database.PackUInt64(height)
 
 	// now save the trie hash against the height it was committed at
 	if err := a.metadataDB.Put(heightBytes, root[:]); err != nil {
@@ -291,9 +292,7 @@ func getRoot(metadataDB database.Database, height uint64) (common.Hash, error) {
 		return types.EmptyRootHash, nil
 	}
 
-	heightBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(heightBytes, height)
-
+	heightBytes := database.PackUInt64(height)
 	hash, err := metadataDB.Get(heightBytes)
 	switch {
 	case err == database.ErrNotFound:
@@ -331,12 +330,10 @@ func (a *atomicTrie) InsertTrie(nodes *trienode.NodeSet, root common.Hash) error
 // AcceptTrie commits the triedb at [root] if needed and returns true if a commit
 // was performed.
 func (a *atomicTrie) AcceptTrie(height uint64, root common.Hash) (bool, error) {
-	// Check whether we have crossed over a commitHeight.
-	// If so, make a commit with the last accepted root.
 	hasCommitted := false
-	commitHeight := nearestCommitHeight(height, a.commitInterval)
-	for commitHeight > a.lastCommittedHeight && height > commitHeight {
-		nextCommitHeight := a.lastCommittedHeight + a.commitInterval
+	// Because we do not accept the trie at every height, we may need to
+	// populate roots at prior commit heights that were skipped.
+	for nextCommitHeight := a.lastCommittedHeight + a.commitInterval; nextCommitHeight < height; nextCommitHeight += a.commitInterval {
 		if err := a.commit(nextCommitHeight, a.lastAcceptedRoot); err != nil {
 			return false, err
 		}
@@ -350,7 +347,7 @@ func (a *atomicTrie) AcceptTrie(height uint64, root common.Hash) (bool, error) {
 	a.tipBuffer.Insert(root)
 
 	// Commit this root if we have reached the [commitInterval].
-	if commitHeight == height {
+	if height%a.commitInterval == 0 {
 		if err := a.commit(height, root); err != nil {
 			return false, err
 		}
