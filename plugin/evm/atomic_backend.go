@@ -229,8 +229,10 @@ func (a *atomicBackend) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		return err
 	}
 
+	lastHeight := binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen])
+
 	lastCommittedRoot, _ := a.atomicTrie.LastCommitted()
-	log.Info("applying atomic operations to shared memory", "root", lastCommittedRoot, "lastAcceptedBlock", lastAcceptedBlock, "startHeight", binary.BigEndian.Uint64(sharedMemoryCursor[:wrappers.LongLen]))
+	log.Info("applying atomic operations to shared memory", "root", lastCommittedRoot, "lastAcceptedBlock", lastAcceptedBlock, "startHeight", lastHeight)
 
 	it, err := a.atomicTrie.Iterator(lastCommittedRoot, sharedMemoryCursor)
 	if err != nil {
@@ -248,19 +250,25 @@ func (a *atomicBackend) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 	// specifying the last atomic operation that was applied to shared memory.
 	// To avoid applying the same operation twice, we call [it.Next()] in the
 	// latter case.
+	var lastBlockchainID ids.ID
 	if len(sharedMemoryCursor) > wrappers.LongLen {
+		lastBlockchainID, err = ids.ToID(sharedMemoryCursor[wrappers.LongLen:])
+		if err != nil {
+			return err
+		}
+
 		it.Next()
 	}
 
 	batchOps := make(map[ids.ID]*atomic.Requests)
 	for it.Next() {
 		height := it.BlockNumber()
-		atomicOps := it.AtomicOps()
-
 		if height > lastAcceptedBlock {
 			log.Warn("Found height above last accepted block while applying operations to shared memory", "height", height, "lastAcceptedBlock", lastAcceptedBlock)
 			break
 		}
+
+		atomicOps := it.AtomicOps()
 
 		putRequests += len(atomicOps.PutRequests)
 		removeRequests += len(atomicOps.RemoveRequests)
@@ -270,7 +278,9 @@ func (a *atomicBackend) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 			log.Info("atomic trie iteration", "height", height, "puts", totalPutRequests, "removes", totalRemoveRequests)
 			lastUpdate = time.Now()
 		}
-		mergeAtomicOpsToMap(batchOps, it.BlockchainID(), atomicOps)
+
+		blockchainID := it.BlockchainID()
+		mergeAtomicOpsToMap(batchOps, blockchainID, atomicOps)
 
 		if putRequests+removeRequests > sharedMemoryApplyBatchSize {
 			// Update the cursor to the key of the atomic operation being executed on shared memory.
@@ -285,8 +295,14 @@ func (a *atomicBackend) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 			}
 			// calling [sharedMemory.Apply] updates the last applied pointer atomically with the shared memory operation.
 			if err = a.sharedMemory.Apply(batchOps, batch); err != nil {
-				return err
+				return fmt.Errorf("failed committing shared memory operations between %d:%s and %d:%s with: %w",
+					lastHeight, lastBlockchainID,
+					height, blockchainID,
+					err,
+				)
 			}
+			lastHeight = height
+			lastBlockchainID = blockchainID
 			putRequests, removeRequests = 0, 0
 			batchOps = make(map[ids.ID]*atomic.Requests)
 		}
@@ -303,7 +319,11 @@ func (a *atomicBackend) ApplyToSharedMemory(lastAcceptedBlock uint64) error {
 		return err
 	}
 	if err = a.sharedMemory.Apply(batchOps, batch); err != nil {
-		return err
+		return fmt.Errorf("failed committing shared memory operations between %d:%s and %d with: %w",
+			lastHeight, lastBlockchainID,
+			lastAcceptedBlock,
+			err,
+		)
 	}
 	log.Info("finished applying atomic operations", "puts", totalPutRequests, "removes", totalRemoveRequests)
 	return nil
