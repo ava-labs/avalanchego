@@ -768,6 +768,7 @@ func (m *manager) createAvalancheChain(
 	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
 	// using.
 	var vmWrappingProposerVM block.ChainVM = proposervm.New(
+		vmWrappedInsideProposerVM,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
@@ -776,7 +777,6 @@ func (m *manager) createAvalancheChain(
 			StakingLeafSigner:   m.stakingSigner,
 			StakingCertLeaf:     m.stakingCert,
 		},
-		vmWrappedInsideProposerVM,
 	)
 
 	if m.MeterVMEnabled {
@@ -1113,6 +1113,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	vm = proposervm.New(
+		vm,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
@@ -1121,7 +1122,6 @@ func (m *manager) createSnowmanChain(
 			StakingLeafSigner:   m.stakingSigner,
 			StakingCertLeaf:     m.stakingCert,
 		},
-		vm,
 	)
 
 	if m.MeterVMEnabled {

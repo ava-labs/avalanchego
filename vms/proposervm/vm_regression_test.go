@@ -45,6 +45,7 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 	}
 
 	proVM := New(
+		innerVM,
 		Config{
 			ActivationTime:      time.Time{},
 			MinimumPChainHeight: 0,
@@ -53,7 +54,6 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		innerVM,
 	)
 
 	defer func() {

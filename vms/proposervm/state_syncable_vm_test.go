@@ -69,6 +69,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 
 	// create the VM
 	vm := New(
+		innerVM,
 		Config{
 			ActivationTime:      time.Time{},
 			MinimumPChainHeight: 0,
@@ -77,7 +78,6 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		innerVM,
 	)
 
 	ctx := snow.DefaultContextTest()
