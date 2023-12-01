@@ -35,6 +35,7 @@ The plugin version is unchanged at `30` and is compatible with versions `v1.10.1
 
 ### Fixes
 
+- Fixed `duplicated operation on provided value` error when executing atomic operations after state syncing the C-chain
 - Prevented closure of `stdout` and `stderr` when shutting down the logger
 
 ### What's Changed
@@ -65,6 +66,7 @@ The plugin version is unchanged at `30` and is compatible with versions `v1.10.1
 - Rename `testnet` fixture to `tmpnet` by @marun in https://github.com/ava-labs/avalanchego/pull/2307
 - Add `p2p.Network` component by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2283
 - `vms/platformvm`: Move `GetRewardUTXOs`, `GetSubnets`, and `GetChains` to `State` interface by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2402
+- Add more descriptive formatted error by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2403
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.16...v1.10.17
 
