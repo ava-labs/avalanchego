@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -643,13 +641,10 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.db,
 		nil,
-		prometheus.NewRegistry(),
 		vm.Config.Validators,
-		execCfg,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
@@ -950,13 +945,10 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.db,
 		nil,
-		prometheus.NewRegistry(),
 		vm.Config.Validators,
-		execCfg,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
