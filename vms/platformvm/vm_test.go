@@ -371,7 +371,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		ApricotPhase5Time:      apricotPhase5Time,
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
-		DTime:                  dTime,
+		DurangoTime:            dTime,
 	}}
 
 	db := memdb.New()
@@ -1250,7 +1250,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		DTime:                  latestForkTime,
+		DurangoTime:            latestForkTime,
 	}}
 
 	firstCtx := defaultContext(t)
@@ -1335,7 +1335,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		DTime:                  latestForkTime,
+		DurangoTime:            latestForkTime,
 	}}
 
 	secondCtx := defaultContext(t)
@@ -1387,7 +1387,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		DTime:                  latestForkTime,
+		DurangoTime:            latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1728,7 +1728,7 @@ func TestUnverifiedParent(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		DTime:                  latestForkTime,
+		DurangoTime:            latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1890,7 +1890,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		DTime:                  latestForkTime,
+		DurangoTime:            latestForkTime,
 	}}
 
 	firstCtx := defaultContext(t)
@@ -1936,7 +1936,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		DTime:                  latestForkTime,
+		DurangoTime:            latestForkTime,
 	}}
 
 	secondCtx := defaultContext(t)
@@ -2031,7 +2031,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
-		DTime:                  latestForkTime,
+		DurangoTime:            latestForkTime,
 	}}
 
 	ctx := defaultContext(t)

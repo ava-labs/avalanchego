@@ -874,7 +874,7 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	now := env.clk.Time()
 	env.config.BanffTime = now.Add(SyncBound)
 	env.config.CortinaTime = now.Add(SyncBound)
-	env.config.DTime = now.Add(SyncBound)
+	env.config.DurangoTime = now.Add(SyncBound)
 
 	// Proposed advancing timestamp to the banff timestamp
 	tx, err := env.txBuilder.NewAdvanceTimeTx(now.Add(SyncBound))
