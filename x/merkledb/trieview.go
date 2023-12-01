@@ -834,11 +834,14 @@ func (t *trieView) insert(
 
 	if closestNode == nil {
 		// [t.root.key] isn't a prefix of [key].
-		oldRoot := t.root.Value()
-		commonPrefixLength := getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, t.tokenSize)
-		commonPrefix := oldRoot.key.Take(commonPrefixLength)
-		newRoot := newNode(commonPrefix)
-		newRoot.addChild(oldRoot, t.tokenSize)
+		var (
+			oldRoot            = t.root.Value()
+			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, t.tokenSize)
+			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
+			newRoot            = newNode(commonPrefix)
+			oldRootID          = oldRoot.calculateID(t.db.metrics)
+		)
+		newRoot.addChildWithID(oldRoot, t.tokenSize, oldRootID) // todo comment
 		if err := t.recordNewNode(newRoot); err != nil {
 			return nil, err
 		}

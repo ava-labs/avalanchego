@@ -105,10 +105,15 @@ func (n *node) setValueDigest() {
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
 func (n *node) addChild(childNode *node, tokenSize int) {
+	n.addChildWithID(childNode, tokenSize, ids.Empty)
+}
+
+func (n *node) addChildWithID(childNode *node, tokenSize int, childID ids.ID) {
 	n.setChildEntry(
 		childNode.key.Token(n.key.length, tokenSize),
 		&child{
 			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
+			id:            childID,
 			hasValue:      childNode.hasValue(),
 		},
 	)

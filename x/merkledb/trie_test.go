@@ -593,9 +593,9 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	key1, key2, keyPrefix := []byte("key12"), []byte("key1F"), []byte("key1")
+	key1, key2, keyPrefix := []byte("12"), []byte("1F"), []byte("1")
 
-	trieIntf, err := dbTrie.NewView(
+	view1, err := dbTrie.NewView(
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
@@ -603,11 +603,13 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 			},
 		})
 	require.NoError(err)
-	trie := trieIntf.(*trieView)
+
+	// trie is:
+	// [1]
 
 	// create new node with common prefix whose children
 	// are key1, key2
-	view2, err := trie.NewView(
+	view2, err := view1.NewView(
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
@@ -616,21 +618,28 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 		})
 	require.NoError(err)
 
+	// trie is:
+	//    [1]
+	//    /  \
+	// [12]  [1F]
+
 	// clear the hash count to ignore setup
 	dbTrie.metrics.(*mockMetrics).hashCount = 0
 
-	// force the new root to calculate
+	// calculate the root
 	_, err = view2.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	// Make sure the branch node with the common prefix was created.
+	// Make sure the root is an intermediate node with the expected common prefix.
 	// Note it's only created on call to GetMerkleRoot, not in NewView.
-	gotRoot, err := view2.getEditableNode(ToKey(keyPrefix), false)
+	prefixNode, err := view2.getEditableNode(ToKey(keyPrefix), false)
 	require.NoError(err)
-	require.Equal(view2.getRoot().Value(), gotRoot)
+	root := view2.getRoot().Value()
+	require.Equal(root, prefixNode)
+	require.Len(root.children, 2)
 
-	// Had to hash new root and new child of root.
-	require.Equal(int64(2), dbTrie.metrics.(*mockMetrics).hashCount)
+	// Had to hash each of the new nodes ("12" and "1F") and the new root
+	require.Equal(int64(3), dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_HashCountOnDelete(t *testing.T) {
@@ -671,8 +680,17 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
-	// The new root is key1; it didn't change so no need to do more hashes
-	require.Equal(oldCount, dbTrie.metrics.(*mockMetrics).hashCount)
+	// trie is:
+	//      [key0] (first 28 bits)
+	//      /  \
+	// [key1]  [key2]
+	root := view.getRoot().Value()
+	expectedRootKey := ToKey([]byte("key0")).Take(28)
+	require.Equal(expectedRootKey, root.key)
+	require.Len(root.children, 2)
+
+	// Had to hash the new root but not [key1] or [key2] nodes
+	require.Equal(oldCount+1, dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_NoExistingResidual(t *testing.T) {
