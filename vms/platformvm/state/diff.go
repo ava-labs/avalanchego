@@ -439,6 +439,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 
 	// writeSubnetOwners
 	for subnetID, owner := range d.subnetOwners {
+		owner := owner
 		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
 		if err != nil {
 			return merkledb.ViewChanges{}, fmt.Errorf("failed to marshal subnet owner: %w", err)
