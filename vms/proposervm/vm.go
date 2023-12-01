@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"crypto"
 	"errors"
 	"fmt"
 	"time"
@@ -26,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -86,18 +84,10 @@ func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 
 type VM struct {
 	block.ChainVM
+	Config
 	blockBuilderVM block.BuildBlockWithContextChainVM
 	batchedVM      block.BatchedChainVM
 	ssVM           block.StateSyncableVM
-
-	activationTime      time.Time
-	minimumPChainHeight uint64
-	minBlkDelay         time.Duration
-	numHistoricalBlocks uint64
-	// block signer
-	stakingLeafSigner crypto.Signer
-	// block certificate
-	stakingCertLeaf *staking.Certificate
 
 	state.State
 	hIndexer indexer.HeightIndexer
@@ -137,29 +127,18 @@ type VM struct {
 // New performs best when [minBlkDelay] is whole seconds. This is because block
 // timestamps are only specific to the second.
 func New(
+	config Config,
 	vm block.ChainVM,
-	activationTime time.Time,
-	minimumPChainHeight uint64,
-	minBlkDelay time.Duration,
-	numHistoricalBlocks uint64,
-	stakingLeafSigner crypto.Signer,
-	stakingCertLeaf *staking.Certificate,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
 		ChainVM:        vm,
+		Config:         config,
 		blockBuilderVM: blockBuilderVM,
 		batchedVM:      batchedVM,
 		ssVM:           ssVM,
-
-		activationTime:      activationTime,
-		minimumPChainHeight: minimumPChainHeight,
-		minBlkDelay:         minBlkDelay,
-		numHistoricalBlocks: numHistoricalBlocks,
-		stakingLeafSigner:   stakingLeafSigner,
-		stakingCertLeaf:     stakingCertLeaf,
 	}
 }
 
@@ -373,8 +352,8 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the subnet config.
-	if minDelay < vm.minBlkDelay {
-		minDelay = vm.minBlkDelay
+	if minDelay < vm.MinBlkDelay {
+		minDelay = vm.MinBlkDelay
 	}
 
 	preferredTime := blk.Timestamp()
@@ -418,7 +397,7 @@ func (vm *VM) repair(ctx context.Context) error {
 		return err
 	}
 
-	if vm.numHistoricalBlocks != 0 {
+	if vm.NumHistoricalBlocks != 0 {
 		vm.ctx.Log.Fatal("block height index must be valid when pruning historical blocks")
 		return errHeightIndexInvalidWhilePruning
 	}

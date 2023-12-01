@@ -133,13 +133,15 @@ func initTestProposerVM(
 	}
 
 	proVM := New(
+		Config{
+			ActivationTime:      proBlkStartTime,
+			MinimumPChainHeight: minPChainHeight,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		proBlkStartTime,
-		minPChainHeight,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -526,10 +528,10 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := postForkBlock{
@@ -570,10 +572,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk1 := postForkBlock{
@@ -589,10 +591,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk2 := postForkBlock{
@@ -879,13 +881,15 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	proVM := New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -1223,13 +1227,15 @@ func TestInnerVMRollback(t *testing.T) {
 	db := memdb.New()
 
 	proVM := New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -1310,13 +1316,15 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	proVM = New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -1802,13 +1810,15 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	proVM := New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -2009,13 +2019,15 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	proVM := New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -2172,13 +2184,15 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
 	vm := New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		innerVM,
-		time.Time{}, // fork is active
-		0,           // minimum P-Chain height
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	innerVM.EXPECT().Initialize(
@@ -2229,10 +2243,10 @@ func TestVMInnerBlkCache(t *testing.T) {
 		ids.GenerateTestID(), // parent
 		time.Time{},          // timestamp
 		1,                    // pChainHeight,
-		vm.stakingCertLeaf,   // cert
+		vm.StakingCertLeaf,   // cert
 		blkNearTipInnerBytes, // inner blk bytes
 		vm.ctx.ChainID,       // chain ID
-		vm.stakingLeafSigner, // key
+		vm.StakingLeafSigner, // key
 	)
 	require.NoError(err)
 
@@ -2401,13 +2415,15 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
 	vm := New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		innerVM,
-		time.Time{}, // fork is active
-		0,           // minimum P-Chain height
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	// make sure that DBs are compressed correctly
@@ -2612,13 +2628,15 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	db := prefixdb.New([]byte{}, memdb.New())
 
 	proVM := New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -2710,13 +2728,15 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	numHistoricalBlocks := uint64(2)
 	proVM = New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: numHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		numHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -2752,13 +2772,15 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	newNumHistoricalBlocks := numHistoricalBlocks + 2
 	proVM = New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: newNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		newNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	require.NoError(proVM.Initialize(

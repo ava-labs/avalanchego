@@ -659,13 +659,15 @@ func TestOptionTimestampValidity(t *testing.T) {
 	// Restart the node.
 	ctx := proVM.ctx
 	proVM = New(
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 		coreVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
 	)
 
 	coreVM.InitializeF = func(
