@@ -1166,7 +1166,7 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 // If the root is on disk, set [db.root] to it.
 // Otherwise leave [db.root] as Nothing.
 func (db *merkleDB) initializeRoot() error {
-	rootBytes, err := db.baseDB.Get(rootDBKey)
+	rootKeyBytes, err := db.baseDB.Get(rootDBKey)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
 			return err
@@ -1176,7 +1176,7 @@ func (db *merkleDB) initializeRoot() error {
 	}
 
 	// Root is on disk.
-	rootKey, err := codec.decodeKey(rootBytes)
+	rootKey, err := codec.decodeKey(rootKeyBytes)
 	if err != nil {
 		return err
 	}
