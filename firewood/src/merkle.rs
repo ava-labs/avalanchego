@@ -1957,4 +1957,48 @@ mod tests {
 
         assert_eq!(verified, Some(value2.to_vec()));
     }
+
+    // this was a specific failing case
+    #[test]
+    fn shared_path_on_insert() {
+        type Bytes = &'static [u8];
+        let pairs: Vec<(Bytes, Bytes)> = vec![
+            (
+                &[1, 1, 46, 82, 67, 218],
+                &[23, 252, 128, 144, 235, 202, 124, 243],
+            ),
+            (
+                &[1, 0, 0, 1, 1, 0, 63, 80],
+                &[99, 82, 31, 213, 180, 196, 49, 242],
+            ),
+            (
+                &[0, 0, 0, 169, 176, 15],
+                &[105, 211, 176, 51, 231, 182, 74, 207],
+            ),
+            (
+                &[1, 0, 0, 0, 53, 57, 93],
+                &[234, 139, 214, 220, 172, 38, 168, 164],
+            ),
+        ];
+
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        for (key, val) in &pairs {
+            let val = val.to_vec();
+            merkle.insert(key, val.clone(), root).unwrap();
+
+            let fetched_val = merkle.get(key, root).unwrap();
+
+            // make sure the value was inserted
+            assert_eq!(fetched_val.as_deref(), val.as_slice().into());
+        }
+
+        for (key, val) in pairs {
+            let fetched_val = merkle.get(key, root).unwrap();
+
+            // make sure the value was inserted
+            assert_eq!(fetched_val.as_deref(), val.into());
+        }
+    }
 }
