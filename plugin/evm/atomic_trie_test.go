@@ -329,7 +329,7 @@ func TestAtomicOpsAreNotTxOrderDependent(t *testing.T) {
 	assert.Equal(t, root1, root2)
 }
 
-func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
+func TestAtomicTrieDoesNotSkipBonusBlocks(t *testing.T) {
 	lastAcceptedHeight := uint64(100)
 	numTxsPerBlock := 3
 	commitInterval := uint64(10)
@@ -359,10 +359,7 @@ func TestAtomicTrieSkipsBonusBlocks(t *testing.T) {
 	assert.EqualValues(t, expectedCommitHeight, commitHeight)
 	assert.NotEqual(t, common.Hash{}, rootHash)
 
-	// Verify the operations are as expected with the bonus block heights removed from the operations map
-	for height := range bonusBlocks {
-		delete(operationsMap, height)
-	}
+	// Verify the operations are as expected
 	verifyOperations(t, atomicTrie, codec, rootHash, 1, expectedCommitHeight, operationsMap)
 }
 
