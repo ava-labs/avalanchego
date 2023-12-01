@@ -495,7 +495,6 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			defer addedDelegatorIterator.Release()
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
 				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
@@ -503,6 +502,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 					reward: staker.PotentialReward,
 				})
 			}
+			addedDelegatorIterator.Release()
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				toDeleteTxIDs = append(toDeleteTxIDs, staker.TxID)
