@@ -41,7 +41,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	// setup
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -96,7 +96,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 }
 
 // ProposerBlock.Verify tests section
-func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
+func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
@@ -113,8 +113,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		return pChainHeight, nil
 	}
 
-	// create parent block ...
-	prntCoreBlk := &snowman.TestBlock{
+	parentCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -124,14 +123,14 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return prntCoreBlk, nil
+		return parentCoreBlk, nil
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
 			return coreGenBlk, nil
-		case prntCoreBlk.ID():
-			return prntCoreBlk, nil
+		case parentCoreBlk.ID():
+			return parentCoreBlk, nil
 		default:
 			return nil, database.ErrNotFound
 		}
@@ -140,38 +139,25 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
-		case bytes.Equal(b, prntCoreBlk.Bytes()):
-			return prntCoreBlk, nil
+		case bytes.Equal(b, parentCoreBlk.Bytes()):
+			return parentCoreBlk, nil
 		default:
 			return nil, errUnknownBlock
 		}
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
-	prntProBlk, err := proVM.BuildBlock(context.Background())
+	parentBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	require.NoError(prntProBlk.Verify(context.Background()))
-	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
-	// .. create child block ...
 	childCoreBlk := &snowman.TestBlock{
-		ParentV:    prntCoreBlk.ID(),
+		ParentV:    parentCoreBlk.ID(),
 		BytesV:     []byte{2},
-		TimestampV: prntCoreBlk.Timestamp(),
+		TimestampV: parentCoreBlk.Timestamp(),
 	}
-	childSlb, err := block.Build(
-		ids.Empty, // refer unknown parent
-		childCoreBlk.Timestamp(),
-		pChainHeight,
-		proVM.StakingCertLeaf,
-		childCoreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.StakingLeafSigner,
-	)
-	require.NoError(err)
 	childProBlk := postForkBlock{
-		SignedBlock: childSlb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
@@ -179,23 +165,145 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		},
 	}
 
-	// child block referring unknown parent does not verify
-	err = childProBlk.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
+	{
+		// child block referring unknown parent does not verify
+		childSlb, err := block.Build(
+			ids.Empty, // refer unknown parent
+			childCoreBlk.Timestamp(),
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
 
-	// child block referring known parent does verify
-	childSlb, err = block.BuildUnsigned(
-		prntProBlk.ID(), // refer known parent
-		prntProBlk.Timestamp().Add(proposer.MaxVerifyDelay),
-		pChainHeight,
-		childCoreBlk.Bytes(),
+		err = childProBlk.Verify(context.Background())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	{
+		// child block referring known parent does verify
+		childSlb, err := block.BuildUnsigned(
+			parentBlk.ID(),
+			parentBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+			pChainHeight,
+			childCoreBlk.Bytes(),
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
+		require.NoError(childProBlk.Verify(context.Background()))
+	}
+}
+
+func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		activationTime  = time.Unix(0, 0)
+		durangoForkTime = time.Unix(0, 0)
 	)
-	require.NoError(err)
-	childProBlk.SignedBlock = childSlb
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	pChainHeight := uint64(100)
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
+		return pChainHeight, nil
+	}
+
+	parentCoreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return parentCoreBlk, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case parentCoreBlk.ID():
+			return parentCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, parentCoreBlk.Bytes()):
+			return parentCoreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parentBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
-	require.NoError(childProBlk.Verify(context.Background()))
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
+
+	childCoreBlk := &snowman.TestBlock{
+		ParentV:    parentCoreBlk.ID(),
+		BytesV:     []byte{2},
+		TimestampV: parentCoreBlk.Timestamp(),
+	}
+	childProBlk := postForkBlock{
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
+	}
+
+	{
+		// child block referring unknown parent does not verify
+		childSlb, err := block.Build(
+			ids.Empty, // refer unknown parent
+			parentBlk.Timestamp().Add(proposer.WindowDuration),
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		err = childProBlk.Verify(context.Background())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	{
+		// child block referring known parent does verify
+		childSlb, err := block.Build(
+			parentBlk.ID(),
+			parentBlk.Timestamp().Add(proposer.WindowDuration),
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		proVM.Set(childSlb.Timestamp())
+		require.NoError(childProBlk.Verify(context.Background()))
+	}
 }
 
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
