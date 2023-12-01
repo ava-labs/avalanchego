@@ -484,6 +484,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 		commitInterval, lastAcceptedHeight uint64
 		setMarker                          func(*atomicBackend) error
 		expectOpsApplied                   func(height uint64) bool
+		bonusBlockHeights                  map[uint64]ids.ID
 	}
 
 	for name, test := range map[string]test{
@@ -492,6 +493,18 @@ func TestApplyToSharedMemory(t *testing.T) {
 			lastAcceptedHeight: 25,
 			setMarker:          func(a *atomicBackend) error { return a.MarkApplyToSharedMemoryCursor(10) },
 			expectOpsApplied:   func(height uint64) bool { return height > 10 && height <= 20 },
+		},
+		"marker is set to height, should skip bonus blocks": {
+			commitInterval:     10,
+			lastAcceptedHeight: 25,
+			setMarker:          func(a *atomicBackend) error { return a.MarkApplyToSharedMemoryCursor(10) },
+			bonusBlockHeights:  map[uint64]ids.ID{15: {}},
+			expectOpsApplied: func(height uint64) bool {
+				if height == 15 {
+					return false
+				}
+				return height > 10 && height <= 20
+			},
 		},
 		"marker is set to height + blockchain ID": {
 			commitInterval:     10,
@@ -522,7 +535,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 			// Initialize atomic repository
 			m := atomic.NewMemory(db)
 			sharedMemories := newSharedMemories(m, testCChainID, blockChainID)
-			backend, err := NewAtomicBackend(db, sharedMemories.thisChain, nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
+			backend, err := NewAtomicBackend(db, sharedMemories.thisChain, test.bonusBlockHeights, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
 			assert.NoError(t, err)
 			atomicTrie := backend.AtomicTrie().(*atomicTrie)
 
