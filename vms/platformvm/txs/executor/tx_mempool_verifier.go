@@ -139,11 +139,7 @@ func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, err
 		return time.Time{}, false, fmt.Errorf("failed getting next staker change time: %w", err)
 	}
 
-	// timeWasCapped means that [timestamp] was reduced to
-	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
-	// be willing to issue an advanceTimeTx. It is also used as a flag for
-	// [buildBanffBlock] to force the issuance of an empty block to advance
-	// the time forward; if there are no available transactions.
+	// timeWasCapped means that [timestamp] was reduced to [nextStakerChangeTime]
 	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
 	if timeWasCapped {
 		timestamp = nextStakerChangeTime
