@@ -1824,9 +1824,7 @@ func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
 	// TODO: Consider if it should be
 
 	for subnetID, supply := range s.modifiedSupplies {
-		supply := supply
 		delete(s.modifiedSupplies, subnetID) // clear up s.supplies to avoid potential double commits
-
 		key := merkleSuppliesKey(subnetID)
 		*batchOps = append(*batchOps, database.BatchOp{
 			Key:   key,
