@@ -318,7 +318,7 @@ func defaultConfig(postBanff, postCortina, postDurango bool) config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
-		DTime:             durangoTime,
+		DurangoTime:       durangoTime,
 	}
 }
 

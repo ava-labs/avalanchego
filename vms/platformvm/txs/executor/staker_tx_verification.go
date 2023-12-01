@@ -38,7 +38,7 @@ var (
 	ErrDuplicateValidator              = errors.New("duplicate validator")
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
-	ErrDUpgradeNotActive               = errors.New("attempting to use a D-upgrade feature prior to activation")
+	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -67,7 +67,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(backend *Backend, chainStat
 		currentChainTime = chainState.GetTimestamp()
 		stakerStart      = subnetValidator.StartTime()
 	)
-	if backend.Config.IsDActivated(currentChainTime) {
+	if backend.Config.IsDurangoActivated(currentChainTime) {
 		stakerStart = currentChainTime
 	}
 	if !txs.BoundedBy(
@@ -102,7 +102,7 @@ func verifyAddValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		duration         = tx.EndTime().Sub(currentTimestamp)
-		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
 		duration = tx.EndTime().Sub(tx.StartTime())
@@ -194,7 +194,7 @@ func verifyAddSubnetValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		duration         = tx.EndTime().Sub(currentTimestamp)
-		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
 		duration = tx.EndTime().Sub(tx.StartTime())
@@ -351,7 +351,7 @@ func verifyAddDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		duration         = tx.EndTime().Sub(currentTimestamp)
-		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
 		duration = tx.EndTime().Sub(tx.StartTime())
@@ -469,7 +469,7 @@ func verifyAddPermissionlessValidatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		duration         = tx.EndTime().Sub(currentTimestamp)
-		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
 		duration = tx.EndTime().Sub(tx.StartTime())
@@ -589,7 +589,7 @@ func verifyAddPermissionlessDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		duration         = tx.EndTime().Sub(currentTimestamp)
-		isDurangoActive  = backend.Config.IsDActivated(currentTimestamp)
+		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if !isDurangoActive {
 		duration = tx.EndTime().Sub(tx.StartTime())
@@ -727,8 +727,8 @@ func verifyTransferSubnetOwnershipTx(
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
 ) error {
-	if !backend.Config.IsDActivated(chainState.GetTimestamp()) {
-		return ErrDUpgradeNotActive
+	if !backend.Config.IsDurangoActivated(chainState.GetTimestamp()) {
+		return ErrDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
@@ -782,7 +782,7 @@ func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time
 }
 
 func verifyStakerStartsSoon(backend *Backend, chainTime, stakerStartTime time.Time) error {
-	if !backend.Config.IsDActivated(chainTime) {
+	if !backend.Config.IsDurangoActivated(chainTime) {
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := chainTime.Add(MaxFutureStartTime)

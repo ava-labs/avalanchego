@@ -160,7 +160,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		return io.ErrUnexpectedEOF
 	}
 
-	n.children = make(map[byte]child, numChildren)
+	n.children = make(map[byte]*child, numChildren)
 	var previousChild uint64
 	for i := uint64(0); i < numChildren; i++ {
 		index, err := c.decodeUint(src)
@@ -184,7 +184,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		if err != nil {
 			return err
 		}
-		n.children[byte(index)] = child{
+		n.children[byte(index)] = &child{
 			compressedKey: compressedKey,
 			id:            childID,
 			hasValue:      hasValue,

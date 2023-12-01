@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
@@ -41,6 +42,9 @@ func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common
 
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
+	require.NoError(engCfg.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp))
+
+	vals.RegisterCallbackListener(engCfg.Ctx.SubnetID, engCfg.ConnectedValidators)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1382,7 +1386,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	require := require.New(t)
 
-	_, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	nodeID, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return gBlk.ID(), nil
@@ -1392,15 +1396,15 @@ func TestEngineGossip(t *testing.T) {
 		return gBlk, nil
 	}
 
-	called := new(bool)
-	sender.SendGossipF = func(_ context.Context, blkBytes []byte) {
-		*called = true
-		require.Equal(gBlk.Bytes(), blkBytes)
+	var calledSendPullQuery bool
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
+		calledSendPullQuery = true
+		require.Equal(set.Of(nodeID), nodeIDs)
 	}
 
 	require.NoError(te.Gossip(context.Background()))
 
-	require.True(*called)
+	require.True(calledSendPullQuery)
 }
 
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
