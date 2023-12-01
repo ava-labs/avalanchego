@@ -405,27 +405,21 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         let mut deleted = Vec::new();
         let mut parents = Vec::new();
 
-        let mut next_node = None;
-
         // we use Nibbles::<1> so that 1 zero nibble is at the front
         // this is for the sentinel node, which avoids moving the root
         // and always only has one child
         let mut key_nibbles = Nibbles::<1>::new(key.as_ref()).into_iter();
 
+        let mut node = self.get_node(root)?;
+
         // walk down the merkle tree starting from next_node, currently the root
         // return None if the value is inserted
         let next_node_and_val = loop {
-            let mut node = next_node
-                .take()
-                .map(Ok)
-                .unwrap_or_else(|| self.get_node(root))?;
-            let node_ptr = node.as_ptr();
-
             let Some(current_nibble) = key_nibbles.next() else {
                 break Some((node, val));
             };
 
-            let (node, next_node_ptr) = match &node.inner {
+            let (node_ref, next_node_ptr) = match &node.inner {
                 // For a Branch node, we look at the child pointer. If it points
                 // to another node, we walk down that. Otherwise, we can store our
                 // value as a leaf and we're done
@@ -481,6 +475,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         .chain(key_nibbles.clone())
                         .collect::<Vec<_>>();
                     let n_path_len = n_path.len();
+                    let node_ptr = node.as_ptr();
 
                     if let Some(v) = self.split(
                         node,
@@ -509,8 +504,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             };
 
             // push another parent, and follow the next pointer
-            parents.push((node, current_nibble));
-            next_node = self.get_node(next_node_ptr)?.into();
+            parents.push((node_ref, current_nibble));
+            node = self.get_node(next_node_ptr)?;
         };
 
         if let Some((mut node, val)) = next_node_and_val {
