@@ -45,6 +45,7 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 	}
 
 	proVM := New(
+		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
 			DurangoTime:         time.Unix(0, 0),
@@ -54,7 +55,6 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		innerVM,
 	)
 
 	defer func() {

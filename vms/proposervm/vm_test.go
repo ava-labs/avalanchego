@@ -134,6 +134,7 @@ func initTestProposerVM(
 	}
 
 	proVM := New(
+		coreVM,
 		Config{
 			ActivationTime:      proBlkStartTime,
 			DurangoTime:         durangoTime,
@@ -143,7 +144,6 @@ func initTestProposerVM(
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	valState := &validators.TestState{
@@ -931,6 +931,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	proVM := New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
 			DurangoTime:         mockable.MaxTime,
@@ -940,7 +941,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	valState := &validators.TestState{
@@ -1282,6 +1282,7 @@ func TestInnerVMRollback(t *testing.T) {
 	db := memdb.New()
 
 	proVM := New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
 			DurangoTime:         mockable.MaxTime,
@@ -1291,7 +1292,6 @@ func TestInnerVMRollback(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -1372,6 +1372,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	proVM = New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
 			DurangoTime:         mockable.MaxTime,
@@ -1381,7 +1382,6 @@ func TestInnerVMRollback(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -1885,6 +1885,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	proVM := New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
 			DurangoTime:         time.Unix(0, 0),
@@ -1894,7 +1895,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	valState := &validators.TestState{
@@ -2095,6 +2095,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	proVM := New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
 			DurangoTime:         time.Unix(0, 0),
@@ -2104,7 +2105,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	valState := &validators.TestState{
@@ -2261,6 +2261,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
 	vm := New(
+		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
 			DurangoTime:         time.Unix(0, 0),
@@ -2270,7 +2271,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		innerVM,
 	)
 
 	innerVM.EXPECT().Initialize(
@@ -2499,6 +2499,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
 	vm := New(
+		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
 			DurangoTime:         time.Unix(0, 0),
@@ -2508,7 +2509,6 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		innerVM,
 	)
 
 	// make sure that DBs are compressed correctly
@@ -2713,6 +2713,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	db := prefixdb.New([]byte{}, memdb.New())
 
 	proVM := New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
 			DurangoTime:         mockable.MaxTime,
@@ -2722,7 +2723,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -2814,6 +2814,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	numHistoricalBlocks := uint64(2)
 	proVM = New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
 			DurangoTime:         mockable.MaxTime,
@@ -2823,7 +2824,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	require.NoError(proVM.Initialize(
@@ -2859,6 +2859,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	newNumHistoricalBlocks := numHistoricalBlocks + 2
 	proVM = New(
+		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
 			DurangoTime:         mockable.MaxTime,
@@ -2868,7 +2869,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			StakingLeafSigner:   pTestSigner,
 			StakingCertLeaf:     pTestCert,
 		},
-		coreVM,
 	)
 
 	require.NoError(proVM.Initialize(
