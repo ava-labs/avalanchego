@@ -1181,9 +1181,8 @@ func (db *merkleDB) initializeRoot() error {
 		return err
 	}
 
-	var root *node
-
 	// First, see if root is an intermediate node.
+	var root *node
 	root, err = db.getEditableNode(rootKey, false /* hasValue */)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
