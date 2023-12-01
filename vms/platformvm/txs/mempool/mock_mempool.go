@@ -184,3 +184,15 @@ func (mr *MockMempoolMockRecorder) Remove(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockMempool)(nil).Remove), arg0)
 }
+
+// RequestBuildBlock mocks base method.
+func (m *MockMempool) RequestBuildBlock(arg0 bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RequestBuildBlock", arg0)
+}
+
+// RequestBuildBlock indicates an expected call of RequestBuildBlock.
+func (mr *MockMempoolMockRecorder) RequestBuildBlock(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestBuildBlock", reflect.TypeOf((*MockMempool)(nil).RequestBuildBlock), arg0)
+}
