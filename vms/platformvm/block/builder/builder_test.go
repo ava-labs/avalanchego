@@ -324,6 +324,7 @@ func TestBuildBlock(t *testing.T) {
 					Outs: []*avax.TransferableOutput{output},
 				}},
 				Validator: txs.Validator{
+					NodeID: ids.GenerateTestNodeID(),
 					// Shouldn't be dropped
 					Start: uint64(now.Add(2 * txexecutor.SyncBound).Unix()),
 				},
@@ -401,16 +402,37 @@ func TestBuildBlock(t *testing.T) {
 			name: "has decision txs",
 			builderF: func(ctrl *gomock.Controller) *builder {
 				mempool := mempool.NewMockMempool(ctrl)
+				manager := blockexecutor.NewMockManager(ctrl)
+				chain := state.NewMockChain(ctrl)
+
+				preferredID := ids.GenerateTestID()
+				manager.EXPECT().Preferred().Return(preferredID)
+				manager.EXPECT().GetState(preferredID).Return(chain, true).AnyTimes()
+				chain.EXPECT().GetTimestamp().Return(parentTimestamp)
+
+				pendingStakerIter := state.NewMockStakerIterator(ctrl)
+				pendingStakerIter.EXPECT().Next().Return(false)
+				pendingStakerIter.EXPECT().Release()
+				chain.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
+
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter.EXPECT().Next().Return(false)
+				currentStakerIter.EXPECT().Release()
+				chain.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 
 				gomock.InOrder(
 					mempool.EXPECT().Peek(targetBlockSize).Return(transactions[0]),
 					mempool.EXPECT().Remove([]*txs.Tx{transactions[0]}),
-					// Second loop iteration
-					mempool.EXPECT().Peek(gomock.Any()).Return(nil),
 				)
 
 				return &builder{
-					Mempool: mempool,
+					Mempool:    mempool,
+					blkManager: manager,
+					txExecutorBackend: &txexecutor.Backend{
+						Ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
 				}
 			},
 			timestamp:        parentTimestamp,
@@ -767,6 +789,10 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.False(env.mempool.Has(tx3ID))
 
 	require.NoError(env.mempool.GetDropReason(tx1ID))
-	require.ErrorIs(env.mempool.GetDropReason(tx2ID), txexecutor.ErrTimestampNotBeforeStartTime)
-	require.ErrorIs(env.mempool.GetDropReason(tx3ID), txexecutor.ErrFutureStakeTime)
+
+	tx2DropReason := env.mempool.GetDropReason(tx2ID)
+	require.ErrorIs(tx2DropReason, txexecutor.ErrTimestampNotBeforeStartTime)
+
+	tx3DropReason := env.mempool.GetDropReason(tx3ID)
+	require.ErrorIs(tx3DropReason, txexecutor.ErrFutureStakeTime)
 }
