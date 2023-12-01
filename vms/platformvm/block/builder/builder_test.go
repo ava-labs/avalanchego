@@ -695,6 +695,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 
 	defaultValidatorStake := 100 * units.MilliAvax
 
+	// Add a validator with StartTime in the future within [MaxFutureStartTime]
 	validatorStartTime := now.Add(txexecutor.MaxFutureStartTime - 1*time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
@@ -713,6 +714,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	tx1ID := tx1.ID()
 	require.True(env.mempool.Has(tx1ID))
 
+	// Add a validator with StartTime before current chain time
 	validator2StartTime := now.Add(-5 * time.Second)
 	validator2EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
 
@@ -731,6 +733,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	tx2ID := tx2.ID()
 	require.True(env.mempool.Has(tx2ID))
 
+	// Add a validator with StartTime in the future past [MaxFutureStartTime]
 	validator3StartTime := now.Add(txexecutor.MaxFutureStartTime + 5*time.Second)
 	validator3EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
 
@@ -749,6 +752,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	tx3ID := tx3.ID()
 	require.True(env.mempool.Has(tx3ID))
 
+	// Only tx1 should be in a built block
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -757,6 +761,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.Len(blk.Txs(), 1)
 	require.Equal(tx1ID, blk.Txs()[0].ID())
 
+	// Mempool should have none of the txs
 	require.False(env.mempool.Has(tx1ID))
 	require.False(env.mempool.Has(tx2ID))
 	require.False(env.mempool.Has(tx3ID))
@@ -764,5 +769,4 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(env.mempool.GetDropReason(tx1ID))
 	require.ErrorIs(env.mempool.GetDropReason(tx2ID), txexecutor.ErrTimestampNotBeforeStartTime)
 	require.ErrorIs(env.mempool.GetDropReason(tx3ID), txexecutor.ErrFutureStakeTime)
-
 }
