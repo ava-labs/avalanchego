@@ -161,10 +161,8 @@ func (a *atomicBackend) initialize(lastAcceptedHeight uint64) error {
 			return err
 		}
 
-		if _, found := a.bonusBlocks[height]; found {
-			// If [height] is a bonus block, do not index the atomic operations into the trie
-			continue
-		}
+		// Note: The atomic trie canonically contains the duplicate operations
+		// from any bonus blocks.
 		if err := a.atomicTrie.UpdateTrie(tr, height, combinedOps); err != nil {
 			return err
 		}
@@ -405,7 +403,10 @@ func (a *atomicBackend) InsertTxs(blockHash common.Hash, blockHeight uint64, par
 		return common.Hash{}, err
 	}
 
-	// update the atomic trie
+	// Insert the operations into the atomic trie
+	//
+	// Note: The atomic trie canonically contains the duplicate operations from
+	// any bonus blocks.
 	atomicOps, err := mergeAtomicOps(txs)
 	if err != nil {
 		return common.Hash{}, err

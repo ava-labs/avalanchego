@@ -982,6 +982,9 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 			}
 		}
 		// Update the atomic backend with [txs] from this block.
+		//
+		// Note: The atomic trie canonically contains the duplicate operations
+		// from any bonus blocks.
 		_, err := vm.atomicBackend.InsertTxs(block.Hash(), block.NumberU64(), block.ParentHash(), txs)
 		if err != nil {
 			return nil, nil, err
