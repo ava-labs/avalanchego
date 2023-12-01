@@ -464,8 +464,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 	// writeChains
 	for _, chains := range d.addedChains {
 		for _, chain := range chains {
-			createChainTx := chain.Unsigned.(*txs.CreateChainTx)
-			subnetID := createChainTx.SubnetID
+			subnetID := chain.Unsigned.(*txs.CreateChainTx).SubnetID
 			key := merkleChainKey(subnetID, chain.ID())
 			changes.BatchOps = append(changes.BatchOps, database.BatchOp{
 				Key:   key,
