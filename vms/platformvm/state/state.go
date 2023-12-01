@@ -18,8 +18,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -34,12 +32,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -56,7 +51,6 @@ const (
 
 	valueNodeCacheSize        = 512 * units.MiB
 	intermediateNodeCacheSize = 512 * units.MiB
-	utxoCacheSize             = 8192 // from avax/utxo_state.go
 )
 
 var (
@@ -75,13 +69,13 @@ var (
 	merkleBlsKeyDiffPrefix  = []byte{0x07}
 	merkleRewardUtxosPrefix = []byte{0x08}
 
-	initializedKey = []byte("initialized")
+	initializedKey         = []byte{0x00}
+	lastAcceptedBlockIDKey = []byte{0x01}
 
 	// merkle db sections
-	metadataSectionPrefix      = byte(0x00)
-	merkleChainTimeKey         = []byte{metadataSectionPrefix, 0x00}
-	merkleLastAcceptedBlkIDKey = []byte{metadataSectionPrefix, 0x01}
-	merkleSuppliesPrefix       = []byte{metadataSectionPrefix, 0x02}
+	metadataSectionPrefix = byte(0x00)
+	merkleChainTimeKey    = []byte{metadataSectionPrefix, 0x00}
+	merkleSuppliesPrefix  = []byte{metadataSectionPrefix, 0x01}
 
 	permissionedSubnetSectionPrefix = []byte{0x01}
 	elasticSubnetSectionPrefix      = []byte{0x02}
@@ -247,62 +241,54 @@ type state struct {
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
-	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64 // (nodeID, subnetID) --> delegatee amount
-	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]   // tracks (nodeID, subnetID) pairs updated after last commit
+	// Node ID --> Subnet ID --> Delegatee Reward on that subnet for that node ID.
+	modifiedDelegateeReward map[ids.NodeID]map[ids.ID]uint64
 
 	// UTXOs section
-	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
-	utxoCache     cache.Cacher[ids.ID, *avax.UTXO] // UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
+	modifiedUTXOs map[ids.ID]*avax.UTXO // map of UTXO ID -> *UTXO
 
 	// Metadata section
 	chainTime, latestComittedChainTime                  time.Time
 	lastAcceptedBlkID, latestCommittedLastAcceptedBlkID ids.ID
-	lastAcceptedHeight                                  uint64                        // TODO: Should this be written to state??
-	modifiedSupplies                                    map[ids.ID]uint64             // map of subnetID -> current supply
-	suppliesCache                                       cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
+	lastAcceptedHeight                                  uint64            // TODO: Should this be written to state??
+	modifiedSupplies                                    map[ids.ID]uint64 // map of subnetID -> current supply
 
 	// Subnets section
 	// Subnet ID --> Owner of the subnet
-	subnetOwners     map[ids.ID]fx.Owner
-	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner if the entry is nil, it is not in the database
+	subnetOwners map[ids.ID]fx.Owner
 
-	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
-	permissionedSubnetCache  []*txs.Tx                     // nil if the subnets haven't been loaded
-	addedElasticSubnets      map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
-	elasticSubnetCache       cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
+	addedPermissionedSubnets []*txs.Tx          // added SubnetTxs, waiting to be committed
+	permissionedSubnetCache  []*txs.Tx          // nil if the subnets haven't been loaded
+	addedElasticSubnets      map[ids.ID]*txs.Tx // map of subnetID -> transformSubnetTx
 
 	// Chains section
-	addedChains map[ids.ID][]*txs.Tx            // maps subnetID -> the newly added chains to the subnet
-	chainCache  cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
+	addedChains map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
 
 	// Blocks section
 	// Note: addedBlocks is a list because multiple blocks can be committed at one (proposal + accepted option)
-	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block.
-	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]block.Block // map of blockID -> Block.
 	blockDB     database.Database
 
-	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
-	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
+	addedBlockIDs map[uint64]ids.ID // map of height -> blockID
 	blockIDDB     database.Database
 
 	// Txs section
 	// FIND a way to reduce use of these. No use in verification of addedTxs
 	// a limited windows to support APIs
-	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
-	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
+	addedTxs map[ids.ID]*txAndStatus // map of txID -> {*txs.Tx, Status}
+	txDB     database.Database
 
 	indexedUTXOsDB database.Database
 
-	localUptimesCache    map[ids.NodeID]map[ids.ID]*uptimes // vdrID -> subnetID -> metadata
-	modifiedLocalUptimes map[ids.NodeID]set.Set[ids.ID]     // vdrID -> subnetIDs
+	// Node ID --> SubnetID --> Uptime of the node on the subnet
+	modifiedLocalUptimes map[ids.NodeID]map[ids.ID]*uptimes
 	localUptimesDB       database.Database
 
 	flatValidatorWeightDiffsDB    database.Database
 	flatValidatorPublicKeyDiffsDB database.Database
 
 	// Reward UTXOs section
-	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
-	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
 	rewardUTXOsDB    database.Database
 }
 
@@ -337,38 +323,10 @@ type txAndStatus struct {
 	status status.Status
 }
 
-type fxOwnerAndSize struct {
-	owner fx.Owner
-	size  int
-}
-
-func txSize(_ ids.ID, tx *txs.Tx) int {
-	if tx == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(tx.Bytes()) + constants.PointerOverhead
-}
-
-func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
-	if t == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
-}
-
-func blockSize(_ ids.ID, blk block.Block) int {
-	if blk == nil {
-		return ids.IDLen + constants.PointerOverhead
-	}
-	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
-}
-
 func New(
 	db database.Database,
 	genesisBytes []byte,
-	metricsReg prometheus.Registerer,
 	validators validators.Manager,
-	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
@@ -377,9 +335,7 @@ func New(
 		db,
 		metrics,
 		validators,
-		execCfg,
 		ctx,
-		metricsReg,
 		rewards,
 	)
 	if err != nil {
@@ -399,9 +355,7 @@ func newState(
 	db database.Database,
 	metrics metrics.Metrics,
 	validators validators.Manager,
-	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
-	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 ) (*state, error) {
 	var (
@@ -415,6 +369,7 @@ func newState(
 		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
 		flatValidatorPublicKeyDiffsDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
 		rewardUTXOsDB                 = prefixdb.New(merkleRewardUtxosPrefix, baseDB)
+		txDB                          = prefixdb.New(txsSectionPrefix, baseDB)
 	)
 
 	noOpTracer, err := trace.New(trace.Config{Enabled: false})
@@ -434,80 +389,6 @@ func newState(
 		return nil, fmt.Errorf("failed creating merkleDB: %w", err)
 	}
 
-	txCache, err := metercacher.New(
-		"tx_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
-		"reward_utxos_cache",
-		metricsReg,
-		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
-		"subnet_owner_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
-			return ids.IDLen + f.size
-		}),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	transformedSubnetCache, err := metercacher.New(
-		"transformed_subnet_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	supplyCache, err := metercacher.New[ids.ID, *uint64](
-		"supply_cache",
-		metricsReg,
-		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
-		"chain_cache",
-		metricsReg,
-		&cache.LRU[ids.ID, []*txs.Tx]{Size: execCfg.ChainCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	blockCache, err := metercacher.New[ids.ID, block.Block](
-		"block_cache",
-		metricsReg,
-		cache.NewSizedLRU[ids.ID, block.Block](execCfg.BlockCacheSize, blockSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
-		metricsReg,
-		&cache.LRU[uint64, ids.ID]{Size: execCfg.BlockIDCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	return &state{
 		validators: validators,
 		ctx:        ctx,
@@ -522,48 +403,38 @@ func newState(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		delegateeRewardCache:    make(map[ids.NodeID]map[ids.ID]uint64),
-		modifiedDelegateeReward: make(map[ids.NodeID]set.Set[ids.ID]),
+		modifiedDelegateeReward: make(map[ids.NodeID]map[ids.ID]uint64),
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
-		utxoCache:     &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
 
 		modifiedSupplies: make(map[ids.ID]uint64),
-		suppliesCache:    supplyCache,
 
-		subnetOwners:     make(map[ids.ID]fx.Owner),
-		subnetOwnerCache: subnetOwnerCache,
+		subnetOwners: make(map[ids.ID]fx.Owner),
 
 		addedPermissionedSubnets: make([]*txs.Tx, 0),
 		permissionedSubnetCache:  nil, // created first time GetSubnets is called
 		addedElasticSubnets:      make(map[ids.ID]*txs.Tx),
-		elasticSubnetCache:       transformedSubnetCache,
 
 		addedChains: make(map[ids.ID][]*txs.Tx),
-		chainCache:  chainCache,
 
 		addedBlocks: make(map[ids.ID]block.Block),
-		blockCache:  blockCache,
 		blockDB:     blockDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
-		blockIDCache:  blockIDCache,
 		blockIDDB:     blockIDsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
-		txCache:  txCache,
+		txDB:     txDB,
 
 		indexedUTXOsDB: indexedUTXOsDB,
 
-		localUptimesCache:    make(map[ids.NodeID]map[ids.ID]*uptimes),
-		modifiedLocalUptimes: make(map[ids.NodeID]set.Set[ids.ID]),
+		modifiedLocalUptimes: make(map[ids.NodeID]map[ids.ID]*uptimes),
 		localUptimesDB:       localUptimesDB,
 
 		flatValidatorWeightDiffsDB:    flatValidatorWeightDiffsDB,
 		flatValidatorPublicKeyDiffsDB: flatValidatorPublicKeyDiffsDB,
 
 		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
-		rewardUTXOsCache: rewardUTXOsCache,
 		rewardUTXOsDB:    rewardUTXOsDB,
 	}, nil
 }
@@ -674,18 +545,14 @@ func (s *state) GetSubnets() ([]*txs.Tx, error) {
 
 func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	s.addedPermissionedSubnets = append(s.addedPermissionedSubnets, createSubnetTx)
+	if s.permissionedSubnetCache != nil {
+		s.permissionedSubnetCache = append(s.permissionedSubnetCache, createSubnetTx)
+	}
 }
 
 func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	if owner, exists := s.subnetOwners[subnetID]; exists {
 		return owner, nil
-	}
-
-	if ownerAndSize, cached := s.subnetOwnerCache.Get(subnetID); cached {
-		if ownerAndSize.owner == nil {
-			return nil, database.ErrNotFound
-		}
-		return ownerAndSize.owner, nil
 	}
 
 	subnetIDKey := merkleSubnetOwnersKey(subnetID)
@@ -695,10 +562,6 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
 			return nil, err
 		}
-		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
-			owner: owner,
-			size:  len(ownerBytes),
-		})
 		return owner, nil
 	}
 	if err != database.ErrNotFound {
@@ -707,9 +570,6 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
-		if err == database.ErrNotFound {
-			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
-		}
 		return nil, err
 	}
 
@@ -731,31 +591,12 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 		return tx, nil
 	}
 
-	if tx, cached := s.elasticSubnetCache.Get(subnetID); cached {
-		if tx == nil {
-			return nil, database.ErrNotFound
-		}
-		return tx, nil
-	}
-
 	key := merkleElasticSubnetKey(subnetID)
 	transformSubnetTxBytes, err := s.merkleDB.Get(key)
-	switch err {
-	case nil:
-		transformSubnetTx, err := txs.Parse(txs.GenesisCodec, transformSubnetTxBytes)
-		if err != nil {
-			return nil, err
-		}
-		s.elasticSubnetCache.Put(subnetID, transformSubnetTx)
-		return transformSubnetTx, nil
-
-	case database.ErrNotFound:
-		s.elasticSubnetCache.Put(subnetID, nil)
-		return nil, database.ErrNotFound
-
-	default:
+	if err != nil {
 		return nil, err
 	}
+	return txs.Parse(txs.GenesisCodec, transformSubnetTxBytes)
 }
 
 func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
@@ -764,10 +605,6 @@ func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
 }
 
 func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
-	if chains, cached := s.chainCache.Get(subnetID); cached {
-		return chains, nil
-	}
-
 	prefix := merkleChainPrefix(subnetID)
 	chainDBIt := s.merkleDB.NewIteratorWithPrefix(prefix)
 	defer chainDBIt.Release()
@@ -785,8 +622,8 @@ func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	if err := chainDBIt.Error(); err != nil {
 		return nil, err
 	}
+
 	chains = append(chains, s.addedChains[subnetID]...)
-	s.chainCache.Put(subnetID, chains)
 	return chains, nil
 }
 
@@ -801,42 +638,28 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
-	if tx, cached := s.txCache.Get(txID); cached {
-		if tx == nil {
-			return nil, status.Unknown, database.ErrNotFound
-		}
-		return tx.tx, tx.status, nil
-	}
 
-	key := merkleTxKey(txID)
-	txBytes, err := s.merkleDB.Get(key)
-	switch err {
-	case nil:
-		stx := txBytesAndStatus{}
-		if _, err := txs.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
-			return nil, status.Unknown, err
-		}
-
-		tx, err := txs.Parse(txs.GenesisCodec, stx.Tx)
-		if err != nil {
-			return nil, status.Unknown, err
-		}
-
-		ptx := &txAndStatus{
-			tx:     tx,
-			status: stx.Status,
-		}
-
-		s.txCache.Put(txID, ptx)
-		return ptx.tx, ptx.status, nil
-
-	case database.ErrNotFound:
-		s.txCache.Put(txID, nil)
-		return nil, status.Unknown, database.ErrNotFound
-
-	default:
+	txBytes, err := s.txDB.Get(txID[:])
+	if err != nil {
 		return nil, status.Unknown, err
 	}
+
+	var txBytesAndStatus txBytesAndStatus
+	if _, err := txs.GenesisCodec.Unmarshal(txBytes, &txBytesAndStatus); err != nil {
+		return nil, status.Unknown, err
+	}
+
+	tx, err := txs.Parse(txs.GenesisCodec, txBytesAndStatus.Tx)
+	if err != nil {
+		return nil, status.Unknown, err
+	}
+
+	txAndStatus := &txAndStatus{
+		tx:     tx,
+		status: txBytesAndStatus.Status,
+	}
+
+	return txAndStatus.tx, txAndStatus.status, nil
 }
 
 func (s *state) AddTx(tx *txs.Tx, status status.Status) {
@@ -850,28 +673,24 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
 		return utxos, nil
 	}
-	if utxos, exists := s.rewardUTXOsCache.Get(txID); exists {
-		return utxos, nil
-	}
 
 	rawTxDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
 	txDB := linkeddb.NewDefault(rawTxDB)
 	it := txDB.NewIterator()
 	defer it.Release()
 
-	utxos := []*avax.UTXO(nil)
+	var utxos []*avax.UTXO
 	for it.Next() {
-		utxo := &avax.UTXO{}
-		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
+		var utxo avax.UTXO
+		if _, err := txs.Codec.Unmarshal(it.Value(), &utxo); err != nil {
 			return nil, err
 		}
-		utxos = append(utxos, utxo)
+		utxos = append(utxos, &utxo)
 	}
 	if err := it.Error(); err != nil {
 		return nil, err
 	}
 
-	s.rewardUTXOsCache.Put(txID, utxos)
 	return utxos, nil
 }
 
@@ -886,31 +705,18 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 		}
 		return utxo, nil
 	}
-	if utxo, found := s.utxoCache.Get(utxoID); found {
-		if utxo == nil {
-			return nil, database.ErrNotFound
-		}
-		return utxo, nil
-	}
 
 	key := merkleUtxoIDKey(utxoID)
-
-	switch bytes, err := s.merkleDB.Get(key); err {
-	case nil:
-		utxo := &avax.UTXO{}
-		if _, err := txs.GenesisCodec.Unmarshal(bytes, utxo); err != nil {
-			return nil, err
-		}
-		s.utxoCache.Put(utxoID, utxo)
-		return utxo, nil
-
-	case database.ErrNotFound:
-		s.utxoCache.Put(utxoID, nil)
-		return nil, database.ErrNotFound
-
-	default:
+	bytes, err := s.merkleDB.Get(key)
+	if err != nil {
 		return nil, err
 	}
+
+	var utxo avax.UTXO
+	if _, err := txs.GenesisCodec.Unmarshal(bytes, &utxo); err != nil {
+		return nil, err
+	}
+	return &utxo, nil
 }
 
 func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
@@ -935,6 +741,8 @@ func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) 
 		start = ids.Empty
 		utxoIDs = append(utxoIDs, utxoID)
 	}
+
+	// TODO do we need to account for UTXOs in [s.modifiedUTXOs]?
 	return utxoIDs, iter.Error()
 }
 
@@ -971,36 +779,17 @@ func (s *state) SetLastAccepted(lastAccepted ids.ID) {
 }
 
 func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
-	supply, ok := s.modifiedSupplies[subnetID]
-	if ok {
+	if supply, ok := s.modifiedSupplies[subnetID]; ok {
 		return supply, nil
-	}
-	cachedSupply, ok := s.suppliesCache.Get(subnetID)
-	if ok {
-		if cachedSupply == nil {
-			return 0, database.ErrNotFound
-		}
-		return *cachedSupply, nil
 	}
 
 	key := merkleSuppliesKey(subnetID)
-
-	switch supplyBytes, err := s.merkleDB.Get(key); err {
-	case nil:
-		supply, err := database.ParseUInt64(supplyBytes)
-		if err != nil {
-			return 0, fmt.Errorf("failed parsing supply: %w", err)
-		}
-		s.suppliesCache.Put(subnetID, &supply)
-		return supply, nil
-
-	case database.ErrNotFound:
-		s.suppliesCache.Put(subnetID, nil)
-		return 0, database.ErrNotFound
-
-	default:
+	supplyBytes, err := s.merkleDB.Get(key)
+	if err != nil {
 		return 0, err
 	}
+
+	return database.ParseUInt64(supplyBytes)
 }
 
 func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
@@ -1200,7 +989,20 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load() error {
-	err := utils.Err(
+	// load last accepted block
+	lastAcceptedBlkIDBytes, err := s.singletonDB.Get(lastAcceptedBlockIDKey)
+	if err != nil {
+		return err
+	}
+
+	lastAcceptedBlkID, err := ids.ToID(lastAcceptedBlkIDBytes)
+	if err != nil {
+		return err
+	}
+	s.SetLastAccepted(lastAcceptedBlkID)
+	s.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
+
+	err = utils.Err(
 		s.loadMerkleMetadata(),
 		s.loadCurrentStakers(),
 		s.loadPendingStakers(),
@@ -1224,16 +1026,6 @@ func (s *state) loadMerkleMetadata() error {
 	}
 	s.latestComittedChainTime = chainTime
 	s.SetTimestamp(chainTime)
-
-	// load last accepted block
-	blkIDBytes, err := s.merkleDB.Get(merkleLastAcceptedBlkIDKey)
-	if err != nil {
-		return err
-	}
-	lastAcceptedBlkID := ids.Empty
-	copy(lastAcceptedBlkID[:], blkIDBytes)
-	s.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
-	s.SetLastAccepted(lastAcceptedBlkID)
 
 	// We don't need to load supplies. Unlike chain time and last block ID,
 	// which have the persisted* attribute, we signify that a supply hasn't
@@ -1297,8 +1089,8 @@ func (s *state) loadPendingStakers() error {
 	iter := s.merkleDB.NewIteratorWithPrefix(prefix)
 	defer iter.Release()
 	for iter.Next() {
-		data := &stakersData{}
-		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), data); err != nil {
+		var data stakersData
+		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), &data); err != nil {
 			return fmt.Errorf("failed to deserialize pending stakers data: %w", err)
 		}
 
@@ -1386,6 +1178,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeBlsKeyDiffs(height, blsKeyDiffs),
 		s.writeRewardUTXOs(),
 		s.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
+		s.singletonDB.Put(lastAcceptedBlockIDKey, s.lastAcceptedBlkID[:]), // Write last accepted block ID
 	)
 }
 
@@ -1495,16 +1288,11 @@ func (s *state) writeBlocks() error {
 		)
 
 		delete(s.addedBlockIDs, blkHeight)
-		s.blockIDCache.Put(blkHeight, blkID)
 		if err := database.PutID(s.blockIDDB, database.PackUInt64(blkHeight), blkID); err != nil {
 			return fmt.Errorf("failed to write block height index: %w", err)
 		}
 
 		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because blk may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.blockCache.Evict(blkID)
 
 		if err := s.blockDB.Put(blkID[:], blk.Bytes()); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
@@ -1518,60 +1306,22 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 		return blk, nil
 	}
 
-	if blk, cached := s.blockCache.Get(blockID); cached {
-		if blk == nil {
-			return nil, database.ErrNotFound
-		}
-
-		return blk, nil
-	}
-
 	blkBytes, err := s.blockDB.Get(blockID[:])
-	switch err {
-	case nil:
-		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-		blk, err := block.Parse(block.GenesisCodec, blkBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		s.blockCache.Put(blockID, blk)
-		return blk, nil
-
-	case database.ErrNotFound:
-		s.blockCache.Put(blockID, nil)
-		return nil, database.ErrNotFound
-
-	default:
+	if err != nil {
 		return nil, err
 	}
+
+	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+	return block.Parse(block.GenesisCodec, blkBytes)
 }
 
 func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
-	if blkID, cached := s.blockIDCache.Get(height); cached {
-		if blkID == ids.Empty {
-			return ids.Empty, database.ErrNotFound
-		}
 
-		return blkID, nil
-	}
-
-	heightKey := database.PackUInt64(height)
-
-	blkID, err := database.GetID(s.blockIDDB, heightKey)
-	if err == database.ErrNotFound {
-		s.blockIDCache.Put(height, ids.Empty)
-		return ids.Empty, database.ErrNotFound
-	}
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	s.blockIDCache.Put(height, blkID)
-	return blkID, nil
+	key := database.PackUInt64(height)
+	return database.GetID(s.blockIDDB, key)
 }
 
 func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
@@ -1599,47 +1349,29 @@ func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[
 }
 
 func (s *state) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
-	nodeDelegateeRewards, exists := s.delegateeRewardCache[vdrID]
-	if exists {
-		delegateeReward, exists := nodeDelegateeRewards[subnetID]
-		if exists {
-			return delegateeReward, nil
+	// check if we have a modified value
+	if subnetIDToReward, ok := s.modifiedDelegateeReward[vdrID]; ok {
+		if reward, ok := subnetIDToReward[subnetID]; ok {
+			return reward, nil
 		}
 	}
 
 	// try loading from the db
 	key := merkleDelegateeRewardsKey(vdrID, subnetID)
-	amountBytes, err := s.merkleDB.Get(key)
+	rewardBytes, err := s.merkleDB.Get(key)
 	if err != nil {
 		return 0, err
 	}
-	delegateeReward, err := database.ParseUInt64(amountBytes)
-	if err != nil {
-		return 0, err
-	}
-
-	if _, found := s.delegateeRewardCache[vdrID]; !found {
-		s.delegateeRewardCache[vdrID] = make(map[ids.ID]uint64)
-	}
-	s.delegateeRewardCache[vdrID][subnetID] = delegateeReward
-	return delegateeReward, nil
+	return database.ParseUInt64(rewardBytes)
 }
 
 func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uint64) error {
-	nodeDelegateeRewards, exists := s.delegateeRewardCache[vdrID]
-	if !exists {
-		nodeDelegateeRewards = make(map[ids.ID]uint64)
-		s.delegateeRewardCache[vdrID] = nodeDelegateeRewards
-	}
-	nodeDelegateeRewards[subnetID] = amount
-
-	// track diff
-	updatedDelegateeRewards, ok := s.modifiedDelegateeReward[vdrID]
+	subnetIDToReward, ok := s.modifiedDelegateeReward[vdrID]
 	if !ok {
-		updatedDelegateeRewards = set.Set[ids.ID]{}
-		s.modifiedDelegateeReward[vdrID] = updatedDelegateeRewards
+		subnetIDToReward = make(map[ids.ID]uint64)
+		s.modifiedDelegateeReward[vdrID] = subnetIDToReward
 	}
-	updatedDelegateeRewards.Add(subnetID)
+	subnetIDToReward[subnetID] = amount
 	return nil
 }
 
@@ -1868,15 +1600,12 @@ func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[
 }
 
 func (s *state) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
-	for nodeID, nodeDelegateeRewards := range s.modifiedDelegateeReward {
-		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
-		for _, subnetID := range nodeDelegateeRewardsList {
-			delegateeReward := s.delegateeRewardCache[nodeID][subnetID]
-
+	for nodeID, subnetIDToReward := range s.modifiedDelegateeReward {
+		for subnetID, reward := range subnetIDToReward {
 			key := merkleDelegateeRewardsKey(nodeID, subnetID)
 			*batchOps = append(*batchOps, database.BatchOp{
 				Key:   key,
-				Value: database.PackUInt64(delegateeReward),
+				Value: database.PackUInt64(reward),
 			})
 		}
 		delete(s.modifiedDelegateeReward, nodeID)
@@ -1904,9 +1633,7 @@ func (s *state) writeTxs() error {
 		// Note: Evict is used rather than Put here because stx may end up
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
-		s.txCache.Evict(txID)
-		key := merkleTxKey(txID)
-		if err := s.merkleDB.Put(key, txBytes); err != nil {
+		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
@@ -1916,7 +1643,6 @@ func (s *state) writeTxs() error {
 func (s *state) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
-		s.rewardUTXOsCache.Put(txID, utxos)
 		rawRewardUTXOsDB := prefixdb.New(txID[:], s.rewardUTXOsDB)
 		rewardUTXOsDB := linkeddb.NewDefault(rawRewardUTXOsDB)
 
@@ -1941,7 +1667,6 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 		if utxo == nil { // delete the UTXO
 			switch utxo, err := s.GetUTXO(utxoID); err {
 			case nil:
-				s.utxoCache.Put(utxoID, nil)
 				*batchOps = append(*batchOps, database.BatchOp{
 					Key:    key,
 					Delete: true,
@@ -2000,11 +1725,6 @@ func (s *state) writeElasticSubnets(batchOps *[]database.BatchOp) error { //noli
 			Value: transforkSubnetTx.Bytes(),
 		})
 		delete(s.addedElasticSubnets, subnetID)
-
-		// Note: Evict is used rather than Put here because tx may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.elasticSubnetCache.Evict(subnetID)
 	}
 	return nil
 }
@@ -2017,11 +1737,6 @@ func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
-
-		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
-			owner: owner,
-			size:  len(ownerBytes),
-		})
 
 		key := merkleSubnetOwnersKey(subnetID)
 		*batchOps = append(*batchOps, database.BatchOp{
@@ -2057,12 +1772,11 @@ func (s *state) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
 }
 
 func (s *state) writeLocalUptimes() error {
-	for vdrID, updatedSubnets := range s.modifiedLocalUptimes {
-		for subnetID := range updatedSubnets {
+	for vdrID, subnetIDToUptime := range s.modifiedLocalUptimes {
+		for subnetID, uptime := range subnetIDToUptime {
 			key := merkleLocalUptimesKey(vdrID, subnetID)
 
-			uptimes := s.localUptimesCache[vdrID][subnetID]
-			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.Version, uptimes)
+			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.Version, uptime)
 			if err != nil {
 				return err
 			}
@@ -2104,21 +1818,12 @@ func (s *state) writeMetadata(batchOps *[]database.BatchOp) error {
 		s.latestComittedChainTime = s.chainTime
 	}
 
-	if s.lastAcceptedBlkID != s.latestCommittedLastAcceptedBlkID {
-		*batchOps = append(*batchOps, database.BatchOp{
-			Key:   merkleLastAcceptedBlkIDKey,
-			Value: s.lastAcceptedBlkID[:],
-		})
-		s.latestCommittedLastAcceptedBlkID = s.lastAcceptedBlkID
-	}
-
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be
 
 	for subnetID, supply := range s.modifiedSupplies {
 		supply := supply
 		delete(s.modifiedSupplies, subnetID) // clear up s.supplies to avoid potential double commits
-		s.suppliesCache.Put(subnetID, &supply)
 
 		key := merkleSuppliesKey(subnetID)
 		*batchOps = append(*batchOps, database.BatchOp{
@@ -2237,10 +1942,9 @@ func (s *state) logMerkleRoot() {
 }
 
 func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	nodeUptimes, exists := s.localUptimesCache[vdrID]
-	if exists {
-		uptime, exists := nodeUptimes[subnetID]
-		if exists {
+	// check if we have a modified value
+	if subnetIDToUptime, ok := s.modifiedLocalUptimes[vdrID]; ok {
+		if uptime, ok := subnetIDToUptime[subnetID]; ok {
 			return uptime.Duration, uptime.lastUpdated, nil
 		}
 	}
@@ -2255,8 +1959,6 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 			return 0, time.Time{}, err
 		}
 		upTm.lastUpdated = time.Unix(int64(upTm.LastUpdated), 0)
-		s.localUptimesCache[vdrID] = make(map[ids.ID]*uptimes)
-		s.localUptimesCache[vdrID][subnetID] = upTm
 		return upTm.Duration, upTm.lastUpdated, nil
 
 	case database.ErrNotFound:
@@ -2268,24 +1970,15 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 }
 
 func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
-	nodeUptimes, exists := s.localUptimesCache[vdrID]
-	if !exists {
-		nodeUptimes = make(map[ids.ID]*uptimes)
-		s.localUptimesCache[vdrID] = nodeUptimes
+	updatedNodeUptimes, ok := s.modifiedLocalUptimes[vdrID]
+	if !ok {
+		updatedNodeUptimes = make(map[ids.ID]*uptimes, 0)
+		s.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
 	}
-
-	nodeUptimes[subnetID] = &uptimes{
+	updatedNodeUptimes[subnetID] = &uptimes{
 		Duration:    upDuration,
 		LastUpdated: uint64(lastUpdated.Unix()),
 		lastUpdated: lastUpdated,
 	}
-
-	// track diff
-	updatedNodeUptimes, ok := s.modifiedLocalUptimes[vdrID]
-	if !ok {
-		updatedNodeUptimes = set.Set[ids.ID]{}
-		s.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
-	}
-	updatedNodeUptimes.Add(subnetID)
 	return nil
 }
