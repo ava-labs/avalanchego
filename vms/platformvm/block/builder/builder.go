@@ -112,8 +112,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	now := b.txExecutorBackend.Clk.Time()
-	timestamp := now
+	timestamp := b.txExecutorBackend.Clk.Time()
 	if parentTime := preferred.Timestamp(); parentTime.After(timestamp) {
 		timestamp = parentTime
 	}
@@ -123,16 +122,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
-
-	waitTime := nextStakerChangeTime.Sub(now)
-	ctx.Log.Debug("setting next scheduled event",
-		zap.Time("nextEventTime", nextStakerChangeTime),
-		zap.Duration("timeUntil", waitTime),
-	)
-
-	// Wake up when it's time to add/remove the next validator
-	b.nextStakerChangeTime = nextStakerChangeTime
-	b.timer.SetTimeoutIn(waitTime)
 
 	// timeWasCapped means that [timestamp] was reduced to
 	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
@@ -172,7 +161,44 @@ func (b *builder) Shutdown() {
 func (b *builder) ResetBlockTimer() {
 	// Next time the context lock is released, we can attempt to reset the block
 	// timer.
-	b.timer.SetTimeoutIn(0)
+	go func() {
+		ctx := b.txExecutorBackend.Ctx
+
+		// Grabbing the lock here enforces that this function is not called mid-way
+		// through modifying of the state.
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+
+		preferredID := b.blkManager.Preferred()
+		preferredState, ok := b.blkManager.GetState(preferredID)
+		if !ok {
+			// The preferred block should always be a decision block
+			ctx.Log.Error("couldn't get preferred block state",
+				zap.Stringer("preferredID", preferredID),
+				zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
+			)
+			return
+		}
+
+		nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+		if err != nil {
+			ctx.Log.Error("couldn't get next staker change time",
+				zap.Stringer("preferredID", preferredID),
+				zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
+				zap.Error(err),
+			)
+		}
+
+		now := b.txExecutorBackend.Clk.Time()
+		waitTime := nextStakerChangeTime.Sub(now)
+		ctx.Log.Debug("setting next scheduled event",
+			zap.Time("nextEventTime", nextStakerChangeTime),
+			zap.Duration("timeUntil", waitTime),
+		)
+
+		// Wake up when it's time to add/remove the next validator
+		b.timer.SetTimeoutIn(waitTime)
+	}()
 }
 
 func (b *builder) maybeAdvanceTime() {
