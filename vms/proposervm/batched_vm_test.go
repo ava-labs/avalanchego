@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 func TestCoreVMNotRemote(t *testing.T) {
@@ -1125,26 +1124,4 @@ func initTestRemoteProposerVM(
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 	return coreVM, proVM, coreGenBlk
-}
-
-func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
-	ctx := context.Background()
-	vm.Clock.Set(vm.Clock.Time().Truncate(time.Second))
-	for { // find the right time to issue next block
-		proposerID, err := vm.ExpectedProposer(
-			ctx,
-			chainTip.Height()+1,
-			pchainHeight,
-			vm.Clock.Time(),
-			chainTip.Timestamp(),
-		)
-		if err != nil {
-			return err
-		}
-		if proposerID == vm.ctx.NodeID {
-			break
-		}
-		vm.Clock.Set(vm.Time().Add(proposer.WindowDuration))
-	}
-	return nil
 }

@@ -215,6 +215,28 @@ func initTestProposerVM(
 	return coreVM, valState, proVM, coreGenBlk, db
 }
 
+func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
+	ctx := context.Background()
+	vm.Clock.Set(vm.Clock.Time().Truncate(time.Second))
+	for { // find the right time to issue next block
+		proposerID, err := vm.ExpectedProposer(
+			ctx,
+			chainTip.Height()+1,
+			pchainHeight,
+			vm.Clock.Time(),
+			chainTip.Timestamp(),
+		)
+		if err != nil {
+			return err
+		}
+		if proposerID == vm.ctx.NodeID {
+			break
+		}
+		vm.Clock.Set(vm.Time().Add(proposer.WindowDuration))
+	}
+	return nil
+}
+
 // VM.BuildBlock tests section
 
 func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
@@ -334,7 +356,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -347,10 +369,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -363,10 +384,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(222),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -420,7 +440,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
+	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -433,7 +453,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -445,10 +465,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -461,10 +480,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(222),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -510,16 +528,15 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    wronglyPreferredcoreBlk.ID(),
-		HeightV:    wronglyPreferredcoreBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: wronglyPreferredcoreBlk.ID(),
+		HeightV: wronglyPreferredcoreBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
+	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 

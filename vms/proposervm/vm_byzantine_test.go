@@ -17,9 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
@@ -36,7 +34,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -48,10 +46,9 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    gBlock.ID(),
-		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: gBlock.ID(),
+		HeightV: gBlock.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
@@ -71,10 +68,9 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     yBlockBytes,
-		ParentV:    xBlock.ID(),
-		HeightV:    xBlock.Height() + 1,
-		TimestampV: xBlock.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  yBlockBytes,
+		ParentV: xBlock.ID(),
+		HeightV: xBlock.Height() + 1,
 	}
 
 	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
@@ -109,7 +105,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -124,9 +120,8 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 				IDV:     xBlockID,
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
+			BytesV:  []byte{1},
+			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
 			&snowman.TestBlock{
@@ -134,18 +129,16 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{2},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{2},
+				ParentV: xBlockID,
 			},
 			&snowman.TestBlock{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{3},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{3},
+				ParentV: xBlockID,
 			},
 		},
 	}
@@ -221,7 +214,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -233,10 +226,9 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    gBlock.ID(),
-		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: gBlock.ID(),
+		HeightV: gBlock.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
@@ -248,10 +240,9 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     yBlockBytes,
-		ParentV:    xBlock.ID(),
-		HeightV:    xBlock.Height() + 1,
-		TimestampV: xBlock.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  yBlockBytes,
+		ParentV: xBlock.ID(),
+		HeightV: xBlock.Height() + 1,
 	}
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -313,7 +304,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -327,9 +318,8 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 				IDV:     ids.GenerateTestID(),
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
+			BytesV:  []byte{1},
+			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
 			&snowman.TestBlock{
@@ -337,18 +327,16 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{2},
-				ParentV:    coreGenBlk.ID(), // valid block should reference xBlock
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{2},
+				ParentV: coreGenBlk.ID(), // valid block should reference xBlock
 			},
 			&snowman.TestBlock{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{3},
-				ParentV:    coreGenBlk.ID(), // valid block should reference xBlock
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{3},
+				ParentV: coreGenBlk.ID(), // valid block should reference xBlock
 			},
 		},
 	}
@@ -416,7 +404,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -432,9 +420,8 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 				IDV:     xBlockID,
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
+			BytesV:  []byte{1},
+			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
 			&snowman.TestBlock{
@@ -442,18 +429,16 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{2},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{2},
+				ParentV: xBlockID,
 			},
 			&snowman.TestBlock{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{3},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{3},
+				ParentV: xBlockID,
 			},
 		},
 	}
@@ -468,10 +453,9 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 
 	ySlb, err := block.BuildUnsigned(
@@ -548,9 +532,8 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 				IDV:     zBlockID,
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
+			BytesV:  []byte{1},
+			ParentV: coreGenBlk.ID(),
 		},
 		opts: [2]snowman.Block{
 			&snowman.TestBlock{
@@ -558,18 +541,16 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{2},
-				ParentV:    zBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{2},
+				ParentV: zBlockID,
 			},
 			&snowman.TestBlock{
 				TestDecidable: choices.TestDecidable{
 					IDV:     ids.GenerateTestID(),
 					StatusV: choices.Processing,
 				},
-				BytesV:     []byte{3},
-				ParentV:    zBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
+				BytesV:  []byte{3},
+				ParentV: zBlockID,
 			},
 		},
 	}
@@ -607,7 +588,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 
 	var (
 		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		durangoForkTime = time.Unix(0, 0)
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
 	defer func() {
@@ -632,10 +613,9 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 
 	coreBlk1 := &snowman.TestBlock{
@@ -643,10 +623,9 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreBlk0.ID(),
-		HeightV:    coreBlk0.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreBlk0.ID(),
+		HeightV: coreBlk0.Height() + 1,
 	}
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -686,7 +665,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 
 	require.NoError(proVM.SetPreference(context.Background(), builtBlk0.ID()))
 
-	// The second propsal block will need to be signed because the timestamp
+	// The second proposal block will need to be signed because the timestamp
 	// hasn't moved forward
 
 	// Craft what would be the next block, but with an invalid signature:
