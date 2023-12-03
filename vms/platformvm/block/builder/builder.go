@@ -123,9 +123,16 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
+	waitTime := nextStakerChangeTime.Sub(timestamp)
+	ctx.Log.Debug("setting next scheduled event",
+		zap.Time("nextEventTime", nextStakerChangeTime),
+		zap.Duration("timeUntil", waitTime),
+	)
+
 	b.nextStakerChangeTimeLock.Lock()
 	b.nextStakerChangeTime = nextStakerChangeTime
 	b.nextStakerChangeTimeLock.Unlock()
+	b.timer.SetTimeoutIn(waitTime)
 
 	// If [timeWasCapped] is true, we must advance time to
 	// [nextStakerChangeTime] even if there are no transactions.
