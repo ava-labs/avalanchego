@@ -15,27 +15,23 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var errTestingDropped = errors.New("testing dropped")
-
-// shows that a locally generated CreateChainTx can be added to mempool and then
-// removed by inclusion in a block
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
@@ -45,17 +41,24 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	// add a tx to it
-	tx := getValidTx(env.txBuilder, t)
+	// Create a valid transaction
+	tx, err := env.txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
 	txID := tx.ID()
 
-	env.sender.SendAppGossipF = func(context.Context, []byte) error {
-		return nil
-	}
+	// Issue the transaction
 	require.NoError(env.network.IssueTx(context.Background(), tx))
 	require.True(env.mempool.Has(txID))
 
-	// show that build block include that tx and removes it from mempool
+	// [BuildBlock] should build a block with the transaction
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -64,7 +67,9 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.Len(blk.Txs(), 1)
 	require.Equal(txID, blk.Txs()[0].ID())
 
+	// Mempool should not contain the transaction or have marked it as dropped
 	require.False(env.mempool.Has(txID))
+	require.NoError(env.mempool.GetDropReason(txID))
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
@@ -76,45 +81,67 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	// create candidate tx
-	tx := getValidTx(env.txBuilder, t)
+	// Create a valid transaction
+	tx, err := env.txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
 	txID := tx.ID()
 
-	// A tx simply added to mempool is obviously not marked as dropped
-	require.NoError(env.mempool.Add(tx))
+	// Issue the transaction
+	require.NoError(env.network.IssueTx(context.Background(), tx))
 	require.True(env.mempool.Has(txID))
+
+	// Transaction should not be marked as dropped when added to the mempool
 	reason := env.mempool.GetDropReason(txID)
 	require.NoError(reason)
 
-	// When a tx is marked as dropped, it is still available to allow re-issuance
+	// Mark the transaction as dropped
+	errTestingDropped := errors.New("testing dropped")
 	env.mempool.MarkDropped(txID, errTestingDropped)
-	require.True(env.mempool.Has(txID)) // still available
 	reason = env.mempool.GetDropReason(txID)
 	require.ErrorIs(reason, errTestingDropped)
 
-	// A previously dropped tx, popped then re-added to mempool,
-	// is not dropped anymore
-	env.mempool.Remove([]*txs.Tx{tx})
-	require.NoError(env.mempool.Add(tx))
-
+	// Dropped transactions should still be in the mempool
 	require.True(env.mempool.Has(txID))
+
+	// Remove the transaction from the mempool
+	env.mempool.Remove([]*txs.Tx{tx})
+
+	// Issue the transaction again
+	require.NoError(env.network.IssueTx(context.Background(), tx))
+	require.True(env.mempool.Has(txID))
+
+	// When issued again, the mempool should not be marked as dropped
 	reason = env.mempool.GetDropReason(txID)
 	require.NoError(reason)
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
+	require := require.New(t)
+
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	env.isBootstrapped.Set(false)
-	env.ctx.Log = logging.NoWarn{}
 	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 
-	require.False(t, env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
+	require.False(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }
 
 func TestGetNextStakerToReward(t *testing.T) {
+	var (
+		now  = time.Now()
+		txID = ids.GenerateTestID()
+	)
+
 	type test struct {
 		name                 string
 		timestamp            time.Time
@@ -124,10 +151,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 		expectedErr          error
 	}
 
-	var (
-		now  = time.Now()
-		txID = ids.GenerateTestID()
-	)
 	tests := []test{
 		{
 			name:      "end of time",
@@ -296,49 +319,35 @@ func TestGetNextStakerToReward(t *testing.T) {
 }
 
 func TestBuildBlock(t *testing.T) {
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(t, shutdownEnvironment(env))
+	}()
+
 	var (
-		parentID = ids.GenerateTestID()
-		height   = uint64(1337)
-		output   = &avax.TransferableOutput{
-			Asset: avax.Asset{ID: ids.GenerateTestID()},
-			Out: &secp256k1fx.TransferOutput{
-				OutputOwners: secp256k1fx.OutputOwners{
-					Addrs: []ids.ShortID{ids.GenerateTestShortID()},
-				},
-			},
-		}
-		now             = time.Now()
+		now             = env.backend.Clk.Time()
+		parentID        = ids.GenerateTestID()
+		height          = uint64(1337)
 		parentTimestamp = now.Add(-2 * time.Second)
-		transactions    = []*txs.Tx{{
-			Unsigned: &txs.AddValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					Ins: []*avax.TransferableInput{{
-						Asset: avax.Asset{ID: ids.GenerateTestID()},
-						In: &secp256k1fx.TransferInput{
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{0},
-							},
-						},
-					}},
-					Outs: []*avax.TransferableOutput{output},
-				}},
-				Validator: txs.Validator{
-					// Shouldn't be dropped
-					Start: uint64(now.Add(2 * txexecutor.SyncBound).Unix()),
-				},
-				StakeOuts: []*avax.TransferableOutput{output},
-				RewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs: []ids.ShortID{ids.GenerateTestShortID()},
-				},
-			},
-			Creds: []verify.Verifiable{
-				&secp256k1fx.Credential{
-					Sigs: [][secp256k1.SignatureLen]byte{{1, 3, 3, 7}},
-				},
-			},
-		}}
-		stakerTxID = ids.GenerateTestID()
+		stakerTxID      = ids.GenerateTestID()
+
+		defaultValidatorStake = 100 * units.MilliAvax
+		validatorStartTime    = now.Add(2 * txexecutor.SyncBound)
+		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
 	)
+
+	tx, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		ids.GenerateTestNodeID(),
+		preFundedKeys[0].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		preFundedKeys[0].PublicKey().Address(),
+	)
+	require.NoError(t, err)
 
 	type test struct {
 		name             string
@@ -358,7 +367,7 @@ func TestBuildBlock(t *testing.T) {
 
 				// The tx builder should be asked to build a reward tx
 				txBuilder := txbuilder.NewMockBuilder(ctrl)
-				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(transactions[0], nil)
+				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(tx, nil)
 
 				return &builder{
 					Mempool:   mempool,
@@ -394,7 +403,7 @@ func TestBuildBlock(t *testing.T) {
 					parentTimestamp,
 					parentID,
 					height,
-					transactions[0],
+					tx,
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -408,7 +417,7 @@ func TestBuildBlock(t *testing.T) {
 
 				// There are txs.
 				mempool.EXPECT().HasTxs().Return(true)
-				mempool.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
+				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{tx})
 				return &builder{
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
@@ -445,7 +454,7 @@ func TestBuildBlock(t *testing.T) {
 					parentTimestamp,
 					parentID,
 					height,
-					transactions,
+					[]*txs.Tx{tx},
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -566,7 +575,7 @@ func TestBuildBlock(t *testing.T) {
 
 				// There is a tx.
 				mempool.EXPECT().HasTxs().Return(true)
-				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
+				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{tx})
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -607,7 +616,7 @@ func TestBuildBlock(t *testing.T) {
 					parentTimestamp,
 					parentID,
 					height,
-					[]*txs.Tx{transactions[0]},
+					[]*txs.Tx{tx},
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -622,7 +631,7 @@ func TestBuildBlock(t *testing.T) {
 				// There are no decision txs
 				// There is a staker tx.
 				mempool.EXPECT().HasTxs().Return(true)
-				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
+				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{tx})
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -663,7 +672,7 @@ func TestBuildBlock(t *testing.T) {
 					parentTimestamp,
 					parentID,
 					height,
-					[]*txs.Tx{transactions[0]},
+					[]*txs.Tx{tx},
 				)
 				require.NoError(err)
 				return expectedBlk
