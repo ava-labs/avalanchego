@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -341,10 +342,10 @@ func TestBuildBlock(t *testing.T) {
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		preFundedKeys[0].PublicKey().Address(),
+		ts.Keys[0].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(t, err)
 
