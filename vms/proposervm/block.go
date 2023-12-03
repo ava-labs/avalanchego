@@ -337,6 +337,7 @@ func (p *postForkCommonComponents) shouldBuildBlock(
 ) (bool, error) {
 	delay := newTimestamp.Sub(parentTimestamp)
 	if delay >= proposer.MaxBuildDelay {
+		// time for any node to build an unsigned block
 		return true, nil
 	}
 
@@ -352,22 +353,25 @@ func (p *postForkCommonComponents) shouldBuildBlock(
 		return false, err
 	}
 
-	if delay < minDelay {
-		// It's not our turn to propose a block yet. This is likely caused
-		// by having previously notified the consensus engine to attempt to
-		// build a block on top of a block that is no longer the preferred
-		// block.
-		p.vm.ctx.Log.Debug("build block dropped",
-			zap.Time("parentTimestamp", parentTimestamp),
-			zap.Duration("minDelay", minDelay),
-			zap.Time("blockTimestamp", newTimestamp),
-		)
-
-		// In case the inner VM only issued one pendingTxs message, we
-		// should attempt to re-handle that once it is our turn to build the
-		// block.
-		p.vm.notifyInnerBlockReady()
-		return false, errProposerWindowNotStarted
+	if delay >= minDelay {
+		// it's time for this node to propose a block. It'll be signed or unsigned
+		// depending on the delay
+		return delay >= proposer.MaxVerifyDelay, nil
 	}
-	return delay >= proposer.MaxVerifyDelay, nil
+
+	// It's not our turn to propose a block yet. This is likely caused
+	// by having previously notified the consensus engine to attempt to
+	// build a block on top of a block that is no longer the preferred
+	// block.
+	p.vm.ctx.Log.Debug("build block dropped",
+		zap.Time("parentTimestamp", parentTimestamp),
+		zap.Duration("minDelay", minDelay),
+		zap.Time("blockTimestamp", newTimestamp),
+	)
+
+	// In case the inner VM only issued one pendingTxs message, we
+	// should attempt to re-handle that once it is our turn to build the
+	// block.
+	p.vm.notifyInnerBlockReady()
+	return false, errProposerWindowNotStarted
 }
