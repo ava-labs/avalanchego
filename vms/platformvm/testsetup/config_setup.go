@@ -52,6 +52,6 @@ func Config(postBanff, postCortina bool) *config.Config {
 		ApricotPhase5Time: forkTime,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
-		DTime:             mockable.MaxTime,
+		DurangoTime:       mockable.MaxTime,
 	}
 }

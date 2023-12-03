@@ -213,7 +213,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *ts.MutableSharedMemory) {
 	vm := &VM{
 		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/),
 	}
-	vm.DTime = vm.CortinaTime // activate DFork as well
+	vm.DurangoTime = vm.CortinaTime // activate DFork as well
 
 	baseDB := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, baseDB)
