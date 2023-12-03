@@ -352,9 +352,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the subnet config.
-	if minDelay < vm.MinBlkDelay {
-		minDelay = vm.MinBlkDelay
-	}
+	minDelay = math.Max(minDelay, vm.MinBlkDelay)
 
 	preferredTime := blk.Timestamp()
 	nextStartTime := preferredTime.Add(minDelay)

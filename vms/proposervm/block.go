@@ -141,7 +141,7 @@ func (p *postForkCommonComponents) Verify(
 			)
 		}
 
-		delay, minDelay, err := p.verifyBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
+		delay, err := p.verifyBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,6 @@ func (p *postForkCommonComponents) Verify(
 		p.vm.ctx.Log.Debug("verified post-fork block",
 			zap.Stringer("blkID", child.ID()),
 			zap.Time("parentTimestamp", parentTimestamp),
-			zap.Duration("minDelay", minDelay),
 			zap.Time("blockTimestamp", childTimestamp),
 		)
 	}
@@ -194,7 +193,7 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	buildUnsignedBlock, err := p.shouldBuildBlock(
+	shouldBuildUnsignedBlock, err := p.shouldBuildBlock(
 		ctx,
 		parentID,
 		parentTimestamp,
@@ -219,7 +218,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if buildUnsignedBlock {
+	if shouldBuildUnsignedBlock {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
@@ -310,7 +309,7 @@ func (p *postForkCommonComponents) verifyBlockDelay(
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
 	blk *postForkBlock,
-) (time.Duration, time.Duration, error) {
+) (time.Duration, error) {
 	var (
 		blkTimestamp = blk.Timestamp()
 		childHeight  = blk.Height()
@@ -318,15 +317,15 @@ func (p *postForkCommonComponents) verifyBlockDelay(
 	)
 	minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 
 	delay := blkTimestamp.Sub(parentTimestamp)
 	if delay < minDelay {
-		return 0, 0, errProposerWindowNotStarted
+		return 0, errProposerWindowNotStarted
 	}
 
-	return delay, minDelay, nil
+	return delay, nil
 }
 
 func (p *postForkCommonComponents) shouldBuildBlock(
