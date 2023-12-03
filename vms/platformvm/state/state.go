@@ -106,10 +106,8 @@ type Chain interface {
 	GetCurrentSupply(subnetID ids.ID) (uint64, error)
 	SetCurrentSupply(subnetID ids.ID, cs uint64)
 
-	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
 
-	GetSubnets() ([]*txs.Tx, error)
 	AddSubnet(createSubnetTx *txs.Tx)
 
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
@@ -118,7 +116,6 @@ type Chain interface {
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
 
-	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
 	AddChain(createChainTx *txs.Tx)
 
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
@@ -139,6 +136,10 @@ type State interface {
 	AddStatelessBlock(block block.Block)
 
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+
+	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
+	GetSubnets() ([]*txs.Tx, error)
+	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
