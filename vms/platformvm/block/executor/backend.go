@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
+
+var errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 
 // Shared fields used by visitors.
 type backend struct {

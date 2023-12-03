@@ -25,7 +25,6 @@ var (
 	errIncorrectBlockHeight                       = errors.New("incorrect block height")
 	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
 	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
-	errConflictingParentTxs                       = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
 )
 
