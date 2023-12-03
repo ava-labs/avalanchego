@@ -702,14 +702,16 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = time.Unix(0, 0)
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
 
-	// Build some post-Fork blocks....
+	// Build some post-Fork blocks
+
+	// build block 1
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -726,10 +728,10 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	// prepare build of next block
+	// build block 2
 	require.NoError(builtBlk1.Verify(context.Background()))
 	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk1.ID()))
-	proRemoteVM.Set(proRemoteVM.Time().Add(proposer.MaxBuildDelay))
+	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk1, 0))
 
 	coreBlk2 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -739,11 +741,12 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		BytesV:     []byte{2},
 		ParentV:    coreBlk1.ID(),
 		HeightV:    coreBlk1.Height() + 1,
-		TimestampV: coreBlk1.Timestamp().Add(proposer.MaxVerifyDelay),
+		TimestampV: coreBlk1.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
 	}
+
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -820,7 +823,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
 
-		durangoTime = mockable.MaxTime
+		durangoTime = time.Unix(0, 0)
 	)
 
 	// enable ProBlks in next future
@@ -1120,4 +1123,26 @@ func initTestRemoteProposerVM(
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 	return coreVM, proVM, coreGenBlk
+}
+
+func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
+	ctx := context.Background()
+	vm.Clock.Set(vm.Clock.Time().Truncate(time.Second))
+	for { // find the right time to issue next block
+		proposerID, err := vm.ExpectedProposer(
+			ctx,
+			chainTip.Height()+1,
+			pchainHeight,
+			vm.Clock.Time(),
+			chainTip.Timestamp(),
+		)
+		if err != nil {
+			return err
+		}
+		if proposerID == vm.ctx.NodeID {
+			break
+		}
+		vm.Clock.Set(vm.Time().Add(proposer.WindowDuration))
+	}
+	return nil
 }

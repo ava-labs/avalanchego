@@ -203,9 +203,9 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	shouldBuildUnsignedBlock := true
+	shouldBuildUnsignedBlock := false
 	if p.vm.IsDurangoActivated(parentTimestamp) {
-		parentHeight := p.innerBlk.Height() - 1
+		parentHeight := p.innerBlk.Height()
 		err = p.shouldPostDurangoBuildBlock(
 			ctx,
 			parentTimestamp,
@@ -362,7 +362,13 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		proposerID   = blk.Proposer()
 	)
 
-	expectedProposerID, err := p.vm.Windower.ExpectedProposer(ctx, blkHeight, parentPChainHeight, blkTimestamp, parentTimestamp)
+	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
+		ctx,
+		blkHeight,
+		parentPChainHeight,
+		blkTimestamp,
+		parentTimestamp,
+	)
 	if err != nil {
 		return err
 	}
@@ -380,7 +386,13 @@ func (p *postForkCommonComponents) shouldPostDurangoBuildBlock(
 	parentPChainHeight uint64,
 	newTimestamp time.Time,
 ) error {
-	expectedProposerID, err := p.vm.Windower.ExpectedProposer(ctx, parentHeight+1, parentPChainHeight, newTimestamp, parentTimestamp)
+	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
+		ctx,
+		parentHeight+1,
+		parentPChainHeight,
+		newTimestamp,
+		parentTimestamp,
+	)
 	if err != nil {
 		return err
 	}
