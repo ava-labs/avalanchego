@@ -37,40 +37,49 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	pChainHeight := uint64(1337)
-	parentID := ids.GenerateTestID()
-	parentTimestamp := time.Now()
-	parentHeight := uint64(1234)
-	blkID := ids.GenerateTestID()
+	var (
+		nodeID          = ids.GenerateTestNodeID()
+		pChainHeight    = uint64(1337)
+		parentID        = ids.GenerateTestID()
+		parentTimestamp = time.Now().Truncate(time.Second)
+		parentHeight    = uint64(1234)
+		blkID           = ids.GenerateTestID()
+	)
+
 	innerBlk := snowman.NewMockBlock(ctrl)
 	innerBlk.EXPECT().ID().Return(blkID).AnyTimes()
 	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
+
 	builtBlk := snowman.NewMockBlock(ctrl)
 	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
 	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
+
 	innerVM := mocks.NewMockChainVM(ctrl)
 	innerBlockBuilderVM := mocks.NewMockBuildBlockWithContextChainVM(ctrl)
 	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &block.Context{
 		PChainHeight: pChainHeight - 1,
 	}).Return(builtBlk, nil).AnyTimes()
+
 	vdrState := validators.NewMockState(ctrl)
 	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+
 	windower := proposer.NewMockWindower(ctrl)
-	windower.EXPECT().Delay(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(time.Duration(0), nil).AnyTimes()
+	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
 	vm := &VM{
 		Config: Config{
 			ActivationTime:    time.Unix(0, 0),
-			DurangoTime:       mockable.MaxTime,
+			DurangoTime:       time.Unix(0, 0),
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 		},
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
 		ctx: &snow.Context{
+			NodeID:         nodeID,
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
@@ -93,7 +102,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
 }
 
-func TestValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
+func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
@@ -230,7 +239,7 @@ func TestValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	}
 }
 
-func TestNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
+func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
