@@ -33,6 +33,9 @@ type Peers interface {
 	ConnectedPercent() float64
 	// TotalWeight returns the total validator weight
 	TotalWeight() uint64
+	// SampleValidator returns a randomly selected connected validator. If there
+	// are no currently connected validators then it will return false.
+	SampleValidator() (ids.NodeID, bool)
 	// PreferredPeers returns the currently connected validators. If there are
 	// no currently connected validators then it will return the currently
 	// connected peers.
@@ -106,6 +109,13 @@ func (p *lockedPeers) TotalWeight() uint64 {
 	defer p.lock.RUnlock()
 
 	return p.peers.TotalWeight()
+}
+
+func (p *lockedPeers) SampleValidator() (ids.NodeID, bool) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.peers.SampleValidator()
 }
 
 func (p *lockedPeers) PreferredPeers() set.Set[ids.NodeID] {
@@ -261,6 +271,10 @@ func (p *peerData) ConnectedPercent() float64 {
 
 func (p *peerData) TotalWeight() uint64 {
 	return p.totalWeight
+}
+
+func (p *peerData) SampleValidator() (ids.NodeID, bool) {
+	return p.connectedValidators.Peek()
 }
 
 func (p *peerData) PreferredPeers() set.Set[ids.NodeID] {

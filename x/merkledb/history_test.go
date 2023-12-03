@@ -660,8 +660,8 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			rootID: ids.GenerateTestID(),
 			nodes: map[Key]*change[*node]{
 				ToKey([]byte{byte(i)}): {
-					before: &node{id: ids.GenerateTestID()},
-					after:  &node{id: ids.GenerateTestID()},
+					before: &node{},
+					after:  &node{},
 				},
 			},
 			values: map[Key]*change[maybe.Maybe[[]byte]]{
