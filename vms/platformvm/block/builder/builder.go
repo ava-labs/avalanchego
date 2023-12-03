@@ -314,6 +314,13 @@ func buildBlock(
 			builder.Mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
+		err = builder.blkManager.VerifyUniqueInputs(preferredID, inputs)
+		if err != nil {
+			txID := tx.ID()
+			builder.Mempool.MarkDropped(txID, err)
+			continue
+		}
+		inputs.Union(executor.Inputs)
 
 		txDiff.AddTx(tx, status.Committed)
 		err = txDiff.Apply(stateDiff)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -94,4 +95,29 @@ func (b *backend) getTimestamp(blkID ids.ID) time.Time {
 	// block is the only accepted block that must return a correct timestamp,
 	// so we just return the chain time.
 	return b.state.GetTimestamp()
+}
+
+// VerifyUniqueInputs verifies that the inputs are not duplicated in the
+// provided blk or any of its ancestors pinned in memory.
+func (b *backend) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
+	if inputs.Len() == 0 {
+		return nil
+	}
+
+	// Check for conflicts in ancestors.
+	for {
+		state, ok := b.blkIDToState[blkID]
+		if !ok {
+			// The parent state isn't pinned in memory.
+			// This means the parent must be accepted already.
+			return nil
+		}
+
+		if state.inputs.Overlaps(inputs) {
+			return errConflictingParentTxs
+		}
+
+		blk := state.statelessBlock
+		blkID = blk.Parent()
+	}
 }
