@@ -1519,11 +1519,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	engineConfig := smeng.Config{
-		Ctx:           bootstrapConfig.Ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            bootstrapConfig.VM,
-		Sender:        bootstrapConfig.Sender,
-		Validators:    beacons,
+		Ctx:                 bootstrapConfig.Ctx,
+		AllGetsServer:       snowGetHandler,
+		VM:                  bootstrapConfig.VM,
+		Sender:              bootstrapConfig.Sender,
+		Validators:          beacons,
+		ConnectedValidators: peers,
 		Params: snowball.Parameters{
 			K:                     1,
 			AlphaPreference:       1,
@@ -1537,7 +1538,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		},
 		Consensus: &smcon.Topological{},
 
-		Peers:                          peers,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 	}
