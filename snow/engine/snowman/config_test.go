@@ -14,14 +14,12 @@ import (
 )
 
 func DefaultConfig() Config {
-	connectedPeers := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedPeers, 0)
-
 	return Config{
-		Ctx:        snow.DefaultConsensusContextTest(),
-		VM:         &block.TestVM{},
-		Sender:     &common.SenderTest{},
-		Validators: validators.NewManager(),
+		Ctx:                 snow.DefaultConsensusContextTest(),
+		VM:                  &block.TestVM{},
+		Sender:              &common.SenderTest{},
+		Validators:          validators.NewManager(),
+		ConnectedValidators: tracker.NewPeers(),
 		Params: snowball.Parameters{
 			K:                     1,
 			AlphaPreference:       1,
@@ -35,7 +33,6 @@ func DefaultConfig() Config {
 		},
 		Consensus: &snowman.Topological{},
 
-		Peers:                          startupTracker,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 	}
