@@ -37,7 +37,7 @@ var (
 	ErrDuplicateValidator              = errors.New("duplicate validator")
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
-	ErrDUpgradeNotActive               = errors.New("attempting to use a D-upgrade feature prior to activation")
+	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -727,8 +727,8 @@ func verifyTransferSubnetOwnershipTx(
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
 ) error {
-	if !backend.Config.IsDActivated(chainState.GetTimestamp()) {
-		return ErrDUpgradeNotActive
+	if !backend.Config.IsDurangoActivated(chainState.GetTimestamp()) {
+		return ErrDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
