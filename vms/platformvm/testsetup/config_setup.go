@@ -34,7 +34,7 @@ func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
-		dTime             = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
 	)
 
 	switch fork {
@@ -53,7 +53,7 @@ func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 		apricotPhase5Time = GenesisTime
 		apricotPhase3Time = GenesisTime
 	case DFork:
-		dTime = forkTime
+		durangoTime = forkTime
 		cortinaTime = GenesisTime
 		banffTime = GenesisTime
 		apricotPhase5Time = GenesisTime
@@ -86,6 +86,6 @@ func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
-		DTime:             dTime,
+		DurangoTime:       durangoTime,
 	}
 }
