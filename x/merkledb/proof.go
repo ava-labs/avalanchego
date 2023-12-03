@@ -847,7 +847,7 @@ func addPathInfo(
 				// We only need the IDs to be correct so that the calculated hash is correct.
 				n.setChildEntry(
 					index,
-					child{
+					&child{
 						id:            childID,
 						compressedKey: compressedKey,
 					})

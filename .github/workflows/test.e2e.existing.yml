@@ -1,0 +1,39 @@
+name: Test e2e with existing network
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  test_e2e_existing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.10'
+          check-latest: true
+      - name: Build the avalanchego binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests with existing network
+        shell: bash
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: tmpnet-data
+          path: ~/.tmpnet/networks/1000

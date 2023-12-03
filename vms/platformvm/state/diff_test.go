@@ -250,15 +250,28 @@ func TestDiffSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state, _ := newInitializedState(require)
+
+	// Initialize parent with one subnet
+	parentStateCreateSubnetTx := &txs.Tx{
+		Unsigned: &txs.CreateSubnetTx{
+			Owner: fx.NewMockOwner(ctrl),
+		},
+	}
+	state.AddSubnet(parentStateCreateSubnetTx)
+
+	// Verify parent returns one subnet
+	subnets, err := state.GetSubnets()
+	require.NoError(err)
+	require.Equal([]*txs.Tx{
+		parentStateCreateSubnetTx,
+	}, subnets)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
-	d, err := NewDiff(lastAcceptedID, states)
+	diff, err := NewDiff(lastAcceptedID, states)
 	require.NoError(err)
 
 	// Put a subnet
@@ -267,60 +280,67 @@ func TestDiffSubnet(t *testing.T) {
 			Owner: fx.NewMockOwner(ctrl),
 		},
 	}
-	d.AddSubnet(createSubnetTx)
+	diff.AddSubnet(createSubnetTx)
 
-	// Assert that we get the subnet back
-	// [state] returns 1 subnet.
-	parentStateCreateSubnetTx := &txs.Tx{
-		Unsigned: &txs.CreateSubnetTx{
-			Owner: fx.NewMockOwner(ctrl),
-		},
-	}
-	state.EXPECT().GetSubnets().Return([]*txs.Tx{parentStateCreateSubnetTx}, nil).Times(1)
-	gotSubnets, err := d.GetSubnets()
+	// Apply diff to parent state
+	require.NoError(diff.Apply(state))
+
+	// Verify parent now returns two subnets
+	subnets, err = state.GetSubnets()
 	require.NoError(err)
-	require.Len(gotSubnets, 2)
-	require.Equal(gotSubnets[0], parentStateCreateSubnetTx)
-	require.Equal(gotSubnets[1], createSubnetTx)
+	require.Equal([]*txs.Tx{
+		parentStateCreateSubnetTx,
+		createSubnetTx,
+	}, subnets)
 }
 
 func TestDiffChain(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state, _ := newInitializedState(require)
+	subnetID := ids.GenerateTestID()
+
+	// Initialize parent with one chain
+	parentStateCreateChainTx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID,
+		},
+	}
+	state.AddChain(parentStateCreateChainTx)
+
+	// Verify parent returns one chain
+	chains, err := state.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{
+		parentStateCreateChainTx,
+	}, chains)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
-	d, err := NewDiff(lastAcceptedID, states)
+	diff, err := NewDiff(lastAcceptedID, states)
 	require.NoError(err)
 
 	// Put a chain
-	subnetID := ids.GenerateTestID()
 	createChainTx := &txs.Tx{
 		Unsigned: &txs.CreateChainTx{
-			SubnetID: subnetID,
+			SubnetID: subnetID, // note this is the same subnet as [parentStateCreateChainTx]
 		},
 	}
-	d.AddChain(createChainTx)
+	diff.AddChain(createChainTx)
 
-	// Assert that we get the chain back
-	// [state] returns 1 chain.
-	parentStateCreateChainTx := &txs.Tx{
-		Unsigned: &txs.CreateChainTx{
-			SubnetID: subnetID, // note this is the same subnet as [createChainTx]
-		},
-	}
-	state.EXPECT().GetChains(subnetID).Return([]*txs.Tx{parentStateCreateChainTx}, nil).Times(1)
-	gotChains, err := d.GetChains(subnetID)
+	// Apply diff to parent state
+	require.NoError(diff.Apply(state))
+
+	// Verify parent now returns two chains
+	chains, err = state.GetChains(subnetID)
 	require.NoError(err)
-	require.Len(gotChains, 2)
-	require.Equal(parentStateCreateChainTx, gotChains[0])
-	require.Equal(createChainTx, gotChains[1])
+	require.Equal([]*txs.Tx{
+		parentStateCreateChainTx,
+		createChainTx,
+	}, chains)
 }
 
 func TestDiffTx(t *testing.T) {
@@ -377,45 +397,46 @@ func TestDiffRewardUTXO(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state, _ := newInitializedState(require)
+
+	txID := ids.GenerateTestID()
+
+	// Initialize parent with one reward UTXO
+	parentRewardUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID},
+	}
+	state.AddRewardUTXO(txID, parentRewardUTXO)
+
+	// Verify parent returns the reward UTXO
+	rewardUTXOs, err := state.GetRewardUTXOs(txID)
+	require.NoError(err)
+	require.Equal([]*avax.UTXO{
+		parentRewardUTXO,
+	}, rewardUTXOs)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
-	d, err := NewDiff(lastAcceptedID, states)
+	diff, err := NewDiff(lastAcceptedID, states)
 	require.NoError(err)
 
 	// Put a reward UTXO
-	txID := ids.GenerateTestID()
 	rewardUTXO := &avax.UTXO{
 		UTXOID: avax.UTXOID{TxID: txID},
 	}
-	d.AddRewardUTXO(txID, rewardUTXO)
+	diff.AddRewardUTXO(txID, rewardUTXO)
 
-	{
-		// Assert that we get the UTXO back
-		gotRewardUTXOs, err := d.GetRewardUTXOs(txID)
-		require.NoError(err)
-		require.Len(gotRewardUTXOs, 1)
-		require.Equal(rewardUTXO, gotRewardUTXOs[0])
-	}
+	// Apply diff to parent state
+	require.NoError(diff.Apply(state))
 
-	{
-		// Assert that we can get a UTXO from the parent state
-		// [state] returns 1 UTXO.
-		txID2 := ids.GenerateTestID()
-		parentRewardUTXO := &avax.UTXO{
-			UTXOID: avax.UTXOID{TxID: txID2},
-		}
-		state.EXPECT().GetRewardUTXOs(txID2).Return([]*avax.UTXO{parentRewardUTXO}, nil).Times(1)
-		gotParentRewardUTXOs, err := d.GetRewardUTXOs(txID2)
-		require.NoError(err)
-		require.Len(gotParentRewardUTXOs, 1)
-		require.Equal(parentRewardUTXO, gotParentRewardUTXOs[0])
-	}
+	// Verify parent now returns two reward UTXOs
+	rewardUTXOs, err = state.GetRewardUTXOs(txID)
+	require.NoError(err)
+	require.Equal([]*avax.UTXO{
+		parentRewardUTXO,
+		rewardUTXO,
+	}, rewardUTXOs)
 }
 
 func TestDiffUTXO(t *testing.T) {
@@ -496,25 +517,6 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 	require.NoError(err)
 
 	require.Equal(expectedCurrentSupply, actualCurrentSupply)
-
-	expectedSubnets, expectedErr := expected.GetSubnets()
-	actualSubnets, actualErr := actual.GetSubnets()
-	require.Equal(expectedErr, actualErr)
-	if expectedErr == nil {
-		require.Equal(expectedSubnets, actualSubnets)
-
-		for _, subnet := range expectedSubnets {
-			subnetID := subnet.ID()
-
-			expectedChains, expectedErr := expected.GetChains(subnetID)
-			actualChains, actualErr := actual.GetChains(subnetID)
-			require.Equal(expectedErr, actualErr)
-			if expectedErr != nil {
-				continue
-			}
-			require.Equal(expectedChains, actualChains)
-		}
-	}
 }
 
 func TestDiffSubnetOwner(t *testing.T) {
@@ -577,4 +579,112 @@ func TestDiffSubnetOwner(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner2, owner)
+}
+
+func TestDiffStacking(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state, _ := newInitializedState(require)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	var (
+		owner1 = fx.NewMockOwner(ctrl)
+		owner2 = fx.NewMockOwner(ctrl)
+		owner3 = fx.NewMockOwner(ctrl)
+
+		createSubnetTx = &txs.Tx{
+			Unsigned: &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{},
+				Owner:  owner1,
+			},
+		}
+
+		subnetID = createSubnetTx.ID()
+	)
+
+	// Create subnet on base state
+	owner, err := state.GetSubnetOwner(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(owner)
+
+	state.AddSubnet(createSubnetTx)
+	state.SetSubnetOwner(subnetID, owner1)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Create first diff and verify that subnet owner returns correctly
+	statesDiff, err := NewDiff(lastAcceptedID, states)
+	require.NoError(err)
+
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Transferring subnet ownership on first diff should be reflected on first diff not state
+	statesDiff.SetSubnetOwner(subnetID, owner2)
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Create a second diff on first diff and verify that subnet owner returns correctly
+	stackedDiff, err := wrapState(statesDiff)
+	require.NoError(err)
+	owner, err = stackedDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+
+	// Transfer ownership on stacked diff and verify it is only reflected on stacked diff
+	stackedDiff.SetSubnetOwner(subnetID, owner3)
+	owner, err = stackedDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner3, owner)
+
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner2, owner)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	// Applying both diffs successively should work as expected.
+	require.NoError(stackedDiff.Apply(statesDiff))
+
+	owner, err = statesDiff.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner3, owner)
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner1, owner)
+
+	require.NoError(statesDiff.Apply(state))
+
+	owner, err = state.GetSubnetOwner(subnetID)
+	require.NoError(err)
+	require.Equal(owner3, owner)
+}
+
+type stateGetter struct {
+	state Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (Chain, bool) {
+	return s.state, true
+}
+
+func wrapState(parentState Chain) (Diff, error) {
+	return NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
 }
