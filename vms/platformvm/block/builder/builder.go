@@ -123,11 +123,12 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
-	// timeWasCapped means that [timestamp] was reduced to
-	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
-	// be willing to issue an advanceTimeTx. It is also used as a flag for
-	// [buildBanffBlock] to force the issuance of an empty block to advance
-	// the time forward; if there are no available transactions.
+	b.nextStakerChangeTimeLock.Lock()
+	b.nextStakerChangeTime = nextStakerChangeTime
+	b.nextStakerChangeTimeLock.Unlock()
+
+	// If [timeWasCapped] is true, we must advance time to
+	// [nextStakerChangeTime] even if there are no transactions.
 	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
 	if timeWasCapped {
 		timestamp = nextStakerChangeTime
