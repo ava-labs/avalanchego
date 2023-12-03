@@ -1,5 +1,77 @@
 # Release Notes
 
+## [v1.10.17](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.17)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `30` and is compatible with versions `v1.10.15-v1.10.16`.
+
+### APIs
+
+- Added `avalanche_{chainID}_blks_build_accept_latency` metric
+- Added `avalanche_{chainID}_blks_issued{source}` metric with sources:
+  -  `pull_gossip`
+  -  `push_gossip`
+  -  `put_gossip` which is deprecated
+  -  `built`
+  -  `unknown`
+- Added `avalanche_{chainID}_issuer_stake_sum` metric
+- Added `avalanche_{chainID}_issuer_stake_count` metric
+
+### Configs
+
+- Added:
+  - `--consensus-frontier-poll-frequency`
+- Removed:
+  - `--consensus-accepted-frontier-gossip-frequency`
+- Deprecated:
+  - `--consensus-accepted-frontier-gossip-validator-size`
+  - `--consensus-accepted-frontier-gossip-non-validator-size`
+  - `--consensus-accepted-frontier-gossip-peer-size`
+    - Updated the default value to 1 to align with the change in default gossip frequency
+  - `--consensus-on-accept-gossip-validator-size`
+  - `--consensus-on-accept-gossip-non-validator-size`
+  - `--consensus-on-accept-gossip-peer-size`
+
+### Fixes
+
+- Fixed `duplicated operation on provided value` error when executing atomic operations after state syncing the C-chain
+- Removed useage of atomic trie after commitment
+- Fixed atomic trie root overwrite during state sync
+- Prevented closure of `stdout` and `stderr` when shutting down the logger
+
+### What's Changed
+
+- Remove Banff check from mempool verifier by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2360
+- Document storage growth in readme by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2364
+- Add metric for duration between block timestamp and acceptance time by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2366
+- `vms/platformvm`: Remove unused `withMetrics` txheap by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2373
+- Move peerTracker from x/sync to network/p2p by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2356
+- Logging avoid closing standard outputs by @felipemadero in https://github.com/ava-labs/avalanchego/pull/2372
+- `vms/platformvm`: Adjust `Diff.Apply` signature by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2368
+- Add bls validator info to genesis by @felipemadero in https://github.com/ava-labs/avalanchego/pull/2371
+- Remove `engine.GetVM` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2374
+- `vms/platformvm`: Consolidate `state` pkg mocks by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2370
+- Remove common bootstrapper by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2297
+- `vms/platformvm`: Move `toEngine` channel to mempool by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2333
+- `vms/avm`: Rename `states` pkg to `state` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2381
+- Implement generic bimap by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2383
+- Unexport RequestID from snowman engine by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2384
+- Add metric to track the stake weight of block providers by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2376
+- Add block source metrics to monitor gossip by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2386
+- Rename `D` to `Durango` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2389
+- Replace periodic push accepted gossip with pull preference gossip for block discovery by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2367
+- MerkleDB Remove ID from Node to reduce size and removal channel creation. by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/2324
+- Remove method `CappedList` from `set.Set` by @danlaine in https://github.com/ava-labs/avalanchego/pull/2395
+- Periodically PullGossip only from connected validators by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2399
+- Update bootstrap IPs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2396
+- Rename `testnet` fixture to `tmpnet` by @marun in https://github.com/ava-labs/avalanchego/pull/2307
+- Add `p2p.Network` component by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2283
+- `vms/platformvm`: Move `GetRewardUTXOs`, `GetSubnets`, and `GetChains` to `State` interface by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2402
+- Add more descriptive formatted error by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2403
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.16...v1.10.17
+
 ## [v1.10.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.16)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
