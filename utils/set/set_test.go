@@ -87,35 +87,6 @@ func TestOf(t *testing.T) {
 	}
 }
 
-func TestSetCappedList(t *testing.T) {
-	require := require.New(t)
-	s := Set[int]{}
-
-	id := 0
-
-	require.Empty(s.CappedList(0))
-
-	s.Add(id)
-
-	require.Empty(s.CappedList(0))
-	require.Len(s.CappedList(1), 1)
-	require.Equal(s.CappedList(1)[0], id)
-	require.Len(s.CappedList(2), 1)
-	require.Equal(s.CappedList(2)[0], id)
-
-	id2 := 1
-	s.Add(id2)
-
-	require.Empty(s.CappedList(0))
-	require.Len(s.CappedList(1), 1)
-	require.Len(s.CappedList(2), 2)
-	require.Len(s.CappedList(3), 2)
-	gotList := s.CappedList(2)
-	require.Contains(gotList, id)
-	require.Contains(gotList, id2)
-	require.NotEqual(gotList[0], gotList[1])
-}
-
 func TestSetClear(t *testing.T) {
 	require := require.New(t)
 

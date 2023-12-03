@@ -30,12 +30,12 @@ jobs:
         run: ./scripts/build.sh
       - name: Run upgrade tests
         shell: bash
-        # 1.10.7 is the first version compatible with the testnet fixture by
+        # 1.10.7 is the first version compatible with the ephnet fixture by
         # virtue of writing a process context file on node start.
         run: ./scripts/tests.upgrade.sh 1.10.7
-      - name: Upload testnet network dir
+      - name: Upload ephnet network dir
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: testnet-data
-          path: ~/.testnetctl/networks/1000
+          name: ephnet-data
+          path: ~/.ephnet/networks/1000
