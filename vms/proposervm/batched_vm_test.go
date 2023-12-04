@@ -365,7 +365,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
 
-		durangoTime = time.Unix(0, 0)
+		durangoTime = mockable.MaxTime
 	)
 
 	// enable ProBlks in next future
