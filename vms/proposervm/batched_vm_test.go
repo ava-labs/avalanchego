@@ -30,10 +30,10 @@ func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
-	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -60,7 +60,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -207,7 +207,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -567,7 +567,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -689,7 +689,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {

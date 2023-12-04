@@ -604,10 +604,10 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 
 	// Note: by default proVM is built such that heightIndex will be considered complete
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = mockable.MaxTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
-	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
