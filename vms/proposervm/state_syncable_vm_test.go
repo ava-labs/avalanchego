@@ -71,7 +71,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
+			ActivationTime:      time.Time{},
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -601,7 +601,7 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 	require := require.New(t)
 
 	// Note: by default proVM is built such that heightIndex will be considered complete
-	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Unix(0, 0), 0)
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
