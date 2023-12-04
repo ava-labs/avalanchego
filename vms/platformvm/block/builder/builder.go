@@ -200,6 +200,10 @@ func (b *builder) ResetBlockTimer() {
 
 	// Wake up when it's time to add/remove the next validator
 	b.nextStakerChangeTimeLock.Lock()
+	ctx.Log.Debug("updating nextStakerChangeTime in ResetBlockTimer",
+		zap.Time("old", b.nextStakerChangeTime),
+		zap.Time("new", nextStakerChangeTime),
+	)
 	b.nextStakerChangeTime = nextStakerChangeTime
 	b.nextStakerChangeTimeLock.Unlock()
 	b.timer.SetTimeoutIn(waitTime)
@@ -227,6 +231,11 @@ func (b *builder) maybeIssueEmptyBlock() {
 		b.timer.SetTimeoutIn(waitTime)
 		return
 	}
+
+	ctx.Log.Debug("issuing empty block to advance time",
+		zap.Time("now", now),
+		zap.Time("nextStakerChangeTime", b.nextStakerChangeTime),
+	)
 
 	// Block needs to be issued to advance time.
 	b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
