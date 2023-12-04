@@ -126,27 +126,10 @@ func (b *builder) buildBlock() (block.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp := b.txExecutorBackend.Clk.Time()
-	if parentTime := preferred.Timestamp(); parentTime.After(timestamp) {
-		timestamp = parentTime
-	}
-	// [timestamp] = max(now, parentTime)
-
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	timestamp, timeWasCapped, err := txexecutor.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
-
-	// timeWasCapped means that [timestamp] was reduced to
-	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
-	// be willing to issue an advanceTimeTx. It is also used as a flag for
-	// [buildBanffBlock] to force the issuance of an empty block to advance
-	// the time forward; if there are no available transactions.
-	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
-	if timeWasCapped {
-		timestamp = nextStakerChangeTime
-	}
-	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
 	return buildBlock(
 		b,
