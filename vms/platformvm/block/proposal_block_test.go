@@ -38,7 +38,8 @@ func TestNewBanffProposalBlock(t *testing.T) {
 
 	blkTxs := blk.Txs()
 	require.Len(blkTxs, 1)
-	expectedTxs := append(blk.Transactions, blk.Tx)
+	expectedTxs := blk.Transactions
+	expectedTxs = append(expectedTxs, blk.Tx)
 	for i, blkTx := range blkTxs {
 		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
@@ -74,7 +75,8 @@ func TestNewBanffProposalBlockWithDecisionTxs(t *testing.T) {
 
 	blkTxs := blk.Txs()
 	require.Len(blkTxs, len(decisionTxs)+1)
-	expectedTxs := append(blk.Transactions, blk.Tx)
+	expectedTxs := blk.Transactions
+	expectedTxs = append(expectedTxs, blk.Tx)
 	for i, blkTx := range blkTxs {
 		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())

@@ -155,7 +155,8 @@ func TestProposalBlocks(t *testing.T) {
 		require.Equal(banffProposalBlkWithDecisionTxs.Height(), parsed.Height())
 		require.IsType(&BanffProposalBlock{}, parsed)
 		parsedBanffProposalBlkWithDecisionTxs := parsed.(*BanffProposalBlock)
-		expectedTxs := append(decisionTxs, proposalTx)
+		expectedTxs := decisionTxs
+		expectedTxs = append(expectedTxs, proposalTx)
 		require.Equal(expectedTxs, parsedBanffProposalBlkWithDecisionTxs.Txs())
 
 		require.Equal(banffProposalBlkWithDecisionTxs.Timestamp(), parsedBanffProposalBlkWithDecisionTxs.Timestamp())
