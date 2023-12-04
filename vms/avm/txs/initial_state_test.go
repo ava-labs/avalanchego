@@ -162,20 +162,20 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 
 func TestInitialStateCompare(t *testing.T) {
 	tests := []struct {
-		a        InitialState
-		b        InitialState
+		a        *InitialState
+		b        *InitialState
 		expected int
 	}{
 		{
-			a:        InitialState{},
-			b:        InitialState{},
+			a:        &InitialState{},
+			b:        &InitialState{},
 			expected: 0,
 		},
 		{
-			a: InitialState{
+			a: &InitialState{
 				FxIndex: 1,
 			},
-			b:        InitialState{},
+			b:        &InitialState{},
 			expected: 1,
 		},
 	}
@@ -183,8 +183,8 @@ func TestInitialStateCompare(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_%d_%d", test.a.FxIndex, test.b.FxIndex, test.expected), func(t *testing.T) {
 			require := require.New(t)
 
-			require.Equal(test.expected, test.a.Compare(&test.b))
-			require.Equal(-test.expected, test.b.Compare(&test.a))
+			require.Equal(test.expected, test.a.Compare(test.b))
+			require.Equal(-test.expected, test.b.Compare(test.a))
 		})
 	}
 }
