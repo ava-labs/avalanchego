@@ -1448,7 +1448,12 @@ func (s *state) loadCurrentValidators() error {
 		}
 		tx, _, err := s.GetTx(txID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed loading validator transaction txID %s, %w", txID, err)
+		}
+
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		if !ok {
+			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
 		metadataBytes := validatorIt.Value()
@@ -1459,11 +1464,6 @@ func (s *state) loadCurrentValidators() error {
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
-		}
-
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
-		if !ok {
-			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
 		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
@@ -1498,11 +1498,12 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
+		startTime := stakerTx.StartTime()
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
 			// in case it's not stored in the database
-			LastUpdated: uint64(stakerTx.StartTime().Unix()),
+			LastUpdated: uint64(startTime.Unix()),
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1538,17 +1539,17 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
+			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			if !ok {
+				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			}
+
 			metadata := &delegatorMetadata{
 				txID: txID,
 			}
 			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
 				return err
-			}
-
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
-			if !ok {
-				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
 			staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
