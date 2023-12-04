@@ -47,6 +47,19 @@ func (b *BanffProposalBlock) Txs() []*txs.Tx {
 	return append(b.Transactions, b.Tx)
 }
 
+func (b *BanffProposalBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	if err := b.Tx.Initialize(txs.Codec); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
+	}
+	for _, tx := range b.Transactions {
+		if err := tx.Initialize(txs.Codec); err != nil {
+			return fmt.Errorf("failed to sign block: %w", err)
+		}
+	}
+	return nil
+}
+
 func NewBanffProposalBlock(
 	timestamp time.Time,
 	parentID ids.ID,
