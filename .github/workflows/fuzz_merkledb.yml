@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  fuzz:
+  MerkleDB:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
