@@ -1,4 +1,4 @@
-name: Run merkledb fuzz tests
+name: Scheduled Fuzz Testing
 
 on:
   workflow_dispatch:
