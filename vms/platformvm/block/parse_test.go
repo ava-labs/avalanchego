@@ -120,7 +120,7 @@ func TestProposalBlocks(t *testing.T) {
 		// compare content
 		require.Equal(banffProposalBlk.ID(), parsed.ID())
 		require.Equal(banffProposalBlk.Bytes(), parsed.Bytes())
-		require.Equal(banffProposalBlk.Parent(), banffProposalBlk.Parent())
+		require.Equal(banffProposalBlk.Parent(), parsed.Parent())
 		require.Equal(banffProposalBlk.Height(), parsed.Height())
 		require.IsType(&BanffProposalBlock{}, parsed)
 		parsedBanffProposalBlk := parsed.(*BanffProposalBlock)
@@ -131,6 +131,31 @@ func TestProposalBlocks(t *testing.T) {
 
 		// backward compatibility check
 		require.Equal(parsedApricotProposalBlk.Txs(), parsedBanffProposalBlk.Txs())
+
+		// check that banff proposal block with decisionTxs can be built and parsed
+		banffProposalBlkWithDecisionTxs, err := NewBanffProposalBlock(
+			blkTimestamp,
+			parentID,
+			height,
+			tx,
+			[]*txs.Tx{},
+		)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, banffProposalBlkWithDecisionTxs.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(banffProposalBlkWithDecisionTxs.ID(), parsed.ID())
+		require.Equal(banffProposalBlkWithDecisionTxs.Bytes(), parsed.Bytes())
+		require.Equal(banffProposalBlkWithDecisionTxs.Parent(), parsed.Parent())
+		require.Equal(banffProposalBlkWithDecisionTxs.Height(), parsed.Height())
+		require.IsType(&BanffProposalBlock{}, parsed)
+		parsedBanffProposalBlkWithDecisionTxs := parsed.(*BanffProposalBlock)
+		require.Equal([]*txs.Tx{tx}, parsedBanffProposalBlkWithDecisionTxs.Txs())
+
+		require.Equal(banffProposalBlkWithDecisionTxs.Timestamp(), parsedBanffProposalBlkWithDecisionTxs.Timestamp())
 	}
 }
 
