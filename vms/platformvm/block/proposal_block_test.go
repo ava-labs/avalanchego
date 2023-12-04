@@ -38,8 +38,11 @@ func TestNewBanffProposalBlock(t *testing.T) {
 
 	blkTxs := blk.Txs()
 	require.Len(blkTxs, 1)
-	expectedTxs := blk.Transactions
-	expectedTxs = append(expectedTxs, blk.Tx)
+	l := len(blk.Transactions)
+	expectedTxs := make([]*txs.Tx, l+1)
+	copy(expectedTxs, blk.Transactions)
+	expectedTxs[l] = blk.Tx
+	require.Equal(expectedTxs, []*txs.Tx{proposalTx})
 	for i, blkTx := range blkTxs {
 		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
@@ -75,8 +78,11 @@ func TestNewBanffProposalBlockWithDecisionTxs(t *testing.T) {
 
 	blkTxs := blk.Txs()
 	require.Len(blkTxs, len(decisionTxs)+1)
-	expectedTxs := blk.Transactions
-	expectedTxs = append(expectedTxs, blk.Tx)
+	l := len(blk.Transactions)
+	expectedTxs := make([]*txs.Tx, l+1)
+	copy(expectedTxs, blk.Transactions)
+	expectedTxs[l] = blk.Tx
+	require.Equal(expectedTxs, blkTxs)
 	for i, blkTx := range blkTxs {
 		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
@@ -107,6 +113,7 @@ func TestNewApricotProposalBlock(t *testing.T) {
 	blkTxs := blk.Txs()
 	require.Len(blkTxs, 1)
 	expectedTxs := []*txs.Tx{proposalTx}
+	require.Equal(blkTxs, expectedTxs)
 	for i, blkTx := range blkTxs {
 		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
