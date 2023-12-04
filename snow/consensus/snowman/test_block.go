@@ -49,12 +49,5 @@ func (b *TestBlock) Bytes() []byte {
 }
 
 func (b *TestBlock) Compare(other *TestBlock) int {
-	switch {
-	case b.HeightV < other.HeightV:
-		return -1
-	case b.HeightV > other.HeightV:
-		return 1
-	default:
-		return 0
-	}
+	return utils.Compare(b.HeightV, other.HeightV)
 }

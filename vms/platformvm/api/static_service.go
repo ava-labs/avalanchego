@@ -51,16 +51,11 @@ type UTXO struct {
 
 // TODO can we define this on *UTXO?
 func (utxo UTXO) Compare(other UTXO) int {
-	if utxo.Locktime < other.Locktime {
-		return -1
-	} else if utxo.Locktime > other.Locktime {
-		return 1
+	if locktimeCmp := utils.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
+		return locktimeCmp
 	}
-
-	if utxo.Amount < other.Amount {
-		return -1
-	} else if utxo.Amount > other.Amount {
-		return 1
+	if amountCmp := utils.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
+		return amountCmp
 	}
 
 	utxoAddr, err := bech32ToID(utxo.Address)

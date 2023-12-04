@@ -20,12 +20,5 @@ type GenesisAsset struct {
 }
 
 func (g *GenesisAsset) Compare(other *GenesisAsset) int {
-	switch {
-	case g.Alias < other.Alias:
-		return -1
-	case g.Alias > other.Alias:
-		return 1
-	default:
-		return 0
-	}
+	return utils.Compare(g.Alias, other.Alias)
 }

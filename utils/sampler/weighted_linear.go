@@ -20,14 +20,7 @@ type weightedLinearElement struct {
 
 // Note that this sorts in order of decreasing cumulative weight.
 func (e weightedLinearElement) Compare(other weightedLinearElement) int {
-	switch {
-	case e.cumulativeWeight > other.cumulativeWeight:
-		return -1
-	case e.cumulativeWeight < other.cumulativeWeight:
-		return 1
-	default:
-		return 0
-	}
+	return utils.Compare(other.cumulativeWeight, e.cumulativeWeight)
 }
 
 // Sampling is performed by executing a linear search over the provided elements

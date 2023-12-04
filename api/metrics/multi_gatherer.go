@@ -13,6 +13,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	"golang.org/x/exp/slices"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -92,13 +94,6 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 
 func sortMetrics(m []*dto.MetricFamily) {
 	slices.SortFunc(m, func(i, j *dto.MetricFamily) int {
-		switch {
-		case *i.Name < *j.Name:
-			return -1
-		case *i.Name > *j.Name:
-			return 1
-		default:
-			return 0
-		}
+		return utils.Compare(*i.Name, *j.Name)
 	})
 }

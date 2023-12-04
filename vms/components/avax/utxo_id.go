@@ -94,17 +94,8 @@ func (utxo *UTXOID) Verify() error {
 func (utxo *UTXOID) Compare(other *UTXOID) int {
 	utxoID, utxoIndex := utxo.InputSource()
 	otherID, otherIndex := other.InputSource()
-
 	if txIDComp := bytes.Compare(utxoID[:], otherID[:]); txIDComp != 0 {
 		return txIDComp
 	}
-
-	switch {
-	case utxoIndex < otherIndex:
-		return -1
-	case utxoIndex > otherIndex:
-		return 1
-	default:
-		return 0
-	}
+	return utils.Compare(utxoIndex, otherIndex)
 }

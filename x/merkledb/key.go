@@ -11,6 +11,8 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -163,18 +165,10 @@ func (k Key) Length() int {
 }
 
 func (k Key) Compare(other Key) int {
-	switch {
-	case k.value < other.value:
-		return -1
-	case k.value > other.value:
-		return 1
-	case k.length < other.length:
-		return -1
-	case k.length > other.length:
-		return 1
-	default:
-		return 0
+	if valueCmp := utils.Compare(k.value, other.value); valueCmp != 0 {
+		return valueCmp
 	}
+	return utils.Compare(k.length, other.length)
 }
 
 // Extend returns a new Key that is the in-order aggregation of Key [k] with [keys]

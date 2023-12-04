@@ -54,14 +54,10 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 }
 
 func (a Allocation) Compare(other Allocation) int {
-	switch {
-	case a.InitialAmount < other.InitialAmount:
-		return -1
-	case a.InitialAmount > other.InitialAmount:
-		return 1
-	default:
-		return a.AVAXAddr.Compare(other.AVAXAddr)
+	if amountCmp := utils.Compare(a.InitialAmount, other.InitialAmount); amountCmp != 0 {
+		return amountCmp
 	}
+	return a.AVAXAddr.Compare(other.AVAXAddr)
 }
 
 type Staker struct {
