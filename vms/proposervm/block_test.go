@@ -101,7 +101,7 @@ func TestValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Unix(0, 0), 0)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -234,7 +234,7 @@ func TestNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Unix(0, 0), 0)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
