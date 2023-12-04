@@ -25,12 +25,12 @@ func TestStandardBlocks(t *testing.T) {
 	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
-	txs, err := testDecisionTxs()
+	decisionTxs, err := testDecisionTxs()
 	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		apricotStandardBlk, err := NewApricotStandardBlock(parentID, height, txs)
+		apricotStandardBlk, err := NewApricotStandardBlock(parentID, height, decisionTxs)
 		require.NoError(err)
 
 		// parse block
@@ -44,10 +44,10 @@ func TestStandardBlocks(t *testing.T) {
 		require.Equal(apricotStandardBlk.Height(), parsed.Height())
 
 		require.IsType(&ApricotStandardBlock{}, parsed)
-		require.Equal(txs, parsed.Txs())
+		require.Equal(decisionTxs, parsed.Txs())
 
 		// check that banff standard block can be built and parsed
-		banffStandardBlk, err := NewBanffStandardBlock(blkTimestamp, parentID, height, txs)
+		banffStandardBlk, err := NewBanffStandardBlock(blkTimestamp, parentID, height, decisionTxs)
 		require.NoError(err)
 
 		// parse block
@@ -61,7 +61,7 @@ func TestStandardBlocks(t *testing.T) {
 		require.Equal(banffStandardBlk.Height(), parsed.Height())
 		require.IsType(&BanffStandardBlock{}, parsed)
 		parsedBanffStandardBlk := parsed.(*BanffStandardBlock)
-		require.Equal(txs, parsedBanffStandardBlk.Txs())
+		require.Equal(decisionTxs, parsedBanffStandardBlk.Txs())
 
 		// timestamp check for banff blocks only
 		require.Equal(banffStandardBlk.Timestamp(), parsedBanffStandardBlk.Timestamp())
@@ -254,7 +254,7 @@ func TestAtomicBlock(t *testing.T) {
 	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
-	tx, err := testAtomicTx()
+	atomicTx, err := testAtomicTx()
 	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
@@ -262,7 +262,7 @@ func TestAtomicBlock(t *testing.T) {
 		atomicBlk, err := NewApricotAtomicBlock(
 			parentID,
 			height,
-			tx,
+			atomicTx,
 		)
 		require.NoError(err)
 
@@ -278,7 +278,7 @@ func TestAtomicBlock(t *testing.T) {
 
 		require.IsType(&ApricotAtomicBlock{}, parsed)
 		parsedAtomicBlk := parsed.(*ApricotAtomicBlock)
-		require.Equal([]*txs.Tx{tx}, parsedAtomicBlk.Txs())
+		require.Equal([]*txs.Tx{atomicTx}, parsedAtomicBlk.Txs())
 	}
 }
 
