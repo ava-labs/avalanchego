@@ -10,10 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestNewBanffProposalBlock(t *testing.T) {
@@ -22,30 +18,14 @@ func TestNewBanffProposalBlock(t *testing.T) {
 	timestamp := time.Now().Truncate(time.Second)
 	parentID := ids.GenerateTestID()
 	height := uint64(1337)
-
-	tx := &txs.Tx{
-		Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{
-				BaseTx: avax.BaseTx{
-					Ins:  []*avax.TransferableInput{},
-					Outs: []*avax.TransferableOutput{},
-				},
-			},
-			StakeOuts: []*avax.TransferableOutput{},
-			Validator: txs.Validator{},
-			RewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs: []ids.ShortID{},
-			},
-		},
-		Creds: []verify.Verifiable{},
-	}
-	require.NoError(tx.Initialize(txs.Codec))
+	proposalTx, err := testProposalTx()
+	require.NoError(err)
 
 	blk, err := NewBanffProposalBlock(
 		timestamp,
 		parentID,
 		height,
-		tx,
+		proposalTx,
 	)
 	require.NoError(err)
 
@@ -53,7 +33,7 @@ func TestNewBanffProposalBlock(t *testing.T) {
 	require.NotEmpty(blk.Bytes())
 	require.NotEmpty(blk.Tx.Bytes())
 	require.NotEqual(ids.Empty, blk.Tx.ID())
-	require.Equal(tx.Bytes(), blk.Tx.Bytes())
+	require.Equal(proposalTx.Bytes(), blk.Tx.Bytes())
 	require.Equal(timestamp, blk.Timestamp())
 	require.Equal(parentID, blk.Parent())
 	require.Equal(height, blk.Height())
@@ -64,29 +44,13 @@ func TestNewApricotProposalBlock(t *testing.T) {
 
 	parentID := ids.GenerateTestID()
 	height := uint64(1337)
-
-	tx := &txs.Tx{
-		Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{
-				BaseTx: avax.BaseTx{
-					Ins:  []*avax.TransferableInput{},
-					Outs: []*avax.TransferableOutput{},
-				},
-			},
-			StakeOuts: []*avax.TransferableOutput{},
-			Validator: txs.Validator{},
-			RewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs: []ids.ShortID{},
-			},
-		},
-		Creds: []verify.Verifiable{},
-	}
-	require.NoError(tx.Initialize(txs.Codec))
+	proposalTx, err := testProposalTx()
+	require.NoError(err)
 
 	blk, err := NewApricotProposalBlock(
 		parentID,
 		height,
-		tx,
+		proposalTx,
 	)
 	require.NoError(err)
 
@@ -94,7 +58,7 @@ func TestNewApricotProposalBlock(t *testing.T) {
 	require.NotEmpty(blk.Bytes())
 	require.NotEmpty(blk.Tx.Bytes())
 	require.NotEqual(ids.Empty, blk.Tx.ID())
-	require.Equal(tx.Bytes(), blk.Tx.Bytes())
+	require.Equal(proposalTx.Bytes(), blk.Tx.Bytes())
 	require.Equal(parentID, blk.Parent())
 	require.Equal(height, blk.Height())
 }
