@@ -53,13 +53,10 @@ func (b *BanffProposalBlock) Timestamp() time.Time {
 
 func (b *BanffProposalBlock) Txs() []*txs.Tx {
 	l := len(b.Transactions)
-	if l == 0 {
-		return []*txs.Tx{b.Tx}
-	}
-
 	txs := make([]*txs.Tx, l+1)
-	_ = copy(txs, b.Transactions)
-	return append(txs, b.Tx)
+	copy(txs, b.Transactions)
+	txs[l] = b.Tx
+	return txs
 }
 
 func (b *BanffProposalBlock) Visit(v Visitor) error {
