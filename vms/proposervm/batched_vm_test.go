@@ -29,11 +29,7 @@ import (
 func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	_, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -58,11 +54,7 @@ func TestCoreVMNotRemote(t *testing.T) {
 
 func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -208,11 +200,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -370,12 +358,10 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		preForkTime  = currentTime.Add(5 * time.Minute)
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
-
-		durangoTime = mockable.MaxTime
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -575,11 +561,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -700,11 +682,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -819,12 +797,10 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		preForkTime  = currentTime.Add(5 * time.Minute)
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
-
-		durangoTime = time.Unix(0, 0)
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -986,8 +962,7 @@ type TestRemoteProposerVM struct {
 
 func initTestRemoteProposerVM(
 	t *testing.T,
-	activationTime,
-	durangoTime time.Time,
+	activationTime time.Time,
 ) (
 	TestRemoteProposerVM,
 	*VM,
@@ -1053,7 +1028,6 @@ func initTestRemoteProposerVM(
 		coreVM,
 		Config{
 			ActivationTime:      activationTime,
-			DurangoTime:         durangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,

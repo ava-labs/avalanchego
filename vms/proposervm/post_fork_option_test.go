@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -37,11 +36,7 @@ func (tob TestOptionsBlock) Options(context.Context) ([2]snowman.Block, error) {
 func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -155,11 +150,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	require := require.New(t)
 
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -260,11 +251,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -373,11 +360,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -478,11 +461,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	require := require.New(t)
 
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -566,11 +545,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 func TestOptionTimestampValidity(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreOracleBlkID := ids.GenerateTestID()
 	coreOracleBlk := &TestOptionsBlock{
@@ -679,7 +654,6 @@ func TestOptionTimestampValidity(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,

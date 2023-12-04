@@ -14,9 +14,6 @@ type Config struct {
 	// Time at which proposerVM activates its congestion control mechanism
 	ActivationTime time.Time
 
-	// Durango fork activation time
-	DurangoTime time.Time
-
 	// Minimal P-chain height referenced upon block building
 	MinimumPChainHeight uint64
 
@@ -32,8 +29,4 @@ type Config struct {
 
 	// Block certificate
 	StakingCertLeaf *staking.Certificate
-}
-
-func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.DurangoTime)
 }

@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *testing.T) {
@@ -49,7 +48,6 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
