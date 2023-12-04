@@ -184,6 +184,7 @@ func (b *builder) ResetBlockTimer() {
 			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 			zap.Error(err),
 		)
+		return
 	}
 
 	now := b.txExecutorBackend.Clk.Time()
