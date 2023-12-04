@@ -208,7 +208,7 @@ The second is at child index `14`, has compressed key `0x0F0F0F` and ID (in hex)
 | 0x01                                                               |
 +--------------------------------------------------------------------+
 | Value length (varint) (optional)                                   |
-| 0x02                                                               |
+| 0x02                                                               |``
 +--------------------------------------------------------------------+
 | Value (variable length bytes) (optional)                           |
 | 0x02                                                               |
@@ -301,18 +301,18 @@ Bytes are encoded by simply copying them onto the buffer.
 ## Design choices
 
 ### []byte copying
-Nodes contain a []byte which represents its value.  This slice should never be edited internally.  This allows usage without having to make copies of it for safety.
-Anytime these values leave the library, for example in `Get`, `GetValue`, `GetProof`, `GetRangeProof`, etc, they need to be copied into a new slice to prevent
-edits made outside the library from being reflected in the DB/TrieViews.
+
+A node may contain a value, which is represented in Go as a `[]byte`. This slice is never edited, allowing it to be used without copying it first in many places. When a value leaves the library, for example when returned in `Get`, `GetValue`, `GetProof`, `GetRangeProof`, etc., the value is copied to prevent edits made outside the library from being reflected in the database.
 
 ### Split Node Storage
-The nodes are stored under two different prefixes depending on if the node contains a value.  
-If it does contain a value it is stored within the ValueNodeDB and if it doesn't it is stored in the IntermediateNodeDB.
-By splitting the nodes up by value, it allows better key/value iteration and a more compact key format.
 
-### Single node type
+Nodes with values ("value nodes") are persisted under one database prefix, while nodes without values ("intermediate nodes") are persisted under another database prefix. This separation allows for easy iteration over all key-value pairs in the database, as this is simply iterating over the database prefix containing value nodes. 
 
-A `Merkle Node` holds the IDs of its children, its value, as well as any key extension. This simplifies some logic and allows all of the data about a node to be loaded in a single database read. This trades off a small amount of storage efficiency (some fields may be `nil` but are still stored for every node).
+### Single Node Type
+
+MerkleDB uses one type to represent nodes, rather than having multiple types (e.g. branch nodes, value nodes, extension nodes) as other Merkle Trie implementations do.
+
+Not using extension nodes results in worse storage efficiency (some nodes may have mostly empty children) but simpler code.
 
 ### Locking
 
