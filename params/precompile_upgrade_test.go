@@ -242,6 +242,22 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				},
 			},
 		},
+		"retroactively enabling upgrades is not allowed": {
+			expectedErrorString: "cannot retroactively enable PrecompileUpgrade[1] in database (have timestamp nil, want timestamp 5, rewindto timestamp 4)",
+			startTimestamps:     []uint64{6},
+			configs: []*UpgradeConfig{
+				{
+					PrecompileUpgrades: []PrecompileUpgrade{
+						{
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(5)),
+						},
+						{
+							Config: txallowlist.NewConfig(utils.NewUint64(6), admins, nil, nil),
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tt := range tests {

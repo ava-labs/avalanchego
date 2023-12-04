@@ -133,7 +133,7 @@ func TestCheckCompatibleStateUpgrades(t *testing.T) {
 			},
 		},
 		"retroactively enabling upgrades is not allowed": {
-			expectedErrorString: "cannot retroactively enable StateUpgrade",
+			expectedErrorString: "cannot retroactively enable StateUpgrade[0] in database (have timestamp nil, want timestamp 5, rewindto timestamp 4)",
 			startTimestamps:     []uint64{6},
 			configs: []*UpgradeConfig{
 				{
