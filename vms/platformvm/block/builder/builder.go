@@ -112,13 +112,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp := b.txExecutorBackend.Clk.Time()
-	if parentTime := preferred.Timestamp(); parentTime.After(timestamp) {
-		timestamp = parentTime
-	}
-	// [timestamp] = max(now, parentTime)
-
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	timestamp, timeWasCapped, nextStakerChangeTime, err := txexecutor.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
@@ -133,14 +127,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	b.nextStakerChangeTime = nextStakerChangeTime
 	b.nextStakerChangeTimeLock.Unlock()
 	b.timer.SetTimeoutIn(waitTime)
-
-	// If [timeWasCapped] is true, we must advance time to
-	// [nextStakerChangeTime] even if there are no transactions.
-	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
-	if timeWasCapped {
-		timestamp = nextStakerChangeTime
-	}
-	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
 	statelessBlk, err := buildBlock(
 		b,
