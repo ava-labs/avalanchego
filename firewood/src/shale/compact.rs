@@ -5,6 +5,7 @@ use crate::shale::ObjCache;
 
 use super::disk_address::DiskAddress;
 use super::{CachedStore, Obj, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
+use bytemuck::{Pod, Zeroable};
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
 use std::num::NonZeroUsize;
@@ -132,7 +133,7 @@ impl Storable for CompactDescriptor {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::NoUninit)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct CompactSpaceHeader {
     meta_space_tail: DiskAddress,
     compact_space_tail: DiskAddress,

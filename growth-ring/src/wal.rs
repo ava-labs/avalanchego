@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use async_trait::async_trait;
-use bytemuck::{cast_slice, AnyBitPattern, NoUninit};
+use bytemuck::{cast_slice, Pod, Zeroable};
 use futures::{
     future::{self, FutureExt, TryFutureExt},
     stream::StreamExt,
@@ -35,7 +35,7 @@ enum WalRingType {
 }
 
 #[repr(C, packed)]
-#[derive(NoUninit, Copy, Clone, Debug, AnyBitPattern)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 struct WalRingBlob {
     counter: u32,
     crc32: u32,
@@ -113,7 +113,7 @@ const fn counter_lt(a: u32, b: u32) -> bool {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, AnyBitPattern, NoUninit)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Header {
     /// all preceding files (<fid) could be removed if not yet
     recover_fid: u64,

@@ -6,13 +6,13 @@ use std::mem::size_of;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 
-use bytemuck::NoUninit;
+use bytemuck::{Pod, Zeroable};
 
 use crate::shale::{CachedStore, ShaleError, Storable};
 
 /// The virtual disk address of an object
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialOrd, PartialEq, NoUninit)]
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialOrd, PartialEq, Pod, Zeroable)]
 pub struct DiskAddress(pub Option<NonZeroUsize>);
 
 impl Deref for DiskAddress {

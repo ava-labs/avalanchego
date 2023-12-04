@@ -26,7 +26,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use bytemuck::{cast_slice, AnyBitPattern};
+use bytemuck::{cast_slice, Pod, Zeroable};
 
 use metered::metered;
 use parking_lot::{Mutex, RwLock};
@@ -105,7 +105,7 @@ impl Error for DbError {}
 /// correct parameters are used when the DB is opened later (the parameters here will override the
 /// parameters in [DbConfig] if the DB already exists).
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AnyBitPattern, bytemuck::NoUninit)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct DbParams {
     magic: [u8; 16],
     meta_file_nbit: u64,
@@ -188,7 +188,7 @@ fn get_sub_universe_from_empty_delta(
 
 /// mutable DB-wide metadata, it keeps track of the root of the top-level trie.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::NoUninit)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 struct DbHeader {
     kv_root: DiskAddress,
 }
