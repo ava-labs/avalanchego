@@ -26,7 +26,7 @@ var (
 	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                       = errors.New("incorrect block height")
 	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
-	errConflictingParentTxs                       = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
 	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
 )
 
@@ -203,7 +203,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	if err := v.VerifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
+	if err := v.verifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
 		return err
 	}
 
@@ -441,7 +441,7 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	if err := v.VerifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
+	if err := v.verifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
 		return err
 	}
 

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
+
+var errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 
 // Shared fields used by visitors.
 type backend struct {
@@ -97,9 +100,9 @@ func (b *backend) getTimestamp(blkID ids.ID) time.Time {
 	return b.state.GetTimestamp()
 }
 
-// VerifyUniqueInputs verifies that the inputs are not duplicated in the
-// provided blk or any of its ancestors pinned in memory.
-func (b *backend) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
+// verifyUniqueInputs returns nil iff no blocks in the inclusive
+// ancestry of [blkID] consume an input in [inputs].
+func (b *backend) verifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
 	if inputs.Len() == 0 {
 		return nil
 	}
