@@ -95,11 +95,8 @@ func (utxo *UTXOID) Compare(other *UTXOID) int {
 	utxoID, utxoIndex := utxo.InputSource()
 	otherID, otherIndex := other.InputSource()
 
-	switch bytes.Compare(utxoID[:], otherID[:]) {
-	case -1:
-		return -1
-	case 1:
-		return 1
+	if txIDComp := bytes.Compare(utxoID[:], otherID[:]); txIDComp != 0 {
+		return txIDComp
 	}
 
 	switch {
