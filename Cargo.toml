@@ -4,7 +4,7 @@ members = [
   "fwdctl",
   "growth-ring",
   "libaio",
-  "rpc",
+  "grpc-testtool",
 ]
 resolver = "2"
 
