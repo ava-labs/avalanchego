@@ -313,6 +313,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
     async fn get_file(&self, fid: u64, touch: bool) -> Result<WalFileHandle<F, S>, WalError> {
         if let Some(h) = self.handle_cache.borrow_mut().pop(&fid) {
             let handle = match self.handle_used.borrow_mut().entry(fid) {
+                #[allow(unsafe_code)]
                 hash_map::Entry::Vacant(e) => unsafe {
                     &*(*e.insert(UnsafeCell::new((h, 1))).get()).0
                 },
@@ -325,6 +326,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
                 wal_file: PhantomData,
             })
         } else {
+            #[allow(unsafe_code)]
             let v = unsafe {
                 &mut *match self.handle_used.borrow_mut().entry(fid) {
                     hash_map::Entry::Occupied(e) => e.into_mut(),
@@ -348,6 +350,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
     fn release_file(&self, fid: WalFileId) {
         match self.handle_used.borrow_mut().entry(fid) {
             hash_map::Entry::Occupied(e) => {
+                #[allow(unsafe_code)]
                 let v = unsafe { &mut *e.get().get() };
                 v.1 -= 1;
                 if v.1 == 0 {
@@ -384,6 +387,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         let mut alloc_start = writes[0].0 & (self.file_size - 1);
         #[allow(clippy::indexing_slicing)]
         let mut alloc_end = alloc_start + writes[0].1.len() as u64;
+        #[allow(unsafe_code)]
         let last_write = unsafe {
             std::mem::replace(&mut *self.last_write.get(), std::mem::MaybeUninit::uninit())
                 .assume_init()
@@ -435,6 +439,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
             res.push(Box::pin(w) as Pin<Box<dyn Future<Output = _> + 'a>>)
         }
 
+        #[allow(unsafe_code)]
         unsafe {
             (*self.last_write.get()) = MaybeUninit::new(std::mem::transmute::<
                 Pin<Box<dyn Future<Output = _> + 'a>>,
@@ -450,6 +455,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         state: &mut WalState,
         keep_nrecords: u32,
     ) -> impl Future<Output = Result<(), WalError>> + 'a {
+        #[allow(unsafe_code)]
         let last_peel = unsafe {
             std::mem::replace(&mut *self.last_peel.get(), std::mem::MaybeUninit::uninit())
                 .assume_init()
@@ -481,6 +487,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         }
         .shared();
 
+        #[allow(unsafe_code)]
         unsafe {
             (*self.last_peel.get()) = MaybeUninit::new(std::mem::transmute(
                 Box::pin(p.clone()) as Pin<Box<dyn Future<Output = _> + 'a>>
@@ -557,6 +564,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                     let d = remain - msize;
                     let rs0 = self.state.next + (bbuff_cur - bbuff_start) as u64;
 
+                    #[allow(unsafe_code)]
                     let blob = unsafe {
                         #[allow(clippy::indexing_slicing)]
                         &mut *self.block_buffer[bbuff_cur as usize..]

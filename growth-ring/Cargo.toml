@@ -33,6 +33,9 @@ name = "growthring"
 path = "src/lib.rs"
 crate-type = ["dylib", "rlib", "staticlib"]
 
+[lints.rust]
+unsafe_code = "deny"
+
 [lints.clippy]
 unwrap_used = "warn"
 indexing_slicing = "warn"
