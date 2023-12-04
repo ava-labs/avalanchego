@@ -9,11 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -151,9 +154,8 @@ func TestValidatorsSample(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
 			subnetID := ids.GenerateTestID()
+			ctrl := gomock.NewController(t)
 			mockValidators := validators.NewMockState(ctrl)
 
 			calls := make([]*gomock.Call, 0)
@@ -177,7 +179,12 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			v := NewValidators(logging.NoLog{}, subnetID, mockValidators, tt.maxStaleness)
+			network := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
+			ctx := context.Background()
+			require.NoError(network.Connected(ctx, nodeID1, nil))
+			require.NoError(network.Connected(ctx, nodeID2, nil))
+
+			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
 				v.lastUpdated = call.time
 				sampled := v.Sample(context.Background(), call.limit)
