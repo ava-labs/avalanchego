@@ -109,6 +109,7 @@ func TestProposalBlocks(t *testing.T) {
 			parentID,
 			height,
 			tx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
