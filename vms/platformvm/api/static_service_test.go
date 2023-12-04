@@ -258,7 +258,7 @@ func TestUTXOCompare(t *testing.T) {
 			name:     "both empty",
 			utxo1:    UTXO{},
 			utxo2:    UTXO{},
-			expected: -1,
+			expected: 0,
 		},
 		{
 			name:  "locktime smaller",
