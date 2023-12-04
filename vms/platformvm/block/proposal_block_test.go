@@ -10,49 +10,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-var (
-	timestamp = time.Now().Truncate(time.Second)
-	parentID  = ids.GenerateTestID()
-	height    = uint64(1337)
-
-	tx = &txs.Tx{
-		Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{
-				BaseTx: avax.BaseTx{
-					Ins:  []*avax.TransferableInput{},
-					Outs: []*avax.TransferableOutput{},
-				},
-			},
-			StakeOuts: []*avax.TransferableOutput{},
-			Validator: txs.Validator{},
-			RewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs: []ids.ShortID{},
-			},
-		},
-		Creds: []verify.Verifiable{},
-	}
-)
-
-func init() {
-	if err := tx.Initialize(txs.Codec); err != nil {
-		panic(err)
-	}
-}
 
 func TestNewBanffProposalBlock(t *testing.T) {
 	require := require.New(t)
+
+	timestamp := time.Now().Truncate(time.Second)
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
+	proposalTx, err := testProposalTx()
+	require.NoError(err)
 
 	blk, err := NewBanffProposalBlock(
 		timestamp,
 		parentID,
 		height,
-		tx,
+		proposalTx,
 		[]*txs.Tx{},
 	)
 	require.NoError(err)
@@ -64,22 +38,32 @@ func TestNewBanffProposalBlock(t *testing.T) {
 
 	blkTxs := blk.Txs()
 	require.Len(blkTxs, 1)
-	for _, blkTx := range blkTxs {
+	expectedTxs := append(blk.Transactions, blk.Tx)
+	for i, blkTx := range blkTxs {
+		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
 		require.NotEqual(ids.Empty, blkTx.ID())
-		require.Equal(tx.Bytes(), blkTx.Bytes())
+		require.Equal(expectedTx.Bytes(), blkTx.Bytes())
 	}
 }
 
 func TestNewBanffProposalBlockWithDecisionTxs(t *testing.T) {
 	require := require.New(t)
 
+	timestamp := time.Now().Truncate(time.Second)
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
+	proposalTx, err := testProposalTx()
+	require.NoError(err)
+	decisionTxs, err := testDecisionTxs()
+	require.NoError(err)
+
 	blk, err := NewBanffProposalBlock(
 		timestamp,
 		parentID,
 		height,
-		tx,
-		[]*txs.Tx{tx, tx, tx},
+		proposalTx,
+		decisionTxs,
 	)
 	require.NoError(err)
 
@@ -89,21 +73,28 @@ func TestNewBanffProposalBlockWithDecisionTxs(t *testing.T) {
 	require.Equal(timestamp, blk.Timestamp())
 
 	blkTxs := blk.Txs()
-	require.Len(blkTxs, 4)
-	for _, blkTx := range blkTxs {
+	require.Len(blkTxs, len(decisionTxs)+1)
+	expectedTxs := append(blk.Transactions, blk.Tx)
+	for i, blkTx := range blkTxs {
+		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
 		require.NotEqual(ids.Empty, blkTx.ID())
-		require.Equal(tx.Bytes(), blkTx.Bytes())
+		require.Equal(expectedTx.Bytes(), blkTx.Bytes())
 	}
 }
 
 func TestNewApricotProposalBlock(t *testing.T) {
 	require := require.New(t)
 
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
+	proposalTx, err := testProposalTx()
+	require.NoError(err)
+
 	blk, err := NewApricotProposalBlock(
 		parentID,
 		height,
-		tx,
+		proposalTx,
 	)
 	require.NoError(err)
 
@@ -111,9 +102,13 @@ func TestNewApricotProposalBlock(t *testing.T) {
 	require.Equal(parentID, blk.Parent())
 	require.Equal(height, blk.Height())
 
-	for _, blkTx := range blk.Txs() {
+	blkTxs := blk.Txs()
+	require.Len(blkTxs, 1)
+	expectedTxs := []*txs.Tx{proposalTx}
+	for i, blkTx := range blkTxs {
+		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
 		require.NotEqual(ids.Empty, blkTx.ID())
-		require.Equal(tx.Bytes(), blkTx.Bytes())
+		require.Equal(expectedTx.Bytes(), blkTx.Bytes())
 	}
 }
