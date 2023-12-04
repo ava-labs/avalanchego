@@ -1879,7 +1879,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2089,7 +2089,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2255,7 +2255,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2493,7 +2493,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,

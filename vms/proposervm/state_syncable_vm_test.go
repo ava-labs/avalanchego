@@ -73,7 +73,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,

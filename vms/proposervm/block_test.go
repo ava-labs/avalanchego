@@ -70,7 +70,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	vm := &VM{
 		Config: Config{
 			ActivationTime:    time.Unix(0, 0),
-			DurangoTime:       time.Unix(0, 0),
+			DurangoTime:       mockable.MaxTime,
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 		},
