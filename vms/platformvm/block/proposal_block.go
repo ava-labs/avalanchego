@@ -28,6 +28,19 @@ type BanffProposalBlock struct {
 	ApricotProposalBlock `serialize:"true"`
 }
 
+func (b *BanffProposalBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	if err := b.Tx.Initialize(txs.Codec); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
+	}
+	for _, tx := range b.Transactions {
+		if err := tx.Initialize(txs.Codec); err != nil {
+			return fmt.Errorf("failed to initialize tx: %w", err)
+		}
+	}
+	return nil
+}
+
 func (b *BanffProposalBlock) InitCtx(ctx *snow.Context) {
 	for _, tx := range b.Transactions {
 		tx.Unsigned.InitCtx(ctx)
@@ -37,6 +50,10 @@ func (b *BanffProposalBlock) InitCtx(ctx *snow.Context) {
 
 func (b *BanffProposalBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.Time), 0)
+}
+
+func (b *BanffProposalBlock) Txs() []*txs.Tx {
+	return append(b.Transactions, b.Tx)
 }
 
 func (b *BanffProposalBlock) Visit(v Visitor) error {
