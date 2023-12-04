@@ -16,14 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestNewBanffProposalBlock(t *testing.T) {
-	require := require.New(t)
+var (
+	timestamp = time.Now().Truncate(time.Second)
+	parentID  = ids.GenerateTestID()
+	height    = uint64(1337)
 
-	timestamp := time.Now().Truncate(time.Second)
-	parentID := ids.GenerateTestID()
-	height := uint64(1337)
-
-	tx := &txs.Tx{
+	tx = &txs.Tx{
 		Unsigned: &txs.AddValidatorTx{
 			BaseTx: txs.BaseTx{
 				BaseTx: avax.BaseTx{
@@ -39,7 +37,16 @@ func TestNewBanffProposalBlock(t *testing.T) {
 		},
 		Creds: []verify.Verifiable{},
 	}
-	require.NoError(tx.Initialize(txs.Codec))
+)
+
+func init() {
+	if err := tx.Initialize(txs.Codec); err != nil {
+		panic(err)
+	}
+}
+
+func TestNewBanffProposalBlock(t *testing.T) {
+	require := require.New(t)
 
 	blk, err := NewBanffProposalBlock(
 		timestamp,
@@ -50,39 +57,48 @@ func TestNewBanffProposalBlock(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Make sure the block and tx are initialized
 	require.NotEmpty(blk.Bytes())
-	require.NotEmpty(blk.Tx.Bytes())
-	require.NotEqual(ids.Empty, blk.Tx.ID())
-	require.Equal(tx.Bytes(), blk.Tx.Bytes())
-	require.Equal(timestamp, blk.Timestamp())
 	require.Equal(parentID, blk.Parent())
 	require.Equal(height, blk.Height())
+	require.Equal(timestamp, blk.Timestamp())
+
+	blkTxs := blk.Txs()
+	require.Len(blkTxs, 1)
+	for _, blkTx := range blkTxs {
+		require.NotEmpty(blkTx.Bytes())
+		require.NotEqual(ids.Empty, blkTx.ID())
+		require.Equal(tx.Bytes(), blkTx.Bytes())
+	}
+}
+
+func TestNewBanffProposalBlockWithDecisionTxs(t *testing.T) {
+	require := require.New(t)
+
+	blk, err := NewBanffProposalBlock(
+		timestamp,
+		parentID,
+		height,
+		tx,
+		[]*txs.Tx{tx, tx, tx},
+	)
+	require.NoError(err)
+
+	require.NotEmpty(blk.Bytes())
+	require.Equal(parentID, blk.Parent())
+	require.Equal(height, blk.Height())
+	require.Equal(timestamp, blk.Timestamp())
+
+	blkTxs := blk.Txs()
+	require.Len(blkTxs, 4)
+	for _, blkTx := range blkTxs {
+		require.NotEmpty(blkTx.Bytes())
+		require.NotEqual(ids.Empty, blkTx.ID())
+		require.Equal(tx.Bytes(), blkTx.Bytes())
+	}
 }
 
 func TestNewApricotProposalBlock(t *testing.T) {
 	require := require.New(t)
-
-	parentID := ids.GenerateTestID()
-	height := uint64(1337)
-
-	tx := &txs.Tx{
-		Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{
-				BaseTx: avax.BaseTx{
-					Ins:  []*avax.TransferableInput{},
-					Outs: []*avax.TransferableOutput{},
-				},
-			},
-			StakeOuts: []*avax.TransferableOutput{},
-			Validator: txs.Validator{},
-			RewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs: []ids.ShortID{},
-			},
-		},
-		Creds: []verify.Verifiable{},
-	}
-	require.NoError(tx.Initialize(txs.Codec))
 
 	blk, err := NewApricotProposalBlock(
 		parentID,
@@ -91,11 +107,13 @@ func TestNewApricotProposalBlock(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Make sure the block and tx are initialized
 	require.NotEmpty(blk.Bytes())
-	require.NotEmpty(blk.Tx.Bytes())
-	require.NotEqual(ids.Empty, blk.Tx.ID())
-	require.Equal(tx.Bytes(), blk.Tx.Bytes())
 	require.Equal(parentID, blk.Parent())
 	require.Equal(height, blk.Height())
+
+	for _, blkTx := range blk.Txs() {
+		require.NotEmpty(blkTx.Bytes())
+		require.NotEqual(ids.Empty, blkTx.ID())
+		require.Equal(tx.Bytes(), blkTx.Bytes())
+	}
 }

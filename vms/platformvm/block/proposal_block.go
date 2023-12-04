@@ -43,6 +43,10 @@ func (b *BanffProposalBlock) Visit(v Visitor) error {
 	return v.BanffProposalBlock(b)
 }
 
+func (b *BanffProposalBlock) Txs() []*txs.Tx {
+	return append(b.Transactions, b.Tx)
+}
+
 func NewBanffProposalBlock(
 	timestamp time.Time,
 	parentID ids.ID,
