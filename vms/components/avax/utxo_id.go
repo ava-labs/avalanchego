@@ -91,16 +91,23 @@ func (utxo *UTXOID) Verify() error {
 	}
 }
 
-func (utxo *UTXOID) Less(other *UTXOID) bool {
+func (utxo *UTXOID) Compare(other *UTXOID) int {
 	utxoID, utxoIndex := utxo.InputSource()
 	otherID, otherIndex := other.InputSource()
 
 	switch bytes.Compare(utxoID[:], otherID[:]) {
 	case -1:
-		return true
-	case 0:
-		return utxoIndex < otherIndex
+		return -1
+	case 1:
+		return 1
+	}
+
+	switch {
+	case utxoIndex < otherIndex:
+		return -1
+	case utxoIndex > otherIndex:
+		return 1
 	default:
-		return false
+		return 0
 	}
 }

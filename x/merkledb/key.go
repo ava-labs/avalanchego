@@ -162,14 +162,19 @@ func (k Key) Length() int {
 	return k.length
 }
 
-// Greater returns true if current Key is greater than other Key
-func (k Key) Greater(other Key) bool {
-	return k.value > other.value || (k.value == other.value && k.length > other.length)
-}
-
-// Less will return true if current Key is less than other Key
-func (k Key) Less(other Key) bool {
-	return k.value < other.value || (k.value == other.value && k.length < other.length)
+func (k Key) Compare(other Key) int {
+	switch {
+	case k.value < other.value:
+		return -1
+	case k.value > other.value:
+		return 1
+	case k.length < other.length:
+		return -1
+	case k.length > other.length:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // Extend returns a new Key that is the in-order aggregation of Key [k] with [keys]

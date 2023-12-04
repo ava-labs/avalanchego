@@ -53,9 +53,15 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	return ua, err
 }
 
-func (a Allocation) Less(other Allocation) bool {
-	return a.InitialAmount < other.InitialAmount ||
-		(a.InitialAmount == other.InitialAmount && a.AVAXAddr.Less(other.AVAXAddr))
+func (a Allocation) Compare(other Allocation) int {
+	switch {
+	case a.InitialAmount < other.InitialAmount:
+		return -1
+	case a.InitialAmount > other.InitialAmount:
+		return 1
+	default:
+		return a.AVAXAddr.Compare(other.AVAXAddr)
+	}
 }
 
 type Staker struct {

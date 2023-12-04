@@ -59,8 +59,15 @@ func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	return nil
 }
 
-func (is *InitialState) Less(other *InitialState) bool {
-	return is.FxIndex < other.FxIndex
+func (is *InitialState) Compare(other *InitialState) int {
+	switch {
+	case is.FxIndex < other.FxIndex:
+		return -1
+	case is.FxIndex > other.FxIndex:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func (is *InitialState) Sort(c codec.Manager) {

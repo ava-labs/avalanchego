@@ -19,17 +19,22 @@ type weightedHeapElement struct {
 	index            int
 }
 
-func (e weightedHeapElement) Less(other weightedHeapElement) bool {
+func (e weightedHeapElement) Compare(other weightedHeapElement) int {
 	// By accounting for the initial index of the weights, this results in a
 	// stable sort. We do this rather than using `sort.Stable` because of the
 	// reported change in performance of the sort used.
-	if e.weight > other.weight {
-		return true
+	switch {
+	case e.weight > other.weight:
+		return -1
+	case e.weight < other.weight:
+		return 1
+	case e.index < other.index:
+		return -1
+	case e.index > other.index:
+		return 1
+	default:
+		return 0
 	}
-	if e.weight < other.weight {
-		return false
-	}
-	return e.index < other.index
 }
 
 // Sampling is performed by executing a search over a tree of elements in the
