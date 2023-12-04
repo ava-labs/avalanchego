@@ -23,4 +23,4 @@ jobs:
           check-latest: true
       - name: Run merkledb fuzz tests
         shell: bash
-        run: ./scripts/build_fuzz.sh 600 ./x/ # Run each merkledb fuzz tests 10 minutes
+        run: ./scripts/build_fuzz.sh 900 ./x/merkledb # Run each merkledb fuzz tests 15 minutes
