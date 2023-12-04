@@ -119,9 +119,9 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return prntCoreBlk, nil
@@ -147,7 +147,6 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		}
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -156,22 +155,11 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 
 	// .. create child block ...
 	childCoreBlk := &snowman.TestBlock{
-		ParentV:    prntCoreBlk.ID(),
-		BytesV:     []byte{2},
-		TimestampV: prntCoreBlk.Timestamp(),
+		ParentV: prntCoreBlk.ID(),
+		BytesV:  []byte{2},
+		HeightV: prntCoreBlk.Height() + 1,
 	}
-	childSlb, err := block.Build(
-		ids.Empty, // refer unknown parent
-		childCoreBlk.Timestamp(),
-		pChainHeight,
-		proVM.StakingCertLeaf,
-		childCoreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.StakingLeafSigner,
-	)
-	require.NoError(err)
 	childProBlk := postForkBlock{
-		SignedBlock: childSlb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
@@ -179,23 +167,39 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		},
 	}
 
-	// child block referring unknown parent does not verify
-	err = childProBlk.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
-
-	// child block referring known parent does verify
-	childSlb, err = block.BuildUnsigned(
-		prntProBlk.ID(), // refer known parent
-		prntProBlk.Timestamp().Add(proposer.MaxVerifyDelay),
-		pChainHeight,
-		childCoreBlk.Bytes(),
-	)
-	require.NoError(err)
-	childProBlk.SignedBlock = childSlb
-	require.NoError(err)
-
 	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
-	require.NoError(childProBlk.Verify(context.Background()))
+
+	{
+		// child block referring unknown parent does not verify
+		childSlb, err := block.Build(
+			ids.Empty, // refer unknown parent
+			proVM.Time(),
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		err = childProBlk.Verify(context.Background())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	{
+		// child block referring known parent does verify
+		childSlb, err := block.BuildUnsigned(
+			prntProBlk.ID(), // refer known parent
+			proVM.Time(),
+			pChainHeight,
+			childCoreBlk.Bytes(),
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		require.NoError(childProBlk.Verify(context.Background()))
+	}
 }
 
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
@@ -221,9 +225,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return prntCoreBlk, nil
@@ -265,22 +269,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		ParentV: prntCoreBlk.ID(),
 		BytesV:  []byte{2},
 	}
-
-	// child block timestamp cannot be lower than parent timestamp
-	childCoreBlk.TimestampV = prntTimestamp.Add(-1 * time.Second)
-	proVM.Clock.Set(childCoreBlk.TimestampV)
-	childSlb, err := block.Build(
-		prntProBlk.ID(),
-		childCoreBlk.Timestamp(),
-		pChainHeight,
-		proVM.StakingCertLeaf,
-		childCoreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.StakingLeafSigner,
-	)
-	require.NoError(err)
 	childProBlk := postForkBlock{
-		SignedBlock: childSlb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
@@ -288,90 +277,122 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		},
 	}
 
-	err = childProBlk.Verify(context.Background())
-	require.ErrorIs(err, errTimeNotMonotonic)
+	newTime := prntTimestamp.Add(-1 * time.Second)
+	proVM.Clock.Set(newTime)
 
-	// block cannot arrive before its creator window starts
+	{
+		// child block timestamp cannot be lower than parent timestamp
+		childSlb, err := block.Build(
+			prntProBlk.ID(),
+			newTime,
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		err = childProBlk.Verify(context.Background())
+		require.ErrorIs(err, errTimeNotMonotonic)
+	}
+
 	blkWinDelay, err := proVM.Delay(context.Background(), childCoreBlk.Height(), pChainHeight, proVM.ctx.NodeID, proposer.MaxVerifyWindows)
 	require.NoError(err)
-	beforeWinStart := prntTimestamp.Add(blkWinDelay).Add(-1 * time.Second)
-	proVM.Clock.Set(beforeWinStart)
-	childSlb, err = block.Build(
-		prntProBlk.ID(),
-		beforeWinStart,
-		pChainHeight,
-		proVM.StakingCertLeaf,
-		childCoreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.StakingLeafSigner,
-	)
-	require.NoError(err)
-	childProBlk.SignedBlock = childSlb
 
-	err = childProBlk.Verify(context.Background())
-	require.ErrorIs(err, errProposerWindowNotStarted)
+	{
+		// block cannot arrive before its creator window starts
+		beforeWinStart := prntTimestamp.Add(blkWinDelay).Add(-1 * time.Second)
+		proVM.Clock.Set(beforeWinStart)
+		childSlb, err := block.Build(
+			prntProBlk.ID(),
+			beforeWinStart,
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
 
-	// block can arrive at its creator window starts
-	atWindowStart := prntTimestamp.Add(blkWinDelay)
-	proVM.Clock.Set(atWindowStart)
-	childSlb, err = block.Build(
-		prntProBlk.ID(),
-		atWindowStart,
-		pChainHeight,
-		proVM.StakingCertLeaf,
-		childCoreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.StakingLeafSigner,
-	)
-	require.NoError(err)
-	childProBlk.SignedBlock = childSlb
+		err = childProBlk.Verify(context.Background())
+		require.ErrorIs(err, errProposerWindowNotStarted)
+	}
 
-	require.NoError(childProBlk.Verify(context.Background()))
+	{
+		// block can arrive at its creator window starts
+		atWindowStart := prntTimestamp.Add(blkWinDelay)
+		proVM.Clock.Set(atWindowStart)
+		childSlb, err := block.Build(
+			prntProBlk.ID(),
+			atWindowStart,
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
 
-	// block can arrive after its creator window starts
-	afterWindowStart := prntTimestamp.Add(blkWinDelay).Add(5 * time.Second)
-	proVM.Clock.Set(afterWindowStart)
-	childSlb, err = block.Build(
-		prntProBlk.ID(),
-		afterWindowStart,
-		pChainHeight,
-		proVM.StakingCertLeaf,
-		childCoreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.StakingLeafSigner,
-	)
-	require.NoError(err)
-	childProBlk.SignedBlock = childSlb
-	require.NoError(childProBlk.Verify(context.Background()))
+		require.NoError(childProBlk.Verify(context.Background()))
+	}
 
-	// block can arrive within submission window
-	atSubWindowEnd := proVM.Time().Add(proposer.MaxVerifyDelay)
-	proVM.Clock.Set(atSubWindowEnd)
-	childSlb, err = block.BuildUnsigned(
-		prntProBlk.ID(),
-		atSubWindowEnd,
-		pChainHeight,
-		childCoreBlk.Bytes(),
-	)
-	require.NoError(err)
-	childProBlk.SignedBlock = childSlb
-	require.NoError(childProBlk.Verify(context.Background()))
+	{
+		// block can arrive after its creator window starts
+		afterWindowStart := prntTimestamp.Add(blkWinDelay).Add(5 * time.Second)
+		proVM.Clock.Set(afterWindowStart)
+		childSlb, err := block.Build(
+			prntProBlk.ID(),
+			afterWindowStart,
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
 
-	// block timestamp cannot be too much in the future
-	afterSubWinEnd := proVM.Time().Add(maxSkew).Add(time.Second)
-	childSlb, err = block.Build(
-		prntProBlk.ID(),
-		afterSubWinEnd,
-		pChainHeight,
-		proVM.StakingCertLeaf,
-		childCoreBlk.Bytes(),
-		proVM.ctx.ChainID,
-		proVM.StakingLeafSigner,
-	)
-	require.NoError(err)
-	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.ErrorIs(err, errTimeTooAdvanced)
+		require.NoError(childProBlk.Verify(context.Background()))
+	}
+
+	{
+		// block can arrive within submission window
+		atSubWindowEnd := proVM.Time().Add(proposer.MaxVerifyDelay)
+		proVM.Clock.Set(atSubWindowEnd)
+		childSlb, err := block.BuildUnsigned(
+			prntProBlk.ID(),
+			atSubWindowEnd,
+			pChainHeight,
+			childCoreBlk.Bytes(),
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		require.NoError(childProBlk.Verify(context.Background()))
+	}
+
+	{
+		// block timestamp cannot be too much in the future
+		afterSubWinEnd := proVM.Time().Add(maxSkew).Add(time.Second)
+		childSlb, err := block.Build(
+			prntProBlk.ID(),
+			afterSubWinEnd,
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childProBlk.SignedBlock = childSlb
+
+		err = childProBlk.Verify(context.Background())
+		require.ErrorIs(err, errTimeTooAdvanced)
+	}
 }
 
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
@@ -397,9 +418,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return prntCoreBlk, nil
@@ -432,21 +453,21 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	prntBlkPChainHeight := pChainHeight
+	nextTime := prntProBlk.Timestamp().Add(proposer.MaxVerifyDelay)
 
 	childCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		ParentV:    prntCoreBlk.ID(),
-		BytesV:     []byte{2},
-		TimestampV: prntProBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		ParentV: prntCoreBlk.ID(),
+		BytesV:  []byte{2},
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
 	childSlb, err := block.Build(
 		prntProBlk.ID(),
-		childCoreBlk.Timestamp(),
+		nextTime,
 		prntBlkPChainHeight-1,
 		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
@@ -541,9 +562,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+			BytesV:  []byte{1},
+			ParentV: coreGenBlk.ID(),
+			HeightV: coreGenBlk.Height() + 1,
 		},
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
@@ -552,18 +573,18 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 				IDV:     ids.Empty.Prefix(2222),
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{2},
-			ParentV:    oracleCoreBlk.ID(),
-			TimestampV: oracleCoreBlk.Timestamp(),
+			BytesV:  []byte{2},
+			ParentV: oracleCoreBlk.ID(),
+			HeightV: oracleCoreBlk.Height() + 1,
 		},
 		&snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.Empty.Prefix(3333),
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{3},
-			ParentV:    oracleCoreBlk.ID(),
-			TimestampV: oracleCoreBlk.Timestamp(),
+			BytesV:  []byte{3},
+			ParentV: oracleCoreBlk.ID(),
+			HeightV: oracleCoreBlk.Height() + 1,
 		},
 	}
 
@@ -616,21 +637,22 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	prntBlkPChainHeight := pChainHeight
+	nextTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
 
 	childCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		ParentV:    oracleCoreBlk.opts[0].ID(),
-		BytesV:     []byte{2},
-		TimestampV: parentBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		ParentV: oracleCoreBlk.opts[0].ID(),
+		BytesV:  []byte{2},
+		HeightV: oracleCoreBlk.opts[0].Height() + 1,
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
 	childSlb, err := block.Build(
 		parentBlk.ID(),
-		childCoreBlk.Timestamp(),
+		nextTime,
 		prntBlkPChainHeight-1,
 		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
@@ -724,9 +746,9 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -791,9 +813,9 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -859,10 +881,9 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -905,10 +926,9 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -945,9 +965,9 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 				IDV:     ids.Empty.Prefix(1111),
 				StatusV: choices.Processing,
 			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
+			BytesV:  []byte{1},
+			ParentV: coreGenBlk.ID(),
+			HeightV: coreGenBlk.Height() + 1,
 		},
 	}
 	coreOpt0 := &snowman.TestBlock{
@@ -955,18 +975,18 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    oracleCoreBlk.ID(),
-		TimestampV: oracleCoreBlk.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: oracleCoreBlk.ID(),
+		HeightV: oracleCoreBlk.Height() + 1,
 	}
 	coreOpt1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    oracleCoreBlk.ID(),
-		TimestampV: oracleCoreBlk.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: oracleCoreBlk.ID(),
+		HeightV: oracleCoreBlk.Height() + 1,
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
 		coreOpt0,
@@ -1052,7 +1072,6 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 5)
-	proVM.Set(coreGenBlk.Timestamp())
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1062,9 +1081,9 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
