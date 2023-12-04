@@ -47,7 +47,7 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 	proVM := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
+			ActivationTime:      time.Time{},
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
