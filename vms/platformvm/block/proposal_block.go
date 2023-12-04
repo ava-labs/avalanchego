@@ -29,9 +29,8 @@ type BanffProposalBlock struct {
 }
 
 func (b *BanffProposalBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
-	if err := b.Tx.Initialize(txs.Codec); err != nil {
-		return fmt.Errorf("failed to initialize tx: %w", err)
+	if err := b.ApricotProposalBlock.initialize(bytes); err != nil {
+		return err
 	}
 	for _, tx := range b.Transactions {
 		if err := tx.Initialize(txs.Codec); err != nil {
@@ -53,7 +52,11 @@ func (b *BanffProposalBlock) Timestamp() time.Time {
 }
 
 func (b *BanffProposalBlock) Txs() []*txs.Tx {
-	return append(b.Transactions, b.Tx)
+	l := len(b.Transactions)
+	txs := make([]*txs.Tx, l+1)
+	copy(txs, b.Transactions)
+	txs[l] = b.Tx
+	return txs
 }
 
 func (b *BanffProposalBlock) Visit(v Visitor) error {
