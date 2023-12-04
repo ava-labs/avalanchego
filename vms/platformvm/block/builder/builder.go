@@ -254,7 +254,7 @@ func buildBlock(
 			parentID,
 			height,
 			rewardValidatorTx,
-			[]*txs.Tx{},
+			[]*txs.Tx{}, // TODO: Populate with StandardBlock txs
 		)
 	}
 
