@@ -61,7 +61,7 @@ type builder struct {
 	blkManager        blockexecutor.Manager
 
 	// This timer goes off when it is time for the next staker to add/leave
-	// the staking set. When it goes off, [maybeAdvanceTime()] is called,
+	// the staking set. When it goes off, [maybeIssueEmptyBlock()] is called,
 	// potentially triggering creation of a new block.
 	timer                    *timer.Timer
 	nextStakerChangeTimeLock sync.RWMutex
@@ -81,7 +81,7 @@ func New(
 		blkManager:        blkManager,
 	}
 
-	builder.timer = timer.NewTimer(builder.maybeAdvanceTime)
+	builder.timer = timer.NewTimer(builder.maybeIssueEmptyBlock)
 
 	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
 	return builder
@@ -201,7 +201,7 @@ func (b *builder) ResetBlockTimer() {
 	b.timer.SetTimeoutIn(waitTime)
 }
 
-func (b *builder) maybeAdvanceTime() {
+func (b *builder) maybeIssueEmptyBlock() {
 	ctx := b.txExecutorBackend.Ctx
 
 	// Grabbing the lock here enforces that this function is not called mid-way
@@ -215,6 +215,7 @@ func (b *builder) maybeAdvanceTime() {
 	now := b.txExecutorBackend.Clk.Time()
 	if b.nextStakerChangeTime.After(now) {
 		// [nextStakerChangeTime] is in the future, no need to advance time.
+		b.ResetBlockTimer()
 		return
 	}
 
