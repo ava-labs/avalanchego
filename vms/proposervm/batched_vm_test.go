@@ -73,9 +73,10 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -99,9 +100,10 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
-		ParentV: coreBlk1.ID(),
-		HeightV: coreBlk1.Height() + 1,
+		BytesV:     []byte{2},
+		ParentV:    coreBlk1.ID(),
+		HeightV:    coreBlk1.Height() + 1,
+		TimestampV: coreBlk1.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -125,9 +127,10 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{3},
-		ParentV: coreBlk2.ID(),
-		HeightV: coreBlk2.Height() + 1,
+		BytesV:     []byte{3},
+		ParentV:    coreBlk2.ID(),
+		HeightV:    coreBlk2.Height() + 1,
+		TimestampV: coreBlk2.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -220,9 +223,10 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -240,9 +244,10 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
-		ParentV: coreBlk1.ID(),
-		HeightV: coreBlk1.Height() + 1,
+		BytesV:     []byte{2},
+		ParentV:    coreBlk1.ID(),
+		HeightV:    coreBlk1.Height() + 1,
+		TimestampV: coreBlk1.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -260,9 +265,10 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{3},
-		ParentV: coreBlk2.ID(),
-		HeightV: coreBlk2.Height() + 1,
+		BytesV:     []byte{3},
+		ParentV:    coreBlk2.ID(),
+		HeightV:    coreBlk2.Height() + 1,
+		TimestampV: coreBlk2.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -381,9 +387,10 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: preForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -408,9 +415,10 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
-		ParentV: coreBlk1.ID(),
-		HeightV: coreBlk1.Height() + 1,
+		BytesV:     []byte{2},
+		ParentV:    coreBlk1.ID(),
+		HeightV:    coreBlk1.Height() + 1,
+		TimestampV: postForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -437,9 +445,10 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{3},
-		ParentV: coreBlk2.ID(),
-		HeightV: coreBlk2.Height() + 1,
+		BytesV:     []byte{3},
+		ParentV:    coreBlk2.ID(),
+		HeightV:    coreBlk2.Height() + 1,
+		TimestampV: postForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -458,9 +467,10 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{4},
-		ParentV: coreBlk3.ID(),
-		HeightV: coreBlk3.Height() + 1,
+		BytesV:     []byte{4},
+		ParentV:    coreBlk3.ID(),
+		HeightV:    coreBlk3.Height() + 1,
+		TimestampV: postForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk4, nil
@@ -580,9 +590,10 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -606,9 +617,10 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
-		ParentV: coreBlk1.ID(),
-		HeightV: coreBlk1.Height() + 1,
+		BytesV:     []byte{2},
+		ParentV:    coreBlk1.ID(),
+		HeightV:    coreBlk1.Height() + 1,
+		TimestampV: coreBlk1.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -632,9 +644,10 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{3},
-		ParentV: coreBlk2.ID(),
-		HeightV: coreBlk2.Height() + 1,
+		BytesV:     []byte{3},
+		ParentV:    coreBlk2.ID(),
+		HeightV:    coreBlk2.Height() + 1,
+		TimestampV: coreBlk2.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -702,9 +715,10 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -722,9 +736,10 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
-		ParentV: coreBlk1.ID(),
-		HeightV: coreBlk1.Height() + 1,
+		BytesV:     []byte{2},
+		ParentV:    coreBlk1.ID(),
+		HeightV:    coreBlk1.Height() + 1,
+		TimestampV: coreBlk1.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -742,9 +757,10 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{3},
-		ParentV: coreBlk2.ID(),
-		HeightV: coreBlk2.Height() + 1,
+		BytesV:     []byte{3},
+		ParentV:    coreBlk2.ID(),
+		HeightV:    coreBlk2.Height() + 1,
+		TimestampV: coreBlk2.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -820,9 +836,10 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk.ID(),
-		HeightV: coreGenBlk.Height() + 1,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: preForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -847,9 +864,10 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
-		ParentV: coreBlk1.ID(),
-		HeightV: coreBlk1.Height() + 1,
+		BytesV:     []byte{2},
+		ParentV:    coreBlk1.ID(),
+		HeightV:    coreBlk1.Height() + 1,
+		TimestampV: postForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -876,9 +894,10 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{3},
-		ParentV: coreBlk2.ID(),
-		HeightV: coreBlk2.Height() + 1,
+		BytesV:     []byte{3},
+		ParentV:    coreBlk2.ID(),
+		HeightV:    coreBlk2.Height() + 1,
+		TimestampV: postForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -897,9 +916,10 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{4},
-		ParentV: coreBlk3.ID(),
-		HeightV: coreBlk3.Height() + 1,
+		BytesV:     []byte{4},
+		ParentV:    coreBlk3.ID(),
+		HeightV:    coreBlk3.Height() + 1,
+		TimestampV: postForkTime,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk4, nil
@@ -980,8 +1000,9 @@ func initTestRemoteProposerVM(
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
 		},
-		HeightV: 0,
-		BytesV:  []byte{0},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
 	}
 
 	initialState := []byte("genesis state")
