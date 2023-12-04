@@ -29,9 +29,8 @@ type BanffProposalBlock struct {
 }
 
 func (b *BanffProposalBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
-	if err := b.Tx.Initialize(txs.Codec); err != nil {
-		return fmt.Errorf("failed to initialize tx: %w", err)
+	if err := b.ApricotProposalBlock.initialize(bytes); err != nil {
+		return err
 	}
 	for _, tx := range b.Transactions {
 		if err := tx.Initialize(txs.Codec); err != nil {
