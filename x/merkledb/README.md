@@ -1,44 +1,129 @@
-# Path Based Merkelized Radix Trie
+# MerkleDB
 
-## TODOs
+## Structure
 
-- [ ] Remove special casing around the root node from the physical structure of the hashed tree.
-- [ ] Analyze performance of using database snapshots rather than in-memory history
-- [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees
+A _Merkle trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store using a Merkle trie. Note that although we sometimes use "a trie" and "a MerkleDB instance" interchangeably below, the two are not the same. Merkle tries need not implement key-value stores, and Merkle trie implementations may differ from ours.
 
-## Introduction
+Conceputally, a node has:
+  * A unique _key_ which identifies its position in the trie. A node's key is a prefix of its childrens' keys.
+  * A unique _ID_, which is the hash of the node.
+  * A _children_ array, where each element is the ID of the child at that index. A child at a lower index is to the "left" of children at higher indices.
+  * An optional value. If a node has a value, then the node's key maps to its value in the key-value store. Otherwise the key isn't present in the store.
 
-The Merkle Trie is a data structure that allows efficient and secure verification of the contents. It is a combination of a [Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [Radix Trie](https://en.wikipedia.org/wiki/Radix_tree).
+and looks like this:
+```
+Node
++--------------------------------------------+
+| ID:                              32 bytes  |
+| Key:                              ? bytes  |
+| Value:                 Some(value) | None  |
+| Children:                                  |
+|   0:                Some(child0ID) | None  |
+|   1:                Some(child2ID) | None  |
+|   ...                                      |
+|   BranchFactor-1:  Some(child15ID) | None  |
++--------------------------------------------+
+```
 
-The trie contains `Merkle Nodes`, which store key/value and children information.
+This conceptual picture differs slightly from the implementation of the `node` in MerkleDB but is still useful in understanding how MerkleDB works. 
 
-Each `Merkle Node` represents a key path into the trie. It stores the key, the value (if one exists), its ID, and the IDs of its children nodes. The children have keys that contain the current node's key path as a prefix, and the index of each child indicates the next nibble in that child's key. For example, if we have two nodes, Node 1 with key path `0x91A` and Node 2 with key path `0x91A4`, Node 2 is stored in index `0x4` of Node 1's children (since 0x4 is the first value after the common prefix).
+## Root ID
 
-To reduce the depth of nodes in the trie, a `Merkle Node` utilizes path compression. Instead of having a long chain of nodes each containing only a single nibble of the key, we can "compress" the path by recording additional key information with each of a node's children. For example, if we have three nodes, Node 1 with key path `0x91A`, Node 2 with key path `0x91A4`, and Node 3 with key path `0x91A5132`, then Node 1 has a key of `0x91A`. Node 2 is stored at index `0x4` of Node 1's children since `4` is the next nibble in Node 2's key after skipping the common nibbles from Node 1's key. Node 3 is stored at index `0x5` of Node 1's children. Rather than have extra nodes for the remainder of Node 3's key, we instead store the rest of the key (`132`) in Node 1's children info.
+The ID of the root node is called the _root ID_, or sometimes just the _root_ of the trie. If any node in a MerkleDB instance changes, the root ID will change. This follows from the fact that changing a node changes the node's ID, which changes its parent's reference to it, which changes the parent, which changes the parent's ID, and so on until the root.
+
+We sometimes call the MerkleDB state at a given root ID a _revision_.
+
+## Views
+
+A _view_ is a proposal to modify a MerkleDB. If a view is _committed_, its changes are written to the MerkleDB. It can be queried, and when it is, it will return the state that the MerkleDB will contain if the view is committed.
+
+A view can be built atop the MerkleDB itself, or it can be built atop another view. Views can be chained together. For example, we might have:
 
 ```
-+-----------------------------------+
-| Merkle Node                       |
-|                                   |
-| ID: 0x0131                        |  an id representing the current node, derived from the node's value and all children ids
-| Key: 0x91                         |  prefix of the key, representing the location of the node in the trie
-| Value: 0x00                       |  the value, if one exists, that is stored at the key (keyPrefix + compressedKey)
-| Children:                         |  a map of children node ids for any nodes in the trie that have this node's key as a prefix
-|   0: [:0x00542F]                  |  child 0 represents a node with key 0x910 with ID 0x00542F
-|   1: [0x432:0xA0561C]             |  child 1 represents a node with key 0x911432 with ID 0xA0561C
-|   ...                             |
-|   15: [0x9A67B:0x02FB093]         |  child 15 represents a node with key 0x91F9A67B with ID 0x02FB093
-+-----------------------------------+
+    db
+  /    \
+view1  view2
+  |
+view3
 ```
+
+where `view1` and `view2` are built atop MerkleDB instance `db` and `view3` is built atop `view1`. Equivalently, we say that `db` is the parent of `view1` and `view2`, and `view3` is a child of `view1`. `view1` and `view2` are _siblings_.
+
+`view1` contains all the key-value pairs in `db`, except those modified by `view1`. That is, if `db` has key-value pair `(k,v)`, and `view1` doesn't modify that pair, then `view1` will return `v` when queried for the value of `k`. If `db` has `(k,v)` but `view1` modifies the pair to `(k, v')` then it will return `v'` when queried for the value of `k`. Similar for `view2`.
+
+`view3` has all of the key-value pairs as `view1`, except those modified in `view3`. That is, it has the state after the changes in `view1` are applied to `db`, followed by those in `view3`.
+
+A view can be committed only if its parent is the MerkleDB (and not another view). A view can only be committed once.
+
+### Validity
+
+When a view is committed, its siblings and all of their descendants are _invalidated_. An invalid view can't be read or committed. Method calls on it will return `ErrInvalid`.
+
+In the diagram above, if `view1` were committed, `view2` would be invalidated. It `view2` were committed, `view1` and `view3` would be invalidated.
+
+## Proofs
+
+### Simple Proofs
+
+MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID _r_ can create a proof that shows that the instance has a key-value pair (_k,v_), or that _k_ is not present. The proof can be verified with no additional context or knowledge of the contents of the instance. This is a powerful tool. Suppose that there's a client that wants to retrieve key-value pairs from a distributed key-value store (i.e. MerkleDB instance), and one or more servers, which may be Byzantine. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with  (or doesn't, as it were.) To put a finer point on it, the flow is:
+
+```mermaid
+flowchart TD
+    A[Client] -->|"ProofRequest(k,r)"| B(Server)
+    B --> |"Proof(k,v,r)"| C(Client)
+    C --> |Proof Valid| D(Client trusts key-value pair)
+    C --> |Proof Invalid| E(Client doesn't trust key-value pair) 
+```
+
+_ProofRequest(k,r)_ is a request for the value that _k_ maps to in the MerkleDB instance with root _r_ and a proof for that data's correctness.
+
+_Proof(k,v,r)_ is a proof that purports to show that key-value pair (_k,v_) exists in the MerkleDB instance whose root ID is _r_. If the proof is valid, then the client trusts that (_k,v_) is actually in the instance with root _r_. 
+
+### Range Proofs
+
+MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is the same as the "simple" proofs described above, except for multiple key-value pairs. Similar to above, the flow is:
+
+```mermaid
+flowchart TD
+    A[Client] -->|"RangeProofRequest(start,end,r)"| B(Server)
+    B --> |"RangeProof(start,end,r)"| C(Client)
+    C --> |Proof Valid| D(Client trusts key-value pairs)
+    C --> |Proof Invalid| E(Client doesn't trust key-value pairs) 
+```
+
+_ProofRequest(k,r)_ is a request for all of the key-value pairs, in order, between keys _start_ and _end_.
+
+_RangeProof(start,end,r)_ contains a set of key-value pairs _kvs_. It purports to show that each element of _kvs_ is a key-value pair in the MerkleDB instance with root _r_.
+
+Clients can use range proofs to efficiently receive many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
+
+Like simple proofs, range proofs can be verified without any additional context or knowledge of the contents of the key-value store.
+
+### Change Proofs
+
+Finally, MerkleDB instances can produce and verify _change proofs_. A change proof proves that a set of key-value changes were applied to a MerkleDB instance in the process of changing its root from _r_ to _r'_. For example, suppose there's an instance with root _r_. After a series of key-value pair modifications, the instance's root is now _r'_. The instance can create a change proof that specifies (a subset of) key-value pairs were modified, and in what way. The flow is:
+
+```mermaid
+flowchart TD
+    A[Client] -->|"ChangeProofRequest(start,end,r,r')"| B(Server)
+    B --> |"ChangeProof(start,end,r,r')"| C(Client)
+    C --> |Proof Valid| D(Client trusts key-value pair changes)
+    C --> |Proof Invalid| E(Client doesn't trust key-value changes) 
+```
+
+_ChangeProofRequest(start,end,r,r')_ is a request for all key-value pairs, in order, between keys _start_ and _end_, that occurred after the root of was _r_ and before the root was _r'_.
+
+_ChangeProof_ contains a set of key-value pairs _kvs_. It purports to show that each element of _kvs_ is a key-value pair in the MerkleDB instance with root _r'_ but was not in the instance with root _r_.
+
+Change proofs are useful for applying changes between revisions. For example, suppose a MerkleDB instance is at revision _r_. (That is, its root ID is _r_.) Applying a change proof allows for updating the state from revision _r_ to _r'_ without applying every intermediate change. That is, if the state went from revision _r_ to _r*_ to _r'_, and _(k,v)_ changes to _(k,v*)_ changes to _(k, v')_ in the course of these revisions, then a change proof from _r_ to _r'_ allows _(k,v)_ to be updated to _(k,v')_ without applying the unnecessary, intermediate value _(k,v*_).
 
 ## Serialization
 
 ### Node
 
-Nodes are persisted in an underlying database. In order to persist nodes, we must first serialize them.
-Serialization is done by the `encoder` interface defined in `codec.go`.
+Nodes are persisted in an underlying database. In order to persist nodes, we must first serialize them. Serialization is done by the `encoder` interface defined in `codec.go`.
 
-The node serialization format is as follows:
+The node serialization format is:
 
 ```
 +----------------------------------------------------+
@@ -229,10 +314,6 @@ By splitting the nodes up by value, it allows better key/value iteration and a m
 
 A `Merkle Node` holds the IDs of its children, its value, as well as any key extension. This simplifies some logic and allows all of the data about a node to be loaded in a single database read. This trades off a small amount of storage efficiency (some fields may be `nil` but are still stored for every node).
 
-### Validity
-
-A `trieView` is built atop another trie, and there may be other `trieView`s built atop the same trie. We call these *siblings*. If one sibling is committed to database, we *invalidate* all other siblings and their descendants. Operations on an invalid trie return `ErrInvalid`. The children of the committed `trieView` are updated so that their new `parentTrie` is the database.
-
 ### Locking
 
 `merkleDB` has a `RWMutex` named `lock`. Its read operations don't store data in a map, so a read lock suffices for read operations.
@@ -252,3 +333,9 @@ This pattern is safe because the `merkleDB` is locked, so no data under the view
 To prevent deadlocks, `trieView` and `merkleDB` never acquire the `commitLock` of descendant views.
 That is, locking is always done from a view toward to the underlying `merkleDB`, never the other way around.
 The `validityTrackingLock` goes the opposite way. A view can lock the `validityTrackingLock` of its children, but not its ancestors. Because of this, any function that takes the `validityTrackingLock` must not take the `commitLock` as this may cause a deadlock. Keeping `commitLock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.
+
+## TODOs
+
+- [ ] Remove special casing around the root node from the physical structure of the hashed tree.
+- [ ] Analyze performance of using database snapshots rather than in-memory history
+- [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees
