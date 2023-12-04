@@ -201,7 +201,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	if err := v.VerifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
+	if err := v.verifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
 		return err
 	}
 
@@ -439,7 +439,7 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	if err := v.VerifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
+	if err := v.verifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
 		return err
 	}
 

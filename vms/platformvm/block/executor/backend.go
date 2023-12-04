@@ -100,9 +100,9 @@ func (b *backend) getTimestamp(blkID ids.ID) time.Time {
 	return b.state.GetTimestamp()
 }
 
-// VerifyUniqueInputs returns nil iff no blocks in the inclusive
+// verifyUniqueInputs returns nil iff no blocks in the inclusive
 // ancestry of [blkID] consume an input in [inputs].
-func (b *backend) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
+func (b *backend) verifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
 	if inputs.Len() == 0 {
 		return nil
 	}
