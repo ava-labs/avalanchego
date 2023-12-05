@@ -962,9 +962,9 @@ func initTestRemoteProposerVM(
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Accepted,
 		},
-		HeightV: 0,
-
-		BytesV: []byte{0},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
 	}
 
 	initialState := []byte("genesis state")

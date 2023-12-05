@@ -254,7 +254,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		ParentV: parentCoreBlk.ID(),
 		BytesV:  []byte{2},
 	}
-	childProBlk := postForkBlock{
+	childBlk := postForkBlock{
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
@@ -277,9 +277,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		err = childProBlk.Verify(context.Background())
+		err = childBlk.Verify(context.Background())
 		require.ErrorIs(err, errTimeNotMonotonic)
 	}
 
@@ -301,9 +301,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		err = childProBlk.Verify(context.Background())
+		err = childBlk.Verify(context.Background())
 		require.ErrorIs(err, errProposerWindowNotStarted)
 	}
 
@@ -322,9 +322,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		require.NoError(childProBlk.Verify(context.Background()))
+		require.NoError(childBlk.Verify(context.Background()))
 	}
 
 	{
@@ -342,9 +342,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		require.NoError(childProBlk.Verify(context.Background()))
+		require.NoError(childBlk.Verify(context.Background()))
 	}
 
 	{
@@ -359,9 +359,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		require.NoError(childProBlk.Verify(context.Background()))
+		require.NoError(childBlk.Verify(context.Background()))
 	}
 
 	{
@@ -378,9 +378,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		err = childProBlk.Verify(context.Background())
+		err = childBlk.Verify(context.Background())
 		require.ErrorIs(err, errTimeTooAdvanced)
 	}
 }
@@ -456,7 +456,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		ParentV: parentCoreBlk.ID(),
 		BytesV:  []byte{2},
 	}
-	childProBlk := postForkBlock{
+	childBlk := postForkBlock{
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: childCoreBlk,
@@ -473,9 +473,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		err = childProBlk.Verify(context.Background())
+		err = childBlk.Verify(context.Background())
 		require.ErrorIs(err, errPChainHeightNotMonotonic)
 	}
 
@@ -488,9 +488,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		require.NoError(childProBlk.Verify(context.Background()))
+		require.NoError(childBlk.Verify(context.Background()))
 	}
 
 	{
@@ -502,9 +502,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		require.NoError(childProBlk.Verify(context.Background()))
+		require.NoError(childBlk.Verify(context.Background()))
 	}
 
 	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
@@ -517,9 +517,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		require.NoError(childProBlk.Verify(context.Background()))
+		require.NoError(childBlk.Verify(context.Background()))
 	}
 
 	{
@@ -531,9 +531,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
-		childProBlk.SignedBlock = childSlb
+		childBlk.SignedBlock = childSlb
 
-		err = childProBlk.Verify(context.Background())
+		err = childBlk.Verify(context.Background())
 		require.ErrorIs(err, errPChainHeightNotReached)
 	}
 }
