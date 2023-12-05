@@ -66,8 +66,8 @@ func (id *NodeID) UnmarshalText(text []byte) error {
 	return id.UnmarshalJSON(text)
 }
 
-func (id NodeID) Less(other NodeID) bool {
-	return bytes.Compare(id[:], other[:]) == -1
+func (id NodeID) Compare(other NodeID) int {
+	return bytes.Compare(id[:], other[:])
 }
 
 // ToNodeID attempt to convert a byte slice into a node id
