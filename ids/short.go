@@ -110,8 +110,8 @@ func (id ShortID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-func (id ShortID) Less(other ShortID) bool {
-	return bytes.Compare(id[:], other[:]) == -1
+func (id ShortID) Compare(other ShortID) int {
+	return bytes.Compare(id[:], other[:])
 }
 
 // ShortIDsToStrings converts an array of shortIDs to an array of their string

@@ -332,6 +332,57 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedErr:            nil,
+		},
+		{
+			name: "banff proposal block; can't fetch primary network validator",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				var (
+					stakerTxID = ids.GenerateTestID()
+					nodeID     = ids.GenerateTestNodeID()
+					subnetID   = ids.GenerateTestID()
+					stakerTx   = &txs.Tx{
+						Unsigned: &txs.AddPermissionlessValidatorTx{
+							Validator: txs.Validator{
+								NodeID: nodeID,
+							},
+							Subnet: subnetID,
+						},
+					}
+				)
+
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
+				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(nil, database.ErrClosed)
+
+				uptimes := uptime.NewMockCalculator(ctrl)
+
+				manager := &manager{
+					backend: &backend{
+						state: state,
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Config{
+							UptimePercentage: 0,
+						},
+						Uptimes: uptimes,
+					},
+				}
+
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.RewardValidatorTx{
+									TxID: stakerTxID,
+								},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
 			expectedPreferenceType: nil,
 			expectedErr:            executor.ErrStakerWithoutPrimaryNetworkValidator,
 		},
