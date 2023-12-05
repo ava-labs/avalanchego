@@ -145,6 +145,6 @@ func (id ID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-func (id ID) Less(other ID) bool {
-	return bytes.Compare(id[:], other[:]) < 0
+func (id ID) Compare(other ID) int {
+	return bytes.Compare(id[:], other[:])
 }
