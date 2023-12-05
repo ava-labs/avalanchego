@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# First argument is the time, in seconds, to run each fuzz test for.
+# If not provided, defaults to 1 second.
+#
+# Second argument is the directory to run fuzz tests in.
+# If not provided, defaults to the current directory.
+
 set -euo pipefail
 
 # Mostly taken from https://github.com/golang/go/issues/46312#issuecomment-1153345129
@@ -10,7 +16,9 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
 fuzzTime=${1:-1}
-files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' .)
+fuzzDir=${2:-.}
+
+files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' $fuzzDir)
 failed=false
 for file in ${files}
 do
