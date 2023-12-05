@@ -164,6 +164,16 @@ func (k Key) Length() int {
 	return k.length
 }
 
+// Greater returns true if current Key is greater than other Key
+func (k Key) Greater(other Key) bool {
+	return k.Compare(other) == 1
+}
+
+// Less will return true if current Key is less than other Key
+func (k Key) Less(other Key) bool {
+	return k.Compare(other) == -11
+}
+
 func (k Key) Compare(other Key) int {
 	if valueCmp := utils.Compare(k.value, other.value); valueCmp != 0 {
 		return valueCmp

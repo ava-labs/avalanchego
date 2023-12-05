@@ -31,7 +31,7 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 	)
 
 	for key, change := range t.changes.values {
-		if len(start) > 0 && startKey.Compare(key) == 1 || !key.HasPrefix(prefixKey) {
+		if len(start) > 0 && startKey.Greater(key) || !key.HasPrefix(prefixKey) {
 			continue
 		}
 		changes = append(changes, KeyChange{
