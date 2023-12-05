@@ -3,7 +3,7 @@
 ## Structure
 
 
-A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries implement a key-value store.
+A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store (sometimes just called "a store") using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries implement a key-value store.
 
 Like all tries, a MerkleDB instance is composed of nodes. Conceputally, a node has:
   * A unique _key_ which identifies its position in the trie. A node's key is a prefix of its childrens' keys.
@@ -32,7 +32,7 @@ This conceptual picture differs slightly from the implementation of the `node` i
 
 The ID of the root node is called the _root ID_, or sometimes just the _root_ of the trie. If any node in a MerkleDB instance changes, the root ID will change. This follows from the fact that changing a node changes its ID, which changes its parent's reference to it, which changes the parent, which changes the parent's ID, and so on until the root.
 
-The root ID also serves as a unique identifier of a given state; instances with the same key-value mappings always have the same root ID, and instances with different key-value mappings always have different root IDs. We call a state with a given root ID a _revision_.
+The root ID also serves as a unique identifier of a given state; instances with the same key-value mappings always have the same root ID, and instances with different key-value mappings always have different root IDs. We call a state with a given root ID a _revision_, and we sometimes say that a MerkleDB instance is "at" a given revision or root ID. The two are equivalent.
 
 ## Views
 
@@ -54,7 +54,7 @@ where `view1` and `view2` are built atop MerkleDB instance `db` and `view3` is b
 
 `view3` has all of the key-value pairs as `view1`, except those modified in `view3`. That is, it has the state after the changes in `view1` are applied to `db`, followed by those in `view3`.
 
-A view can be committed only if its parent is the MerkleDB (and not another view). A view can only be committed once.
+A view can be committed only if its parent is the MerkleDB (and not another view). A view can only be committed once. In the above diagram, `view3` can't be committed until `view1` is committed.
 
 ### Validity
 
@@ -66,23 +66,25 @@ In the diagram above, if `view1` were committed, `view2` would be invalidated. I
 
 ### Simple Proofs
 
-MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that the instance has a key-value pair `(k,v)`, or that `k` is not present. The proof can be verified with no additional context or knowledge of the contents of the instance. This is a powerful tool. Suppose that there's a client that wants to retrieve key-value pairs from a distributed key-value store (i.e. MerkleDB instance), and one or more servers, which may be Byzantine. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with  (or doesn't, as it were.) To put a finer point on it, the flow is:
+MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that it has a key-value pair `(k,v)`, or that `k` is not present.
+
+Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.) To put a finer point on it, the flow is:
 
 ```mermaid
 flowchart TD
     A[Client] -->|"ProofRequest(k,r)"| B(Server)
-    B --> |"Proof(k,v,r)"| C(Client)
-    C --> |Proof Valid| D(Client trusts key-value pair)
-    C --> |Proof Invalid| E(Client doesn't trust key-value pair) 
+    B --> |"Proof(k,r)"| C(Client)
+    C --> |Proof Valid| D(Client trusts key-value pair from proof)
+    C --> |Proof Invalid| E(Client doesn't trust key-value pair from proof) 
 ```
 
 `ProofRequest(k,r)` is a request for the value that `k` maps to in the MerkleDB instance with root `r` and a proof for that data's correctness.
 
-`Proof(k,v,r)` is a proof that purports to show that key-value pair `(k,v)` exists in the MerkleDB instance whose root ID is `r`
+`Proof(k,r)` is a proof that purports to show either that key-value pair `(k,v)` exists in the revision at `r`, or that `k` isn't in the revision.
 
 ### Range Proofs
 
-MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is the same as the "simple" proofs described above, except for multiple key-value pairs. Similar to above, the flow is:
+MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is similar to the merkle proofs described above, except for multiple key-value pairs. Similar to above, the flow is:
 
 ```mermaid
 flowchart TD
@@ -92,11 +94,14 @@ flowchart TD
     C --> |Proof Invalid| E(Client doesn't trust key-value pairs) 
 ```
 
-`RangeProofRequest(start,end,r)` is a request for all of the key-value pairs, in order, between keys `start` and `end`.
+`RangeProofRequest(start,end,r)` is a request for all of the key-value pairs, in order, between keys `start` and `end` at revision `r`.
 
-`RangeProof(start,end,r)` contains a set of key-value pairs `kvs`. It purports to show that each element of `kvs` is a key-value pair in the MerkleDB instance with root `r`
+`RangeProof(start,end,r)` contains a list of key-value pairs `kvs`, sorted by increasing key. It purports to show that, at revision `r`:
+* Each element of `kvs` is a key-value pair in the store.
+* There are no keys at/after `start` but before the first key in `kvs`.
+* For adjacent key-value pairs `(k1,v1)` and `(k2,v2)` in `kvs`, there doesn't exist a key-value pair `(k3,v3)` in the store such that `k1 < k3 < k2`. In other words, `kvs` is a contiguous set of key-value pairs.
 
-Clients can use range proofs to efficiently receive many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
+Clients can use range proofs to efficiently download many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
 
 Like simple proofs, range proofs can be verified without any additional context or knowledge of the contents of the key-value store.
 
@@ -114,9 +119,12 @@ flowchart TD
 
 `ChangeProofRequest(start,end,r,r')` is a request for all key-value pairs, in order, between keys `start` and `end`, that occurred after the root of was `r` and before the root was `r'`.
 
-`ChangeProof` contains a set of key-value pairs `kvs`. It purports to show that each element of `kvs` is a key-value pair in the MerkleDB instance with root `r'` but was not in the instance with root `r`
+`ChangeProof(start,end,r,r')` contains a set of key-value pairs `kvs`. It purports to show that:
+* Each element of `kvs` is a key-value pair in the at revision `r'` but not at revision `r`.
+* There are no key-value changes between `r` and `r'` such that the key is at/after `start` but before the first key in `kvs`.
+* For adjacent key-value changes `(k1,v1)` and `(k2,v2)` in `kvs`, there doesn't exist a key-value change `(k3,v3)` between `r` and `r'` such that `k1 < k3 < k2`. In other words, `kvs` is a contiguous set of key-value changes.
 
-Change proofs are useful for applying changes between revisions. For example, suppose a MerkleDB instance is at revision `r`
+Change proofs are useful for applying changes between revisions. For example, suppose a client has a MerkleDB instance at revision `r`. The client learns that the state has been updated and that the new root is `r'`. The client can request a change proof from a server at revision `r'`, and apply the changes in the change proof to change its state from `r` to `r'`. Note that `r` and `r'` need not be "consecutive" revisions. For example, it's possible that the state goes from revision `r` to `r1` to `r2` to `r'`. The client apply changes to get directly from `r` to `r'`, without ever needing to be at revision `r1` or `r2`.
 
 ## Serialization
 
