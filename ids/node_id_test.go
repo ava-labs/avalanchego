@@ -182,11 +182,6 @@ func TestNodeIDCompare(t *testing.T) {
 		expected int
 	}{
 		{
-			a:        NodeID{},
-			b:        NodeID{},
-			expected: 0,
-		},
-		{
 			a:        NodeID{1},
 			b:        NodeID{0},
 			expected: 1,

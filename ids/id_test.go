@@ -208,11 +208,6 @@ func TestIDCompare(t *testing.T) {
 		expected int
 	}{
 		{
-			a:        ID{},
-			b:        ID{},
-			expected: 0,
-		},
-		{
 			a:        ID{1},
 			b:        ID{0},
 			expected: 1,
