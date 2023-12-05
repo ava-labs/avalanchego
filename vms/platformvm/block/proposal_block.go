@@ -67,16 +67,18 @@ func NewBanffProposalBlock(
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
-	tx *txs.Tx,
+	proposalTx *txs.Tx,
+	decisionTxs []*txs.Tx,
 ) (*BanffProposalBlock, error) {
 	blk := &BanffProposalBlock{
-		Time: uint64(timestamp.Unix()),
+		Transactions: decisionTxs,
+		Time:         uint64(timestamp.Unix()),
 		ApricotProposalBlock: ApricotProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
-			Tx: tx,
+			Tx: proposalTx,
 		},
 	}
 	return blk, initialize(blk)

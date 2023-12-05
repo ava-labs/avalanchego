@@ -1020,12 +1020,14 @@ func initTestRemoteProposerVM(
 
 	proVM := New(
 		coreVM,
-		proBlkStartTime,
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
+		Config{
+			ActivationTime:      proBlkStartTime,
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 	)
 
 	valState := &validators.TestState{

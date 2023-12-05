@@ -617,7 +617,7 @@ func TestParsedStateBlock(t *testing.T) {
 			Unsigned: &txs.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
-		})
+		}, []*txs.Tx{})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
