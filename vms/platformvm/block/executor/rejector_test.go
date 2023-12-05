@@ -121,7 +121,6 @@ func TestRejectBlock(t *testing.T) {
 
 			mempool := mempool.NewMockMempool(ctrl)
 			state := state.NewMockState(ctrl)
-			state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
 				blk.ID():     nil,
