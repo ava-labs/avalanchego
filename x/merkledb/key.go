@@ -171,7 +171,7 @@ func (k Key) Greater(other Key) bool {
 
 // Less will return true if current Key is less than other Key
 func (k Key) Less(other Key) bool {
-	return k.Compare(other) == -11
+	return k.Compare(other) == -1
 }
 
 func (k Key) Compare(other Key) int {
