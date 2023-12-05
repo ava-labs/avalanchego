@@ -19,6 +19,8 @@ type weightedHeapElement struct {
 	index            int
 }
 
+// Compare the elements. Weight is in decreasing order. Index is in increasing
+// order.
 func (e weightedHeapElement) Compare(other weightedHeapElement) int {
 	// By accounting for the initial index of the weights, this results in a
 	// stable sort. We do this rather than using `sort.Stable` because of the
