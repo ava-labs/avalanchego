@@ -2,9 +2,10 @@
 
 ## Structure
 
-A _Merkle trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store using a Merkle trie. Note that although we sometimes use "a trie" and "a MerkleDB instance" interchangeably below, the two are not the same. Merkle tries need not implement key-value stores, and Merkle trie implementations may differ from ours.
 
-Conceputally, a node has:
+A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries implement a key-value store.
+
+Like all tries, a MerkleDB instance is composed of nodes. Conceputally, a node has:
   * A unique _key_ which identifies its position in the trie. A node's key is a prefix of its childrens' keys.
   * A unique _ID_, which is the hash of the node.
   * A _children_ array, where each element is the ID of the child at that index. A child at a lower index is to the "left" of children at higher indices.
@@ -27,11 +28,11 @@ Node
 
 This conceptual picture differs slightly from the implementation of the `node` in MerkleDB but is still useful in understanding how MerkleDB works. 
 
-## Root ID
+## Root IDs and Revisions
 
-The ID of the root node is called the _root ID_, or sometimes just the _root_ of the trie. If any node in a MerkleDB instance changes, the root ID will change. This follows from the fact that changing a node changes the node's ID, which changes its parent's reference to it, which changes the parent, which changes the parent's ID, and so on until the root.
+The ID of the root node is called the _root ID_, or sometimes just the _root_ of the trie. If any node in a MerkleDB instance changes, the root ID will change. This follows from the fact that changing a node changes its ID, which changes its parent's reference to it, which changes the parent, which changes the parent's ID, and so on until the root.
 
-We sometimes call the MerkleDB state at a given root ID a _revision_.
+The root ID also serves as a unique identifier of a given state; instances with the same key-value mappings always have the same root ID, and instances with different key-value mappings always have different root IDs. We call a state with a given root ID a _revision_.
 
 ## Views
 
