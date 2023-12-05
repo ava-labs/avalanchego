@@ -124,12 +124,11 @@ func (p *postForkCommonComponents) Verify(
 	// If the node is currently syncing - we don't assume that the P-chain has
 	// been synced up to this point yet.
 	if p.vm.consensusState == snow.NormalOp {
-		childID := child.ID()
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
 			p.vm.ctx.Log.Error("block verification failed",
 				zap.String("reason", "failed to get current P-Chain height"),
-				zap.Stringer("blkID", childID),
+				zap.Stringer("blkID", child.ID()),
 				zap.Error(err),
 			)
 			return err
@@ -142,16 +141,9 @@ func (p *postForkCommonComponents) Verify(
 			)
 		}
 
-		childHeight := child.Height()
-		proposerID := child.Proposer()
-		minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
+		delay, err := p.verifyBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		if err != nil {
 			return err
-		}
-
-		delay := childTimestamp.Sub(parentTimestamp)
-		if delay < minDelay {
-			return errProposerWindowNotStarted
 		}
 
 		// Verify the signature of the node
@@ -161,9 +153,8 @@ func (p *postForkCommonComponents) Verify(
 		}
 
 		p.vm.ctx.Log.Debug("verified post-fork block",
-			zap.Stringer("blkID", childID),
+			zap.Stringer("blkID", child.ID()),
 			zap.Time("parentTimestamp", parentTimestamp),
-			zap.Duration("minDelay", minDelay),
 			zap.Time("blockTimestamp", childTimestamp),
 		)
 	}
@@ -202,37 +193,15 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	delay := newTimestamp.Sub(parentTimestamp)
-	if delay < proposer.MaxBuildDelay {
-		parentHeight := p.innerBlk.Height()
-		proposerID := p.vm.ctx.NodeID
-		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
-		if err != nil {
-			p.vm.ctx.Log.Error("unexpected build block failure",
-				zap.String("reason", "failed to calculate required timestamp delay"),
-				zap.Stringer("parentID", parentID),
-				zap.Error(err),
-			)
-			return nil, err
-		}
-
-		if delay < minDelay {
-			// It's not our turn to propose a block yet. This is likely caused
-			// by having previously notified the consensus engine to attempt to
-			// build a block on top of a block that is no longer the preferred
-			// block.
-			p.vm.ctx.Log.Debug("build block dropped",
-				zap.Time("parentTimestamp", parentTimestamp),
-				zap.Duration("minDelay", minDelay),
-				zap.Time("blockTimestamp", newTimestamp),
-			)
-
-			// In case the inner VM only issued one pendingTxs message, we
-			// should attempt to re-handle that once it is our turn to build the
-			// block.
-			p.vm.notifyInnerBlockReady()
-			return nil, errProposerWindowNotStarted
-		}
+	shouldBuildUnsignedBlock, err := p.shouldBuildUnsignedBlock(
+		ctx,
+		parentID,
+		parentTimestamp,
+		parentPChainHeight,
+		newTimestamp,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	var innerBlock snowman.Block
@@ -249,7 +218,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if delay >= proposer.MaxVerifyDelay {
+	if shouldBuildUnsignedBlock {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
@@ -261,10 +230,10 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
-			p.vm.stakingCertLeaf,
+			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.stakingLeafSigner,
+			p.vm.StakingLeafSigner,
 		)
 	}
 	if err != nil {
@@ -333,4 +302,76 @@ func verifyIsNotOracleBlock(ctx context.Context, b snowman.Block) error {
 	default:
 		return err
 	}
+}
+
+func (p *postForkCommonComponents) verifyBlockDelay(
+	ctx context.Context,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	blk *postForkBlock,
+) (time.Duration, error) {
+	var (
+		blkTimestamp = blk.Timestamp()
+		childHeight  = blk.Height()
+		proposerID   = blk.Proposer()
+	)
+	minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
+	if err != nil {
+		return 0, err
+	}
+
+	delay := blkTimestamp.Sub(parentTimestamp)
+	if delay < minDelay {
+		return 0, errProposerWindowNotStarted
+	}
+
+	return delay, nil
+}
+
+func (p *postForkCommonComponents) shouldBuildUnsignedBlock(
+	ctx context.Context,
+	parentID ids.ID,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	newTimestamp time.Time,
+) (bool, error) {
+	delay := newTimestamp.Sub(parentTimestamp)
+	if delay >= proposer.MaxBuildDelay {
+		// time for any node to build an unsigned block
+		return true, nil
+	}
+
+	parentHeight := p.innerBlk.Height()
+	proposerID := p.vm.ctx.NodeID
+	minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
+	if err != nil {
+		p.vm.ctx.Log.Error("unexpected build block failure",
+			zap.String("reason", "failed to calculate required timestamp delay"),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return false, err
+	}
+
+	if delay >= minDelay {
+		// it's time for this node to propose a block. It'll be signed or unsigned
+		// depending on the delay
+		return delay >= proposer.MaxVerifyDelay, nil
+	}
+
+	// It's not our turn to propose a block yet. This is likely caused
+	// by having previously notified the consensus engine to attempt to
+	// build a block on top of a block that is no longer the preferred
+	// block.
+	p.vm.ctx.Log.Debug("build block dropped",
+		zap.Time("parentTimestamp", parentTimestamp),
+		zap.Duration("minDelay", minDelay),
+		zap.Time("blockTimestamp", newTimestamp),
+	)
+
+	// In case the inner VM only issued one pendingTxs message, we
+	// should attempt to re-handle that once it is our turn to build the
+	// block.
+	p.vm.notifyInnerBlockReady()
+	return false, errProposerWindowNotStarted
 }
