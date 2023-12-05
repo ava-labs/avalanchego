@@ -66,7 +66,7 @@ In the diagram above, if `view1` were committed, `view2` would be invalidated. I
 
 ### Simple Proofs
 
-MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID _r_ can create a proof that shows that the instance has a key-value pair (_k,v_), or that _k_ is not present. The proof can be verified with no additional context or knowledge of the contents of the instance. This is a powerful tool. Suppose that there's a client that wants to retrieve key-value pairs from a distributed key-value store (i.e. MerkleDB instance), and one or more servers, which may be Byzantine. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with  (or doesn't, as it were.) To put a finer point on it, the flow is:
+MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that the instance has a key-value pair `(k,v)`, or that `k` is not present. The proof can be verified with no additional context or knowledge of the contents of the instance. This is a powerful tool. Suppose that there's a client that wants to retrieve key-value pairs from a distributed key-value store (i.e. MerkleDB instance), and one or more servers, which may be Byzantine. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with  (or doesn't, as it were.) To put a finer point on it, the flow is:
 
 ```mermaid
 flowchart TD
@@ -76,9 +76,9 @@ flowchart TD
     C --> |Proof Invalid| E(Client doesn't trust key-value pair) 
 ```
 
-_ProofRequest(k,r)_ is a request for the value that _k_ maps to in the MerkleDB instance with root _r_ and a proof for that data's correctness.
+`ProofRequest(k,r)` is a request for the value that `k` maps to in the MerkleDB instance with root `r` and a proof for that data's correctness.
 
-_Proof(k,v,r)_ is a proof that purports to show that key-value pair (_k,v_) exists in the MerkleDB instance whose root ID is _r_. If the proof is valid, then the client trusts that (_k,v_) is actually in the instance with root _r_. 
+`Proof(k,v,r)` is a proof that purports to show that key-value pair `(k,v)` exists in the MerkleDB instance whose root ID is `r`
 
 ### Range Proofs
 
@@ -92,9 +92,9 @@ flowchart TD
     C --> |Proof Invalid| E(Client doesn't trust key-value pairs) 
 ```
 
-_ProofRequest(k,r)_ is a request for all of the key-value pairs, in order, between keys _start_ and _end_.
+`RangeProofRequest(start,end,r)` is a request for all of the key-value pairs, in order, between keys `start` and `end`.
 
-_RangeProof(start,end,r)_ contains a set of key-value pairs _kvs_. It purports to show that each element of _kvs_ is a key-value pair in the MerkleDB instance with root _r_.
+`RangeProof(start,end,r)` contains a set of key-value pairs `kvs`. It purports to show that each element of `kvs` is a key-value pair in the MerkleDB instance with root `r`
 
 Clients can use range proofs to efficiently receive many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
 
@@ -102,7 +102,7 @@ Like simple proofs, range proofs can be verified without any additional context 
 
 ### Change Proofs
 
-Finally, MerkleDB instances can produce and verify _change proofs_. A change proof proves that a set of key-value changes were applied to a MerkleDB instance in the process of changing its root from _r_ to _r'_. For example, suppose there's an instance with root _r_. After a series of key-value pair modifications, the instance's root is now _r'_. The instance can create a change proof that specifies (a subset of) key-value pairs were modified, and in what way. The flow is:
+Finally, MerkleDB instances can produce and verify _change proofs_. A change proof proves that a set of key-value changes were applied to a MerkleDB instance in the process of changing its root from `r` to `r'`. For example, suppose there's an instance with root `r`
 
 ```mermaid
 flowchart TD
@@ -112,11 +112,11 @@ flowchart TD
     C --> |Proof Invalid| E(Client doesn't trust key-value changes) 
 ```
 
-_ChangeProofRequest(start,end,r,r')_ is a request for all key-value pairs, in order, between keys _start_ and _end_, that occurred after the root of was _r_ and before the root was _r'_.
+`ChangeProofRequest(start,end,r,r')` is a request for all key-value pairs, in order, between keys `start` and `end`, that occurred after the root of was `r` and before the root was `r'`.
 
-_ChangeProof_ contains a set of key-value pairs _kvs_. It purports to show that each element of _kvs_ is a key-value pair in the MerkleDB instance with root _r'_ but was not in the instance with root _r_.
+`ChangeProof` contains a set of key-value pairs `kvs`. It purports to show that each element of `kvs` is a key-value pair in the MerkleDB instance with root `r'` but was not in the instance with root `r`
 
-Change proofs are useful for applying changes between revisions. For example, suppose a MerkleDB instance is at revision _r_. (That is, its root ID is _r_.) Applying a change proof allows for updating the state from revision _r_ to _r'_ without applying every intermediate change. That is, if the state went from revision _r_ to _r*_ to _r'_, and _(k,v)_ changes to _(k,v*)_ changes to _(k, v')_ in the course of these revisions, then a change proof from _r_ to _r'_ allows _(k,v)_ to be updated to _(k,v')_ without applying the unnecessary, intermediate value _(k,v*_).
+Change proofs are useful for applying changes between revisions. For example, suppose a MerkleDB instance is at revision `r`
 
 ## Serialization
 
@@ -177,9 +177,9 @@ For each child of the node, we have an additional:
 +----------------------------------------------------+
 | Child index (varint)                               |
 +----------------------------------------------------+
-| Child compressed key length (varint)              |
+| Child compressed key length (varint)               |
 +----------------------------------------------------+
-| Child compressed key (variable length bytes)      |
+| Child compressed key (variable length bytes)       |
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
 +----------------------------------------------------+
@@ -209,7 +209,7 @@ The second is at child index `14`, has compressed key `0x0F0F0F` and ID (in hex)
 | 0x01                                                               |
 +--------------------------------------------------------------------+
 | Value length (varint) (optional)                                   |
-| 0x02                                                               |``
+| 0x02                                                               |
 +--------------------------------------------------------------------+
 | Value (variable length bytes) (optional)                           |
 | 0x02                                                               |
@@ -220,10 +220,10 @@ The second is at child index `14`, has compressed key `0x0F0F0F` and ID (in hex)
 | Child index (varint)                                               |
 | 0x00                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key length (varint)                              |
+| Child compressed key length (varint)                               |
 | 0x02                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key (variable length bytes)                      |
+| Child compressed key (variable length bytes)                       |
 | 0x10                                                               |
 +--------------------------------------------------------------------+
 | Child ID (32 bytes)                                                |
@@ -232,10 +232,10 @@ The second is at child index `14`, has compressed key `0x0F0F0F` and ID (in hex)
 | Child index (varint)                                               |
 | 0x0E                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key length (varint)                              |
+| Child compressed key length (varint)                               |
 | 0x06                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key (variable length bytes)                      |
+| Child compressed key (variable length bytes)                       |
 | 0xFFF0                                                             |
 +--------------------------------------------------------------------+
 | Child ID (32 bytes)                                                |
