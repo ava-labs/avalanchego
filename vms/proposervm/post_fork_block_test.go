@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -199,6 +200,25 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
+	// reduce validator state to allow proVM.ctx.NodeID to be easily selected as proposer
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		var (
+			thisNode = proVM.ctx.NodeID
+			nodeID1  = ids.BuildTestNodeID([]byte{1})
+		)
+		return map[ids.NodeID]*validators.GetValidatorOutput{
+			thisNode: {
+				NodeID: thisNode,
+				Weight: 5,
+			},
+			nodeID1: {
+				NodeID: nodeID1,
+				Weight: 100,
+			},
+		}, nil
+	}
+	proVM.ctx.ValidatorState = valState
+
 	pChainHeight := uint64(100)
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return pChainHeight, nil
@@ -244,7 +264,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require.NoError(parentBlk.Verify(context.Background()))
 	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
-	parentTimestamp := parentBlk.Timestamp()
+	var (
+		parentTimestamp    = parentBlk.Timestamp()
+		parentPChainHeight = parentBlk.(*postForkBlock).PChainHeight()
+	)
 
 	childCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -252,6 +275,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: parentCoreBlk.ID(),
+		HeightV: parentCoreBlk.Height() + 1,
 		BytesV:  []byte{2},
 	}
 	childBlk := postForkBlock{
@@ -283,7 +307,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		require.ErrorIs(err, errTimeNotMonotonic)
 	}
 
-	blkWinDelay, err := proVM.Delay(context.Background(), childCoreBlk.Height(), pChainHeight, proVM.ctx.NodeID, proposer.MaxVerifyWindows)
+	blkWinDelay, err := proVM.Delay(context.Background(), childCoreBlk.Height(), parentPChainHeight, proVM.ctx.NodeID, proposer.MaxVerifyWindows)
 	require.NoError(err)
 
 	{
