@@ -515,21 +515,25 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
 		options, err := oracleBlk.Options(ctx)
 		switch {
-		case err == snowman.ErrNotOracle:
-			// if there aren't blocks we need to deliver on startup, we need to set
-			// the preference to the last accepted block
-			if err := t.VM.SetPreference(ctx, lastAcceptedID); err != nil {
-				return err
-			}
-		case err != nil:
-			return err
-		default:
+		case err == nil:
 			issuedMetric := t.metrics.issued.WithLabelValues(builtSource)
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
 				if err := t.deliver(ctx, t.Ctx.NodeID, blk, false, issuedMetric); err != nil {
 					return err
 				}
+			}
+		case err != snowman.ErrNotOracle:
+			t.Ctx.Log.Warn("failed to set preferences for oracle block",
+				zap.Stringer("blkID", lastAcceptedID),
+				zap.Error(err),
+			)
+			fallthrough
+		default:
+			// if there aren't blocks we need to deliver on startup, we need to
+			// set the preference to the last accepted block
+			if err := t.VM.SetPreference(ctx, lastAcceptedID); err != nil {
+				return err
 			}
 		}
 	} else if err := t.VM.SetPreference(ctx, lastAcceptedID); err != nil {
@@ -1015,11 +1019,8 @@ func (t *Transitive) deliver(
 	dropped := []snowman.Block{}
 	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options(ctx)
-		if err != snowman.ErrNotOracle {
-			if err != nil {
-				return err
-			}
-
+		switch {
+		case err == nil:
 			for _, blk := range options {
 				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, nodeID, blk, issuedMetric)
 				if err != nil {
@@ -1031,6 +1032,11 @@ func (t *Transitive) deliver(
 					dropped = append(dropped, blk)
 				}
 			}
+		case err != snowman.ErrNotOracle:
+			t.Ctx.Log.Debug("failed to set preferences for oracle block",
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
 		}
 	}
 
