@@ -51,10 +51,10 @@ func (mr *MockPredicaterMockRecorder) PredicateGas(arg0 interface{}) *gomock.Cal
 }
 
 // VerifyPredicate mocks base method.
-func (m *MockPredicater) VerifyPredicate(arg0 *PredicateContext, arg1 [][]byte) []byte {
+func (m *MockPredicater) VerifyPredicate(arg0 *PredicateContext, arg1 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyPredicate", arg0, arg1)
-	ret0, _ := ret[0].([]byte)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
