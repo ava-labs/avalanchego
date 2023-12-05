@@ -19,8 +19,8 @@ type weightedArrayElement struct {
 }
 
 // Note that this sorts in order of decreasing weight.
-func (e weightedArrayElement) Less(other weightedArrayElement) bool {
-	return e.cumulativeWeight > other.cumulativeWeight
+func (e weightedArrayElement) Compare(other weightedArrayElement) int {
+	return utils.Compare(other.cumulativeWeight, e.cumulativeWeight)
 }
 
 // Sampling is performed by executing a modified binary search over the provided
