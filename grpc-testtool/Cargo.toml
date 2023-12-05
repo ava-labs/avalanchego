@@ -24,3 +24,12 @@ tonic = { version = "0.10.0", features = ["tls"] }
 
 [build-dependencies]
 tonic-build = "0.10.0"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "warn"
+indexing_slicing = "warn"
+explicit_deref_methods = "warn"
+missing_const_for_fn = "warn"

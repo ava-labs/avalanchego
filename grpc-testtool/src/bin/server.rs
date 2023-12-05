@@ -10,7 +10,8 @@ use tonic::transport::Server;
 
 // TODO: use clap to parse command line input to run the server
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), tonic::transport::Error> {
+    #[allow(clippy::unwrap_used)]
     let addr = "[::1]:10000".parse().unwrap();
 
     println!("Database-Server listening on: {}", addr);
@@ -23,5 +24,4 @@ async fn main() {
         .add_service(SyncServer::from_arc(svc))
         .serve(addr)
         .await
-        .unwrap();
 }
