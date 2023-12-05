@@ -95,9 +95,9 @@ func TestNewApricotProposalBlock(t *testing.T) {
 	require.Equal(parentID, blk.Parent())
 	require.Equal(height, blk.Height())
 
-	blkTxs := blk.Txs()
-	require.Len(blkTxs, 1)
 	expectedTxs := []*txs.Tx{proposalTx}
+
+	blkTxs := blk.Txs()
 	require.Equal(blkTxs, expectedTxs)
 	for i, blkTx := range blkTxs {
 		expectedTx := expectedTxs[i]
