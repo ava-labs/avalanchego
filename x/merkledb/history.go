@@ -181,7 +181,7 @@ func (th *trieHistory) getValueChanges(
 		for key, valueChange := range changes.values {
 			// The key is outside the range [start, end].
 			if (startKey.HasValue() && key.Less(startKey.Value())) ||
-				(end.HasValue() && key.Less(endKey.Value())) {
+				(end.HasValue() && key.Greater(endKey.Value())) {
 				continue
 			}
 
