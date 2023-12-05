@@ -132,17 +132,9 @@ func (e *ProposalTxPreference) RewardValidatorTx(tx *txs.RewardValidatorTx) erro
 		constants.PrimaryNetworkID,
 		nodeID,
 	)
-	if err == database.ErrNotFound {
-		// This can happen if this transaction is attempting to reward a
-		// validator that hasn't been moved from the pending validator set to
-		// the current validator set yet.
-		e.PrefersCommit = true
-		return nil
-	}
 	if err != nil {
-		// GetCurrentValidator can only return [ErrNotFound], or an unexpected
-		// error like a parsing error or internal DB error. For anything other
-		// than [ErrNotFound] the block can just be dropped.
+		// If this transaction is included into an invalid block where the
+		// staker has already been removed, we can just drop it.
 		return fmt.Errorf("%w %s: %w",
 			ErrStakerWithoutPrimaryNetworkValidator,
 			nodeID,
@@ -173,9 +165,8 @@ func (e *ProposalTxPreference) RewardValidatorTx(tx *txs.RewardValidatorTx) erro
 		primaryNetworkValidator.StartTime,
 	)
 	if err != nil {
-		// This should only happen due to unexpected internal DB errors because
-		// we have already confirmed that this node is a current primary network
-		// validator.
+		// If this transaction is included into an invalid block where the
+		// staker has already been removed, we can just drop it.
 		return fmt.Errorf("%w %s: %w",
 			ErrCalculatingUptime,
 			nodeID,
