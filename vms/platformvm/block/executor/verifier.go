@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -26,7 +25,6 @@ var (
 	errIncorrectBlockHeight                       = errors.New("incorrect block height")
 	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
 	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
-	errConflictingParentTxs                       = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
 )
 
@@ -203,7 +201,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	if err := v.verifyUniqueInputs(b, atomicExecutor.Inputs); err != nil {
+	if err := v.verifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
 		return err
 	}
 
@@ -441,7 +439,7 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
+	if err := v.verifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
 		return err
 	}
 
@@ -460,29 +458,4 @@ func (v *verifier) standardBlock(
 
 	v.Mempool.Remove(b.Transactions)
 	return nil
-}
-
-// verifyUniqueInputs verifies that the inputs of the given block are not
-// duplicated in any of the parent blocks pinned in memory.
-func (v *verifier) verifyUniqueInputs(block block.Block, inputs set.Set[ids.ID]) error {
-	if inputs.Len() == 0 {
-		return nil
-	}
-
-	// Check for conflicts in ancestors.
-	for {
-		parentID := block.Parent()
-		parentState, ok := v.blkIDToState[parentID]
-		if !ok {
-			// The parent state isn't pinned in memory.
-			// This means the parent must be accepted already.
-			return nil
-		}
-
-		if parentState.inputs.Overlaps(inputs) {
-			return errConflictingParentTxs
-		}
-
-		block = parentState.statelessBlock
-	}
 }
