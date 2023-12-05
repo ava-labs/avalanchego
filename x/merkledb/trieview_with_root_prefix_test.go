@@ -40,7 +40,7 @@ func TestTrieViewWithRootPrefix(t *testing.T) {
 	}
 
 	for _, prefix := range prefixes {
-		parent := tvs[len(tvs)-1]
+		parent := tvs[0]
 		batchOps := []database.BatchOp{}
 		for i, key := range keys {
 			batchOps = append(
@@ -70,7 +70,7 @@ func TestTrieViewWithRootPrefix(t *testing.T) {
 		require.Equal(prefixAltRoots[i], prefixAltRoots[i-1])
 	}
 
-	parent := tvs[len(tvs)-1]
+	parent := tvs[0]
 	batchOps := []database.BatchOp{}
 	for i, prefix := range prefixes {
 		batchOps = append(

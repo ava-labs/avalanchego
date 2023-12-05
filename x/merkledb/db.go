@@ -1166,19 +1166,16 @@ func (db *merkleDB) VerifyChangeProof(
 // Invalidates and removes any child views that aren't [exception].
 // Assumes [db.lock] is held.
 func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
-	isTrackedView := false
-
+	childViews := make([]*trieView, 0, defaultPreallocationSize)
 	for _, childView := range db.childViews {
-		if childView != exception {
+		if childView != exception &&
+			(exception == nil || childView.rootPrefix.HasPrefix(exception.rootPrefix)) {
 			childView.invalidate()
 		} else {
-			isTrackedView = true
+			childViews = append(childViews, childView)
 		}
 	}
-	db.childViews = make([]*trieView, 0, defaultPreallocationSize)
-	if isTrackedView {
-		db.childViews = append(db.childViews, exception)
-	}
+	db.childViews = childViews
 }
 
 func (db *merkleDB) initializeRoot() error {
