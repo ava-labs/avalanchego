@@ -217,17 +217,14 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	}()
 
 	// Build some post-Fork blocks....
-
-	// build blk1
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -235,7 +232,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	// build blk2
+	// prepare build of next block
 	require.NoError(builtBlk1.Verify(context.Background()))
 	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk1.ID()))
 	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk1, 0))
@@ -245,10 +242,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreBlk1.ID(),
-		HeightV:    coreBlk1.Height() + 1,
-		TimestampV: coreBlk1.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreBlk1.ID(),
+		HeightV: coreBlk1.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -256,20 +252,19 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	// buid blk3
+	// prepare build of next block
 	require.NoError(builtBlk2.Verify(context.Background()))
 	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk2.ID()))
-	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk1, 0))
+	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk2, 0))
 
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    coreBlk2.ID(),
-		HeightV:    coreBlk2.Height() + 1,
-		TimestampV: coreBlk2.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: coreBlk2.ID(),
+		HeightV: coreBlk2.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -446,10 +441,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    coreBlk2.ID(),
-		HeightV:    coreBlk2.Height() + 1,
-		TimestampV: postForkTime,
+		BytesV:  []byte{3},
+		ParentV: coreBlk2.ID(),
+		HeightV: coreBlk2.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -468,10 +462,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{4},
-		ParentV:    coreBlk3.ID(),
-		HeightV:    coreBlk3.Height() + 1,
-		TimestampV: postForkTime,
+		BytesV:  []byte{4},
+		ParentV: coreBlk3.ID(),
+		HeightV: coreBlk3.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk4, nil
@@ -591,10 +584,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -618,10 +610,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreBlk1.ID(),
-		HeightV:    coreBlk1.Height() + 1,
-		TimestampV: coreBlk1.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreBlk1.ID(),
+		HeightV: coreBlk1.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -645,10 +636,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    coreBlk2.ID(),
-		HeightV:    coreBlk2.Height() + 1,
-		TimestampV: coreBlk2.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: coreBlk2.ID(),
+		HeightV: coreBlk2.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -710,18 +700,15 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
 
-	// Build some post-Fork blocks
-
-	// build block 1
+	// Build some post-Fork blocks....
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -729,7 +716,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	// build block 2
+	// prepare build of next block
 	require.NoError(builtBlk1.Verify(context.Background()))
 	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk1.ID()))
 	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk1, 0))
@@ -739,15 +726,13 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreBlk1.ID(),
-		HeightV:    coreBlk1.Height() + 1,
-		TimestampV: coreBlk1.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreBlk1.ID(),
+		HeightV: coreBlk1.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
 	}
-
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -761,10 +746,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    coreBlk2.ID(),
-		HeightV:    coreBlk2.Height() + 1,
-		TimestampV: coreBlk2.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: coreBlk2.ID(),
+		HeightV: coreBlk2.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -898,10 +882,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    coreBlk2.ID(),
-		HeightV:    coreBlk2.Height() + 1,
-		TimestampV: postForkTime,
+		BytesV:  []byte{3},
+		ParentV: coreBlk2.ID(),
+		HeightV: coreBlk2.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -920,10 +903,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{4},
-		ParentV:    coreBlk3.ID(),
-		HeightV:    coreBlk3.Height() + 1,
-		TimestampV: postForkTime,
+		BytesV:  []byte{4},
+		ParentV: coreBlk3.ID(),
+		HeightV: coreBlk3.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk4, nil
