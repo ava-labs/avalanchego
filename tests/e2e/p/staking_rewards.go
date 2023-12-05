@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -43,13 +43,13 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
 			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
-			require.Equal(testnet.DefaultMinStakeDuration, minStakeDuration)
+			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
 		ginkgo.By("adding alpha node, whose uptime should result in a staking reward")
-		alphaNode := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
+		alphaNode := e2e.AddEphemeralNode(network, tmpnet.FlagsMap{})
 		ginkgo.By("adding beta node, whose uptime should not result in a staking reward")
-		betaNode := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
+		betaNode := e2e.AddEphemeralNode(network, tmpnet.FlagsMap{})
 
 		// Wait to check health until both nodes have started to minimize the duration
 		// required for both nodes to report healthy.
@@ -103,11 +103,17 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
+		pvmClient := platformvm.NewClient(alphaNode.GetProcessContext().URI)
+
 		const (
 			delegationPercent = 0.10 // 10%
 			delegationShare   = reward.PercentDenominator * delegationPercent
 			weight            = 2_000 * units.Avax
 		)
+
+		ginkgo.By("retrieving supply before inserting validators")
+		supplyAtValidatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
+		require.NoError(err)
 
 		alphaValidatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		alphaValidatorEndTime := alphaValidatorStartTime.Add(validationPeriod)
@@ -171,6 +177,10 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
+		ginkgo.By("retrieving supply before inserting delegators")
+		supplyAtDelegatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
+		require.NoError(err)
+
 		gammaDelegatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		tests.Outf("gamma delegation period starting at: %v\n", gammaDelegatorStartTime)
 
@@ -227,8 +237,6 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		// delegation periods are shorter than the validation periods.
 		time.Sleep(time.Until(betaValidatorEndTime))
 
-		pvmClient := platformvm.NewClient(alphaNode.GetProcessContext().URI)
-
 		ginkgo.By("waiting until the alpha and beta nodes are no longer validators")
 		e2e.Eventually(func() bool {
 			validators, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PrimaryNetworkID, nil)
@@ -270,11 +278,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		require.Len(rewardBalances, len(rewardKeys))
 
 		ginkgo.By("determining expected validation and delegation rewards")
-		currentSupply, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
-		require.NoError(err)
 		calculator := reward.NewCalculator(rewardConfig)
-		expectedValidationReward := calculator.Calculate(validationPeriod, weight, currentSupply)
-		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, currentSupply)
+		expectedValidationReward := calculator.Calculate(validationPeriod, weight, supplyAtValidatorsStart)
+		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, supplyAtDelegatorsStart)
 		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		ginkgo.By("checking expected rewards against actual rewards")

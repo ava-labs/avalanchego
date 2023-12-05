@@ -205,8 +205,8 @@ type ManagerConfig struct {
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 	Metrics          metrics.MultiGatherer
 
-	AcceptedFrontierGossipFrequency time.Duration
-	ConsensusAppConcurrency         int
+	FrontierPollFrequency   time.Duration
+	ConsensusAppConcurrency int
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -824,7 +824,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.AcceptedFrontierGossipFrequency,
+		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
@@ -859,13 +859,14 @@ func (m *manager) createAvalancheChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	snowmanEngineConfig := smeng.Config{
-		Ctx:           ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            vmWrappingProposerVM,
-		Sender:        snowmanMessageSender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     snowmanConsensus,
+		Ctx:                 ctx,
+		AllGetsServer:       snowGetHandler,
+		VM:                  vmWrappingProposerVM,
+		Sender:              snowmanMessageSender,
+		Validators:          vdrs,
+		ConnectedValidators: connectedValidators,
+		Params:              consensusParams,
+		Consensus:           snowmanConsensus,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
 	if err != nil {
@@ -878,21 +879,17 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		Config: common.Config{
-			Ctx:                            ctx,
-			Beacons:                        vdrs,
-			SampleK:                        sampleK,
-			Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-			StartupTracker:                 startupTracker,
-			Sender:                         snowmanMessageSender,
-			BootstrapTracker:               sb,
-			Timer:                          h,
-			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-			SharedCfg:                      &common.SharedConfig{},
-		},
-		AllGetsServer: snowGetHandler,
-		Blocked:       blockBlocker,
-		VM:            vmWrappingProposerVM,
+		AllGetsServer:                  snowGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        vdrs,
+		SampleK:                        sampleK,
+		StartupTracker:                 startupTracker,
+		Sender:                         snowmanMessageSender,
+		BootstrapTracker:               sb,
+		Timer:                          h,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		Blocked:                        blockBlocker,
+		VM:                             vmWrappingProposerVM,
 	}
 	var snowmanBootstrapper common.BootstrapableEngine
 	snowmanBootstrapper, err = smbootstrap.New(
@@ -1170,7 +1167,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.AcceptedFrontierGossipFrequency,
+		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		subnetConnector,
@@ -1205,14 +1202,15 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:           ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            vm,
-		Sender:        messageSender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     consensus,
-		PartialSync:   m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
+		Ctx:                 ctx,
+		AllGetsServer:       snowGetHandler,
+		VM:                  vm,
+		Sender:              messageSender,
+		Validators:          vdrs,
+		ConnectedValidators: connectedValidators,
+		Params:              consensusParams,
+		Consensus:           consensus,
+		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
@@ -1224,24 +1222,19 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// create bootstrap gear
-	alpha := bootstrapWeight/2 + 1 // must be > 50%
 	bootstrapCfg := smbootstrap.Config{
-		Config: common.Config{
-			Ctx:                            ctx,
-			Beacons:                        beacons,
-			SampleK:                        sampleK,
-			StartupTracker:                 startupTracker,
-			Alpha:                          alpha,
-			Sender:                         messageSender,
-			BootstrapTracker:               sb,
-			Timer:                          h,
-			AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
-			SharedCfg:                      &common.SharedConfig{},
-		},
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
-		Bootstrapped:  bootstrapFunc,
+		AllGetsServer:                  snowGetHandler,
+		Ctx:                            ctx,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		StartupTracker:                 startupTracker,
+		Sender:                         messageSender,
+		BootstrapTracker:               sb,
+		Timer:                          h,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		Blocked:                        blocked,
+		VM:                             vm,
+		Bootstrapped:                   bootstrapFunc,
 	}
 	var bootstrapper common.BootstrapableEngine
 	bootstrapper, err = smbootstrap.New(
@@ -1264,7 +1257,7 @@ func (m *manager) createSnowmanChain(
 		messageSender,
 		beacons,
 		sampleK,
-		alpha,
+		bootstrapWeight/2+1, // must be > 50%
 		m.StateSyncBeacons,
 		vm,
 	)

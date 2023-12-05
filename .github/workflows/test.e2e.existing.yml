@@ -1,4 +1,4 @@
-name: Test e2e with persistent network
+name: Test e2e with existing network
 
 on:
   push:
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  test_e2e_persistent:
+  test_e2e_existing:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
@@ -28,12 +28,12 @@ jobs:
       - name: Build the avalanchego binary
         shell: bash
         run: ./scripts/build.sh -r
-      - name: Run e2e tests with persistent network
+      - name: Run e2e tests with existing network
         shell: bash
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.persistent.sh
-      - name: Upload testnet network dir
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+      - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: testnet-data
-          path: ~/.testnetctl/networks/1000
+          name: tmpnet-data
+          path: ~/.tmpnet/networks/1000
