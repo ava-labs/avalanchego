@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/bits"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -118,10 +119,10 @@ func (w *windower) ExpectedProposer(
 
 	var (
 		numToSample = 1
-		slot        = blockTime.Sub(parentBlockTime) / WindowDuration
-		seed        = chainHeight ^ w.chainSource ^ uint64(slot)
+		slot        = uint32(blockTime.Sub(parentBlockTime) / WindowDuration)
+		seed        = int64(chainHeight ^ w.chainSource ^ uint64(bits.Reverse32(slot)))
 	)
-	w.sampler.Seed(int64(seed))
+	w.sampler.Seed(seed)
 
 	indices, err := w.sampler.Sample(numToSample)
 	if err != nil {

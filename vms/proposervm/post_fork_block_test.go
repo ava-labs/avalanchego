@@ -374,6 +374,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: parentCoreBlk.ID(),
+		HeightV: parentBlk.Height() + 1,
 		BytesV:  []byte{2},
 	}
 	childBlk := postForkBlock{
@@ -465,6 +466,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
+
 		require.NoError(childBlk.Verify(context.Background()))
 	}
 
@@ -481,6 +483,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
+
 		require.NoError(childBlk.Verify(context.Background()))
 	}
 
@@ -499,6 +502,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
+
 		err = childBlk.Verify(context.Background())
 		require.ErrorIs(err, errTimeTooAdvanced)
 	}
@@ -575,6 +579,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: parentCoreBlk.ID(),
+		HeightV: parentBlk.Height() + 1,
 		BytesV:  []byte{2},
 	}
 	childBlk := postForkBlock{
