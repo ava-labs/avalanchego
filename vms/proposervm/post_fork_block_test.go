@@ -649,7 +649,6 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
 		)
-
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
