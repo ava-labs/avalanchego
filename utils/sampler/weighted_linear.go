@@ -19,8 +19,8 @@ type weightedLinearElement struct {
 }
 
 // Note that this sorts in order of decreasing cumulative weight.
-func (e weightedLinearElement) Less(other weightedLinearElement) bool {
-	return e.cumulativeWeight > other.cumulativeWeight
+func (e weightedLinearElement) Compare(other weightedLinearElement) int {
+	return utils.Compare(other.cumulativeWeight, e.cumulativeWeight)
 }
 
 // Sampling is performed by executing a linear search over the provided elements
