@@ -130,8 +130,8 @@ func merkleSubnetOwnersKey(subnetID ids.ID) []byte {
 }
 
 func merkleTxKey(txID ids.ID) []byte {
-	key := make([]byte, len(txsSectionPrefix)+ids.IDLen)
-	copy(key, txsSectionPrefix)
-	copy(key[len(txsSectionPrefix):], txID[:])
+	key := make([]byte, len(merkleTxsPrefix)+ids.IDLen)
+	copy(key, merkleTxsPrefix)
+	copy(key[len(merkleTxsPrefix):], txID[:])
 	return key
 }

@@ -63,11 +63,12 @@ var (
 	merkleSingletonPrefix   = []byte{0x01}
 	merkleBlockPrefix       = []byte{0x02}
 	merkleBlockIDsPrefix    = []byte{0x03}
-	merkleIndexUTXOsPrefix  = []byte{0x04} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix     = []byte{0x05} // locally measured uptimes
-	merkleWeightDiffPrefix  = []byte{0x06} // non-merkleized validators weight diff. TODO: should we merkleize them?
-	merkleBlsKeyDiffPrefix  = []byte{0x07}
-	merkleRewardUtxosPrefix = []byte{0x08}
+	merkleTxsPrefix         = []byte{0x04}
+	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
+	merkleWeightDiffPrefix  = []byte{0x07} // non-merkleized validators weight diff. TODO: should we merkleize them?
+	merkleBlsKeyDiffPrefix  = []byte{0x08}
+	merkleRewardUtxosPrefix = []byte{0x09}
 
 	initializedKey         = []byte{0x00}
 	lastAcceptedBlockIDKey = []byte{0x01}
@@ -85,7 +86,6 @@ var (
 	pendingStakersSectionPrefix     = []byte{0x06}
 	delegateeRewardsPrefix          = []byte{0x07}
 	subnetOwnersPrefix              = []byte{0x08}
-	txsSectionPrefix                = []byte{0x09}
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -370,7 +370,7 @@ func newState(
 		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
 		flatValidatorPublicKeyDiffsDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
 		rewardUTXOsDB                 = prefixdb.New(merkleRewardUtxosPrefix, baseDB)
-		txDB                          = prefixdb.New(txsSectionPrefix, baseDB)
+		txDB                          = prefixdb.New(merkleTxsPrefix, baseDB)
 	)
 
 	noOpTracer, err := trace.New(trace.Config{Enabled: false})

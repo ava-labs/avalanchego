@@ -146,7 +146,7 @@ func TestMerkleTxKey(t *testing.T) {
 	txID := ids.GenerateTestID()
 
 	key := merkleTxKey(txID)
-	require.Len(key, len(txsSectionPrefix)+len(txID[:]))
-	require.Equal(txsSectionPrefix, key[:len(txsSectionPrefix)])
-	require.Equal(txID[:], key[len(txsSectionPrefix):])
+	require.Len(key, len(merkleTxsPrefix)+len(txID[:]))
+	require.Equal(merkleTxsPrefix, key[:len(merkleTxsPrefix)])
+	require.Equal(txID[:], key[len(merkleTxsPrefix):])
 }
