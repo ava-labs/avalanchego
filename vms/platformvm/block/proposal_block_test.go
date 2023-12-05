@@ -14,80 +14,65 @@ import (
 )
 
 func TestNewBanffProposalBlock(t *testing.T) {
-	require := require.New(t)
-
 	timestamp := time.Now().Truncate(time.Second)
 	parentID := ids.GenerateTestID()
 	height := uint64(1337)
 	proposalTx, err := testProposalTx()
-	require.NoError(err)
-
-	blk, err := NewBanffProposalBlock(
-		timestamp,
-		parentID,
-		height,
-		proposalTx,
-		[]*txs.Tx{},
-	)
-	require.NoError(err)
-
-	require.NotEmpty(blk.Bytes())
-	require.Equal(parentID, blk.Parent())
-	require.Equal(height, blk.Height())
-	require.Equal(timestamp, blk.Timestamp())
-
-	blkTxs := blk.Txs()
-	require.Len(blkTxs, 1)
-	l := len(blk.Transactions)
-	expectedTxs := make([]*txs.Tx, l+1)
-	copy(expectedTxs, blk.Transactions)
-	expectedTxs[l] = blk.Tx
-	require.Equal(expectedTxs, []*txs.Tx{proposalTx})
-	for i, blkTx := range blkTxs {
-		expectedTx := expectedTxs[i]
-		require.NotEmpty(blkTx.Bytes())
-		require.NotEqual(ids.Empty, blkTx.ID())
-		require.Equal(expectedTx.Bytes(), blkTx.Bytes())
-	}
-}
-
-func TestNewBanffProposalBlockWithDecisionTxs(t *testing.T) {
-	require := require.New(t)
-
-	timestamp := time.Now().Truncate(time.Second)
-	parentID := ids.GenerateTestID()
-	height := uint64(1337)
-	proposalTx, err := testProposalTx()
-	require.NoError(err)
+	require.NoError(t, err)
 	decisionTxs, err := testDecisionTxs()
-	require.NoError(err)
+	require.NoError(t, err)
 
-	blk, err := NewBanffProposalBlock(
-		timestamp,
-		parentID,
-		height,
-		proposalTx,
-		decisionTxs,
-	)
-	require.NoError(err)
+	type test struct {
+		name        string
+		proposalTx  *txs.Tx
+		decisionTxs []*txs.Tx
+	}
 
-	require.NotEmpty(blk.Bytes())
-	require.Equal(parentID, blk.Parent())
-	require.Equal(height, blk.Height())
-	require.Equal(timestamp, blk.Timestamp())
+	tests := []test{
+		{
+			name:        "no decision txs",
+			proposalTx:  proposalTx,
+			decisionTxs: []*txs.Tx{},
+		},
+		{
+			name:        "decision txs",
+			proposalTx:  proposalTx,
+			decisionTxs: decisionTxs,
+		},
+	}
 
-	blkTxs := blk.Txs()
-	require.Len(blkTxs, len(decisionTxs)+1)
-	l := len(blk.Transactions)
-	expectedTxs := make([]*txs.Tx, l+1)
-	copy(expectedTxs, blk.Transactions)
-	expectedTxs[l] = blk.Tx
-	require.Equal(expectedTxs, blkTxs)
-	for i, blkTx := range blkTxs {
-		expectedTx := expectedTxs[i]
-		require.NotEmpty(blkTx.Bytes())
-		require.NotEqual(ids.Empty, blkTx.ID())
-		require.Equal(expectedTx.Bytes(), blkTx.Bytes())
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			blk, err := NewBanffProposalBlock(
+				timestamp,
+				parentID,
+				height,
+				test.proposalTx,
+				test.decisionTxs,
+			)
+			require.NoError(err)
+
+			require.NotEmpty(blk.Bytes())
+			require.Equal(parentID, blk.Parent())
+			require.Equal(height, blk.Height())
+			require.Equal(timestamp, blk.Timestamp())
+
+			l := len(blk.Transactions)
+			expectedTxs := make([]*txs.Tx, l+1)
+			copy(expectedTxs, blk.Transactions)
+			expectedTxs[l] = blk.Tx
+
+			blkTxs := blk.Txs()
+			require.Equal(expectedTxs, blkTxs)
+			for i, blkTx := range blkTxs {
+				expectedTx := expectedTxs[i]
+				require.NotEmpty(blkTx.Bytes())
+				require.NotEqual(ids.Empty, blkTx.ID())
+				require.Equal(expectedTx.Bytes(), blkTx.Bytes())
+			}
+		})
 	}
 }
 
