@@ -179,21 +179,6 @@ func (mr *MockChainMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockChain)(nil).DeleteUTXO), arg0)
 }
 
-// GetChains mocks base method.
-func (m *MockChain) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetChains", arg0)
-	ret0, _ := ret[0].([]*txs.Tx)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetChains indicates an expected call of GetChains.
-func (mr *MockChainMockRecorder) GetChains(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChains", reflect.TypeOf((*MockChain)(nil).GetChains), arg0)
-}
-
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockChain) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -314,21 +299,6 @@ func (mr *MockChainMockRecorder) GetPendingValidator(arg0, arg1 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockChain)(nil).GetPendingValidator), arg0, arg1)
 }
 
-// GetRewardUTXOs mocks base method.
-func (m *MockChain) GetRewardUTXOs(arg0 ids.ID) ([]*avax.UTXO, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRewardUTXOs", arg0)
-	ret0, _ := ret[0].([]*avax.UTXO)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRewardUTXOs indicates an expected call of GetRewardUTXOs.
-func (mr *MockChainMockRecorder) GetRewardUTXOs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockChain)(nil).GetRewardUTXOs), arg0)
-}
-
 // GetSubnetOwner mocks base method.
 func (m *MockChain) GetSubnetOwner(arg0 ids.ID) (fx.Owner, error) {
 	m.ctrl.T.Helper()
@@ -357,21 +327,6 @@ func (m *MockChain) GetSubnetTransformation(arg0 ids.ID) (*txs.Tx, error) {
 func (mr *MockChainMockRecorder) GetSubnetTransformation(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetTransformation", reflect.TypeOf((*MockChain)(nil).GetSubnetTransformation), arg0)
-}
-
-// GetSubnets mocks base method.
-func (m *MockChain) GetSubnets() ([]*txs.Tx, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnets")
-	ret0, _ := ret[0].([]*txs.Tx)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetSubnets indicates an expected call of GetSubnets.
-func (mr *MockChainMockRecorder) GetSubnets() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnets", reflect.TypeOf((*MockChain)(nil).GetSubnets))
 }
 
 // GetTimestamp mocks base method.
@@ -701,21 +656,6 @@ func (mr *MockDiffMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockDiff)(nil).DeleteUTXO), arg0)
 }
 
-// GetChains mocks base method.
-func (m *MockDiff) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetChains", arg0)
-	ret0, _ := ret[0].([]*txs.Tx)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetChains indicates an expected call of GetChains.
-func (mr *MockDiffMockRecorder) GetChains(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChains", reflect.TypeOf((*MockDiff)(nil).GetChains), arg0)
-}
-
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockDiff) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -836,21 +776,6 @@ func (mr *MockDiffMockRecorder) GetPendingValidator(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockDiff)(nil).GetPendingValidator), arg0, arg1)
 }
 
-// GetRewardUTXOs mocks base method.
-func (m *MockDiff) GetRewardUTXOs(arg0 ids.ID) ([]*avax.UTXO, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRewardUTXOs", arg0)
-	ret0, _ := ret[0].([]*avax.UTXO)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRewardUTXOs indicates an expected call of GetRewardUTXOs.
-func (mr *MockDiffMockRecorder) GetRewardUTXOs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockDiff)(nil).GetRewardUTXOs), arg0)
-}
-
 // GetSubnetOwner mocks base method.
 func (m *MockDiff) GetSubnetOwner(arg0 ids.ID) (fx.Owner, error) {
 	m.ctrl.T.Helper()
@@ -879,21 +804,6 @@ func (m *MockDiff) GetSubnetTransformation(arg0 ids.ID) (*txs.Tx, error) {
 func (mr *MockDiffMockRecorder) GetSubnetTransformation(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetTransformation", reflect.TypeOf((*MockDiff)(nil).GetSubnetTransformation), arg0)
-}
-
-// GetSubnets mocks base method.
-func (m *MockDiff) GetSubnets() ([]*txs.Tx, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnets")
-	ret0, _ := ret[0].([]*txs.Tx)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetSubnets indicates an expected call of GetSubnets.
-func (mr *MockDiffMockRecorder) GetSubnets() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnets", reflect.TypeOf((*MockDiff)(nil).GetSubnets))
 }
 
 // GetTimestamp mocks base method.
