@@ -63,7 +63,7 @@ var (
 	merkleSingletonPrefix   = []byte{0x01}
 	merkleBlockPrefix       = []byte{0x02}
 	merkleBlockIDsPrefix    = []byte{0x03}
-	merkleTxPrefix          = []byte{0x04}
+	merkleTxsPrefix         = []byte{0x04}
 	merkleIndexUTXOsPrefix  = []byte{0x05} // to serve UTXOIDs(addr)
 	merkleUptimesPrefix     = []byte{0x06} // locally measured uptimes
 	merkleWeightDiffPrefix  = []byte{0x07} // non-merkleized validators weight diff. TODO: should we merkleize them?
@@ -277,7 +277,6 @@ type state struct {
 	// FIND a way to reduce use of these. No use in verification of addedTxs
 	// a limited windows to support APIs
 	addedTxs map[ids.ID]*txAndStatus // map of txID -> {*txs.Tx, Status}
-	txDB     database.Database
 
 	indexedUTXOsDB database.Database
 
@@ -365,7 +364,6 @@ func newState(
 		singletonDB                   = prefixdb.New(merkleSingletonPrefix, baseDB)
 		blockDB                       = prefixdb.New(merkleBlockPrefix, baseDB)
 		blockIDsDB                    = prefixdb.New(merkleBlockIDsPrefix, baseDB)
-		txDB                          = prefixdb.New(merkleTxPrefix, baseDB)
 		indexedUTXOsDB                = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
 		localUptimesDB                = prefixdb.New(merkleUptimesPrefix, baseDB)
 		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
@@ -425,7 +423,6 @@ func newState(
 		blockIDDB:     blockIDsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
-		txDB:     txDB,
 
 		indexedUTXOsDB: indexedUTXOsDB,
 
@@ -640,7 +637,8 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 		return tx.tx, tx.status, nil
 	}
 
-	txBytes, err := s.txDB.Get(txID[:])
+	key := merkleTxKey(txID)
+	txBytes, err := s.merkleDB.Get(key)
 	if err != nil {
 		return nil, status.Unknown, err
 	}
@@ -1189,7 +1187,6 @@ func (s *state) Close() error {
 		s.flatValidatorPublicKeyDiffsDB.Close(),
 		s.localUptimesDB.Close(),
 		s.indexedUTXOsDB.Close(),
-		s.txDB.Close(),
 		s.blockDB.Close(),
 		s.blockIDDB.Close(),
 		s.merkleDB.Close(),
@@ -1635,7 +1632,8 @@ func (s *state) writeTxs() error {
 		// Note: Evict is used rather than Put here because stx may end up
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
+		key := merkleTxKey(txID)
+		if err := s.merkleDB.Put(key, txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
