@@ -193,7 +193,7 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	shouldBuildUnsignedBlock, err := p.shouldBuildBlock(
+	buildUnsigned, err := p.shouldBuildUnsignedBlock(
 		ctx,
 		parentID,
 		parentTimestamp,
@@ -218,7 +218,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if shouldBuildUnsignedBlock {
+	if buildUnsigned {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
@@ -328,7 +328,7 @@ func (p *postForkCommonComponents) verifyBlockDelay(
 	return delay, nil
 }
 
-func (p *postForkCommonComponents) shouldBuildBlock(
+func (p *postForkCommonComponents) shouldBuildUnsignedBlock(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
