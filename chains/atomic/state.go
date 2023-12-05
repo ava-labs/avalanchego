@@ -8,11 +8,12 @@ import (
 	"errors"
 	"fmt"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -207,7 +208,7 @@ func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int)
 	lastKey := startKey
 	// Iterate over the traits in order appending all of the keys that possess
 	// the given [traits].
-	utils.SortBytes(traits)
+	slices.SortFunc(traits, bytes.Compare)
 	for _, trait := range traits {
 		switch bytes.Compare(trait, startTrait) {
 		case -1:
