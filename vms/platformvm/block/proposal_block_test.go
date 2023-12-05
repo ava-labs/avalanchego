@@ -59,10 +59,10 @@ func TestNewBanffProposalBlock(t *testing.T) {
 			require.Equal(height, blk.Height())
 			require.Equal(timestamp, blk.Timestamp())
 
-			l := len(blk.Transactions)
+			l := len(test.decisionTxs)
 			expectedTxs := make([]*txs.Tx, l+1)
-			copy(expectedTxs, blk.Transactions)
-			expectedTxs[l] = blk.Tx
+			copy(expectedTxs, test.decisionTxs)
+			expectedTxs[l] = test.proposalTx
 
 			blkTxs := blk.Txs()
 			require.Equal(expectedTxs, blkTxs)
