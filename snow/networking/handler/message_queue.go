@@ -183,7 +183,6 @@ func (m *messageQueue) Shutdown() {
 		msgAndCtx, _ := m.msgAndCtxs.PopLeft()
 		msgAndCtx.msg.OnFinishedHandling()
 	}
-	m.msgAndCtxs = nil
 	m.nodeToUnprocessedMsgs = nil
 
 	// Update metrics
