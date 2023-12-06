@@ -291,6 +291,8 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	// Update the state if this tx is committed
 	e.OnCommitState.SetTimestamp(newChainTime)
 	changes.Apply(e.OnCommitState)
+
+	// Note that state doesn't change if this proposal is aborted
 	return nil
 }
 
