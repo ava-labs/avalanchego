@@ -205,18 +205,9 @@ func (b *builder) maybeIssueEmptyBlock() {
 	if b.nextStakerChangeTime.After(now) {
 		// [nextStakerChangeTime] is in the future, no need to advance time.
 		waitTime := b.nextStakerChangeTime.Sub(now)
-		ctx.Log.Debug("setting next scheduled event from maybeIssueEmptyBlock",
-			zap.Time("nextEventTime", b.nextStakerChangeTime),
-			zap.Duration("timeUntil", waitTime),
-		)
 		b.timer.SetTimeoutIn(waitTime)
 		return
 	}
-
-	ctx.Log.Debug("issuing empty block to advance time",
-		zap.Time("now", now),
-		zap.Time("nextStakerChangeTime", b.nextStakerChangeTime),
-	)
 
 	// Block needs to be issued to advance time.
 	b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
