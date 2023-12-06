@@ -103,11 +103,17 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
+		pvmClient := platformvm.NewClient(alphaNode.GetProcessContext().URI)
+
 		const (
 			delegationPercent = 0.10 // 10%
 			delegationShare   = reward.PercentDenominator * delegationPercent
 			weight            = 2_000 * units.Avax
 		)
+
+		ginkgo.By("retrieving supply before inserting validators")
+		supplyAtValidatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
+		require.NoError(err)
 
 		alphaValidatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		alphaValidatorEndTime := alphaValidatorStartTime.Add(validationPeriod)
@@ -171,6 +177,10 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
+		ginkgo.By("retrieving supply before inserting delegators")
+		supplyAtDelegatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
+		require.NoError(err)
+
 		gammaDelegatorStartTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
 		tests.Outf("gamma delegation period starting at: %v\n", gammaDelegatorStartTime)
 
@@ -227,8 +237,6 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		// delegation periods are shorter than the validation periods.
 		time.Sleep(time.Until(betaValidatorEndTime))
 
-		pvmClient := platformvm.NewClient(alphaNode.GetProcessContext().URI)
-
 		ginkgo.By("waiting until the alpha and beta nodes are no longer validators")
 		e2e.Eventually(func() bool {
 			validators, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PrimaryNetworkID, nil)
@@ -270,11 +278,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		require.Len(rewardBalances, len(rewardKeys))
 
 		ginkgo.By("determining expected validation and delegation rewards")
-		currentSupply, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
-		require.NoError(err)
 		calculator := reward.NewCalculator(rewardConfig)
-		expectedValidationReward := calculator.Calculate(validationPeriod, weight, currentSupply)
-		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, currentSupply)
+		expectedValidationReward := calculator.Calculate(validationPeriod, weight, supplyAtValidatorsStart)
+		potentialDelegationReward := calculator.Calculate(delegationPeriod, weight, supplyAtDelegatorsStart)
 		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		ginkgo.By("checking expected rewards against actual rewards")
