@@ -180,6 +180,21 @@ func (mr *MockChainMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockChain)(nil).DeleteUTXO), arg0)
 }
 
+// GetChainSubnet mocks base method.
+func (m *MockChain) GetChainSubnet(arg0 ids.ID) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChainSubnet", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetChainSubnet indicates an expected call of GetChainSubnet.
+func (mr *MockChainMockRecorder) GetChainSubnet(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainSubnet", reflect.TypeOf((*MockChain)(nil).GetChainSubnet), arg0)
+}
+
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockChain) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -655,6 +670,21 @@ func (m *MockDiff) DeleteUTXO(arg0 ids.ID) {
 func (mr *MockDiffMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockDiff)(nil).DeleteUTXO), arg0)
+}
+
+// GetChainSubnet mocks base method.
+func (m *MockDiff) GetChainSubnet(arg0 ids.ID) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChainSubnet", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetChainSubnet indicates an expected call of GetChainSubnet.
+func (mr *MockDiffMockRecorder) GetChainSubnet(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainSubnet", reflect.TypeOf((*MockDiff)(nil).GetChainSubnet), arg0)
 }
 
 // GetCurrentDelegatorIterator mocks base method.
@@ -1242,6 +1272,21 @@ func (m *MockState) GetBlockIDAtHeight(arg0 uint64) (ids.ID, error) {
 func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).GetBlockIDAtHeight), arg0)
+}
+
+// GetChainSubnet mocks base method.
+func (m *MockState) GetChainSubnet(arg0 ids.ID) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChainSubnet", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetChainSubnet indicates an expected call of GetChainSubnet.
+func (mr *MockStateMockRecorder) GetChainSubnet(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainSubnet", reflect.TypeOf((*MockState)(nil).GetChainSubnet), arg0)
 }
 
 // GetChains mocks base method.

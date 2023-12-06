@@ -1921,17 +1921,12 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 }
 
 func (s *Service) nodeValidates(blockchainID ids.ID) bool {
-	chainTx, _, err := s.vm.state.GetTx(blockchainID)
+	subnetID, err := s.vm.state.GetChainSubnet(blockchainID)
 	if err != nil {
 		return false
 	}
 
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-	if !ok {
-		return false
-	}
-
-	_, isValidator := s.vm.Validators.GetValidator(chain.SubnetID, s.vm.ctx.NodeID)
+	_, isValidator := s.vm.Validators.GetValidator(subnetID, s.vm.ctx.NodeID)
 	return isValidator
 }
 
@@ -1948,15 +1943,8 @@ func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.I
 		}
 	}
 
-	tx, _, err := state.GetTx(chainID)
-	if err == database.ErrNotFound {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	_, ok = tx.Unsigned.(*txs.CreateChainTx)
-	return ok, nil
+	_, err := state.GetChainSubnet(chainID)
+	return err == nil, err
 }
 
 // ValidatedByArgs is the arguments for calling ValidatedBy

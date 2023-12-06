@@ -118,6 +118,7 @@ type Chain interface {
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
 
 	AddChain(createChainTx *txs.Tx)
+	GetChainSubnet(chainID ids.ID) (ids.ID, error)
 
 	GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error)
 
@@ -993,6 +994,22 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 		chains = append(chains, createChainTxIntf)
 		s.chainCache.Put(subnetID, chains)
 	}
+}
+
+func (s *state) GetChainSubnet(chainID ids.ID) (ids.ID, error) {
+	chainTx, _, err := s.GetTx(chainID)
+	if err != nil {
+		return ids.Empty, fmt.Errorf(
+			"problem retrieving blockchain %q: %w",
+			chainID,
+			err,
+		)
+	}
+	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+	if !ok {
+		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
+	}
+	return chain.SubnetID, nil
 }
 
 func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {

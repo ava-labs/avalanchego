@@ -5,7 +5,6 @@ package validators
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -19,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -43,7 +40,7 @@ type Manager interface {
 }
 
 type State interface {
-	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
+	GetChainSubnet(chainID ids.ID) (ids.ID, error)
 
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
@@ -353,19 +350,7 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 		return constants.PrimaryNetworkID, nil
 	}
 
-	chainTx, _, err := m.state.GetTx(chainID)
-	if err != nil {
-		return ids.Empty, fmt.Errorf(
-			"problem retrieving blockchain %q: %w",
-			chainID,
-			err,
-		)
-	}
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-	if !ok {
-		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
-	}
-	return chain.SubnetID, nil
+	return m.state.GetChainSubnet(chainID)
 }
 
 func (m *manager) OnAcceptedBlockID(blkID ids.ID) {

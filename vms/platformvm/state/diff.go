@@ -349,6 +349,22 @@ func (d *diff) AddChain(createChainTx *txs.Tx) {
 	}
 }
 
+func (d *diff) GetChainSubnet(chainID ids.ID) (ids.ID, error) {
+	chainTx, _, err := d.GetTx(chainID)
+	if err != nil {
+		return ids.Empty, fmt.Errorf(
+			"problem retrieving blockchain %q: %w",
+			chainID,
+			err,
+		)
+	}
+	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+	if !ok {
+		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
+	}
+	return chain.SubnetID, nil
+}
+
 func (d *diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := d.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
