@@ -44,6 +44,7 @@ func TestRejectBlock(t *testing.T) {
 						},
 						Creds: []verify.Verifiable{},
 					},
+					[]*txs.Tx{},
 				)
 			},
 			rejectFunc: func(r *rejector, b block.Block) error {
