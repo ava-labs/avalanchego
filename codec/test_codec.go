@@ -1166,7 +1166,7 @@ func (t *textType) UnmarshalText(data []byte) error {
 		}
 		return nil
 	}
-	return errors.New("Invalid value")
+	return errors.New("invalid value")
 }
 
 func TestTypesWithTextEncoders(codec GeneralCodec, t testing.TB) {
@@ -1204,5 +1204,5 @@ func TestTypesWithTextEncoders(codec GeneralCodec, t testing.TB) {
 	bytes2[10] = 12
 	version, err = manager.Unmarshal(bytes2, &newValueFalse)
 	require.Equal(uint16(12), version)
-	require.Error(err)
+	require.NotEmpty(err)
 }

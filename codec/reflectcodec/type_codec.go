@@ -316,7 +316,7 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen, false /*=nullable*/, nil /*=typeStack*/)
 }
 
-func (c *genericCodec) customMarshal(value reflect.Value, p *wrappers.Packer) (bool, error) {
+func (*genericCodec) customMarshal(value reflect.Value, p *wrappers.Packer) (bool, error) {
 	if value.Type().Implements(binMarshalerType) {
 		marshaler := value.Interface().(encoding.BinaryMarshaler)
 		binary, err := marshaler.MarshalBinary()
@@ -583,7 +583,7 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	return nil
 }
 
-func (c *genericCodec) customUnmarshal(p *wrappers.Packer, value reflect.Value) (bool, error) {
+func (*genericCodec) customUnmarshal(p *wrappers.Packer, value reflect.Value) (bool, error) {
 	if value.Type().Implements(binUnmarshalerType) {
 		marshaler := value.Interface().(encoding.BinaryUnmarshaler)
 		bytes := p.UnpackBytes()
