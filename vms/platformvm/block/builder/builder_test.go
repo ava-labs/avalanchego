@@ -132,7 +132,7 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 
-	require.False(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
+	require.True(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }
 
 func TestGetNextStakerToReward(t *testing.T) {
@@ -398,6 +398,7 @@ func TestBuildBlock(t *testing.T) {
 					parentID,
 					height,
 					tx,
+					[]*txs.Tx{},
 				)
 				require.NoError(err)
 				return expectedBlk

@@ -70,10 +70,10 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		ids.Empty, // refer unknown parent
 		time.Time{},
 		0, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk = postForkBlock{
@@ -155,10 +155,10 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk := postForkBlock{
@@ -260,10 +260,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk := postForkBlock{
@@ -287,10 +287,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		beforeWinStart,
 		pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
@@ -305,10 +305,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		atWindowStart,
 		pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
@@ -322,10 +322,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		afterWindowStart,
 		pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
@@ -350,10 +350,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		afterSubWinEnd,
 		pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
@@ -431,10 +431,10 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk := postForkBlock{
@@ -611,10 +611,10 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	childProBlk := postForkBlock{
@@ -986,10 +986,10 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		postForkOracleBlk.ID(),
 		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
 		postForkOracleBlk.PChainHeight(),
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 
