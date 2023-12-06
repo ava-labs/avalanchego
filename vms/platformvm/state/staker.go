@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -139,6 +140,7 @@ type StakerColdAttributes struct {
 	Shares                 uint32
 	ValidationRewardsOwner fx.Owner
 	DelegationRewardsOwner fx.Owner
+	ProofOfPossession      *signer.ProofOfPossession
 
 	// delegators specific attributes
 	RewardsOwner fx.Owner

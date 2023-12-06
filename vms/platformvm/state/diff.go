@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -201,12 +202,20 @@ func (d *diff) GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, 
 	}
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
+		var pop *signer.ProofOfPossession
+		if staker, ok := uStakerTx.(*txs.AddPermissionlessValidatorTx); ok {
+			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
+				pop = s
+			}
+		}
+
 		return &StakerColdAttributes{
 			Stake:                  uStakerTx.Stake(),
 			Outputs:                uStakerTx.Outputs(),
 			Shares:                 uStakerTx.Shares(),
 			ValidationRewardsOwner: uStakerTx.ValidationRewardsOwner(),
 			DelegationRewardsOwner: uStakerTx.DelegationRewardsOwner(),
+			ProofOfPossession:      pop,
 		}, nil
 	case txs.DelegatorTx:
 		return &StakerColdAttributes{

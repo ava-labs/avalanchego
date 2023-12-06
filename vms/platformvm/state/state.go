@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -742,12 +743,20 @@ func (s *state) GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes,
 	}
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
+		var pop *signer.ProofOfPossession
+		if staker, ok := uStakerTx.(*txs.AddPermissionlessValidatorTx); ok {
+			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
+				pop = s
+			}
+		}
+
 		return &StakerColdAttributes{
 			Stake:                  uStakerTx.Stake(),
 			Outputs:                uStakerTx.Outputs(),
 			Shares:                 uStakerTx.Shares(),
 			ValidationRewardsOwner: uStakerTx.ValidationRewardsOwner(),
 			DelegationRewardsOwner: uStakerTx.DelegationRewardsOwner(),
+			ProofOfPossession:      pop,
 		}, nil
 	case txs.DelegatorTx:
 		return &StakerColdAttributes{

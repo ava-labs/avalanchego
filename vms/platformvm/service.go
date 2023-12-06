@@ -32,9 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -86,16 +84,7 @@ var (
 type Service struct {
 	vm                    *VM
 	addrManager           avax.AddressManager
-	stakerAttributesCache *cache.LRU[ids.ID, *stakerAttributes]
-}
-
-// All attributes are optional and may not be filled for each stakerTx.
-type stakerAttributes struct {
-	shares                 uint32
-	rewardsOwner           fx.Owner
-	validationRewardsOwner fx.Owner
-	delegationRewardsOwner fx.Owner
-	proofOfPossession      *signer.ProofOfPossession
+	stakerAttributesCache *cache.LRU[ids.ID, *state.StakerColdAttributes]
 }
 
 // GetHeight returns the height of the last accepted block
@@ -726,7 +715,7 @@ type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 }
 
-func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error) {
+func (s *Service) loadStakerTxAttributes(txID ids.ID) (*state.StakerColdAttributes, error) {
 	// Lookup tx from the cache first.
 	attr, found := s.stakerAttributesCache.Get(txID)
 	if found {
@@ -734,34 +723,9 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	}
 
 	// Tx not available in cache; pull it from disk and populate the cache.
-	tx, _, err := s.vm.state.GetTx(txID)
+	attr, err := s.vm.state.GetStakerColdAttributes(txID)
 	if err != nil {
 		return nil, err
-	}
-
-	switch stakerTx := tx.Unsigned.(type) {
-	case txs.ValidatorTx:
-		var pop *signer.ProofOfPossession
-		if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-				pop = s
-			}
-		}
-
-		attr = &stakerAttributes{
-			shares:                 stakerTx.Shares(),
-			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
-			delegationRewardsOwner: stakerTx.DelegationRewardsOwner(),
-			proofOfPossession:      pop,
-		}
-
-	case txs.DelegatorTx:
-		attr = &stakerAttributes{
-			rewardsOwner: stakerTx.RewardsOwner(),
-		}
-
-	default:
-		return nil, fmt.Errorf("unexpected staker tx type %T", tx.Unsigned)
 	}
 
 	s.stakerAttributesCache.Put(txID, attr)
@@ -856,7 +820,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				return err
 			}
 
-			shares := attr.shares
+			shares := attr.Shares
 			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
 			uptime, err := s.getAPIUptime(currentStaker)
@@ -869,14 +833,14 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
 			)
-			validationOwner, ok := attr.validationRewardsOwner.(*secp256k1fx.OutputOwners)
+			validationOwner, ok := attr.ValidationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				validationRewardOwner, err = s.getAPIOwner(validationOwner)
 				if err != nil {
 					return err
 				}
 			}
-			delegationOwner, ok := attr.delegationRewardsOwner.(*secp256k1fx.OutputOwners)
+			delegationOwner, ok := attr.DelegationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				delegationRewardOwner, err = s.getAPIOwner(delegationOwner)
 				if err != nil {
@@ -894,7 +858,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				ValidationRewardOwner:  validationRewardOwner,
 				DelegationRewardOwner:  delegationRewardOwner,
 				DelegationFee:          delegationFee,
-				Signer:                 attr.proofOfPossession,
+				Signer:                 attr.ProofOfPossession,
 			}
 			reply.Validators = append(reply.Validators, vdr)
 
@@ -907,7 +871,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				if err != nil {
 					return err
 				}
-				owner, ok := attr.rewardsOwner.(*secp256k1fx.OutputOwners)
+				owner, ok := attr.RewardsOwner.(*secp256k1fx.OutputOwners)
 				if ok {
 					rewardOwner, err = s.getAPIOwner(owner)
 					if err != nil {
@@ -1064,7 +1028,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 				return err
 			}
 
-			shares := attr.shares
+			shares := attr.Shares
 			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
 			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
@@ -1072,7 +1036,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 				Staker:        apiStaker,
 				DelegationFee: delegationFee,
 				Connected:     connected,
-				Signer:        attr.proofOfPossession,
+				Signer:        attr.ProofOfPossession,
 			}
 			reply.Validators = append(reply.Validators, vdr)
 
