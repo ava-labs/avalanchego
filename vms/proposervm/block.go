@@ -214,7 +214,7 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 		)
 	} else {
-		shouldBuildUnsignedBlock, err = p.shouldPreDurangoBuildBlock(
+		shouldBuildUnsignedBlock, err = p.shouldPreDurangoBuildUnsignedBlock(
 			ctx,
 			parentID,
 			parentTimestamp,
@@ -403,7 +403,7 @@ func (p *postForkCommonComponents) shouldPostDurangoBuildBlock(
 	return nil
 }
 
-func (p *postForkCommonComponents) shouldPreDurangoBuildBlock(
+func (p *postForkCommonComponents) shouldPreDurangoBuildUnsignedBlock(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
