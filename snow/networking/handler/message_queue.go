@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -69,7 +70,7 @@ type messageQueue struct {
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.NodeID]int
 	// Unprocessed messages
-	msgAndCtxs []*msgAndContext
+	msgAndCtxs buffer.Queue[*msgAndContext]
 }
 
 func NewMessageQueue(
@@ -99,7 +100,7 @@ func (m *messageQueue) Push(ctx context.Context, msg Message) {
 	}
 
 	// Add the message to the queue
-	m.msgAndCtxs = append(m.msgAndCtxs, &msgAndContext{
+	m.msgAndCtxs.Push(&msgAndContext{
 		msg: msg,
 		ctx: ctx,
 	})
@@ -124,13 +125,13 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		if m.closed {
 			return nil, Message{}, false
 		}
-		if len(m.msgAndCtxs) != 0 {
+		if m.msgAndCtxs.Len() != 0 {
 			break
 		}
 		m.cond.Wait()
 	}
 
-	n := len(m.msgAndCtxs)
+	n := m.msgAndCtxs.Len()
 	i := 0
 	for {
 		if i == n {
@@ -140,20 +141,14 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		}
 
 		var (
-			msgAndCtx = m.msgAndCtxs[0]
-			msg       = msgAndCtx.msg
-			ctx       = msgAndCtx.ctx
-			nodeID    = msg.NodeID()
+			msgAndCtx, _ = m.msgAndCtxs.Pop()
+			msg          = msgAndCtx.msg
+			ctx          = msgAndCtx.ctx
+			nodeID       = msg.NodeID()
 		)
-		m.msgAndCtxs[0] = nil
 
 		// See if it's OK to process [msg] next
 		if m.canPop(msg) || i == n { // i should never == n but handle anyway as a fail-safe
-			if cap(m.msgAndCtxs) == 1 {
-				m.msgAndCtxs = nil // Give back memory if possible
-			} else {
-				m.msgAndCtxs = m.msgAndCtxs[1:]
-			}
 			m.nodeToUnprocessedMsgs[nodeID]--
 			if m.nodeToUnprocessedMsgs[nodeID] == 0 {
 				delete(m.nodeToUnprocessedMsgs, nodeID)
@@ -165,8 +160,7 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		}
 		// [msg.nodeID] is causing excessive CPU usage.
 		// Push [msg] to back of [m.msgs] and handle it later.
-		m.msgAndCtxs = append(m.msgAndCtxs, msgAndCtx)
-		m.msgAndCtxs = m.msgAndCtxs[1:]
+		m.msgAndCtxs.Push(msgAndCtx)
 		i++
 		m.metrics.numExcessiveCPU.Inc()
 	}
@@ -176,7 +170,7 @@ func (m *messageQueue) Len() int {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
-	return len(m.msgAndCtxs)
+	return m.msgAndCtxs.Len()
 }
 
 func (m *messageQueue) Shutdown() {
@@ -184,8 +178,9 @@ func (m *messageQueue) Shutdown() {
 	defer m.cond.L.Unlock()
 
 	// Remove all the current messages from the queue
-	for _, msg := range m.msgAndCtxs {
-		msg.msg.OnFinishedHandling()
+	for m.msgAndCtxs.Len() > 0 {
+		msgAndCtx, _ := m.msgAndCtxs.Pop()
+		msgAndCtx.msg.OnFinishedHandling()
 	}
 	m.msgAndCtxs = nil
 	m.nodeToUnprocessedMsgs = nil
