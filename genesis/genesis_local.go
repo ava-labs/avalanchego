@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -74,6 +75,7 @@ var (
 			},
 			CaminoConfig: caminoconfig.Config{
 				DACProposalBondAmount: 100 * units.Avax,
+				FeeDistribution:       [dac.FeeDistributionFractionsCount]uint64{30, 30, 40}, // 30% validators, 30% grant program, 40% burned
 			},
 		},
 	}

@@ -10,70 +10,83 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"golang.org/x/exp/slices"
 )
 
-const baseFeeProposalMaxOptionsCount = 3
-
-var (
-	_ Proposal      = (*BaseFeeProposal)(nil)
-	_ ProposalState = (*BaseFeeProposalState)(nil)
-
-	errZeroFee = errors.New("base-fee option is zero")
+const (
+	feeDistributionProposalMaxOptionsCount = 3
+	FeeDistributionFractionsCount          = 3
 )
 
-type BaseFeeProposal struct {
-	Options []uint64 `serialize:"true"` // New base fee options
-	Start   uint64   `serialize:"true"` // Start time of proposal
-	End     uint64   `serialize:"true"` // End time of proposal
+var (
+	_ Proposal      = (*FeeDistributionProposal)(nil)
+	_ ProposalState = (*FeeDistributionProposalState)(nil)
+
+	errWrongFeeDistribution = errors.New("fee distribution sum is not equal to 100%")
+)
+
+type FeeDistributionProposal struct {
+	// New fee distribution options. Fee is distributed between validators, grant program and burning.
+	// Each uint64 value is nominator that represents fraction of fee distribution.
+	Options [][FeeDistributionFractionsCount]uint64 `serialize:"true"`
+	Start   uint64                                  `serialize:"true"` // Start time of proposal
+	End     uint64                                  `serialize:"true"` // End time of proposal
 }
 
-func (p *BaseFeeProposal) StartTime() time.Time {
+func (p *FeeDistributionProposal) StartTime() time.Time {
 	return time.Unix(int64(p.Start), 0)
 }
 
-func (p *BaseFeeProposal) EndTime() time.Time {
+func (p *FeeDistributionProposal) EndTime() time.Time {
 	return time.Unix(int64(p.End), 0)
 }
 
-func (p *BaseFeeProposal) GetOptions() any {
+func (p *FeeDistributionProposal) GetOptions() any {
 	return p.Options
 }
 
-func (*BaseFeeProposal) AdminProposer() as.AddressState {
-	return as.AddressStateEmpty // for now its forbidden, until we'll introduce dedicated role for it
+// This proposal type cannot be admin proposal
+func (*FeeDistributionProposal) AdminProposer() as.AddressState {
+	return as.AddressStateEmpty
 }
 
-func (p *BaseFeeProposal) Verify() error {
+func (p *FeeDistributionProposal) Verify() error {
 	switch {
 	case len(p.Options) == 0:
 		return errNoOptions
-	case len(p.Options) > baseFeeProposalMaxOptionsCount:
-		return fmt.Errorf("%w (expected: no more than %d, actual: %d)", errWrongOptionsCount, baseFeeProposalMaxOptionsCount, len(p.Options))
+	case len(p.Options) > feeDistributionProposalMaxOptionsCount:
+		return fmt.Errorf("%w (expected: no more than %d, actual: %d)", errWrongOptionsCount, feeDistributionProposalMaxOptionsCount, len(p.Options))
 	case p.Start >= p.End:
 		return errEndNotAfterStart
 	}
-
-	unique := set.NewSet[uint64](len(p.Options))
-	for _, fee := range p.Options {
-		if fee == 0 {
-			return errZeroFee
+	unique := set.NewSet[[FeeDistributionFractionsCount]uint64](len(p.Options))
+	for _, option := range p.Options {
+		sum, err := math.Add64(option[0], option[1])
+		if err != nil {
+			return fmt.Errorf("%w: %s", errWrongFeeDistribution, err)
 		}
-		if unique.Contains(fee) {
+		sum, err = math.Add64(sum, option[2])
+		if err != nil {
+			return fmt.Errorf("%w: %s", errWrongFeeDistribution, err)
+		}
+		if sum != FractionDenominator {
+			return errWrongFeeDistribution
+		}
+		if unique.Contains(option) {
 			return errNotUniqueOption
 		}
-		unique.Add(fee)
+		unique.Add(option)
 	}
-
 	return nil
 }
 
-func (p *BaseFeeProposal) CreateProposalState(allowedVoters []ids.ShortID) ProposalState {
-	stateProposal := &BaseFeeProposalState{
-		SimpleVoteOptions: SimpleVoteOptions[uint64]{
-			Options: make([]SimpleVoteOption[uint64], len(p.Options)),
+func (p *FeeDistributionProposal) CreateProposalState(allowedVoters []ids.ShortID) ProposalState {
+	stateProposal := &FeeDistributionProposalState{
+		SimpleVoteOptions: SimpleVoteOptions[[FeeDistributionFractionsCount]uint64]{
+			Options: make([]SimpleVoteOption[[FeeDistributionFractionsCount]uint64], len(p.Options)),
 		},
 		Start:              p.Start,
 		End:                p.End,
@@ -86,21 +99,21 @@ func (p *BaseFeeProposal) CreateProposalState(allowedVoters []ids.ShortID) Propo
 	return stateProposal
 }
 
-func (p *BaseFeeProposal) CreateFinishedProposalState(optionIndex uint32) (ProposalState, error) {
+func (p *FeeDistributionProposal) CreateFinishedProposalState(optionIndex uint32) (ProposalState, error) {
 	if optionIndex >= uint32(len(p.Options)) {
 		return nil, fmt.Errorf("%w (expected: less than %d, actual: %d)", errWrongOptionIndex, len(p.Options), optionIndex)
 	}
-	proposalState := p.CreateProposalState([]ids.ShortID{}).(*BaseFeeProposalState)
+	proposalState := p.CreateProposalState([]ids.ShortID{}).(*FeeDistributionProposalState)
 	proposalState.Options[optionIndex].Weight++
 	return proposalState, nil
 }
 
-func (p *BaseFeeProposal) VerifyWith(verifier Verifier) error {
-	return verifier.BaseFeeProposal(p)
+func (p *FeeDistributionProposal) VerifyWith(verifier Verifier) error {
+	return verifier.FeeDistributionProposal(p)
 }
 
-type BaseFeeProposalState struct {
-	SimpleVoteOptions[uint64] `serialize:"true"` // New base fee options
+type FeeDistributionProposalState struct {
+	SimpleVoteOptions[[FeeDistributionFractionsCount]uint64] `serialize:"true"` // New base fee options
 	// Start time of proposal
 	Start uint64 `serialize:"true"`
 	// End time of proposal
@@ -112,20 +125,20 @@ type BaseFeeProposalState struct {
 	TotalAllowedVoters uint32 `serialize:"true"`
 }
 
-func (p *BaseFeeProposalState) StartTime() time.Time {
+func (p *FeeDistributionProposalState) StartTime() time.Time {
 	return time.Unix(int64(p.Start), 0)
 }
 
-func (p *BaseFeeProposalState) EndTime() time.Time {
+func (p *FeeDistributionProposalState) EndTime() time.Time {
 	return time.Unix(int64(p.End), 0)
 }
 
-func (p *BaseFeeProposalState) IsActiveAt(time time.Time) bool {
+func (p *FeeDistributionProposalState) IsActiveAt(time time.Time) bool {
 	timestamp := uint64(time.Unix())
 	return p.Start <= timestamp && timestamp <= p.End
 }
 
-func (p *BaseFeeProposalState) CanBeFinished() bool {
+func (p *FeeDistributionProposalState) CanBeFinished() bool {
 	mostVotedWeight, _, unambiguous := p.GetMostVoted()
 	voted := p.Voted()
 	return p.TotalAllowedVoters-voted+mostVotedWeight < voted/2+1 ||
@@ -133,13 +146,13 @@ func (p *BaseFeeProposalState) CanBeFinished() bool {
 		unambiguous && mostVotedWeight > p.TotalAllowedVoters/2
 }
 
-func (p *BaseFeeProposalState) IsSuccessful() bool {
+func (p *FeeDistributionProposalState) IsSuccessful() bool {
 	mostVotedWeight, _, unambiguous := p.GetMostVoted()
 	voted := p.Voted()
 	return unambiguous && voted > p.TotalAllowedVoters/2 && mostVotedWeight > voted/2
 }
 
-func (p *BaseFeeProposalState) Outcome() any {
+func (p *FeeDistributionProposalState) Outcome() any {
 	_, mostVotedOptionIndex, unambiguous := p.GetMostVoted()
 	if !unambiguous {
 		return -1
@@ -147,13 +160,13 @@ func (p *BaseFeeProposalState) Outcome() any {
 	return mostVotedOptionIndex
 }
 
-func (p *BaseFeeProposalState) Result() (uint64, uint32, bool) {
+func (p *FeeDistributionProposalState) Result() ([FeeDistributionFractionsCount]uint64, uint32, bool) {
 	mostVotedWeight, mostVotedOptionIndex, unambiguous := p.GetMostVoted()
 	return p.Options[mostVotedOptionIndex].Value, mostVotedWeight, unambiguous
 }
 
 // Will return modified proposal with added vote, original proposal will not be modified!
-func (p *BaseFeeProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) (ProposalState, error) {
+func (p *FeeDistributionProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) (ProposalState, error) {
 	vote, ok := voteIntf.(*SimpleVote)
 	if !ok {
 		return nil, ErrWrongVote
@@ -169,12 +182,12 @@ func (p *BaseFeeProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) 
 		return nil, ErrNotAllowedToVoteOnProposal
 	}
 
-	updatedProposal := &BaseFeeProposalState{
+	updatedProposal := &FeeDistributionProposalState{
 		Start:         p.Start,
 		End:           p.End,
 		AllowedVoters: make([]ids.ShortID, len(p.AllowedVoters)-1),
-		SimpleVoteOptions: SimpleVoteOptions[uint64]{
-			Options: make([]SimpleVoteOption[uint64], len(p.Options)),
+		SimpleVoteOptions: SimpleVoteOptions[[FeeDistributionFractionsCount]uint64]{
+			Options: make([]SimpleVoteOption[[FeeDistributionFractionsCount]uint64], len(p.Options)),
 		},
 		TotalAllowedVoters: p.TotalAllowedVoters,
 	}
@@ -188,7 +201,7 @@ func (p *BaseFeeProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) 
 }
 
 // Will return modified proposal with added vote ignoring allowed voters, original proposal will not be modified!
-func (p *BaseFeeProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error) {
+func (p *FeeDistributionProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error) {
 	vote, ok := voteIntf.(*SimpleVote)
 	if !ok {
 		return nil, ErrWrongVote
@@ -197,12 +210,12 @@ func (p *BaseFeeProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error
 		return nil, ErrWrongVote
 	}
 
-	updatedProposal := &BaseFeeProposalState{
+	updatedProposal := &FeeDistributionProposalState{
 		Start:         p.Start,
 		End:           p.End,
 		AllowedVoters: p.AllowedVoters,
-		SimpleVoteOptions: SimpleVoteOptions[uint64]{
-			Options: make([]SimpleVoteOption[uint64], len(p.Options)),
+		SimpleVoteOptions: SimpleVoteOptions[[FeeDistributionFractionsCount]uint64]{
+			Options: make([]SimpleVoteOption[[FeeDistributionFractionsCount]uint64], len(p.Options)),
 		},
 		TotalAllowedVoters: p.TotalAllowedVoters,
 	}
@@ -212,10 +225,10 @@ func (p *BaseFeeProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error
 	return updatedProposal, nil
 }
 
-func (p *BaseFeeProposalState) ExecuteWith(executor Executor) error {
-	return executor.BaseFeeProposal(p)
+func (p *FeeDistributionProposalState) ExecuteWith(executor Executor) error {
+	return executor.FeeDistributionProposal(p)
 }
 
-func (p *BaseFeeProposalState) GetBondTxIDsWith(bondTxIDsGetter BondTxIDsGetter) ([]ids.ID, error) {
-	return bondTxIDsGetter.BaseFeeProposal(p)
+func (p *FeeDistributionProposalState) GetBondTxIDsWith(bondTxIDsGetter BondTxIDsGetter) ([]ids.ID, error) {
+	return bondTxIDsGetter.FeeDistributionProposal(p)
 }

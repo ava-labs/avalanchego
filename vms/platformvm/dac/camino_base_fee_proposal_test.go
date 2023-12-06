@@ -612,7 +612,7 @@ func TestBaseFeeProposalStateCanBeFinished(t *testing.T) {
 		expectedCanBeFinished    bool
 		expectedOriginalProposal *BaseFeeProposalState
 	}{
-		"Can not be finished: most voted weight is less than 50% of total allowed voters and not everyone had voted": {
+		"Can not be finished: most voted weight is less than 50% of total allowed voters, not everyone had voted and some options could still reach 50%+ of votes": {
 			proposal: &BaseFeeProposalState{
 				SimpleVoteOptions: SimpleVoteOptions[uint64]{
 					Options: []SimpleVoteOption[uint64]{

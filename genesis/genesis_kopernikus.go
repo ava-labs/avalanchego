@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -47,6 +48,7 @@ var (
 			},
 			CaminoConfig: caminoconfig.Config{
 				DACProposalBondAmount: 100 * units.Avax,
+				FeeDistribution:       [dac.FeeDistributionFractionsCount]uint64{30, 30, 40}, // 30% validators, 30% grant program, 40% burned
 			},
 		},
 	}

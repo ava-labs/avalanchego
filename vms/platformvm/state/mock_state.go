@@ -384,6 +384,21 @@ func (mr *MockStateMockRecorder) GetBaseFee() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBaseFee", reflect.TypeOf((*MockState)(nil).GetBaseFee))
 }
 
+// GetFeeDistribution mocks base method.
+func (m *MockState) GetFeeDistribution() ([dac.FeeDistributionFractionsCount]uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFeeDistribution")
+	ret0, _ := ret[0].([dac.FeeDistributionFractionsCount]uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFeeDistribution indicates an expected call of GetFeeDistribution.
+func (mr *MockStateMockRecorder) GetFeeDistribution() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeDistribution", reflect.TypeOf((*MockState)(nil).GetFeeDistribution))
+}
+
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockState) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -1050,6 +1065,18 @@ func (m *MockState) SetBaseFee(arg0 uint64) {
 func (mr *MockStateMockRecorder) SetBaseFee(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBaseFee", reflect.TypeOf((*MockState)(nil).SetBaseFee), arg0)
+}
+
+// SetFeeDistribution mocks base method.
+func (m *MockState) SetFeeDistribution(arg0 [dac.FeeDistributionFractionsCount]uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeDistribution", arg0)
+}
+
+// SetFeeDistribution indicates an expected call of SetFeeDistribution.
+func (mr *MockStateMockRecorder) SetFeeDistribution(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeDistribution", reflect.TypeOf((*MockState)(nil).SetFeeDistribution), arg0)
 }
 
 // SetCurrentSupply mocks base method.

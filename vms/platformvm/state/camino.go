@@ -64,6 +64,7 @@ var (
 	depositBondModeKey               = []byte("depositBondMode")
 	notDistributedValidatorRewardKey = []byte("notDistributedValidatorReward")
 	baseFeeKey                       = []byte("baseFee")
+	feeDistributionKey               = []byte("feeDistribution")
 
 	errWrongTxType      = errors.New("unexpected tx type")
 	errNonExistingOffer = errors.New("deposit offer doesn't exist")
@@ -78,6 +79,8 @@ type CaminoDiff interface {
 	// Singletones
 	GetBaseFee() (uint64, error)
 	SetBaseFee(uint64)
+	GetFeeDistribution() ([dac.FeeDistributionFractionsCount]uint64, error)
+	SetFeeDistribution([dac.FeeDistributionFractionsCount]uint64)
 
 	// Address State
 
@@ -180,6 +183,7 @@ type caminoDiff struct {
 	modifiedProposalIDsToFinish           map[ids.ID]bool
 	modifiedNotDistributedValidatorReward *uint64
 	modifiedBaseFee                       *uint64
+	modifiedFeeDistribution               *[dac.FeeDistributionFractionsCount]uint64
 }
 
 type caminoState struct {
@@ -190,6 +194,7 @@ type caminoState struct {
 	verifyNodeSignature bool
 	lockModeBondDeposit bool
 	baseFee             uint64
+	feeDistribution     [dac.FeeDistributionFractionsCount]uint64
 
 	// Deferred Stakers
 	deferredStakers       *baseStakers
@@ -556,6 +561,16 @@ func (cs *caminoState) Load(s *state) error {
 	}
 	cs.baseFee = baseFee
 
+	feeDistribution, err := database.GetUInt64Slice(cs.caminoDB, feeDistributionKey)
+	if err == database.ErrNotFound {
+		// if fee distribution is not in db yet, than its first time when we access it
+		// and it should be equal to hardcoded fee distribution
+		feeDistribution = s.cfg.CaminoConfig.FeeDistribution[:]
+	} else if err != nil {
+		return err
+	}
+	cs.feeDistribution = *(*[dac.FeeDistributionFractionsCount]uint64)(feeDistribution) // TODO @evlekht change when mod go is >= 1.20
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		cs.loadDepositOffers(),
@@ -578,6 +593,7 @@ func (cs *caminoState) Write() error {
 	}
 	errs.Add(
 		database.PutUInt64(cs.caminoDB, baseFeeKey, cs.baseFee),
+		database.PutUInt64Slice(cs.caminoDB, feeDistributionKey, cs.feeDistribution[:]),
 		cs.writeAddressStates(),
 		cs.writeDepositOffers(),
 		cs.writeDeposits(),
@@ -615,4 +631,12 @@ func (cs *caminoState) GetBaseFee() (uint64, error) {
 
 func (cs *caminoState) SetBaseFee(baseFee uint64) {
 	cs.baseFee = baseFee
+}
+
+func (cs *caminoState) GetFeeDistribution() ([dac.FeeDistributionFractionsCount]uint64, error) {
+	return cs.feeDistribution, nil
+}
+
+func (cs *caminoState) SetFeeDistribution(feeDistribution [dac.FeeDistributionFractionsCount]uint64) {
+	cs.feeDistribution = feeDistribution
 }

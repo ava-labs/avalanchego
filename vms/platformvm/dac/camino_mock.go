@@ -78,3 +78,18 @@ func (mr *MockBondTxIDsGetterMockRecorder) ExcludeMemberProposal(arg0 interface{
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExcludeMemberProposal", reflect.TypeOf((*MockBondTxIDsGetter)(nil).ExcludeMemberProposal), arg0)
 }
+
+// FeeDistributionProposal mocks base method.
+func (m *MockBondTxIDsGetter) FeeDistributionProposal(arg0 *FeeDistributionProposalState) ([]ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FeeDistributionProposal", arg0)
+	ret0, _ := ret[0].([]ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FeeDistributionProposal indicates an expected call of FeeDistributionProposal.
+func (mr *MockBondTxIDsGetterMockRecorder) FeeDistributionProposal(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FeeDistributionProposal", reflect.TypeOf((*MockBondTxIDsGetter)(nil).FeeDistributionProposal), arg0)
+}

@@ -27,6 +27,7 @@ func init() {
 			c.RegisterCustomType(&BaseFeeProposalState{}),
 			c.RegisterCustomType(&AddMemberProposalState{}),
 			c.RegisterCustomType(&ExcludeMemberProposalState{}),
+			c.RegisterCustomType(&FeeDistributionProposalState{}),
 		)
 	}
 	errs.Add(

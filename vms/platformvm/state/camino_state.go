@@ -189,3 +189,11 @@ func (s *state) GetBaseFee() (uint64, error) {
 func (s *state) SetBaseFee(baseFee uint64) {
 	s.caminoState.SetBaseFee(baseFee)
 }
+
+func (s *state) GetFeeDistribution() ([dac.FeeDistributionFractionsCount]uint64, error) {
+	return s.caminoState.GetFeeDistribution()
+}
+
+func (s *state) SetFeeDistribution(feeDistribution [dac.FeeDistributionFractionsCount]uint64) {
+	s.caminoState.SetFeeDistribution(feeDistribution)
+}

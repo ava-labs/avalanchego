@@ -48,7 +48,7 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-func defaultCtx(db database.Database) *snow.Context {
+func defaultCtx(db database.Database) *snow.Context { //nolint:unparam
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
@@ -160,7 +160,7 @@ func generateTestUTXOWithIndex(txID ids.ID, outIndex uint32, assetID ids.ID, amo
 	return testUTXO
 }
 
-func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
+func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput { //nolint:unparam
 	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
 		Amt:          amount,
 		OutputOwners: outputOwners,

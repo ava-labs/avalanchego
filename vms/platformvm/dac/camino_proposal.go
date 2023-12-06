@@ -12,10 +12,14 @@ import (
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 )
 
+// FractionDenominator is the denominator used to calculate percentages
+const FractionDenominator = 1_000_000
+
 var (
 	errNoOptions                  = errors.New("no options")
 	errNotUniqueOption            = errors.New("not unique option")
 	errWrongOptionIndex           = errors.New("wrong option index")
+	errWrongOptionsCount          = errors.New("wrong options count")
 	errEndNotAfterStart           = errors.New("proposal end-time is not after start-time")
 	errWrongDuration              = errors.New("wrong proposal duration")
 	ErrWrongVote                  = errors.New("this proposal can't be voted with this vote")
@@ -28,18 +32,21 @@ type Verifier interface {
 	BaseFeeProposal(*BaseFeeProposal) error
 	AddMemberProposal(*AddMemberProposal) error
 	ExcludeMemberProposal(*ExcludeMemberProposal) error
+	FeeDistributionProposal(*FeeDistributionProposal) error
 }
 
 type Executor interface {
 	BaseFeeProposal(*BaseFeeProposalState) error
 	AddMemberProposal(*AddMemberProposalState) error
 	ExcludeMemberProposal(*ExcludeMemberProposalState) error
+	FeeDistributionProposal(*FeeDistributionProposalState) error
 }
 
 type BondTxIDsGetter interface {
 	BaseFeeProposal(*BaseFeeProposalState) ([]ids.ID, error)
 	AddMemberProposal(*AddMemberProposalState) ([]ids.ID, error)
 	ExcludeMemberProposal(*ExcludeMemberProposalState) ([]ids.ID, error)
+	FeeDistributionProposal(*FeeDistributionProposalState) ([]ids.ID, error)
 }
 
 type Proposal interface {

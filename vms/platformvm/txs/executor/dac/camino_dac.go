@@ -348,3 +348,49 @@ func (e *proposalBondTxIDsGetter) ExcludeMemberProposal(proposal *dac.ExcludeMem
 
 	return []ids.ID{pendingValidator.TxID}, nil
 }
+
+// FeeDistributionProposal
+
+func (e *proposalVerifier) FeeDistributionProposal(*dac.FeeDistributionProposal) error {
+	// verify address state (role)
+	proposerAddressState, err := e.state.GetAddressStates(e.addProposalTx.ProposerAddress)
+	if err != nil {
+		return err
+	}
+
+	if proposerAddressState.IsNot(as.AddressStateCaminoProposer) {
+		return errNotPermittedToCreateProposal
+	}
+
+	// verify that there is no existing fee distribution proposal
+	proposalsIterator, err := e.state.GetProposalIterator()
+	if err != nil {
+		return err
+	}
+	defer proposalsIterator.Release()
+	for proposalsIterator.Next() {
+		proposal, err := proposalsIterator.Value()
+		if err != nil {
+			return err
+		}
+		if _, ok := proposal.(*dac.FeeDistributionProposalState); ok {
+			return errAlreadyActiveProposal
+		}
+	}
+
+	if err := proposalsIterator.Error(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *proposalExecutor) FeeDistributionProposal(proposal *dac.FeeDistributionProposalState) error {
+	_, mostVotedOptionIndex, _ := proposal.GetMostVoted()
+	e.state.SetFeeDistribution(proposal.Options[mostVotedOptionIndex].Value)
+	return nil
+}
+
+func (*proposalBondTxIDsGetter) FeeDistributionProposal(*dac.FeeDistributionProposalState) ([]ids.ID, error) {
+	return nil, nil
+}

@@ -634,6 +634,23 @@ func (d *diff) SetBaseFee(baseFee uint64) {
 	d.caminoDiff.modifiedBaseFee = &baseFee
 }
 
+func (d *diff) GetFeeDistribution() ([dac.FeeDistributionFractionsCount]uint64, error) {
+	if d.caminoDiff.modifiedFeeDistribution != nil {
+		return *d.caminoDiff.modifiedFeeDistribution, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return [dac.FeeDistributionFractionsCount]uint64{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetFeeDistribution()
+}
+
+func (d *diff) SetFeeDistribution(feeDistribution [dac.FeeDistributionFractionsCount]uint64) {
+	d.caminoDiff.modifiedFeeDistribution = &feeDistribution
+}
+
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
 	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
@@ -641,6 +658,9 @@ func (d *diff) ApplyCaminoState(baseState State) {
 	}
 	if d.caminoDiff.modifiedBaseFee != nil {
 		baseState.SetBaseFee(*d.caminoDiff.modifiedBaseFee)
+	}
+	if d.caminoDiff.modifiedFeeDistribution != nil {
+		baseState.SetFeeDistribution(*d.caminoDiff.modifiedFeeDistribution)
 	}
 
 	for k, v := range d.caminoDiff.modifiedAddressStates {

@@ -833,3 +833,158 @@ func TestGetBondTxIDs(t *testing.T) {
 		append(finishProposalsTx.ProposalIDs(), additionalBondTxID1, additionalBondTxID2, additionalBondTxID3),
 		bondTxIDs)
 }
+
+func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
+	ctx := defaultCtx(nil)
+
+	feeOwnerKey, _, feeOwner := generateKeyAndOwner(t)
+	bondOwnerKey, _, bondOwner := generateKeyAndOwner(t)
+	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
+
+	proposalBondAmt := uint64(100)
+	feeUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
+	bondUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty)
+
+	proposal := &txs.ProposalWrapper{Proposal: &dac.FeeDistributionProposal{End: 1, Options: [][dac.FeeDistributionFractionsCount]uint64{{1}}}}
+	proposalBytes, err := txs.Codec.Marshal(txs.Version, proposal)
+	require.NoError(t, err)
+
+	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    ctx.NetworkID,
+		BlockchainID: ctx.ChainID,
+		Ins: []*avax.TransferableInput{
+			generateTestInFromUTXO(feeUTXO, []uint32{0}),
+			generateTestInFromUTXO(bondUTXO, []uint32{0}),
+		},
+		Outs: []*avax.TransferableOutput{
+			generateTestOut(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
+		},
+	}}
+
+	tests := map[string]struct {
+		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		utx             func() *txs.AddProposalTx
+		signers         [][]*secp256k1.PrivateKey
+		isAdminProposal bool
+		expectedErr     error
+	}{
+		"Proposer isn't caminoProposer": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateCaminoProposer
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errNotPermittedToCreateProposal,
+		},
+		"Already active FeeDistributionProposal": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				proposalsIterator := state.NewMockProposalsIterator(c)
+				proposalsIterator.EXPECT().Next().Return(true)
+				proposalsIterator.EXPECT().Value().Return(&dac.FeeDistributionProposalState{}, nil)
+				proposalsIterator.EXPECT().Release()
+
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errAlreadyActiveProposal,
+		},
+		"OK": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				proposalsIterator := state.NewMockProposalsIterator(c)
+				proposalsIterator.EXPECT().Next().Return(false)
+				proposalsIterator.EXPECT().Release()
+				proposalsIterator.EXPECT().Error().Return(nil)
+
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			fx := defaultFx(true)
+
+			utx := tt.utx()
+			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
+			avax.SortTransferableOutputs(utx.Outs, txs.Codec)
+			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
+			require.NoError(t, err)
+
+			proposal, err := utx.Proposal()
+			require.NoError(t, err)
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestProposalExecutorFeeDistributionProposal(t *testing.T) {
+	tests := map[string]struct {
+		state       func(*gomock.Controller) *state.MockDiff
+		proposal    dac.ProposalState
+		expectedErr error
+	}{
+		"OK": {
+			state: func(c *gomock.Controller) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().SetFeeDistribution([dac.FeeDistributionFractionsCount]uint64{20, 20, 60})
+				return s
+			},
+			proposal: &dac.FeeDistributionProposalState{
+				SimpleVoteOptions: dac.SimpleVoteOptions[[dac.FeeDistributionFractionsCount]uint64]{Options: []dac.SimpleVoteOption[[dac.FeeDistributionFractionsCount]uint64]{
+					{Value: [dac.FeeDistributionFractionsCount]uint64{10, 10, 80}, Weight: 0},
+					{Value: [dac.FeeDistributionFractionsCount]uint64{20, 20, 60}, Weight: 2},
+					{Value: [dac.FeeDistributionFractionsCount]uint64{30, 30, 40}, Weight: 1},
+				}},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			fx := defaultFx(true)
+			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(ctrl), fx))
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
