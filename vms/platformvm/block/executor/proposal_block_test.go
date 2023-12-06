@@ -258,6 +258,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			parentID,
 			banffParentBlk.Height(),
 			blkTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -287,6 +288,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -304,6 +306,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -321,6 +324,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -342,6 +346,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			parentID,
 			banffParentBlk.Height()+1,
 			invalidTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -357,6 +362,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -373,6 +379,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -664,6 +671,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					parentBlk.ID(),
 					parentBlk.Height()+1,
 					s0RewardTx,
+					[]*txs.Tx{},
 				)
 				require.NoError(err)
 
@@ -825,6 +833,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
+		[]*txs.Tx{},
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -939,6 +948,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				parentBlk.ID(),
 				parentBlk.Height()+1,
 				s0RewardTx,
+				[]*txs.Tx{},
 			)
 			require.NoError(err)
 			propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -1027,6 +1037,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
+		[]*txs.Tx{},
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -1120,6 +1131,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
+		[]*txs.Tx{},
 	)
 	require.NoError(err)
 
@@ -1212,6 +1224,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
+		[]*txs.Tx{},
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -1304,6 +1317,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
+		[]*txs.Tx{},
 	)
 	require.NoError(err)
 	propBlk = env.blkManager.NewBlock(statelessProposalBlock)
