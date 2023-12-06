@@ -46,13 +46,16 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 
 	proVM := New(
 		innerVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 	)
+
 	defer func() {
 		// avoids leaking goroutines
 		require.NoError(proVM.Shutdown(context.Background()))

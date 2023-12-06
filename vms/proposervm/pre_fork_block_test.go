@@ -342,10 +342,10 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	postForkChild := &postForkBlock{
@@ -740,10 +740,10 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
 		0, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 
@@ -798,7 +798,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 
 	// Should call BuildBlock since proposervm is not activated
 	innerBlk.EXPECT().Timestamp().Return(time.Time{})
-	vm.activationTime = mockable.MaxTime
+	vm.ActivationTime = mockable.MaxTime
 
 	gotChild, err = blk.buildChild(context.Background())
 	require.NoError(err)

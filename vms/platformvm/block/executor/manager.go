@@ -107,9 +107,9 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	}
 }
 
-func (m *manager) SetPreference(blockID ids.ID) (updated bool) {
-	updated = m.preferred == blockID
-	m.preferred = blockID
+func (m *manager) SetPreference(blkID ids.ID) bool {
+	updated := m.preferred != blkID
+	m.preferred = blkID
 	return updated
 }
 
