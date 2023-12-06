@@ -17,6 +17,7 @@ use tonic::Status;
 
 pub mod database;
 pub mod db;
+pub mod process;
 
 trait IntoStatusResultExt<T> {
     fn into_status_result(self) -> Result<T, Status>;
@@ -81,3 +82,6 @@ impl Iterators {
         self.map.remove(&id);
     }
 }
+
+#[derive(Debug)]
+pub struct ProcessServer;

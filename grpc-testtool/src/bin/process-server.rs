@@ -1,27 +1,96 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use chrono::Local;
+use clap::Parser;
+use env_logger::{Builder, Target};
+use log::{info, LevelFilter};
 use rpc::{
+    process_server::process_server_service_server::ProcessServerServiceServer,
     rpcdb::database_server::DatabaseServer as RpcServer, sync::db_server::DbServer as SyncServer,
     DatabaseService,
 };
-use std::sync::Arc;
+use std::{
+    error::Error,
+    io::Write,
+    net::{IpAddr::V4, Ipv4Addr},
+    path::PathBuf,
+    sync::Arc,
+};
+use tempdir::TempDir;
 use tonic::transport::Server;
 
-// TODO: use clap to parse command line input to run the server
-#[tokio::main]
-async fn main() -> Result<(), tonic::transport::Error> {
-    #[allow(clippy::unwrap_used)]
-    let addr = "[::1]:10000".parse().unwrap();
+/// A GRPC server that can be plugged into the generic testing framework for merkledb
 
-    println!("Database-Server listening on: {}", addr);
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
+struct Opts {
+    #[arg(short = 'g', long, default_value_t = 10000)]
+    //// Port gRPC server listens on
+    grpc_port: u16,
+
+    #[arg(short = 'G', long = "gatewayPort", default_value_t = 10001)]
+    /// Port gRPC gateway server, which HTTP requests can be made to
+    _gateway_port: u16,
+
+    #[arg(short = 'l', long = "logDir", default_value = temp_path())]
+    log_dir: PathBuf,
+
+    #[arg(short = 'L', long = "LogLevelStr", default_value_t = LevelFilter::Info)]
+    log_level: LevelFilter,
+
+    #[arg(short = 'b', long = "branch-factor")]
+    _branch_factor: Option<u16>,
+}
+
+fn temp_path() -> clap::builder::OsStr {
+    let tmpdir = TempDir::new("process-server").expect("unable to create temporary directory");
+    // we leak because we want the temporary directory to stick around forever (emulating what happens in golang)
+    Box::leak(Box::new(tmpdir.into_path())).as_os_str().into()
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    // parse command line options
+    let args = Opts::parse();
+
+    // set up the log file
+    let logfile = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(true)
+        .open(args.log_dir.join("server.log"))?;
+
+    // configure the logger
+    Builder::new()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{} [{}] - {}",
+                Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                record.level(),
+                record.args()
+            )
+        })
+        .format_target(true)
+        .target(Target::Pipe(Box::new(logfile)))
+        .filter(None, args.log_level)
+        .init();
+
+    // log to the file and to stderr
+    eprintln!("Database-Server listening on: {}", args.grpc_port);
+    info!("Starting up: Listening on {}", args.grpc_port);
 
     let svc = Arc::new(DatabaseService::default());
 
     // TODO: graceful shutdown
-    Server::builder()
+    Ok(Server::builder()
         .add_service(RpcServer::from_arc(svc.clone()))
-        .add_service(SyncServer::from_arc(svc))
-        .serve(addr)
-        .await
+        .add_service(SyncServer::from_arc(svc.clone()))
+        .add_service(ProcessServerServiceServer::from_arc(svc.clone()))
+        .serve(std::net::SocketAddr::new(
+            V4(Ipv4Addr::LOCALHOST),
+            args.grpc_port,
+        ))
+        .await?)
 }
