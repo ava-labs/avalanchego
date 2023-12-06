@@ -1320,9 +1320,12 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
+		// we expect genesis validator txs to be AddValidatorTx or AddPermissionlessValidatorTx
+		// even if, post Durango, we don't explicitly type check for these two txs.
+		// TODO: enforce stricter type check
 		validatorTx, ok := vdrTx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", vdrTx.Unsigned)
+			return fmt.Errorf("expected a scheduled staker but got %T", vdrTx.Unsigned)
 		}
 
 		stakeAmount := validatorTx.Weight()
