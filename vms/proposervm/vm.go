@@ -114,7 +114,8 @@ type VM struct {
 	// Block ID --> Block
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
-	verifiedBlocks map[ids.ID]PostForkBlock
+	verifiedProposerBlocks map[ids.ID]PostForkBlock
+	verifiedBlocks         map[ids.ID]PostForkBlock
 	// Stateless block ID --> inner block.
 	// Only contains post-fork blocks near the tip so that the cache doesn't get
 	// filled with random blocks every time this node parses blocks while
@@ -225,6 +226,7 @@ func (vm *VM) Initialize(
 		scheduler.Dispatch(time.Now())
 	})
 
+	vm.verifiedProposerBlocks = make(map[ids.ID]PostForkBlock)
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
 	detachedCtx := utils.Detach(ctx)
 	context, cancel := context.WithCancel(detachedCtx)
@@ -748,8 +750,10 @@ func (vm *VM) getForkHeight() (uint64, error) {
 }
 
 func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock, error) {
-	block, exists := vm.verifiedBlocks[blkID]
-	if exists {
+	if block, exists := vm.verifiedProposerBlocks[blkID]; exists {
+		return block, nil
+	}
+	if block, exists := vm.verifiedBlocks[blkID]; exists {
 		return block, nil
 	}
 
@@ -797,6 +801,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	blkID := blk.ID()
 
 	vm.lastAcceptedHeight = height
+	delete(vm.verifiedProposerBlocks, blkID)
 	delete(vm.verifiedBlocks, blkID)
 
 	// Persist this block, its height index, and its status

@@ -27,6 +27,8 @@ type Block interface {
 	// Parent returns the ID of this block's parent.
 	Parent() ids.ID
 
+	VerifyProposer(context.Context) error
+
 	// Verify that the state transition this block would make if accepted is
 	// valid. If the state transition is invalid, a non-nil error should be
 	// returned.

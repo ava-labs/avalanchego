@@ -168,6 +168,20 @@ func (mr *MockPostForkBlockMockRecorder) Verify(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockPostForkBlock)(nil).Verify), arg0)
 }
 
+// VerifyProposer mocks base method.
+func (m *MockPostForkBlock) VerifyProposer(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyProposer", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyProposer indicates an expected call of VerifyProposer.
+func (mr *MockPostForkBlockMockRecorder) VerifyProposer(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyProposer", reflect.TypeOf((*MockPostForkBlock)(nil).VerifyProposer), arg0)
+}
+
 // acceptInnerBlk mocks base method.
 func (m *MockPostForkBlock) acceptInnerBlk(arg0 context.Context) error {
 	m.ctrl.T.Helper()
@@ -318,4 +332,32 @@ func (m *MockPostForkBlock) verifyPreForkChild(arg0 context.Context, arg1 *preFo
 func (mr *MockPostForkBlockMockRecorder) verifyPreForkChild(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyPreForkChild", reflect.TypeOf((*MockPostForkBlock)(nil).verifyPreForkChild), arg0, arg1)
+}
+
+// verifyProposerPostForkChild mocks base method.
+func (m *MockPostForkBlock) verifyProposerPostForkChild(arg0 context.Context, arg1 *postForkBlock) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "verifyProposerPostForkChild", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// verifyProposerPostForkChild indicates an expected call of verifyProposerPostForkChild.
+func (mr *MockPostForkBlockMockRecorder) verifyProposerPostForkChild(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyProposerPostForkChild", reflect.TypeOf((*MockPostForkBlock)(nil).verifyProposerPostForkChild), arg0, arg1)
+}
+
+// verifyProposerPostForkOption mocks base method.
+func (m *MockPostForkBlock) verifyProposerPostForkOption(arg0 context.Context, arg1 *postForkOption) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "verifyProposerPostForkOption", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// verifyProposerPostForkOption indicates an expected call of verifyProposerPostForkOption.
+func (mr *MockPostForkBlockMockRecorder) verifyProposerPostForkOption(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyProposerPostForkOption", reflect.TypeOf((*MockPostForkBlock)(nil).verifyProposerPostForkOption), arg0, arg1)
 }

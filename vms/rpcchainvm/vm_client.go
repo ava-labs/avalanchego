@@ -866,6 +866,13 @@ func (b *blockClient) Parent() ids.ID {
 	return b.parentID
 }
 
+func (b *blockClient) VerifyProposer(ctx context.Context) error {
+	_, err := b.vm.client.BlockVerifyProposer(ctx, &vmpb.BlockVerifyProposerRequest{
+		Bytes: b.bytes,
+	})
+	return err
+}
+
 func (b *blockClient) Verify(ctx context.Context) error {
 	resp, err := b.vm.client.BlockVerify(ctx, &vmpb.BlockVerifyRequest{
 		Bytes: b.bytes,

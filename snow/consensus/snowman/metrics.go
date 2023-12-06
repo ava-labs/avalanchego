@@ -41,7 +41,9 @@ type metrics struct {
 	// numProcessing keeps track of the number of processing blocks
 	numProcessing prometheus.Gauge
 
-	blockSizeAcceptedSum prometheus.Gauge
+	blockSizeAcceptedSum       prometheus.Gauge
+	timesVerifiedAcceptedSum   prometheus.Gauge
+	verifiedOnceBlocksAccepted prometheus.Counter
 	// pollsAccepted tracks the number of polls that a block was in processing
 	// for before being accepted
 	pollsAccepted metric.Averager
@@ -50,7 +52,9 @@ type metrics struct {
 	latAccepted          metric.Averager
 	buildLatencyAccepted prometheus.Gauge
 
-	blockSizeRejectedSum prometheus.Gauge
+	blockSizeRejectedSum     prometheus.Gauge
+	timesVerifiedRejectedSum prometheus.Gauge
+	unverifiedBlocksRejected prometheus.Counter
 	// pollsRejected tracks the number of polls that a block was in processing
 	// for before being rejected
 	pollsRejected metric.Averager
@@ -107,6 +111,21 @@ func newMetrics(
 			Name:      "blks_accepted_container_size_sum",
 			Help:      "cumulative size of all accepted blocks",
 		}),
+		buildLatencyAccepted: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "blks_build_accept_latency",
+			Help:      "time (in ns) from the timestamp of a block to the time it was accepted",
+		}),
+		timesVerifiedAcceptedSum: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "blks_times_verified_accepted_sum",
+			Help:      "cumulative number of times all accepted blocks were verified",
+		}),
+		verifiedOnceBlocksAccepted: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "verified_once_blks_rejected",
+			Help:      "number of blocks accepted that were only verified once",
+		}),
 		pollsAccepted: metric.NewAveragerWithErrs(
 			namespace,
 			"blks_polls_accepted",
@@ -127,16 +146,21 @@ func newMetrics(
 			reg,
 			&errs,
 		),
-		buildLatencyAccepted: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "blks_build_accept_latency",
-			Help:      "time (in ns) from the timestamp of a block to the time it was accepted",
-		}),
 
 		blockSizeRejectedSum: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "blks_rejected_container_size_sum",
 			Help:      "cumulative size of all rejected blocks",
+		}),
+		timesVerifiedRejectedSum: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "blks_times_verified_rejected_sum",
+			Help:      "cumulative number of times all rejected blocks were verified",
+		}),
+		unverifiedBlocksRejected: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "unverified_blks_rejected",
+			Help:      "number of blocks rejected that were never verified",
 		}),
 		pollsRejected: metric.NewAveragerWithErrs(
 			namespace,
@@ -183,7 +207,11 @@ func newMetrics(
 		reg.Register(m.numProcessing),
 		reg.Register(m.blockSizeAcceptedSum),
 		reg.Register(m.buildLatencyAccepted),
+		reg.Register(m.timesVerifiedAcceptedSum),
+		reg.Register(m.verifiedOnceBlocksAccepted),
 		reg.Register(m.blockSizeRejectedSum),
+		reg.Register(m.timesVerifiedRejectedSum),
+		reg.Register(m.unverifiedBlocksRejected),
 		reg.Register(m.numSuccessfulPolls),
 		reg.Register(m.numFailedPolls),
 	)
@@ -207,6 +235,7 @@ func (m *metrics) Accepted(
 	blkID ids.ID,
 	height uint64,
 	timestamp time.Time,
+	timesVerified int,
 	pollNumber uint64,
 	blockSize int,
 ) {
@@ -224,6 +253,11 @@ func (m *metrics) Accepted(
 	m.numProcessing.Dec()
 
 	m.blockSizeAcceptedSum.Add(float64(blockSize))
+	m.timesVerifiedAcceptedSum.Add(float64(timesVerified))
+
+	if timesVerified == 1 {
+		m.verifiedOnceBlocksAccepted.Inc()
+	}
 
 	m.pollsAccepted.Observe(float64(pollNumber - start.pollNumber))
 
@@ -235,7 +269,12 @@ func (m *metrics) Accepted(
 	m.buildLatencyAccepted.Add(float64(builtDuration))
 }
 
-func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
+func (m *metrics) Rejected(
+	blkID ids.ID,
+	timesVerified int,
+	pollNumber uint64,
+	blockSize int,
+) {
 	start, ok := m.processingBlocks.Get(blkID)
 	if !ok {
 		m.log.Error("unable to measure latency",
@@ -248,6 +287,13 @@ func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
 	m.numProcessing.Dec()
 
 	m.blockSizeRejectedSum.Add(float64(blockSize))
+
+	m.blockSizeRejectedSum.Add(float64(blockSize))
+	m.timesVerifiedRejectedSum.Add(float64(timesVerified))
+
+	if timesVerified == 0 {
+		m.unverifiedBlocksRejected.Inc()
+	}
 
 	m.pollsRejected.Observe(float64(pollNumber - start.pollNumber))
 

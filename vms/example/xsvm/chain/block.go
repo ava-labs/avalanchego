@@ -87,6 +87,10 @@ func (b *block) Timestamp() time.Time {
 	return b.Time()
 }
 
+func (*block) VerifyProposer(context.Context) error {
+	return nil
+}
+
 func (b *block) Verify(ctx context.Context) error {
 	return b.VerifyWithContext(ctx, nil)
 }
