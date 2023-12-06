@@ -18,7 +18,7 @@ type standardBlockState struct {
 	inputs       set.Set[ids.ID]
 }
 
-type proposalBlockState struct {
+type optionsState struct {
 	initiallyPreferCommit bool
 	onCommitState         state.Diff
 	onAbortState          state.Diff
@@ -28,7 +28,7 @@ type proposalBlockState struct {
 // Note that not all fields will be set for a given block.
 type blockState struct {
 	standardBlockState
-	proposalBlockState
+	optionsState
 	statelessBlock block.Block
 	onAcceptState  state.Diff
 

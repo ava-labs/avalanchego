@@ -47,12 +47,17 @@ type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
 	Tx *txs.Tx
-	// [OnCommitState] is the state used for validation.
+
+	// [OnProposalBlockState] is modified by this struct's methods to
+	// reflect changes related to timestamp advannce to be stored
+	// whether we then accept commit or abort block
+	//
+	// Invariant: Both [OnCommitState] and [OnAbortState] are built on
+	//            top of OnProposalBlockState when provided to the executor.
+	OnProposalBlockState state.Diff
+
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
-	//
-	// Invariant: Both [OnCommitState] and [OnAbortState] represent the same
-	//            state when provided to this struct.
 	OnCommitState state.Diff
 	// [OnAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
@@ -109,7 +114,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
 	// StandardBlocks.
-	currentTimestamp := e.OnCommitState.GetTimestamp()
+	currentTimestamp := e.OnProposalBlockState.GetTimestamp()
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
@@ -121,7 +126,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	onAbortOuts, err := verifyAddValidatorTx(
 		e.Backend,
-		e.OnCommitState,
+		e.OnProposalBlockState,
 		e.Tx,
 		tx,
 	)
@@ -131,25 +136,22 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	txID := e.Tx.ID()
 
+	// Consume the input UTXOs whether we accept commit or abort blocks
+	avax.Consume(e.OnProposalBlockState, tx.Ins)
+
 	// Set up the state if this tx is committed
-	// Consume the UTXOs
-	avax.Consume(e.OnCommitState, tx.Ins)
-	// Produce the UTXOs
 	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
 	}
-
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
-	// Consume the UTXOs
-	avax.Consume(e.OnAbortState, tx.Ins)
-	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, onAbortOuts)
 
+	// Set Preference
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
@@ -158,7 +160,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// AddSubnetValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddSubnetValidatorTxs must be
 	// issued into StandardBlocks.
-	currentTimestamp := e.OnCommitState.GetTimestamp()
+	currentTimestamp := e.OnProposalBlockState.GetTimestamp()
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
@@ -170,7 +172,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
-		e.OnCommitState,
+		e.OnProposalBlockState,
 		e.Tx,
 		tx,
 	); err != nil {
@@ -179,25 +181,22 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	txID := e.Tx.ID()
 
+	// Consume the input UTXOs whether we accept commit or abort blocks
+	avax.Consume(e.OnProposalBlockState, tx.Ins)
+
 	// Set up the state if this tx is committed
-	// Consume the UTXOs
-	avax.Consume(e.OnCommitState, tx.Ins)
-	// Produce the UTXOs
 	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
 	}
-
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
-	// Consume the UTXOs
-	avax.Consume(e.OnAbortState, tx.Ins)
-	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, tx.Outs)
 
+	// Set Preference
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
@@ -206,7 +205,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// AddDelegatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddDelegatorTxs must be issued into
 	// StandardBlocks.
-	currentTimestamp := e.OnCommitState.GetTimestamp()
+	currentTimestamp := e.OnProposalBlockState.GetTimestamp()
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
@@ -218,7 +217,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	onAbortOuts, err := verifyAddDelegatorTx(
 		e.Backend,
-		e.OnCommitState,
+		e.OnProposalBlockState,
 		e.Tx,
 		tx,
 	)
@@ -228,25 +227,22 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	txID := e.Tx.ID()
 
+	// Consume the input UTXOs whether we accept commit or abort blocks
+	avax.Consume(e.OnProposalBlockState, tx.Ins)
+
 	// Set up the state if this tx is committed
-	// Consume the UTXOs
-	avax.Consume(e.OnCommitState, tx.Ins)
-	// Produce the UTXOs
 	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
 	}
-
 	e.OnCommitState.PutPendingDelegator(newStaker)
 
 	// Set up the state if this tx is aborted
-	// Consume the UTXOs
-	avax.Consume(e.OnAbortState, tx.Ins)
-	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, onAbortOuts)
 
+	// Set Preference
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
@@ -270,7 +266,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		)
 	}
 
-	parentChainTime := e.OnCommitState.GetTimestamp()
+	parentChainTime := e.OnProposalBlockState.GetTimestamp()
 	if !newChainTime.After(parentChainTime) {
 		return fmt.Errorf(
 			"%w, proposed timestamp (%s), chain time (%s)",
@@ -282,7 +278,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := GetNextStakerChangeTime(e.OnCommitState)
+	nextStakerChangeTime, err := GetNextStakerChangeTime(e.OnProposalBlockState)
 	if err != nil {
 		return err
 	}
@@ -296,7 +292,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	changes, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
+	changes, err := AdvanceTimeTo(e.Backend, e.OnProposalBlockState, newChainTime)
 	if err != nil {
 		return err
 	}
@@ -321,7 +317,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakerIterator, err := e.OnCommitState.GetCurrentStakerIterator()
+	currentStakerIterator, err := e.OnProposalBlockState.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -341,7 +337,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
-	currentChainTime := e.OnCommitState.GetTimestamp()
+	currentChainTime := e.OnProposalBlockState.GetTimestamp()
 	if !stakerToReward.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
 			"%w: TxID = %s with %s < %s",
@@ -353,7 +349,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// retrieve primaryNetworkValidator before possibly removing it.
-	primaryNetworkValidator, err := e.OnCommitState.GetCurrentValidator(
+	primaryNetworkValidator, err := e.OnProposalBlockState.GetCurrentValidator(
 		constants.PrimaryNetworkID,
 		stakerToReward.NodeID,
 	)
@@ -363,7 +359,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	stakerTx, _, err := e.OnCommitState.GetTx(stakerToReward.TxID)
+	stakerTx, _, err := e.OnProposalBlockState.GetTx(stakerToReward.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
@@ -396,7 +392,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// If the reward is aborted, then the current supply should be decreased.
-	currentSupply, err := e.OnAbortState.GetCurrentSupply(stakerToReward.SubnetID)
+	currentSupply, err := e.OnProposalBlockState.GetCurrentSupply(stakerToReward.SubnetID)
 	if err != nil {
 		return err
 	}
@@ -465,7 +461,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	// Provide the accrued delegatee rewards from successful delegations here.
-	delegateeReward, err := e.OnCommitState.GetDelegateeReward(
+	delegateeReward, err := e.OnProposalBlockState.GetDelegateeReward(
 		validator.SubnetID,
 		validator.NodeID,
 	)
@@ -539,12 +535,12 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 
 	// We're (possibly) rewarding a delegator, so we need to fetch
 	// the validator they are delegated to.
-	validator, err := e.OnCommitState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
+	validator, err := e.OnProposalBlockState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
 	if err != nil {
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
 
-	vdrTxIntf, _, err := e.OnCommitState.GetTx(validator.TxID)
+	vdrTxIntf, _, err := e.OnProposalBlockState.GetTx(validator.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
@@ -596,7 +592,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 
 	// Reward the delegatee here
 	if e.Config.IsCortinaActivated(validator.StartTime) {
-		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
+		previousDelegateeReward, err := e.OnProposalBlockState.GetDelegateeReward(
 			validator.SubnetID,
 			validator.NodeID,
 		)
@@ -649,7 +645,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
 	expectedUptimePercentage := e.Config.UptimePercentage
 	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
-		transformSubnet, err := GetTransformSubnetTx(e.OnCommitState, stakerToReward.SubnetID)
+		transformSubnet, err := GetTransformSubnetTx(e.OnProposalBlockState, stakerToReward.SubnetID)
 		if err != nil {
 			return false, fmt.Errorf("failed to calculate uptime: %w", err)
 		}

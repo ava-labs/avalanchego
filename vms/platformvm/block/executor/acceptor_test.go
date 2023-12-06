@@ -135,7 +135,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	childOnCommitState := state.NewMockDiff(ctrl)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
-		proposalBlockState: proposalBlockState{
+		optionsState: optionsState{
 			onAbortState:  childOnAbortState,
 			onCommitState: childOnCommitState,
 		},
@@ -224,7 +224,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	childOnCommitState := state.NewMockDiff(ctrl)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
-		proposalBlockState: proposalBlockState{
+		optionsState: optionsState{
 			onAbortState:  childOnAbortState,
 			onCommitState: childOnCommitState,
 		},
@@ -284,7 +284,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentState := &blockState{
 		statelessBlock: parentStatelessBlk,
 		onAcceptState:  parentOnAcceptState,
-		proposalBlockState: proposalBlockState{
+		optionsState: optionsState{
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},
@@ -375,7 +375,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentState := &blockState{
 		statelessBlock: parentStatelessBlk,
 		onAcceptState:  parentOnAcceptState,
-		proposalBlockState: proposalBlockState{
+		optionsState: optionsState{
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},

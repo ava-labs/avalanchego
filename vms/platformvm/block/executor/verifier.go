@@ -58,11 +58,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onCommitState, err := state.NewDiff(parentID, v.backend)
-	if err != nil {
-		return err
-	}
-	onAbortState, err := state.NewDiff(parentID, v.backend)
+	onProposalBlockState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
@@ -71,20 +67,27 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
-		onCommitState,
+		onProposalBlockState,
 		nextChainTime,
 	)
 	if err != nil {
 		return err
 	}
 
-	onCommitState.SetTimestamp(nextChainTime)
-	changes.Apply(onCommitState)
+	onProposalBlockState.SetTimestamp(nextChainTime)
+	changes.Apply(onProposalBlockState)
 
-	onAbortState.SetTimestamp(nextChainTime)
-	changes.Apply(onAbortState)
+	// Note: unlike other kind of blocks, we immediately index onProposalBlockState
+	// to be able to build OnCommitState and onAbortState on top of it.
+	// We can't fill the optionsState; we'll do in the following, as we pre-process the options.
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		onAcceptState:  onProposalBlockState,
+		statelessBlock: b,
+		timestamp:      onProposalBlockState.GetTimestamp(),
+	}
 
-	return v.proposalBlock(&b.ApricotProposalBlock, onCommitState, onAbortState)
+	return v.preProcessOptions(&b.ApricotProposalBlock)
 }
 
 func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -141,16 +144,22 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onCommitState, err := state.NewDiff(parentID, v.backend)
-	if err != nil {
-		return err
-	}
-	onAbortState, err := state.NewDiff(parentID, v.backend)
+	onProposalBlockState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
 
-	return v.proposalBlock(b, onCommitState, onAbortState)
+	// Note: unlike other kind of blocks, we immediately index onProposalBlockState
+	// to be able to build OnCommitState and onAbortState on top of it.
+	// We can't fill the optionsState; we'll do in the following, as we pre-process the options.
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		onAcceptState:  onProposalBlockState,
+		statelessBlock: b,
+		timestamp:      onProposalBlockState.GetTimestamp(),
+	}
+
+	return v.preProcessOptions(b)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -318,13 +327,16 @@ func (v *verifier) commonBlock(b block.Block) error {
 // abortBlock populates the state of this block if [nil] is returned
 func (v *verifier) abortBlock(b block.Block) error {
 	parentID := b.Parent()
-	onAcceptState, ok := v.getOnAbortState(parentID)
+	onAcceptState, preferCommit, ok := v.getOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
+		optionsState: optionsState{
+			initiallyPreferCommit: preferCommit,
+		},
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
 		timestamp:      onAcceptState.GetTimestamp(),
@@ -335,13 +347,16 @@ func (v *verifier) abortBlock(b block.Block) error {
 // commitBlock populates the state of this block if [nil] is returned
 func (v *verifier) commitBlock(b block.Block) error {
 	parentID := b.Parent()
-	onAcceptState, ok := v.getOnCommitState(parentID)
+	onAcceptState, preferCommit, ok := v.getOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
+		optionsState: optionsState{
+			initiallyPreferCommit: preferCommit,
+		},
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
 		timestamp:      onAcceptState.GetTimestamp(),
@@ -349,43 +364,50 @@ func (v *verifier) commitBlock(b block.Block) error {
 	return nil
 }
 
-// proposalBlock populates the state of this block if [nil] is returned
-func (v *verifier) proposalBlock(
-	b *block.ApricotProposalBlock,
-	onCommitState state.Diff,
-	onAbortState state.Diff,
-) error {
-	txExecutor := executor.ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       v.txExecutorBackend,
-		Tx:            b.Tx,
+// preProcessOptions populates the state of this block if [nil] is returned
+func (v *verifier) preProcessOptions(parentBlk *block.ApricotProposalBlock) error {
+	parentID := parentBlk.ID()
+
+	onProposalBlockState, ok := v.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
-		txID := b.Tx.ID()
+	onCommitState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+	onAbortState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+
+	txExecutor := executor.ProposalTxExecutor{
+		OnProposalBlockState: onProposalBlockState.onAcceptState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              v.txExecutorBackend,
+		Tx:                   parentBlk.Tx,
+	}
+
+	if err := parentBlk.Tx.Unsigned.Visit(&txExecutor); err != nil {
+		txID := parentBlk.Tx.ID()
 		v.MarkDropped(txID, err) // cache tx as dropped
 		return err
 	}
 
-	onCommitState.AddTx(b.Tx, status.Committed)
-	onAbortState.AddTx(b.Tx, status.Aborted)
+	onCommitState.AddTx(parentBlk.Tx, status.Committed)
+	onAbortState.AddTx(parentBlk.Tx, status.Aborted)
 
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
-		proposalBlockState: proposalBlockState{
-			onCommitState:         onCommitState,
-			onAbortState:          onAbortState,
-			initiallyPreferCommit: txExecutor.PrefersCommit,
-		},
-		statelessBlock: b,
-		// It is safe to use [b.onAbortState] here because the timestamp will
-		// never be modified by an Apricot Abort block and the timestamp will
-		// always be the same as the Banff Proposal Block.
-		timestamp: onAbortState.GetTimestamp(),
+	// options state is temporary stored in proposal block state
+	// It will be copied to options as soon as they are verified
+	onProposalBlockState.optionsState = optionsState{
+		onCommitState:         onCommitState,
+		onAbortState:          onAbortState,
+		initiallyPreferCommit: txExecutor.PrefersCommit,
 	}
 
-	v.Mempool.Remove([]*txs.Tx{b.Tx})
+	v.Mempool.Remove([]*txs.Tx{parentBlk.Tx})
 	return nil
 }
 

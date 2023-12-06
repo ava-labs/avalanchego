@@ -143,7 +143,7 @@ func TestBlockOptions(t *testing.T) {
 					backend: &backend{
 						blkIDToState: map[ids.ID]*blockState{
 							blkID: {
-								proposalBlockState: proposalBlockState{
+								optionsState: optionsState{
 									initiallyPreferCommit: true,
 								},
 							},
@@ -189,7 +189,7 @@ func TestBlockOptions(t *testing.T) {
 					backend: &backend{
 						blkIDToState: map[ids.ID]*blockState{
 							blkID: {
-								proposalBlockState: proposalBlockState{
+								optionsState: optionsState{
 									initiallyPreferCommit: true,
 								},
 							},

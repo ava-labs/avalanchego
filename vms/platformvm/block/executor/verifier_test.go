@@ -318,7 +318,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
 				statelessBlock: parentStatelessBlk,
-				proposalBlockState: proposalBlockState{
+				optionsState: optionsState{
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},
@@ -388,7 +388,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
 				statelessBlock: parentStatelessBlk,
-				proposalBlockState: proposalBlockState{
+				optionsState: optionsState{
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},
@@ -559,7 +559,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
-				proposalBlockState: proposalBlockState{
+				optionsState: optionsState{
 					onCommitState: onCommitState,
 					onAbortState:  onAbortState,
 				},
@@ -652,7 +652,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
-				proposalBlockState: proposalBlockState{
+				optionsState: optionsState{
 					onCommitState: onCommitState,
 					onAbortState:  onAbortState,
 				},
@@ -780,7 +780,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
 				statelessBlock: parentStatelessBlk,
-				proposalBlockState: proposalBlockState{
+				optionsState: optionsState{
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},
@@ -838,7 +838,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
 				statelessBlock: parentStatelessBlk,
-				proposalBlockState: proposalBlockState{
+				optionsState: optionsState{
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},

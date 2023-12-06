@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
@@ -41,8 +40,7 @@ func (a *acceptor) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (a *acceptor) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	a.proposalBlock(b, "banff proposal")
-	return nil
+	return a.proposalBlock(b, "banff proposal")
 }
 
 func (a *acceptor) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -58,8 +56,7 @@ func (a *acceptor) ApricotCommitBlock(b *block.ApricotCommitBlock) error {
 }
 
 func (a *acceptor) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
-	a.proposalBlock(b, "apricot proposal")
-	return nil
+	return a.proposalBlock(b, "apricot proposal")
 }
 
 func (a *acceptor) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -117,56 +114,66 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 }
 
 func (a *acceptor) abortBlock(b block.Block, blockType string) error {
-	parentID := b.Parent()
-	parentState, ok := a.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	if a.bootstrapped.Get() {
-		if parentState.initiallyPreferCommit {
-			a.metrics.MarkOptionVoteLost()
-		} else {
-			a.metrics.MarkOptionVoteWon()
-		}
-	}
-
-	return a.optionBlock(b, parentState.statelessBlock, blockType)
+	return a.optionBlock(b, blockType)
 }
 
 func (a *acceptor) commitBlock(b block.Block, blockType string) error {
-	parentID := b.Parent()
-	parentState, ok := a.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	if a.bootstrapped.Get() {
-		if parentState.initiallyPreferCommit {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
-
-	return a.optionBlock(b, parentState.statelessBlock, blockType)
+	return a.optionBlock(b, blockType)
 }
 
-func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
+func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	blkID := b.ID()
-	parentID := parent.ID()
 
 	defer func() {
-		// Note: we assume this block's sibling doesn't
-		// need the parent's state when it's rejected.
-		a.free(parentID)
+		a.free(b.Parent())
 		a.free(blkID)
 	}()
 
-	// Note that the parent must be accepted first.
-	if err := a.commonAccept(parent); err != nil {
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
+	}
+
+	if a.bootstrapped.Get() {
+		if blkState.initiallyPreferCommit {
+			a.metrics.MarkOptionVoteLost()
+		} else {
+			a.metrics.MarkOptionVoteWon()
+		}
+	}
+
+	if err := a.commonAccept(b); err != nil {
 		return err
 	}
+
+	if err := blkState.onAcceptState.Apply(a.state); err != nil {
+		return err
+	}
+
+	// Here we commit both option block changes and its proposal block
+	// parent ones.
+	if err := a.state.Commit(); err != nil {
+		return err
+	}
+
+	a.ctx.Log.Trace(
+		"accepted block",
+		zap.String("blockType", blockType),
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parentID", b.Parent()),
+		zap.Stringer("utxoChecksum", a.state.Checksum()),
+	)
+
+	return nil
+}
+
+func (a *acceptor) proposalBlock(b block.Block, blockType string) error {
+	blkID := b.ID()
+
+	// Note: we free proposalBlock blkState entry once we accept an options
+	// TODO: consider handling cases when this can be done earlier
+	// (e.g. both options verified before accepting one of them)
 
 	if err := a.commonAccept(b); err != nil {
 		return err
@@ -180,40 +187,13 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 		return err
 	}
 
-	if err := a.state.Commit(); err != nil {
-		return err
-	}
+	// Note: We don't write this block to state here.
+	//       That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
+	//       We do this so that in the event that the node shuts down, the proposal block
+	//       is not written to disk unless its child is.
+	//       (The VM's Shutdown method commits the database.)
+	//       The snowman.Engine requires that the last committed block is a decision block
 
-	a.ctx.Log.Trace(
-		"accepted block",
-		zap.String("blockType", blockType),
-		zap.Stringer("blkID", blkID),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", parentID),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
-	)
-
-	return nil
-}
-
-func (a *acceptor) proposalBlock(b block.Block, blockType string) {
-	// Note that:
-	//
-	// * We don't free the proposal block in this method.
-	//   It is freed when its child is accepted.
-	//   We need to keep this block's state in memory for its child to use.
-	//
-	// * We only update the metrics to reflect this block's
-	//   acceptance when its child is accepted.
-	//
-	// * We don't write this block to state here.
-	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-	//   We do this so that in the event that the node shuts down, the proposal block
-	//   is not written to disk unless its child is.
-	//   (The VM's Shutdown method commits the database.)
-	//   The snowman.Engine requires that the last committed block is a decision block
-
-	blkID := b.ID()
 	a.backend.lastAccepted = blkID
 
 	a.ctx.Log.Trace(
@@ -224,6 +204,7 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) {
 		zap.Stringer("parentID", b.Parent()),
 		zap.Stringer("utxoChecksum", a.state.Checksum()),
 	)
+	return nil
 }
 
 func (a *acceptor) standardBlock(b block.Block, blockType string) error {
