@@ -70,7 +70,7 @@ type messageQueue struct {
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.NodeID]int
 	// Unprocessed messages
-	msgAndCtxs buffer.Queue[*msgAndContext]
+	msgAndCtxs buffer.Deque[*msgAndContext]
 }
 
 func NewMessageQueue(
@@ -86,6 +86,7 @@ func NewMessageQueue(
 		cpuTracker:            cpuTracker,
 		cond:                  sync.NewCond(&sync.Mutex{}),
 		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
+		msgAndCtxs:            buffer.NewUnboundedDeque[*msgAndContext](1 /*=initSize*/),
 	}
 	return m, m.metrics.initialize(metricsNamespace, ctx.Registerer, ops)
 }
@@ -100,7 +101,7 @@ func (m *messageQueue) Push(ctx context.Context, msg Message) {
 	}
 
 	// Add the message to the queue
-	m.msgAndCtxs.Push(&msgAndContext{
+	m.msgAndCtxs.PushRight(&msgAndContext{
 		msg: msg,
 		ctx: ctx,
 	})
@@ -131,7 +132,7 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		m.cond.Wait()
 	}
 
-	n := m.msgAndCtxs.Len()
+	n := m.msgAndCtxs.Len() // note that n > 0
 	i := 0
 	for {
 		if i == n {
@@ -141,7 +142,7 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		}
 
 		var (
-			msgAndCtx, _ = m.msgAndCtxs.Pop()
+			msgAndCtx, _ = m.msgAndCtxs.PopLeft()
 			msg          = msgAndCtx.msg
 			ctx          = msgAndCtx.ctx
 			nodeID       = msg.NodeID()
@@ -160,7 +161,7 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		}
 		// [msg.nodeID] is causing excessive CPU usage.
 		// Push [msg] to back of [m.msgs] and handle it later.
-		m.msgAndCtxs.Push(msgAndCtx)
+		m.msgAndCtxs.PushRight(msgAndCtx)
 		i++
 		m.metrics.numExcessiveCPU.Inc()
 	}
@@ -179,7 +180,7 @@ func (m *messageQueue) Shutdown() {
 
 	// Remove all the current messages from the queue
 	for m.msgAndCtxs.Len() > 0 {
-		msgAndCtx, _ := m.msgAndCtxs.Pop()
+		msgAndCtx, _ := m.msgAndCtxs.PopLeft()
 		msgAndCtx.msg.OnFinishedHandling()
 	}
 	m.msgAndCtxs = nil
