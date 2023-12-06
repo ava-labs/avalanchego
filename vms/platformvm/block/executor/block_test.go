@@ -136,7 +136,6 @@ func TestBlockOptions(t *testing.T) {
 		name                   string
 		blkF                   func(*gomock.Controller) *Block
 		expectedPreferenceType block.Block
-		expectedErr            error
 	}
 
 	tests := []test{
@@ -165,10 +164,41 @@ func TestBlockOptions(t *testing.T) {
 				}
 			},
 			expectedPreferenceType: &block.ApricotCommitBlock{},
-			expectedErr:            nil,
 		},
 		{
-			name: "banff proposal block; commit preferred; missing tx",
+			name: "banff proposal block; invalid proposal tx",
+			blkF: func(ctrl *gomock.Controller) *Block {
+				state := state.NewMockState(ctrl)
+
+				uptimes := uptime.NewMockCalculator(ctrl)
+
+				manager := &manager{
+					backend: &backend{
+						state: state,
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Config{
+							UptimePercentage: 0,
+						},
+						Uptimes: uptimes,
+					},
+				}
+
+				return &Block{
+					Block: &block.BanffProposalBlock{
+						ApricotProposalBlock: block.ApricotProposalBlock{
+							Tx: &txs.Tx{
+								Unsigned: &txs.CreateChainTx{},
+							},
+						},
+					},
+					manager: manager,
+				}
+			},
+			expectedPreferenceType: &block.BanffCommitBlock{},
+		},
+		{
+			name: "banff proposal block; missing tx",
 			blkF: func(ctrl *gomock.Controller) *Block {
 				stakerTxID := ids.GenerateTestID()
 
@@ -203,7 +233,6 @@ func TestBlockOptions(t *testing.T) {
 				}
 			},
 			expectedPreferenceType: &block.BanffCommitBlock{},
-			expectedErr:            nil,
 		},
 		{
 			name: "banff proposal block; error fetching staker tx",
@@ -240,8 +269,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: nil,
-			expectedErr:            executor.ErrMissingStakerTx,
+			expectedPreferenceType: &block.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; unexpected staker tx type",
@@ -281,8 +309,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: nil,
-			expectedErr:            executor.ErrUnexpectedStakerTransactionType,
+			expectedPreferenceType: &block.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; missing primary network validator",
@@ -332,8 +359,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: nil,
-			expectedErr:            executor.ErrStakerWithoutPrimaryNetworkValidator,
+			expectedPreferenceType: &block.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; failed calculating primary network uptime",
@@ -388,8 +414,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: nil,
-			expectedErr:            executor.ErrCalculatingUptime,
+			expectedPreferenceType: &block.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; failed fetching subnet transformation",
@@ -444,8 +469,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: nil,
-			expectedErr:            executor.ErrMissingSubnetTransformation,
+			expectedPreferenceType: &block.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; prefers commit",
@@ -507,7 +531,6 @@ func TestBlockOptions(t *testing.T) {
 				}
 			},
 			expectedPreferenceType: &block.BanffCommitBlock{},
-			expectedErr:            nil,
 		},
 		{
 			name: "banff proposal block; prefers abort",
@@ -569,7 +592,6 @@ func TestBlockOptions(t *testing.T) {
 				}
 			},
 			expectedPreferenceType: &block.BanffAbortBlock{},
-			expectedErr:            nil,
 		},
 	}
 
@@ -580,10 +602,7 @@ func TestBlockOptions(t *testing.T) {
 
 			blk := tt.blkF(ctrl)
 			options, err := blk.Options(context.Background())
-			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr != nil {
-				return
-			}
+			require.NoError(err)
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)
 		})
 	}

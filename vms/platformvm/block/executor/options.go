@@ -8,8 +8,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -40,16 +43,6 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
-	preference := executor.ProposalTxPreference{
-		PrimaryUptimePercentage: o.primaryUptimePercentage,
-		Uptimes:                 o.uptimes,
-		State:                   o.state,
-		Tx:                      b.Tx,
-	}
-	if err := b.Tx.Unsigned.Visit(&preference); err != nil {
-		return err
-	}
-
 	commitBlock, err := block.NewBanffCommitBlock(timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
@@ -66,7 +59,7 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		)
 	}
 
-	if preference.PrefersCommit {
+	if o.prefersCommit(b.Tx) {
 		o.preferredBlock = commitBlock
 		o.alternateBlock = abortBlock
 	} else {
@@ -117,4 +110,52 @@ func (*options) ApricotStandardBlock(*block.ApricotStandardBlock) error {
 
 func (*options) ApricotAtomicBlock(*block.ApricotAtomicBlock) error {
 	return snowman.ErrNotOracle
+}
+
+// TODO: should prefersCommit log errors
+func (o *options) prefersCommit(tx *txs.Tx) bool {
+	unsignedTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	if !ok {
+		return true
+	}
+
+	stakerTx, _, err := o.state.GetTx(unsignedTx.TxID)
+	if err != nil {
+		return true
+	}
+
+	staker, ok := stakerTx.Unsigned.(txs.Staker)
+	if !ok {
+		return true
+	}
+
+	nodeID := staker.NodeID()
+	primaryNetworkValidator, err := o.state.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		nodeID,
+	)
+	if err != nil {
+		return true
+	}
+
+	expectedUptimePercentage := o.primaryUptimePercentage
+	if subnetID := staker.SubnetID(); subnetID != constants.PrimaryNetworkID {
+		transformSubnet, err := executor.GetTransformSubnetTx(o.state, subnetID)
+		if err != nil {
+			return true
+		}
+
+		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
+	}
+
+	uptime, err := o.uptimes.CalculateUptimePercentFrom(
+		nodeID,
+		constants.PrimaryNetworkID,
+		primaryNetworkValidator.StartTime,
+	)
+	if err != nil {
+		return true
+	}
+
+	return uptime >= expectedUptimePercentage
 }
