@@ -85,10 +85,6 @@ type Manager interface {
 	// If sampling the requested size isn't possible, an error will be returned.
 	Sample(subnetID ids.ID, size int) ([]ids.NodeID, error)
 
-	// UniformSample returns a collection of validatorIDs in the subnet.
-	// If sampling the requested size isn't possible, an error will be returned.
-	UniformSample(subnetID ids.ID, size int) ([]ids.NodeID, error)
-
 	// Map of the validators in this subnet
 	GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput
 
@@ -255,21 +251,6 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 	}
 
 	return set.Sample(size)
-}
-
-func (m *manager) UniformSample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
-	if size == 0 {
-		return nil, nil
-	}
-
-	m.lock.RLock()
-	set, exists := m.subnetToVdrs[subnetID]
-	m.lock.RUnlock()
-	if !exists {
-		return nil, ErrMissingValidators
-	}
-
-	return set.UniformSample(size)
 }
 
 func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {

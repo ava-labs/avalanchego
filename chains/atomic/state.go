@@ -6,17 +6,22 @@ package atomic
 import (
 	"bytes"
 	"errors"
+	"fmt"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var errDuplicatedOperation = errors.New("duplicated operation on provided value")
+var (
+	errDuplicatePut    = errors.New("duplicate put")
+	errDuplicateRemove = errors.New("duplicate remove")
+)
 
 type dbElement struct {
 	// Present indicates the value was removed before existing.
@@ -86,7 +91,7 @@ func (s *state) SetValue(e *Element) error {
 		}
 
 		// This key was written twice, which is invalid
-		return errDuplicatedOperation
+		return fmt.Errorf("%w: Key=0x%x Value=0x%x", errDuplicatePut, e.Key, e.Value)
 	}
 	if err != database.ErrNotFound {
 		// An unexpected error occurred, so we should propagate that error
@@ -160,7 +165,7 @@ func (s *state) RemoveValue(key []byte) error {
 
 	// Don't allow the removal of something that was already removed.
 	if !value.Present {
-		return errDuplicatedOperation
+		return fmt.Errorf("%w: Key=0x%x", errDuplicateRemove, key)
 	}
 
 	// Remove [key] from the indexDB for each trait that has indexed this key.
@@ -203,7 +208,7 @@ func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int)
 	lastKey := startKey
 	// Iterate over the traits in order appending all of the keys that possess
 	// the given [traits].
-	utils.SortBytes(traits)
+	slices.SortFunc(traits, bytes.Compare)
 	for _, trait := range traits {
 		switch bytes.Compare(trait, startTrait) {
 		case -1:

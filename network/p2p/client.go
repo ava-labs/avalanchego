@@ -41,10 +41,9 @@ type CrossChainAppResponseCallback func(
 type Client struct {
 	handlerID     uint64
 	handlerPrefix []byte
-	router        *Router
+	router        *router
 	sender        common.AppSender
-	// nodeSampler is used to select nodes to route AppRequestAny to
-	nodeSampler NodeSampler
+	options       *clientOptions
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -55,7 +54,7 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	sampled := c.nodeSampler.Sample(ctx, 1)
+	sampled := c.options.nodeSampler.Sample(ctx, 1)
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
