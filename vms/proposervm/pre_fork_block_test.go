@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
@@ -242,7 +241,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require.True(coreGenBlk.Timestamp().Before(activationTime))
 
 	// create parent block ...
-	prntCoreBlk := &snowman.TestBlock{
+	parentCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -252,14 +251,14 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return prntCoreBlk, nil
+		return parentCoreBlk, nil
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
 			return coreGenBlk, nil
-		case prntCoreBlk.ID():
-			return prntCoreBlk, nil
+		case parentCoreBlk.ID():
+			return parentCoreBlk, nil
 		default:
 			return nil, database.ErrNotFound
 		}
@@ -268,15 +267,14 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
-		case bytes.Equal(b, prntCoreBlk.Bytes()):
-			return prntCoreBlk, nil
+		case bytes.Equal(b, parentCoreBlk.Bytes()):
+			return parentCoreBlk, nil
 		default:
 			return nil, database.ErrNotFound
 		}
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
-	prntProBlk, err := proVM.BuildBlock(context.Background())
+	parentBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
 	// .. create child block ...
@@ -286,21 +284,25 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{2},
-		TimestampV: prntCoreBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		TimestampV: parentCoreBlk.Timestamp(),
 	}
-	childProBlk := preForkBlock{
+	childBlk := preForkBlock{
 		Block: childCoreBlk,
 		vm:    proVM,
 	}
 
-	// child block referring unknown parent does not verify
-	childCoreBlk.ParentV = ids.Empty
-	err = childProBlk.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
+	{
+		// child block referring unknown parent does not verify
+		childCoreBlk.ParentV = ids.Empty
+		err = childBlk.Verify(context.Background())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
 
-	// child block referring known parent does verify
-	childCoreBlk.ParentV = prntProBlk.ID()
-	require.NoError(childProBlk.Verify(context.Background()))
+	{
+		// child block referring known parent does verify
+		childCoreBlk.ParentV = parentBlk.ID()
+		require.NoError(childBlk.Verify(context.Background()))
+	}
 }
 
 func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
