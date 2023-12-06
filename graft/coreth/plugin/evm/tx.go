@@ -10,8 +10,6 @@ import (
 	"math/big"
 	"sort"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/coreth/core/state"
@@ -21,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -56,12 +55,12 @@ type EVMOutput struct {
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
-func (o EVMOutput) Less(other EVMOutput) bool {
+func (o EVMOutput) Compare(other EVMOutput) int {
 	addrComp := bytes.Compare(o.Address.Bytes(), other.Address.Bytes())
 	if addrComp != 0 {
-		return addrComp < 0
+		return addrComp
 	}
-	return bytes.Compare(o.AssetID[:], other.AssetID[:]) < 0
+	return bytes.Compare(o.AssetID[:], other.AssetID[:])
 }
 
 // EVMInput defines an input created from the EVM state to fund export transactions
@@ -72,12 +71,12 @@ type EVMInput struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
-func (i EVMInput) Less(other EVMInput) bool {
+func (i EVMInput) Compare(other EVMInput) int {
 	addrComp := bytes.Compare(i.Address.Bytes(), other.Address.Bytes())
 	if addrComp != 0 {
-		return addrComp < 0
+		return addrComp
 	}
-	return bytes.Compare(i.AssetID[:], other.AssetID[:]) < 0
+	return bytes.Compare(i.AssetID[:], other.AssetID[:])
 }
 
 // Verify ...
@@ -143,8 +142,17 @@ type Tx struct {
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 }
 
-func (tx *Tx) Less(other *Tx) bool {
-	return tx.ID().Hex() < other.ID().Hex()
+func (tx *Tx) Compare(other *Tx) int {
+	txHex := tx.ID().Hex()
+	otherHex := other.ID().Hex()
+	switch {
+	case txHex < otherHex:
+		return -1
+	case txHex > otherHex:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // Sign this transaction with the provided signers
@@ -267,9 +275,7 @@ func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
 		// with txs initialized from the txID index.
 		copyTxs := make([]*Tx, len(txs))
 		copy(copyTxs, txs)
-		slices.SortFunc(copyTxs, func(i, j *Tx) bool {
-			return i.Less(j)
-		})
+		utils.Sort(copyTxs)
 		txs = copyTxs
 	}
 	output := make(map[ids.ID]*atomic.Requests)
