@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -738,36 +737,7 @@ func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
 }
 
 func (s *state) GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error) {
-	stakerTx, _, err := s.GetTx(stakerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get next staker %s: %w", stakerID, err)
-	}
-	switch uStakerTx := stakerTx.Unsigned.(type) {
-	case txs.ValidatorTx:
-		var pop *signer.ProofOfPossession
-		if staker, ok := uStakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-				pop = s
-			}
-		}
-
-		return &StakerColdAttributes{
-			Stake:                  uStakerTx.Stake(),
-			Outputs:                uStakerTx.Outputs(),
-			Shares:                 uStakerTx.Shares(),
-			ValidationRewardsOwner: uStakerTx.ValidationRewardsOwner(),
-			DelegationRewardsOwner: uStakerTx.DelegationRewardsOwner(),
-			ProofOfPossession:      pop,
-		}, nil
-	case txs.DelegatorTx:
-		return &StakerColdAttributes{
-			Stake:        uStakerTx.Stake(),
-			Outputs:      uStakerTx.Outputs(),
-			RewardsOwner: uStakerTx.RewardsOwner(),
-		}, nil
-	default:
-		return nil, fmt.Errorf("unexpected stakerTx type %T", uStakerTx)
-	}
+	return getStakerColdAttributes(s, stakerID)
 }
 
 func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -997,19 +967,7 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 }
 
 func (s *state) GetChainSubnet(chainID ids.ID) (ids.ID, error) {
-	chainTx, _, err := s.GetTx(chainID)
-	if err != nil {
-		return ids.Empty, fmt.Errorf(
-			"problem retrieving blockchain %q: %w",
-			chainID,
-			err,
-		)
-	}
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-	if !ok {
-		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
-	}
-	return chain.SubnetID, nil
+	return getChainSubnet(s, chainID)
 }
 
 func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
