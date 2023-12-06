@@ -109,7 +109,7 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 		return nil, err
 	}
 
-	nextBlkTime, _, _, err := NextBlockTime(state, v.Clk)
+	nextBlkTime, _, err := NextBlockTime(state, v.Clk)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 	return state, nil
 }
 
-func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, time.Time, error) {
+func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, error) {
 	var (
 		timestamp  = clk.Time()
 		parentTime = state.GetTimestamp()
@@ -136,7 +136,7 @@ func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, tim
 
 	nextStakerChangeTime, err := GetNextStakerChangeTime(state)
 	if err != nil {
-		return time.Time{}, false, time.Time{}, fmt.Errorf("failed getting next staker change time: %w", err)
+		return time.Time{}, false, fmt.Errorf("failed getting next staker change time: %w", err)
 	}
 
 	// timeWasCapped means that [timestamp] was reduced to [nextStakerChangeTime]
@@ -145,5 +145,5 @@ func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, tim
 		timestamp = nextStakerChangeTime
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
-	return timestamp, timeWasCapped, nextStakerChangeTime, nil
+	return timestamp, timeWasCapped, nil
 }

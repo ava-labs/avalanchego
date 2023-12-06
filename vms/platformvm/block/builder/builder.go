@@ -112,25 +112,10 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp, timeWasCapped, nextStakerChangeTime, err := txexecutor.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, timeWasCapped, err := txexecutor.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
-
-	waitTime := nextStakerChangeTime.Sub(timestamp)
-	ctx.Log.Debug("setting next scheduled event",
-		zap.Time("nextEventTime", nextStakerChangeTime),
-		zap.Duration("timeUntil", waitTime),
-	)
-
-	b.nextStakerChangeTimeLock.Lock()
-	ctx.Log.Debug("updating nextStakerChangeTime in BuildBlock",
-		zap.Time("old", b.nextStakerChangeTime),
-		zap.Time("new", nextStakerChangeTime),
-	)
-	b.nextStakerChangeTime = nextStakerChangeTime
-	b.nextStakerChangeTimeLock.Unlock()
-	b.timer.SetTimeoutIn(waitTime)
 
 	statelessBlk, err := buildBlock(
 		b,
@@ -200,10 +185,6 @@ func (b *builder) ResetBlockTimer() {
 
 	// Wake up when it's time to add/remove the next validator
 	b.nextStakerChangeTimeLock.Lock()
-	ctx.Log.Debug("updating nextStakerChangeTime in ResetBlockTimer",
-		zap.Time("old", b.nextStakerChangeTime),
-		zap.Time("new", nextStakerChangeTime),
-	)
 	b.nextStakerChangeTime = nextStakerChangeTime
 	b.nextStakerChangeTimeLock.Unlock()
 	b.timer.SetTimeoutIn(waitTime)
@@ -224,7 +205,7 @@ func (b *builder) maybeIssueEmptyBlock() {
 	if b.nextStakerChangeTime.After(now) {
 		// [nextStakerChangeTime] is in the future, no need to advance time.
 		waitTime := b.nextStakerChangeTime.Sub(now)
-		ctx.Log.Debug("setting next scheduled event",
+		ctx.Log.Debug("setting next scheduled event from maybeIssueEmptyBlock",
 			zap.Time("nextEventTime", b.nextStakerChangeTime),
 			zap.Duration("timeUntil", waitTime),
 		)
