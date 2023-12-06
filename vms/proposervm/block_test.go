@@ -60,15 +60,17 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
 	vm := &VM{
+		Config: Config{
+			StakingCertLeaf:   &staking.Certificate{},
+			StakingLeafSigner: pk,
+		},
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
 		ctx: &snow.Context{
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower:          windower,
-		stakingCertLeaf:   &staking.Certificate{},
-		stakingLeafSigner: pk,
+		Windower: windower,
 	}
 
 	blk := &postForkCommonComponents{
