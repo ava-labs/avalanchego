@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package process;
+
+import "google/protobuf/empty.proto";
+import "io/prometheus/client/metrics.proto";
+
+option go_package = "github.com/ava-labs/merkledb-tester/proto/pb/process";
+
+service ProcessServerService {
+  rpc Metrics(google.protobuf.Empty) returns (MetricsResponse);
+}
+
+message MetricsResponse {
+  repeated io.prometheus.client.MetricFamily metric_families = 1;
+}
