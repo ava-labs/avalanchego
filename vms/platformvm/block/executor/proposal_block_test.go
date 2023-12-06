@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -1320,4 +1321,115 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// Test validator weight after delegation
 	vdrWeight = env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
+}
+
+func TestDurangoVerifierVisitProposalBlockWithStandarTxs(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	env := newEnvironment(t, ctrl)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+	env.clk.Set(defaultGenesisTime)
+	env.config.DurangoTime = time.Time{} // activate Durango
+
+	// create parentBlock. It's a standard one for simplicity
+	parentTime := defaultGenesisTime
+	parentHeight := uint64(2022)
+
+	parentBlk, err := block.NewBanffStandardBlock(
+		parentTime,
+		genesisBlkID, // does not matter
+		parentHeight,
+		nil, // txs do not matter in this test
+	)
+	require.NoError(err)
+	parentBlkID := parentBlk.ID()
+
+	// store parent block, with relevant quantities
+	chainTime := parentTime
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+
+	onParentAccept := state.NewMockDiff(ctrl)
+	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+
+	env.blkManager.(*manager).blkIDToState[parentBlkID] = &blockState{
+		statelessBlock: parentBlk,
+		onAcceptState:  onParentAccept,
+		timestamp:      parentTime,
+	}
+	env.blkManager.(*manager).lastAccepted = parentBlkID
+	env.mockedState.EXPECT().GetLastAccepted().Return(parentBlkID).AnyTimes()
+	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
+		func(blockID ids.ID) (block.Block, error) {
+			if blockID == parentBlkID {
+				return parentBlk, nil
+			}
+			return nil, database.ErrNotFound
+		}).AnyTimes()
+
+	// build proposal block with decision txs
+	proposalUnsignedMock := txs.NewMockUnsignedTx(ctrl)
+	proposalUnsignedMock.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
+	proposalTx := &txs.Tx{
+		Unsigned: proposalUnsignedMock,
+	}
+
+	decisionUnsignedMock := txs.NewMockUnsignedTx(ctrl)
+	decisionUnsignedMock.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).Return(nil).Times(2) // Two times because my dummy implementation sucks. TODO: make this 1
+	decisionTx := &txs.Tx{
+		Unsigned: decisionUnsignedMock,
+	}
+
+	// We can't serialize [blkTx] because it isn't registered with the blocks.Codec.
+	// Serialize this block with a dummy txs and replace it after creation with the mock tx.
+	var (
+		blkTimestamp = chainTime.Add(time.Second)
+		blkHeight    = parentHeight + 1
+	)
+	durangoProposalBlk, err := block.NewBanffProposalBlock(
+		blkTimestamp,
+		parentBlkID,
+		blkHeight,
+		&txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{},
+			Creds:    []verify.Verifiable{},
+		},
+		[]*txs.Tx{
+			{
+				Unsigned: &txs.ImportTx{}, // a dummy tx that passes marshalling even if empty
+				Creds:    []verify.Verifiable{},
+			},
+		},
+	)
+	require.NoError(err)
+	durangoProposalBlk.ApricotProposalBlock.Tx = proposalTx
+	durangoProposalBlk.Transactions = []*txs.Tx{decisionTx}
+
+	// setup state to validate proposal block transactions
+	var (
+		nextStakerTime = chainTime.Add(time.Second)
+		nextStakerTxID = ids.GenerateTestID()
+	)
+	currentStakersIt := state.NewMockStakerIterator(ctrl)
+	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
+	currentStakersIt.EXPECT().Value().Return(&state.Staker{
+		TxID:     nextStakerTxID,
+		EndTime:  nextStakerTime,
+		NextTime: nextStakerTime,
+		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+	}).AnyTimes()
+	currentStakersIt.EXPECT().Release().AnyTimes()
+	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
+
+	pendingStakersIt := state.NewMockStakerIterator(ctrl)
+	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
+	pendingStakersIt.EXPECT().Release().AnyTimes()
+	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
+
+	// test: verify the block
+	blk := env.blkManager.NewBlock(durangoProposalBlk)
+	require.NoError(blk.Verify(context.Background()))
 }

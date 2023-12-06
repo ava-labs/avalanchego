@@ -96,7 +96,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 			timestamp:      onCommitState.GetTimestamp(),
 			atomicRequests: make(map[ids.ID]*atomic.Requests),
 		}
-		if err := v.processStandardTxs(onCommitBlkState); err != nil {
+		if err := v.processStandardTxs(b.Transactions, onCommitBlkState); err != nil {
 			return err
 		}
 
@@ -106,10 +106,10 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 			timestamp:      onCommitState.GetTimestamp(),
 			atomicRequests: make(map[ids.ID]*atomic.Requests),
 		}
-		if err := v.processStandardTxs(onAbortBlkState); err != nil {
+		if err := v.processStandardTxs(b.Transactions, onAbortBlkState); err != nil {
 			return err
 		}
-		if reflect.DeepEqual(onCommitBlkState.atomicRequests, onAbortBlkState.atomicRequests) {
+		if !reflect.DeepEqual(onCommitBlkState.atomicRequests, onAbortBlkState.atomicRequests) {
 			return errors.New("this should really never ever happen, so gotta find a structural way to avoid it")
 		}
 		atomicRequests = onCommitBlkState.atomicRequests
@@ -435,15 +435,16 @@ func (v *verifier) standardBlock(
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	return v.processStandardTxs(blkState)
+	return v.processStandardTxs(b.Txs(), blkState)
 }
 
-func (v *verifier) processStandardTxs(blkState *blockState) error {
+func (v *verifier) processStandardTxs(transactions []*txs.Tx, blkState *blockState) error {
+	// We pass explicitly transactions instead of calling b.Txs(), since in proposal blocks
+	// with decision txs, b.Txs() returns the proposal txs which we don't want to validate here.
 	var (
-		transactions = blkState.statelessBlock.Txs()
-		parentBlkID  = blkState.statelessBlock.Parent()
-		blkID        = blkState.statelessBlock.ID()
-		funcs        = make([]func(), 0, len(transactions))
+		parentBlkID = blkState.statelessBlock.Parent()
+		blkID       = blkState.statelessBlock.ID()
+		funcs       = make([]func(), 0, len(transactions))
 	)
 
 	for _, tx := range transactions {
