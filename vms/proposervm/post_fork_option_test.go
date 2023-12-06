@@ -653,7 +653,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
+			ActivationTime:      time.Time{},
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
