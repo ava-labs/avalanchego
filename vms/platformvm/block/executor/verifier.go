@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	reflect "reflect"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -49,7 +50,8 @@ func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	if len(b.Transactions) != 0 {
+	nextChainTime := b.Timestamp()
+	if !v.txExecutorBackend.Config.IsDurangoActivated(nextChainTime) && len(b.Transactions) != 0 {
 		return errBanffProposalBlockWithMultipleTransactions
 	}
 
@@ -67,8 +69,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	// Apply the changes, if any, from advancing the chain time.
-	nextChainTime := b.Timestamp()
+	// Step 1: advance timestamp and apply resulting changes, if any
 	changes, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
 		onCommitState,
@@ -84,7 +85,38 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	onAbortState.SetTimestamp(nextChainTime)
 	changes.Apply(onAbortState)
 
-	return v.proposalBlock(&b.ApricotProposalBlock, onCommitState, onAbortState)
+	// Step 2: process standard transactions, if any
+	var atomicRequests map[ids.ID]*atomic.Requests
+	if len(b.Transactions) != 0 {
+		// NOTE: this sucks! Find a way to execute standardTxs once (at least for the same proposal block)
+
+		onCommitBlkState := &blockState{
+			statelessBlock: b,
+			onAcceptState:  onCommitState,
+			timestamp:      onCommitState.GetTimestamp(),
+			atomicRequests: make(map[ids.ID]*atomic.Requests),
+		}
+		if err := v.processStandardTxs(onCommitBlkState); err != nil {
+			return err
+		}
+
+		onAbortBlkState := &blockState{
+			statelessBlock: b,
+			onAcceptState:  onCommitState,
+			timestamp:      onCommitState.GetTimestamp(),
+			atomicRequests: make(map[ids.ID]*atomic.Requests),
+		}
+		if err := v.processStandardTxs(onAbortBlkState); err != nil {
+			return err
+		}
+		if reflect.DeepEqual(onCommitBlkState.atomicRequests, onAbortBlkState.atomicRequests) {
+			return errors.New("this should really never ever happen, so gotta find a structural way to avoid it")
+		}
+		atomicRequests = onCommitBlkState.atomicRequests
+	}
+
+	// Step 3: finally process the proposal transaction
+	return v.proposalBlock(&b.ApricotProposalBlock, onCommitState, onAbortState, atomicRequests)
 }
 
 func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -150,7 +182,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, onCommitState, onAbortState)
+	return v.proposalBlock(b, onCommitState, onAbortState, nil)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -354,6 +386,7 @@ func (v *verifier) proposalBlock(
 	b *block.ApricotProposalBlock,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
+	atomicRequests map[ids.ID]*atomic.Requests,
 ) error {
 	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -382,7 +415,8 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp: onAbortState.GetTimestamp(),
+		timestamp:      onAbortState.GetTimestamp(),
+		atomicRequests: atomicRequests,
 	}
 
 	v.Mempool.Remove([]*txs.Tx{b.Tx})
