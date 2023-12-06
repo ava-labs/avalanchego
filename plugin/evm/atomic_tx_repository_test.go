@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"testing"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -104,9 +103,7 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 		assert.NoErrorf(t, err, "unexpected error on GetByHeight at height=%d", height)
 		assert.Lenf(t, txs, len(expectedTxs), "wrong len of txs at height=%d", height)
 		// txs should be stored in order of txID
-		slices.SortFunc(expectedTxs, func(i, j *Tx) bool {
-			return i.Less(j)
-		})
+		utils.Sort(expectedTxs)
 
 		txIDs := set.Set[ids.ID]{}
 		for i := 0; i < len(txs); i++ {

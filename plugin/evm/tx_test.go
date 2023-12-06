@@ -188,16 +188,16 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	}
 }
 
-func TestEVMOutputLess(t *testing.T) {
+func TestEVMOutputCompare(t *testing.T) {
 	type test struct {
 		name     string
 		a, b     EVMOutput
-		expected bool
+		expected int
 	}
 
 	tests := []test{
 		{
-			name: "first address less",
+			name: "address less",
 			a: EVMOutput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
@@ -206,22 +206,10 @@ func TestEVMOutputLess(t *testing.T) {
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{0},
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
-			name: "first address greater",
-			a: EVMOutput{
-				Address: common.BytesToAddress([]byte{0x02}),
-				AssetID: ids.ID{0},
-			},
-			b: EVMOutput{
-				Address: common.BytesToAddress([]byte{0x01}),
-				AssetID: ids.ID{1},
-			},
-			expected: false,
-		},
-		{
-			name: "first address greater; assetIDs equal",
+			name: "address greater; assetIDs equal",
 			a: EVMOutput{
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{},
@@ -230,10 +218,10 @@ func TestEVMOutputLess(t *testing.T) {
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{},
 			},
-			expected: false,
+			expected: 1,
 		},
 		{
-			name: "addresses equal; first assetID less",
+			name: "addresses equal; assetID less",
 			a: EVMOutput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{0},
@@ -242,33 +230,36 @@ func TestEVMOutputLess(t *testing.T) {
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
 			name:     "equal",
 			a:        EVMOutput{},
 			b:        EVMOutput{},
-			expected: false,
+			expected: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.a.Less(tt.b))
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.a.Compare(tt.b))
+			require.Equal(-tt.expected, tt.b.Compare(tt.a))
 		})
 	}
 }
 
-func TestEVMInputLess(t *testing.T) {
+func TestEVMInputCompare(t *testing.T) {
 	type test struct {
 		name     string
 		a, b     EVMInput
-		expected bool
+		expected int
 	}
 
 	tests := []test{
 		{
-			name: "first address less",
+			name: "address less",
 			a: EVMInput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
@@ -277,22 +268,10 @@ func TestEVMInputLess(t *testing.T) {
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{0},
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
-			name: "first address greater",
-			a: EVMInput{
-				Address: common.BytesToAddress([]byte{0x02}),
-				AssetID: ids.ID{0},
-			},
-			b: EVMInput{
-				Address: common.BytesToAddress([]byte{0x01}),
-				AssetID: ids.ID{1},
-			},
-			expected: false,
-		},
-		{
-			name: "first address greater; assetIDs equal",
+			name: "address greater; assetIDs equal",
 			a: EVMInput{
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{},
@@ -301,10 +280,10 @@ func TestEVMInputLess(t *testing.T) {
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{},
 			},
-			expected: false,
+			expected: 1,
 		},
 		{
-			name: "addresses equal; first assetID less",
+			name: "addresses equal; assetID less",
 			a: EVMInput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{0},
@@ -313,31 +292,22 @@ func TestEVMInputLess(t *testing.T) {
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
 			},
-			expected: true,
-		},
-		{
-			name: "addresses equal; first assetID greater",
-			a: EVMInput{
-				Address: common.BytesToAddress([]byte{0x01}),
-				AssetID: ids.ID{1},
-			},
-			b: EVMInput{
-				Address: common.BytesToAddress([]byte{0x01}),
-				AssetID: ids.ID{0},
-			},
-			expected: false,
+			expected: -1,
 		},
 		{
 			name:     "equal",
 			a:        EVMInput{},
 			b:        EVMInput{},
-			expected: false,
+			expected: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.a.Less(tt.b))
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.a.Compare(tt.b))
+			require.Equal(-tt.expected, tt.b.Compare(tt.a))
 		})
 	}
 }

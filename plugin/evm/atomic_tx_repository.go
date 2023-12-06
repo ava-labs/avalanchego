@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -273,9 +274,7 @@ func (a *atomicTxRepository) write(height uint64, txs []*Tx, bonus bool) error {
 		// with txs initialized from the txID index.
 		copyTxs := make([]*Tx, len(txs))
 		copy(copyTxs, txs)
-		slices.SortFunc(copyTxs, func(i, j *Tx) bool {
-			return i.Less(j)
-		})
+		utils.Sort(copyTxs)
 		txs = copyTxs
 	}
 	heightBytes := make([]byte, wrappers.LongLen)
