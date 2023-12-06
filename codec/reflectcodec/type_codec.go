@@ -5,6 +5,7 @@ package reflectcodec
 
 import (
 	"bytes"
+	"encoding"
 	"errors"
 	"fmt"
 	"math"
@@ -25,6 +26,11 @@ const (
 
 var (
 	_ codec.Codec = (*genericCodec)(nil)
+
+	binMarshalerType    = reflect.TypeOf((*encoding.BinaryMarshaler)(nil)).Elem()
+	binUnmarshalerType  = reflect.TypeOf((*encoding.BinaryUnmarshaler)(nil)).Elem()
+	textMarshalerType   = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+	textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 
 	errMarshalNil              = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil            = errors.New("can't unmarshal nil")
@@ -310,6 +316,30 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen, false /*=nullable*/, nil /*=typeStack*/)
 }
 
+func (c *genericCodec) customMarshal(value reflect.Value, p *wrappers.Packer) (bool, error) {
+	if value.Type().Implements(binMarshalerType) {
+		marshaler := value.Interface().(encoding.BinaryMarshaler)
+		binary, err := marshaler.MarshalBinary()
+		if err != nil {
+			return true, err
+		}
+		p.PackBytes(binary)
+		return true, p.Err
+	}
+
+	if value.Type().Implements(textMarshalerType) {
+		marshaler := value.Interface().(encoding.TextMarshaler)
+		binary, err := marshaler.MarshalText()
+		if err != nil {
+			return true, err
+		}
+		p.PackBytes(binary)
+		return true, p.Err
+	}
+
+	return false, nil
+}
+
 // marshal writes the byte representation of [value] to [p]
 //
 // c.lock should be held for the duration of this function
@@ -352,6 +382,10 @@ func (c *genericCodec) marshal(
 		p.PackBool(value.Bool())
 		return p.Err
 	case reflect.Ptr:
+		if hasCustomMarshal, err := c.customMarshal(value, p); hasCustomMarshal {
+			return err
+		}
+
 		isNil := value.IsNil()
 		if nullable {
 			p.PackBool(isNil)
@@ -361,7 +395,6 @@ func (c *genericCodec) marshal(
 		} else if isNil {
 			return errMarshalNil
 		}
-
 		return c.marshal(value.Elem(), p, c.maxSliceLen, false /*=nullable*/, typeStack)
 	case reflect.Interface:
 		isNil := value.IsNil()
@@ -440,6 +473,9 @@ func (c *genericCodec) marshal(
 		}
 		return nil
 	case reflect.Struct:
+		if hasCustomMarshal, err := c.customMarshal(value, p); hasCustomMarshal {
+			return err
+		}
 		serializedFields, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
 			return err
@@ -545,6 +581,28 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 		)
 	}
 	return nil
+}
+
+func (c *genericCodec) customUnmarshal(p *wrappers.Packer, value reflect.Value) (bool, error) {
+	if value.Type().Implements(binUnmarshalerType) {
+		marshaler := value.Interface().(encoding.BinaryUnmarshaler)
+		bytes := p.UnpackBytes()
+		if p.Err != nil {
+			return true, fmt.Errorf("couldn't unmarshal UnmarshalBinary(): %w", p.Err)
+		}
+		return true, marshaler.UnmarshalBinary(bytes)
+	}
+
+	if value.Type().Implements(textUnmarshalerType) {
+		marshaler := value.Interface().(encoding.TextUnmarshaler)
+		bytes := p.UnpackBytes()
+		if p.Err != nil {
+			return true, fmt.Errorf("couldn't unmarshal UnmarshalText(): %w", p.Err)
+		}
+		return true, marshaler.UnmarshalText(bytes)
+	}
+
+	return false, nil
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
@@ -707,6 +765,9 @@ func (c *genericCodec) unmarshal(
 		value.Set(intfImplementor)
 		return nil
 	case reflect.Struct:
+		if hasCustomUnmarshal, err := c.customUnmarshal(p, value); hasCustomUnmarshal {
+			return err
+		}
 		// Get indices of fields that will be unmarshaled into
 		serializedFieldIndices, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
@@ -720,6 +781,10 @@ func (c *genericCodec) unmarshal(
 		}
 		return nil
 	case reflect.Ptr:
+		if hasCustomUnmarshal, err := c.customUnmarshal(p, value); hasCustomUnmarshal {
+			return err
+		}
+
 		if nullable {
 			isNil := p.UnpackBool()
 			if isNil || p.Err != nil {

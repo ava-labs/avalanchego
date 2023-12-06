@@ -4,6 +4,8 @@
 package codec
 
 import (
+	"bytes"
+	"errors"
 	"math"
 	"testing"
 
@@ -44,6 +46,7 @@ var (
 		TestExtraSpace,
 		TestSliceLengthOverflow,
 		TestMap,
+		TestTypesWithTextEncoders,
 	}
 
 	MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
@@ -1142,4 +1145,64 @@ func FuzzStructUnmarshal(codec GeneralCodec, f *testing.F) {
 		require.NoError(err)
 		require.Len(bytes, size)
 	})
+}
+
+type textType struct {
+	valid bool
+}
+
+func (t *textType) MarshalText() ([]byte, error) {
+	if t.valid {
+		return []byte("true"), nil
+	}
+
+	return []byte("false"), nil
+}
+
+func (t *textType) UnmarshalText(data []byte) error {
+	if bytes.Equal(data, []byte("true")) || bytes.Equal(data, []byte("false")) {
+		*t = textType{
+			valid: bytes.Equal(data, []byte("true")),
+		}
+		return nil
+	}
+	return errors.New("Invalid value")
+}
+
+func TestTypesWithTextEncoders(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(12, codec))
+	value := &textType{
+		valid: true,
+	}
+	bytes1, err := manager.Marshal(12, value)
+	require.NoError(err)
+	require.Equal(len(bytes1), 10)
+
+	value = &textType{
+		valid: false,
+	}
+	bytes2, err := manager.Marshal(12, value)
+	require.NoError(err)
+	require.Equal(len(bytes2), 11)
+
+	newValueTrue := &textType{}
+	version, err := manager.Unmarshal(bytes1, &newValueTrue)
+	require.Equal(uint16(12), version)
+	require.NoError(err)
+	require.Equal(true, newValueTrue.valid)
+
+	newValueFalse := &textType{}
+	version, err = manager.Unmarshal(bytes2, &newValueFalse)
+	require.Equal(uint16(12), version)
+	require.NoError(err)
+	require.Equal(false, newValueFalse.valid)
+
+	// tamper with the bytes, it should lead to an error because our unmarshal
+	// code is strict
+	bytes2[10] = 12
+	version, err = manager.Unmarshal(bytes2, &newValueFalse)
+	require.Equal(uint16(12), version)
+	require.Error(err)
 }
