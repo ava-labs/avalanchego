@@ -280,7 +280,7 @@ func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
 	txIter := m.unissuedTxs.NewIterator()
 	for txIter.Next() {
 		tx := txIter.Value()
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
 			continue
 		}
