@@ -118,6 +118,8 @@ type Chain interface {
 
 	AddChain(createChainTx *txs.Tx)
 
+	GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error)
+
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
 }
@@ -731,6 +733,31 @@ func (s *state) DeleteCurrentDelegator(staker *Staker) {
 
 func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
 	return s.currentStakers.GetStakerIterator(), nil
+}
+
+func (s *state) GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error) {
+	stakerTx, _, err := s.GetTx(stakerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next staker %s: %w", stakerID, err)
+	}
+	switch uStakerTx := stakerTx.Unsigned.(type) {
+	case txs.ValidatorTx:
+		return &StakerColdAttributes{
+			Stake:                  uStakerTx.Stake(),
+			Outputs:                uStakerTx.Outputs(),
+			Shares:                 uStakerTx.Shares(),
+			ValidationRewardsOwner: uStakerTx.ValidationRewardsOwner(),
+			DelegationRewardsOwner: uStakerTx.DelegationRewardsOwner(),
+		}, nil
+	case txs.DelegatorTx:
+		return &StakerColdAttributes{
+			Stake:        uStakerTx.Stake(),
+			Outputs:      uStakerTx.Outputs(),
+			RewardsOwner: uStakerTx.RewardsOwner(),
+		}, nil
+	default:
+		return nil, fmt.Errorf("unexpected stakerTx type %T", uStakerTx)
+	}
 }
 
 func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {

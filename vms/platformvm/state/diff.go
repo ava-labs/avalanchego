@@ -194,6 +194,31 @@ func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 	return d.currentStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
+func (d *diff) GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error) {
+	stakerTx, _, err := d.GetTx(stakerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next staker %s: %w", stakerID, err)
+	}
+	switch uStakerTx := stakerTx.Unsigned.(type) {
+	case txs.ValidatorTx:
+		return &StakerColdAttributes{
+			Stake:                  uStakerTx.Stake(),
+			Outputs:                uStakerTx.Outputs(),
+			Shares:                 uStakerTx.Shares(),
+			ValidationRewardsOwner: uStakerTx.ValidationRewardsOwner(),
+			DelegationRewardsOwner: uStakerTx.DelegationRewardsOwner(),
+		}, nil
+	case txs.DelegatorTx:
+		return &StakerColdAttributes{
+			Stake:        uStakerTx.Stake(),
+			Outputs:      uStakerTx.Outputs(),
+			RewardsOwner: uStakerTx.RewardsOwner(),
+		}, nil
+	default:
+		return nil, fmt.Errorf("unexpected stakerTx type %T", uStakerTx)
+	}
+}
+
 func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.

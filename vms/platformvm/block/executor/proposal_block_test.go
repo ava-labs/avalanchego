@@ -96,6 +96,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		StartTime: utx.StartTime(),
 		NextTime:  chainTime,
 		EndTime:   chainTime,
+		Priority:  utx.CurrentPriority(),
 	}).Times(2)
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)

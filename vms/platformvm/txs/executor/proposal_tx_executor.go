@@ -363,24 +363,28 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	stakerTx, _, err := e.OnCommitState.GetTx(stakerToReward.TxID)
+	stakerAttributes, err := e.OnCommitState.GetStakerColdAttributes(stakerToReward.TxID)
 	if err != nil {
-		return fmt.Errorf("failed to get next removed staker tx: %w", err)
+		return fmt.Errorf("failed to get attributes for staker %d: %w", stakerToReward.TxID, err)
 	}
 
-	// Invariant: A [txs.DelegatorTx] does not also implement the
-	//            [txs.ValidatorTx] interface.
-	switch uStakerTx := stakerTx.Unsigned.(type) {
-	case txs.ValidatorTx:
-		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
+	switch {
+	case stakerToReward.Priority.IsPermissionedValidator():
+		// Invariant: Permissioned stakers are removed by the advancement of
+		//            time and the current chain timestamp is == this staker's
+		//            EndTime. This means only permissionless stakers should be
+		//            left in the staker set.
+		return ErrShouldBePermissionlessStaker
+	case stakerToReward.Priority.IsCurrentValidator():
+		if err := e.rewardValidatorTx(stakerToReward, stakerAttributes); err != nil {
 			return err
 		}
 
 		// Handle staker lifecycle.
 		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
 		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
-	case txs.DelegatorTx:
-		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
+	case stakerToReward.Priority.IsCurrentDelegator():
+		if err := e.rewardDelegatorTx(stakerToReward, stakerAttributes); err != nil {
 			return err
 		}
 
@@ -388,11 +392,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
 		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
 	default:
-		// Invariant: Permissioned stakers are removed by the advancement of
-		//            time and the current chain timestamp is == this staker's
-		//            EndTime. This means only permissionless stakers should be
-		//            left in the staker set.
-		return ErrShouldBePermissionlessStaker
+		return errors.New("unexpected staker type")
 	}
 
 	// If the reward is aborted, then the current supply should be decreased.
@@ -411,11 +411,11 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	return err
 }
 
-func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
+func (e *ProposalTxExecutor) rewardValidatorTx(validator *state.Staker, valAttributes *state.StakerColdAttributes) error {
 	var (
 		txID    = validator.TxID
-		stake   = uValidatorTx.Stake()
-		outputs = uValidatorTx.Outputs()
+		stake   = valAttributes.Stake
+		outputs = valAttributes.Outputs
 		// Invariant: The staked asset must be equal to the reward asset.
 		stakeAsset = stake[0].Asset
 	)
@@ -440,7 +440,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	// Provide the reward here
 	reward := validator.PotentialReward
 	if reward > 0 {
-		validationRewardsOwner := uValidatorTx.ValidationRewardsOwner()
+		validationRewardsOwner := valAttributes.ValidationRewardsOwner
 		outIntf, err := e.Fx.CreateOutput(reward, validationRewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
@@ -477,7 +477,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		return nil
 	}
 
-	delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
+	delegationRewardsOwner := valAttributes.DelegationRewardsOwner
 	outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 	if err != nil {
 		return fmt.Errorf("failed to create output: %w", err)
@@ -513,11 +513,11 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	return nil
 }
 
-func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, delegator *state.Staker) error {
+func (e *ProposalTxExecutor) rewardDelegatorTx(delegator *state.Staker, delAttributes *state.StakerColdAttributes) error {
 	var (
 		txID    = delegator.TxID
-		stake   = uDelegatorTx.Stake()
-		outputs = uDelegatorTx.Outputs()
+		stake   = delAttributes.Stake
+		outputs = delAttributes.Outputs
 		// Invariant: The staked asset must be equal to the reward asset.
 		stakeAsset = stake[0].Asset
 	)
@@ -544,29 +544,20 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
 
-	vdrTxIntf, _, err := e.OnCommitState.GetTx(validator.TxID)
+	valAttributes, err := e.OnCommitState.GetStakerColdAttributes(validator.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
 
-	// Invariant: Delegators must only be able to reference validator
-	//            transactions that implement [txs.ValidatorTx]. All
-	//            validator transactions implement this interface except the
-	//            AddSubnetValidatorTx.
-	vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
-	if !ok {
-		return ErrWrongTxType
-	}
-
 	// Calculate split of reward between delegator/delegatee
-	delegateeReward, delegatorReward := reward.Split(delegator.PotentialReward, vdrTx.Shares())
+	delegateeReward, delegatorReward := reward.Split(delegator.PotentialReward, valAttributes.Shares)
 
 	utxosOffset := 0
 
 	// Reward the delegator here
 	reward := delegatorReward
 	if reward > 0 {
-		rewardsOwner := uDelegatorTx.RewardsOwner()
+		rewardsOwner := delAttributes.RewardsOwner
 		outIntf, err := e.Fx.CreateOutput(reward, rewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
@@ -622,7 +613,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	} else {
 		// For any validators who started prior to [CortinaTime], we issue the
 		// [delegateeReward] immediately.
-		delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
+		delegationRewardsOwner := valAttributes.DelegationRewardsOwner
 		outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)

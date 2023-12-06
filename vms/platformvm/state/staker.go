@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -120,4 +122,24 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 		NextTime:  startTime,
 		Priority:  staker.PendingPriority(),
 	}, nil
+}
+
+// While Staker object contains a staker's hot attributes, likely to be used pretty often
+// StakerColdAttributes contains a staker's cold attributes, rarely used, mostly when rewarding it.
+// Note that both Staker and StakerAttribute content comes from the stakerTx creating the staker.
+// In state.State we do have StakerMetadata information as well, which contains data about the stakers
+// that are generated during staker's activity (mostly uptimes)
+// TODO: consider moving delegatees reward here, out of StakersMetadata.
+type StakerColdAttributes struct {
+	// common attributes
+	Stake   []*avax.TransferableOutput
+	Outputs []*avax.TransferableOutput
+
+	// validators specific attributes
+	Shares                 uint32
+	ValidationRewardsOwner fx.Owner
+	DelegationRewardsOwner fx.Owner
+
+	// delegators specific attributes
+	RewardsOwner fx.Owner
 }
