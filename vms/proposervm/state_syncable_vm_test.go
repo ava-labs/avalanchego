@@ -70,12 +70,14 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	// create the VM
 	vm := New(
 		innerVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 	)
 
 	ctx := snow.DefaultContextTest()
@@ -186,10 +188,10 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -271,10 +273,10 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -359,10 +361,10 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -432,10 +434,10 @@ func TestParseStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -487,10 +489,10 @@ func TestStateSummaryAccept(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 
@@ -567,10 +569,10 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
