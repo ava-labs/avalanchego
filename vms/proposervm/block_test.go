@@ -37,10 +37,10 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	var (
-		pChainHeight    = uint64(1337)
-		parentID        = ids.GenerateTestID()
-		parentTimestamp = time.Now().Truncate(time.Second)
-		blkID           = ids.GenerateTestID()
+		pChainHeight    uint64 = 1337
+		parentID               = ids.GenerateTestID()
+		parentTimestamp        = time.Now().Truncate(time.Second)
+		blkID                  = ids.GenerateTestID()
 	)
 
 	innerBlk := snowman.NewMockBlock(ctrl)

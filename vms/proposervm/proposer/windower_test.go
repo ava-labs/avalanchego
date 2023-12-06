@@ -34,8 +34,8 @@ func TestWindowerNoValidators(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	var (
-		chainHeight  = uint64(1)
-		pChainHeight = uint64(0)
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
 	)
 	delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
 	require.NoError(err)
