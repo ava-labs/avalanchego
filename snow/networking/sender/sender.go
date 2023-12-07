@@ -1210,7 +1210,7 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	ctx = utils.Detach(ctx)
 
 	// The failed message is treated as if it was sent by the requested chain
-	failedMsg := message.InternalCrossChainAppRequestFailed(
+	failedMsg := message.InternalCrossChainAppError(
 		s.ctx.NodeID,
 		chainID,
 		s.ctx.ChainID,

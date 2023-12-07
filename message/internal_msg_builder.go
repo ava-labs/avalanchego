@@ -435,7 +435,7 @@ func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func InternalCrossChainAppRequestFailed(
+func InternalCrossChainAppError(
 	nodeID ids.NodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
