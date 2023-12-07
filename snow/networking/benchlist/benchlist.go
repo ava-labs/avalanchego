@@ -142,12 +142,11 @@ func (b *benchlist) run() {
 
 		b.waitForBenchedNodes()
 
-		now := b.clock.Time()
-		b.removedExpiredNodes(now)
+		b.removedExpiredNodes()
 
 		// Note: If there are no nodes to remove, [duration] will be 0 and we
 		// will immediately wait until there are benched nodes.
-		duration := b.durationToSleep(now)
+		duration := b.durationToSleep()
 		timer.Reset(duration)
 	}
 }
@@ -167,10 +166,11 @@ func (b *benchlist) waitForBenchedNodes() {
 	}
 }
 
-func (b *benchlist) removedExpiredNodes(now time.Time) {
+func (b *benchlist) removedExpiredNodes() {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
+	now := b.clock.Time()
 	for {
 		_, next, ok := b.benchedHeap.Peek()
 		if !ok {
@@ -200,7 +200,7 @@ func (b *benchlist) removedExpiredNodes(now time.Time) {
 	b.metrics.weightBenched.Set(float64(benchedStake))
 }
 
-func (b *benchlist) durationToSleep(now time.Time) time.Duration {
+func (b *benchlist) durationToSleep() time.Duration {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
@@ -208,6 +208,8 @@ func (b *benchlist) durationToSleep(now time.Time) time.Duration {
 	if !ok {
 		return 0
 	}
+
+	now := b.clock.Time()
 	return next.Sub(now)
 }
 
