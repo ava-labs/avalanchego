@@ -40,7 +40,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	parentOnAcceptState := state.NewMockDiff(ctrl)
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
-	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp)
 
 	backend := &backend{
 		lastAccepted: parentID,

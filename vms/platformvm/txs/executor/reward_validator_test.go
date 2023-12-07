@@ -625,10 +625,17 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
+	testID := ids.GenerateTestID()
+	env.SetState(testID, delOnCommitState)
+
 	nextProposalBlkID := ids.GenerateTestID()
-	onProposalBlockState, vdrOnCommitState, vdrOnAbortState := makeProposalAndOptionsStates(require, env, proposalBlkID, nextProposalBlkID)
+	onNextProposalBlockState, vdrOnCommitState, vdrOnAbortState := makeProposalAndOptionsStates(require, env, testID, nextProposalBlkID)
+
+	tx, err = env.txBuilder.NewRewardValidatorTx(vdrTx.ID())
+	require.NoError(err)
+
 	txExecutor = ProposalTxExecutor{
-		OnProposalBlockState: onProposalBlockState,
+		OnProposalBlockState: onNextProposalBlockState,
 		OnCommitState:        vdrOnCommitState,
 		OnAbortState:         vdrOnAbortState,
 		Backend:              &env.backend,
