@@ -948,6 +948,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			}
 
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, maxProofLen)
+			if isEmpty(db) {
+				require.ErrorIs(err, ErrEmptyProof)
+				continue
+			}
 			require.NoError(err)
 			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
 

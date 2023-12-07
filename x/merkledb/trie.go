@@ -81,3 +81,8 @@ type TrieView interface {
 	// Takes the DB commit lock.
 	CommitToDB(ctx context.Context) error
 }
+
+func isEmpty(t ReadOnlyTrie) bool {
+	sentinel := t.getSentinel()
+	return sentinel.value.IsNothing() && sentinel.valueDigest.IsNothing() && len(sentinel.children) == 0
+}

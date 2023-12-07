@@ -320,6 +320,9 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	proof := &Proof{
 		Key: ToKey(key),
 	}
+	if isEmpty(t) {
+		return nil, ErrEmptyProof
+	}
 
 	var closestNode *node
 	if err := t.visitPathToKey(proof.Key, func(n *node) error {

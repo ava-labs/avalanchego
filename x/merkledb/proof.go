@@ -36,6 +36,7 @@ var (
 	ErrNoStartProof                = errors.New("no start proof")
 	ErrNoEndProof                  = errors.New("no end proof")
 	ErrNoProof                     = errors.New("proof has no nodes")
+	ErrEmptyProof                  = errors.New("proof is empty")
 	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
