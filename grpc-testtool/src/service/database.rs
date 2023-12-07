@@ -18,7 +18,7 @@ use tonic::{async_trait, Request, Response, Status};
 impl Database for DatabaseService {
     async fn has(&self, request: Request<HasRequest>) -> Result<Response<HasResponse>, Status> {
         let key = request.into_inner().key;
-        let revision = self.revision().await.into_status_result()?;
+        let revision = self.latest().await.into_status_result()?;
 
         let val = revision.val(key).await.into_status_result()?;
 
@@ -32,7 +32,7 @@ impl Database for DatabaseService {
 
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         let key = request.into_inner().key;
-        let revision = self.revision().await.into_status_result()?;
+        let revision = self.latest().await.into_status_result()?;
 
         let value = revision
             .val(key)

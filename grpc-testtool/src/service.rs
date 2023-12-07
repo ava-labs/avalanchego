@@ -1,12 +1,13 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood::v2::{
-    api::{Db, Error},
-    emptydb::{EmptyDb, HistoricalImpl},
-};
+use firewood::db::Db;
+use firewood::v2::{api::Db as _, api::Error};
+
+use std::path::Path;
 use std::{
     collections::HashMap,
+    ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -38,23 +39,39 @@ impl<T> IntoStatusResultExt<T> for Result<T, Error> {
     }
 }
 pub struct Database {
-    db: EmptyDb,
+    db: Db,
     iterators: Arc<Mutex<Iterators>>,
 }
 
-impl Default for Database {
-    fn default() -> Self {
-        Self {
-            db: EmptyDb,
+impl Database {
+    pub async fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        // try to create the parents for this directory, but it's okay if it fails; it will get caught in Db::new
+        std::fs::create_dir_all(&path).ok();
+        // TODO: truncate should be false
+        // see https://github.com/ava-labs/firewood/issues/418
+        let cfg = firewood::config::DbConfig::builder().truncate(true).build();
+
+        let db = Db::new(path, &cfg).await?;
+
+        Ok(Self {
+            db,
             iterators: Default::default(),
-        }
+        })
+    }
+}
+
+impl Deref for Database {
+    type Target = Db;
+
+    fn deref(&self) -> &Self::Target {
+        &self.db
     }
 }
 
 impl Database {
-    async fn revision(&self) -> Result<Arc<HistoricalImpl>, Error> {
-        let root_hash = self.db.root_hash().await?;
-        self.db.revision(root_hash).await
+    async fn latest(&self) -> Result<Arc<<Db as firewood::v2::api::Db>::Historical>, Error> {
+        let root_hash = self.root_hash().await?;
+        self.revision(root_hash).await
     }
 }
 

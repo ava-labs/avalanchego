@@ -29,7 +29,7 @@ impl DbServerTrait for Database {
         request: Request<GetProofRequest>,
     ) -> Result<Response<GetProofResponse>, Status> {
         let GetProofRequest { key: _ } = request.into_inner();
-        let _revision = self.revision().await.into_status_result()?;
+        let _revision = self.latest().await.into_status_result()?;
 
         todo!()
     }
@@ -46,7 +46,7 @@ impl DbServerTrait for Database {
             key_limit: _,
         } = request.into_inner();
 
-        let _revision = self.revision().await.into_status_result()?;
+        let _revision = self.latest().await.into_status_result()?;
 
         todo!()
     }
@@ -62,7 +62,7 @@ impl DbServerTrait for Database {
             expected_root_hash: _,
         } = request.into_inner();
 
-        let _revision = self.revision().await.into_status_result()?;
+        let _revision = self.latest().await.into_status_result()?;
 
         todo!()
     }

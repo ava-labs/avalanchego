@@ -103,7 +103,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     eprintln!("Database-Server listening on: {}", args.grpc_port);
     info!("Starting up: Listening on {}", args.grpc_port);
 
-    let svc = Arc::new(DatabaseService::default());
+    let svc = Arc::new(DatabaseService::new(args.db_dir).await?);
 
     // TODO: graceful shutdown
     Ok(Server::builder()
