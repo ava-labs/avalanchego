@@ -210,6 +210,8 @@ func initTestProposerVM(
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
+	proVM.Set(coreGenBlk.Timestamp())
+
 	return coreVM, valState, proVM, coreGenBlk, db
 }
 
@@ -232,10 +234,9 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -262,10 +263,9 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -297,10 +297,9 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -332,10 +331,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -348,10 +346,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(222),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -396,10 +393,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    prefcoreBlk.ID(),
-		HeightV:    prefcoreBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: prefcoreBlk.ID(),
+		HeightV: prefcoreBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -426,10 +422,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(111),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
@@ -442,10 +437,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(222),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk2, nil
@@ -491,10 +485,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    wronglyPreferredcoreBlk.ID(),
-		HeightV:    wronglyPreferredcoreBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: wronglyPreferredcoreBlk.ID(),
+		HeightV: wronglyPreferredcoreBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk3, nil
@@ -518,15 +511,14 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	}()
 
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		TimestampV: proVM.Time(),
+		BytesV: []byte{1},
 	}
 	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		return nil, errMarshallingFailed
 	}
 	slb, err := statelessblock.Build(
 		proVM.preferred,
-		innerBlk.Timestamp(),
+		proVM.Time(),
 		100, // pChainHeight,
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
@@ -558,19 +550,20 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 	// create two Proposer blocks at the same height
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		ParentV:    gencoreBlk.ID(),
-		HeightV:    gencoreBlk.Height() + 1,
-		TimestampV: proVM.Time(),
+		BytesV:  []byte{1},
+		ParentV: gencoreBlk.ID(),
+		HeightV: gencoreBlk.Height() + 1,
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
+	blkTimestamp := proVM.Time()
+
 	slb1, err := statelessblock.Build(
 		proVM.preferred,
-		innerBlk.Timestamp(),
+		blkTimestamp,
 		100, // pChainHeight,
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
@@ -589,7 +582,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 	slb2, err := statelessblock.Build(
 		proVM.preferred,
-		innerBlk.Timestamp(),
+		blkTimestamp,
 		200, // pChainHeight,
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
@@ -629,10 +622,9 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
-		BytesV:     []byte{111},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: genesisTimestamp,
+		BytesV:  []byte{111},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return localcoreBlk, nil
@@ -644,10 +636,9 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	// another block with same parent comes from network and is parsed
 	netcoreBlk := &snowman.TestBlock{
-		BytesV:     []byte{222},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: genesisTimestamp,
+		BytesV:  []byte{222},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
@@ -668,7 +659,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
-		netcoreBlk.Timestamp(),
+		proVM.Time(),
 		pChainHeight,
 		netcoreBlk.Bytes(),
 	)
@@ -719,10 +710,9 @@ func TestPreFork_BuildBlock(t *testing.T) {
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		BytesV:  []byte{3},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk, nil
@@ -971,14 +961,13 @@ func TestExpiredBuildBlock(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	statelessBlock, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
-		coreBlk.Timestamp(),
+		proVM.Time(),
 		0,
 		coreBlk.Bytes(),
 	)
@@ -1375,24 +1364,22 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    coreBlk0.ID(),
-		HeightV:    coreBlk0.Height() + 1,
-		TimestampV: coreBlk0.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: coreBlk0.ID(),
+		HeightV: coreBlk0.Height() + 1,
 	}
 	statelessBlock0, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
-		coreBlk0.Timestamp(),
+		proVM.Time(),
 		0,
 		coreBlk0.Bytes(),
 	)
@@ -1471,10 +1458,9 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{1},
-		ParentV:    gBlock.ID(),
-		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp(),
+		BytesV:  []byte{1},
+		ParentV: gBlock.ID(),
+		HeightV: gBlock.Height() + 1,
 	}
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -1491,15 +1477,14 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{2},
-		ParentV:    gBlock.ID(),
-		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp(),
+		BytesV:  []byte{2},
+		ParentV: gBlock.ID(),
+		HeightV: gBlock.Height() + 1,
 	}
 
 	ySlb, err := statelessblock.BuildUnsigned(
 		gBlock.ID(),
-		gBlock.Timestamp(),
+		proVM.Time(),
 		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
@@ -1522,16 +1507,16 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		BytesV:     []byte{3},
-		ParentV:    yBlock.ID(),
-		HeightV:    yBlock.Height() + 1,
-		TimestampV: yBlock.Timestamp(),
+		BytesV:  []byte{3},
+		ParentV: yBlock.ID(),
+		HeightV: yBlock.Height() + 1,
 	}
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return zBlock, nil
 	}
 	require.NoError(proVM.SetPreference(context.Background(), bBlock.ID()))
+	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
 	cBlock, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 	coreVM.BuildBlockF = nil
@@ -1647,7 +1632,6 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
-	proVM.Set(coreGenBlk.Timestamp())
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1722,7 +1706,6 @@ func TestLaggedPChainHeight(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
-	proVM.Set(coreGenBlk.Timestamp())
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
