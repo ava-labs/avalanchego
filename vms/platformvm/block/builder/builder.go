@@ -124,10 +124,10 @@ func (b *builder) StartBlockTimer() {
 				b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
 
 				// Invariant: ResetBlockTimer is guaranteed to be called after
-				// [durationToSleep] returns a value <= 0. This is because we are
-				// guaranteed to build a valid block. After building a valid block,
-				// the chain will have its preference updated which will trigger a
-				// timer reset.
+				// [durationToSleep] returns a value <= 0. This is because we
+				// are guaranteed to build a valid block. After building a valid
+				// block, the chain will have its preference updated which will
+				// trigger a timer reset.
 				select {
 				case <-b.resetTimer:
 				case <-b.closed:
@@ -180,11 +180,15 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
+		// If we need to advance the chain's timestamp in a standard block, but
+		// we build an invalid block, then we need to re-trigger block building.
+		b.ResetBlockTimer()
+		// If there are still transactions in the mempool, then we need to
+		// re-trigger block building.
 		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 	}()
 
-	ctx := b.txExecutorBackend.Ctx
-	ctx.Log.Debug("starting to attempt to build a block")
+	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
 	preferredID := b.blkManager.Preferred()
