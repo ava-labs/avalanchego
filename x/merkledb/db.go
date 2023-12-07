@@ -217,6 +217,10 @@ type merkleDB struct {
 	tokenSize int
 }
 
+func (db *merkleDB) getSentinel() *node {
+	return db.sentinelNode
+}
+
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
 	metrics, err := newMetrics("merkleDB", config.Reg)

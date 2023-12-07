@@ -38,6 +38,10 @@ type ReadOnlyTrie interface {
 	// database.ErrNotFound if the key is not present
 	getValue(key Key) ([]byte, error)
 
+	// Returns the sentinel node of the trie.
+	// Must be copied before modification.
+	getSentinel() *node
+
 	// get an editable copy of the node with the given key path
 	// hasValue indicates which db to look in (value or intermediate)
 	getEditableNode(key Key, hasValue bool) (*node, error)

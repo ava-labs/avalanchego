@@ -762,9 +762,9 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := newTrie.getEditableNode(Key{}, false)
+	sentinel := newTrie.getSentinel()
 	require.NoError(err)
-	require.Len(root.children, 1)
+	require.Len(sentinel.children, 1)
 
 	newTrie, err = newTrie.NewView(
 		context.Background(),
@@ -779,10 +779,9 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getEditableNode(Key{}, false)
-	require.NoError(err)
+	sentinel = trie.getSentinel()
 	// since all values have been deleted, the nodes should have been cleaned up
-	require.Empty(root.children)
+	require.Empty(sentinel.children)
 }
 
 func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
@@ -844,15 +843,13 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := trie.getEditableNode(Key{}, false)
-	require.NoError(err)
-	require.Len(root.children, 1)
+	sentinel := trie.getSentinel()
+	require.Len(sentinel.children, 1)
 
-	root, err = trie.getEditableNode(Key{}, false)
-	require.NoError(err)
-	require.Len(root.children, 1)
+	sentinel = trie.getSentinel()
+	require.Len(sentinel.children, 1)
 
-	firstNode, err := trie.getEditableNode(getSingleChildKey(root, dbTrie.tokenSize), true)
+	firstNode, err := trie.getEditableNode(getSingleChildKey(sentinel, dbTrie.tokenSize), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 1)
 
@@ -870,11 +867,10 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getEditableNode(Key{}, false)
-	require.NoError(err)
-	require.Len(root.children, 1)
+	sentinel = trie.getSentinel()
+	require.Len(sentinel.children, 1)
 
-	firstNode, err = trie.getEditableNode(getSingleChildKey(root, dbTrie.tokenSize), true)
+	firstNode, err = trie.getEditableNode(getSingleChildKey(sentinel, dbTrie.tokenSize), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 2)
 }

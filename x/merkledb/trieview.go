@@ -148,16 +148,8 @@ func newTrieView(
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	sentinelNode, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrNoValidRoot
-		}
-		return nil, err
-	}
-
 	newView := &trieView{
-		sentinelNode: sentinelNode,
+		sentinelNode: parentTrie.getSentinel().clone(),
 		db:           db,
 		parentTrie:   parentTrie,
 		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
@@ -882,6 +874,10 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 	}
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
+}
+
+func (t *trieView) getSentinel() *node {
+	return t.sentinelNode
 }
 
 func (t *trieView) getRoot() (*node, error) {
