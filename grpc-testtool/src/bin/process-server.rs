@@ -29,18 +29,30 @@ struct Opts {
     //// Port gRPC server listens on
     grpc_port: u16,
 
-    #[arg(short = 'G', long = "gatewayPort", default_value_t = 10001)]
+    #[arg(short = 'G', long, default_value_t = 10001)]
     /// Port gRPC gateway server, which HTTP requests can be made to
     _gateway_port: u16,
 
-    #[arg(short = 'l', long = "logDir", default_value = temp_path())]
+    #[arg(short = 'l', long, default_value = temp_path())]
     log_dir: PathBuf,
 
-    #[arg(short = 'L', long = "LogLevelStr", default_value_t = LevelFilter::Info)]
+    #[arg(short = 'L', long, default_value_t = LevelFilter::Info)]
     log_level: LevelFilter,
 
-    #[arg(short = 'b', long = "branch-factor")]
+    #[arg(short = 'b', long)]
     _branch_factor: Option<u16>,
+
+    #[arg(short = 'p', long)]
+    _process_name: String,
+
+    #[arg(short = 'd')]
+    db_dir: PathBuf,
+
+    #[arg(short = 'H')]
+    _history_length: Option<u32>,
+
+    #[arg(short = 'N')]
+    _node_cache_size: Option<u32>,
 }
 
 fn temp_path() -> clap::builder::OsStr {
@@ -53,6 +65,12 @@ fn temp_path() -> clap::builder::OsStr {
 async fn main() -> Result<(), Box<dyn Error>> {
     // parse command line options
     let args = Opts::parse();
+
+    match std::fs::create_dir_all(&args.log_dir) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(e) => panic!("Unable to create directory\n{}", e),
+    }
 
     // set up the log file
     let logfile = std::fs::OpenOptions::new()
@@ -76,6 +94,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .target(Target::Pipe(Box::new(logfile)))
         .filter(None, args.log_level)
         .init();
+
+    log_panics::Config::new()
+        .backtrace_mode(log_panics::BacktraceMode::Unresolved)
+        .install_panic_hook();
 
     // log to the file and to stderr
     eprintln!("Database-Server listening on: {}", args.grpc_port);
