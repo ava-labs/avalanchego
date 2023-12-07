@@ -1213,6 +1213,9 @@ func TestTypesWithCustomMarshals(codec GeneralCodec, t testing.TB) {
 	value := &customMarshalStruct{
 		valid: true,
 	}
+	size, err := manager.Size(12, value)
+	require.NoError(err)
+	require.Equal(size, 6)
 	bytes1, err := manager.Marshal(12, value)
 	require.NoError(err)
 	require.Equal(len(bytes1), 10)
@@ -1220,6 +1223,9 @@ func TestTypesWithCustomMarshals(codec GeneralCodec, t testing.TB) {
 	value = &customMarshalStruct{
 		valid: false,
 	}
+	size, err = manager.Size(12, value)
+	require.NoError(err)
+	require.Equal(size, 7)
 	bytes2, err := manager.Marshal(12, value)
 	require.NoError(err)
 	require.Equal(len(bytes2), 11)

@@ -128,6 +128,13 @@ func (c *genericCodec) size(
 	case reflect.String:
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
+		if hasCustomMarshal, bytes, err := c.customMarshal(value); hasCustomMarshal {
+			if err != nil {
+				return 0, false, err
+			}
+			return len(bytes), false, nil
+		}
+
 		if value.IsNil() {
 			if !nullable {
 				return 0, false, errMarshalNil
@@ -218,6 +225,12 @@ func (c *genericCodec) size(
 		return size, false, nil
 
 	case reflect.Struct:
+		if hasCustomMarshal, bytes, err := c.customMarshal(value); hasCustomMarshal {
+			if err != nil {
+				return 0, false, err
+			}
+			return len(bytes), false, nil
+		}
 		serializedFields, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
 			return 0, false, err
@@ -323,9 +336,25 @@ func (c *genericCodec) hasNoSerializedFields(value reflect.Value) bool {
 	switch valueKind := value.Kind(); valueKind {
 	case reflect.Struct:
 		serializedFieldIndices, _ := c.fielder.GetSerializedFields(value.Type())
-		return len(serializedFieldIndices) == 0
+
+		return len(serializedFieldIndices) == 0 &&
+			value.Type().Implements(binUnmarshalerType) &&
+			value.Type().Implements(binMarshalerType)
 	case reflect.Ptr:
-		return c.hasNoSerializedFields(value.Elem())
+		innerValue := value.Elem()
+		if innerValue.Kind() != reflect.Struct {
+			return false
+		}
+		serialiedFieldsIndices, _ := c.fielder.GetSerializedFields(innerValue.Type())
+		if len(serialiedFieldsIndices) > 0 {
+			return false
+		}
+
+		// Check if the pointer implements the binUnmarshalerType and
+		// binMarshalerType as reference or as the object
+		return (value.Type().Implements(binUnmarshalerType) &&
+			value.Type().Implements(binMarshalerType)) ||
+			c.hasNoSerializedFields(value.Elem())
 	}
 	return false
 }
@@ -334,21 +363,20 @@ func (c *genericCodec) hasNoSerializedFields(value reflect.Value) bool {
 //
 // This applies to struct which implements a custom marshal (the BinaryMarshal
 // trait) and has no field tagged to be exported through tags
-func (c *genericCodec) customMarshal(value reflect.Value, p *wrappers.Packer) (bool, error) {
+func (c *genericCodec) customMarshal(value reflect.Value) (bool, []byte, error) {
 	if !c.hasNoSerializedFields(value) {
-		return false, nil
+		return false, nil, nil
 	}
 	if value.Type().Implements(binMarshalerType) {
 		marshaler := value.Interface().(encoding.BinaryMarshaler)
 		binary, err := marshaler.MarshalBinary()
 		if err != nil {
-			return true, err
+			return true, nil, err
 		}
-		p.PackBytes(binary)
-		return true, p.Err
+		return true, binary, nil
 	}
 
-	return false, nil
+	return false, nil, nil
 }
 
 // Attempts to deserialize using a custom Unmarshal
@@ -413,8 +441,12 @@ func (c *genericCodec) marshal(
 		p.PackBool(value.Bool())
 		return p.Err
 	case reflect.Ptr:
-		if hasCustomMarshal, err := c.customMarshal(value, p); hasCustomMarshal {
-			return err
+		if hasCustomMarshal, bytes, err := c.customMarshal(value); hasCustomMarshal {
+			if err != nil {
+				return err
+			}
+			p.PackBytes(bytes)
+			return p.Err
 		}
 
 		isNil := value.IsNil()
@@ -504,8 +536,12 @@ func (c *genericCodec) marshal(
 		}
 		return nil
 	case reflect.Struct:
-		if hasCustomMarshal, err := c.customMarshal(value, p); hasCustomMarshal {
-			return err
+		if hasCustomMarshal, bytes, err := c.customMarshal(value); hasCustomMarshal {
+			if err != nil {
+				return err
+			}
+			p.PackBytes(bytes)
+			return p.Err
 		}
 		serializedFields, err := c.fielder.GetSerializedFields(value.Type())
 		if err != nil {
