@@ -218,14 +218,6 @@ type merkleDB struct {
 	tokenSize int
 }
 
-func (db *merkleDB) getSentinelNode() *node {
-	return db.sentinelNode
-}
-
-func (db *merkleDB) getTokenSize() int {
-	return db.tokenSize
-}
-
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
 	metrics, err := newMetrics("merkleDB", config.Reg)
@@ -595,12 +587,7 @@ func (db *merkleDB) GetRangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
-
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProof")
-	defer span.End()
-	return getRangeProof(db, start, end, maxLength)
+	return db.GetRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
 }
 
 func (db *merkleDB) GetRangeProofAtRoot(
@@ -623,11 +610,11 @@ func (db *merkleDB) GetRangeProofAtRoot(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
-	historicalView, err := db.getHistoricalViewForRange(rootID, start, end)
+	historicalTrie, err := db.getHistoricalTrieForRange(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return getRangeProof(historicalView, start, end, maxLength)
+	return getRangeProof(historicalTrie, start, end, maxLength)
 }
 
 func (db *merkleDB) GetChangeProof(
@@ -687,13 +674,13 @@ func (db *merkleDB) GetChangeProof(
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
+	historicalTrie, err := db.getHistoricalTrieForRange(endRootID, start, largestKey)
 	if err != nil {
 		return nil, err
 	}
 
 	if largestKey.HasValue() {
-		endProof, err := getProof(historicalView, largestKey.Value())
+		endProof, err := getProof(historicalTrie, largestKey.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -701,7 +688,7 @@ func (db *merkleDB) GetChangeProof(
 	}
 
 	if start.HasValue() {
-		startProof, err := getProof(historicalView, start.Value())
+		startProof, err := getProof(historicalTrie, start.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -1170,15 +1157,13 @@ func (db *merkleDB) initializeRoot() error {
 // If [end] is Nothing, there's no upper bound on the range.
 // Assumes [db.commitLock] is read locked.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getHistoricalViewForRange(
+func (db *merkleDB) getHistoricalTrieForRange(
 	rootID ids.ID,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 ) (Trie, error) {
-	currentRootID := db.getMerkleRoot()
-
 	// looking for the trie's current root id, so return the trie unmodified
-	if currentRootID == rootID {
+	if rootID == db.getMerkleRoot() {
 		return db, nil
 	}
 
@@ -1272,6 +1257,14 @@ func (db *merkleDB) Clear() error {
 		nodes:  map[Key]*change[*node]{},
 	})
 	return nil
+}
+
+func (db *merkleDB) getSentinelNode() *node {
+	return db.sentinelNode
+}
+
+func (db *merkleDB) getTokenSize() int {
+	return db.tokenSize
 }
 
 // Returns [key] prefixed by [prefix].
