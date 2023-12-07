@@ -720,7 +720,9 @@ func (db *merkleDB) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
-
+	if isEmpty(historicalView) {
+		return nil, ErrEmptyProof
+	}
 	if largestKey.HasValue() {
 		endProof, err := historicalView.getProof(ctx, largestKey.Value())
 		if err != nil {

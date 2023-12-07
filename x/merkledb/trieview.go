@@ -398,6 +398,10 @@ func (t *trieView) GetRangeProof(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
+	if isEmpty(t) {
+		return nil, ErrEmptyProof
+	}
+
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return nil, err
 	}

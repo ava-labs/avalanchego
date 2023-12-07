@@ -819,6 +819,42 @@ func TestMerkleDBClear(t *testing.T) {
 	require.Empty(change.values)
 }
 
+func TestGetRangeProofAtRootEmptyRootID(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	_, err = db.getRangeProofAtRoot(
+		context.Background(),
+		db.rootID,
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		10,
+	)
+	require.ErrorIs(err, ErrEmptyProof)
+}
+
+func TestGetChangeProofEmptyRootID(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	emptyRoot := db.rootID
+	require.NoError(db.Put([]byte("key"), []byte("value")))
+
+	_, err = db.GetChangeProof(
+		context.Background(),
+		db.getMerkleRoot(),
+		emptyRoot,
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		10,
+	)
+	require.ErrorIs(err, ErrEmptyProof)
+}
+
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 	f.Fuzz(
 		func(
