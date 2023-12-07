@@ -24,16 +24,16 @@ trait IntoStatusResultExt<T> {
 }
 
 impl<T> IntoStatusResultExt<T> for Result<T, Error> {
+    // We map errors from bad arguments into Status::invalid_argument; all other errors are Status::internal errors
     fn into_status_result(self) -> Result<T, Status> {
         self.map_err(|err| match err {
-            Error::HashNotFound { provided: _ } => todo!(),
-            Error::IncorrectRootHash {
-                provided: _,
-                current: _,
-            } => todo!(),
-            Error::IO(_) => todo!(),
-            Error::InvalidProposal => todo!(),
-            _ => todo!(),
+            Error::IncorrectRootHash { .. } | Error::HashNotFound { .. } | Error::RangeTooSmall => {
+                Status::invalid_argument(err.to_string())
+            }
+            Error::IO { .. } | Error::InternalError { .. } | Error::InvalidProposal => {
+                Status::internal(err.to_string())
+            }
+            _ => Status::internal(err.to_string()),
         })
     }
 }
