@@ -262,17 +262,15 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				tt.setup(freshTH)
 			}
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, freshTH)
-			require.NoError(err)
-
-			onAbortState, err := state.NewDiff(lastAcceptedID, freshTH)
-			require.NoError(err)
+			proposalBlkID := ids.GenerateTestID()
+			onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, freshTH, lastAcceptedID, proposalBlkID)
 
 			executor := ProposalTxExecutor{
-				OnCommitState: onCommitState,
-				OnAbortState:  onAbortState,
-				Backend:       &freshTH.backend,
-				Tx:            tx,
+				OnProposalBlockState: onProposalBlockState,
+				OnCommitState:        onCommitState,
+				OnAbortState:         onAbortState,
+				Backend:              &freshTH.backend,
+				Tx:                   tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, tt.expectedErr)
@@ -304,17 +302,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrPeriodMismatch)
@@ -336,17 +332,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		require.NoError(tx.Unsigned.Visit(&executor))
 	}
@@ -382,17 +376,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrNotValidator)
@@ -427,17 +419,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrPeriodMismatch)
@@ -457,17 +447,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrPeriodMismatch)
@@ -487,17 +475,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		require.NoError(tx.Unsigned.Visit(&executor))
 	}
@@ -519,17 +505,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
@@ -576,17 +560,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            duplicateSubnetTx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrDuplicateValidator)
@@ -616,17 +598,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -650,17 +630,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 		copy(tx.Creds[1].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -692,17 +670,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrDuplicateValidator)
@@ -733,17 +709,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
@@ -763,17 +737,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrFutureStakeTime)
@@ -795,17 +767,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrAlreadyValidator)
@@ -838,17 +808,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrAlreadyValidator)
@@ -876,17 +844,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			env.state.DeleteUTXO(utxoID)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrFlowCheckFailed)

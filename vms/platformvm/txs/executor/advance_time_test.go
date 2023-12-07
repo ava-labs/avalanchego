@@ -42,17 +42,15 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -91,17 +89,15 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, ErrChildBlockNotAfterParent)
@@ -125,17 +121,15 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrChildBlockAfterStakerChangeTime)
@@ -158,17 +152,15 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		tx, err := env.txBuilder.NewAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second))
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
+		proposalBlkID := ids.GenerateTestID()
+		onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+			OnProposalBlockState: onProposalBlockState,
+			OnCommitState:        onCommitState,
+			OnAbortState:         onAbortState,
+			Backend:              &env.backend,
+			Tx:                   tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrChildBlockAfterStakerChangeTime)
@@ -397,17 +389,15 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				tx, err := env.txBuilder.NewAdvanceTimeTx(newTime)
 				require.NoError(err)
 
-				onCommitState, err := state.NewDiff(lastAcceptedID, env)
-				require.NoError(err)
-
-				onAbortState, err := state.NewDiff(lastAcceptedID, env)
-				require.NoError(err)
+				proposalBlkID := ids.GenerateTestID()
+				onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 				executor := ProposalTxExecutor{
-					OnCommitState: onCommitState,
-					OnAbortState:  onAbortState,
-					Backend:       &env.backend,
-					Tx:            tx,
+					OnProposalBlockState: onProposalBlockState,
+					OnCommitState:        onCommitState,
+					OnAbortState:         onAbortState,
+					Backend:              &env.backend,
+					Tx:                   tx,
 				}
 				require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -521,17 +511,15 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1EndTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -597,17 +585,15 @@ func TestTrackedSubnet(t *testing.T) {
 			tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1StartTime)
 			require.NoError(err)
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, env)
-			require.NoError(err)
-
-			onAbortState, err := state.NewDiff(lastAcceptedID, env)
-			require.NoError(err)
+			proposalBlkID := ids.GenerateTestID()
+			onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 			executor := ProposalTxExecutor{
-				OnCommitState: onCommitState,
-				OnAbortState:  onAbortState,
-				Backend:       &env.backend,
-				Tx:            tx,
+				OnProposalBlockState: onProposalBlockState,
+				OnCommitState:        onCommitState,
+				OnAbortState:         onAbortState,
+				Backend:              &env.backend,
+				Tx:                   tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -647,17 +633,15 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -704,17 +688,14 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	onProposalBlockState, onCommitState, onAbortState = makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -748,17 +729,15 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -800,17 +779,14 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	onProposalBlockState, onCommitState, onAbortState = makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -838,17 +814,15 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
@@ -869,17 +843,15 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, ErrAdvanceTimeTxIssuedAfterBanff)
@@ -947,4 +919,27 @@ func addPendingValidator(
 		return nil, err
 	}
 	return addPendingValidatorTx, nil
+}
+
+func makeProposalAndOptionsStates(
+	r *require.Assertions,
+	env *environment,
+	proposalParentBlkID,
+	proposalBlkID ids.ID) (
+	onProposalBlockState state.Diff,
+	onCommitState state.Diff,
+	onAbortState state.Diff,
+) {
+	var err error
+	onProposalBlockState, err = state.NewDiff(proposalParentBlkID, env)
+	r.NoError(err)
+
+	env.SetState(proposalBlkID, onProposalBlockState)
+
+	onCommitState, err = state.NewDiff(proposalBlkID, env)
+	r.NoError(err)
+
+	onAbortState, err = state.NewDiff(proposalBlkID, env)
+	r.NoError(err)
+	return
 }

@@ -272,70 +272,34 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 	blk, err := block.NewApricotCommitBlock(parentID, 1 /*height*/)
 	require.NoError(err)
-
-	err = acceptor.ApricotCommitBlock(blk)
-	require.ErrorIs(err, state.ErrMissingParentState)
-
-	// Set [blk]'s parent in the state map.
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentState := &blockState{
-		statelessBlock: parentStatelessBlk,
-		onAcceptState:  parentOnAcceptState,
-		optionsState: optionsState{
-			onAbortState:  parentOnAbortState,
-			onCommitState: parentOnCommitState,
-		},
-	}
-	acceptor.backend.blkIDToState[parentID] = parentState
-
 	blkID := blk.ID()
-	// Set expected calls on dependencies.
-	// Make sure the parent is accepted first.
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
-		s.EXPECT().SetLastAccepted(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
-		s.EXPECT().AddStatelessBlock(parentState.statelessBlock).Times(1),
 
-		s.EXPECT().SetLastAccepted(blkID).Times(1),
-		s.EXPECT().SetHeight(blk.Height()).Times(1),
-		s.EXPECT().AddStatelessBlock(blk).Times(1),
-	)
-
-	err = acceptor.ApricotCommitBlock(blk)
-	require.ErrorIs(err, errMissingBlockState)
-
-	// Set [blk]'s state in the map as though it had been verified.
-	acceptor.backend.blkIDToState[parentID] = parentState
-	onAcceptState := state.NewMockDiff(ctrl)
-	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: onAcceptState,
+	{
+		err = acceptor.ApricotCommitBlock(blk)
+		require.ErrorIs(err, errMissingBlockState)
 	}
 
-	// Set expected calls on dependencies.
-	// Make sure the parent is accepted first.
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
-		s.EXPECT().SetLastAccepted(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
-		s.EXPECT().AddStatelessBlock(parentState.statelessBlock).Times(1),
+	{
+		onAcceptState := state.NewMockDiff(ctrl)
+		acceptor.backend.blkIDToState[blkID] = &blockState{
+			onAcceptState: onAcceptState,
+		}
 
-		s.EXPECT().SetLastAccepted(blkID).Times(1),
-		s.EXPECT().SetHeight(blk.Height()).Times(1),
-		s.EXPECT().AddStatelessBlock(blk).Times(1),
+		// Set expected calls on dependencies.
+		// Make sure the parent is accepted first.
+		gomock.InOrder(
+			s.EXPECT().SetLastAccepted(blkID).Times(1),
+			s.EXPECT().SetHeight(blk.Height()).Times(1),
+			s.EXPECT().AddStatelessBlock(blk).Times(1),
 
-		onAcceptState.EXPECT().Apply(s).Times(1),
-		s.EXPECT().Commit().Return(nil).Times(1),
-		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
-	)
+			onAcceptState.EXPECT().Apply(s).Times(1),
+			s.EXPECT().Commit().Return(nil).Times(1),
+			s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		)
 
-	require.NoError(acceptor.ApricotCommitBlock(blk))
-	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
+		require.NoError(acceptor.ApricotCommitBlock(blk))
+		require.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	}
 }
 
 func TestAcceptorVisitAbortBlock(t *testing.T) {
@@ -363,69 +327,31 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 	blk, err := block.NewApricotAbortBlock(parentID, 1 /*height*/)
 	require.NoError(err)
-
-	err = acceptor.ApricotAbortBlock(blk)
-	require.ErrorIs(err, state.ErrMissingParentState)
-
-	// Set [blk]'s parent in the state map.
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentState := &blockState{
-		statelessBlock: parentStatelessBlk,
-		onAcceptState:  parentOnAcceptState,
-		optionsState: optionsState{
-			onAbortState:  parentOnAbortState,
-			onCommitState: parentOnCommitState,
-		},
-	}
-	acceptor.backend.blkIDToState[parentID] = parentState
-
 	blkID := blk.ID()
-	// Set expected calls on dependencies.
-	// Make sure the parent is accepted first.
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
-		s.EXPECT().SetLastAccepted(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
-		s.EXPECT().AddStatelessBlock(parentState.statelessBlock).Times(1),
 
-		s.EXPECT().SetLastAccepted(blkID).Times(1),
-		s.EXPECT().SetHeight(blk.Height()).Times(1),
-		s.EXPECT().AddStatelessBlock(blk).Times(1),
-	)
-
-	err = acceptor.ApricotAbortBlock(blk)
-	require.ErrorIs(err, errMissingBlockState)
-
-	// Set [blk]'s state in the map as though it had been verified.
-	acceptor.backend.blkIDToState[parentID] = parentState
-
-	onAcceptState := state.NewMockDiff(ctrl)
-	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: onAcceptState,
+	{
+		err = acceptor.ApricotAbortBlock(blk)
+		require.ErrorIs(err, errMissingBlockState)
 	}
 
-	// Set expected calls on dependencies.
-	// Make sure the parent is accepted first.
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
-		s.EXPECT().SetLastAccepted(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
-		s.EXPECT().AddStatelessBlock(parentState.statelessBlock).Times(1),
+	{
+		onAcceptState := state.NewMockDiff(ctrl)
+		acceptor.backend.blkIDToState[blkID] = &blockState{
+			onAcceptState: onAcceptState,
+		}
 
-		s.EXPECT().SetLastAccepted(blkID).Times(1),
-		s.EXPECT().SetHeight(blk.Height()).Times(1),
-		s.EXPECT().AddStatelessBlock(blk).Times(1),
+		// Set expected calls on dependencies.
+		gomock.InOrder(
+			s.EXPECT().SetLastAccepted(blkID).Times(1),
+			s.EXPECT().SetHeight(blk.Height()).Times(1),
+			s.EXPECT().AddStatelessBlock(blk).Times(1),
 
-		onAcceptState.EXPECT().Apply(s).Times(1),
-		s.EXPECT().Commit().Return(nil).Times(1),
-		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
-	)
+			onAcceptState.EXPECT().Apply(s).Times(1),
+			s.EXPECT().Commit().Return(nil).Times(1),
+			s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		)
 
-	require.NoError(acceptor.ApricotAbortBlock(blk))
-	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
+		require.NoError(acceptor.ApricotAbortBlock(blk))
+		require.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	}
 }
