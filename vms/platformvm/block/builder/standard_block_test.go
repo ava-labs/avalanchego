@@ -26,6 +26,7 @@ func TestAtomicTxImports(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	utxoID := avax.UTXOID{

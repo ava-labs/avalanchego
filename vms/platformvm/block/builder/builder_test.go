@@ -38,6 +38,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	// Create a valid transaction
@@ -78,6 +79,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	// Create a valid transaction
@@ -130,6 +132,7 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	env.isBootstrapped.Set(false)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	require.True(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
@@ -322,6 +325,7 @@ func TestBuildBlock(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	var (
