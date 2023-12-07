@@ -151,9 +151,10 @@ func (a *acceptor) commitBlock(b block.Block, blockType string) error {
 
 func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	blkID := b.ID()
+	parentID := b.Parent()
 
 	defer func() {
-		a.free(b.Parent())
+		a.free(parentID)
 		a.free(blkID)
 	}()
 
@@ -181,7 +182,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
+		zap.Stringer("parentID", parentID),
 		zap.Stringer("utxoChecksum", a.state.Checksum()),
 	)
 
