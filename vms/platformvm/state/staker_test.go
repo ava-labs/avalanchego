@@ -148,7 +148,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	potentialReward := uint64(54321)
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
-	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx := txs.NewMockScheduledStaker(ctrl)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
@@ -192,7 +192,7 @@ func TestNewPendingStaker(t *testing.T) {
 	endTime := time.Now()
 	pendingPriority := txs.SubnetPermissionedValidatorPendingPriority
 
-	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx := txs.NewMockScheduledStaker(ctrl)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
