@@ -21,7 +21,7 @@ func newRNG() *rng {
 	return &rng{rng: source}
 }
 
-func Seed(seed int64) {
+func Seed(seed uint64) {
 	globalRNG.Seed(seed)
 }
 
@@ -37,9 +37,9 @@ type rng struct {
 
 // Seed uses the provided seed value to initialize the generator to a
 // deterministic state.
-func (r *rng) Seed(seed int64) {
+func (r *rng) Seed(seed uint64) {
 	r.lock.Lock()
-	r.rng.Seed(uint64(seed))
+	r.rng.Seed(seed)
 	r.lock.Unlock()
 }
 
