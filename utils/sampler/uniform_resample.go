@@ -42,7 +42,7 @@ func (s *uniformResample) Sample(count int) ([]uint64, error) {
 	return results, nil
 }
 
-func (s *uniformResample) Seed(seed int64) {
+func (s *uniformResample) Seed(seed uint64) {
 	s.rng = s.seededRNG
 	s.rng.Seed(seed)
 }
