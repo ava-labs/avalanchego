@@ -81,20 +81,6 @@ func (mr *MockStakerMockRecorder) NodeID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NodeID", reflect.TypeOf((*MockStaker)(nil).NodeID))
 }
 
-// PendingPriority mocks base method.
-func (m *MockStaker) PendingPriority() Priority {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PendingPriority")
-	ret0, _ := ret[0].(Priority)
-	return ret0
-}
-
-// PendingPriority indicates an expected call of PendingPriority.
-func (mr *MockStakerMockRecorder) PendingPriority() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingPriority", reflect.TypeOf((*MockStaker)(nil).PendingPriority))
-}
-
 // PublicKey mocks base method.
 func (m *MockStaker) PublicKey() (*bls.PublicKey, bool, error) {
 	m.ctrl.T.Helper()
@@ -109,20 +95,6 @@ func (m *MockStaker) PublicKey() (*bls.PublicKey, bool, error) {
 func (mr *MockStakerMockRecorder) PublicKey() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKey", reflect.TypeOf((*MockStaker)(nil).PublicKey))
-}
-
-// StartTime mocks base method.
-func (m *MockStaker) StartTime() time.Time {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartTime")
-	ret0, _ := ret[0].(time.Time)
-	return ret0
-}
-
-// StartTime indicates an expected call of StartTime.
-func (mr *MockStakerMockRecorder) StartTime() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartTime", reflect.TypeOf((*MockStaker)(nil).StartTime))
 }
 
 // SubnetID mocks base method.
