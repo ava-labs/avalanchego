@@ -182,6 +182,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		b.Mempool.EnableAdding()
 		// If we need to advance the chain's timestamp in a standard block, but
 		// we build an invalid block, then we need to re-trigger block building.
+		//
+		// TODO: Remove once we are guaranteed to build a valid block.
 		b.ResetBlockTimer()
 		// If there are still transactions in the mempool, then we need to
 		// re-trigger block building.
