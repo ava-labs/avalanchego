@@ -985,6 +985,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				require.ErrorIs(err, errSameRoot)
 				continue
 			}
+			if isEmpty(db) {
+				require.ErrorIs(err, ErrEmptyProof)
+				continue
+			}
 			require.NoError(err)
 			require.LessOrEqual(len(changeProof.KeyChanges), maxProofLen)
 
