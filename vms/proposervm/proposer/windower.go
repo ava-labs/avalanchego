@@ -157,7 +157,7 @@ func (w *windower) proposers(ctx context.Context, chainHeight, pChainHeight uint
 	}
 
 	seed := chainHeight ^ w.chainSource
-	w.sampler.Seed(int64(seed))
+	w.sampler.Seed(seed)
 
 	indices, err := w.sampler.Sample(numToSample)
 	if err != nil {

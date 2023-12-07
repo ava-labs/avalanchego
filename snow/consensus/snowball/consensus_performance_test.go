@@ -16,16 +16,18 @@ import (
 func TestDualAlphaOptimization(t *testing.T) {
 	require := require.New(t)
 
-	numColors := 10
-	numNodes := 100
-	params := Parameters{
-		K:               20,
-		AlphaPreference: 15,
-		AlphaConfidence: 15,
-		BetaVirtuous:    15,
-		BetaRogue:       20,
-	}
-	seed := int64(0)
+	var (
+		numColors = 10
+		numNodes  = 100
+		params    = Parameters{
+			K:               20,
+			AlphaPreference: 15,
+			AlphaConfidence: 15,
+			BetaVirtuous:    15,
+			BetaRogue:       20,
+		}
+		seed uint64 = 0
+	)
 
 	singleAlphaNetwork := Network{}
 	singleAlphaNetwork.Initialize(params, numColors)
@@ -54,10 +56,12 @@ func TestDualAlphaOptimization(t *testing.T) {
 func TestTreeConvergenceOptimization(t *testing.T) {
 	require := require.New(t)
 
-	numColors := 10
-	numNodes := 100
-	params := DefaultParameters
-	seed := int64(0)
+	var (
+		numColors        = 10
+		numNodes         = 100
+		params           = DefaultParameters
+		seed      uint64 = 0
+	)
 
 	treeNetwork := Network{}
 	treeNetwork.Initialize(params, numColors)
@@ -79,13 +83,13 @@ func TestTreeConvergenceOptimization(t *testing.T) {
 	runNetworksInLockstep(require, seed, &treeNetwork, &flatNetwork)
 }
 
-func runNetworksInLockstep(require *require.Assertions, seed int64, fast *Network, slow *Network) {
+func runNetworksInLockstep(require *require.Assertions, seed uint64, fast *Network, slow *Network) {
 	numRounds := 0
 	for !fast.Finalized() && !fast.Disagreement() && !slow.Finalized() && !slow.Disagreement() {
-		sampler.Seed(int64(numRounds) + seed)
+		sampler.Seed(uint64(numRounds) + seed)
 		fast.Round()
 
-		sampler.Seed(int64(numRounds) + seed)
+		sampler.Seed(uint64(numRounds) + seed)
 		slow.Round()
 		numRounds++
 	}
