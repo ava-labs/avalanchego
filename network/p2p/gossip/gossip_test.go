@@ -11,10 +11,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -120,7 +123,7 @@ func TestGossiperGossip(t *testing.T) {
 			responseNetwork := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
 			responseBloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
-			responseSet := testSet{
+			responseSet := &testSet{
 				set:   set.Set[*testTx]{},
 				bloom: responseBloom,
 			}
@@ -128,7 +131,13 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(responseSet.Add(item))
 			}
 
-			handler, err := NewHandler[*testTx](responseSet, tt.config, prometheus.NewRegistry())
+			handler, err := NewHandler[testTx, *testTx](
+				logging.NoLog{},
+				nil,
+				responseSet,
+				tt.config,
+				prometheus.NewRegistry(),
+			)
 			require.NoError(err)
 			require.NoError(responseNetwork.AddHandler(0x0, handler))
 
@@ -153,8 +162,7 @@ func TestGossiperGossip(t *testing.T) {
 
 			bloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
-			requestSet := testSet{
-				set:   set.Set[*testTx]{},
+			requestSet := &testSet{
 				bloom: bloom,
 			}
 			for _, item := range tt.requester {
@@ -243,6 +251,251 @@ func TestValidatorGossiper(t *testing.T) {
 	validators.validators = set.Set[ids.NodeID]{}
 	require.NoError(gossiper.Gossip(context.Background()))
 	require.Equal(2, calls)
+}
+
+func TestPushGossiper(t *testing.T) {
+	tests := []struct {
+		name   string
+		cycles [][]*testTx
+	}{
+		{
+			name: "single cycle",
+			cycles: [][]*testTx{
+				{
+					&testTx{
+						id: ids.ID{0},
+					},
+					&testTx{
+						id: ids.ID{1},
+					},
+					&testTx{
+						id: ids.ID{2},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple cycles",
+			cycles: [][]*testTx{
+				{
+					&testTx{
+						id: ids.ID{0},
+					},
+				},
+				{
+					&testTx{
+						id: ids.ID{1},
+					},
+					&testTx{
+						id: ids.ID{2},
+					},
+				},
+				{
+					&testTx{
+						id: ids.ID{3},
+					},
+					&testTx{
+						id: ids.ID{4},
+					},
+					&testTx{
+						id: ids.ID{5},
+					},
+				},
+				{
+					&testTx{
+						id: ids.ID{6},
+					},
+					&testTx{
+						id: ids.ID{7},
+					},
+					&testTx{
+						id: ids.ID{8},
+					},
+					&testTx{
+						id: ids.ID{9},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+
+			sent := make(chan []byte, 1)
+			gossiper := NewPushGossiper[*testTx](nil)
+			gossiper.sender = &fakeGossipClient{
+				sent: sent,
+			}
+
+			for _, gossipables := range tt.cycles {
+				gossiper.Add(gossipables...)
+				require.NoError(gossiper.Gossip(ctx))
+
+				want := &sdk.PushGossip{
+					Gossip: make([][]byte, 0, len(tt.cycles)),
+				}
+
+				for _, gossipable := range gossipables {
+					bytes, err := gossipable.Marshal()
+					require.NoError(err)
+
+					want.Gossip = append(want.Gossip, bytes)
+				}
+
+				got := &sdk.PushGossip{}
+				sentMsg := <-sent
+				// remove the handler prefix
+				require.NoError(proto.Unmarshal(sentMsg[1:], got))
+				require.Equal(want.Gossip, got.Gossip)
+			}
+		})
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	require := require.New(t)
+
+	sent := make(chan []byte)
+	gossiper := NewPushGossiper[*testTx](nil)
+	gossiper.sender = &fakeGossipClient{
+		sent: sent,
+	}
+
+	ctx := context.Background()
+	toGossip := make(chan *testTx)
+
+	go Subscribe(ctx, logging.NoLog{}, gossiper, toGossip)
+
+	tx := &testTx{id: ids.ID{1}}
+	toGossip <- tx
+
+	txBytes, err := tx.Marshal()
+	require.NoError(err)
+	want := [][]byte{txBytes}
+
+	gotMsg := &sdk.PushGossip{}
+	// remove the handler prefix
+	sentMsg := <-sent
+	require.NoError(proto.Unmarshal(sentMsg[1:], gotMsg))
+
+	require.Equal(want, gotMsg.Gossip)
+}
+
+func TestSubscribeCloseChannel(*testing.T) {
+	gossiper := &PushGossiper[*testTx]{}
+
+	wg := &sync.WaitGroup{}
+	ctx := context.Background()
+	toGossip := make(chan *testTx)
+
+	wg.Add(1)
+	go func() {
+		Subscribe(ctx, logging.NoLog{}, gossiper, toGossip)
+		wg.Done()
+	}()
+
+	close(toGossip)
+	wg.Wait()
+}
+
+func TestSubscribeCancelContext(*testing.T) {
+	gossiper := &PushGossiper[*testTx]{}
+
+	wg := &sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
+	toGossip := make(chan *testTx)
+
+	wg.Add(1)
+	go func() {
+		Subscribe(ctx, logging.NoLog{}, gossiper, toGossip)
+		wg.Done()
+	}()
+
+	cancel()
+	wg.Wait()
+}
+
+func TestPushGossipE2E(t *testing.T) {
+	require := require.New(t)
+
+	// tx known by both the sender and the receiver which should not be
+	// forwarded
+	knownTx := &testTx{id: ids.GenerateTestID()}
+
+	log := logging.NoLog{}
+	bloom, err := NewBloomFilter(100, 0.01)
+	require.NoError(err)
+	set := &testSet{
+		bloom: bloom,
+	}
+	require.NoError(set.Add(knownTx))
+
+	metrics := prometheus.NewRegistry()
+	handler, err := NewHandler[testTx, *testTx](
+		log,
+		nil,
+		set,
+		HandlerConfig{},
+		metrics,
+	)
+	require.NoError(err)
+
+	handlerID := uint64(123)
+	forwarded := make(chan []byte, 1)
+	handler.gossipSender = &fakeGossipClient{
+		handlerID: handlerID,
+		sent:      forwarded,
+	}
+
+	network := p2p.NewNetwork(log, nil, metrics, "")
+	_, err = network.NewAppProtocol(handlerID, handler)
+	require.NoError(err)
+
+	sendGossiper := NewPushGossiper[*testTx](nil)
+	sent := make(chan []byte, 1)
+	sendGossiper.sender = &fakeGossipClient{
+		handlerID: handlerID,
+		sent:      sent,
+	}
+
+	want := []*testTx{
+		{id: ids.GenerateTestID()},
+		{id: ids.GenerateTestID()},
+		{id: ids.GenerateTestID()},
+	}
+
+	// gossip both the new tx and the one the peer already knows about
+	gossiped := append(want, knownTx)
+	sendGossiper.Add(gossiped...)
+	got := make([]*testTx, 0, len(want))
+	set.onAdd = func(tx *testTx) {
+		got = append(got, tx)
+	}
+
+	ctx := context.Background()
+	require.NoError(sendGossiper.Gossip(ctx))
+
+	// make sure that we only add new txs someone gossips to us
+	require.NoError(network.AppGossip(ctx, ids.EmptyNodeID, <-sent))
+	require.Equal(want, got)
+
+	// make sure that we only forward txs we have not already seen before
+	forwardedBytes := <-forwarded
+	forwardedMsg := &sdk.PushGossip{}
+	require.NoError(proto.Unmarshal(forwardedBytes[1:], forwardedMsg))
+	require.Len(forwardedMsg.Gossip, len(want))
+
+	gotForwarded := make([]*testTx, 0, len(got))
+	for _, bytes := range forwardedMsg.Gossip {
+		tx := &testTx{}
+		require.NoError(tx.Unmarshal(bytes))
+		gotForwarded = append(gotForwarded, tx)
+	}
+
+	require.Equal(want, gotForwarded)
 }
 
 type testGossiper struct {
