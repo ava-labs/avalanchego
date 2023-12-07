@@ -11,7 +11,7 @@ type Uniform interface {
 	// negative the implementation may panic.
 	Sample(length int) ([]uint64, error)
 
-	Seed(int64)
+	Seed(uint64)
 	ClearSeed()
 
 	Reset()
