@@ -55,7 +55,7 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 	return results, nil
 }
 
-func (s *uniformReplacer) Seed(seed int64) {
+func (s *uniformReplacer) Seed(seed uint64) {
 	s.rng = s.seededRNG
 	s.rng.Seed(seed)
 }

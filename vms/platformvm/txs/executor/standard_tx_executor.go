@@ -534,7 +534,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
-func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
+func (e *StandardTxExecutor) putStaker(stakerTx txs.ScheduledStaker) error {
 	txID := e.Tx.ID()
 	staker, err := state.NewPendingStaker(txID, stakerTx)
 	if err != nil {
