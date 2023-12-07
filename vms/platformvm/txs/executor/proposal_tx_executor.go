@@ -49,18 +49,18 @@ type ProposalTxExecutor struct {
 	Tx *txs.Tx
 
 	// [OnProposalBlockState] is modified by this struct's methods to
-	// reflect changes related to timestamp advannce to be stored
-	// whether we then accept commit or abort block
+	// reflect changes related to the block timestamp and other changes
+	// to be stored whether we then accept commit or abort block
 	//
 	// Invariant: Both [OnCommitState] and [OnAbortState] are built on
 	//            top of OnProposalBlockState when provided to the executor.
 	OnProposalBlockState state.Diff
 
 	// [OnCommitState] is modified by this struct's methods to
-	// reflect changes made to the state if the proposal is committed.
+	// reflect changes made to the state if the proposal tx is committed.
 	OnCommitState state.Diff
 	// [OnAbortState] is modified by this struct's methods to
-	// reflect changes made to the state if the proposal is aborted.
+	// reflect changes made to the state if the proposal tx is aborted.
 	OnAbortState state.Diff
 
 	// outputs populated by this struct's methods:
