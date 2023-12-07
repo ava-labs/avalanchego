@@ -52,6 +52,8 @@ type Builder interface {
 
 	// ShutdownBlockTimer stops block creation requests to advance the chain
 	// timestamp.
+	//
+	// Invariant: Assumes the context lock is held when calling.
 	ShutdownBlockTimer()
 
 	// BuildBlock can be called to attempt to create a new block
@@ -106,6 +108,9 @@ func (b *builder) StartBlockTimer() {
 				return
 			}
 
+			// Note: Because the context lock is not held here, it is possible
+			// that [ShutdownBlockTimer] is called concurrently with this
+			// execution.
 			for {
 				duration, err := b.durationToSleep()
 				if err != nil {
@@ -143,6 +148,16 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 	// through modifying of the state.
 	b.txExecutorBackend.Ctx.Lock.Lock()
 	defer b.txExecutorBackend.Ctx.Lock.Unlock()
+
+	// If [ShutdownBlockTimer] was called, we want to exit the block timer
+	// goroutine. We check this with the context lock held because
+	// [ShutdownBlockTimer] is expected to only be called with the context lock
+	// held.
+	select {
+	case <-b.closed:
+		return 0, nil
+	default:
+	}
 
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
