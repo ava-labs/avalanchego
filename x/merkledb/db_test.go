@@ -958,6 +958,16 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				root,
 				tokenSize,
 			))
+			toProto := rangeProof.ToProto()
+			fromProto := &RangeProof{}
+			require.NoError(fromProto.UnmarshalProto(toProto))
+			require.NoError(fromProto.Verify(
+				context.Background(),
+				start,
+				end,
+				root,
+				tokenSize,
+			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -990,6 +1000,16 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
 				changeProof,
+				start,
+				end,
+				root,
+			))
+			toProto := changeProof.ToProto()
+			fromProto := &ChangeProof{}
+			require.NoError(fromProto.UnmarshalProto(toProto))
+			require.NoError(changeProofDB.VerifyChangeProof(
+				context.Background(),
+				fromProto,
 				start,
 				end,
 				root,
