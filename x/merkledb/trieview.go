@@ -462,19 +462,6 @@ func (t *trieView) GetRangeProof(
 		result.StartProof = result.StartProof[i:]
 	}
 
-	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
-		// If the range is empty, return the root proof.
-		root, err := t.getRoot()
-		if err != nil {
-			return nil, err
-		}
-		rootProof, err := t.getProof(ctx, root.key.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		result.EndProof = rootProof.Path
-	}
-
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
