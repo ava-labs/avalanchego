@@ -96,6 +96,7 @@ type ChangeProofer interface {
 }
 
 type RangeProofer interface {
+
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
 	// If [start] is Nothing, there's no lower bound on the range.
@@ -579,13 +580,6 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 	return db.rootID
 }
 
-// isSentinelNodeTheRoot returns true if the passed in sentinel node has a value and or multiple child nodes
-// When this is true, the root of the trie is the sentinel node
-// When this is false, the root of the trie is the sentinel node's single child
-func isSentinelNodeTheRoot(sentinel *node) bool {
-	return sentinel.valueDigest.HasValue() || len(sentinel.children) != 1
-}
-
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -744,7 +738,7 @@ func (db *merkleDB) GetChangeProof(
 func (db *merkleDB) NewView(
 	_ context.Context,
 	changes ViewChanges,
-) (TrieView, error) {
+) (View, error) {
 	// ensure the db doesn't change while creating the new view
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -1162,7 +1156,7 @@ func (db *merkleDB) initializeRoot() error {
 	}
 
 	db.rootID = db.sentinelNode.calculateID(db.metrics)
-	if !isSentinelNodeTheRoot(db.sentinelNode) {
+	if !isSentinelNodeTheRoot(db) {
 		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
 		for _, childEntry := range db.sentinelNode.children {
 			db.rootID = childEntry.id
@@ -1192,7 +1186,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	if err != nil {
 		return nil, err
 	}
-	return newHistoricalTrieView(db, changeHistory)
+	return newHistoricalView(db, changeHistory)
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].

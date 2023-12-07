@@ -1221,7 +1221,7 @@ func TestTrieCommitToDB(t *testing.T) {
 
 	type test struct {
 		name        string
-		trieFunc    func() TrieView
+		trieFunc    func() View
 		expectedErr error
 	}
 
@@ -1232,7 +1232,7 @@ func TestTrieCommitToDB(t *testing.T) {
 	tests := []test{
 		{
 			name: "invalid",
-			trieFunc: func() TrieView {
+			trieFunc: func() View {
 				view, err := db.NewView(context.Background(), ViewChanges{})
 				r.NoError(err)
 
@@ -1245,7 +1245,7 @@ func TestTrieCommitToDB(t *testing.T) {
 		},
 		{
 			name: "committed",
-			trieFunc: func() TrieView {
+			trieFunc: func() View {
 				view, err := db.NewView(context.Background(), ViewChanges{})
 				r.NoError(err)
 
@@ -1258,7 +1258,7 @@ func TestTrieCommitToDB(t *testing.T) {
 		},
 		{
 			name: "parent not database",
-			trieFunc: func() TrieView {
+			trieFunc: func() View {
 				view, err := db.NewView(context.Background(), ViewChanges{})
 				r.NoError(err)
 

@@ -345,10 +345,10 @@ func (mr *MockMerkleDBMockRecorder) NewIteratorWithStartAndPrefix(arg0, arg1 int
 }
 
 // NewView mocks base method.
-func (m *MockMerkleDB) NewView(arg0 context.Context, arg1 ViewChanges) (TrieView, error) {
+func (m *MockMerkleDB) NewView(arg0 context.Context, arg1 ViewChanges) (View, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewView", arg0, arg1)
-	ret0, _ := ret[0].(TrieView)
+	ret0, _ := ret[0].(View)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

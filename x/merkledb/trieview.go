@@ -4,10 +4,8 @@
 package merkledb
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -28,7 +26,7 @@ const (
 )
 
 var (
-	_ TrieView = (*trieView)(nil)
+	_ View = (*trieView)(nil)
 
 	ErrCommitted                  = errors.New("view has been committed")
 	ErrInvalid                    = errors.New("the trie this view was based on has changed, rendering this view invalid")
@@ -83,7 +81,7 @@ type trieView struct {
 
 	// the uncommitted parent trie of this view
 	// [validityTrackingLock] must be held when reading/writing this field.
-	parentTrie TrieView
+	parentTrie View
 
 	// The valid children of this trie.
 	// [validityTrackingLock] must be held when reading/writing this field.
@@ -110,7 +108,7 @@ type trieView struct {
 func (t *trieView) NewView(
 	ctx context.Context,
 	changes ViewChanges,
-) (TrieView, error) {
+) (View, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -145,7 +143,7 @@ func (t *trieView) NewView(
 // Assumes [parentTrie] isn't locked.
 func newTrieView(
 	db *merkleDB,
-	parentTrie TrieView,
+	parentTrie View,
 	changes ViewChanges,
 ) (*trieView, error) {
 	sentinelNode, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
@@ -193,7 +191,7 @@ func newTrieView(
 }
 
 // Creates a view of the db at a historical root using the provided changes
-func newHistoricalTrieView(
+func newHistoricalView(
 	db *merkleDB,
 	changes *changeSummary,
 ) (*trieView, error) {
@@ -218,6 +216,13 @@ func newHistoricalTrieView(
 	newView.calculateNodesOnce.Do(func() {})
 	newView.nodesAlreadyCalculated.Set(true)
 	return newView, nil
+}
+
+func (t *trieView) getSentinelNode() *node {
+	return t.sentinelNode
+}
+func (t *trieView) getTokenSize() int {
+	return t.tokenSize
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
@@ -255,7 +260,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		t.db.calculateNodeIDsSema.Release(1)
 
 		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
-		if !isSentinelNodeTheRoot(t.sentinelNode) {
+		if !isSentinelNodeTheRoot(t) {
 			for _, childEntry := range t.sentinelNode.children {
 				t.changes.rootID = childEntry.id
 			}
@@ -317,70 +322,11 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, err
 	}
 
-	return t.getProof(ctx, key)
-}
-
-// Returns a proof that [bytesPath] is in or not in trie [t].
-func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.getProof")
-	defer span.End()
-
-	proof := &Proof{
-		Key: ToKey(key),
-	}
-
-	var closestNode *node
-	if err := t.visitPathToKey(proof.Key, func(n *node) error {
-		closestNode = n
-		proof.Path = append(proof.Path, n.asProofNode())
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	root, err := t.getRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	// The sentinel node is always the first node in the path.
-	// If the sentinel node is not the root, remove it from the proofPath.
-	if root != t.sentinelNode {
-		proof.Path = proof.Path[1:]
-
-		// if there are no nodes in the proof path, add the root to serve as an exclusion proof
-		if len(proof.Path) == 0 {
-			proof.Path = []ProofNode{root.asProofNode()}
-			return proof, nil
-		}
-	}
-
-	if closestNode.key == proof.Key {
-		// There is a node with the given [key].
-		proof.Value = maybe.Bind(closestNode.value, slices.Clone[[]byte])
-		return proof, nil
-	}
-
-	// There is no node with the given [key].
-	// If there is a child at the index where the node would be
-	// if it existed, include that child in the proof.
-	nextIndex := proof.Key.Token(closestNode.key.length, t.tokenSize)
-	child, ok := closestNode.children[nextIndex]
-	if !ok {
-		return proof, nil
-	}
-
-	childNode, err := t.getNode(
-		closestNode.key.Extend(ToToken(nextIndex, t.tokenSize), child.compressedKey),
-		child.hasValue,
-	)
-	if err != nil {
-		return nil, err
-	}
-	proof.Path = append(proof.Path, childNode.asProofNode())
+	result, err := getProof(t, key)
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
-	return proof, nil
+	return result, err
 }
 
 // GetRangeProof returns a range proof for (at least part of) the key range [start, end].
@@ -394,91 +340,11 @@ func (t *trieView) GetRangeProof(
 ) (*RangeProof, error) {
 	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
-
-	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
-		return nil, ErrStartAfterEnd
-	}
-
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
-	}
-
-	if err := t.calculateNodeIDs(ctx); err != nil {
-		return nil, err
-	}
-
-	var result RangeProof
-
-	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
-	it := t.NewIteratorWithStart(start.Value())
-	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
-		// clone the value to prevent editing of the values stored within the trie
-		result.KeyValues = append(result.KeyValues, KeyValue{
-			Key:   it.Key(),
-			Value: slices.Clone(it.Value()),
-		})
-	}
-	it.Release()
-	if err := it.Error(); err != nil {
-		return nil, err
-	}
-
-	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
-	// The end proof we provide should be for the last key-value pair in the proof, not for
-	// the last key-value pair requested, which may not be in this proof.
-	var (
-		endProof *Proof
-		err      error
-	)
-	if len(result.KeyValues) > 0 {
-		greatestKey := result.KeyValues[len(result.KeyValues)-1].Key
-		endProof, err = t.getProof(ctx, greatestKey)
-		if err != nil {
-			return nil, err
-		}
-	} else if end.HasValue() {
-		endProof, err = t.getProof(ctx, end.Value())
-		if err != nil {
-			return nil, err
-		}
-	}
-	if endProof != nil {
-		result.EndProof = endProof.Path
-	}
-
-	if start.HasValue() {
-		startProof, err := t.getProof(ctx, start.Value())
-		if err != nil {
-			return nil, err
-		}
-		result.StartProof = startProof.Path
-
-		// strip out any common nodes to reduce proof size
-		i := 0
-		for ; i < len(result.StartProof) &&
-			i < len(result.EndProof) &&
-			result.StartProof[i].Key == result.EndProof[i].Key; i++ {
-		}
-		result.StartProof = result.StartProof[i:]
-	}
-
-	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
-		// If the range is empty, return the root proof.
-		root, err := t.getRoot()
-		if err != nil {
-			return nil, err
-		}
-		rootProof, err := t.getProof(ctx, root.key.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		result.EndProof = rootProof.Path
-	}
-
+	result, err := getRangeProof(t, start, end, maxLength)
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
-	return &result, nil
+	return result, err
 }
 
 // CommitToDB commits changes from this trie to the underlying DB.
@@ -543,7 +409,7 @@ func (t *trieView) invalidate() {
 	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
 }
 
-func (t *trieView) updateParent(newParent TrieView) {
+func (t *trieView) updateParent(newParent View) {
 	t.validityTrackingLock.Lock()
 	defer t.validityTrackingLock.Unlock()
 
@@ -645,7 +511,7 @@ func (t *trieView) remove(key Key) error {
 	// mark all ancestor for change
 	// grab parent and grandparent nodes for path compression
 	var grandParent, parent, nodeToDelete *node
-	if err := t.visitPathToKey(key, func(n *node) error {
+	if err := visitPathToKey(t, key, func(n *node) error {
 		grandParent = parent
 		parent = nodeToDelete
 		nodeToDelete = n
@@ -718,41 +584,6 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	return t.recordNodeChange(parent)
 }
 
-// Returns the nodes along the path to [key].
-// The first node is the root, and the last node is either the node with the
-// given [key], if it's in the trie, or the node with the largest prefix of
-// the [key] if it isn't in the trie.
-// Always returns at least the root node.
-func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
-	var (
-		// all node paths start at the sentinelNode since its nil key is a prefix of all keys
-		currentNode = t.sentinelNode
-		err         error
-	)
-	if err := visitNode(currentNode); err != nil {
-		return err
-	}
-	// while the entire path hasn't been matched
-	for currentNode.key.length < key.length {
-		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.length, t.tokenSize)]
-
-		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentNode.key.length+t.tokenSize, t.tokenSize) {
-			// there was no child along the path or the child that was there doesn't match the remaining path
-			return nil
-		}
-		// grab the next node along the path
-		currentNode, err = t.getNode(key.Take(currentNode.key.length+t.tokenSize+nextChildEntry.compressedKey.length), nextChildEntry.hasValue)
-		if err != nil {
-			return err
-		}
-		if err := visitNode(currentNode); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Get a copy of the node matching the passed key from the trie.
 // Used by views to get nodes from their ancestors.
 func (t *trieView) getEditableNode(key Key, hadValue bool) (*node, error) {
@@ -786,7 +617,7 @@ func (t *trieView) insert(
 	}
 
 	var closestNode *node
-	if err := t.visitPathToKey(key, func(n *node) error {
+	if err := visitPathToKey(t, key, func(n *node) error {
 		closestNode = n
 		return t.recordNodeChange(n)
 	}); err != nil {
@@ -897,19 +728,6 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
-func (t *trieView) getRoot() (*node, error) {
-	if !isSentinelNodeTheRoot(t.sentinelNode) {
-		// sentinelNode has one child, which is the root
-		for index, childEntry := range t.sentinelNode.children {
-			return t.getNode(
-				t.sentinelNode.key.Extend(ToToken(index, t.tokenSize), childEntry.compressedKey),
-				childEntry.hasValue)
-		}
-	}
-
-	return t.sentinelNode, nil
-}
-
 // Records that the node associated with the given key has been changed.
 // If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
@@ -995,7 +813,7 @@ func (t *trieView) getNode(key Key, hasValue bool) (*node, error) {
 }
 
 // Get the parent trie of the view
-func (t *trieView) getParentTrie() TrieView {
+func (t *trieView) getParentTrie() View {
 	t.validityTrackingLock.RLock()
 	defer t.validityTrackingLock.RUnlock()
 	return t.parentTrie

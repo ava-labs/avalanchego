@@ -14,6 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
+type ViewChanges struct {
+	BatchOps []database.BatchOp
+	MapOps   map[string]maybe.Maybe[[]byte]
+	// ConsumeBytes when set to true will skip copying of bytes and assume
+	// ownership of the provided bytes.
+	ConsumeBytes bool
+}
+
 type MerkleRootGetter interface {
 	// GetMerkleRoot returns the merkle root of the Trie
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
@@ -23,17 +31,15 @@ type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
 	GetProof(ctx context.Context, keyBytes []byte) (*Proof, error)
+
+	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
+	// keys in range [start, end].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
+	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 }
 
-type ViewChanges struct {
-	BatchOps []database.BatchOp
-	MapOps   map[string]maybe.Maybe[[]byte]
-	// ConsumeBytes when set to true will skip copying of bytes and assume
-	// ownership of the provided bytes.
-	ConsumeBytes bool
-}
-
-type trieInternal interface {
+type trieInternals interface {
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
 	getValue(key Key) ([]byte, error)
@@ -52,7 +58,7 @@ type trieInternal interface {
 }
 
 type Trie interface {
-	trieInternal
+	trieInternals
 	MerkleRootGetter
 	ProofGetter
 	database.Iteratee
@@ -65,21 +71,15 @@ type Trie interface {
 	// database.ErrNotFound if the key is not present
 	GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error)
 
-	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
-	// keys in range [start, end].
-	// If [start] is Nothing, there's no lower bound on the range.
-	// If [end] is Nothing, there's no upper bound on the range.
-	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
-
 	// NewView returns a new view on top of this Trie where the passed changes
 	// have been applied.
 	NewView(
 		ctx context.Context,
 		changes ViewChanges,
-	) (TrieView, error)
+	) (View, error)
 }
 
-type TrieView interface {
+type View interface {
 	Trie
 
 	// CommitToDB writes the changes in this view to the database.
@@ -87,9 +87,24 @@ type TrieView interface {
 	CommitToDB(ctx context.Context) error
 }
 
+// isSentinelNodeTheRoot returns true if the sentinel node of the passed in trie has a value and or multiple child nodes
+// When this is true, the root of the trie is the sentinel node
+// When this is false, the root of the trie is the sentinel node's single child
+func isSentinelNodeTheRoot[T Trie](t T) bool {
+	sentinel := t.getSentinelNode()
+	return sentinel.valueDigest.HasValue() || len(sentinel.children) != 1
+}
+func getValueCopy[T Trie](t T, key Key) ([]byte, error) {
+	val, err := t.getValue(key)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(val), nil
+}
+
 func getRoot[T Trie](t T) (*node, error) {
 	sentinel := t.getSentinelNode()
-	if !isSentinelNodeTheRoot(sentinel) {
+	if !isSentinelNodeTheRoot(t) {
 		// sentinel has one child, which is the root
 		for index, childEntry := range sentinel.children {
 			return t.getNode(
