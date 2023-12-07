@@ -27,10 +27,8 @@ const (
 var (
 	_ codec.Codec = (*genericCodec)(nil)
 
-	binMarshalerType    = reflect.TypeOf((*encoding.BinaryMarshaler)(nil)).Elem()
-	binUnmarshalerType  = reflect.TypeOf((*encoding.BinaryUnmarshaler)(nil)).Elem()
-	textMarshalerType   = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
-	textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+	binMarshalerType   = reflect.TypeOf((*encoding.BinaryMarshaler)(nil)).Elem()
+	binUnmarshalerType = reflect.TypeOf((*encoding.BinaryUnmarshaler)(nil)).Elem()
 
 	errMarshalNil              = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil            = errors.New("can't unmarshal nil")
@@ -316,7 +314,30 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 	return c.marshal(reflect.ValueOf(value), p, c.maxSliceLen, false /*=nullable*/, nil /*=typeStack*/)
 }
 
-func (*genericCodec) customMarshal(value reflect.Value, p *wrappers.Packer) (bool, error) {
+// Checks if the current value has any no tags to serialize fields
+//
+// To be backwards compatible any struct that has fields to be serialized
+// through tags will not use the BinaryMarshal/BinaryUnmarshal even if those
+// traits are implemented
+func (c *genericCodec) hasNoSerializedFields(value reflect.Value) bool {
+	switch valueKind := value.Kind(); valueKind {
+	case reflect.Struct:
+		serializedFieldIndices, _ := c.fielder.GetSerializedFields(value.Type())
+		return len(serializedFieldIndices) == 0
+	case reflect.Ptr:
+		return c.hasNoSerializedFields(value.Elem())
+	}
+	return true
+}
+
+// Attempts to serialize using a custom Marshal
+//
+// This applies to struct which implements a custom marshal (the BinaryMarshal
+// trait) and has no field tagged to be exported through tags
+func (c *genericCodec) customMarshal(value reflect.Value, p *wrappers.Packer) (bool, error) {
+	if !c.hasNoSerializedFields(value) {
+		return false, nil
+	}
 	if value.Type().Implements(binMarshalerType) {
 		marshaler := value.Interface().(encoding.BinaryMarshaler)
 		binary, err := marshaler.MarshalBinary()
@@ -327,14 +348,24 @@ func (*genericCodec) customMarshal(value reflect.Value, p *wrappers.Packer) (boo
 		return true, p.Err
 	}
 
-	if value.Type().Implements(textMarshalerType) {
-		marshaler := value.Interface().(encoding.TextMarshaler)
-		binary, err := marshaler.MarshalText()
-		if err != nil {
-			return true, err
+	return false, nil
+}
+
+// Attempts to deserialize using a custom Unmarshal
+//
+// This applies to struct which implements a custom unmarshal (the
+// BinaryUnmarshal trait) and has no field tagged to be exported through tags
+func (c *genericCodec) customUnmarshal(p *wrappers.Packer, value reflect.Value) (bool, error) {
+	if !c.hasNoSerializedFields(value) {
+		return false, nil
+	}
+	if value.Type().Implements(binUnmarshalerType) {
+		marshaler := value.Interface().(encoding.BinaryUnmarshaler)
+		bytes := p.UnpackBytes()
+		if p.Err != nil {
+			return true, fmt.Errorf("couldn't unmarshal UnmarshalBinary(): %w", p.Err)
 		}
-		p.PackBytes(binary)
-		return true, p.Err
+		return true, marshaler.UnmarshalBinary(bytes)
 	}
 
 	return false, nil
@@ -581,28 +612,6 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 		)
 	}
 	return nil
-}
-
-func (*genericCodec) customUnmarshal(p *wrappers.Packer, value reflect.Value) (bool, error) {
-	if value.Type().Implements(binUnmarshalerType) {
-		marshaler := value.Interface().(encoding.BinaryUnmarshaler)
-		bytes := p.UnpackBytes()
-		if p.Err != nil {
-			return true, fmt.Errorf("couldn't unmarshal UnmarshalBinary(): %w", p.Err)
-		}
-		return true, marshaler.UnmarshalBinary(bytes)
-	}
-
-	if value.Type().Implements(textUnmarshalerType) {
-		marshaler := value.Interface().(encoding.TextUnmarshaler)
-		bytes := p.UnpackBytes()
-		if p.Err != nil {
-			return true, fmt.Errorf("couldn't unmarshal UnmarshalText(): %w", p.Err)
-		}
-		return true, marshaler.UnmarshalText(bytes)
-	}
-
-	return false, nil
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.

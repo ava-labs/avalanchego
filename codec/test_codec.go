@@ -46,7 +46,8 @@ var (
 		TestExtraSpace,
 		TestSliceLengthOverflow,
 		TestMap,
-		TestTypesWithTextEncoders,
+		TestTypesWithCustomMarshals,
+		TestTypesWithCustomMarshalsIgnored,
 	}
 
 	MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
@@ -1147,11 +1148,11 @@ func FuzzStructUnmarshal(codec GeneralCodec, f *testing.F) {
 	})
 }
 
-type textType struct {
+type customMarshalStruct struct {
 	valid bool
 }
 
-func (t *textType) MarshalText() ([]byte, error) {
+func (t *customMarshalStruct) MarshalBinary() ([]byte, error) {
 	if t.valid {
 		return []byte("true"), nil
 	}
@@ -1159,9 +1160,9 @@ func (t *textType) MarshalText() ([]byte, error) {
 	return []byte("false"), nil
 }
 
-func (t *textType) UnmarshalText(data []byte) error {
+func (t *customMarshalStruct) UnmarshalBinary(data []byte) error {
 	if bytes.Equal(data, []byte("true")) || bytes.Equal(data, []byte("false")) {
-		*t = textType{
+		*t = customMarshalStruct{
 			valid: bytes.Equal(data, []byte("true")),
 		}
 		return nil
@@ -1169,31 +1170,73 @@ func (t *textType) UnmarshalText(data []byte) error {
 	return errors.New("invalid value")
 }
 
-func TestTypesWithTextEncoders(codec GeneralCodec, t testing.TB) {
+type customMarshalStructIgnored struct {
+	Valid bool `serialize:"true"`
+}
+
+func (*customMarshalStructIgnored) MarshalBinary() ([]byte, error) {
+	return nil, errors.New("i should not be called")
+}
+
+func (*customMarshalStructIgnored) UnmarshalBinary([]byte) error {
+	return errors.New("i should not be called")
+}
+
+func TestTypesWithCustomMarshalsIgnored(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 	manager := NewDefaultManager()
 	require.NoError(manager.RegisterCodec(12, codec))
-	value := &textType{
+	value := &customMarshalStructIgnored{
+		Valid: true,
+	}
+	bytes1, err := manager.Marshal(12, value)
+	require.NoError(err)
+	require.Equal(len(bytes1), 3)
+	value = &customMarshalStructIgnored{
+		Valid: false,
+	}
+	bytes2, err := manager.Marshal(12, value)
+	require.NoError(err)
+	require.Equal(len(bytes2), 3)
+
+	newValueTrue := &customMarshalStructIgnored{}
+	version, err := manager.Unmarshal(bytes1, &newValueTrue)
+	require.Equal(uint16(12), version)
+	require.NoError(err)
+	require.Equal(true, newValueTrue.Valid)
+
+	newValueFalse := &customMarshalStruct{}
+	version, err = manager.Unmarshal(bytes2, &newValueFalse)
+	require.Equal(uint16(12), version)
+	require.NoError(err)
+	require.Equal(false, newValueFalse.valid)
+}
+
+func TestTypesWithCustomMarshals(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(12, codec))
+	value := &customMarshalStruct{
 		valid: true,
 	}
 	bytes1, err := manager.Marshal(12, value)
 	require.NoError(err)
 	require.Equal(len(bytes1), 10)
 
-	value = &textType{
+	value = &customMarshalStruct{
 		valid: false,
 	}
 	bytes2, err := manager.Marshal(12, value)
 	require.NoError(err)
 	require.Equal(len(bytes2), 11)
 
-	newValueTrue := &textType{}
+	newValueTrue := &customMarshalStruct{}
 	version, err := manager.Unmarshal(bytes1, &newValueTrue)
 	require.Equal(uint16(12), version)
 	require.NoError(err)
 	require.Equal(true, newValueTrue.valid)
 
-	newValueFalse := &textType{}
+	newValueFalse := &customMarshalStruct{}
 	version, err = manager.Unmarshal(bytes2, &newValueFalse)
 	require.Equal(uint16(12), version)
 	require.NoError(err)
