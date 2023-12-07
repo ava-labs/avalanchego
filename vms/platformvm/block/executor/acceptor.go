@@ -166,7 +166,6 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
-
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
 	}
@@ -190,12 +189,23 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 }
 
 func (a *acceptor) proposalBlock(b block.Block, blockType string) error {
+	// Note that:
+	//
+	// * We don't free the proposal block in this method.
+	//   It is freed when its child is accepted.
+	//   TODO: this is the simplest way, but there are other ways
+	//   We could free it if both options are verified OR
+	//   with deferred verification active, when one option is verified.
+	//   Consider doing it.
+	//
+	// * We don't write this block to state here.
+	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
+	//   We do this so that in the event that the node shuts down, the proposal block
+	//   is not written to disk unless its child is.
+	//   (The VM's Shutdown method commits the database.)
+	//   The snowman.Engine requires that the last committed block is a decision block
+
 	blkID := b.ID()
-
-	// Note: we free proposalBlock blkState entry once we accept an options
-	// TODO: consider handling cases when this can be done earlier
-	// (e.g. both options verified before accepting one of them)
-
 	if err := a.commonAccept(b); err != nil {
 		return err
 	}
@@ -207,13 +217,6 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) error {
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
 	}
-
-	// Note: We don't write this block to state here.
-	//       That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-	//       We do this so that in the event that the node shuts down, the proposal block
-	//       is not written to disk unless its child is.
-	//       (The VM's Shutdown method commits the database.)
-	//       The snowman.Engine requires that the last committed block is a decision block
 
 	a.backend.lastAccepted = blkID
 
