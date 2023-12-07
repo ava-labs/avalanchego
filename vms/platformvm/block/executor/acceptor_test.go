@@ -48,15 +48,16 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	blkID := blk.ID()
 
 	s := state.NewMockState(ctrl)
-	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
-
+	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
 			blkIDToState: map[ids.ID]*blockState{
-				blkID: {},
+				blkID: {
+					onAcceptState: onAcceptState,
+				},
 			},
 			state: s,
 		},
@@ -64,12 +65,20 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 		validators: validators.TestManager,
 	}
 
+	gomock.InOrder(
+		s.EXPECT().SetLastAccepted(blkID).Times(1),
+		s.EXPECT().SetHeight(blk.Height()).Times(1),
+		s.EXPECT().AddStatelessBlock(blk).Times(1),
+
+		onAcceptState.EXPECT().Apply(gomock.Any()).Return(nil),
+		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+	)
 	require.NoError(acceptor.ApricotProposalBlock(blk))
 
 	require.Equal(blkID, acceptor.backend.lastAccepted)
 
 	_, exists := acceptor.GetState(blkID)
-	require.False(exists)
+	require.True(exists) // proposal block state will be removed once an option is accepted
 
 	s.EXPECT().GetLastAccepted().Return(lastAcceptedID).Times(1)
 

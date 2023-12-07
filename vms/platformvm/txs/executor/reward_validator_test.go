@@ -46,17 +46,15 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
@@ -68,17 +66,14 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	onProposalBlockState, onCommitState, onAbortState = makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	require.ErrorIs(err, ErrRemoveWrongStaker)
@@ -87,17 +82,14 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	onProposalBlockState, onCommitState, onAbortState = makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -149,17 +141,15 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
@@ -172,10 +162,11 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	require.ErrorIs(err, ErrRemoveWrongStaker)
@@ -184,17 +175,14 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	onProposalBlockState, onCommitState, onAbortState = makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -293,17 +281,15 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -423,18 +409,15 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	require.NoError(err)
 
-	// Create Delegator Diff
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -471,18 +454,14 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(vdrStaker.TxID)
 	require.NoError(err)
 
-	// Create Validator Diff
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	onProposalBlockState, onCommitState, onAbortState = makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -634,39 +613,26 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	require.NoError(err)
 
-	// Create Delegator Diffs
-	delOnCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	delOnAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, delOnCommitState, delOnAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor := ProposalTxExecutor{
-		OnCommitState: delOnCommitState,
-		OnAbortState:  delOnAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        delOnCommitState,
+		OnAbortState:         delOnAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	// Create Validator Diffs
-	testID := ids.GenerateTestID()
-	env.SetState(testID, delOnCommitState)
-
-	vdrOnCommitState, err := state.NewDiff(testID, env)
-	require.NoError(err)
-
-	vdrOnAbortState, err := state.NewDiff(testID, env)
-	require.NoError(err)
-
-	tx, err = env.txBuilder.NewRewardValidatorTx(vdrTx.ID())
-	require.NoError(err)
-
+	nextProposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, vdrOnCommitState, vdrOnAbortState := makeProposalAndOptionsStates(require, env, proposalBlkID, nextProposalBlkID)
 	txExecutor = ProposalTxExecutor{
-		OnCommitState: vdrOnCommitState,
-		OnAbortState:  vdrOnAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        vdrOnCommitState,
+		OnAbortState:         vdrOnAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -784,17 +750,15 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	proposalBlkID := ids.GenerateTestID()
+	onProposalBlockState, onCommitState, onAbortState := makeProposalAndOptionsStates(require, env, lastAcceptedID, proposalBlkID)
 
 	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
+		OnProposalBlockState: onProposalBlockState,
+		OnCommitState:        onCommitState,
+		OnAbortState:         onAbortState,
+		Backend:              &env.backend,
+		Tx:                   tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
