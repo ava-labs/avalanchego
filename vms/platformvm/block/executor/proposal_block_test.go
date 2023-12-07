@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -151,7 +152,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 	env.clk.Set(defaultGenesisTime)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env.config.BanffTime = time.Time{}        // activate Banff
+	env.config.DurangoTime = mockable.MaxTime // disactivate Durango
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime

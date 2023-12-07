@@ -221,10 +221,8 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
 		onAcceptState:  onAcceptState,
 		atomicRequests: atomicRequests,
-		standardBlockState: standardBlockState{
-			onAcceptFunc: func() {
-				calledOnAcceptFunc = true
-			},
+		onAcceptFunc: func() {
+			calledOnAcceptFunc = true
 		},
 	}
 	// Give [blk] a child.

@@ -49,7 +49,8 @@ func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	if len(b.Transactions) != 0 {
+	nextChainTime := b.Timestamp()
+	if !v.txExecutorBackend.Config.IsDurangoActivated(nextChainTime) && len(b.Transactions) != 0 {
 		return errBanffProposalBlockWithMultipleTransactions
 	}
 
@@ -63,8 +64,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	// Apply the changes, if any, from advancing the chain time.
-	nextChainTime := b.Timestamp()
+	// Step 1: advance timestamp and apply resulting changes, if any
 	changes, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
 		onProposalBlockState,
@@ -77,16 +77,21 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	onProposalBlockState.SetTimestamp(nextChainTime)
 	changes.Apply(onProposalBlockState)
 
-	// Note: we index onProposalBlockState here, to be able to build
-	// OnCommitState and onAbortState on top of it in [preProcessOptions].
-	// Note that onProposalBlockState is incomplete: we'll fill
-	// onProposalBlockState.optionsState in [preProcessOptions].
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
+	// Step 2: execute decision txs if any
+	proposalBlkState := &blockState{
 		onAcceptState:  onProposalBlockState,
 		statelessBlock: b,
 		timestamp:      onProposalBlockState.GetTimestamp(),
 	}
+	if err := v.processStandardTxs(b.Transactions, proposalBlkState); err != nil {
+		return err
+	}
+
+	// Note: we index onProposalBlockState here, to be able to build
+	// OnCommitState and onAbortState on top of it in [preProcessOptions].
+	// Note that onProposalBlockState is incomplete: we'll fill
+	// onProposalBlockState.optionsState in [preProcessOptions].
+	v.blkIDToState[b.ID()] = proposalBlkState
 
 	return v.preProcessOptions(&b.ApricotProposalBlock)
 }
@@ -218,11 +223,9 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		standardBlockState: standardBlockState{
-			inputs: atomicExecutor.Inputs,
-		},
 		statelessBlock: b,
 		onAcceptState:  atomicExecutor.OnAccept,
+		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
@@ -429,12 +432,22 @@ func (v *verifier) standardBlock(
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	// Finally we process the transactions
-	funcs := make([]func(), 0, len(b.Transactions))
-	for _, tx := range b.Transactions {
+	return v.processStandardTxs(b.Txs(), blkState)
+}
+
+func (v *verifier) processStandardTxs(transactions []*txs.Tx, blkState *blockState) error {
+	// We pass explicitly transactions instead of calling b.Txs(), since in proposal blocks
+	// with decision txs, b.Txs() returns the proposal txs which we don't want to validate here.
+	var (
+		parentBlkID = blkState.statelessBlock.Parent()
+		blkID       = blkState.statelessBlock.ID()
+		funcs       = make([]func(), 0, len(transactions))
+	)
+
+	for _, tx := range transactions {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: v.txExecutorBackend,
-			State:   onAcceptState,
+			State:   blkState.onAcceptState,
 			Tx:      tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
@@ -449,7 +462,7 @@ func (v *verifier) standardBlock(
 		// Add UTXOs to batch
 		blkState.inputs.Union(txExecutor.Inputs)
 
-		onAcceptState.AddTx(tx, status.Committed)
+		blkState.onAcceptState.AddTx(tx, status.Committed)
 		if txExecutor.OnAccept != nil {
 			funcs = append(funcs, txExecutor.OnAccept)
 		}
@@ -467,7 +480,7 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	if err := v.verifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
+	if err := v.verifyUniqueInputs(parentBlkID, blkState.inputs); err != nil {
 		return err
 	}
 
@@ -481,9 +494,8 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	blkID := b.ID()
 	v.blkIDToState[blkID] = blkState
 
-	v.Mempool.Remove(b.Transactions)
+	v.Mempool.Remove(transactions)
 	return nil
 }
