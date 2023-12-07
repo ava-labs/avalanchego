@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -34,22 +33,29 @@ const targetBlockSize = 128 * units.KiB
 var (
 	_ Builder = (*builder)(nil)
 
-	ErrEndOfTime       = errors.New("program time is suspiciously far in the future")
-	ErrNoPendingBlocks = errors.New("no pending blocks")
+	ErrEndOfTime                 = errors.New("program time is suspiciously far in the future")
+	ErrNoPendingBlocks           = errors.New("no pending blocks")
+	errMissingPreferredState     = errors.New("missing preferred block state")
+	errCalculatingNextStakerTime = errors.New("failed calculating next staker time")
 )
 
 type Builder interface {
 	mempool.Mempool
 
-	// ResetBlockTimer schedules a timer to notify the consensus engine once a
-	// block needs to be built to process a staker change.
+	// StartBlockTimer starts to issue block creation requests to advance the
+	// chain timestamp.
+	StartBlockTimer()
+
+	// ResetBlockTimer forces the block timer to recalcualte when it should
+	// advance the chain timestamp.
 	ResetBlockTimer()
+
+	// ShutdownBlockTimer stops block creation requests to advance the chain
+	// timestamp.
+	ShutdownBlockTimer()
 
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
-
-	// Shutdown cleanly shuts Builder down
-	Shutdown()
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -60,12 +66,11 @@ type builder struct {
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
-	// This timer goes off when it is time for the next staker to add/leave
-	// the staking set. When it goes off, [maybeIssueEmptyBlock()] is called,
-	// potentially triggering creation of a new block.
-	timer                    *timer.Timer
-	nextStakerChangeTimeLock sync.RWMutex
-	nextStakerChangeTime     time.Time
+	// resetTimer is used to signal that the block builder timer should update
+	// when it will trigger building of a block.
+	resetTimer chan struct{}
+	closed     chan struct{}
+	closeOnce  sync.Once
 }
 
 func New(
@@ -74,17 +79,98 @@ func New(
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
-	builder := &builder{
+	return &builder{
 		Mempool:           mempool,
 		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
+		resetTimer:        make(chan struct{}, 1),
+		closed:            make(chan struct{}),
+	}
+}
+
+func (b *builder) StartBlockTimer() {
+	go func() {
+		timer := time.NewTimer(0)
+		defer timer.Stop()
+
+		for {
+			// Invariant: The [timer] is not stopped.
+			select {
+			case <-timer.C:
+			case <-b.resetTimer:
+				if !timer.Stop() {
+					<-timer.C
+				}
+			case <-b.closed:
+				return
+			}
+
+			for {
+				duration, err := b.durationToSleep()
+				if err != nil {
+					b.txExecutorBackend.Ctx.Log.Error("block builder encountered a fatal error",
+						zap.Error(err),
+					)
+					return
+				}
+
+				if duration > 0 {
+					timer.Reset(duration)
+					break
+				}
+
+				// Block needs to be issued to advance time.
+				b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
+
+				// Invariant: ResetBlockTimer is guaranteed to be called after
+				// [durationToSleep] returns a value <= 0. This is because we
+				// are guaranteed to attempt to build block. After building a
+				// valid block, the chain will have its preference updated which
+				// may change the duration to sleep and trigger a timer reset.
+				select {
+				case <-b.resetTimer:
+				case <-b.closed:
+					return
+				}
+			}
+		}
+	}()
+}
+
+func (b *builder) durationToSleep() (time.Duration, error) {
+	// Grabbing the lock here enforces that this function is not called mid-way
+	// through modifying of the state.
+	b.txExecutorBackend.Ctx.Lock.Lock()
+	defer b.txExecutorBackend.Ctx.Lock.Unlock()
+
+	preferredID := b.blkManager.Preferred()
+	preferredState, ok := b.blkManager.GetState(preferredID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	builder.timer = timer.NewTimer(builder.maybeIssueEmptyBlock)
+	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	if err != nil {
+		return 0, fmt.Errorf("%w of %s: %w", errCalculatingNextStakerTime, preferredID, err)
+	}
 
-	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
-	return builder
+	now := b.txExecutorBackend.Clk.Time()
+	return nextStakerChangeTime.Sub(now), nil
+}
+
+func (b *builder) ResetBlockTimer() {
+	// Ensure that the timer will be reset at least once.
+	select {
+	case b.resetTimer <- struct{}{}:
+	default:
+	}
+}
+
+func (b *builder) ShutdownBlockTimer() {
+	b.closeOnce.Do(func() {
+		close(b.closed)
+	})
 }
 
 // BuildBlock builds a block to be added to consensus.
@@ -94,11 +180,17 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
+		// If we need to advance the chain's timestamp in a standard block, but
+		// we build an invalid block, then we need to re-trigger block building.
+		//
+		// TODO: Remove once we are guaranteed to build a valid block.
+		b.ResetBlockTimer()
+		// If there are still transactions in the mempool, then we need to
+		// re-trigger block building.
 		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 	}()
 
-	ctx := b.txExecutorBackend.Ctx
-	ctx.Log.Debug("starting to attempt to build a block")
+	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
 	preferredID := b.blkManager.Preferred()
@@ -134,83 +226,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	txs := statelessBlk.Txs()
 	b.Mempool.Remove(txs)
 	return b.blkManager.NewBlock(statelessBlk), nil
-}
-
-func (b *builder) Shutdown() {
-	// There is a potential deadlock if the timer is about to execute a timeout.
-	// So, the lock must be released before stopping the timer.
-	ctx := b.txExecutorBackend.Ctx
-	ctx.Lock.Unlock()
-	b.timer.Stop()
-	ctx.Lock.Lock()
-}
-
-func (b *builder) ResetBlockTimer() {
-	ctx := b.txExecutorBackend.Ctx
-
-	if !b.txExecutorBackend.Bootstrapped.Get() {
-		ctx.Log.Verbo("skipping block timer reset",
-			zap.String("reason", "not bootstrapped"),
-		)
-		return
-	}
-
-	preferredID := b.blkManager.Preferred()
-	preferredState, ok := b.blkManager.GetState(preferredID)
-	if !ok {
-		// The preferred block should always be a decision block
-		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("preferredID", preferredID),
-			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
-		)
-		return
-	}
-
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
-	if err != nil {
-		ctx.Log.Error("couldn't get next staker change time",
-			zap.Stringer("preferredID", preferredID),
-			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
-			zap.Error(err),
-		)
-		return
-	}
-
-	now := b.txExecutorBackend.Clk.Time()
-	waitTime := nextStakerChangeTime.Sub(now)
-	ctx.Log.Debug("setting next scheduled event",
-		zap.Time("nextEventTime", nextStakerChangeTime),
-		zap.Duration("timeUntil", waitTime),
-	)
-
-	// Wake up when it's time to add/remove the next validator
-	b.nextStakerChangeTimeLock.Lock()
-	b.nextStakerChangeTime = nextStakerChangeTime
-	b.nextStakerChangeTimeLock.Unlock()
-	b.timer.SetTimeoutIn(waitTime)
-}
-
-func (b *builder) maybeIssueEmptyBlock() {
-	ctx := b.txExecutorBackend.Ctx
-
-	// Grabbing the lock here enforces that this function is not called mid-way
-	// through modifying of the state.
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
-	b.nextStakerChangeTimeLock.RLock()
-	defer b.nextStakerChangeTimeLock.RUnlock()
-
-	now := b.txExecutorBackend.Clk.Time()
-	if b.nextStakerChangeTime.After(now) {
-		// [nextStakerChangeTime] is in the future, no need to advance time.
-		waitTime := b.nextStakerChangeTime.Sub(now)
-		b.timer.SetTimeoutIn(waitTime)
-		return
-	}
-
-	// Block needs to be issued to advance time.
-	b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
 }
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
