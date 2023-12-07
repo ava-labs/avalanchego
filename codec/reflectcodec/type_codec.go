@@ -327,7 +327,7 @@ func (c *genericCodec) hasNoSerializedFields(value reflect.Value) bool {
 	case reflect.Ptr:
 		return c.hasNoSerializedFields(value.Elem())
 	}
-	return true
+	return false
 }
 
 // Attempts to serialize using a custom Marshal

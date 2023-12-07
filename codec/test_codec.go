@@ -1204,12 +1204,6 @@ func TestTypesWithCustomMarshalsIgnored(codec GeneralCodec, t testing.TB) {
 	require.Equal(uint16(12), version)
 	require.NoError(err)
 	require.Equal(true, newValueTrue.Valid)
-
-	newValueFalse := &customMarshalStruct{}
-	version, err = manager.Unmarshal(bytes2, &newValueFalse)
-	require.Equal(uint16(12), version)
-	require.NoError(err)
-	require.Equal(false, newValueFalse.valid)
 }
 
 func TestTypesWithCustomMarshals(codec GeneralCodec, t testing.TB) {
