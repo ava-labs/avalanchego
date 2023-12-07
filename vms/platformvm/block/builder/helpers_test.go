@@ -169,7 +169,7 @@ func newEnvironment(t *testing.T) *environment {
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -193,7 +193,6 @@ func newEnvironment(t *testing.T) *environment {
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
-		nil, // toEngine,
 	)
 
 	res.blkManager.SetPreference(genesisID)
@@ -437,18 +436,4 @@ func shutdownEnvironment(env *environment) error {
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-}
-
-func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
-	tx, err := txBuilder.NewCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		constants.AVMID,
-		nil,
-		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	require.NoError(t, err)
-	return tx
 }

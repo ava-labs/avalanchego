@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
@@ -31,7 +31,7 @@ func TestManagerGetStatelessBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := states.NewMockState(ctrl)
+	state := state.NewMockState(ctrl)
 	m := &manager{
 		state:        state,
 		blkIDToState: map[ids.ID]*blockState{},
@@ -73,16 +73,16 @@ func TestManagerGetState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := states.NewMockState(ctrl)
+	s := state.NewMockState(ctrl)
 	m := &manager{
-		state:        state,
+		state:        s,
 		blkIDToState: map[ids.ID]*blockState{},
 		lastAccepted: ids.GenerateTestID(),
 	}
 
 	// Case: Block is in memory
 	{
-		diff := states.NewMockDiff(ctrl)
+		diff := state.NewMockDiff(ctrl)
 		blkID := ids.GenerateTestID()
 		m.blkIDToState[blkID] = &blockState{
 			onAcceptState: diff,
@@ -97,14 +97,14 @@ func TestManagerGetState(t *testing.T) {
 		blkID := ids.GenerateTestID()
 		gotState, ok := m.GetState(blkID)
 		require.False(ok)
-		require.Equal(state, gotState)
+		require.Equal(s, gotState)
 	}
 
 	// Case: Block isn't in memory; block is last accepted
 	{
 		gotState, ok := m.GetState(m.lastAccepted)
 		require.True(ok)
-		require.Equal(state, gotState)
+		require.Equal(s, gotState)
 	}
 }
 
@@ -164,7 +164,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				preferred := ids.GenerateTestID()
 
 				// These values don't matter for this test
-				state := states.NewMockState(ctrl)
+				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(preferred)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 
@@ -197,7 +197,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				preferred := ids.GenerateTestID()
 
 				// These values don't matter for this test
-				state := states.NewMockState(ctrl)
+				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(preferred)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 
@@ -237,7 +237,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				preferred.EXPECT().Parent().Return(lastAcceptedID).AnyTimes()
 
 				// These values don't matter for this test
-				diffState := states.NewMockDiff(ctrl)
+				diffState := state.NewMockDiff(ctrl)
 				diffState.EXPECT().GetLastAccepted().Return(preferredID)
 				diffState.EXPECT().GetTimestamp().Return(time.Time{})
 
@@ -276,7 +276,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				preferred := ids.GenerateTestID()
 
 				// These values don't matter for this test
-				state := states.NewMockState(ctrl)
+				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(preferred)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 

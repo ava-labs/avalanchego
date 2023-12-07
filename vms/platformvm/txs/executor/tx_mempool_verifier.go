@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -102,28 +103,17 @@ func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 	return err
 }
 
-// Upon Banff activation, txs are not verified against current chain time
-// but against the block timestamp. [baseTime] calculates
-// the right timestamp to be used to mempool tx verification
 func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 	state, err := state.NewDiff(v.ParentID, v.StateVersions)
 	if err != nil {
 		return nil, err
 	}
 
-	nextBlkTime, err := v.nextBlockTime(state)
+	nextBlkTime, _, err := NextBlockTime(state, v.Clk)
 	if err != nil {
 		return nil, err
 	}
 
-	if !v.Backend.Config.IsBanffActivated(nextBlkTime) {
-		// next tx would be included into an Apricot block
-		// so we verify it against current chain state
-		return state, nil
-	}
-
-	// next tx would be included into a Banff block
-	// so we verify it against duly updated chain state
 	changes, err := AdvanceTimeTo(v.Backend, state, nextBlkTime)
 	if err != nil {
 		return nil, err
@@ -134,20 +124,26 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 	return state, nil
 }
 
-func (v *MempoolTxVerifier) nextBlockTime(state state.Diff) (time.Time, error) {
+func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, error) {
 	var (
-		parentTime  = state.GetTimestamp()
-		nextBlkTime = v.Clk.Time()
+		timestamp  = clk.Time()
+		parentTime = state.GetTimestamp()
 	)
-	if parentTime.After(nextBlkTime) {
-		nextBlkTime = parentTime
+	if parentTime.After(timestamp) {
+		timestamp = parentTime
 	}
+	// [timestamp] = max(now, parentTime)
+
 	nextStakerChangeTime, err := GetNextStakerChangeTime(state)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("could not calculate next staker change time: %w", err)
+		return time.Time{}, false, fmt.Errorf("failed getting next staker change time: %w", err)
 	}
-	if !nextBlkTime.Before(nextStakerChangeTime) {
-		nextBlkTime = nextStakerChangeTime
+
+	// timeWasCapped means that [timestamp] was reduced to [nextStakerChangeTime]
+	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
+	if timeWasCapped {
+		timestamp = nextStakerChangeTime
 	}
-	return nextBlkTime, nil
+	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
+	return timestamp, timeWasCapped, nil
 }

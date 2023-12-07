@@ -243,7 +243,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// check that vdrs are reached out for frontiers
-	require.Len(contactedFrontiersProviders, safemath.Min(beacons.Count(ctx.SubnetID), common.MaxOutstandingBroadcastRequests))
+	require.Len(contactedFrontiersProviders, safemath.Min(beacons.Count(ctx.SubnetID), maxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		require.Contains(syncer.pendingSeeders, beaconID)
@@ -284,7 +284,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	require.Positive(initiallyReachedOutBeaconsSize)
-	require.LessOrEqual(initiallyReachedOutBeaconsSize, common.MaxOutstandingBroadcastRequests)
+	require.LessOrEqual(initiallyReachedOutBeaconsSize, maxOutstandingBroadcastRequests)
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
@@ -373,7 +373,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	require.Positive(initiallyReachedOutBeaconsSize)
-	require.LessOrEqual(initiallyReachedOutBeaconsSize, common.MaxOutstandingBroadcastRequests)
+	require.LessOrEqual(initiallyReachedOutBeaconsSize, maxOutstandingBroadcastRequests)
 
 	// mock VM to simulate an invalid summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
@@ -441,7 +441,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	require.Positive(initiallyReachedOutBeaconsSize)
-	require.LessOrEqual(initiallyReachedOutBeaconsSize, common.MaxOutstandingBroadcastRequests)
+	require.LessOrEqual(initiallyReachedOutBeaconsSize, maxOutstandingBroadcastRequests)
 
 	// pick one of the vdrs that have been reached out
 	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
@@ -647,7 +647,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
 	require.Positive(initiallyContactedVotersSize)
-	require.LessOrEqual(initiallyContactedVotersSize, common.MaxOutstandingBroadcastRequests)
+	require.LessOrEqual(initiallyContactedVotersSize, maxOutstandingBroadcastRequests)
 }
 
 func TestUnRequestedVotesAreDropped(t *testing.T) {
@@ -716,7 +716,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
 	require.Positive(initiallyContactedVotersSize)
-	require.LessOrEqual(initiallyContactedVotersSize, common.MaxOutstandingBroadcastRequests)
+	require.LessOrEqual(initiallyContactedVotersSize, maxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
 	require.True(found)
@@ -832,7 +832,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
 	require.Positive(initiallyContactedVotersSize)
-	require.LessOrEqual(initiallyContactedVotersSize, common.MaxOutstandingBroadcastRequests)
+	require.LessOrEqual(initiallyContactedVotersSize, maxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
 	require.True(found)

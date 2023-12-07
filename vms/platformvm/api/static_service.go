@@ -50,30 +50,25 @@ type UTXO struct {
 }
 
 // TODO can we define this on *UTXO?
-func (utxo UTXO) Less(other UTXO) bool {
-	if utxo.Locktime < other.Locktime {
-		return true
-	} else if utxo.Locktime > other.Locktime {
-		return false
+func (utxo UTXO) Compare(other UTXO) int {
+	if locktimeCmp := utils.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
+		return locktimeCmp
 	}
-
-	if utxo.Amount < other.Amount {
-		return true
-	} else if utxo.Amount > other.Amount {
-		return false
+	if amountCmp := utils.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
+		return amountCmp
 	}
 
 	utxoAddr, err := bech32ToID(utxo.Address)
 	if err != nil {
-		return false
+		return 0
 	}
 
 	otherAddr, err := bech32ToID(other.Address)
 	if err != nil {
-		return false
+		return 0
 	}
 
-	return utxoAddr.Less(otherAddr)
+	return utxoAddr.Compare(otherAddr)
 }
 
 // TODO: Refactor APIStaker, APIValidators and merge them together for
@@ -138,10 +133,11 @@ type PermissionlessValidator struct {
 // GenesisPermissionlessValidator should to be used for genesis validators only.
 type GenesisPermissionlessValidator struct {
 	GenesisValidator
-	RewardOwner        *Owner       `json:"rewardOwner,omitempty"`
-	DelegationFee      json.Float32 `json:"delegationFee"`
-	ExactDelegationFee *json.Uint32 `json:"exactDelegationFee,omitempty"`
-	Staked             []UTXO       `json:"staked,omitempty"`
+	RewardOwner        *Owner                    `json:"rewardOwner,omitempty"`
+	DelegationFee      json.Float32              `json:"delegationFee"`
+	ExactDelegationFee *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Staked             []UTXO                    `json:"staked,omitempty"`
+	Signer             *signer.ProofOfPossession `json:"signer,omitempty"`
 }
 
 // PermissionedValidator is the repr. of a permissioned validator sent over APIs.
@@ -315,21 +311,39 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			delegationFee = uint32(*vdr.ExactDelegationFee)
 		}
 
-		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+		var (
+			baseTx = txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
-			}},
-			Validator: txs.Validator{
+			}}
+			validator = txs.Validator{
 				NodeID: vdr.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,
-			},
-			StakeOuts:        stake,
-			RewardsOwner:     owner,
-			DelegationShares: delegationFee,
-		}}
+			}
+			tx *txs.Tx
+		)
+		if vdr.Signer == nil {
+			tx = &txs.Tx{Unsigned: &txs.AddValidatorTx{
+				BaseTx:           baseTx,
+				Validator:        validator,
+				StakeOuts:        stake,
+				RewardsOwner:     owner,
+				DelegationShares: delegationFee,
+			}}
+		} else {
+			tx = &txs.Tx{Unsigned: &txs.AddPermissionlessValidatorTx{
+				BaseTx:                baseTx,
+				Validator:             validator,
+				Signer:                vdr.Signer,
+				StakeOuts:             stake,
+				ValidatorRewardsOwner: owner,
+				DelegatorRewardsOwner: owner,
+				DelegationShares:      delegationFee,
+			}}
+		}
+
 		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}

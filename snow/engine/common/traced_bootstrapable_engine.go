@@ -6,11 +6,6 @@ package common
 import (
 	"context"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 )
 
@@ -27,15 +22,6 @@ func TraceBootstrapableEngine(bootstrapableEngine BootstrapableEngine, tracer tr
 		Engine:              TraceEngine(bootstrapableEngine, tracer),
 		bootstrapableEngine: bootstrapableEngine,
 	}
-}
-
-func (e *tracedBootstrapableEngine) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
-	ctx, span := e.tracer.Start(ctx, "tracedBootstrapableEngine.ForceAccepted", oteltrace.WithAttributes(
-		attribute.Int("numAcceptedContainerIDs", len(acceptedContainerIDs)),
-	))
-	defer span.End()
-
-	return e.bootstrapableEngine.ForceAccepted(ctx, acceptedContainerIDs)
 }
 
 func (e *tracedBootstrapableEngine) Clear(ctx context.Context) error {

@@ -4,8 +4,10 @@
 package merkledb
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -101,14 +103,6 @@ type trieView struct {
 	tokenSize int
 }
 
-func (t *trieView) getSentinelNode() *node {
-	return t.sentinelNode
-}
-
-func (t *trieView) getTokenSize() int {
-	return t.tokenSize
-}
-
 // NewView returns a new view on top of this Trie where the passed changes
 // have been applied.
 // Adds the new view to [t.childViews].
@@ -148,13 +142,22 @@ func (t *trieView) NewView(
 }
 
 // Creates a new view with the given [parentTrie].
+// Assumes [parentTrie] isn't locked.
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
+	sentinelNode, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNoValidRoot
+		}
+		return nil, err
+	}
+
 	newView := &trieView{
-		sentinelNode: parentTrie.getSentinelNode().clone(),
+		sentinelNode: sentinelNode,
 		db:           db,
 		parentTrie:   parentTrie,
 		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
@@ -248,9 +251,15 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(t.sentinelNode)
+		t.changes.rootID = t.calculateNodeIDsHelper(t.sentinelNode)
 		t.db.calculateNodeIDsSema.Release(1)
-		t.changes.rootID = t.getMerkleRoot()
+
+		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
+		if !isSentinelNodeTheRoot(t.sentinelNode) {
+			for _, childEntry := range t.sentinelNode.children {
+				t.changes.rootID = childEntry.id
+			}
+		}
 
 		// ensure no ancestor changes occurred during execution
 		if t.isInvalid() {
@@ -263,58 +272,40 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(n *node) {
-	var (
-		// We use [wg] to wait until all descendants of [n] have been updated.
-		wg              sync.WaitGroup
-		updatedChildren = make(chan *node, len(n.children))
-	)
+func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
+	// We use [wg] to wait until all descendants of [n] have been updated.
+	var wg sync.WaitGroup
 
-	for childIndex, child := range n.children {
-		childKey := n.key.Extend(ToToken(childIndex, t.tokenSize), child.compressedKey)
+	for childIndex := range n.children {
+		childEntry := n.children[childIndex]
+		childKey := n.key.Extend(ToToken(childIndex, t.tokenSize), childEntry.compressedKey)
 		childNodeChange, ok := t.changes.nodes[childKey]
 		if !ok {
 			// This child wasn't changed.
 			continue
 		}
-
-		wg.Add(1)
-		calculateChildID := func() {
-			defer wg.Done()
-
-			t.calculateNodeIDsHelper(childNodeChange.after)
-
-			// Note that this will never block
-			updatedChildren <- childNodeChange.after
-		}
+		n.onNodeChanged()
+		childEntry.hasValue = childNodeChange.after.hasValue()
 
 		// Try updating the child and its descendants in a goroutine.
 		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
+			wg.Add(1)
 			go func() {
-				calculateChildID()
+				childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after)
 				t.db.calculateNodeIDsSema.Release(1)
+				wg.Done()
 			}()
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			calculateChildID()
+			childEntry.id = t.calculateNodeIDsHelper(childNodeChange.after)
 		}
 	}
 
 	// Wait until all descendants of [n] have been updated.
 	wg.Wait()
-	close(updatedChildren)
-
-	for updatedChild := range updatedChildren {
-		index := updatedChild.key.Token(n.key.length, t.tokenSize)
-		n.setChildEntry(index, child{
-			compressedKey: n.children[index].compressedKey,
-			id:            updatedChild.id,
-			hasValue:      updatedChild.hasValue(),
-		})
-	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	n.calculateID(t.db.metrics)
+	return n.calculateID(t.db.metrics)
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
@@ -326,11 +317,70 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, err
 	}
 
-	result, err := getProof(t, key)
+	return t.getProof(ctx, key)
+}
+
+// Returns a proof that [bytesPath] is in or not in trie [t].
+func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
+	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.getProof")
+	defer span.End()
+
+	proof := &Proof{
+		Key: ToKey(key),
+	}
+
+	var closestNode *node
+	if err := t.visitPathToKey(proof.Key, func(n *node) error {
+		closestNode = n
+		proof.Path = append(proof.Path, n.asProofNode())
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	root, err := t.getRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	// The sentinel node is always the first node in the path.
+	// If the sentinel node is not the root, remove it from the proofPath.
+	if root != t.sentinelNode {
+		proof.Path = proof.Path[1:]
+
+		// if there are no nodes in the proof path, add the root to serve as an exclusion proof
+		if len(proof.Path) == 0 {
+			proof.Path = []ProofNode{root.asProofNode()}
+			return proof, nil
+		}
+	}
+
+	if closestNode.key == proof.Key {
+		// There is a node with the given [key].
+		proof.Value = maybe.Bind(closestNode.value, slices.Clone[[]byte])
+		return proof, nil
+	}
+
+	// There is no node with the given [key].
+	// If there is a child at the index where the node would be
+	// if it existed, include that child in the proof.
+	nextIndex := proof.Key.Token(closestNode.key.length, t.tokenSize)
+	child, ok := closestNode.children[nextIndex]
+	if !ok {
+		return proof, nil
+	}
+
+	childNode, err := t.getNode(
+		closestNode.key.Extend(ToToken(nextIndex, t.tokenSize), child.compressedKey),
+		child.hasValue,
+	)
+	if err != nil {
+		return nil, err
+	}
+	proof.Path = append(proof.Path, childNode.asProofNode())
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
-	return result, err
+	return proof, nil
 }
 
 // GetRangeProof returns a range proof for (at least part of) the key range [start, end].
@@ -345,14 +395,90 @@ func (t *trieView) GetRangeProof(
 	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
+	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
+		return nil, ErrStartAfterEnd
+	}
+
+	if maxLength <= 0 {
+		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	}
+
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return nil, err
 	}
-	result, err := getRangeProof(t, start, end, maxLength)
+
+	var result RangeProof
+
+	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
+	it := t.NewIteratorWithStart(start.Value())
+	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
+		// clone the value to prevent editing of the values stored within the trie
+		result.KeyValues = append(result.KeyValues, KeyValue{
+			Key:   it.Key(),
+			Value: slices.Clone(it.Value()),
+		})
+	}
+	it.Release()
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+
+	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
+	// The end proof we provide should be for the last key-value pair in the proof, not for
+	// the last key-value pair requested, which may not be in this proof.
+	var (
+		endProof *Proof
+		err      error
+	)
+	if len(result.KeyValues) > 0 {
+		greatestKey := result.KeyValues[len(result.KeyValues)-1].Key
+		endProof, err = t.getProof(ctx, greatestKey)
+		if err != nil {
+			return nil, err
+		}
+	} else if end.HasValue() {
+		endProof, err = t.getProof(ctx, end.Value())
+		if err != nil {
+			return nil, err
+		}
+	}
+	if endProof != nil {
+		result.EndProof = endProof.Path
+	}
+
+	if start.HasValue() {
+		startProof, err := t.getProof(ctx, start.Value())
+		if err != nil {
+			return nil, err
+		}
+		result.StartProof = startProof.Path
+
+		// strip out any common nodes to reduce proof size
+		i := 0
+		for ; i < len(result.StartProof) &&
+			i < len(result.EndProof) &&
+			result.StartProof[i].Key == result.EndProof[i].Key; i++ {
+		}
+		result.StartProof = result.StartProof[i:]
+	}
+
+	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
+		// If the range is empty, return the root proof.
+		root, err := t.getRoot()
+		if err != nil {
+			return nil, err
+		}
+		rootProof, err := t.getProof(ctx, root.key.Bytes())
+		if err != nil {
+			return nil, err
+		}
+		result.EndProof = rootProof.Path
+	}
+
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
-	return result, err
+	return &result, nil
 }
 
 // CommitToDB commits changes from this trie to the underlying DB.
@@ -429,17 +555,7 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}
-	return t.getMerkleRoot(), nil
-}
-
-func (t *trieView) getMerkleRoot() ids.ID {
-	if !isSentinelNodeTheRoot(t.sentinelNode) {
-		for _, childEntry := range t.sentinelNode.children {
-			return childEntry.id
-		}
-	}
-
-	return t.sentinelNode.id
+	return t.changes.rootID, nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
@@ -529,7 +645,7 @@ func (t *trieView) remove(key Key) error {
 	// mark all ancestor for change
 	// grab parent and grandparent nodes for path compression
 	var grandParent, parent, nodeToDelete *node
-	if err := visitPathToKey(t, key, func(n *node) error {
+	if err := t.visitPathToKey(key, func(n *node) error {
 		grandParent = parent
 		parent = nodeToDelete
 		nodeToDelete = n
@@ -580,7 +696,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	}
 
 	var (
-		childEntry child
+		childEntry *child
 		childKey   Key
 	)
 	// There is only one child, but we don't know the index.
@@ -594,12 +710,47 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
 	parent.setChildEntry(childKey.Token(parent.key.length, t.tokenSize),
-		child{
+		&child{
 			compressedKey: childKey.Skip(parent.key.length + t.tokenSize),
 			id:            childEntry.id,
 			hasValue:      childEntry.hasValue,
 		})
 	return t.recordNodeChange(parent)
+}
+
+// Returns the nodes along the path to [key].
+// The first node is the root, and the last node is either the node with the
+// given [key], if it's in the trie, or the node with the largest prefix of
+// the [key] if it isn't in the trie.
+// Always returns at least the root node.
+func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
+	var (
+		// all node paths start at the sentinelNode since its nil key is a prefix of all keys
+		currentNode = t.sentinelNode
+		err         error
+	)
+	if err := visitNode(currentNode); err != nil {
+		return err
+	}
+	// while the entire path hasn't been matched
+	for currentNode.key.length < key.length {
+		// confirm that a child exists and grab its ID before attempting to load it
+		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.length, t.tokenSize)]
+
+		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentNode.key.length+t.tokenSize, t.tokenSize) {
+			// there was no child along the path or the child that was there doesn't match the remaining path
+			return nil
+		}
+		// grab the next node along the path
+		currentNode, err = t.getNode(key.Take(currentNode.key.length+t.tokenSize+nextChildEntry.compressedKey.length), nextChildEntry.hasValue)
+		if err != nil {
+			return err
+		}
+		if err := visitNode(currentNode); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Get a copy of the node matching the passed key from the trie.
@@ -635,7 +786,7 @@ func (t *trieView) insert(
 	}
 
 	var closestNode *node
-	if err := visitPathToKey(t, key, func(n *node) error {
+	if err := t.visitPathToKey(key, func(n *node) error {
 		closestNode = n
 		return t.recordNodeChange(n)
 	}); err != nil {
@@ -706,7 +857,7 @@ func (t *trieView) insert(
 	// add the existing child onto the branch node
 	branchNode.setChildEntry(
 		existingChildEntry.compressedKey.Token(commonPrefixLength, t.tokenSize),
-		child{
+		&child{
 			compressedKey: existingChildEntry.compressedKey.Skip(commonPrefixLength + t.tokenSize),
 			id:            existingChildEntry.id,
 			hasValue:      existingChildEntry.hasValue,

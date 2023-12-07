@@ -17,12 +17,13 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GiB
 - Storage: 1 TiB
+  - Nodes running for very long periods of time or nodes with custom configurations may observe higher storage requirements.
 - OS: Ubuntu 20.04/22.04 or macOS >= 12
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.20.10
+- [Go](https://golang.org/doc/install) version >= 1.20.12
 - [gcc](https://gcc.gnu.org/)
 - g++
 
