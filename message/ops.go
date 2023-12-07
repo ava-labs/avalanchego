@@ -347,6 +347,8 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.AppRequest, nil
 	case *p2p.Message_AppResponse:
 		return msg.AppResponse, nil
+	case *p2p.Message_AppError:
+		return msg.AppError, nil
 	case *p2p.Message_AppGossip:
 		return msg.AppGossip, nil
 	default:
@@ -400,6 +402,8 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return AppRequestOp, nil
 	case *p2p.Message_AppResponse:
 		return AppResponseOp, nil
+	case *p2p.Message_AppError:
+		return AppRequestFailedOp, nil
 	case *p2p.Message_AppGossip:
 		return AppGossipOp, nil
 	default:
