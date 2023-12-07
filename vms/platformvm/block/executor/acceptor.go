@@ -114,21 +114,7 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 }
 
 func (a *acceptor) abortBlock(b block.Block, blockType string) error {
-	return a.optionBlock(b, blockType)
-}
-
-func (a *acceptor) commitBlock(b block.Block, blockType string) error {
-	return a.optionBlock(b, blockType)
-}
-
-func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	blkID := b.ID()
-
-	defer func() {
-		a.free(b.Parent())
-		a.free(blkID)
-	}()
-
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
@@ -142,8 +128,42 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		}
 	}
 
+	return a.optionBlock(b, blockType)
+}
+
+func (a *acceptor) commitBlock(b block.Block, blockType string) error {
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
+	}
+
+	if a.bootstrapped.Get() {
+		if blkState.initiallyPreferCommit {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+
+	return a.optionBlock(b, blockType)
+}
+
+func (a *acceptor) optionBlock(b block.Block, blockType string) error {
+	blkID := b.ID()
+
+	defer func() {
+		a.free(b.Parent())
+		a.free(blkID)
+	}()
+
 	if err := a.commonAccept(b); err != nil {
 		return err
+	}
+
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
