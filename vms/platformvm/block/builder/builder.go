@@ -46,7 +46,7 @@ type Builder interface {
 	// chain timestamp.
 	StartBlockTimer()
 
-	// ResetBlockTimer forces the block timer to recalcualte when it should
+	// ResetBlockTimer forces the block timer to recalculate when it should
 	// advance the chain timestamp.
 	ResetBlockTimer()
 
