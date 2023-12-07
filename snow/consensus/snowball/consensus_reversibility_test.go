@@ -14,12 +14,14 @@ import (
 func TestSnowballGovernance(t *testing.T) {
 	require := require.New(t)
 
-	numColors := 2
-	numNodes := 100
-	numByzantine := 10
-	numRed := 55
-	params := DefaultParameters
-	seed := int64(0)
+	var (
+		numColors           = 2
+		numNodes            = 100
+		numByzantine        = 10
+		numRed              = 55
+		params              = DefaultParameters
+		seed         uint64 = 0
+	)
 
 	nBitwise := Network{}
 	nBitwise.Initialize(params, numColors)

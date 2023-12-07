@@ -1320,9 +1320,10 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		// we expect genesis validator txs to be AddValidatorTx or AddPermissionlessValidatorTx
-		// even if, post Durango, we don't explicitly type check for these two txs.
-		// TODO: enforce stricter type check
+		// We expect genesis validator txs to be either AddValidatorTx or
+		// AddPermissionlessValidatorTx.
+		//
+		// TODO: Enforce stricter type check
 		validatorTx, ok := vdrTx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
 			return fmt.Errorf("expected a scheduled staker but got %T", vdrTx.Unsigned)
@@ -1462,7 +1463,10 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
+		defaultStartTime := int64(0)
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			defaultStartTime = scheduledStakerTx.StartTime().Unix()
+		}
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start values as the fallback
@@ -1511,7 +1515,10 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
+		defaultStartTime := int64(0)
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			defaultStartTime = scheduledStakerTx.StartTime().Unix()
+		}
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
@@ -1564,7 +1571,10 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			metadataBytes := delegatorIt.Value()
-			defaultStartTime := stakerTx.(txs.ScheduledStaker).StartTime().Unix()
+			defaultStartTime := int64(0)
+			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+				defaultStartTime = scheduledStakerTx.StartTime().Unix()
+			}
 			metadata := &delegatorMetadata{
 				// use the start values as the fallback
 				// in case they are not stored in the database
