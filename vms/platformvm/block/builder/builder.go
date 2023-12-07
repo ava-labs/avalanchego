@@ -125,9 +125,9 @@ func (b *builder) StartBlockTimer() {
 
 				// Invariant: ResetBlockTimer is guaranteed to be called after
 				// [durationToSleep] returns a value <= 0. This is because we
-				// are guaranteed to build a valid block. After building a valid
-				// block, the chain will have its preference updated which will
-				// trigger a timer reset.
+				// are guaranteed to attempt to build block. After building a
+				// valid block, the chain will have its preference updated which
+				// may change the duration to sleep and trigger a timer reset.
 				select {
 				case <-b.resetTimer:
 				case <-b.closed:
