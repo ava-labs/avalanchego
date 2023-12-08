@@ -93,8 +93,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		remainingSize = targetBlockSize
 	)
 	for {
-		tx := b.mempool.Peek(remainingSize)
-		if tx == nil {
+		tx := b.mempool.Peek()
+		if tx == nil || len(tx.Bytes()) > remainingSize {
 			break
 		}
 		b.mempool.Remove([]*txs.Tx{tx})
