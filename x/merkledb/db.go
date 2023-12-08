@@ -64,6 +64,8 @@ type ChangeProofer interface {
 	// Returns at most [maxLength] key/value pairs.
 	// Returns [ErrInsufficientHistory] if this node has insufficient history
 	// to generate the proof.
+	// Returns [ErrNoEndRoot], which wraps [ErrInsufficientHistory], if the
+	// history doesn't contain the [endRootID].
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
