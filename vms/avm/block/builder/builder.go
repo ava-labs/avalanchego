@@ -94,11 +94,10 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	)
 	for {
 		tx := b.mempool.Peek()
-		// This will always pack at least one tx because of the following
-		// invariant. The resulting blocks will be packed at least
-		// 100 * [mempool.TxSize] / [targetBlockSize]%.
-		//
-		// Invariant: [mempool.MaxTxSize] < [targetBlockSize].
+		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
+		// that we will only stop building a block once there are no
+		// transactions in the mempool or the block is at least
+		// [targetBlockSize - mempool.MaxTxSize] bytes full.
 		if tx == nil || len(tx.Bytes()) > remainingSize {
 			break
 		}
