@@ -120,7 +120,7 @@ func (w *windower) ExpectedProposer(
 	var (
 		numToSample = 1
 		slot        = uint32(blockTime.Sub(parentBlockTime) / WindowDuration)
-		seed        = int64(chainHeight ^ w.chainSource ^ uint64(bits.Reverse32(slot)))
+		seed        = chainHeight ^ w.chainSource ^ uint64(bits.Reverse32(slot))
 	)
 	w.sampler.Seed(seed)
 
