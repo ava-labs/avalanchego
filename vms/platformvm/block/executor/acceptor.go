@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
@@ -40,7 +41,8 @@ func (a *acceptor) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (a *acceptor) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	return a.proposalBlock(b, "banff proposal")
+	a.proposalBlock(b, "banff proposal")
+	return nil
 }
 
 func (a *acceptor) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -56,7 +58,8 @@ func (a *acceptor) ApricotCommitBlock(b *block.ApricotCommitBlock) error {
 }
 
 func (a *acceptor) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
-	return a.proposalBlock(b, "apricot proposal")
+	a.proposalBlock(b, "apricot proposal")
+	return nil
 }
 
 func (a *acceptor) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -150,14 +153,35 @@ func (a *acceptor) commitBlock(b block.Block, blockType string) error {
 }
 
 func (a *acceptor) optionBlock(b block.Block, blockType string) error {
-	blkID := b.ID()
-	parentID := b.Parent()
+	var (
+		parentID = b.Parent()
+		blkID    = b.ID()
+	)
 
 	defer func() {
 		a.free(parentID)
 		a.free(blkID)
 	}()
 
+	// 1. Accept the proposal block
+	parentState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	if err := a.commonAccept(parentState.statelessBlock); err != nil {
+		return err
+	}
+
+	parentBlkState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w %s", errMissingBlockState, parentID)
+	}
+	if err := parentBlkState.onAcceptState.Apply(a.state); err != nil {
+		return err
+	}
+
+	// 2. Accept the option
 	if err := a.commonAccept(b); err != nil {
 		return err
 	}
@@ -170,8 +194,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		return err
 	}
 
-	// Here we commit both option block changes and its proposal block
-	// parent ones.
+	// 3. Commit both option and proposal block changes
 	if err := a.state.Commit(); err != nil {
 		return err
 	}
@@ -188,15 +211,15 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	return nil
 }
 
-func (a *acceptor) proposalBlock(b block.Block, blockType string) error {
+func (a *acceptor) proposalBlock(b block.Block, blockType string) {
 	// Note that:
 	//
 	// * We don't free the proposal block in this method.
 	//   It is freed when its child is accepted.
-	//   TODO: this is the simplest way, but there are other ways
-	//   We could free it if both options are verified OR
-	//   with deferred verification active, when one option is verified.
-	//   Consider doing it.
+	//   We need to keep this block's state in memory for its child to use.
+	//
+	// * We only update the metrics to reflect this block's
+	//   acceptance when its child is accepted.
 	//
 	// * We don't write this block to state here.
 	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
@@ -206,18 +229,6 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) error {
 	//   The snowman.Engine requires that the last committed block is a decision block
 
 	blkID := b.ID()
-	if err := a.commonAccept(b); err != nil {
-		return err
-	}
-
-	blkState, ok := a.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
-	}
-	if err := blkState.onAcceptState.Apply(a.state); err != nil {
-		return err
-	}
-
 	a.backend.lastAccepted = blkID
 
 	a.ctx.Log.Trace(
@@ -228,7 +239,6 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) error {
 		zap.Stringer("parentID", b.Parent()),
 		zap.Stringer("utxoChecksum", a.state.Checksum()),
 	)
-	return nil
 }
 
 func (a *acceptor) standardBlock(b block.Block, blockType string) error {

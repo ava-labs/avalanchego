@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -48,16 +49,15 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	blkID := blk.ID()
 
 	s := state.NewMockState(ctrl)
-	onAcceptState := state.NewMockDiff(ctrl)
+	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
+
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
 			blkIDToState: map[ids.ID]*blockState{
-				blkID: {
-					onAcceptState: onAcceptState,
-				},
+				blkID: {},
 			},
 			state: s,
 		},
@@ -65,20 +65,12 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 		validators: validators.TestManager,
 	}
 
-	gomock.InOrder(
-		s.EXPECT().SetLastAccepted(blkID).Times(1),
-		s.EXPECT().SetHeight(blk.Height()).Times(1),
-		s.EXPECT().AddStatelessBlock(blk).Times(1),
-
-		onAcceptState.EXPECT().Apply(gomock.Any()).Return(nil),
-		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
-	)
 	require.NoError(acceptor.ApricotProposalBlock(blk))
 
 	require.Equal(blkID, acceptor.backend.lastAccepted)
 
 	_, exists := acceptor.GetState(blkID)
-	require.True(exists) // proposal block state will be removed once an option is accepted
+	require.False(exists)
 
 	s.EXPECT().GetLastAccepted().Return(lastAcceptedID).Times(1)
 
@@ -263,7 +255,12 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
-	parentID := ids.GenerateTestID()
+	var (
+		parentID     = ids.GenerateTestID()
+		parentHeight = uint64(10)
+		blkTime      = time.Now().Truncate(time.Second)
+	)
+
 	acceptor := &acceptor{
 		backend: &backend{
 			lastAccepted: parentID,
@@ -279,16 +276,30 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
-	blk, err := block.NewApricotCommitBlock(parentID, 1 /*height*/)
+	blk, err := block.NewBanffCommitBlock(blkTime, parentID, parentHeight+1)
 	require.NoError(err)
 	blkID := blk.ID()
 
 	{
-		err = acceptor.ApricotCommitBlock(blk)
+		err = acceptor.BanffCommitBlock(blk)
 		require.ErrorIs(err, errMissingBlockState)
 	}
 
 	{
+		// Set [blk]'s parent in the state map.
+		// We don't bother setting options state since
+		// it's not relevant when accepting the block
+		parentOnAcceptState := state.NewMockDiff(ctrl)
+		parentStatelessBlk := block.NewMockBlock(ctrl)
+		parentStatelessBlk.EXPECT().ID().Return(parentID).AnyTimes()
+		parentStatelessBlk.EXPECT().Height().Return(parentHeight).AnyTimes()
+
+		parentState := &blockState{
+			statelessBlock: parentStatelessBlk,
+			onAcceptState:  parentOnAcceptState,
+		}
+		acceptor.backend.blkIDToState[parentID] = parentState
+
 		onAcceptState := state.NewMockDiff(ctrl)
 		acceptor.backend.blkIDToState[blkID] = &blockState{
 			onAcceptState: onAcceptState,
@@ -297,6 +308,11 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		// Set expected calls on dependencies.
 		// Make sure the parent is accepted first.
 		gomock.InOrder(
+			s.EXPECT().SetLastAccepted(parentStatelessBlk.ID()).Times(1),
+			s.EXPECT().SetHeight(parentStatelessBlk.Height()).Times(1),
+			s.EXPECT().AddStatelessBlock(parentStatelessBlk).Times(1),
+			parentOnAcceptState.EXPECT().Apply(s).Times(1),
+
 			s.EXPECT().SetLastAccepted(blkID).Times(1),
 			s.EXPECT().SetHeight(blk.Height()).Times(1),
 			s.EXPECT().AddStatelessBlock(blk).Times(1),
@@ -306,7 +322,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			s.EXPECT().Checksum().Return(ids.Empty).Times(1),
 		)
 
-		require.NoError(acceptor.ApricotCommitBlock(blk))
+		require.NoError(acceptor.BanffCommitBlock(blk))
 		require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 	}
 }
@@ -318,7 +334,11 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
-	parentID := ids.GenerateTestID()
+	var (
+		parentID     = ids.GenerateTestID()
+		parentHeight = uint64(10)
+		blkTime      = time.Now().Truncate(time.Second)
+	)
 	acceptor := &acceptor{
 		backend: &backend{
 			lastAccepted: parentID,
@@ -334,23 +354,43 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
-	blk, err := block.NewApricotAbortBlock(parentID, 1 /*height*/)
+	blk, err := block.NewBanffAbortBlock(blkTime, parentID, parentHeight+1)
 	require.NoError(err)
 	blkID := blk.ID()
 
 	{
-		err = acceptor.ApricotAbortBlock(blk)
+		err = acceptor.BanffAbortBlock(blk)
 		require.ErrorIs(err, errMissingBlockState)
 	}
 
 	{
+		// Set [blk]'s parent in the state map.
+		// We don't bother setting options state since
+		// it's not relevant when accepting the block
+		parentOnAcceptState := state.NewMockDiff(ctrl)
+		parentStatelessBlk := block.NewMockBlock(ctrl)
+		parentStatelessBlk.EXPECT().ID().Return(parentID).AnyTimes()
+		parentStatelessBlk.EXPECT().Height().Return(parentHeight).AnyTimes()
+
+		parentState := &blockState{
+			statelessBlock: parentStatelessBlk,
+			onAcceptState:  parentOnAcceptState,
+		}
+		acceptor.backend.blkIDToState[parentID] = parentState
+
 		onAcceptState := state.NewMockDiff(ctrl)
 		acceptor.backend.blkIDToState[blkID] = &blockState{
 			onAcceptState: onAcceptState,
 		}
 
 		// Set expected calls on dependencies.
+		// Make sure the parent is accepted first.
 		gomock.InOrder(
+			s.EXPECT().SetLastAccepted(parentStatelessBlk.ID()).Times(1),
+			s.EXPECT().SetHeight(parentStatelessBlk.Height()).Times(1),
+			s.EXPECT().AddStatelessBlock(parentStatelessBlk).Times(1),
+			parentOnAcceptState.EXPECT().Apply(s).Times(1),
+
 			s.EXPECT().SetLastAccepted(blkID).Times(1),
 			s.EXPECT().SetHeight(blk.Height()).Times(1),
 			s.EXPECT().AddStatelessBlock(blk).Times(1),
@@ -360,7 +400,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			s.EXPECT().Checksum().Return(ids.Empty).Times(1),
 		)
 
-		require.NoError(acceptor.ApricotAbortBlock(blk))
+		require.NoError(acceptor.BanffAbortBlock(blk))
 		require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 	}
 }
