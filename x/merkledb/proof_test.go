@@ -654,6 +654,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	require.NoError(err)
 
 	_, err = db.GetChangeProof(context.Background(), startRoot, ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 50)
+	require.ErrorIs(err, ErrNoEndRoot)
 	require.ErrorIs(err, ErrInsufficientHistory)
 }
 
