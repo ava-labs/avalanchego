@@ -6,6 +6,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -35,6 +36,8 @@ type BlockState interface {
 }
 
 type blockState struct {
+	durangoTime time.Time
+
 	// Caches BlockID -> Block. If the Block is nil, that means the block is not
 	// in storage.
 	blkCache cache.Cacher[ids.ID, *blockWrapper]
@@ -56,8 +59,9 @@ func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
 	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
-func NewBlockState(db database.Database) BlockState {
+func NewBlockState(db database.Database, durangoTime time.Time) BlockState {
 	return &blockState{
+		durangoTime: durangoTime,
 		blkCache: cache.NewSizedLRU[ids.ID, *blockWrapper](
 			blockCacheSize,
 			cachedBlockSize,
@@ -66,7 +70,12 @@ func NewBlockState(db database.Database) BlockState {
 	}
 }
 
-func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer) (BlockState, error) {
+func NewMeteredBlockState(
+	db database.Database,
+	namespace string,
+	metrics prometheus.Registerer,
+	durangoTime time.Time,
+) (BlockState, error) {
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		fmt.Sprintf("%s_block_cache", namespace),
 		metrics,
@@ -77,8 +86,9 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	)
 
 	return &blockState{
-		blkCache: blkCache,
-		db:       db,
+		durangoTime: durangoTime,
+		blkCache:    blkCache,
+		db:          db,
 	}, err
 }
 
@@ -109,7 +119,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	}
 
 	// The key was in the database
-	blk, err := block.Parse(blkWrapper.Block)
+	blk, err := block.Parse(blkWrapper.Block, s.durangoTime)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}

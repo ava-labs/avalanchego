@@ -41,10 +41,6 @@ var (
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L793-L797
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L816-L879
 func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
-	if err := ValidateCertificate(cert); err != nil {
-		return err
-	}
-
 	hasher := crypto.SHA256.New()
 	_, err := hasher.Write(msg)
 	if err != nil {

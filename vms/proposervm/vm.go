@@ -172,7 +172,7 @@ func (vm *VM) Initialize(
 
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-	baseState, err := state.NewMetered(vm.db, "state", registerer)
+	baseState, err := state.NewMetered(vm.db, "state", registerer, vm.DurangoTime)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (vm *VM) Initialize(
 	vm.innerBlkCache = innerBlkCache
 
 	indexerDB := versiondb.New(vm.db)
-	indexerState := state.New(indexerDB)
+	indexerState := state.New(indexerDB, vm.DurangoTime)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
@@ -646,7 +646,7 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 }
 
 func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, error) {
-	statelessBlock, err := statelessblock.Parse(b)
+	statelessBlock, err := statelessblock.Parse(b, vm.DurangoTime)
 	if err != nil {
 		return nil, err
 	}

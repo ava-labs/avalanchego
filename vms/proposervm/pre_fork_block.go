@@ -167,7 +167,7 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 	}
 
 	// Verify the lack of signature on the node
-	if err := child.SignedBlock.Verify(false, b.vm.ctx.ChainID); err != nil {
+	if err := child.SignedBlock.Verify(false, b.vm.ctx.ChainID, b.vm.DurangoTime); err != nil {
 		return err
 	}
 

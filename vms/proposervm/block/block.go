@@ -28,7 +28,7 @@ type Block interface {
 	Block() []byte
 	Bytes() []byte
 
-	initialize(bytes []byte) error
+	initialize(bytes []byte, durangoTime time.Time) error
 }
 
 type SignedBlock interface {
@@ -38,7 +38,7 @@ type SignedBlock interface {
 	Timestamp() time.Time
 	Proposer() ids.NodeID
 
-	Verify(shouldHaveProposer bool, chainID ids.ID) error
+	Verify(shouldHaveProposer bool, chainID ids.ID, durangoTime time.Time) error
 }
 
 type statelessUnsignedBlock struct {
@@ -76,7 +76,7 @@ func (b *statelessBlock) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlock) initialize(bytes []byte) error {
+func (b *statelessBlock) initialize(bytes []byte, durangoTime time.Time) error {
 	b.bytes = bytes
 
 	// The serialized form of the block is the unsignedBytes followed by the
@@ -91,13 +91,17 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 		return nil
 	}
 
-	cert, err := staking.ParseCertificate(b.StatelessBlock.Certificate)
+	var err error
+	if b.timestamp.Before(durangoTime) {
+		b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
+	} else {
+		b.cert, err = staking.ParseCertificatePermissive(b.StatelessBlock.Certificate)
+	}
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}
 
-	b.cert = cert
-	b.proposer = ids.NodeIDFromCert(cert)
+	b.proposer = ids.NodeIDFromCert(b.cert)
 	return nil
 }
 
@@ -113,7 +117,7 @@ func (b *statelessBlock) Proposer() ids.NodeID {
 	return b.proposer
 }
 
-func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
+func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID, durangoTime time.Time) error {
 	if !shouldHaveProposer {
 		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
 			return errUnexpectedProposer
@@ -121,6 +125,12 @@ func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 		return nil
 	} else if b.cert == nil {
 		return errMissingProposer
+	}
+
+	if b.timestamp.Before(durangoTime) {
+		if err := staking.ValidateCertificate(b.cert); err != nil {
+			return err
+		}
 	}
 
 	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)

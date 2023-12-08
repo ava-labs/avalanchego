@@ -1010,9 +1010,18 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 	}
 
 	// the peers this peer told us about
+	beforeDurango := time.Now().Before(version.GetDurangoTime(p.NetworkID))
 	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts))
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
-		tlsCert, err := staking.ParseCertificate(claimedIPPort.X509Certificate)
+		var (
+			tlsCert *staking.Certificate
+			err     error
+		)
+		if beforeDurango {
+			tlsCert, err = staking.ParseCertificate(claimedIPPort.X509Certificate)
+		} else {
+			tlsCert, err = staking.ParseCertificatePermissive(claimedIPPort.X509Certificate)
+		}
 		if err != nil {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),

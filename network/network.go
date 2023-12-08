@@ -276,6 +276,7 @@ func NewNetwork(
 		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),
 	}
 
+	durangoTime := version.GetDurangoTime(config.NetworkID)
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:               config,
@@ -286,8 +287,8 @@ func NewNetwork(
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
 		dialer:                      dialer,
-		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected),
-		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected),
+		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected, durangoTime),
+		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected, durangoTime),
 
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,

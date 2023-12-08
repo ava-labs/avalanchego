@@ -44,7 +44,7 @@ func TestParse(t *testing.T) {
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlockIntf, err := Parse(builtBlockBytes)
+	parsedBlockIntf, err := Parse(builtBlockBytes, timestamp)
 	require.NoError(err)
 
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
@@ -60,7 +60,7 @@ func TestParseDuplicateExtension(t *testing.T) {
 	blockBytes, err := hex.DecodeString(blockHex)
 	require.NoError(err)
 
-	_, err = Parse(blockBytes)
+	_, err = Parse(blockBytes, time.Now())
 	require.ErrorIs(err, errInvalidCertificate)
 }
 
@@ -97,7 +97,7 @@ func TestParseOption(t *testing.T) {
 
 	builtOptionBytes := builtOption.Bytes()
 
-	parsedOption, err := Parse(builtOptionBytes)
+	parsedOption, err := Parse(builtOptionBytes, time.Now())
 	require.NoError(err)
 
 	equalOption(require, builtOption, parsedOption)
@@ -116,7 +116,7 @@ func TestParseUnsigned(t *testing.T) {
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlockIntf, err := Parse(builtBlockBytes)
+	parsedBlockIntf, err := Parse(builtBlockBytes, time.Now())
 	require.NoError(err)
 
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
@@ -130,6 +130,6 @@ func TestParseGibberish(t *testing.T) {
 
 	bytes := []byte{0, 1, 2, 3, 4, 5}
 
-	_, err := Parse(bytes)
+	_, err := Parse(bytes, time.Now())
 	require.ErrorIs(err, codec.ErrUnknownVersion)
 }

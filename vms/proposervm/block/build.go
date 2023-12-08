@@ -35,7 +35,7 @@ func BuildUnsigned(
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+	return block, block.initialize(bytes, time.Time{})
 }
 
 func Build(
@@ -121,5 +121,5 @@ func BuildOption(
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+	return block, block.initialize(bytes, time.Time{})
 }

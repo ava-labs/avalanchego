@@ -772,6 +772,7 @@ func (m *manager) createAvalancheChain(
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
+			DurangoTime:         version.GetDurangoTime(ctx.NetworkID),
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.stakingSigner,
@@ -1117,6 +1118,7 @@ func (m *manager) createSnowmanChain(
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
+			DurangoTime:         version.GetDurangoTime(ctx.NetworkID),
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.stakingSigner,
