@@ -263,7 +263,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		"insufficient history for change proof or range proof": {
 			request: &pb.SyncGetChangeProofRequest{
 				// These roots don't exist so server has insufficient history
-				// to serve a change proof
+				// to serve a change proof or range proof
 				StartRootHash: ids.Empty[:],
 				EndRootHash:   fakeRootID[:],
 				KeyLimit:      defaultRequestKeyLimit,
