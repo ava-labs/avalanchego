@@ -159,6 +159,8 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	)
 
 	defer func() {
+		// Note: we assume this block's sibling doesn't
+		// need the parent's state when it's rejected.
 		a.free(parentID)
 		a.free(blkID)
 	}()
