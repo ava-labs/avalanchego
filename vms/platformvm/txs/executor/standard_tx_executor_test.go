@@ -629,7 +629,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
 		addSubnetValTx,
-		defaultValidateStartTime,
+		ts.ValidateStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -785,7 +785,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
 			addSubnetValTx,
-			defaultValidateStartTime,
+			ts.ValidateStartTime,
 			0,
 		)
 		require.NoError(err)
