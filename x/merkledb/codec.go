@@ -111,6 +111,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 		c.encodeKey(buf, entry.compressedKey)
 		_, _ = buf.Write(entry.id[:])
 		c.encodeBool(buf, entry.hasValue)
+		c.encodeBool(buf, entry.isValueNode)
 	}
 	return buf.Bytes()
 }
@@ -184,10 +185,15 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		if err != nil {
 			return err
 		}
+		isValueNode, err := c.decodeBool(src)
+		if err != nil {
+			return err
+		}
 		n.children[byte(index)] = &child{
 			compressedKey: compressedKey,
 			id:            childID,
 			hasValue:      hasValue,
+			isValueNode:   isValueNode,
 		}
 	}
 	if src.Len() != 0 {

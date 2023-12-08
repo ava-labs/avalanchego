@@ -1067,19 +1067,3 @@ func (t *trieView) getParentTrie() TrieView {
 	defer t.validityTrackingLock.RUnlock()
 	return t.parentTrie
 }
-
-func ForceUpdateParent(child TrieView, parent TrieView) error {
-	childTv, okChild := child.(*trieView)
-	parentTv, okParent := parent.(*trieView)
-	if !okChild || !okParent {
-		return fmt.Errorf("invalid types %T %T", child, parent)
-	}
-
-	childTv.updateParent(parent)
-
-	parentTv.validityTrackingLock.Lock()
-	defer parentTv.validityTrackingLock.Unlock()
-	parentTv.childViews = append(parentTv.childViews, childTv)
-
-	return nil
-}

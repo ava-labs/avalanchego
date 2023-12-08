@@ -153,6 +153,7 @@ func (n *node) clone() *node {
 			id:            existing.id,
 			rlp:           existing.rlp,
 			hasValue:      existing.hasValue,
+			isValueNode:   existing.isValueNode,
 		}
 	}
 	return result

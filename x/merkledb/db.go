@@ -1168,8 +1168,7 @@ func (db *merkleDB) VerifyChangeProof(
 func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 	childViews := make([]*trieView, 0, defaultPreallocationSize)
 	for _, childView := range db.childViews {
-		if childView != exception &&
-			(exception == nil || childView.rootPrefix.HasPrefix(exception.rootPrefix)) {
+		if childView != exception {
 			childView.invalidate()
 		} else {
 			childViews = append(childViews, childView)

@@ -60,6 +60,10 @@ func genMap(rand *rand.Rand, nKeys int) map[string]string {
 	kvs := make(map[string]string, nKeys)
 	for len(kvs) < nKeys {
 		keyLen := rand.Intn(maxKeyLen) + 1
+		if keyLen == 32 {
+			// Don't allow keys of length 32, since that's the length of an account key.
+			keyLen += 1
+		}
 		valLen := rand.Intn(maxValLen) + 1
 
 		key := utils.RandomBytes(keyLen)

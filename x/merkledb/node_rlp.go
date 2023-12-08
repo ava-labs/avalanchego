@@ -21,7 +21,8 @@ func toNibbles(key Key) []byte {
 }
 
 func (n *node) isValueNode() bool {
-	return len(n.children) == 0 && !n.value.IsNothing()
+	isLeaf := len(n.children) == 0 && !n.value.IsNothing()
+	return isLeaf || n.isAccountNode()
 }
 
 func (n *node) calculateRLP() {
@@ -30,9 +31,15 @@ func (n *node) calculateRLP() {
 	n.rlp = w.ToBytes()
 }
 
+func (n *node) isAccountNode() bool {
+	keyLen := n.key.Length() / 8
+	isAccount := keyLen == 32 && n.value.HasValue()
+	return isAccount
+}
+
 func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 	// case 1: there are no children
-	if len(n.children) == 0 {
+	if len(n.children) == 0 || n.isAccountNode() {
 		// the case where there is no value corresponds to an empty trie
 		// the case with a value correspond to value nodes in ethereum representation.
 		if !n.value.IsNothing() {
