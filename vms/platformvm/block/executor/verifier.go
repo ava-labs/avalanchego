@@ -401,12 +401,26 @@ func (v *verifier) standardBlock(
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	// Finally we process the transactions
-	funcs := make([]func(), 0, len(b.Transactions))
-	for _, tx := range b.Transactions {
+	if err := v.processStandardTxs(b.Txs(), onAcceptState, blkState); err != nil {
+		return err
+	}
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = blkState
+
+	v.Mempool.Remove(b.Transactions)
+	return nil
+}
+
+func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, blkState *blockState) error {
+	var (
+		parentID = blkState.statelessBlock.Parent()
+		funcs    = make([]func(), 0, len(txs))
+	)
+	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: v.txExecutorBackend,
-			State:   onAcceptState,
+			State:   state,
 			Tx:      tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
@@ -421,7 +435,7 @@ func (v *verifier) standardBlock(
 		// Add UTXOs to batch
 		blkState.inputs.Union(txExecutor.Inputs)
 
-		onAcceptState.AddTx(tx, status.Committed)
+		state.AddTx(tx, status.Committed)
 		if txExecutor.OnAccept != nil {
 			funcs = append(funcs, txExecutor.OnAccept)
 		}
@@ -439,7 +453,7 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	if err := v.verifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
+	if err := v.verifyUniqueInputs(parentID, blkState.inputs); err != nil {
 		return err
 	}
 
@@ -453,9 +467,5 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	blkID := b.ID()
-	v.blkIDToState[blkID] = blkState
-
-	v.Mempool.Remove(b.Transactions)
 	return nil
 }
