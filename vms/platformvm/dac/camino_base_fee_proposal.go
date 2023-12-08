@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"golang.org/x/exp/slices"
 )
@@ -48,16 +49,25 @@ func (*BaseFeeProposal) AdminProposer() as.AddressState {
 
 func (p *BaseFeeProposal) Verify() error {
 	switch {
+	case len(p.Options) == 0:
+		return errNoOptions
 	case len(p.Options) > baseFeeProposalMaxOptionsCount:
 		return fmt.Errorf("%w (expected: no more than %d, actual: %d)", errWrongOptionsCount, baseFeeProposalMaxOptionsCount, len(p.Options))
 	case p.Start >= p.End:
 		return errEndNotAfterStart
 	}
+
+	unique := set.NewSet[uint64](len(p.Options))
 	for _, fee := range p.Options {
 		if fee == 0 {
 			return errZeroFee
 		}
+		if unique.Contains(fee) {
+			return errNotUniqueOption
+		}
+		unique.Add(fee)
 	}
+
 	return nil
 }
 
@@ -119,7 +129,9 @@ func (p *BaseFeeProposalState) IsActiveAt(time time.Time) bool {
 func (p *BaseFeeProposalState) CanBeFinished() bool {
 	mostVotedWeight, _, unambiguous := p.GetMostVoted()
 	voted := p.Voted()
-	return voted == p.TotalAllowedVoters || unambiguous && mostVotedWeight > p.TotalAllowedVoters/2
+	return p.TotalAllowedVoters-voted+mostVotedWeight < voted/2+1 ||
+		voted == p.TotalAllowedVoters ||
+		unambiguous && mostVotedWeight > p.TotalAllowedVoters/2
 }
 
 func (p *BaseFeeProposalState) IsSuccessful() bool {

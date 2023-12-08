@@ -6194,7 +6194,7 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
-				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateEmpty, nil)
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateKYCVerified, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				// *
 

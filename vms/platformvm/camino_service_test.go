@@ -30,17 +30,17 @@ import (
 func TestGetCaminoBalance(t *testing.T) {
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 
-	id := keys[0].PublicKey().Address()
+	id := caminoPreFundedKeys[0].PublicKey().Address()
 	addr, err := address.FormatBech32(hrp, id.Bytes())
 	require.NoError(t, err)
 
 	tests := map[string]struct {
 		camino          api.Camino
-		genesisUTXOs    []api.UTXO
+		genesisUTXOs    []api.UTXO // unlocked utxos
 		address         string
-		bonded          uint64
-		deposited       uint64
-		depositedBonded uint64
+		bonded          uint64 // additional (to existing genesis validator bond) bonded utxos
+		deposited       uint64 // additional deposited utxos
+		depositedBonded uint64 // additional depositedBonded utxos
 		expectedError   error
 	}{
 		"Genesis Validator with added balance": {
@@ -135,6 +135,18 @@ func TestGetCaminoBalance(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			if tt.bonded != 0 {
+				outputOwners := secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				}
+				utxo := generateTestUTXO(ids.GenerateTestID(), avaxAssetID, tt.bonded, outputOwners, ids.Empty, ids.GenerateTestID())
+				service.vm.state.AddUTXO(utxo)
+				err := service.vm.state.Commit()
+				require.NoError(t, err)
+			}
+
 			if tt.depositedBonded != 0 {
 				outputOwners := secp256k1fx.OutputOwners{
 					Locktime:  0,
@@ -153,7 +165,7 @@ func TestGetCaminoBalance(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			expectedBalance := json.Uint64(defaultBalance + tt.bonded + tt.deposited + tt.depositedBonded)
+			expectedBalance := json.Uint64(defaultCaminoValidatorWeight + defaultBalance + tt.bonded + tt.deposited + tt.depositedBonded)
 
 			if !tt.camino.LockModeBondDeposit {
 				response := responseWrapper.avax
@@ -163,8 +175,9 @@ func TestGetCaminoBalance(t *testing.T) {
 				require.Equal(t, json.Uint64(defaultBalance), response.Unlocked, "Wrong unlocked balance. Expected %d ; Returned %d", defaultBalance, response.Unlocked)
 			} else {
 				response := responseWrapper.camino
-				require.Equal(t, json.Uint64(defaultBalance+tt.bonded+tt.deposited+tt.depositedBonded), response.Balances[avaxAssetID], "Wrong balance. Expected %d ; Returned %d", expectedBalance, response.Balances[avaxAssetID])
+				require.Equal(t, json.Uint64(defaultCaminoValidatorWeight+defaultBalance+tt.bonded+tt.deposited+tt.depositedBonded), response.Balances[avaxAssetID], "Wrong balance. Expected %d ; Returned %d", expectedBalance, response.Balances[avaxAssetID])
 				require.Equal(t, json.Uint64(tt.deposited), response.DepositedOutputs[avaxAssetID], "Wrong deposited balance. Expected %d ; Returned %d", tt.deposited, response.DepositedOutputs[avaxAssetID])
+				require.Equal(t, json.Uint64(defaultCaminoValidatorWeight+tt.bonded), response.BondedOutputs[avaxAssetID], "Wrong bonded balance. Expected %d ; Returned %d", tt.bonded, response.BondedOutputs[avaxAssetID])
 				require.Equal(t, json.Uint64(tt.depositedBonded), response.DepositedBondedOutputs[avaxAssetID], "Wrong depositedBonded balance. Expected %d ; Returned %d", tt.depositedBonded, response.DepositedBondedOutputs[avaxAssetID])
 				require.Equal(t, json.Uint64(defaultBalance), response.UnlockedOutputs[avaxAssetID], "Wrong unlocked balance. Expected %d ; Returned %d", defaultBalance, response.UnlockedOutputs[avaxAssetID])
 			}

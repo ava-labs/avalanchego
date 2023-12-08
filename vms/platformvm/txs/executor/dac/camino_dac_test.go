@@ -49,10 +49,11 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
-		utx         func() *txs.AddProposalTx
-		signers     [][]*secp256k1.PrivateKey
-		expectedErr error
+		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		utx             func() *txs.AddProposalTx
+		signers         [][]*secp256k1.PrivateKey
+		isAdminProposal bool
+		expectedErr     error
 	}{
 		"Proposer isn't caminoProposer": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
@@ -137,7 +138,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx))
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -204,10 +205,11 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
-		utx         func() *txs.AddProposalTx
-		signers     [][]*secp256k1.PrivateKey
-		expectedErr error
+		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		utx             func() *txs.AddProposalTx
+		signers         [][]*secp256k1.PrivateKey
+		isAdminProposal bool
+		expectedErr     error
 	}{
 		"Applicant address is consortium member": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
@@ -228,6 +230,25 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 			},
 			expectedErr: errConsortiumMember,
 		},
+		"Applicant address is not kyc verified": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateEmpty, nil)
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errNotKYCVerified,
+		},
 		"Already active AddMemberProposal for this applicant": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
@@ -236,7 +257,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Value().Return(&dac.AddMemberProposalState{ApplicantAddress: applicantAddress}, nil)
 				proposalsIterator.EXPECT().Release()
 
-				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateEmpty, nil)
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateKYCVerified, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -261,7 +282,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
-				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateEmpty, nil)
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateKYCVerified, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -292,7 +313,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx))
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -341,6 +362,9 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 	bondOwnerKey, _, bondOwner := generateKeyAndOwner(t)
 	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
 	memberAddress := ids.ShortID{1}
+	memberNodeShortID := ids.ShortID{2}
+	memberNodeID := ids.NodeID(memberNodeShortID)
+	memberValidator := &state.Staker{TxID: ids.ID{3}}
 
 	proposalBondAmt := uint64(100)
 	feeUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
@@ -363,12 +387,13 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
-		utx         func() *txs.AddProposalTx
-		signers     [][]*secp256k1.PrivateKey
-		expectedErr error
+		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		utx             func() *txs.AddProposalTx
+		signers         [][]*secp256k1.PrivateKey
+		isAdminProposal bool
+		expectedErr     error
 	}{
-		"Applicant address is not consortium member": {
+		"Member-to-exclude is not consortium member": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateEmpty, nil)
@@ -387,6 +412,69 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 			},
 			expectedErr: errNotConsortiumMember,
 		},
+		"Proposer is not consortium member": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil)
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errNotConsortiumMember,
+		},
+		"Proposer doesn't have registered node": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetShortIDLink(utx.ProposerAddress, state.ShortLinkKeyRegisterNode).Return(ids.ShortEmpty, database.ErrNotFound)
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errNoActiveValidator,
+		},
+		"Proposer doesn't have active validator": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetShortIDLink(utx.ProposerAddress, state.ShortLinkKeyRegisterNode).Return(memberNodeShortID, nil)
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID).Return(nil, database.ErrNotFound)
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errNoActiveValidator,
+		},
 		"Already active ExcludeMemberProposal for this member": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
@@ -396,6 +484,9 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 
 				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetShortIDLink(utx.ProposerAddress, state.ShortLinkKeyRegisterNode).Return(memberNodeShortID, nil)
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID).Return(memberValidator, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -412,6 +503,31 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 			},
 			expectedErr: errAlreadyActiveProposal,
 		},
+		"OK: admin proposal": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				proposalsIterator := state.NewMockProposalsIterator(c)
+				proposalsIterator.EXPECT().Next().Return(false)
+				proposalsIterator.EXPECT().Release()
+				proposalsIterator.EXPECT().Error().Return(nil)
+
+				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
+				return s
+			},
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			isAdminProposal: true,
+		},
 		"OK": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
@@ -421,6 +537,9 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Error().Return(nil)
 
 				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetShortIDLink(utx.ProposerAddress, state.ShortLinkKeyRegisterNode).Return(memberNodeShortID, nil)
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID).Return(memberValidator, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -451,7 +570,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx))
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

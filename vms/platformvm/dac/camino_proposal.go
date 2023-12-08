@@ -13,6 +13,8 @@ import (
 )
 
 var (
+	errNoOptions                  = errors.New("no options")
+	errNotUniqueOption            = errors.New("not unique option")
 	errWrongOptionIndex           = errors.New("wrong option index")
 	errEndNotAfterStart           = errors.New("proposal end-time is not after start-time")
 	errWrongDuration              = errors.New("wrong proposal duration")
@@ -61,11 +63,9 @@ type Proposal interface {
 }
 
 type ProposalState interface {
-	verify.Verifiable
-
 	EndTime() time.Time
 	IsActiveAt(time time.Time) bool
-	// Once a proposal has become Finishable, it cannot be undone by adding more votes.
+	// Once a proposal has become Finishable, it cannot be undone by adding more votes. Should only return true, when future votes cannot change the outcome of proposal.
 	CanBeFinished() bool
 	IsSuccessful() bool // should be called only for finished proposals
 	Outcome() any       // should be called only for finished successful proposals

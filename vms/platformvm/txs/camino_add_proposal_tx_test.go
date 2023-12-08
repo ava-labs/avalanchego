@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,6 +41,12 @@ func TestAddProposalTxSyntacticVerify(t *testing.T) {
 	}{
 		"Nil tx": {
 			expectedErr: ErrNilTx,
+		},
+		"Too big proposal description": {
+			tx: &AddProposalTx{
+				ProposalDescription: make(types.JSONByteSlice, maxProposalDescriptionSize+1),
+			},
+			expectedErr: errTooBigProposalDescription,
 		},
 		"Fail to unmarshal proposal": {
 			tx: &AddProposalTx{
@@ -91,11 +98,19 @@ func TestAddProposalTxSyntacticVerify(t *testing.T) {
 			},
 			expectedErr: locked.ErrWrongOutType,
 		},
-		"OK": {
+		"OK: no proposal description": {
 			tx: &AddProposalTx{
 				BaseTx:          baseTx,
 				ProposalPayload: proposalBytes,
 				ProposerAuth:    &secp256k1fx.Input{},
+			},
+		},
+		"OK": {
+			tx: &AddProposalTx{
+				BaseTx:              baseTx,
+				ProposalDescription: make(types.JSONByteSlice, maxProposalDescriptionSize),
+				ProposalPayload:     proposalBytes,
+				ProposerAuth:        &secp256k1fx.Input{},
 			},
 		},
 	}

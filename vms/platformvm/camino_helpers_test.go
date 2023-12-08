@@ -181,7 +181,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
+				Amount:  json.Uint64(defaultCaminoValidatorWeight),
 				Address: addr,
 			}},
 		}

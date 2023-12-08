@@ -13,20 +13,26 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
+
+const maxProposalDescriptionSize = 2048
 
 var (
 	_ UnsignedTx = (*AddProposalTx)(nil)
 
-	errBadProposal     = errors.New("bad proposal")
-	errBadProposerAuth = errors.New("bad proposer auth")
-	errTooBigBond      = errors.New("to big bond")
+	errBadProposal               = errors.New("bad proposal")
+	errBadProposerAuth           = errors.New("bad proposer auth")
+	errTooBigBond                = errors.New("too big bond")
+	errTooBigProposalDescription = errors.New("too big proposal description")
 )
 
 // AddProposalTx is an unsigned addProposalTx
 type AddProposalTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
+	// Contains arbitrary bytes, up to maxProposalDescriptionSize
+	ProposalDescription types.JSONByteSlice `serialize:"true" json:"proposalDescription"`
 	// Proposal bytes
 	ProposalPayload []byte `serialize:"true" json:"proposalPayload"`
 	// Address that can create proposals of this type
@@ -43,6 +49,8 @@ func (tx *AddProposalTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
+	case len(tx.ProposalDescription) > maxProposalDescriptionSize:
+		return errTooBigProposalDescription
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}

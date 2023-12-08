@@ -10,6 +10,123 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBaseFeeProposalVerify(t *testing.T) {
+	tests := map[string]struct {
+		proposal         *BaseFeeProposal
+		expectedProposal *BaseFeeProposal
+		expectedErr      error
+	}{
+		"No options": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{},
+			},
+			expectedErr: errNoOptions,
+		},
+		"To many options": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 2, 3, 4},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 2, 3, 4},
+			},
+			expectedErr: errWrongOptionsCount,
+		},
+		"End-time is equal to start-time": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     100,
+				Options: []uint64{1, 2, 3},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     100,
+				Options: []uint64{1, 2, 3},
+			},
+			expectedErr: errEndNotAfterStart,
+		},
+		"End-time is less than start-time": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     99,
+				Options: []uint64{1, 2, 3},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     99,
+				Options: []uint64{1, 2, 3},
+			},
+			expectedErr: errEndNotAfterStart,
+		},
+		"Zero fee option": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 0, 3},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 0, 3},
+			},
+			expectedErr: errZeroFee,
+		},
+		"Not unique fee option": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 2, 1},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 2, 1},
+			},
+			expectedErr: errNotUniqueOption,
+		},
+		"OK: 1 option": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1},
+			},
+		},
+		"OK: 3 options": {
+			proposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 2, 3},
+			},
+			expectedProposal: &BaseFeeProposal{
+				Start:   100,
+				End:     101,
+				Options: []uint64{1, 2, 3},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorIs(t, tt.proposal.Verify(), tt.expectedErr)
+			require.Equal(t, tt.expectedProposal, tt.proposal)
+		})
+	}
+}
+
 func TestBaseFeeProposalCreateProposalState(t *testing.T) {
 	tests := map[string]struct {
 		proposal              *BaseFeeProposal
@@ -404,6 +521,184 @@ func TestBaseFeeProposalCreateFinishedProposalState(t *testing.T) {
 				require.True(t, proposalState.CanBeFinished())
 				require.True(t, proposalState.IsSuccessful())
 			}
+		})
+	}
+}
+
+func TestBaseFeeProposalStateIsSuccessful(t *testing.T) {
+	tests := map[string]struct {
+		proposal                 *BaseFeeProposalState
+		expectedSuccessful       bool
+		expectedOriginalProposal *BaseFeeProposalState
+	}{
+		"Not successful: most voted weight is less, than 50% of votes": {
+			proposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 20},
+						{Value: 2, Weight: 21},
+						{Value: 3, Weight: 10},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedSuccessful: false,
+			expectedOriginalProposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 20},
+						{Value: 2, Weight: 21},
+						{Value: 3, Weight: 10},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+		"Not successful: total voted weight is less, than 50% of total allowed voters": {
+			proposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 25},
+						{Value: 2, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 102,
+			},
+			expectedSuccessful: false,
+			expectedOriginalProposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 25},
+						{Value: 2, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 102,
+			},
+		},
+		"Successful": {
+			proposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 25},
+						{Value: 2, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedSuccessful: true,
+			expectedOriginalProposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 25},
+						{Value: 2, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expectedSuccessful, tt.proposal.IsSuccessful())
+			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)
+		})
+	}
+}
+
+func TestBaseFeeProposalStateCanBeFinished(t *testing.T) {
+	tests := map[string]struct {
+		proposal                 *BaseFeeProposalState
+		expectedCanBeFinished    bool
+		expectedOriginalProposal *BaseFeeProposalState
+	}{
+		"Can not be finished: most voted weight is less than 50% of total allowed voters and not everyone had voted": {
+			proposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 50},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedCanBeFinished: false,
+			expectedOriginalProposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 50},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+		"Can be finished: everyone had voted": {
+			proposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 50},
+						{Value: 2, Weight: 50},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedCanBeFinished: true,
+			expectedOriginalProposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 50},
+						{Value: 2, Weight: 50},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+		"Can be finished: most voted weight is greater than 50% of total allowed voters": {
+			proposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 51},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedCanBeFinished: true,
+			expectedOriginalProposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 51},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+		"Can be finished: no option can reach 50%+ of votes": {
+			proposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 30},
+						{Value: 2, Weight: 30},
+						{Value: 3, Weight: 30},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedCanBeFinished: true,
+			expectedOriginalProposal: &BaseFeeProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[uint64]{
+					Options: []SimpleVoteOption[uint64]{
+						{Value: 1, Weight: 30},
+						{Value: 2, Weight: 30},
+						{Value: 3, Weight: 30},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expectedCanBeFinished, tt.proposal.CanBeFinished())
+			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)
 		})
 	}
 }

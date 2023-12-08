@@ -10,6 +10,85 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestExcludeMemberProposalVerify(t *testing.T) {
+	tests := map[string]struct {
+		proposal         *ExcludeMemberProposal
+		expectedProposal *ExcludeMemberProposal
+		expectedErr      error
+	}{
+		"End-time is equal to start-time": {
+			proposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100,
+			},
+			expectedProposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100,
+			},
+			expectedErr: errEndNotAfterStart,
+		},
+		"End-time is less than start-time": {
+			proposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   99,
+			},
+			expectedProposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   99,
+			},
+			expectedErr: errEndNotAfterStart,
+		},
+		"To small duration": {
+			proposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMinDuration - 1,
+			},
+			expectedProposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMinDuration - 1,
+			},
+			expectedErr: errWrongDuration,
+		},
+		"To big duration": {
+			proposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMaxDuration + 1,
+			},
+			expectedProposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMaxDuration + 1,
+			},
+			expectedErr: errWrongDuration,
+		},
+		"OK: min duration": {
+			proposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMinDuration,
+			},
+			expectedProposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMinDuration,
+			},
+		},
+		"OK: max duration": {
+			proposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMaxDuration,
+			},
+			expectedProposal: &ExcludeMemberProposal{
+				Start: 100,
+				End:   100 + ExcludeMemberProposalMaxDuration,
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorIs(t, tt.proposal.Verify(), tt.expectedErr)
+			require.Equal(t, tt.expectedProposal, tt.proposal)
+		})
+	}
+}
+
 func TestExcludeMemberProposalCreateProposalState(t *testing.T) {
 	tests := map[string]struct {
 		proposal              *ExcludeMemberProposal
@@ -75,8 +154,8 @@ func TestExcludeMemberProposalCreateProposalState(t *testing.T) {
 
 func TestExcludeMemberProposalStateAddVote(t *testing.T) {
 	voterAddr1 := ids.ShortID{1}
-	voterAddr2 := ids.ShortID{1}
-	voterAddr3 := ids.ShortID{1}
+	voterAddr2 := ids.ShortID{2}
+	voterAddr3 := ids.ShortID{3}
 
 	tests := map[string]struct {
 		proposal                 *ExcludeMemberProposalState
@@ -392,6 +471,144 @@ func TestExcludeMemberProposalCreateFinishedProposalState(t *testing.T) {
 				require.True(t, proposalState.CanBeFinished())
 				require.True(t, proposalState.IsSuccessful())
 			}
+		})
+	}
+}
+
+func TestExcludeMemberProposalStateIsSuccessful(t *testing.T) {
+	tests := map[string]struct {
+		proposal                 *ExcludeMemberProposalState
+		expectedSuccessful       bool
+		expectedOriginalProposal *ExcludeMemberProposalState
+	}{
+		// Case, when most voted weight is less, than 50% of votes is impossible, cause proposal only has 2 options
+		"Not successful: total voted weight is less, than 50% of total allowed voters": {
+			proposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 25},
+						{Value: false, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 102,
+			},
+			expectedSuccessful: false,
+			expectedOriginalProposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 25},
+						{Value: false, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 102,
+			},
+		},
+		"Successful": {
+			proposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 25},
+						{Value: false, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedSuccessful: true,
+			expectedOriginalProposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 25},
+						{Value: false, Weight: 26},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expectedSuccessful, tt.proposal.IsSuccessful())
+			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)
+		})
+	}
+}
+
+func TestExcludeMemberProposalStateCanBeFinished(t *testing.T) {
+	tests := map[string]struct {
+		proposal                 *ExcludeMemberProposalState
+		expectedCanBeFinished    bool
+		expectedOriginalProposal *ExcludeMemberProposalState
+	}{
+		"Can not be finished: most voted weight is less than 50% of total allowed voters and not everyone had voted": {
+			proposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 50},
+						{Value: false},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedCanBeFinished: false,
+			expectedOriginalProposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 50},
+						{Value: false},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+		"Can be finished: everyone had voted": {
+			proposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 50},
+						{Value: false, Weight: 50},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedCanBeFinished: true,
+			expectedOriginalProposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 50},
+						{Value: false, Weight: 50},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+		"Can be finished: most voted weight is greater than 50% of total allowed voters": {
+			proposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 51},
+						{Value: false},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+			expectedCanBeFinished: true,
+			expectedOriginalProposal: &ExcludeMemberProposalState{
+				SimpleVoteOptions: SimpleVoteOptions[bool]{
+					Options: []SimpleVoteOption[bool]{
+						{Value: true, Weight: 51},
+						{Value: false},
+					},
+				},
+				TotalAllowedVoters: 100,
+			},
+		},
+		// We don't have test-case 'no option can reach 50%+ of votes' for this proposal type, cause its impossible with just 2 options
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expectedCanBeFinished, tt.proposal.CanBeFinished())
+			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)
 		})
 	}
 }

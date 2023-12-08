@@ -91,6 +91,15 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
+	addrStateTx, err := vm.txBuilder.NewAddressStateTx(
+		consortiumMemberKey.Address(),
+		false,
+		as.AddressStateBitKYCVerified,
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		nil,
+	)
+	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, addrStateTx)
 	proposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
 		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
@@ -158,7 +167,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state and consortium member is true
 	ownerState, _ := vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, as.AddressStateNodeDeferred|as.AddressStateConsortiumMember)
+	require.Equal(ownerState, as.AddressStateNodeDeferred|as.AddressStateConsortiumMember|as.AddressStateKYCVerified)
 
 	// Fast-forward clock to time for validator to be rewarded
 	vm.clock.Set(endTime)
@@ -209,7 +218,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state is false
 	ownerState, _ = vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, as.AddressStateConsortiumMember)
+	require.Equal(ownerState, as.AddressStateConsortiumMember|as.AddressStateKYCVerified)
 
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(endTime.Unix(), timestamp.Unix())
@@ -268,6 +277,15 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
+	addrStateTx, err := vm.txBuilder.NewAddressStateTx(
+		consortiumMemberKey.Address(),
+		false,
+		as.AddressStateBitKYCVerified,
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		nil,
+	)
+	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, addrStateTx)
 	proposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
 		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
@@ -704,7 +722,7 @@ func TestAdminProposals(t *testing.T) {
 			Address: proposerAddrStr,
 		},
 		{
-			Amount:  json.Uint64(defaultTxFee),
+			Amount:  json.Uint64(defaultTxFee * 2),
 			Address: caminoPreFundedKey0AddrStr,
 		},
 	}, &defaultConfig.BanffTime)
@@ -733,6 +751,22 @@ func TestAdminProposals(t *testing.T) {
 	applicantAddrState, err := vm.state.GetAddressStates(applicantAddr)
 	require.NoError(err)
 	require.True(applicantAddrState.IsNot(as.AddressStateConsortiumMember))
+
+	// Make applicant (see admin proposal below) kyc-verified
+	addrStateTx, err = vm.txBuilder.NewAddressStateTx(
+		applicantAddr,
+		false,
+		as.AddressStateBitKYCVerified,
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		nil,
+	)
+	require.NoError(err)
+	blk = buildAndAcceptBlock(t, vm, addrStateTx)
+	require.Len(blk.Txs(), 1)
+	checkTx(t, vm, blk.ID(), addrStateTx.ID())
+	applicantAddrState, err = vm.state.GetAddressStates(applicantAddr)
+	require.NoError(err)
+	require.True(applicantAddrState.Is(as.AddressStateKYCVerified))
 
 	// Add admin proposal
 	chainTime := vm.state.GetTimestamp()
@@ -775,21 +809,35 @@ func TestAdminProposals(t *testing.T) {
 }
 
 func TestExcludeMemberProposals(t *testing.T) {
-	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
-	require.NoError(t, err)
-	memberKey, memberAddr, _ := generateKeyAndOwner(t)
-	memberAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], memberAddr.Bytes())
-	require.NoError(t, err)
-	memberNodeKey, memberNodeShortID, _ := generateKeyAndOwner(t)
-	memberNodeID := ids.NodeID(memberNodeShortID)
+	// member to exclude
+	memberToExcludeKey, memberToExcludeAddr, _ := generateKeyAndOwner(t)
+	memberToExcludeNodeKey, memberToExcludeNodeShortID, _ := generateKeyAndOwner(t)
+	memberToExcludeNodeID := ids.NodeID(memberToExcludeNodeShortID)
+
+	// admin & funds & proposer
 	rootAdminKey := caminoPreFundedKeys[0]
-	adminProposerKey := caminoPreFundedKeys[0]
+	consortiumAdminKey := caminoPreFundedKeys[0]
+	proposerMemberKey := caminoPreFundedKeys[0]
+	fundsKey := caminoPreFundedKeys[0]
+	fundsAddr := caminoPreFundedKeys[0].Address()
+	fundsKeyAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], fundsKey.Address().Bytes())
+	require.NoError(t, err)
 
 	defaultConfig := defaultCaminoConfig(true)
 	fee := defaultConfig.TxFee
 	addValidatorFee := defaultConfig.AddPrimaryNetworkValidatorFee
 	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
 	validatorBondAmount := defaultConfig.MaxValidatorStake // is equal to min
+	// for simplicity: member == member that will be excluded
+	//                 proposer == member that creates excludeMember proposal
+	initialBalance := validatorBondAmount + // proposer validator's bond
+		validatorBondAmount + addValidatorFee*2 + // bond and fee for validators (both pending and current just in case) of member
+		proposalBondAmount + fee + // bond and fee for admin proposal to add member that we'll try to exclude later
+		proposalBondAmount + fee + // bond and fee for excludeMember proposal
+		proposalBondAmount + fee + // bond and fee for 2nd excludeMember proposal
+		fee + // fee to give KYC verified status to member before adding him to consortium
+		fee // fee to give consortiumAdmin role to root admin so he can add member to consortium
+	initialHeight := uint64(3)
 
 	tests := map[string]struct {
 		moreExlcude      bool // try to exclude member with additional proposal
@@ -858,78 +906,130 @@ func TestExcludeMemberProposals(t *testing.T) {
 			if tt.currentValidator {
 				numberOfValidatorsInNetwork++
 			}
+			balance := initialBalance
 			burnedAmt := uint64(0)
-			bondedAmt := uint64(0)
-			balance := proposalBondAmount + defaultTxFee*8 + validatorBondAmount*2 + addValidatorFee*2
+			bondedAmt := validatorBondAmount // proposer validator's bond from genesis
+			expectedHeight := initialHeight
+
 			// Prepare vm
 			vm := newCaminoVM(api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				InitialAdmin:        caminoPreFundedKeys[0].Address(),
-			}, []api.UTXO{
-				{
-					Amount:  json.Uint64(balance),
-					Address: memberAddrStr,
-				},
-				{
-					Amount:  json.Uint64(defaultTxFee*3 + proposalBondAmount*2),
-					Address: caminoPreFundedKey0AddrStr,
-				},
-			}, &defaultConfig.BanffTime)
+				InitialAdmin:        rootAdminKey.Address(),
+			}, []api.UTXO{{Amount: json.Uint64(initialBalance - defaultCaminoValidatorWeight), Address: fundsKeyAddrStr}}, &defaultConfig.BanffTime)
 			vm.ctx.Lock.Lock()
 			defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
-			initialMemberBalance, _, _, _, _ := getBalance(t, vm.state, memberAddr)
-			checkBalance(t, vm.state, memberAddr,
-				initialMemberBalance,          // total
-				0, 0, 0, initialMemberBalance, // unlocked
-			)
-			memberAddrState, err := vm.state.GetAddressStates(memberAddr)
+			height, err := vm.GetCurrentHeight(context.Background())
 			require.NoError(err)
-			require.Equal(as.AddressStateEmpty, memberAddrState)
-			_, err = vm.state.GetShortIDLink(memberAddr, state.ShortLinkKeyRegisterNode)
-			require.ErrorIs(err, database.ErrNotFound)
+			require.Equal(expectedHeight, height)
+			checkBalance(t, vm.state, fundsAddr,
+				balance,                 // total     // nothing is burned yet
+				bondedAmt,               // bonded
+				0, 0, balance-bondedAmt, // unlocked
+			)
 
-			// Make member actual consortium member
-			tx, err := vm.txBuilder.NewAddressStateTx(
-				adminProposerKey.Address(),
+			// give root admin consortiumAdmin role
+			addrStateTx, err := vm.txBuilder.NewAddressStateTx(
+				consortiumAdminKey.Address(),
 				false,
 				as.AddressStateBitRoleConsortiumAdminProposer,
+				[]*secp256k1.PrivateKey{rootAdminKey, fundsKey},
+				nil,
+			)
+			require.NoError(err)
+			_ = buildAndAcceptBlock(t, vm, addrStateTx)
+			expectedHeight++
+			height, err = vm.GetCurrentHeight(context.Background())
+			require.NoError(err)
+			require.Equal(expectedHeight, height)
+			burnedAmt += fee
+			checkBalance(t, vm.state, fundsAddr,
+				balance-burnedAmt,                 // total
+				bondedAmt,                         // bonded
+				0, 0, balance-bondedAmt-burnedAmt, // unlocked
+			)
+
+			// Prepare member that will be excluded
+			memberAddrState, err := vm.state.GetAddressStates(memberToExcludeAddr)
+			require.NoError(err)
+			require.Equal(as.AddressStateEmpty, memberAddrState)
+			_, err = vm.state.GetShortIDLink(memberToExcludeAddr, state.ShortLinkKeyRegisterNode)
+			require.ErrorIs(err, database.ErrNotFound)
+			addrStateTx, err = vm.txBuilder.NewAddressStateTx(
+				memberToExcludeAddr,
+				false,
+				as.AddressStateBitKYCVerified,
 				[]*secp256k1.PrivateKey{rootAdminKey},
 				nil,
 			)
 			require.NoError(err)
-			_ = buildAndAcceptBlock(t, vm, tx)
-			addMemberProposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], proposalBondAmount, defaultTxFee,
-				adminProposerKey, memberAddr, vm.clock.Time(), true)
-			_, _, _, _ = makeProposalWithTx(t, vm, addMemberProposalTx) // add admin proposal
-			_ = buildAndAcceptBlock(t, vm, nil)                         // execute admin proposal
-			memberAddrState, err = vm.state.GetAddressStates(memberAddr)
+			_ = buildAndAcceptBlock(t, vm, addrStateTx)
+			expectedHeight++
+			height, err = vm.GetCurrentHeight(context.Background())
 			require.NoError(err)
-			require.Equal(as.AddressStateConsortiumMember, memberAddrState)
+			require.Equal(expectedHeight, height)
+			burnedAmt += fee
+			checkBalance(t, vm.state, fundsAddr,
+				balance-burnedAmt,                 // total
+				bondedAmt,                         // bonded
+				0, 0, balance-bondedAmt-burnedAmt, // unlocked
+			)
+
+			addMemberProposalTx := buildAddMemberProposalTx(t, vm, fundsKey, proposalBondAmount, defaultTxFee,
+				consortiumAdminKey, memberToExcludeAddr, vm.clock.Time(), true)
+			_, _, _, _ = makeProposalWithTx(t, vm, addMemberProposalTx) // add admin proposal
+			expectedHeight++
+			height, err = vm.GetCurrentHeight(context.Background())
+			require.NoError(err)
+			require.Equal(expectedHeight, height)
+			burnedAmt += fee
+			bondedAmt += proposalBondAmount
+			checkBalance(t, vm.state, fundsAddr,
+				balance-burnedAmt,                 // total
+				bondedAmt,                         // bonded
+				0, 0, balance-bondedAmt-burnedAmt, // unlocked
+			)
+
+			_ = buildAndAcceptBlock(t, vm, nil) // execute admin proposal
+			expectedHeight++
+			height, err = vm.GetCurrentHeight(context.Background())
+			require.NoError(err)
+			require.Equal(expectedHeight, height)
+			memberAddrState, err = vm.state.GetAddressStates(memberToExcludeAddr)
+			require.NoError(err)
+			require.Equal(as.AddressStateConsortiumMember|as.AddressStateKYCVerified, memberAddrState)
+			bondedAmt -= proposalBondAmount
+			checkBalance(t, vm.state, fundsAddr,
+				balance-burnedAmt,                 // total
+				bondedAmt,                         // bonded
+				0, 0, balance-bondedAmt-burnedAmt, // unlocked
+			)
 
 			// Register member's node
 			if tt.registerNode {
 				registerNodeTx, err := vm.txBuilder.NewRegisterNodeTx(
 					ids.EmptyNodeID,
-					memberNodeID,
-					memberAddr,
-					[]*secp256k1.PrivateKey{memberKey, memberNodeKey},
-					&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{memberAddr},
-					},
+					memberToExcludeNodeID,
+					memberToExcludeAddr,
+					[]*secp256k1.PrivateKey{memberToExcludeKey, memberToExcludeNodeKey, fundsKey},
+					nil,
 				)
 				require.NoError(err)
 				blk := buildAndAcceptBlock(t, vm, registerNodeTx)
+				expectedHeight++
+				height, err = vm.GetCurrentHeight(context.Background())
+				require.NoError(err)
+				require.Equal(expectedHeight, height)
 				require.Len(blk.Txs(), 1)
 				checkTx(t, vm, blk.ID(), registerNodeTx.ID())
-				registeredMemberNodeID, err := vm.state.GetShortIDLink(memberAddr, state.ShortLinkKeyRegisterNode)
+				registeredMemberNodeID, err := vm.state.GetShortIDLink(memberToExcludeAddr, state.ShortLinkKeyRegisterNode)
 				require.NoError(err)
-				require.Equal(memberNodeShortID, registeredMemberNodeID)
+				require.Equal(memberToExcludeNodeShortID, registeredMemberNodeID)
 				burnedAmt += fee
-				checkBalance(t, vm.state, memberAddr,
-					balance-burnedAmt,          // total
-					0, 0, 0, balance-burnedAmt, // unlocked
+				checkBalance(t, vm.state, fundsAddr,
+					balance-burnedAmt,                 // total
+					bondedAmt,                         // bonded
+					0, 0, balance-bondedAmt-burnedAmt, // unlocked
 				)
 			}
 
@@ -944,27 +1044,31 @@ func TestExcludeMemberProposals(t *testing.T) {
 					validatorBondAmount,
 					uint64(pendingValidatorStartTime.Unix()),
 					uint64(validatorsEndTime.Unix()),
-					memberNodeID,
-					memberAddr,
-					memberAddr,
+					memberToExcludeNodeID,
+					memberToExcludeAddr,
+					memberToExcludeAddr,
 					0,
-					[]*secp256k1.PrivateKey{memberKey},
-					memberAddr,
+					[]*secp256k1.PrivateKey{memberToExcludeKey, fundsKey},
+					fundsAddr,
 				)
 				require.NoError(err)
 				blk := buildAndAcceptBlock(t, vm, addValidatorTx)
+				expectedHeight++
+				height, err = vm.GetCurrentHeight(context.Background())
+				require.NoError(err)
+				require.Equal(expectedHeight, height)
 				require.Len(blk.Txs(), 1)
 				checkTx(t, vm, blk.ID(), addValidatorTx.ID())
-				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
+				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
 				require.NoError(err)
-				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
+				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
 				require.ErrorIs(err, database.ErrNotFound)
 				burnedAmt += addValidatorFee
 				bondedAmt += validatorBondAmount
-				checkBalance(t, vm.state, memberAddr,
+				checkBalance(t, vm.state, fundsAddr,
 					balance-burnedAmt,                 // total
 					bondedAmt,                         // bonded
-					0, 0, balance-burnedAmt-bondedAmt, // unlocked
+					0, 0, balance-bondedAmt-burnedAmt, // unlocked
 				)
 			}
 
@@ -975,52 +1079,64 @@ func TestExcludeMemberProposals(t *testing.T) {
 					validatorBondAmount,
 					uint64(currentValidatorStartTime.Unix()),
 					uint64(validatorsEndTime.Unix()),
-					memberNodeID,
-					memberAddr,
-					memberAddr,
+					memberToExcludeNodeID,
+					memberToExcludeAddr,
+					memberToExcludeAddr,
 					0,
-					[]*secp256k1.PrivateKey{memberKey},
-					memberAddr,
+					[]*secp256k1.PrivateKey{memberToExcludeKey, fundsKey},
+					fundsAddr,
 				)
 				require.NoError(err)
 				blk := buildAndAcceptBlock(t, vm, addValidatorTx)
+				expectedHeight++
+				height, err = vm.GetCurrentHeight(context.Background())
+				require.NoError(err)
+				require.Equal(expectedHeight, height)
 				require.Len(blk.Txs(), 1)
 				checkTx(t, vm, blk.ID(), addValidatorTx.ID())
-				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
+				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
 				require.NoError(err)
-				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
+				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
 				require.ErrorIs(err, database.ErrNotFound)
 
 				// Advance time, so pending validator will become current
 				vm.clock.Set(currentValidatorStartTime)
 				blk = buildAndAcceptBlock(t, vm, nil)
+				expectedHeight++
+				height, err = vm.GetCurrentHeight(context.Background())
+				require.NoError(err)
+				require.Equal(expectedHeight, height)
 				require.Empty(blk.Txs())
-				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
+				_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
 				require.ErrorIs(err, database.ErrNotFound)
-				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
+				_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
 				require.NoError(err)
 				burnedAmt += addValidatorFee
 				bondedAmt += validatorBondAmount
-				checkBalance(t, vm.state, memberAddr,
+				checkBalance(t, vm.state, fundsAddr,
 					balance-burnedAmt,                 // total
 					bondedAmt,                         // bonded
-					0, 0, balance-burnedAmt-bondedAmt, // unlocked
+					0, 0, balance-bondedAmt-burnedAmt, // unlocked
 				)
 			}
 
 			chainTime = vm.state.GetTimestamp()
 
-			// Add proposal (member proposes to exclude himself using his own funds)
+			// Add proposal (one member proposes to exclude another member)
 			proposalStartTime := chainTime.Add(100 * time.Second)
 			proposalEndTime := proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration) * time.Second)
-			excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, memberKey, proposalBondAmount, fee,
-				memberKey, memberAddr, proposalStartTime, proposalEndTime, false)
+			excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, fundsKey, proposalBondAmount, fee,
+				proposerMemberKey, memberToExcludeAddr, proposalStartTime, proposalEndTime, false)
 			proposalState, _, _, _ := makeProposalWithTx(t, vm, excludeMemberProposalTx)
+			expectedHeight++
+			height, err = vm.GetCurrentHeight(context.Background())
+			require.NoError(err)
+			require.Equal(expectedHeight, height)
 			excludeMemberProposalState, ok := proposalState.(*dac.ExcludeMemberProposalState)
 			require.True(ok)
 			burnedAmt += fee
 			bondedAmt += proposalBondAmount
-			checkBalance(t, vm.state, memberAddr,
+			checkBalance(t, vm.state, fundsAddr,
 				balance-burnedAmt,                 // total
 				bondedAmt,                         // bonded
 				0, 0, balance-burnedAmt-bondedAmt, // unlocked
@@ -1029,9 +1145,12 @@ func TestExcludeMemberProposals(t *testing.T) {
 			vm.clock.Set(excludeMemberProposalState.StartTime())
 
 			if tt.moreExlcude {
-				excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, caminoPreFundedKeys[0], proposalBondAmount, fee,
-					adminProposerKey, memberAddr, proposalStartTime, proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration)*time.Second), true)
+				excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, fundsKey, proposalBondAmount, fee,
+					consortiumAdminKey, memberToExcludeAddr, proposalStartTime, proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration)*time.Second), true)
 				require.Error(vm.Builder.AddUnverifiedTx(excludeMemberProposalTx))
+				height, err = vm.GetCurrentHeight(context.Background())
+				require.NoError(err)
+				require.Equal(expectedHeight, height)
 				return
 			}
 
@@ -1050,10 +1169,14 @@ func TestExcludeMemberProposals(t *testing.T) {
 
 			for i := 0; i < numberOfVotesToSuccess; i++ {
 				optionWeights[optionIndex]++
-				voteTx := buildSimpleVoteTx(t, vm, memberKey, fee, excludeMemberProposalTx.ID(), caminoPreFundedKeys[i], optionIndex)
+				voteTx := buildSimpleVoteTx(t, vm, fundsKey, fee, excludeMemberProposalTx.ID(), caminoPreFundedKeys[i], optionIndex)
 				proposalState = voteWithTx(t, vm, voteTx, excludeMemberProposalTx.ID(), optionWeights)
+				expectedHeight++
+				height, err = vm.GetCurrentHeight(context.Background())
+				require.NoError(err)
+				require.Equal(expectedHeight, height)
 				burnedAmt += fee
-				checkBalance(t, vm.state, memberAddr,
+				checkBalance(t, vm.state, fundsAddr,
 					balance-burnedAmt,                 // total
 					bondedAmt,                         // bonded
 					0, 0, balance-burnedAmt-bondedAmt, // unlocked
@@ -1068,20 +1191,24 @@ func TestExcludeMemberProposals(t *testing.T) {
 
 			// Build block with FinishProposalsTx
 			blk := buildAndAcceptBlock(t, vm, nil)
+			expectedHeight++
+			height, err = vm.GetCurrentHeight(context.Background())
+			require.NoError(err)
+			require.Equal(expectedHeight, height)
 			require.Len(blk.Txs(), 1)
 			checkTx(t, vm, blk.ID(), blk.Txs()[0].ID())
 			_, err = vm.state.GetProposal(excludeMemberProposalTx.ID())
 			require.ErrorIs(err, database.ErrNotFound)
 
 			bondedAmt -= proposalBondAmount
-			memberAddrState, err = vm.state.GetAddressStates(memberAddr)
+			memberAddrState, err = vm.state.GetAddressStates(memberToExcludeAddr)
 			require.NoError(err)
-			_, pendingValidatorErr := vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberNodeID)
-			_, currentValidatorErr := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID)
-			_, suspendedValidatorErr := vm.state.GetDeferredValidator(constants.PrimaryNetworkID, memberNodeID)
-			registeredMemberNodeID, registeredNodeErr := vm.state.GetShortIDLink(memberAddr, state.ShortLinkKeyRegisterNode)
+			_, pendingValidatorErr := vm.state.GetPendingValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
+			_, currentValidatorErr := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
+			_, suspendedValidatorErr := vm.state.GetDeferredValidator(constants.PrimaryNetworkID, memberToExcludeNodeID)
+			registeredMemberNodeID, registeredNodeErr := vm.state.GetShortIDLink(memberToExcludeAddr, state.ShortLinkKeyRegisterNode)
 			if tt.excluded {
-				require.Equal(as.AddressStateEmpty, memberAddrState)
+				require.Equal(as.AddressStateKYCVerified, memberAddrState)
 				require.ErrorIs(pendingValidatorErr, database.ErrNotFound)
 				require.ErrorIs(currentValidatorErr, database.ErrNotFound)
 				require.ErrorIs(registeredNodeErr, database.ErrNotFound)
@@ -1093,13 +1220,13 @@ func TestExcludeMemberProposals(t *testing.T) {
 				if tt.pendingValidator {
 					bondedAmt -= validatorBondAmount
 				}
-				checkBalance(t, vm.state, memberAddr,
+				checkBalance(t, vm.state, fundsAddr,
 					balance-burnedAmt,                 // total
 					bondedAmt,                         // bonded
 					0, 0, balance-burnedAmt-bondedAmt, // unlocked
 				)
 			} else {
-				require.Equal(as.AddressStateConsortiumMember, memberAddrState)
+				require.Equal(as.AddressStateConsortiumMember|as.AddressStateKYCVerified, memberAddrState)
 				if tt.pendingValidator {
 					require.NoError(pendingValidatorErr)
 				} else {
@@ -1112,12 +1239,12 @@ func TestExcludeMemberProposals(t *testing.T) {
 				}
 				if tt.registerNode {
 					require.NoError(registeredNodeErr)
-					require.Equal(memberNodeShortID, registeredMemberNodeID)
+					require.Equal(memberToExcludeNodeShortID, registeredMemberNodeID)
 				} else {
 					require.ErrorIs(registeredNodeErr, database.ErrNotFound)
 				}
 				require.ErrorIs(suspendedValidatorErr, database.ErrNotFound)
-				checkBalance(t, vm.state, memberAddr,
+				checkBalance(t, vm.state, fundsAddr,
 					balance-burnedAmt,                 // total
 					bondedAmt,                         // bonded
 					0, 0, balance-burnedAmt-bondedAmt, // unlocked
@@ -1187,11 +1314,11 @@ func checkBalance(
 ) {
 	t.Helper()
 	total, bonded, deposited, depositBonded, unlocked := getBalance(t, db, addr)
-	require.Equal(t, expectedTotal, total, "total balance")
-	require.Equal(t, expectedBonded, bonded, "bonded balance")
-	require.Equal(t, expectedDeposited, deposited, "deposited balance")
-	require.Equal(t, expectedDepositBonded, depositBonded, "depositBonded balance")
-	require.Equal(t, expectedUnlocked, unlocked, "unlocked balance")
+	require.Equal(t, expectedTotal, total, "total balance (expected: %d, actual: %d)", expectedTotal, total)
+	require.Equal(t, expectedBonded, bonded, "bonded balance (expected: %d, actual: %d)", expectedBonded, bonded)
+	require.Equal(t, expectedDeposited, deposited, "deposited balance (expected: %d, actual: %d)", expectedDeposited, deposited)
+	require.Equal(t, expectedDepositBonded, depositBonded, "depositBonded balance (expected: %d, actual: %d)", expectedDepositBonded, depositBonded)
+	require.Equal(t, expectedUnlocked, unlocked, "unlocked balance (expected: %d, actual: %d)", expectedUnlocked, unlocked)
 }
 
 func checkTx(t *testing.T, vm *VM, blkID, txID ids.ID) {

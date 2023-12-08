@@ -5,6 +5,7 @@ package dac
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,10 +22,12 @@ var (
 	_ dac.Executor        = (*proposalExecutor)(nil)
 	_ dac.BondTxIDsGetter = (*proposalBondTxIDsGetter)(nil)
 
+	errNotKYCVerified               = errors.New("address is not KYC verified")
 	errNotConsortiumMember          = errors.New("address isn't consortium member")
 	errConsortiumMember             = errors.New("address is consortium member")
 	errNotPermittedToCreateProposal = errors.New("don't have permission to create proposal of this type")
 	errAlreadyActiveProposal        = errors.New("there is already active proposal of this type")
+	errNoActiveValidator            = errors.New("no active validator")
 )
 
 type proposalVerifier struct {
@@ -32,6 +35,7 @@ type proposalVerifier struct {
 	fx                  fx.Fx
 	signedAddProposalTx *txs.Tx
 	addProposalTx       *txs.AddProposalTx
+	isAdminProposal     bool
 }
 
 // Executor calls should never error.
@@ -52,12 +56,13 @@ type proposalBondTxIDsGetter struct {
 	state state.Chain
 }
 
-func NewProposalVerifier(state state.Chain, fx fx.Fx, signedTx *txs.Tx, tx *txs.AddProposalTx) dac.Verifier {
+func NewProposalVerifier(state state.Chain, fx fx.Fx, signedTx *txs.Tx, tx *txs.AddProposalTx, isAdminProposal bool) dac.Verifier {
 	return &proposalVerifier{
 		state:               state,
 		fx:                  fx,
 		signedAddProposalTx: signedTx,
 		addProposalTx:       tx,
+		isAdminProposal:     isAdminProposal,
 	}
 }
 
@@ -136,14 +141,15 @@ func (*proposalBondTxIDsGetter) BaseFeeProposal(*dac.BaseFeeProposalState) ([]id
 // AddMemberProposal
 
 func (e *proposalVerifier) AddMemberProposal(proposal *dac.AddMemberProposal) error {
-	// verify that address isn't consortium member
+	// verify that address isn't consortium member and is KYC verified
 	applicantAddress, err := e.state.GetAddressStates(proposal.ApplicantAddress)
-	if err != nil {
+	switch {
+	case err != nil:
 		return err
-	}
-
-	if applicantAddress.Is(as.AddressStateConsortiumMember) {
-		return errConsortiumMember
+	case applicantAddress.Is(as.AddressStateConsortiumMember):
+		return fmt.Errorf("%w (applicant)", errConsortiumMember)
+	case applicantAddress.IsNot(as.AddressStateKYCVerified):
+		return fmt.Errorf("%w (applicant)", errNotKYCVerified)
 	}
 
 	// verify that there is no existing add member proposal for this address
@@ -197,14 +203,45 @@ func (*proposalBondTxIDsGetter) AddMemberProposal(*dac.AddMemberProposalState) (
 // ExcludeMemberProposal
 
 func (e *proposalVerifier) ExcludeMemberProposal(proposal *dac.ExcludeMemberProposal) error {
-	// verify that address is consortium member
+	// verify that member-to-exclude is consortium member
 	memberAddressState, err := e.state.GetAddressStates(proposal.MemberAddress)
-	if err != nil {
+	switch {
+	case err != nil:
 		return err
+	case memberAddressState.IsNot(as.AddressStateConsortiumMember):
+		return fmt.Errorf("%w (member)", errNotConsortiumMember)
 	}
 
-	if memberAddressState.IsNot(as.AddressStateConsortiumMember) {
-		return errNotConsortiumMember
+	if !e.isAdminProposal { // if its admin proposal, we don't care about this check
+		// verify that proposer is consortium member
+		proposerAddressState, err := e.state.GetAddressStates(e.addProposalTx.ProposerAddress)
+		switch {
+		case err != nil:
+			return err
+		case proposerAddressState.IsNot(as.AddressStateConsortiumMember):
+			return fmt.Errorf("%w (proposer)", errNotConsortiumMember)
+		}
+
+		// verify that proposer has active validator
+
+		// get proposer nodeID
+		proposerNodeShortID, err := e.state.GetShortIDLink(e.addProposalTx.ProposerAddress, state.ShortLinkKeyRegisterNode)
+		switch {
+		case err == database.ErrNotFound:
+			return errNoActiveValidator
+		case err != nil:
+			return err
+		}
+		proposerNodeID := ids.NodeID(proposerNodeShortID)
+
+		// get proposer active validator
+		_, err = e.state.GetCurrentValidator(constants.PrimaryNetworkID, proposerNodeID)
+		switch {
+		case err == database.ErrNotFound:
+			return errNoActiveValidator
+		case err != nil:
+			return err
+		}
 	}
 
 	// verify that there is no existing exclude member proposal for this address

@@ -108,7 +108,9 @@ func (p *AddMemberProposalState) IsActiveAt(time time.Time) bool {
 func (p *AddMemberProposalState) CanBeFinished() bool {
 	mostVotedWeight, _, unambiguous := p.GetMostVoted()
 	voted := p.Voted()
-	return voted == p.TotalAllowedVoters || unambiguous && mostVotedWeight > p.TotalAllowedVoters/2
+	// We don't check for 'no option can reach 50%+ of votes' for this proposal type, cause its impossible with just 2 options
+	return voted == p.TotalAllowedVoters ||
+		unambiguous && mostVotedWeight > p.TotalAllowedVoters/2
 }
 
 func (p *AddMemberProposalState) IsSuccessful() bool {

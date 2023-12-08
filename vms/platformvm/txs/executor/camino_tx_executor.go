@@ -1765,7 +1765,7 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return fmt.Errorf("%w: %s", errProposerCredentialMismatch, err)
 	}
 
-	if err := txProposal.VerifyWith(dac.NewProposalVerifier(e.State, e.Fx, e.Tx, tx)); err != nil {
+	if err := txProposal.VerifyWith(dac.NewProposalVerifier(e.State, e.Fx, e.Tx, tx, isAdminProposal)); err != nil {
 		return fmt.Errorf("%w: %s", errInvalidProposal, err)
 	}
 
