@@ -1585,20 +1585,22 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	require := require.New(t)
 
-	numColors := 50
-	numNodes := 100
-	params := snowball.Parameters{
-		K:                     20,
-		AlphaPreference:       15,
-		AlphaConfidence:       15,
-		BetaVirtuous:          20,
-		BetaRogue:             30,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-	seed := int64(0)
+	var (
+		numColors = 50
+		numNodes  = 100
+		params    = snowball.Parameters{
+			K:                     20,
+			AlphaPreference:       15,
+			AlphaConfidence:       15,
+			BetaVirtuous:          20,
+			BetaRogue:             30,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		}
+		seed uint64 = 0
+	)
 
 	sampler.Seed(seed)
 

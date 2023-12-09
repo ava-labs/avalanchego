@@ -796,16 +796,18 @@ func TestSnowballDoubleAdd(t *testing.T) {
 func TestSnowballConsistent(t *testing.T) {
 	require := require.New(t)
 
-	numColors := 50
-	numNodes := 100
-	params := Parameters{
-		K:               20,
-		AlphaPreference: 15,
-		AlphaConfidence: 15,
-		BetaVirtuous:    20,
-		BetaRogue:       30,
-	}
-	seed := int64(0)
+	var (
+		numColors = 50
+		numNodes  = 100
+		params    = Parameters{
+			K:               20,
+			AlphaPreference: 15,
+			AlphaConfidence: 15,
+			BetaVirtuous:    20,
+			BetaRogue:       30,
+		}
+		seed uint64 = 0
+	)
 
 	sampler.Seed(seed)
 

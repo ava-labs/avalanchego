@@ -28,6 +28,18 @@ type BanffProposalBlock struct {
 	ApricotProposalBlock `serialize:"true"`
 }
 
+func (b *BanffProposalBlock) initialize(bytes []byte) error {
+	if err := b.ApricotProposalBlock.initialize(bytes); err != nil {
+		return err
+	}
+	for _, tx := range b.Transactions {
+		if err := tx.Initialize(txs.Codec); err != nil {
+			return fmt.Errorf("failed to initialize tx: %w", err)
+		}
+	}
+	return nil
+}
+
 func (b *BanffProposalBlock) InitCtx(ctx *snow.Context) {
 	for _, tx := range b.Transactions {
 		tx.Unsigned.InitCtx(ctx)
@@ -39,6 +51,14 @@ func (b *BanffProposalBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.Time), 0)
 }
 
+func (b *BanffProposalBlock) Txs() []*txs.Tx {
+	l := len(b.Transactions)
+	txs := make([]*txs.Tx, l+1)
+	copy(txs, b.Transactions)
+	txs[l] = b.Tx
+	return txs
+}
+
 func (b *BanffProposalBlock) Visit(v Visitor) error {
 	return v.BanffProposalBlock(b)
 }
@@ -47,16 +67,18 @@ func NewBanffProposalBlock(
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
-	tx *txs.Tx,
+	proposalTx *txs.Tx,
+	decisionTxs []*txs.Tx,
 ) (*BanffProposalBlock, error) {
 	blk := &BanffProposalBlock{
-		Time: uint64(timestamp.Unix()),
+		Transactions: decisionTxs,
+		Time:         uint64(timestamp.Unix()),
 		ApricotProposalBlock: ApricotProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
-			Tx: tx,
+			Tx: proposalTx,
 		},
 	}
 	return blk, initialize(blk)

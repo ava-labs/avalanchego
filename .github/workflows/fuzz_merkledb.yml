@@ -1,14 +1,16 @@
-name: Run fuzz tests
+name: Scheduled Fuzz Testing
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"
+    # Run every 6 hours
+    - cron: "0 0,6,12,18 * * *"
 
 permissions:
   contents: read
 
 jobs:
-  fuzz:
+  MerkleDB:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
@@ -20,6 +22,6 @@ jobs:
         with:
           go-version: '~1.20.12'
           check-latest: true
-      - name: Run fuzz tests
+      - name: Run merkledb fuzz tests
         shell: bash
-        run: ./scripts/build_fuzz.sh 30 # Run each fuzz test 30 seconds
+        run: ./scripts/build_fuzz.sh 900 ./x/merkledb # Run each merkledb fuzz tests 15 minutes
