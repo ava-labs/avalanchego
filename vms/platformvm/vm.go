@@ -330,7 +330,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	// Start the block builder
-	vm.Builder.ResetBlockTimer()
+	vm.Builder.StartBlockTimer()
 	return nil
 }
 
@@ -351,7 +351,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.Builder.Shutdown()
+	vm.Builder.ShutdownBlockTimer()
 
 	if vm.bootstrapped.Get() {
 		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
