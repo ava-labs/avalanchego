@@ -29,30 +29,26 @@ var (
 	_ common.AppHandler = (*router)(nil)
 )
 
-type metrics struct {
-	appRequestTime                 metric.Averager
-	appRequestFailedTime           metric.Averager
-	appResponseTime                metric.Averager
-	appGossipTime                  metric.Averager
-	crossChainAppRequestTime       metric.Averager
-	crossChainAppRequestFailedTime metric.Averager
-	crossChainAppResponseTime      metric.Averager
+type serverMetrics struct {
+	appRequestTime           metric.Averager
+	appGossipTime            metric.Averager
+	crossChainAppRequestTime metric.Averager
 }
 
 type pendingAppRequest struct {
-	*metrics
-	AppResponseCallback
+	callback AppResponseCallback
+	metrics  *clientMetrics
 }
 
 type pendingCrossChainAppRequest struct {
-	*metrics
-	CrossChainAppResponseCallback
+	callback CrossChainAppResponseCallback
+	metrics  *clientMetrics
 }
 
 // meteredHandler emits metrics for a Handler
 type meteredHandler struct {
 	*responder
-	*metrics
+	*serverMetrics
 }
 
 // router routes incoming application messages to the corresponding registered
@@ -109,26 +105,6 @@ func (r *router) addHandler(handlerID uint64, handler Handler) error {
 		return fmt.Errorf("failed to register app request metric for handler_%d: %w", handlerID, err)
 	}
 
-	appRequestFailedTime, err := metric.NewAverager(
-		r.namespace,
-		fmt.Sprintf("handler_%d_app_request_failed", handlerID),
-		"app request failed time (ns)",
-		r.metrics,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to register app request failed metric for handler_%d: %w", handlerID, err)
-	}
-
-	appResponseTime, err := metric.NewAverager(
-		r.namespace,
-		fmt.Sprintf("handler_%d_app_response", handlerID),
-		"app response time (ns)",
-		r.metrics,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to register app response metric for handler_%d: %w", handlerID, err)
-	}
-
 	appGossipTime, err := metric.NewAverager(
 		r.namespace,
 		fmt.Sprintf("handler_%d_app_gossip", handlerID),
@@ -149,26 +125,6 @@ func (r *router) addHandler(handlerID uint64, handler Handler) error {
 		return fmt.Errorf("failed to register cross-chain app request metric for handler_%d: %w", handlerID, err)
 	}
 
-	crossChainAppRequestFailedTime, err := metric.NewAverager(
-		r.namespace,
-		fmt.Sprintf("handler_%d_cross_chain_app_request_failed", handlerID),
-		"app request failed time (ns)",
-		r.metrics,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to register cross-chain app request failed metric for handler_%d: %w", handlerID, err)
-	}
-
-	crossChainAppResponseTime, err := metric.NewAverager(
-		r.namespace,
-		fmt.Sprintf("handler_%d_cross_chain_app_response", handlerID),
-		"cross chain app response time (ns)",
-		r.metrics,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to register cross-chain app response metric for handler_%d: %w", handlerID, err)
-	}
-
 	r.handlers[handlerID] = &meteredHandler{
 		responder: &responder{
 			Handler:   handler,
@@ -176,14 +132,10 @@ func (r *router) addHandler(handlerID uint64, handler Handler) error {
 			log:       r.log,
 			sender:    r.sender,
 		},
-		metrics: &metrics{
-			appRequestTime:                 appRequestTime,
-			appRequestFailedTime:           appRequestFailedTime,
-			appResponseTime:                appResponseTime,
-			appGossipTime:                  appGossipTime,
-			crossChainAppRequestTime:       crossChainAppRequestTime,
-			crossChainAppRequestFailedTime: crossChainAppRequestFailedTime,
-			crossChainAppResponseTime:      crossChainAppResponseTime,
+		serverMetrics: &serverMetrics{
+			appRequestTime:           appRequestTime,
+			appGossipTime:            appGossipTime,
+			crossChainAppRequestTime: crossChainAppRequestTime,
 		},
 	}
 
@@ -214,7 +166,7 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 		return err
 	}
 
-	handler.metrics.appRequestTime.Observe(float64(time.Since(start)))
+	handler.serverMetrics.appRequestTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
@@ -231,8 +183,8 @@ func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 		return ErrUnrequestedResponse
 	}
 
-	pending.AppResponseCallback(ctx, nodeID, nil, ErrAppRequestFailed)
-	pending.appRequestFailedTime.Observe(float64(time.Since(start)))
+	pending.callback(ctx, nodeID, nil, ErrAppRequestFailed)
+	pending.metrics.appRequestFailedTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
@@ -249,8 +201,8 @@ func (r *router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 		return ErrUnrequestedResponse
 	}
 
-	pending.AppResponseCallback(ctx, nodeID, response, nil)
-	pending.appResponseTime.Observe(float64(time.Since(start)))
+	pending.callback(ctx, nodeID, response, nil)
+	pending.metrics.appResponseTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
@@ -273,7 +225,7 @@ func (r *router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 
 	handler.AppGossip(ctx, nodeID, parsedMsg)
 
-	handler.metrics.appGossipTime.Observe(float64(time.Since(start)))
+	handler.serverMetrics.appGossipTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
@@ -307,7 +259,7 @@ func (r *router) CrossChainAppRequest(
 		return err
 	}
 
-	handler.metrics.crossChainAppRequestTime.Observe(float64(time.Since(start)))
+	handler.serverMetrics.crossChainAppRequestTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
@@ -324,8 +276,8 @@ func (r *router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 		return ErrUnrequestedResponse
 	}
 
-	pending.CrossChainAppResponseCallback(ctx, chainID, nil, ErrAppRequestFailed)
-	pending.crossChainAppRequestFailedTime.Observe(float64(time.Since(start)))
+	pending.callback(ctx, chainID, nil, ErrAppRequestFailed)
+	pending.metrics.crossChainAppRequestFailedTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
@@ -342,8 +294,8 @@ func (r *router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requ
 		return ErrUnrequestedResponse
 	}
 
-	pending.CrossChainAppResponseCallback(ctx, chainID, response, nil)
-	pending.crossChainAppResponseTime.Observe(float64(time.Since(start)))
+	pending.callback(ctx, chainID, response, nil)
+	pending.metrics.crossChainAppResponseTime.Observe(float64(time.Since(start)))
 	return nil
 }
 
