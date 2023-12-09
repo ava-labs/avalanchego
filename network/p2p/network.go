@@ -6,6 +6,7 @@ package p2p
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -117,12 +119,47 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	return nil
 }
 
-// NewAppProtocol reserves an identifier for an application protocol handler and
-// returns a Client that can be used to send messages for the corresponding
-// protocol.
-func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...ClientOption) (*Client, error) {
-	if err := n.router.addHandler(handlerID, handler); err != nil {
-		return nil, err
+// NewClient returns a Client that can be used to send messages for the
+// corresponding protocol.
+func (n *Network) NewClient(handlerID uint64, options ...ClientOption) (*Client, error) {
+	appRequestFailedTime, err := metric.NewAverager(
+		n.namespace,
+		fmt.Sprintf("client_%d_app_request_failed_time", handlerID),
+		"app request failed time (ns)",
+		n.metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register app request failed metric for client %d: %w", handlerID, err)
+	}
+
+	appResponseTime, err := metric.NewAverager(
+		n.namespace,
+		fmt.Sprintf("client_%d_app_response_time", handlerID),
+		"app response time (ns)",
+		n.metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register app response metric for client %d: %w", handlerID, err)
+	}
+
+	crossChainAppRequestFailedTime, err := metric.NewAverager(
+		n.namespace,
+		fmt.Sprintf("client_%d_cross_chain_app_request_failed_time", handlerID),
+		"app request failed time (ns)",
+		n.metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register cross-chain app request failed metric for client %d: %w", handlerID, err)
+	}
+
+	crossChainAppResponseTime, err := metric.NewAverager(
+		n.namespace,
+		fmt.Sprintf("client_%d_cross_chain_app_response_time", handlerID),
+		"cross chain app response time (ns)",
+		n.metrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register cross-chain app response metric for client %d: %w", handlerID, err)
 	}
 
 	client := &Client{
@@ -135,6 +172,10 @@ func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...C
 				peers: n.Peers,
 			},
 		},
+		appRequestFailedTime:           appRequestFailedTime,
+		appResponseTime:                appResponseTime,
+		crossChainAppRequestFailedTime: crossChainAppRequestFailedTime,
+		crossChainAppResponseTime:      crossChainAppResponseTime,
 	}
 
 	for _, option := range options {
@@ -142,6 +183,11 @@ func (n *Network) NewAppProtocol(handlerID uint64, handler Handler, options ...C
 	}
 
 	return client, nil
+}
+
+// AddHandler reserves an identifier for an application protocol
+func (n *Network) AddHandler(handlerID uint64, handler Handler) error {
+	return n.router.addHandler(handlerID, handler)
 }
 
 // Peers contains metadata about the current set of connected peers

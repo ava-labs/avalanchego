@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -40,11 +41,15 @@ type CrossChainAppResponseCallback func(
 )
 
 type Client struct {
-	handlerID     uint64
-	handlerPrefix []byte
-	router        *router
-	sender        common.AppSender
-	options       *clientOptions
+	handlerID                      uint64
+	handlerPrefix                  []byte
+	router                         *router
+	sender                         common.AppSender
+	appRequestFailedTime           metric.Averager
+	appResponseTime                metric.Averager
+	crossChainAppRequestFailedTime metric.Averager
+	crossChainAppResponseTime      metric.Averager
+	options                        *clientOptions
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -96,8 +101,9 @@ func (c *Client) AppRequest(
 		}
 
 		c.router.pendingAppRequests[requestID] = pendingAppRequest{
-			AppResponseCallback: onResponse,
-			metrics:             c.router.handlers[c.handlerID].metrics,
+			callback:             onResponse,
+			appRequestFailedTime: c.appRequestFailedTime,
+			appResponseTime:      c.appResponseTime,
 		}
 		c.router.requestID += 2
 	}
@@ -159,8 +165,9 @@ func (c *Client) CrossChainAppRequest(
 	}
 
 	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
-		CrossChainAppResponseCallback: onResponse,
-		metrics:                       c.router.handlers[c.handlerID].metrics,
+		callback:                       onResponse,
+		crossChainAppRequestFailedTime: c.crossChainAppRequestFailedTime,
+		crossChainAppResponseTime:      c.crossChainAppResponseTime,
 	}
 	c.router.requestID += 2
 
