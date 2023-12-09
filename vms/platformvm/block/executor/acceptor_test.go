@@ -312,9 +312,13 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
 	onAcceptState := state.NewMockDiff(ctrl)
+	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: onAcceptState,
+		onAcceptState:  onAcceptState,
+		atomicRequests: atomicRequests,
 	}
+
+	batch := database.NewMockBatch(ctrl)
 
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
@@ -330,8 +334,10 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().AddStatelessBlock(blk).Times(1),
 
 		onAcceptState.EXPECT().Apply(s).Times(1),
-		s.EXPECT().Commit().Return(nil).Times(1),
+		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
+		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
 		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		s.EXPECT().Abort().Times(1),
 	)
 
 	require.NoError(acceptor.ApricotCommitBlock(blk))
@@ -402,11 +408,14 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
-
+	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: onAcceptState,
+		onAcceptState:  onAcceptState,
+		atomicRequests: atomicRequests,
 	}
+
+	batch := database.NewMockBatch(ctrl)
 
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
@@ -422,8 +431,10 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().AddStatelessBlock(blk).Times(1),
 
 		onAcceptState.EXPECT().Apply(s).Times(1),
-		s.EXPECT().Commit().Return(nil).Times(1),
+		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
+		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
 		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		s.EXPECT().Abort().Times(1),
 	)
 
 	require.NoError(acceptor.ApricotAbortBlock(blk))
