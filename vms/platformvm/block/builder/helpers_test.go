@@ -165,6 +165,7 @@ func newEnvironment(t *testing.T) *environment {
 		&res.backend,
 		res.blkManager,
 	)
+	res.Builder.StartBlockTimer()
 
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
@@ -334,7 +335,7 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 }
 
 func shutdownEnvironment(env *environment) error {
-	env.Builder.Shutdown()
+	env.Builder.ShutdownBlockTimer()
 
 	if env.isBootstrapped.Get() {
 		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
