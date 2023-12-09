@@ -298,7 +298,10 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 				},
 			}
 			network := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
-			_, err := network.NewAppProtocol(handlerID, handler)
+			require.NoError(err)
+			require.NoError(network.Connected(context.Background(), nodeID, nil))
+			require.NoError(network.AddHandler(handlerID, handler))
+			client, err := network.NewClient(handlerID)
 			require.NoError(err)
 
 			require.Nil(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
@@ -373,7 +376,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	}
 
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	client, err := network.NewAppProtocol(0x1, &NoOpHandler{})
+	client, err := network.NewClient(0x1)
 	require.NoError(err)
 
 	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
@@ -507,7 +510,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 				require.NoError(n.Connected(context.Background(), peer, &version.Application{}))
 			}
 
-			client, err := n.NewAppProtocol(1, nil)
+			client, err := n.NewClient(1)
 			require.NoError(err)
 
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
@@ -597,7 +600,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 				require.NoError(network.Connected(ctx, peer, nil))
 			}
 
-			client, err := network.NewAppProtocol(0x0, nil, tt.option(t, network))
+			client, err := network.NewClient(0, tt.option(t, network))
 			require.NoError(err)
 
 			if err = client.AppRequestAny(ctx, []byte("request"), nil); err != nil {

@@ -133,8 +133,7 @@ func TestGossiperGossip(t *testing.T) {
 
 			handler, err := NewHandler[*testTx](responseSet, tt.config, prometheus.NewRegistry())
 			require.NoError(err)
-			_, err = responseNetwork.NewAppProtocol(0x0, handler)
-			require.NoError(err)
+			require.NoError(responseNetwork.AddHandler(0x0, handler))
 
 			requestSender := &common.FakeSender{
 				SentAppRequest: make(chan []byte, 1),
@@ -153,7 +152,7 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(requestSet.Add(item))
 			}
 
-			requestClient, err := requestNetwork.NewAppProtocol(0x0, nil)
+			requestClient, err := requestNetwork.NewClient(0x0)
 			require.NoError(err)
 
 			config := Config{
