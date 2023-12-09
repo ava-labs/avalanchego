@@ -10,7 +10,7 @@ type WeightedWithoutReplacement interface {
 	Initialize(weights []uint64) error
 	Sample(count int) ([]int, error)
 
-	Seed(int64)
+	Seed(uint64)
 	ClearSeed()
 }
 

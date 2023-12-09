@@ -1423,3 +1423,124 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	)
 	require.NoError(err)
 }
+
+func TestBootstrapperReceiveStaleAncestorsMessage(t *testing.T) {
+	require := require.New(t)
+
+	config, peerID, sender, vm := newConfig(t)
+
+	var (
+		blkID0    = ids.GenerateTestID()
+		blkBytes0 = utils.RandomBytes(1024)
+		blk0      = &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     blkID0,
+				StatusV: choices.Accepted,
+			},
+			HeightV: 0,
+			BytesV:  blkBytes0,
+		}
+
+		blkID1    = ids.GenerateTestID()
+		blkBytes1 = utils.RandomBytes(1024)
+		blk1      = &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     blkID1,
+				StatusV: choices.Processing,
+			},
+			ParentV: blk0.IDV,
+			HeightV: blk0.HeightV + 1,
+			BytesV:  blkBytes1,
+		}
+
+		blkID2    = ids.GenerateTestID()
+		blkBytes2 = utils.RandomBytes(1024)
+		blk2      = &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     blkID2,
+				StatusV: choices.Processing,
+			},
+			ParentV: blk1.IDV,
+			HeightV: blk1.HeightV + 1,
+			BytesV:  blkBytes2,
+		}
+	)
+
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		require.Equal(blkID0, blkID)
+		return blk0, nil
+	}
+	bs, err := New(
+		config,
+		func(context.Context, uint32) error {
+			config.Ctx.State.Set(snow.EngineState{
+				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+				State: snow.NormalOp,
+			})
+			return nil
+		},
+	)
+	require.NoError(err)
+
+	vm.CantSetState = false
+	require.NoError(bs.Start(context.Background(), 0))
+
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case blkID0:
+			return blk0, nil
+		case blkID1:
+			if blk1.StatusV == choices.Accepted {
+				return blk1, nil
+			}
+			return nil, database.ErrNotFound
+		case blkID2:
+			if blk2.StatusV == choices.Accepted {
+				return blk2, nil
+			}
+			return nil, database.ErrNotFound
+		default:
+			require.FailNow(database.ErrNotFound.Error())
+			return nil, database.ErrNotFound
+		}
+	}
+	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blkBytes, blkBytes0):
+			return blk0, nil
+		case bytes.Equal(blkBytes, blkBytes1):
+			return blk1, nil
+		case bytes.Equal(blkBytes, blkBytes2):
+			return blk2, nil
+		default:
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
+		}
+	}
+
+	requestIDs := map[ids.ID]uint32{}
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(peerID, vdr)
+		requestIDs[blkID] = reqID
+	}
+
+	require.NoError(bs.startSyncing(context.Background(), []ids.ID{blkID1, blkID2})) // should request blk2 and blk1
+
+	reqIDBlk1, ok := requestIDs[blkID1]
+	require.True(ok)
+	reqIDBlk2, ok := requestIDs[blkID2]
+	require.True(ok)
+
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}))
+
+	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, blk0.Status())
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Accepted, blk2.Status())
+
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqIDBlk1, [][]byte{blkBytes1}))
+	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
+}
