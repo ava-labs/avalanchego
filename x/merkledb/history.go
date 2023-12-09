@@ -15,7 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var ErrInsufficientHistory = errors.New("insufficient history to generate proof")
+var (
+	ErrInsufficientHistory = errors.New("insufficient history to generate proof")
+	ErrNoEndRoot           = fmt.Errorf("%w: end root not found", ErrInsufficientHistory)
+)
 
 // stores previous trie states
 type trieHistory struct {
@@ -77,6 +80,8 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 // If [end] is Nothing, there's no upper bound on the range.
 // Returns [ErrInsufficientHistory] if the history is insufficient
 // to generate the proof.
+// Returns [ErrNoEndRoot], which wraps [ErrInsufficientHistory], if
+// the [endRoot] isn't in the history.
 func (th *trieHistory) getValueChanges(
 	startRoot ids.ID,
 	endRoot ids.ID,
@@ -99,7 +104,7 @@ func (th *trieHistory) getValueChanges(
 	// lack the necessary history.
 	endRootChanges, ok := th.lastChanges[endRoot]
 	if !ok {
-		return nil, fmt.Errorf("%w: end root %s not found", ErrInsufficientHistory, endRoot)
+		return nil, fmt.Errorf("%w: %s", ErrNoEndRoot, endRoot)
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
