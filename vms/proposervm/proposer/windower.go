@@ -29,12 +29,15 @@ const (
 
 	MaxBuildWindows = 60
 	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
+
+	MaxLookAheadWindow = time.Hour
 )
 
 var (
 	_ Windower = (*windower)(nil)
 
-	ErrNoProposersAvailable = errors.New("no proposers available")
+	ErrNoProposersAvailable         = errors.New("no proposers available")
+	ErrNoSlotsScheduledInNextFuture = errors.New("no slots scheduled in next future")
 )
 
 type Windower interface {
@@ -56,6 +59,15 @@ type Windower interface {
 		blockTime,
 		parentBlockTime time.Time,
 	) (ids.NodeID, error)
+
+	MinDelayForProposer(
+		ctx context.Context,
+		chainHeight,
+		pChainHeight uint64,
+		parentBlockTime time.Time,
+		nodeID ids.NodeID,
+		startTime time.Time,
+	) (time.Time, error)
 }
 
 // windower interfaces with P-Chain and it is responsible for calculating the
@@ -125,6 +137,49 @@ func (w *windower) ExpectedProposer(
 		return ids.EmptyNodeID, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
 	}
 	return validators[indices[0]].id, nil
+}
+
+func (w *windower) MinDelayForProposer(
+	ctx context.Context,
+	chainHeight,
+	pChainHeight uint64,
+	parentBlockTime time.Time,
+	nodeID ids.NodeID,
+	startTime time.Time,
+) (time.Time, error) {
+	validators, err := w.sortedValidators(ctx, pChainHeight)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	var (
+		res              = startTime
+		source           = prng.NewMT19937_64()
+		validatorWeights = validatorsToWeight(validators)
+	)
+
+	for res.Sub(startTime) < MaxLookAheadWindow {
+		var (
+			slot = uint64(startTime.Sub(parentBlockTime) / WindowDuration)
+			seed = chainHeight ^ bits.Reverse64(slot) ^ w.chainSource
+		)
+
+		source.Seed(seed)
+		sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
+		if err := sampler.Initialize(validatorWeights); err != nil {
+			return time.Time{}, err
+		}
+		indices, err := sampler.Sample(1)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
+		}
+
+		if validators[indices[0]].id == nodeID {
+			return res, nil
+		}
+		res = res.Add(WindowDuration)
+	}
+	return time.Time{}, ErrNoSlotsScheduledInNextFuture
 }
 
 // proposers returns the proposer list for building a block at [chainHeight]

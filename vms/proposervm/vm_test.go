@@ -220,23 +220,28 @@ func initTestProposerVM(
 func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
 	ctx := context.Background()
 	vm.Clock.Set(vm.Clock.Time().Truncate(time.Second))
-	for { // find the right time to issue next block
-		proposerID, err := vm.ExpectedProposer(
+
+	for {
+		nextTime, err := vm.MinDelayForProposer(
 			ctx,
 			chainTip.Height()+1,
 			pchainHeight,
-			vm.Clock.Time(),
 			chainTip.Timestamp(),
+			vm.ctx.NodeID,
+			vm.Clock.Time(),
 		)
-		if err != nil {
+
+		switch err {
+		case nil:
+			vm.Clock.Set(nextTime)
+			return nil
+		case proposer.ErrNoSlotsScheduledInNextFuture:
+			// repeat slot search
+			vm.Clock.Set(vm.Clock.Time().Add(proposer.MaxLookAheadWindow))
+		default:
 			return err
 		}
-		if proposerID == vm.ctx.NodeID {
-			break
-		}
-		vm.Clock.Set(vm.Time().Add(proposer.WindowDuration))
 	}
-	return nil
 }
 
 // VM.BuildBlock tests section

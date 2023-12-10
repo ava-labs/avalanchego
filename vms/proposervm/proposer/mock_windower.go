@@ -68,3 +68,18 @@ func (mr *MockWindowerMockRecorder) ExpectedProposer(arg0, arg1, arg2, arg3, arg
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpectedProposer", reflect.TypeOf((*MockWindower)(nil).ExpectedProposer), arg0, arg1, arg2, arg3, arg4)
 }
+
+// MinDelayForProposer mocks base method.
+func (m *MockWindower) MinDelayForProposer(arg0 context.Context, arg1, arg2 uint64, arg3 time.Time, arg4 ids.NodeID, arg5 time.Time) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MinDelayForProposer", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MinDelayForProposer indicates an expected call of MinDelayForProposer.
+func (mr *MockWindowerMockRecorder) MinDelayForProposer(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MinDelayForProposer", reflect.TypeOf((*MockWindower)(nil).MinDelayForProposer), arg0, arg1, arg2, arg3, arg4, arg5)
+}
