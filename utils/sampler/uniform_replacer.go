@@ -60,10 +60,6 @@ func (s *uniformReplacer) Seed(seed uint64) {
 	s.rng.Seed(seed)
 }
 
-func (s *uniformReplacer) ClearSeed() {
-	s.rng = globalRNG
-}
-
 func (s *uniformReplacer) Reset() {
 	maps.Clear(s.drawn)
 	s.drawsCount = 0

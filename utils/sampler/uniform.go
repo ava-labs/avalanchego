@@ -12,7 +12,6 @@ type Uniform interface {
 	Sample(length int) ([]uint64, error)
 
 	Seed(uint64)
-	ClearSeed()
 
 	Reset()
 	Next() (uint64, error)

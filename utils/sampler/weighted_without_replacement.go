@@ -11,7 +11,6 @@ type WeightedWithoutReplacement interface {
 	Sample(count int) ([]int, error)
 
 	Seed(uint64)
-	ClearSeed()
 }
 
 // NewWeightedWithoutReplacement returns a new sampler

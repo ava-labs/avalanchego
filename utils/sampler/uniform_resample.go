@@ -47,10 +47,6 @@ func (s *uniformResample) Seed(seed uint64) {
 	s.rng.Seed(seed)
 }
 
-func (s *uniformResample) ClearSeed() {
-	s.rng = globalRNG
-}
-
 func (s *uniformResample) Reset() {
 	maps.Clear(s.drawn)
 }

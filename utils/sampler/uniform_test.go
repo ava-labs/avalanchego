@@ -179,11 +179,6 @@ func TestSeeding(t *testing.T) {
 	v, err := s2.Next()
 	require.NoError(err)
 	require.NotEqual(s1Val, v)
-
-	s1.ClearSeed()
-
-	_, err = s1.Next()
-	require.NoError(err)
 }
 
 func TestSeedingProducesTheSame(t *testing.T) {
