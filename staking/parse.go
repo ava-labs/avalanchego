@@ -37,7 +37,6 @@ var (
 	ErrInvalidRSAModulus                     = errors.New("staking: invalid RSA modulus")
 	ErrInvalidRSAPublicExponent              = errors.New("staking: invalid RSA public exponent")
 	ErrRSAModulusNotPositive                 = errors.New("staking: RSA modulus is not a positive number")
-	ErrInvalidRSAModulusBitLen               = fmt.Errorf("staking: RSA modulus bitLen is greater than %d", MaxRSAKeyBitLen)
 	ErrRSAPublicExponentNotPositive          = errors.New("staking: RSA public exponent is not a positive number")
 	ErrInvalidECDSAParameters                = errors.New("staking: invalid ECDSA parameters")
 	ErrUnsupportedEllipticCurve              = errors.New("staking: unsupported elliptic curve")
@@ -64,6 +63,10 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 //
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L789-L968
 func ParseCertificatePermissive(bytes []byte) (*Certificate, error) {
+	if len(bytes) > MaxCertificateLen {
+		return nil, ErrCertificateTooLarge
+	}
+
 	input := cryptobyte.String(bytes)
 	// Consume the length and tag bytes.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
@@ -181,8 +184,8 @@ func parsePublicKey(keyData *publicKeyInfo) (any, x509.SignatureAlgorithm, error
 			return nil, 0, ErrRSAModulusNotPositive
 		}
 		// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L874-L877
-		if pub.N.BitLen() > MaxRSAKeyBitLen {
-			return nil, 0, ErrInvalidRSAModulusBitLen
+		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
+			return nil, 0, fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidRSAPublicKey, bitLen, MaxRSAKeyBitLen)
 		}
 		if pub.E <= 0 {
 			return nil, 0, ErrRSAPublicExponentNotPositive
