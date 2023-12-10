@@ -248,12 +248,12 @@ func TestExpectedProposerChangeByHeight(t *testing.T) {
 
 	proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, blockTime, parentBlockTime)
 	require.NoError(err)
-	require.Equal(validatorIDs[6], proposerID)
+	require.Equal(validatorIDs[2], proposerID)
 
 	chainHeight = 2
 	proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, blockTime, parentBlockTime)
 	require.NoError(err)
-	require.Equal(validatorIDs[4], proposerID)
+	require.Equal(validatorIDs[1], proposerID)
 }
 
 func TestExpectedProposerChangeByChain(t *testing.T) {
@@ -353,14 +353,14 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 
 	proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, blockTime, parentBlockTime)
 	require.NoError(err)
-	require.Equal(validatorIDs[6], proposerID)
+	require.Equal(validatorIDs[2], proposerID)
 
 	{
 		// proposerID won't change within the same slot
 		blockTime = parentBlockTime.Add(WindowDuration).Add(-1 * time.Second)
 		proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, blockTime, parentBlockTime)
 		require.NoError(err)
-		require.Equal(validatorIDs[6], proposerID)
+		require.Equal(validatorIDs[2], proposerID)
 	}
 
 	{
@@ -368,7 +368,7 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		blockTime = parentBlockTime.Add(WindowDuration)
 		proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, blockTime, parentBlockTime)
 		require.NoError(err)
-		require.Equal(validatorIDs[6], proposerID)
+		require.Equal(validatorIDs[0], proposerID)
 	}
 
 	{

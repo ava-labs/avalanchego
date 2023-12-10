@@ -37,10 +37,10 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = time.Unix(0, 0)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -156,10 +156,10 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = time.Unix(0, 0)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -261,10 +261,10 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = time.Unix(0, 0)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -374,10 +374,10 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = time.Unix(0, 0)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -479,10 +479,10 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = time.Unix(0, 0)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -567,10 +567,10 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = time.Unix(0, 0)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, activationTime, durangoTime, 0)
 
 	coreOracleBlkID := ids.GenerateTestID()
 	coreOracleBlk := &TestOptionsBlock{

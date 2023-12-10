@@ -51,10 +51,10 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = mockable.MaxTime
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = mockable.MaxTime
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -143,10 +143,10 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = genesisTimestamp.Add(10 * time.Second)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -240,10 +240,10 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = genesisTimestamp.Add(10 * time.Second)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -319,10 +319,10 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = genesisTimestamp.Add(10 * time.Second)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -453,10 +453,10 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = genesisTimestamp.Add(-1 * time.Second)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = genesisTimestamp.Add(-1 * time.Second)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	proVM.Set(activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -498,10 +498,10 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 
 	// setup
 	var (
-		activationTime  = mockable.MaxTime
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = mockable.MaxTime
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -560,10 +560,10 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = mockable.MaxTime
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = mockable.MaxTime
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -595,10 +595,10 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = genesisTimestamp.Add(10 * time.Second)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -689,10 +689,10 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime  = genesisTimestamp.Add(10 * time.Second)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = time.Unix(0, 0)
 	)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()

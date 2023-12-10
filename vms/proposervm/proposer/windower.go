@@ -102,29 +102,25 @@ func (w *windower) ExpectedProposer(
 	blockTime,
 	parentBlockTime time.Time,
 ) (ids.NodeID, error) {
-	validators, _, err := w.sortedValidators(ctx, pChainHeight)
+	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
 		return ids.EmptyNodeID, err
 	}
 
-	// convert the slice of validators to a slice of weights
-	validatorWeights := make([]uint64, len(validators))
-	for i, v := range validators {
-		validatorWeights[i] = v.weight
-	}
+	var (
+		slot             = uint64(blockTime.Sub(parentBlockTime) / WindowDuration)
+		seed             = chainHeight ^ bits.Reverse64(slot) ^ w.chainSource
+		source           = prng.NewMT19937_64()
+		validatorWeights = validatorsToWeight(validators)
+	)
 
-	if err := w.sampler.Initialize(validatorWeights); err != nil {
+	source.Seed(seed)
+	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
+	if err := sampler.Initialize(validatorWeights); err != nil {
 		return ids.EmptyNodeID, err
 	}
 
-	var (
-		numToSample = 1
-		slot        = uint32(blockTime.Sub(parentBlockTime) / WindowDuration)
-		seed        = chainHeight ^ w.chainSource ^ uint64(bits.Reverse32(slot))
-	)
-	w.sampler.Seed(seed)
-
-	indices, err := w.sampler.Sample(numToSample)
+	indices, err := sampler.Sample(1)
 	if err != nil {
 		return ids.EmptyNodeID, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
 	}
@@ -136,31 +132,32 @@ func (w *windower) ExpectedProposer(
 // in order. The minimum delay of a validator is the index they appear times
 // [WindowDuration].
 func (w *windower) proposers(ctx context.Context, chainHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
-	validators, totalWeight, err := w.sortedValidators(ctx, pChainHeight)
+	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
 		return nil, err
 	}
 
-	// convert the slice of validators to a slice of weights
-	validatorWeights := make([]uint64, len(validators))
-	for i, v := range validators {
-		validatorWeights[i] = v.weight
-	}
+	var (
+		seed             = chainHeight ^ w.chainSource
+		source           = prng.NewMT19937()
+		validatorWeights = validatorsToWeight(validators)
+	)
 
-	seed := chainHeight ^ w.chainSource
-
-	source := prng.NewMT19937()
 	source.Seed(seed)
 	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
 	if err := sampler.Initialize(validatorWeights); err != nil {
 		return nil, err
 	}
 
-	numToSample := maxWindows
-	if totalWeight < uint64(numToSample) {
-		numToSample = int(totalWeight)
+	var totalWeight uint64
+	for _, weight := range validatorWeights {
+		totalWeight, err = math.Add64(totalWeight, weight)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	numToSample := int(math.Min(uint64(maxWindows), totalWeight))
 	indices, err := sampler.Sample(numToSample)
 	if err != nil {
 		return nil, err
@@ -173,26 +170,20 @@ func (w *windower) proposers(ctx context.Context, chainHeight, pChainHeight uint
 	return nodeIDs, nil
 }
 
-func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([]validatorData, uint64, error) {
+func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([]validatorData, error) {
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	// convert the map of validators to a slice
 	validators := make([]validatorData, 0, len(validatorsMap))
-	totalWeight := uint64(0)
 	for k, v := range validatorsMap {
 		validators = append(validators, validatorData{
 			id:     k,
 			weight: v.Weight,
 		})
-		newWeight, err := math.Add64(totalWeight, v.Weight)
-		if err != nil {
-			return nil, 0, err
-		}
-		totalWeight = newWeight
 	}
 
 	// canonically sort validators
@@ -200,5 +191,13 @@ func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([
 	// canonically sorted list
 	utils.Sort(validators)
 
-	return validators, totalWeight, nil
+	return validators, nil
+}
+
+func validatorsToWeight(validators []validatorData) []uint64 {
+	weights := make([]uint64, len(validators))
+	for i, validator := range validators {
+		weights[i] = validator.weight
+	}
+	return weights
 }

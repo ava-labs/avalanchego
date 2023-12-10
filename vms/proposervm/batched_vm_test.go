@@ -29,10 +29,10 @@ func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
 	var (
-		activationTime  = time.Unix(0, 0)
-		durangoForkTime = time.Unix(0, 0)
+		activationTime = time.Unix(0, 0)
+		durangoTime    = time.Unix(0, 0)
 	)
-	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoForkTime, 0)
+	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
