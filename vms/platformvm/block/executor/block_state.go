@@ -24,11 +24,11 @@ type optionsState struct {
 type blockState struct {
 	optionsState
 	statelessBlock block.Block
-	onAcceptState  state.Diff
 
-	onAcceptFunc func()
-	inputs       set.Set[ids.ID]
+	onAcceptState state.Diff
+	onAcceptFunc  func()
 
+	inputs         set.Set[ids.ID]
 	timestamp      time.Time
 	atomicRequests map[ids.ID]*atomic.Requests
 }

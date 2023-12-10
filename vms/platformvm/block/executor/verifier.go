@@ -224,7 +224,9 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  atomicExecutor.OnAccept,
+
+		onAcceptState: atomicExecutor.OnAccept,
+
 		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 		atomicRequests: atomicExecutor.AtomicRequests,
