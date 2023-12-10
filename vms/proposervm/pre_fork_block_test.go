@@ -52,7 +52,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -499,7 +499,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -561,7 +561,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {

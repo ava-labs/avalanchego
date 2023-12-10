@@ -59,7 +59,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -571,7 +571,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {

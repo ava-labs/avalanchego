@@ -739,7 +739,7 @@ func TestPreFork_Initialize(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -762,7 +762,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -804,7 +804,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	// setup
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -843,7 +843,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
