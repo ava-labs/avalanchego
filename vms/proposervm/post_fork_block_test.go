@@ -42,7 +42,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	// setup
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -206,7 +206,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0) // post Durango
+		durangoTime    = activationTime // post Durango
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -536,7 +536,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -907,7 +907,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Show that other verify call would not call coreBlk.Verify()
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -974,7 +974,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1041,7 +1041,7 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1092,7 +1092,7 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1128,7 +1128,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1246,7 +1246,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 5)
 	defer func() {

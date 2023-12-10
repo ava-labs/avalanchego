@@ -30,7 +30,7 @@ func TestCoreVMNotRemote(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -209,7 +209,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -693,7 +693,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {

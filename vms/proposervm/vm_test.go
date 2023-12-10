@@ -247,7 +247,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -283,7 +283,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -321,7 +321,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	// setup
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -358,7 +358,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -454,7 +454,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -551,7 +551,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -593,7 +593,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -669,7 +669,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1120,7 +1120,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1800,7 +1800,7 @@ func TestLaggedPChainHeight(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -2371,7 +2371,7 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -2450,7 +2450,7 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {

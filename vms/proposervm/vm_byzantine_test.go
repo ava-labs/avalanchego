@@ -34,7 +34,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -105,7 +105,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -214,7 +214,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -304,7 +304,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -404,7 +404,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -588,7 +588,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {

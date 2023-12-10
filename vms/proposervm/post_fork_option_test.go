@@ -38,7 +38,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -157,7 +157,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -262,7 +262,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -375,7 +375,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -480,7 +480,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -568,7 +568,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, activationTime, durangoTime, 0)
 
