@@ -280,13 +280,22 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	calledOnAcceptFunc := false
+	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	parentState := &blockState{
-		statelessBlock: parentStatelessBlk,
-		onAcceptState:  parentOnAcceptState,
 		proposalBlockState: proposalBlockState{
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},
+
+		statelessBlock: parentStatelessBlk,
+
+		onAcceptState: parentOnAcceptState,
+		onAcceptFunc: func() {
+			calledOnAcceptFunc = true
+		},
+
+		atomicRequests: atomicRequests,
 	}
 	acceptor.backend.blkIDToState[parentID] = parentState
 
@@ -310,11 +319,9 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState:  onAcceptState,
-		atomicRequests: atomicRequests,
+		onAcceptState: onAcceptState,
 	}
 
 	batch := database.NewMockBatch(ctrl)
@@ -340,6 +347,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	)
 
 	require.NoError(acceptor.ApricotCommitBlock(blk))
+	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
@@ -377,13 +385,22 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
+	calledOnAcceptFunc := false
 	parentState := &blockState{
-		statelessBlock: parentStatelessBlk,
-		onAcceptState:  parentOnAcceptState,
 		proposalBlockState: proposalBlockState{
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},
+
+		statelessBlock: parentStatelessBlk,
+
+		onAcceptState: parentOnAcceptState,
+		onAcceptFunc: func() {
+			calledOnAcceptFunc = true
+		},
+
+		atomicRequests: atomicRequests,
 	}
 	acceptor.backend.blkIDToState[parentID] = parentState
 
@@ -407,7 +424,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
 		onAcceptState:  onAcceptState,
@@ -437,5 +453,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	)
 
 	require.NoError(acceptor.ApricotAbortBlock(blk))
+	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

@@ -176,6 +176,10 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
+	parentBlkState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w %s", errMissingBlockState, parentID)
+	}
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
 	}
@@ -191,11 +195,11 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 	}
 
 	// Note that this method writes [batch] to the database.
-	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
+	if err := a.ctx.SharedMemory.Apply(parentBlkState.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
-	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
+	if onAcceptFunc := parentBlkState.onAcceptFunc; onAcceptFunc != nil {
 		onAcceptFunc()
 	}
 
