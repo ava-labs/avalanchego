@@ -395,7 +395,7 @@ func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
 	onAcceptState state.Diff,
 ) error {
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Txs(), onAcceptState, b.Parent())
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent())
 	if err != nil {
 		return err
 	}
