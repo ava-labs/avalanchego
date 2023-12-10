@@ -22,8 +22,8 @@ func equal(require *require.Assertions, chainID ids.ID, want, have SignedBlock) 
 	require.Equal(want.Block(), have.Block())
 	require.Equal(want.Proposer(), have.Proposer())
 	require.Equal(want.Bytes(), have.Bytes())
-	require.Equal(want.Verify(false, chainID, want.Timestamp().Add(-time.Second)), have.Verify(false, chainID, have.Timestamp().Add(-time.Second)))
-	require.Equal(want.Verify(true, chainID, want.Timestamp().Add(time.Second)), have.Verify(true, chainID, have.Timestamp().Add(time.Second)))
+	require.Equal(want.Verify(false, chainID), have.Verify(false, chainID))
+	require.Equal(want.Verify(true, chainID), have.Verify(true, chainID))
 }
 
 func TestVerifyNoCertWithSignature(t *testing.T) {
@@ -40,10 +40,10 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	builtBlock := builtBlockIntf.(*statelessBlock)
 	builtBlock.Signature = []byte{0}
 
-	err = builtBlock.Verify(false, ids.Empty, time.Time{})
+	err = builtBlock.Verify(false, ids.Empty)
 	require.ErrorIs(err, errUnexpectedProposer)
 
-	err = builtBlock.Verify(true, ids.Empty, time.Time{})
+	err = builtBlock.Verify(true, ids.Empty)
 	require.ErrorIs(err, errMissingProposer)
 }
 

@@ -38,7 +38,7 @@ type SignedBlock interface {
 	Timestamp() time.Time
 	Proposer() ids.NodeID
 
-	Verify(shouldHaveProposer bool, chainID ids.ID, durangoTime time.Time) error
+	Verify(shouldHaveProposer bool, chainID ids.ID) error
 }
 
 type statelessUnsignedBlock struct {
@@ -117,7 +117,7 @@ func (b *statelessBlock) Proposer() ids.NodeID {
 	return b.proposer
 }
 
-func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID, durangoTime time.Time) error {
+func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 	if !shouldHaveProposer {
 		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
 			return errUnexpectedProposer
@@ -125,12 +125,6 @@ func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID, durango
 		return nil
 	} else if b.cert == nil {
 		return errMissingProposer
-	}
-
-	if b.timestamp.Before(durangoTime) {
-		if err := staking.ValidateCertificate(b.cert); err != nil {
-			return err
-		}
 	}
 
 	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)

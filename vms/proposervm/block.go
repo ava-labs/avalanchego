@@ -148,7 +148,7 @@ func (p *postForkCommonComponents) Verify(
 
 		// Verify the signature of the node
 		shouldHaveProposer := delay < proposer.MaxVerifyDelay
-		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID, p.vm.DurangoTime); err != nil {
+		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
 			return err
 		}
 
