@@ -113,11 +113,6 @@ func ReadFlagsMap(path string, description string) (*FlagsMap, error) {
 	return flagsMap, nil
 }
 
-// Marshal to json with default prefix and indent.
-func DefaultJSONMarshal(v interface{}) ([]byte, error) {
-	return json.MarshalIndent(v, "", "  ")
-}
-
 // NetworkConfig defines configuration shared or
 // common to all nodes in a given network.
 type NetworkConfig struct {
@@ -158,14 +153,14 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, initialStakers []genesis
 
 // NodeURI associates a node ID with its API URI.
 type NodeURI struct {
-	NodeID ids.NodeID
-	URI    string
+	ID  ids.NodeID
+	URI string
 }
 
 // NodeConfig defines configuration for an AvalancheGo node.
 type NodeConfig struct {
-	NodeID ids.NodeID
-	Flags  FlagsMap
+	ID    ids.NodeID
+	Flags FlagsMap
 }
 
 func NewNodeConfig() *NodeConfig {
@@ -311,7 +306,7 @@ func (nc *NodeConfig) EnsureNodeID() error {
 		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
 	}
 	stakingCert := staking.CertificateFromX509(tlsCert.Leaf)
-	nc.NodeID = ids.NodeIDFromCert(stakingCert)
+	nc.ID = ids.NodeIDFromCert(stakingCert)
 
 	return nil
 }
