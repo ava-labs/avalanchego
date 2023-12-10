@@ -21,3 +21,12 @@ func NewUniform() Uniform {
 		rng: globalRNG,
 	}
 }
+
+// NewDeterministicUniform returns a new sampler
+func NewDeterministicUniform(source Source) Uniform {
+	return &uniformReplacer{
+		rng: &rng{
+			rng: source,
+		},
+	}
+}
