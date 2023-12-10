@@ -401,16 +401,17 @@ func (v *verifier) proposalBlock(
 			onAbortState:          onAbortState,
 			initiallyPreferCommit: txExecutor.PrefersCommit,
 		},
-		standardBlockState: standardBlockState{
-			inputs:       inputs,
-			onAcceptFunc: onAcceptFunc,
-		},
-		atomicRequests: atomicRequests,
+
 		statelessBlock: b,
+
+		onAcceptFunc: onAcceptFunc,
+
+		inputs: inputs,
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp: onAbortState.GetTimestamp(),
+		timestamp:      onAbortState.GetTimestamp(),
+		atomicRequests: atomicRequests,
 	}
 
 	v.Mempool.Remove(b.Txs())
@@ -430,14 +431,13 @@ func (v *verifier) standardBlock(
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
-		atomicRequests: atomicRequests,
 
-		standardBlockState: standardBlockState{
-			onAcceptFunc: onAcceptFunc,
-			inputs:       inputs,
-		},
+		onAcceptState: onAcceptState,
+		onAcceptFunc:  onAcceptFunc,
+
+		timestamp:      onAcceptState.GetTimestamp(),
+		inputs:         inputs,
+		atomicRequests: atomicRequests,
 	}
 
 	v.Mempool.Remove(b.Transactions)
