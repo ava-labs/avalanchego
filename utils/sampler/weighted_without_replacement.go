@@ -12,12 +12,10 @@ type WeightedWithoutReplacement interface {
 }
 
 // NewWeightedWithoutReplacement returns a new sampler
-func NewDeterministicWeightedWithoutReplacement(seed uint64) WeightedWithoutReplacement {
-	rng := newRNG()
-	rng.Seed(seed)
+func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
 		u: &uniformReplacer{
-			rng: rng,
+			rng: newRNG(source),
 		},
 		w: NewDeterministicWeighted(),
 	}

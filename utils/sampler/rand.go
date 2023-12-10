@@ -11,36 +11,29 @@ import (
 	"gonum.org/v1/gonum/mathext/prng"
 )
 
-var globalRNG = newRNG()
+var globalRNG *rng
 
-func newRNG() *rng {
+func init() {
 	// We don't use a cryptographically secure source of randomness here, as
 	// there's no need to ensure a truly random sampling.
 	source := prng.NewMT19937()
 	source.Seed(uint64(time.Now().UnixNano()))
+	globalRNG = newRNG(source)
+}
+
+func newRNG(source Source) *rng {
 	return &rng{rng: source}
-}
-
-func Seed(seed uint64) {
-	globalRNG.Seed(seed)
-}
-
-type source interface {
-	Seed(uint64)
-	Uint64() uint64
 }
 
 type rng struct {
 	lock sync.Mutex
-	rng  source
+	rng  Source
 }
 
-// Seed uses the provided seed value to initialize the generator to a
-// deterministic state.
-func (r *rng) Seed(seed uint64) {
-	r.lock.Lock()
-	r.rng.Seed(seed)
-	r.lock.Unlock()
+type Source interface {
+	// Uint64 returns a random number in [0, MaxUint64] and advances the
+	// generator's state.
+	Uint64() uint64
 }
 
 // Uint64Inclusive returns a pseudo-random number in [0,n].

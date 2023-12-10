@@ -7,6 +7,8 @@ import (
 	"context"
 	"time"
 
+	"gonum.org/v1/gonum/mathext/prng"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -102,7 +104,10 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	}
 
 	seed := chainHeight ^ w.chainSource
-	sampler := sampler.NewDeterministicWeightedWithoutReplacement(seed)
+
+	source := prng.NewMT19937()
+	source.Seed(seed)
+	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
 	if err := sampler.Initialize(validatorWeights); err != nil {
 		return nil, err
 	}
