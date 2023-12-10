@@ -729,7 +729,7 @@ func stakersForNodes(networkID uint32, nodes []*LocalNode) ([]genesis.UnparsedSt
 	// Configure provided nodes as initial stakers
 	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
 	for i, node := range nodes {
-		pop, err := node.GetProofOfPosession()
+		pop, err := node.GetProofOfPossession()
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive proof of possession: %w", err)
 		}

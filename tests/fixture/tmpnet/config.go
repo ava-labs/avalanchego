@@ -204,7 +204,7 @@ func (nc *NodeConfig) EnsureKeys() error {
 
 // Derives the nodes proof-of-possession. Requires the node to have a
 // BLS signing key.
-func (nc *NodeConfig) GetProofOfPosession() (*signer.ProofOfPossession, error) {
+func (nc *NodeConfig) GetProofOfPossession() (*signer.ProofOfPossession, error) {
 	signingKey, err := nc.Flags.GetStringVal(config.StakingSignerKeyContentKey)
 	if err != nil {
 		return nil, err
