@@ -210,13 +210,12 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	calledOnAcceptFunc := false
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
-		onAcceptState:  onAcceptState,
-		atomicRequests: atomicRequests,
-		standardBlockState: standardBlockState{
-			onAcceptFunc: func() {
-				calledOnAcceptFunc = true
-			},
+		onAcceptState: onAcceptState,
+		onAcceptFunc: func() {
+			calledOnAcceptFunc = true
 		},
+
+		atomicRequests: atomicRequests,
 	}
 	// Give [blk] a child.
 	childOnAcceptState := state.NewMockDiff(ctrl)
