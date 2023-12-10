@@ -321,8 +321,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	acceptor.backend.blkIDToState[parentID] = parentState
 	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState:  onAcceptState,
-		atomicRequests: atomicRequests,
+		onAcceptState: onAcceptState,
 	}
 
 	batch := database.NewMockBatch(ctrl)
