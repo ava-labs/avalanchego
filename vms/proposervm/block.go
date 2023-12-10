@@ -205,16 +205,15 @@ func (p *postForkCommonComponents) buildChild(
 
 	shouldBuildUnsignedBlock := false
 	if p.vm.IsDurangoActivated(parentTimestamp) {
-		parentHeight := p.innerBlk.Height()
-		err = p.shouldPostDurangoBuildBlock(
+		err = p.shouldBuildBlockPostDurango(
 			ctx,
+			parentID,
 			parentTimestamp,
-			parentHeight,
 			parentPChainHeight,
 			newTimestamp,
 		)
 	} else {
-		shouldBuildUnsignedBlock, err = p.shouldPreDurangoBuildUnsignedBlock(
+		shouldBuildUnsignedBlock, err = p.shouldBuildUnsignedBlockPreDurango(
 			ctx,
 			parentID,
 			parentTimestamp,
@@ -337,7 +336,13 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 		childHeight  = blk.Height()
 		proposerID   = blk.Proposer()
 	)
-	minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID, proposer.MaxVerifyWindows)
+	minDelay, err := p.vm.Windower.Delay(
+		ctx,
+		childHeight,
+		parentPChainHeight,
+		proposerID,
+		proposer.MaxVerifyWindows,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -379,13 +384,14 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	return nil
 }
 
-func (p *postForkCommonComponents) shouldPostDurangoBuildBlock(
+func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 	ctx context.Context,
+	parentID ids.ID,
 	parentTimestamp time.Time,
-	parentHeight uint64,
 	parentPChainHeight uint64,
 	newTimestamp time.Time,
 ) error {
+	parentHeight := p.innerBlk.Height()
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		parentHeight+1,
@@ -394,16 +400,33 @@ func (p *postForkCommonComponents) shouldPostDurangoBuildBlock(
 		parentTimestamp,
 	)
 	if err != nil {
+		p.vm.ctx.Log.Error("unexpected build block failure",
+			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
 		return err
 	}
-	if expectedProposerID != p.vm.ctx.NodeID {
-		return errProposerWindowNotStarted
+	if expectedProposerID == p.vm.ctx.NodeID {
+		return nil
 	}
 
-	return nil
+	// It's not our turn to propose a block yet. This is likely caused by having
+	// previously notified the consensus engine to attempt to build a block on
+	// top of a block that is no longer the preferred block.
+	p.vm.ctx.Log.Debug("build block dropped",
+		zap.Time("parentTimestamp", parentTimestamp),
+		zap.Time("blockTimestamp", newTimestamp),
+		zap.Stringer("expectedProposer", expectedProposerID),
+	)
+
+	// In case the inner VM only issued one pendingTxs message, we should
+	// attempt to re-handle that once it is our turn to build the block.
+	p.vm.notifyInnerBlockReady()
+	return errProposerWindowNotStarted
 }
 
-func (p *postForkCommonComponents) shouldPreDurangoBuildUnsignedBlock(
+func (p *postForkCommonComponents) shouldBuildUnsignedBlockPreDurango(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
@@ -429,24 +452,22 @@ func (p *postForkCommonComponents) shouldPreDurangoBuildUnsignedBlock(
 	}
 
 	if delay >= minDelay {
-		// it's time for this node to propose a block. It'll be signed or unsigned
-		// depending on the delay
+		// it's time for this node to propose a block. It'll be signed or
+		// unsigned depending on the delay
 		return delay >= proposer.MaxVerifyDelay, nil
 	}
 
-	// It's not our turn to propose a block yet. This is likely caused
-	// by having previously notified the consensus engine to attempt to
-	// build a block on top of a block that is no longer the preferred
-	// block.
+	// It's not our turn to propose a block yet. This is likely caused by having
+	// previously notified the consensus engine to attempt to build a block on
+	// top of a block that is no longer the preferred block.
 	p.vm.ctx.Log.Debug("build block dropped",
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Duration("minDelay", minDelay),
 		zap.Time("blockTimestamp", newTimestamp),
 	)
 
-	// In case the inner VM only issued one pendingTxs message, we
-	// should attempt to re-handle that once it is our turn to build the
-	// block.
+	// In case the inner VM only issued one pendingTxs message, we should
+	// attempt to re-handle that once it is our turn to build the block.
 	p.vm.notifyInnerBlockReady()
 	return false, errProposerWindowNotStarted
 }
