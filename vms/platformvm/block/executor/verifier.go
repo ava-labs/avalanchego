@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -394,43 +395,67 @@ func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
 	onAcceptState state.Diff,
 ) error {
-	blkState := &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Txs(), onAcceptState, b.Parent())
+	if err != nil {
+		return err
 	}
 
-	// Finally we process the transactions
-	funcs := make([]func(), 0, len(b.Transactions))
-	for _, tx := range b.Transactions {
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		statelessBlock: b,
+
+		onAcceptState: onAcceptState,
+		onAcceptFunc:  onAcceptFunc,
+
+		timestamp:      onAcceptState.GetTimestamp(),
+		inputs:         inputs,
+		atomicRequests: atomicRequests,
+	}
+
+	v.Mempool.Remove(b.Transactions)
+	return nil
+}
+
+func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID) (
+	set.Set[ids.ID],
+	map[ids.ID]*atomic.Requests,
+	func(),
+	error,
+) {
+	var (
+		onAcceptFunc   func()
+		inputs         set.Set[ids.ID]
+		funcs          = make([]func(), 0, len(txs))
+		atomicRequests = make(map[ids.ID]*atomic.Requests)
+	)
+	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: v.txExecutorBackend,
-			State:   onAcceptState,
+			State:   state,
 			Tx:      tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return err
+			return nil, nil, nil, err
 		}
 		// ensure it doesn't overlap with current input batch
-		if blkState.inputs.Overlaps(txExecutor.Inputs) {
-			return errConflictingBatchTxs
+		if inputs.Overlaps(txExecutor.Inputs) {
+			return nil, nil, nil, errConflictingBatchTxs
 		}
 		// Add UTXOs to batch
-		blkState.inputs.Union(txExecutor.Inputs)
+		inputs.Union(txExecutor.Inputs)
 
-		onAcceptState.AddTx(tx, status.Committed)
+		state.AddTx(tx, status.Committed)
 		if txExecutor.OnAccept != nil {
 			funcs = append(funcs, txExecutor.OnAccept)
 		}
 
 		for chainID, txRequests := range txExecutor.AtomicRequests {
 			// Add/merge in the atomic requests represented by [tx]
-			chainRequests, exists := blkState.atomicRequests[chainID]
+			chainRequests, exists := atomicRequests[chainID]
 			if !exists {
-				blkState.atomicRequests[chainID] = txRequests
+				atomicRequests[chainID] = txRequests
 				continue
 			}
 
@@ -439,23 +464,19 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	if err := v.verifyUniqueInputs(b.Parent(), blkState.inputs); err != nil {
-		return err
+	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
+		return nil, nil, nil, err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
-		blkState.onAcceptFunc = funcs[0]
+		onAcceptFunc = funcs[0]
 	} else if numFuncs > 1 {
-		blkState.onAcceptFunc = func() {
+		onAcceptFunc = func() {
 			for _, f := range funcs {
 				f()
 			}
 		}
 	}
 
-	blkID := b.ID()
-	v.blkIDToState[blkID] = blkState
-
-	v.Mempool.Remove(b.Transactions)
-	return nil
+	return inputs, atomicRequests, onAcceptFunc, nil
 }
