@@ -9,14 +9,16 @@ package sampler
 type WeightedWithoutReplacement interface {
 	Initialize(weights []uint64) error
 	Sample(count int) ([]int, error)
-
-	Seed(uint64)
 }
 
 // NewWeightedWithoutReplacement returns a new sampler
-func NewDeterministicWeightedWithoutReplacement() WeightedWithoutReplacement {
+func NewDeterministicWeightedWithoutReplacement(seed uint64) WeightedWithoutReplacement {
+	rng := newRNG()
+	rng.Seed(seed)
 	return &weightedWithoutReplacementGeneric{
-		u: NewUniform(),
+		u: &uniformReplacer{
+			rng: rng,
+		},
 		w: NewDeterministicWeighted(),
 	}
 }

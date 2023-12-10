@@ -11,13 +11,13 @@ type Uniform interface {
 	// negative the implementation may panic.
 	Sample(length int) ([]uint64, error)
 
-	Seed(uint64)
-
 	Reset()
 	Next() (uint64, error)
 }
 
 // NewUniform returns a new sampler
 func NewUniform() Uniform {
-	return &uniformReplacer{}
+	return &uniformReplacer{
+		rng: globalRNG,
+	}
 }
