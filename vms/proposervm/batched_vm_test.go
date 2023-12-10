@@ -367,7 +367,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
 
-		durangoTime = time.Unix(0, 0)
+		durangoTime = currentTime.Add(10 * time.Minute)
 	)
 
 	// enable ProBlks in next future
@@ -808,7 +808,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
 
-		durangoTime = time.Unix(0, 0)
+		durangoTime = currentTime.Add(10 * time.Minute)
 	)
 
 	// enable ProBlks in next future
