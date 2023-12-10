@@ -344,6 +344,11 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 		proposer.MaxVerifyWindows,
 	)
 	if err != nil {
+		p.vm.ctx.Log.Error("unexpected block verification failure",
+			zap.String("reason", "failed to calculate required timestamp delay"),
+			zap.Stringer("blkID", blk.ID()),
+			zap.Error(err),
+		)
 		return 0, err
 	}
 
@@ -375,6 +380,11 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		parentTimestamp,
 	)
 	if err != nil {
+		p.vm.ctx.Log.Error("unexpected block verification failure",
+			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Stringer("blkID", blk.ID()),
+			zap.Error(err),
+		)
 		return err
 	}
 	if expectedProposerID != proposerID {
