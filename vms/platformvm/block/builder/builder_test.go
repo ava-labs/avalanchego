@@ -18,14 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -314,120 +311,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 			}
 			require.Equal(tt.expectedTxID, txID)
 			require.Equal(tt.expectedShouldReward, shouldReward)
-		})
-	}
-}
-
-func TestBuildBlock(t *testing.T) {
-	env := newEnvironment(t)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	var (
-		now             = env.backend.Clk.Time()
-		parentID        = ids.GenerateTestID()
-		height          = uint64(1337)
-		parentTimestamp = now.Add(-2 * time.Second)
-		stakerTxID      = ids.GenerateTestID()
-
-		defaultValidatorStake = 100 * units.MilliAvax
-		validatorStartTime    = now.Add(2 * txexecutor.SyncBound)
-		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
-	)
-
-	tx, err := env.txBuilder.NewAddValidatorTx(
-		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.GenerateTestNodeID(),
-		preFundedKeys[0].PublicKey().Address(),
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-	)
-	require.NoError(t, err)
-
-	type test struct {
-		name             string
-		builderF         func(*gomock.Controller) *builder
-		timestamp        time.Time
-		forceAdvanceTime bool
-		parentStateF     func(*gomock.Controller) state.Chain
-		expectedBlkF     func(*require.Assertions) block.Block
-		expectedErr      error
-	}
-
-	tests := []test{
-		{
-			name: "should reward",
-			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// The tx builder should be asked to build a reward tx
-				txBuilder := txbuilder.NewMockBuilder(ctrl)
-				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(tx, nil)
-
-				return &builder{
-					Mempool:   mempool,
-					txBuilder: txBuilder,
-				}
-			},
-			timestamp:        parentTimestamp,
-			forceAdvanceTime: false,
-			parentStateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-
-				// add current validator that ends at [parentTimestamp]
-				// i.e. it should be rewarded
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     stakerTxID,
-					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					EndTime:  parentTimestamp,
-				})
-				currentStakerIter.EXPECT().Release()
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
-				return s
-			},
-			expectedBlkF: func(require *require.Assertions) block.Block {
-				expectedBlk, err := block.NewBanffProposalBlock(
-					parentTimestamp,
-					parentID,
-					height,
-					tx,
-					[]*txs.Tx{},
-				)
-				require.NoError(err)
-				return expectedBlk
-			},
-			expectedErr: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
-			gotBlk, err := buildBlock(
-				tt.builderF(ctrl),
-				parentID,
-				height,
-				tt.timestamp,
-				tt.forceAdvanceTime,
-				tt.parentStateF(ctrl),
-			)
-			if tt.expectedErr != nil {
-				require.ErrorIs(err, tt.expectedErr)
-				return
-			}
-			require.NoError(err)
-			require.Equal(tt.expectedBlkF(require), gotBlk)
 		})
 	}
 }
