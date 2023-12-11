@@ -232,22 +232,14 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-// [timestamp] is min(max(now, parent timestamp), next staker change time)
-func buildBlock(
-	builder *builder,
-	parentID ids.ID,
-	height uint64,
-	timestamp time.Time,
-	forceAdvanceTime bool,
-	parentState state.Chain,
-) (block.Block, error) {
-	preferredID := builder.blkManager.Preferred()
-	stateDiff, err := state.NewDiff(preferredID, builder.blkManager)
+func buildBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager blockexecutor.Manager, timestamp time.Time) ([]*txs.Tx, error) {
+	preferredID := manager.Preferred()
+	stateDiff, err := state.NewDiff(preferredID, manager)
 	if err != nil {
 		return nil, err
 	}
 
-	changes, err := txexecutor.AdvanceTimeTo(builder.txExecutorBackend, stateDiff, timestamp)
+	changes, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -261,11 +253,11 @@ func buildBlock(
 	)
 
 	for {
-		tx, exists := builder.Mempool.Peek()
+		tx, exists := mempool.Peek()
 		if !exists || len(tx.Bytes()) > remainingSize {
 			break
 		}
-		builder.Mempool.Remove([]*txs.Tx{tx})
+		mempool.Remove([]*txs.Tx{tx})
 
 		// Invariant: [tx] has already been syntactically verified.
 
@@ -275,7 +267,7 @@ func buildBlock(
 		}
 
 		executor := &txexecutor.StandardTxExecutor{
-			Backend: builder.txExecutorBackend,
+			Backend: backend,
 			State:   txDiff,
 			Tx:      tx,
 		}
@@ -283,19 +275,19 @@ func buildBlock(
 		err = tx.Unsigned.Visit(executor)
 		if err != nil {
 			txID := tx.ID()
-			builder.Mempool.MarkDropped(txID, err)
+			mempool.MarkDropped(txID, err)
 			continue
 		}
 
 		if inputs.Overlaps(executor.Inputs) {
 			txID := tx.ID()
-			builder.Mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
+			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
-		err = builder.blkManager.VerifyUniqueInputs(preferredID, inputs)
+		err = manager.VerifyUniqueInputs(preferredID, inputs)
 		if err != nil {
 			txID := tx.ID()
-			builder.Mempool.MarkDropped(txID, err)
+			mempool.MarkDropped(txID, err)
 			continue
 		}
 		inputs.Union(executor.Inputs)
@@ -304,7 +296,7 @@ func buildBlock(
 		err = txDiff.Apply(stateDiff)
 		if err != nil {
 			txID := tx.ID()
-			builder.Mempool.MarkDropped(txID, err)
+			mempool.MarkDropped(txID, err)
 			continue
 		}
 
@@ -312,6 +304,18 @@ func buildBlock(
 		blockTxs = append(blockTxs, tx)
 	}
 
+	return blockTxs, nil
+}
+
+// [timestamp] is min(max(now, parent timestamp), next staker change time)
+func buildBlock(
+	builder *builder,
+	parentID ids.ID,
+	height uint64,
+	timestamp time.Time,
+	forceAdvanceTime bool,
+	parentState state.Chain,
+) (block.Block, error) {
 	// Try rewarding stakers whose staking period ends at the new chain time.
 	// This is done first to prioritize advancing the timestamp as quickly as
 	// possible.
@@ -325,6 +329,15 @@ func buildBlock(
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
 
+		blockTxs := []*txs.Tx{}
+		// TODO: Cleanup post-Durango
+		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
+			blockTxs, err = buildBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build blockTxs: %w", err)
+			}
+		}
+
 		return block.NewBanffProposalBlock(
 			timestamp,
 			parentID,
@@ -332,6 +345,11 @@ func buildBlock(
 			rewardValidatorTx,
 			blockTxs,
 		)
+	}
+
+	blockTxs, err := buildBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build blockTxs: %w", err)
 	}
 
 	// If there is no reason to build a block, don't.
