@@ -360,6 +360,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	// Build and accept a block with the tx
 	blk, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
+	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
 	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
@@ -470,58 +471,6 @@ func TestBuildBlock(t *testing.T) {
 	}
 
 	tests := []test{
-		{
-			name: "has decision txs",
-			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-
-				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx, true),
-					mempool.EXPECT().Remove([]*txs.Tx{tx}),
-					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil, false),
-				)
-
-				return &builder{
-					Mempool: mempool,
-				}
-			},
-			timestamp:        parentTimestamp,
-			forceAdvanceTime: false,
-			parentStateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime].
-				// Next validator change time is in the future.
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				gomock.InOrder(
-					// expect calls from [getNextStakerToReward]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					}),
-					currentStakerIter.EXPECT().Release(),
-				)
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
-				return s
-			},
-			expectedBlkF: func(require *require.Assertions) block.Block {
-				expectedBlk, err := block.NewBanffStandardBlock(
-					parentTimestamp,
-					parentID,
-					height,
-					[]*txs.Tx{tx},
-				)
-				require.NoError(err)
-				return expectedBlk
-			},
-			expectedErr: nil,
-		},
 		{
 			name: "no stakers tx",
 			builderF: func(ctrl *gomock.Controller) *builder {
