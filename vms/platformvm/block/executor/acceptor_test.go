@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -287,7 +288,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},
-
 		statelessBlock: parentStatelessBlk,
 
 		onAcceptState: parentOnAcceptState,
@@ -317,11 +317,17 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	err = acceptor.ApricotCommitBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
 
+	parentOnCommitState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
-	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: onAcceptState,
+		onAcceptState: parentState.onCommitState,
+		onAcceptFunc:  parentState.onAcceptFunc,
+
+		inputs:         parentState.inputs,
+		timestamp:      parentOnCommitState.GetTimestamp(),
+		atomicRequests: parentState.atomicRequests,
 	}
 
 	batch := database.NewMockBatch(ctrl)
@@ -339,7 +345,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
 		s.EXPECT().AddStatelessBlock(blk).Times(1),
 
-		onAcceptState.EXPECT().Apply(s).Times(1),
+		parentOnCommitState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
 		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
 		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
@@ -385,14 +391,13 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	calledOnAcceptFunc := false
+	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
 	parentState := &blockState{
 		proposalBlockState: proposalBlockState{
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},
-
 		statelessBlock: parentStatelessBlk,
 
 		onAcceptState: parentOnAcceptState,
@@ -422,12 +427,17 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	err = acceptor.ApricotAbortBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
 
+	parentOnAbortState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
-	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState:  onAcceptState,
-		atomicRequests: atomicRequests,
+		onAcceptState: parentState.onAbortState,
+		onAcceptFunc:  parentState.onAcceptFunc,
+
+		inputs:         parentState.inputs,
+		timestamp:      parentOnAbortState.GetTimestamp(),
+		atomicRequests: parentState.atomicRequests,
 	}
 
 	batch := database.NewMockBatch(ctrl)
@@ -445,7 +455,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
 		s.EXPECT().AddStatelessBlock(blk).Times(1),
 
-		onAcceptState.EXPECT().Apply(s).Times(1),
+		parentOnAbortState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
 		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
 		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
