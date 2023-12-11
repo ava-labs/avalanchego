@@ -390,6 +390,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(err)
 		require.True(iter.Next())
 		staker := iter.Value()
+		iter.Release()
 
 		// Check that the right block was built
 		blk, err := env.Builder.BuildBlock(context.Background())
@@ -419,7 +420,6 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		if staker.TxID == txID {
 			break
 		}
-		iter.Release()
 	}
 
 	// Staking rewards should have been issued
