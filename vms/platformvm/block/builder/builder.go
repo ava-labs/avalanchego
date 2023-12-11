@@ -334,7 +334,7 @@ func buildBlock(
 		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
 			blockTxs, err = packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build blockTxs: %w", err)
+				return nil, fmt.Errorf("failed to pack block txs: %w", err)
 			}
 		}
 
@@ -349,7 +349,7 @@ func buildBlock(
 
 	blockTxs, err := packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build blockTxs: %w", err)
+		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
 
 	// If there is no reason to build a block, don't.
