@@ -1387,7 +1387,6 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	blk := env.blkManager.NewBlock(statelessBlk)
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
-	env.state.AddStatelessBlock(statelessBlk)
 	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
 
 	// Should be pending
@@ -1413,7 +1412,6 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	blk = env.blkManager.NewBlock(statelessBlk)
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
-	env.state.AddStatelessBlock(statelessBlk)
 	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
 
 	// Should be current
@@ -1443,7 +1441,6 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		blk = env.blkManager.NewBlock(statelessBlk)
 		require.NoError(blk.Verify(context.Background()))
 		require.NoError(blk.Accept(context.Background()))
-		env.state.AddStatelessBlock(statelessBlk)
 		require.True(env.blkManager.SetPreference(statelessBlk.ID()))
 	}
 
