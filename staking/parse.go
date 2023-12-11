@@ -4,12 +4,10 @@
 package staking
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
@@ -32,17 +30,11 @@ var (
 	ErrMalformedPublicKeyAlgorithmIdentifier = errors.New("staking: malformed public key algorithm identifier")
 	ErrMalformedSubjectPublicKey             = errors.New("staking: malformed subject public key")
 	ErrMalformedOID                          = errors.New("staking: malformed oid")
-	ErrMalformedParameters                   = errors.New("staking: malformed parameters")
-	ErrRSAKeyMissingNULLParameters           = errors.New("staking: RSA key missing NULL parameters")
 	ErrInvalidRSAModulus                     = errors.New("staking: invalid RSA modulus")
 	ErrInvalidRSAPublicExponent              = errors.New("staking: invalid RSA public exponent")
 	ErrRSAModulusNotPositive                 = errors.New("staking: RSA modulus is not a positive number")
 	ErrRSAPublicExponentNotPositive          = errors.New("staking: RSA public exponent is not a positive number")
-	ErrInvalidECDSAParameters                = errors.New("staking: invalid ECDSA parameters")
-	ErrUnsupportedEllipticCurve              = errors.New("staking: unsupported elliptic curve")
 	ErrFailedUnmarshallingEllipticCurvePoint = errors.New("staking: failed to unmarshal elliptic curve point")
-	ErrUnexpectedED25519Parameters           = errors.New("staking: Ed25519 key encoded with illegal parameters")
-	ErrWrongED25519PublicKeySize             = errors.New("staking: wrong Ed25519 public key size")
 	ErrUnknownPublicKeyAlgorithm             = errors.New("staking: unknown public key algorithm")
 )
 
@@ -106,9 +98,9 @@ func ParseCertificatePermissive(bytes []byte) (*Certificate, error) {
 	if !input.ReadASN1(&pkAISeq, cryptobyte_asn1.SEQUENCE) {
 		return nil, ErrMalformedPublicKeyAlgorithmIdentifier
 	}
-	pkAI, err := parseAI(pkAISeq)
-	if err != nil {
-		return nil, err
+	var pkAI asn1.ObjectIdentifier
+	if !pkAISeq.ReadASN1ObjectIdentifier(&pkAI) {
+		return nil, ErrMalformedOID
 	}
 
 	// Note: Unlike the x509 package, we require parsing the public key.
@@ -117,10 +109,7 @@ func ParseCertificatePermissive(bytes []byte) (*Certificate, error) {
 	if !input.ReadASN1BitString(&spk) {
 		return nil, ErrMalformedSubjectPublicKey
 	}
-	publicKey, signatureAlgorithm, err := parsePublicKey(&publicKeyInfo{
-		Algorithm: pkAI,
-		PublicKey: spk,
-	})
+	publicKey, signatureAlgorithm, err := parsePublicKey(pkAI, spk)
 	return &Certificate{
 		Raw:                bytes,
 		SignatureAlgorithm: signatureAlgorithm,
@@ -128,47 +117,11 @@ func ParseCertificatePermissive(bytes []byte) (*Certificate, error) {
 	}, err
 }
 
-// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L149-L165
-func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
-	ai := pkix.AlgorithmIdentifier{}
-	if !der.ReadASN1ObjectIdentifier(&ai.Algorithm) {
-		return ai, ErrMalformedOID
-	}
-	if der.Empty() {
-		return ai, nil
-	}
-
-	var (
-		params cryptobyte.String
-		tag    cryptobyte_asn1.Tag
-	)
-	if !der.ReadAnyASN1Element(&params, &tag) {
-		return ai, ErrMalformedParameters
-	}
-	ai.Parameters.Tag = int(tag)
-	ai.Parameters.FullBytes = params
-	return ai, nil
-}
-
-// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L172-L176
-type publicKeyInfo struct {
-	Algorithm pkix.AlgorithmIdentifier
-	PublicKey asn1.BitString
-}
-
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L215-L306
-func parsePublicKey(keyData *publicKeyInfo) (any, x509.SignatureAlgorithm, error) {
-	oid := keyData.Algorithm.Algorithm
-	params := keyData.Algorithm.Parameters
-	der := cryptobyte.String(keyData.PublicKey.RightAlign())
+func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (any, x509.SignatureAlgorithm, error) {
+	der := cryptobyte.String(publicKey.RightAlign())
 	switch {
 	case oid.Equal(oidPublicKeyRSA):
-		// RSA public keys must have a NULL in the parameters.
-		// See RFC 3279, Section 2.3.1.
-		if !bytes.Equal(params.FullBytes, asn1.NullBytes) {
-			return nil, 0, ErrRSAKeyMissingNULLParameters
-		}
-
 		pub := &rsa.PublicKey{N: new(big.Int)}
 		if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
 			return nil, 0, ErrInvalidRSAPublicKey
@@ -192,15 +145,6 @@ func parsePublicKey(keyData *publicKeyInfo) (any, x509.SignatureAlgorithm, error
 		}
 		return pub, x509.SHA256WithRSA, nil
 	case oid.Equal(oidPublicKeyECDSA):
-		paramsDer := cryptobyte.String(params.FullBytes)
-		var namedCurveOID asn1.ObjectIdentifier
-		if !paramsDer.ReadASN1ObjectIdentifier(&namedCurveOID) {
-			return nil, 0, ErrInvalidECDSAParameters
-		}
-		// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L491-L503
-		if !namedCurveOID.Equal(oidNamedCurveP256) {
-			return nil, 0, ErrUnsupportedEllipticCurve
-		}
 		namedCurve := elliptic.P256()
 		x, y := elliptic.Unmarshal(namedCurve, der)
 		if x == nil {
