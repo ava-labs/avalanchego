@@ -636,41 +636,6 @@ func (t *trieView) remove(key Key) error {
 	}
 
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if nodeToDelete.key == t.root.Value().key {
-		// We're deleting the root.
-		switch len(nodeToDelete.children) {
-		case 0:
-			// The trie is empty now.
-			t.root = maybe.Nothing[*node]()
-			return t.recordNodeDeleted(nodeToDelete)
-		case 1:
-			// The root has one child, so make that child the new root.
-			var (
-				childIndex byte
-				child      *child
-			)
-			for childIndex, child = range nodeToDelete.children {
-				break
-			}
-
-			childKey := nodeToDelete.key.Extend(ToToken(childIndex, t.tokenSize), child.compressedKey)
-			newRoot, err := t.getNode(childKey, child.hasValue)
-			if err != nil {
-				return err
-			}
-			if err := t.recordNodeDeleted(t.root.Value()); err != nil {
-				return err
-			}
-			t.root = maybe.Some(newRoot)
-			return nil
-		default:
-			// The root has multiple children so we can't delete it.
-			return t.recordNodeChange(nodeToDelete)
-		}
-	}
-
-	// Note [parent] != nil since [nodeToDelete.key] != [t.root.key].
-	// i.e. There's the root and at least one more node.
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
@@ -678,6 +643,14 @@ func (t *trieView) remove(key Key) error {
 			return err
 		}
 
+		if nodeToDelete.key == t.root.Value().key {
+			// We deleted the root. The trie is empty now.
+			t.root = maybe.Nothing[*node]()
+			return nil
+		}
+
+		// Note [parent] != nil since [nodeToDelete.key] != [t.root.key].
+		// i.e. There's the root and at least one more node.
 		parent.removeChild(nodeToDelete, t.tokenSize)
 
 		// merge the parent node and its child into a single node if possible
