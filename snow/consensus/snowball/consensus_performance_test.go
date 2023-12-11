@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/sampler"
+	"gonum.org/v1/gonum/mathext/prng"
 )
 
 // Test that a network running the lower AlphaPreference converges faster than a
@@ -26,29 +26,28 @@ func TestDualAlphaOptimization(t *testing.T) {
 			BetaVirtuous:    15,
 			BetaRogue:       20,
 		}
-		seed uint64 = 0
+		seed   uint64 = 0
+		source        = prng.NewMT19937()
 	)
 
-	singleAlphaNetwork := Network{}
-	singleAlphaNetwork.Initialize(params, numColors)
+	singleAlphaNetwork := NewNetwork(params, numColors, source)
 
 	params.AlphaPreference = params.K/2 + 1
-	dualAlphaNetwork := Network{}
-	dualAlphaNetwork.Initialize(params, numColors)
+	dualAlphaNetwork := NewNetwork(params, numColors, source)
 
-	sampler.Seed(seed)
+	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		dualAlphaNetwork.AddNode(NewTree)
 	}
 
-	sampler.Seed(seed)
+	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		singleAlphaNetwork.AddNode(NewTree)
 	}
 
 	// Although this can theoretically fail with a correct implementation, it
 	// shouldn't in practice
-	runNetworksInLockstep(require, seed, &dualAlphaNetwork, &singleAlphaNetwork)
+	runNetworksInLockstep(require, seed, source, dualAlphaNetwork, singleAlphaNetwork)
 }
 
 // Test that a network running the snowball tree converges faster than a network
@@ -61,35 +60,34 @@ func TestTreeConvergenceOptimization(t *testing.T) {
 		numNodes         = 100
 		params           = DefaultParameters
 		seed      uint64 = 0
+		source           = prng.NewMT19937()
 	)
 
-	treeNetwork := Network{}
-	treeNetwork.Initialize(params, numColors)
+	treeNetwork := NewNetwork(params, numColors, source)
+	flatNetwork := NewNetwork(params, numColors, source)
 
-	flatNetwork := treeNetwork
-
-	sampler.Seed(seed)
+	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		treeNetwork.AddNode(NewTree)
 	}
 
-	sampler.Seed(seed)
+	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		flatNetwork.AddNode(NewFlat)
 	}
 
 	// Although this can theoretically fail with a correct implementation, it
 	// shouldn't in practice
-	runNetworksInLockstep(require, seed, &treeNetwork, &flatNetwork)
+	runNetworksInLockstep(require, seed, source, treeNetwork, flatNetwork)
 }
 
-func runNetworksInLockstep(require *require.Assertions, seed uint64, fast *Network, slow *Network) {
+func runNetworksInLockstep(require *require.Assertions, seed uint64, source *prng.MT19937, fast *Network, slow *Network) {
 	numRounds := 0
 	for !fast.Finalized() && !fast.Disagreement() && !slow.Finalized() && !slow.Disagreement() {
-		sampler.Seed(uint64(numRounds) + seed)
+		source.Seed(uint64(numRounds) + seed)
 		fast.Round()
 
-		sampler.Seed(uint64(numRounds) + seed)
+		source.Seed(uint64(numRounds) + seed)
 		slow.Round()
 		numRounds++
 	}
