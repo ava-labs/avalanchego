@@ -170,17 +170,3 @@ func (mr *MockManagerMockRecorder) VerifyUniqueInputs(blkID, inputs interface{})
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyUniqueInputs", reflect.TypeOf((*MockManager)(nil).VerifyUniqueInputs), blkID, inputs)
 }
-
-// VerifyUniqueInputs mocks base method.
-func (m *MockManager) VerifyUniqueInputs(arg0 ids.ID, arg1 set.Set[ids.ID]) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyUniqueInputs", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// VerifyUniqueInputs indicates an expected call of VerifyUniqueInputs.
-func (mr *MockManagerMockRecorder) VerifyUniqueInputs(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyUniqueInputs", reflect.TypeOf((*MockManager)(nil).VerifyUniqueInputs), arg0, arg1)
-}
