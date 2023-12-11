@@ -21,26 +21,15 @@ func newRNG() *rng {
 	return &rng{rng: source}
 }
 
-func Seed(seed uint64) {
-	globalRNG.Seed(seed)
-}
-
-type source interface {
-	Seed(uint64)
-	Uint64() uint64
-}
-
 type rng struct {
 	lock sync.Mutex
-	rng  source
+	rng  Source
 }
 
-// Seed uses the provided seed value to initialize the generator to a
-// deterministic state.
-func (r *rng) Seed(seed uint64) {
-	r.lock.Lock()
-	r.rng.Seed(seed)
-	r.lock.Unlock()
+type Source interface {
+	// Uint64 returns a random number in [0, MaxUint64] and advances the
+	// generator's state.
+	Uint64() uint64
 }
 
 // Uint64Inclusive returns a pseudo-random number in [0,n].
