@@ -192,9 +192,7 @@ func (b *builder) ShutdownBlockTimer() {
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
-	b.Mempool.DisableAdding()
 	defer func() {
-		b.Mempool.EnableAdding()
 		// If we need to advance the chain's timestamp in a standard block, but
 		// we build an invalid block, then we need to re-trigger block building.
 		//
