@@ -206,7 +206,11 @@ func (w *windower) MinDelayForProposer(
 		res              = startTime
 		source           = prng.NewMT19937_64()
 		validatorWeights = validatorsToWeight(validators)
+		sampler          = sampler.NewDeterministicWeightedWithoutReplacement(source)
 	)
+	if err := sampler.Initialize(validatorWeights); err != nil {
+		return time.Time{}, err
+	}
 
 	for res.Sub(startTime) < MaxLookAheadWindow {
 		var (
@@ -215,10 +219,7 @@ func (w *windower) MinDelayForProposer(
 		)
 
 		source.Seed(seed)
-		sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
-		if err := sampler.Initialize(validatorWeights); err != nil {
-			return time.Time{}, err
-		}
+
 		indices, err := sampler.Sample(1)
 		if err != nil {
 			return time.Time{}, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
