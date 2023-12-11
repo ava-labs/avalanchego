@@ -413,7 +413,7 @@ func TestBuildBlock(t *testing.T) {
 			name: "no stakers tx",
 			builderF: func(ctrl *gomock.Controller) *builder {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek().Return(nil)
+				mempool.EXPECT().Peek().Return(nil, false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -458,7 +458,7 @@ func TestBuildBlock(t *testing.T) {
 			name: "should advance time",
 			builderF: func(ctrl *gomock.Controller) *builder {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek().Return(nil)
+				mempool.EXPECT().Peek().Return(nil, false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -511,10 +511,10 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx),
+					mempool.EXPECT().Peek().Return(tx, true),
 					mempool.EXPECT().Remove([]*txs.Tx{tx}),
 					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil),
+					mempool.EXPECT().Peek().Return(nil, false),
 				)
 
 				clk := &mockable.Clock{}
@@ -566,10 +566,10 @@ func TestBuildBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 
 				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx),
+					mempool.EXPECT().Peek().Return(tx, true),
 					mempool.EXPECT().Remove([]*txs.Tx{tx}),
 					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil),
+					mempool.EXPECT().Peek().Return(nil, false),
 				)
 
 				clk := &mockable.Clock{}
