@@ -72,6 +72,60 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.NoError(env.mempool.GetDropReason(txID))
 }
 
+func TestBuildBlockForceAdvanceTime(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	// Create a valid transaction
+	tx, err := env.txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
+	txID := tx.ID()
+
+	// Issue the transaction
+	require.NoError(env.network.IssueTx(context.Background(), tx))
+	require.True(env.mempool.Has(txID))
+
+	var (
+		now      = env.backend.Clk.Time()
+		nextTime = now.Add(2 * txexecutor.SyncBound)
+	)
+
+	// Add a staker to [env.state]
+	env.state.PutCurrentValidator(&state.Staker{
+		NextTime: nextTime,
+		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+	})
+
+	// Advance wall clock to [nextTime] + [txexecutor.SyncBound]
+	env.backend.Clk.Set(nextTime.Add(txexecutor.SyncBound))
+
+	// [BuildBlock] should build a block advancing the time to [nextTime],
+	// not the current wall clock.
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
+	require.Equal([]*txs.Tx{tx}, blk.Txs())
+	require.IsType(&block.BanffStandardBlock{}, blk.Block)
+	standardBlk := blk.Block.(*block.BanffStandardBlock)
+	require.Equal(nextTime.Unix(), standardBlk.Timestamp().Unix())
+}
+
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
