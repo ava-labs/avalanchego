@@ -38,6 +38,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	// Create a valid transaction
@@ -78,6 +79,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	// Create a valid transaction
@@ -130,9 +132,10 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	env.isBootstrapped.Set(false)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
-	require.False(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
+	require.True(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }
 
 func TestGetNextStakerToReward(t *testing.T) {
@@ -322,6 +325,7 @@ func TestBuildBlock(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	var (
@@ -398,6 +402,7 @@ func TestBuildBlock(t *testing.T) {
 					parentID,
 					height,
 					tx,
+					[]*txs.Tx{},
 				)
 				require.NoError(err)
 				return expectedBlk

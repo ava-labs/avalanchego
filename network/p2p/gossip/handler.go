@@ -5,7 +5,6 @@ package gossip
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
@@ -20,11 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var (
-	_ p2p.Handler = (*Handler[Gossipable])(nil)
-
-	ErrInvalidID = errors.New("invalid id")
-)
+var _ p2p.Handler = (*Handler[Gossipable])(nil)
 
 type HandlerConfig struct {
 	Namespace          string

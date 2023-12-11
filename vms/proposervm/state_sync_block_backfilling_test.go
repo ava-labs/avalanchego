@@ -1001,10 +1001,10 @@ func createPostForkStateSummary(
 		proVMParentStateSummaryBlk,
 		innerBlk.Timestamp(),
 		pchainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 
@@ -1078,12 +1078,14 @@ func setupBlockBackfillingVM(
 	// createVM
 	vm := New(
 		innerVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
+		Config{
+			ActivationTime:      time.Time{},
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 	)
 
 	ctx := snow.DefaultContextTest()
