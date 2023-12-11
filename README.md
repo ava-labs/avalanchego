@@ -118,7 +118,7 @@ instances to replicate the state. A synchronization library should also
 be developed for this milestone.
 
 - [x] Migrate to a fully async interface
-- [ ] :runner: Pluggable encoding for nodes, for optional compatibility with MerkleDB
+- [x] Pluggable encoding for nodes, for optional compatibility with MerkleDB
 - [ ] :runner: MerkleDB root hash in parity for seamless transition between MerkleDB
       and Firewood.
 - [ ] :runner: Support replicating the full state with corresponding range proofs that
