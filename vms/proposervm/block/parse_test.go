@@ -65,6 +65,7 @@ func TestParseDuplicateExtension(t *testing.T) {
 	blockBytes, err := hex.DecodeString(blockHex)
 	require.NoError(err)
 
+	// Note: The above blockHex specifies 123 as the block's timestamp.
 	timestamp := time.Unix(123, 0)
 	durangoNotYetActivatedTime := timestamp.Add(time.Second)
 	durangoAlreadyActivatedTime := timestamp.Add(-time.Second)
