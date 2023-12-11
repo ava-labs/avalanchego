@@ -17,6 +17,7 @@ type Config struct {
 	// Minimal P-chain height referenced upon block building
 	MinimumPChainHeight uint64
 
+	// Durango fork activation time
 	DurangoTime time.Time
 
 	// Configurable minimal delay among blocks issued consecutively
