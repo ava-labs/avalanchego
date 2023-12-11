@@ -27,15 +27,12 @@ func (m defaultMap) get(key uint64, defaultVal uint64) uint64 {
 // Sampling is performed in O(count) time and O(count) space.
 type uniformReplacer struct {
 	rng        *rng
-	seededRNG  *rng
 	length     uint64
 	drawn      defaultMap
 	drawsCount uint64
 }
 
 func (s *uniformReplacer) Initialize(length uint64) {
-	s.rng = globalRNG
-	s.seededRNG = newRNG()
 	s.length = length
 	s.drawn = make(defaultMap)
 	s.drawsCount = 0
@@ -53,15 +50,6 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 		results[i] = ret
 	}
 	return results, nil
-}
-
-func (s *uniformReplacer) Seed(seed uint64) {
-	s.rng = s.seededRNG
-	s.rng.Seed(seed)
-}
-
-func (s *uniformReplacer) ClearSeed() {
-	s.rng = globalRNG
 }
 
 func (s *uniformReplacer) Reset() {

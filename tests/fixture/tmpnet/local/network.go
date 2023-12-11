@@ -21,8 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 const (
@@ -238,18 +240,18 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	}
 
 	// Ensure each node has keys and an associated node ID. This
-	// ensures the availability of validator node IDs for genesis
-	// generation.
+	// ensures the availability of node IDs and proofs of possession
+	// for genesis generation.
 	for _, node := range ln.Nodes {
 		if err := node.EnsureKeys(); err != nil {
 			return err
 		}
 	}
 
-	// Assume all initial nodes are validator ids
-	validatorIDs := make([]ids.NodeID, 0, len(ln.Nodes))
-	for _, node := range ln.Nodes {
-		validatorIDs = append(validatorIDs, node.NodeID)
+	// Assume all the initial nodes are stakers
+	initialStakers, err := stakersForNodes(networkID, ln.Nodes)
+	if err != nil {
+		return err
 	}
 
 	if keyCount > 0 {
@@ -265,7 +267,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 		ln.FundedKeys = keys
 	}
 
-	if err := ln.EnsureGenesis(networkID, validatorIDs); err != nil {
+	if err := ln.EnsureGenesis(networkID, initialStakers); err != nil {
 		return err
 	}
 
@@ -712,4 +714,32 @@ func (ln *LocalNetwork) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
+}
+
+// Returns staker configuration for the given set of nodes.
+func stakersForNodes(networkID uint32, nodes []*LocalNode) ([]genesis.UnparsedStaker, error) {
+	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
+	// will be easier to perform with nodes other than the initial validators since the timing of
+	// staking can be more easily controlled.
+	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to format reward address: %w", err)
+	}
+
+	// Configure provided nodes as initial stakers
+	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
+	for i, node := range nodes {
+		pop, err := node.GetProofOfPossession()
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive proof of possession: %w", err)
+		}
+		initialStakers[i] = genesis.UnparsedStaker{
+			NodeID:        node.NodeID,
+			RewardAddress: rewardAddr,
+			DelegationFee: .01 * reward.PercentDenominator,
+			Signer:        pop,
+		}
+	}
+
+	return initialStakers, nil
 }

@@ -13,11 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-type standardBlockState struct {
-	onAcceptFunc func()
-	inputs       set.Set[ids.ID]
-}
-
 type proposalBlockState struct {
 	initiallyPreferCommit bool
 	onCommitState         state.Diff
@@ -27,11 +22,13 @@ type proposalBlockState struct {
 // The state of a block.
 // Note that not all fields will be set for a given block.
 type blockState struct {
-	standardBlockState
 	proposalBlockState
 	statelessBlock block.Block
-	onAcceptState  state.Diff
 
+	onAcceptState state.Diff
+	onAcceptFunc  func()
+
+	inputs         set.Set[ids.ID]
 	timestamp      time.Time
 	atomicRequests map[ids.ID]*atomic.Requests
 }
