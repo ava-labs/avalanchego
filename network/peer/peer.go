@@ -1009,9 +1009,12 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		close(p.onFinishHandshake)
 	}
 
-	// the peers this peer told us about
-	beforeDurango := time.Now().Before(version.GetDurangoTime(p.NetworkID))
-	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts))
+	// Invariant: We do not account for clock skew here, as the sender of the
+	// certificate is expected to account for clock skew during the activation
+	// of Durango.
+	durangoTime := version.GetDurangoTime(p.NetworkID)
+	beforeDurango := time.Now().Before(durangoTime)
+	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts)) // the peers this peer told us about
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
 		var (
 			tlsCert *staking.Certificate
