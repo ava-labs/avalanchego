@@ -70,7 +70,7 @@ func FuzzParseCertificate(f *testing.F) {
 			_, err := ParseCertificatePermissive(certBytes)
 			if err != nil {
 				_, err = ParseCertificate(certBytes)
-				require.Error(t, err)
+				require.Error(t, err) //nolint:forbidigo
 			}
 		}
 	})
