@@ -232,7 +232,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func buildBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager blockexecutor.Manager, timestamp time.Time) ([]*txs.Tx, error) {
+func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager blockexecutor.Manager, timestamp time.Time) ([]*txs.Tx, error) {
 	preferredID := manager.Preferred()
 	stateDiff, err := state.NewDiff(preferredID, manager)
 	if err != nil {
@@ -332,7 +332,7 @@ func buildBlock(
 		blockTxs := []*txs.Tx{}
 		// TODO: Cleanup post-Durango
 		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
-			blockTxs, err = buildBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+			blockTxs, err = packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build blockTxs: %w", err)
 			}
@@ -347,7 +347,7 @@ func buildBlock(
 		)
 	}
 
-	blockTxs, err := buildBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+	blockTxs, err := packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build blockTxs: %w", err)
 	}
