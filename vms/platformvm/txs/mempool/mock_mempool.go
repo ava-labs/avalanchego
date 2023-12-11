@@ -52,30 +52,6 @@ func (mr *MockMempoolMockRecorder) Add(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockMempool)(nil).Add), arg0)
 }
 
-// DisableAdding mocks base method.
-func (m *MockMempool) DisableAdding() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DisableAdding")
-}
-
-// DisableAdding indicates an expected call of DisableAdding.
-func (mr *MockMempoolMockRecorder) DisableAdding() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableAdding", reflect.TypeOf((*MockMempool)(nil).DisableAdding))
-}
-
-// EnableAdding mocks base method.
-func (m *MockMempool) EnableAdding() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "EnableAdding")
-}
-
-// EnableAdding indicates an expected call of EnableAdding.
-func (mr *MockMempoolMockRecorder) EnableAdding() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableAdding", reflect.TypeOf((*MockMempool)(nil).EnableAdding))
-}
-
 // Get mocks base method.
 func (m *MockMempool) Get(arg0 ids.ID) *txs.Tx {
 	m.ctrl.T.Helper()
@@ -131,17 +107,17 @@ func (mr *MockMempoolMockRecorder) MarkDropped(arg0, arg1 interface{}) *gomock.C
 }
 
 // Peek mocks base method.
-func (m *MockMempool) Peek(arg0 int) *txs.Tx {
+func (m *MockMempool) Peek() *txs.Tx {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Peek", arg0)
+	ret := m.ctrl.Call(m, "Peek")
 	ret0, _ := ret[0].(*txs.Tx)
 	return ret0
 }
 
 // Peek indicates an expected call of Peek.
-func (mr *MockMempoolMockRecorder) Peek(arg0 interface{}) *gomock.Call {
+func (mr *MockMempoolMockRecorder) Peek() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Peek", reflect.TypeOf((*MockMempool)(nil).Peek), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Peek", reflect.TypeOf((*MockMempool)(nil).Peek))
 }
 
 // Remove mocks base method.
