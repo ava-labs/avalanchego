@@ -675,65 +675,6 @@ func TestBuildBlock(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		{
-			name: "has a staker tx with force",
-			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There are no decision txs
-				// There is a staker tx.
-				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-
-				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx, true),
-					mempool.EXPECT().Remove([]*txs.Tx{tx}),
-					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil, false),
-				)
-
-				clk := &mockable.Clock{}
-				clk.Set(now)
-				return &builder{
-					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
-						Clk: clk,
-					},
-				}
-			},
-			timestamp:        parentTimestamp,
-			forceAdvanceTime: true,
-			parentStateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime].
-				// Next validator change time is in the future.
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				gomock.InOrder(
-					// expect calls from [getNextStakerToReward]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					}),
-					currentStakerIter.EXPECT().Release(),
-				)
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
-				return s
-			},
-			expectedBlkF: func(require *require.Assertions) block.Block {
-				expectedBlk, err := block.NewBanffStandardBlock(
-					parentTimestamp,
-					parentID,
-					height,
-					[]*txs.Tx{tx},
-				)
-				require.NoError(err)
-				return expectedBlk
-			},
-			expectedErr: nil,
-		},
 	}
 
 	for _, tt := range tests {
