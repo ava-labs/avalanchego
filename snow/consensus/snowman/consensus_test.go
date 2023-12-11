@@ -17,12 +17,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"gonum.org/v1/gonum/mathext/prng"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
 type testFunc func(*testing.T, Factory)
@@ -1599,13 +1600,13 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		}
-		seed uint64 = 0
+		seed   uint64 = 0
+		source        = prng.NewMT19937()
 	)
 
-	sampler.Seed(seed)
+	source.Seed(seed)
 
-	n := Network{}
-	n.Initialize(params, numColors)
+	n := NewNetwork(params, numColors, source)
 
 	for i := 0; i < numNodes; i++ {
 		require.NoError(n.AddNode(factory.New()))
