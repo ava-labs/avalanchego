@@ -55,22 +55,32 @@ func BenchmarkParse(b *testing.B) {
 }
 
 func FuzzParseCertificate(f *testing.F) {
+	tlsCert, err := NewTLSCert()
+	require.NoError(f, err)
+
+	f.Add(tlsCert.Leaf.Raw)
 	f.Add(largeRSAKeyCert)
 	f.Fuzz(func(t *testing.T, certBytes []byte) {
+		require := require.New(t)
+
+		// Verify that any certificate that can be parsed by ParseCertificate
+		// can also be parsed by ParseCertificatePermissive.
 		{
 			strictCert, err := ParseCertificate(certBytes)
 			if err == nil {
 				permissiveCert, err := ParseCertificatePermissive(certBytes)
-				require.NoError(t, err)
-				require.Equal(t, strictCert, permissiveCert)
+				require.NoError(err)
+				require.Equal(strictCert, permissiveCert)
 			}
 		}
 
+		// Verify that any certificate that can't be parsed by
+		// ParseCertificatePermissive also can't be parsed by ParseCertificate.
 		{
 			_, err := ParseCertificatePermissive(certBytes)
 			if err != nil {
 				_, err = ParseCertificate(certBytes)
-				require.Error(t, err) //nolint:forbidigo
+				require.Error(err) //nolint:forbidigo
 			}
 		}
 	})
