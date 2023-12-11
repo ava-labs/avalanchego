@@ -15,15 +15,12 @@ import "golang.org/x/exp/maps"
 //
 // Sampling is performed in O(count) time and O(count) space.
 type uniformResample struct {
-	rng       *rng
-	seededRNG *rng
-	length    uint64
-	drawn     map[uint64]struct{}
+	rng    *rng
+	length uint64
+	drawn  map[uint64]struct{}
 }
 
 func (s *uniformResample) Initialize(length uint64) {
-	s.rng = globalRNG
-	s.seededRNG = newRNG()
 	s.length = length
 	s.drawn = make(map[uint64]struct{})
 }
@@ -40,15 +37,6 @@ func (s *uniformResample) Sample(count int) ([]uint64, error) {
 		results[i] = ret
 	}
 	return results, nil
-}
-
-func (s *uniformResample) Seed(seed uint64) {
-	s.rng = s.seededRNG
-	s.rng.Seed(seed)
-}
-
-func (s *uniformResample) ClearSeed() {
-	s.rng = globalRNG
 }
 
 func (s *uniformResample) Reset() {

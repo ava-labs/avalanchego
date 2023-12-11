@@ -322,7 +322,6 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},
-				standardBlockState: standardBlockState{},
 			},
 		},
 		Mempool: mempool,
@@ -392,7 +391,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},
-				standardBlockState: standardBlockState{},
 			},
 		},
 		Mempool: mempool,
@@ -686,11 +684,9 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			grandParentID: {
-				standardBlockState: standardBlockState{
-					inputs: atomicInputs,
-				},
 				statelessBlock: grandParentStatelessBlk,
 				onAcceptState:  grandParentState,
+				inputs:         atomicInputs,
 			},
 			parentID: {
 				statelessBlock: parentStatelessBlk,
@@ -784,7 +780,6 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},
-				standardBlockState: standardBlockState{},
 			},
 		},
 		Mempool: mempool,
@@ -842,7 +837,6 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 					onCommitState: parentOnCommitState,
 					onAbortState:  parentOnAbortState,
 				},
-				standardBlockState: standardBlockState{},
 			},
 		},
 		Mempool: mempool,
