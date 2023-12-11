@@ -7,6 +7,8 @@ import (
 	"context"
 	"time"
 
+	"gonum.org/v1/gonum/mathext/prng"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -57,7 +59,6 @@ type windower struct {
 	state       validators.State
 	subnetID    ids.ID
 	chainSource uint64
-	sampler     sampler.WeightedWithoutReplacement
 }
 
 func New(state validators.State, subnetID, chainID ids.ID) Windower {
@@ -66,7 +67,6 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 		state:       state,
 		subnetID:    subnetID,
 		chainSource: w.UnpackLong(),
-		sampler:     sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
 }
 
@@ -103,7 +103,12 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		validatorWeights[i] = v.weight
 	}
 
-	if err := w.sampler.Initialize(validatorWeights); err != nil {
+	seed := chainHeight ^ w.chainSource
+
+	source := prng.NewMT19937()
+	source.Seed(seed)
+	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
+	if err := sampler.Initialize(validatorWeights); err != nil {
 		return nil, err
 	}
 
@@ -112,10 +117,7 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		numToSample = int(weight)
 	}
 
-	seed := chainHeight ^ w.chainSource
-	w.sampler.Seed(seed)
-
-	indices, err := w.sampler.Sample(numToSample)
+	indices, err := sampler.Sample(numToSample)
 	if err != nil {
 		return nil, err
 	}
