@@ -283,21 +283,11 @@ func buildBlock(
 	)
 
 	for {
-		builder.txExecutorBackend.Ctx.Log.Error("[builder.buildBlock] mempool: peeking tx",
-			zap.Int("remainingSize", remainingSize),
-			zap.Error(err),
-		)
 		tx := builder.Mempool.Peek()
 		if tx == nil || len(tx.Bytes()) > remainingSize {
 			break
 		}
 		builder.Mempool.Remove([]*txs.Tx{tx})
-
-		txID := tx.ID()
-		builder.txExecutorBackend.Ctx.Log.Error("[builder.buildBlock] mempool: removed tx",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
 
 		remainingSize -= len(tx.Bytes())
 		blockTxs = append(blockTxs, tx)
