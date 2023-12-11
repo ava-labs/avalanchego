@@ -77,6 +77,8 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter, durangoTim
 	// Invariant: ParseCertificate is used rather than CertificateFromX509 to
 	// ensure that signature verification can assume the certificate was
 	// parseable according the staking package's parser.
+	//
+	// TODO: Remove pre-Durango parsing after v1.11.x has activated.
 	var (
 		peerCert *staking.Certificate
 		err      error
