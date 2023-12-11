@@ -311,6 +311,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	parentOnDecisionState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
@@ -319,8 +320,9 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			parentID: {
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: parentOnCommitState,
-					onAbortState:  parentOnAbortState,
+					onDecisionState: parentOnDecisionState,
+					onCommitState:   parentOnCommitState,
+					onAbortState:    parentOnAbortState,
 				},
 			},
 		},
@@ -354,6 +356,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+		parentOnDecisionState.EXPECT().Apply(parentOnCommitState).Return(nil),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
@@ -380,6 +383,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	parentOnDecisionState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
@@ -388,8 +392,9 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			parentID: {
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: parentOnCommitState,
-					onAbortState:  parentOnAbortState,
+					onDecisionState: parentOnDecisionState,
+					onCommitState:   parentOnCommitState,
+					onAbortState:    parentOnAbortState,
 				},
 			},
 		},
@@ -423,6 +428,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+		parentOnDecisionState.EXPECT().Apply(parentOnAbortState).Return(nil),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
@@ -547,9 +553,11 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := defaultGenesisTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 
+			onDecisionState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			onAbortState, err := state.NewDiff(parentID, backend)
@@ -558,8 +566,9 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: onCommitState,
-					onAbortState:  onAbortState,
+					onDecisionState: onDecisionState,
+					onCommitState:   onCommitState,
+					onAbortState:    onAbortState,
 				},
 			}
 
@@ -640,9 +649,11 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := defaultGenesisTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 
+			onDecisionState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			onAbortState, err := state.NewDiff(parentID, backend)
@@ -651,8 +662,9 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: onCommitState,
-					onAbortState:  onAbortState,
+					onDecisionState: onDecisionState,
+					onCommitState:   onCommitState,
+					onAbortState:    onAbortState,
 				},
 			}
 
