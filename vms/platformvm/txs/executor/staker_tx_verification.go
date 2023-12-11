@@ -44,7 +44,11 @@ var (
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
 // network requirements for [subnetValidator]. An error is returned if they
 // are not fulfilled.
-func verifySubnetValidatorPrimaryNetworkRequirements(backend *Backend, chainState state.Chain, subnetValidator txs.Validator) error {
+func verifySubnetValidatorPrimaryNetworkRequirements(
+	backend *Backend,
+	chainState state.Chain,
+	subnetValidator txs.Validator,
+) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf(
