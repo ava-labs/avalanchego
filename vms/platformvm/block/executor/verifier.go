@@ -319,7 +319,7 @@ func (v *verifier) commonBlock(b block.Block) error {
 // abortBlock populates the state of this block if [nil] is returned
 func (v *verifier) abortBlock(b block.Block) error {
 	parentID := b.Parent()
-	onAcceptState, ok := v.getOnAbortState(parentID)
+	parentState, ok := v.getBlkWithOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
@@ -327,8 +327,13 @@ func (v *verifier) abortBlock(b block.Block) error {
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
+
+		onAcceptState: parentState.onAbortState,
+		onAcceptFunc:  parentState.onAcceptFunc,
+
+		inputs:         parentState.inputs,
+		timestamp:      parentState.onAbortState.GetTimestamp(),
+		atomicRequests: parentState.atomicRequests,
 	}
 	return nil
 }
@@ -336,7 +341,7 @@ func (v *verifier) abortBlock(b block.Block) error {
 // commitBlock populates the state of this block if [nil] is returned
 func (v *verifier) commitBlock(b block.Block) error {
 	parentID := b.Parent()
-	onAcceptState, ok := v.getOnCommitState(parentID)
+	parentState, ok := v.getBlkWithOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
@@ -344,8 +349,13 @@ func (v *verifier) commitBlock(b block.Block) error {
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
+
+		onAcceptState: parentState.onCommitState,
+		onAcceptFunc:  parentState.onAcceptFunc,
+
+		inputs:         parentState.inputs,
+		timestamp:      parentState.onCommitState.GetTimestamp(),
+		atomicRequests: parentState.atomicRequests,
 	}
 	return nil
 }
