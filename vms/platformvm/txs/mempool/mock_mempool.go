@@ -109,20 +109,6 @@ func (mr *MockMempoolMockRecorder) Has(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Has", reflect.TypeOf((*MockMempool)(nil).Has), arg0)
 }
 
-// HasTxs mocks base method.
-func (m *MockMempool) HasTxs() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasTxs")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// HasTxs indicates an expected call of HasTxs.
-func (mr *MockMempoolMockRecorder) HasTxs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasTxs", reflect.TypeOf((*MockMempool)(nil).HasTxs))
-}
-
 // MarkDropped mocks base method.
 func (m *MockMempool) MarkDropped(arg0 ids.ID, arg1 error) {
 	m.ctrl.T.Helper()
@@ -135,18 +121,19 @@ func (mr *MockMempoolMockRecorder) MarkDropped(arg0, arg1 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkDropped", reflect.TypeOf((*MockMempool)(nil).MarkDropped), arg0, arg1)
 }
 
-// PeekTxs mocks base method.
-func (m *MockMempool) PeekTxs(arg0 int) []*txs.Tx {
+// Peek mocks base method.
+func (m *MockMempool) Peek() (*txs.Tx, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PeekTxs", arg0)
-	ret0, _ := ret[0].([]*txs.Tx)
-	return ret0
+	ret := m.ctrl.Call(m, "Peek")
+	ret0, _ := ret[0].(*txs.Tx)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
-// PeekTxs indicates an expected call of PeekTxs.
-func (mr *MockMempoolMockRecorder) PeekTxs(arg0 interface{}) *gomock.Call {
+// Peek indicates an expected call of Peek.
+func (mr *MockMempoolMockRecorder) Peek() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekTxs", reflect.TypeOf((*MockMempool)(nil).PeekTxs), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Peek", reflect.TypeOf((*MockMempool)(nil).Peek))
 }
 
 // Remove mocks base method.

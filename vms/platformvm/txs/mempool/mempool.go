@@ -50,13 +50,8 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Following Banff activation, all mempool transactions,
-	// (both decision and staker) are included into Standard blocks.
-	// HasTxs allow to check for availability of any mempool transaction.
-	HasTxs() bool
-	// PeekTxs returns the next txs for Banff blocks
-	// up to maxTxsBytes without removing them from the mempool.
-	PeekTxs(maxTxsBytes int) []*txs.Tx
+	// Peek returns the oldest tx in the mempool.
+	Peek() (tx *txs.Tx, exists bool)
 
 	// Drops all [txs.Staker] transactions whose [StartTime] is before
 	// [minStartTime] from [mempool]. The dropped tx ids are returned.
@@ -210,23 +205,9 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	}
 }
 
-func (m *mempool) HasTxs() bool {
-	return m.unissuedTxs.Len() > 0
-}
-
-func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	var txs []*txs.Tx
-	txIter := m.unissuedTxs.NewIterator()
-	size := 0
-	for txIter.Next() {
-		tx := txIter.Value()
-		size += len(tx.Bytes())
-		if size > maxTxsBytes {
-			return txs
-		}
-		txs = append(txs, tx)
-	}
-	return txs
+func (m *mempool) Peek() (*txs.Tx, bool) {
+	_, tx, exists := m.unissuedTxs.Oldest()
+	return tx, exists
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
@@ -239,7 +220,7 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	if !emptyBlockPermitted && !m.HasTxs() {
+	if !emptyBlockPermitted && m.unissuedTxs.Len() == 0 {
 		return
 	}
 
