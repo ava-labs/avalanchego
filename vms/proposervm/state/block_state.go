@@ -67,11 +67,7 @@ func NewBlockState(db database.Database) BlockState {
 	}
 }
 
-func NewMeteredBlockState(
-	db database.Database,
-	namespace string,
-	metrics prometheus.Registerer,
-) (BlockState, error) {
+func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer) (BlockState, error) {
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		fmt.Sprintf("%s_block_cache", namespace),
 		metrics,
