@@ -41,6 +41,17 @@ var (
 )
 
 type Windower interface {
+	// Proposers returns the proposer list for building a block at [chainHeight]
+	// when the validator set is defined at [pChainHeight]. The list is returned
+	// in order. The minimum delay of a validator is the index they appear times
+	// [WindowDuration].
+	Proposers(
+		ctx context.Context,
+		chainHeight,
+		pChainHeight uint64,
+		maxWindows int,
+	) ([]ids.NodeID, error)
+
 	// Delay returns the amount of time that [validatorID] must wait before
 	// building a block at [chainHeight] when the validator set is defined at
 	// [pChainHeight].
@@ -87,12 +98,51 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	}
 }
 
+func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
+	validators, err := w.sortedValidators(ctx, pChainHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		seed             = chainHeight ^ w.chainSource
+		source           = prng.NewMT19937()
+		validatorWeights = validatorsToWeight(validators)
+	)
+
+	source.Seed(seed)
+	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
+	if err := sampler.Initialize(validatorWeights); err != nil {
+		return nil, err
+	}
+
+	var totalWeight uint64
+	for _, weight := range validatorWeights {
+		totalWeight, err = math.Add64(totalWeight, weight)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	numToSample := int(math.Min(uint64(maxWindows), totalWeight))
+	indices, err := sampler.Sample(numToSample)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeIDs := make([]ids.NodeID, numToSample)
+	for i, index := range indices {
+		nodeIDs[i] = validators[index].id
+	}
+	return nodeIDs, nil
+}
+
 func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
 		return time.Duration(maxWindows) * WindowDuration, nil
 	}
 
-	proposers, err := w.proposers(ctx, chainHeight, pChainHeight, maxWindows)
+	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight, maxWindows)
 	if err != nil {
 		return 0, err
 	}
@@ -180,49 +230,6 @@ func (w *windower) MinDelayForProposer(
 		res = res.Add(WindowDuration)
 	}
 	return time.Time{}, ErrNoSlotsScheduledInNextFuture
-}
-
-// proposers returns the proposer list for building a block at [chainHeight]
-// when the validator set is defined at [pChainHeight]. The list is returned
-// in order. The minimum delay of a validator is the index they appear times
-// [WindowDuration].
-func (w *windower) proposers(ctx context.Context, chainHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
-	validators, err := w.sortedValidators(ctx, pChainHeight)
-	if err != nil {
-		return nil, err
-	}
-
-	var (
-		seed             = chainHeight ^ w.chainSource
-		source           = prng.NewMT19937()
-		validatorWeights = validatorsToWeight(validators)
-	)
-
-	source.Seed(seed)
-	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
-	if err := sampler.Initialize(validatorWeights); err != nil {
-		return nil, err
-	}
-
-	var totalWeight uint64
-	for _, weight := range validatorWeights {
-		totalWeight, err = math.Add64(totalWeight, weight)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	numToSample := int(math.Min(uint64(maxWindows), totalWeight))
-	indices, err := sampler.Sample(numToSample)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeIDs := make([]ids.NodeID, numToSample)
-	for i, index := range indices {
-		nodeIDs[i] = validators[index].id
-	}
-	return nodeIDs, nil
 }
 
 func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([]validatorData, error) {
