@@ -647,19 +647,17 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
-	env.sender.SendAppGossipF = func(context.Context, []byte) error {
-		return nil
-	}
+	var (
+		now                   = env.backend.Clk.Time()
+		defaultValidatorStake = 100 * units.MilliAvax
 
-	now := env.backend.Clk.Time()
-
-	defaultValidatorStake := 100 * units.MilliAvax
-
-	// Add a validator with StartTime in the future within [MaxFutureStartTime]
-	validatorStartTime := now.Add(txexecutor.MaxFutureStartTime - 1*time.Second)
-	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
+		// Add a validator with StartTime in the future within [MaxFutureStartTime]
+		validatorStartTime = now.Add(txexecutor.MaxFutureStartTime - 1*time.Second)
+		validatorEndTime   = validatorStartTime.Add(360 * 24 * time.Hour)
+	)
 
 	tx1, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
@@ -728,6 +726,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.False(env.mempool.Has(tx2ID))
 	require.False(env.mempool.Has(tx3ID))
 
+	// Only tx2 and tx3 should be dropped
 	require.NoError(env.mempool.GetDropReason(tx1ID))
 
 	tx2DropReason := env.mempool.GetDropReason(tx2ID)
