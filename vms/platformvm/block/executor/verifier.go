@@ -318,7 +318,7 @@ func (v *verifier) commonBlock(b block.Block) error {
 // abortBlock populates the state of this block if [nil] is returned
 func (v *verifier) abortBlock(b block.Block) error {
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	parentState, ok := v.getBlkWithOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
@@ -340,7 +340,7 @@ func (v *verifier) abortBlock(b block.Block) error {
 // commitBlock populates the state of this block if [nil] is returned
 func (v *verifier) commitBlock(b block.Block) error {
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	parentState, ok := v.getBlkWithOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
