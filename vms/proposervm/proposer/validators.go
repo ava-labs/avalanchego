@@ -15,6 +15,6 @@ type validatorData struct {
 	weight uint64
 }
 
-func (d validatorData) Less(other validatorData) bool {
-	return d.id.Less(other.id)
+func (d validatorData) Compare(other validatorData) int {
+	return d.id.Compare(other.id)
 }

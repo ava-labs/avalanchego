@@ -48,8 +48,8 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Peek returns the first tx in the mempool whose size is <= [maxTxSize].
-	Peek(maxTxSize int) *txs.Tx
+	// Peek returns the oldest tx in the mempool.
+	Peek() *txs.Tx
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built if there is at least one transaction in the mempool.
@@ -182,16 +182,9 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	}
 }
 
-func (m *mempool) Peek(maxTxSize int) *txs.Tx {
-	txIter := m.unissuedTxs.NewIterator()
-	for txIter.Next() {
-		tx := txIter.Value()
-		txSize := len(tx.Bytes())
-		if txSize <= maxTxSize {
-			return tx
-		}
-	}
-	return nil
+func (m *mempool) Peek() *txs.Tx {
+	_, tx, _ := m.unissuedTxs.Oldest()
+	return tx
 }
 
 func (m *mempool) RequestBuildBlock() {
