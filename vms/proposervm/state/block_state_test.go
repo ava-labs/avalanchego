@@ -68,7 +68,7 @@ func TestBlockState(t *testing.T) {
 	a := require.New(t)
 
 	db := memdb.New()
-	bs := NewBlockState(db, time.Now())
+	bs := NewBlockState(db)
 
 	testBlockState(a, bs)
 }
@@ -77,7 +77,7 @@ func TestMeteredBlockState(t *testing.T) {
 	a := require.New(t)
 
 	db := memdb.New()
-	bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry(), time.Now())
+	bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry())
 	a.NoError(err)
 
 	testBlockState(a, bs)

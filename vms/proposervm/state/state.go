@@ -4,8 +4,6 @@
 package state
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -30,29 +28,24 @@ type state struct {
 	HeightIndex
 }
 
-func New(db *versiondb.Database, durangoTime time.Time) State {
+func New(db *versiondb.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	return &state{
 		ChainState:  NewChainState(chainDB),
-		BlockState:  NewBlockState(blockDB, durangoTime),
+		BlockState:  NewBlockState(blockDB),
 		HeightIndex: NewHeightIndex(heightDB, db),
 	}
 }
 
-func NewMetered(
-	db *versiondb.Database,
-	namespace string,
-	metrics prometheus.Registerer,
-	durangoTime time.Time,
-) (State, error) {
+func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
-	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics, durangoTime)
+	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics)
 	if err != nil {
 		return nil, err
 	}

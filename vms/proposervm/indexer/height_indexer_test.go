@@ -27,7 +27,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	storedState := state.New(vdb, time.Now())
+	storedState := state.New(vdb)
 
 	// Build a chain of post fork blocks
 	var (
@@ -106,7 +106,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	storedState := state.New(vdb, time.Now())
+	storedState := state.New(vdb)
 
 	// Build a chain of post fork blocks
 	var (
@@ -190,7 +190,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	storedState := state.New(vdb, time.Now())
+	storedState := state.New(vdb)
 
 	// Build a chain of post fork blocks
 	var (

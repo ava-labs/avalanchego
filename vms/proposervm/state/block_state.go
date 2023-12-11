@@ -6,7 +6,6 @@ package state
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -36,8 +36,6 @@ type BlockState interface {
 }
 
 type blockState struct {
-	durangoTime time.Time
-
 	// Caches BlockID -> Block. If the Block is nil, that means the block is not
 	// in storage.
 	blkCache cache.Cacher[ids.ID, *blockWrapper]
@@ -59,9 +57,8 @@ func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
 	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
-func NewBlockState(db database.Database, durangoTime time.Time) BlockState {
+func NewBlockState(db database.Database) BlockState {
 	return &blockState{
-		durangoTime: durangoTime,
 		blkCache: cache.NewSizedLRU[ids.ID, *blockWrapper](
 			blockCacheSize,
 			cachedBlockSize,
@@ -74,7 +71,6 @@ func NewMeteredBlockState(
 	db database.Database,
 	namespace string,
 	metrics prometheus.Registerer,
-	durangoTime time.Time,
 ) (BlockState, error) {
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		fmt.Sprintf("%s_block_cache", namespace),
@@ -86,9 +82,8 @@ func NewMeteredBlockState(
 	)
 
 	return &blockState{
-		durangoTime: durangoTime,
-		blkCache:    blkCache,
-		db:          db,
+		blkCache: blkCache,
+		db:       db,
 	}, err
 }
 
@@ -114,12 +109,16 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}
-	if parsedVersion != version {
+	if parsedVersion != codecVersion {
 		return nil, choices.Unknown, errBlockWrongVersion
 	}
 
 	// The key was in the database
-	blk, err := block.Parse(blkWrapper.Block, s.durangoTime)
+	//
+	// Invariant: Blocks stored on disk were previously accepted by this node.
+	// Because the durango activation relaxes TLS cert parsing rules, we assume
+	// it is always activated here.
+	blk, err := block.Parse(blkWrapper.Block, version.DefaultUpgradeTime)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}
@@ -136,7 +135,7 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 		block:  blk,
 	}
 
-	bytes, err := c.Marshal(version, &blkWrapper)
+	bytes, err := c.Marshal(codecVersion, &blkWrapper)
 	if err != nil {
 		return err
 	}

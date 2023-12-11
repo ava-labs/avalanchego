@@ -5,7 +5,6 @@ package state
 
 import (
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -20,7 +19,7 @@ func TestState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s := New(vdb, time.Now())
+	s := New(vdb)
 
 	testBlockState(a, s)
 	testChainState(a, s)
@@ -31,7 +30,7 @@ func TestMeteredState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := NewMetered(vdb, "", prometheus.NewRegistry(), time.Now())
+	s, err := NewMetered(vdb, "", prometheus.NewRegistry())
 	a.NoError(err)
 
 	testBlockState(a, s)
