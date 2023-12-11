@@ -417,10 +417,10 @@ func TestBuildBlock(t *testing.T) {
 				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 
 				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx),
+					mempool.EXPECT().Peek().Return(tx, true),
 					mempool.EXPECT().Remove([]*txs.Tx{tx}),
 					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil),
+					mempool.EXPECT().Peek().Return(nil, false),
 				)
 
 				return &builder{
@@ -468,7 +468,7 @@ func TestBuildBlock(t *testing.T) {
 
 				// There are no txs.
 				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-				mempool.EXPECT().Peek().Return(nil)
+				mempool.EXPECT().Peek().Return(nil, false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -516,7 +516,7 @@ func TestBuildBlock(t *testing.T) {
 
 				// There are no txs.
 				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-				mempool.EXPECT().Peek().Return(nil)
+				mempool.EXPECT().Peek().Return(nil, false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -572,10 +572,10 @@ func TestBuildBlock(t *testing.T) {
 				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 
 				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx),
+					mempool.EXPECT().Peek().Return(tx, true),
 					mempool.EXPECT().Remove([]*txs.Tx{tx}),
 					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil),
+					mempool.EXPECT().Peek().Return(nil, false),
 				)
 
 				clk := &mockable.Clock{}
@@ -631,10 +631,10 @@ func TestBuildBlock(t *testing.T) {
 				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
 
 				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx),
+					mempool.EXPECT().Peek().Return(tx, true),
 					mempool.EXPECT().Remove([]*txs.Tx{tx}),
 					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil),
+					mempool.EXPECT().Peek().Return(nil, false),
 				)
 
 				clk := &mockable.Clock{}

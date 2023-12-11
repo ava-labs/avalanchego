@@ -283,8 +283,8 @@ func buildBlock(
 	)
 
 	for {
-		tx := builder.Mempool.Peek()
-		if tx == nil || len(tx.Bytes()) > remainingSize {
+		tx, exists := builder.Mempool.Peek()
+		if !exists || tx == nil || len(tx.Bytes()) > remainingSize {
 			break
 		}
 		builder.Mempool.Remove([]*txs.Tx{tx})
