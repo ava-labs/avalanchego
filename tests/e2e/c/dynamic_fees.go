@@ -42,7 +42,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		privateNetwork := e2e.Env.NewPrivateNetwork()
 
 		ginkgo.By("allocating a pre-funded key")
-		key := privateNetwork.GetConfig().FundedKeys[0]
+		key := privateNetwork.GetConfig().PreFundedKeys[0]
 		ethAddress := evm.GetEthAddress(key)
 
 		ginkgo.By("initializing a coreth client")

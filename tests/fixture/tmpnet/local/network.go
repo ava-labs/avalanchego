@@ -226,7 +226,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	if len(ln.Nodes) > 0 && nodeCount > 0 {
 		return errInvalidNodeCount
 	}
-	if len(ln.FundedKeys) > 0 && keyCount > 0 {
+	if len(ln.PreFundedKeys) > 0 && keyCount > 0 {
 		return errInvalidKeyCount
 	}
 
@@ -264,7 +264,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 			}
 			keys = append(keys, key)
 		}
-		ln.FundedKeys = keys
+		ln.PreFundedKeys = keys
 	}
 
 	if err := ln.EnsureGenesis(networkID, initialStakers); err != nil {
@@ -498,9 +498,9 @@ func (ln *LocalNetwork) WriteCChainConfig() error {
 
 // Used to marshal/unmarshal persistent local network defaults.
 type localDefaults struct {
-	Flags      tmpnet.FlagsMap
-	ExecPath   string
-	FundedKeys []*secp256k1.PrivateKey
+	Flags         tmpnet.FlagsMap
+	ExecPath      string
+	PreFundedKeys []*secp256k1.PrivateKey
 }
 
 func (ln *LocalNetwork) GetDefaultsPath() string {
@@ -518,15 +518,15 @@ func (ln *LocalNetwork) ReadDefaults() error {
 	}
 	ln.DefaultFlags = defaults.Flags
 	ln.ExecPath = defaults.ExecPath
-	ln.FundedKeys = defaults.FundedKeys
+	ln.PreFundedKeys = defaults.PreFundedKeys
 	return nil
 }
 
 func (ln *LocalNetwork) WriteDefaults() error {
 	defaults := localDefaults{
-		Flags:      ln.DefaultFlags,
-		ExecPath:   ln.ExecPath,
-		FundedKeys: ln.FundedKeys,
+		Flags:         ln.DefaultFlags,
+		ExecPath:      ln.ExecPath,
+		PreFundedKeys: ln.PreFundedKeys,
 	}
 	bytes, err := tmpnet.DefaultJSONMarshal(defaults)
 	if err != nil {

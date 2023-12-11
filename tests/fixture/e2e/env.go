@@ -75,7 +75,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 	tests.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
 
 	testDataServerURI, err := fixture.ServeTestData(fixture.TestData{
-		FundedKeys: network.FundedKeys,
+		PreFundedKeys: network.PreFundedKeys,
 	})
 	tests.Outf("{{green}}test data server URI: {{/}} %+v\n", testDataServerURI)
 	require.NoError(err)
@@ -104,21 +104,21 @@ func (te *TestEnvironment) GetNetwork() tmpnet.Network {
 }
 
 // Retrieve the specified number of funded keys allocated for the caller's exclusive use.
-func (te *TestEnvironment) AllocateFundedKeys(count int) []*secp256k1.PrivateKey {
-	keys, err := fixture.AllocateFundedKeys(te.TestDataServerURI, count)
+func (te *TestEnvironment) AllocatePreFundedKeys(count int) []*secp256k1.PrivateKey {
+	keys, err := fixture.AllocatePreFundedKeys(te.TestDataServerURI, count)
 	te.require.NoError(err)
-	tests.Outf("{{blue}} allocated funded key(s): %+v{{/}}\n", keys)
+	tests.Outf("{{blue}} allocated pre-funded key(s): %+v{{/}}\n", keys)
 	return keys
 }
 
 // Retrieve a funded key allocated for the caller's exclusive use.
-func (te *TestEnvironment) AllocateFundedKey() *secp256k1.PrivateKey {
-	return te.AllocateFundedKeys(1)[0]
+func (te *TestEnvironment) AllocatePreFundedKey() *secp256k1.PrivateKey {
+	return te.AllocatePreFundedKeys(1)[0]
 }
 
 // Create a new keychain with the specified number of test keys.
 func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
-	keys := te.AllocateFundedKeys(count)
+	keys := te.AllocatePreFundedKeys(count)
 	return secp256k1fx.NewKeychain(keys...)
 }
 
