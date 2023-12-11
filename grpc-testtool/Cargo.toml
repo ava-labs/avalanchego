@@ -21,12 +21,15 @@ prost = "0.12.0"
 thiserror = "1.0.47"
 tokio = { version = "1.32.0", features = ["sync", "rt-multi-thread"] }
 tonic = { version = "0.10.0", features = ["tls"] }
+tracing = { version = "0.1.16" }
+tracing-subscriber = { version = "0.3", features = ["tracing-log", "fmt", "env-filter"] }
 clap = { version = "4.4.11", features = ["derive"] }
 tempdir = "0.3.7"
 log = "0.4.20"
 env_logger = "0.10.1"
 chrono = "0.4.31"
-log-panics = { version = "2.1.0", features = ["backtrace", "with-backtrace"] }
+serde_json = "1.0.108"
+serde = { version = "1.0.193", features = ["derive"] }
 
 [build-dependencies]
 tonic-build = "0.10.0"

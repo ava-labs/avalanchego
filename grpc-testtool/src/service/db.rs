@@ -13,6 +13,7 @@ use tonic::{async_trait, Request, Response, Status};
 
 #[async_trait]
 impl DbServerTrait for Database {
+    #[tracing::instrument(level = "trace")]
     async fn get_merkle_root(
         &self,
         _request: Request<()>,
@@ -24,6 +25,7 @@ impl DbServerTrait for Database {
         Ok(Response::new(response))
     }
 
+    #[tracing::instrument(level = "trace")]
     async fn get_proof(
         &self,
         request: Request<GetProofRequest>,
@@ -34,6 +36,7 @@ impl DbServerTrait for Database {
         todo!()
     }
 
+    #[tracing::instrument(level = "trace")]
     async fn get_change_proof(
         &self,
         request: Request<GetChangeProofRequest>,
@@ -51,6 +54,7 @@ impl DbServerTrait for Database {
         todo!()
     }
 
+    #[tracing::instrument(level = "trace")]
     async fn verify_change_proof(
         &self,
         request: Request<VerifyChangeProofRequest>,
@@ -67,6 +71,7 @@ impl DbServerTrait for Database {
         todo!()
     }
 
+    #[tracing::instrument(level = "trace")]
     async fn commit_change_proof(
         &self,
         request: Request<CommitChangeProofRequest>,
@@ -76,6 +81,7 @@ impl DbServerTrait for Database {
         todo!()
     }
 
+    #[tracing::instrument(level = "trace")]
     async fn get_range_proof(
         &self,
         request: Request<GetRangeProofRequest>,
@@ -90,6 +96,7 @@ impl DbServerTrait for Database {
         todo!()
     }
 
+    #[tracing::instrument(level = "trace")]
     async fn commit_range_proof(
         &self,
         request: Request<CommitRangeProofRequest>,
