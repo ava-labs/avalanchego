@@ -63,6 +63,8 @@ func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
 
 // ValidateCertificate verifies that this certificate conforms to the required
 // staking format assuming that it was already able to be parsed.
+//
+// TODO: Remove after v1.11.x activates.
 func ValidateCertificate(cert *Certificate) error {
 	if len(cert.Raw) > MaxCertificateLen {
 		return ErrCertificateTooLarge
