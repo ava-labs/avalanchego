@@ -17,6 +17,7 @@ type proposalBlockState struct {
 	initiallyPreferCommit bool
 	onCommitState         state.Diff
 	onAbortState          state.Diff
+	onDecisionState       state.Diff
 }
 
 // The state of a block.
