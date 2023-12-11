@@ -194,16 +194,9 @@ func (b *builder) ShutdownBlockTimer() {
 // This method removes the transactions from the returned
 // blocks from the mempool.
 func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
-	defer func() {
-		// If we need to advance the chain's timestamp in a standard block, but
-		// we build an invalid block, then we need to re-trigger block building.
-		//
-		// TODO: Remove once we are guaranteed to build a valid block.
-		b.ResetBlockTimer()
-		// If there are still transactions in the mempool, then we need to
-		// re-trigger block building.
-		b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
-	}()
+	// If there are still transactions in the mempool, then we need to
+	// re-trigger block building.
+	defer b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
@@ -248,28 +241,6 @@ func buildBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (block.Block, error) {
-	// Try rewarding stakers whose staking period ends at the new chain time.
-	// This is done first to prioritize advancing the timestamp as quickly as
-	// possible.
-	stakerTxID, shouldReward, err := getNextStakerToReward(timestamp, parentState)
-	if err != nil {
-		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
-	}
-	if shouldReward {
-		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
-		if err != nil {
-			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
-		}
-
-		return block.NewBanffProposalBlock(
-			timestamp,
-			parentID,
-			height,
-			rewardValidatorTx,
-			[]*txs.Tx{}, // TODO: Populate with StandardBlock txs
-		)
-	}
-
 	preferredID := builder.blkManager.Preferred()
 	stateDiff, err := state.NewDiff(preferredID, builder.blkManager)
 	if err != nil {
@@ -339,6 +310,28 @@ func buildBlock(
 
 		remainingSize -= len(tx.Bytes())
 		blockTxs = append(blockTxs, tx)
+	}
+
+	// Try rewarding stakers whose staking period ends at the new chain time.
+	// This is done first to prioritize advancing the timestamp as quickly as
+	// possible.
+	stakerTxID, shouldReward, err := getNextStakerToReward(timestamp, parentState)
+	if err != nil {
+		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
+	}
+	if shouldReward {
+		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
+		if err != nil {
+			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
+		}
+
+		return block.NewBanffProposalBlock(
+			timestamp,
+			parentID,
+			height,
+			rewardValidatorTx,
+			blockTxs,
+		)
 	}
 
 	// If there is no reason to build a block, don't.
