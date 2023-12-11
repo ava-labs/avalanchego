@@ -148,6 +148,20 @@ func (p *postForkCommonComponents) Verify(
 			if err != nil {
 				return err
 			}
+
+			// Post durango, p.vm.Ctx.NodeID slot may be so far in time that we don't
+			// schedule it when resetting vm preferred block. So we make sure to reschedule timer
+			// every time we verify a block to avoid stalls where innerVM is ready to build a block
+			// but proposerVM has not scheduled its timer.
+			nextStartTime, err := p.vm.resetPostDurangoScheduler(ctx, child, childPChainHeight)
+			switch err {
+			case nil:
+				p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
+			case proposer.ErrNoSlotsScheduledInNextFuture:
+				// Can't schedule a slot now. We'll try later again
+			default:
+				return err
+			}
 		} else {
 			delay, err := p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 			if err != nil {
