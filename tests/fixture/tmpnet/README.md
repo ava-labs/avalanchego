@@ -24,12 +24,14 @@ repositories.
 The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
-| Filename    | Types   | Purpose                                       |
-|:------------|:--------|:----------------------------------------------|
-| defaults.go | <none>  | Default configuration                         |
-| network.go  | Network | Network-level orchestration and configuration |
-| node.go     | Node    | Node-level orchestration and configuration    |
-| util.go     | <none>  | Shared utility functions                      |
+| Filename          | Types       | Purpose                                        |
+|:------------------|:------------|:-----------------------------------------------|
+| defaults.go       |             | Defines common default configuration           |
+| flags.go          | FlagsMap    | Simplifies configuration of avalanchego flags  |
+| genesis.go        |             | Creates test genesis                           |
+| network.go        | Network     | Orchestrates and configures temporary networks |
+| node.go           | Node        | Orchestrates and configures nodes              |
+| utils.go          |             | Defines shared utility functions               |
 
 ## Usage
 

@@ -5,6 +5,7 @@ package tmpnet
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,11 +23,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
-var errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
+var (
+	errNodeAlreadyRunning     = errors.New("failed to start node: node is already running")
+	errMissingTLSKeyForNodeID = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingTLSKeyContentKey)
+	errMissingCertForNodeID   = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingCertContentKey)
+	errInvalidKeypair         = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
+)
 
 // Defines configuration to execute a node.
 //
@@ -39,19 +50,19 @@ type NodeRuntimeConfig struct {
 
 // Stores the configuration and process details of a node in a temporary network.
 type Node struct {
-	NodeConfig
 	NodeRuntimeConfig
 	node.NodeProcessContext
+
+	NodeID ids.NodeID
+	Flags  FlagsMap
 
 	// Configuration is intended to be stored at the path identified in NodeConfig.Flags[config.DataDirKey]
 }
 
 func NewNode(dataDir string) *Node {
 	return &Node{
-		NodeConfig: NodeConfig{
-			Flags: FlagsMap{
-				config.DataDirKey: dataDir,
-			},
+		Flags: FlagsMap{
+			config.DataDirKey: dataDir,
 		},
 	}
 }
@@ -83,11 +94,10 @@ func (n *Node) ReadConfig() error {
 	if err := json.Unmarshal(bytes, &flags); err != nil {
 		return fmt.Errorf("failed to unmarshal node config: %w", err)
 	}
-	config := NodeConfig{Flags: flags}
-	if err := config.EnsureNodeID(); err != nil {
+	n.Flags = flags
+	if err := n.EnsureNodeID(); err != nil {
 		return err
 	}
-	n.NodeConfig = config
 	return nil
 }
 
@@ -319,5 +329,145 @@ func (n *Node) WaitForProcessContext(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
+	return nil
+}
+
+// Convenience method for setting networking flags.
+func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
+	var (
+		// Use dynamic port allocation.
+		httpPort    uint16 = 0
+		stakingPort uint16 = 0
+	)
+	n.Flags[config.HTTPPortKey] = httpPort
+	n.Flags[config.StakingPortKey] = stakingPort
+	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
+	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
+}
+
+// Ensures staking and signing keys are generated if not already present and
+// that the node ID (derived from the staking keypair) is set.
+func (n *Node) EnsureKeys() error {
+	if err := n.EnsureBLSSigningKey(); err != nil {
+		return err
+	}
+	if err := n.EnsureStakingKeypair(); err != nil {
+		return err
+	}
+	// Once a staking keypair is guaranteed it is safe to derive the node ID
+	return n.EnsureNodeID()
+}
+
+// Derives the nodes proof-of-possession. Requires the node to have a
+// BLS signing key.
+func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
+	signingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
+	if err != nil {
+		return nil, err
+	}
+	signingKeyBytes, err := base64.StdEncoding.DecodeString(signingKey)
+	if err != nil {
+		return nil, err
+	}
+	secretKey, err := bls.SecretKeyFromBytes(signingKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	return signer.NewProofOfPossession(secretKey), nil
+}
+
+// Ensures a BLS signing key is generated if not already present.
+func (n *Node) EnsureBLSSigningKey() error {
+	// Attempt to retrieve an existing key
+	existingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
+	if err != nil {
+		return err
+	}
+	if len(existingKey) > 0 {
+		// Nothing to do
+		return nil
+	}
+
+	// Generate a new signing key
+	newKey, err := bls.NewSecretKey()
+	if err != nil {
+		return fmt.Errorf("failed to generate staking signer key: %w", err)
+	}
+	n.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(bls.SerializeSecretKey(newKey))
+	return nil
+}
+
+// Ensures a staking keypair is generated if not already present.
+func (n *Node) EnsureStakingKeypair() error {
+	keyKey := config.StakingTLSKeyContentKey
+	certKey := config.StakingCertContentKey
+
+	key, err := n.Flags.GetStringVal(keyKey)
+	if err != nil {
+		return err
+	}
+
+	cert, err := n.Flags.GetStringVal(certKey)
+	if err != nil {
+		return err
+	}
+
+	if len(key) == 0 && len(cert) == 0 {
+		// Generate new keypair
+		tlsCertBytes, tlsKeyBytes, err := staking.NewCertAndKeyBytes()
+		if err != nil {
+			return fmt.Errorf("failed to generate staking keypair: %w", err)
+		}
+		n.Flags[keyKey] = base64.StdEncoding.EncodeToString(tlsKeyBytes)
+		n.Flags[certKey] = base64.StdEncoding.EncodeToString(tlsCertBytes)
+	} else if len(key) == 0 || len(cert) == 0 {
+		// Only one of key and cert was provided
+		return errInvalidKeypair
+	}
+
+	err = n.EnsureNodeID()
+	if err != nil {
+		return fmt.Errorf("failed to derive a node ID: %w", err)
+	}
+
+	return nil
+}
+
+// Attempt to derive the node ID from the node configuration.
+func (n *Node) EnsureNodeID() error {
+	keyKey := config.StakingTLSKeyContentKey
+	certKey := config.StakingCertContentKey
+
+	key, err := n.Flags.GetStringVal(keyKey)
+	if err != nil {
+		return err
+	}
+	if len(key) == 0 {
+		return errMissingTLSKeyForNodeID
+	}
+	keyBytes, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", keyKey, err)
+	}
+
+	cert, err := n.Flags.GetStringVal(certKey)
+	if err != nil {
+		return err
+	}
+	if len(cert) == 0 {
+		return errMissingCertForNodeID
+	}
+	certBytes, err := base64.StdEncoding.DecodeString(cert)
+	if err != nil {
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", certKey, err)
+	}
+
+	tlsCert, err := staking.LoadTLSCertFromBytes(keyBytes, certBytes)
+	if err != nil {
+		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
+	}
+	stakingCert := staking.CertificateFromX509(tlsCert.Leaf)
+	n.NodeID = ids.NodeIDFromCert(stakingCert)
+
 	return nil
 }
