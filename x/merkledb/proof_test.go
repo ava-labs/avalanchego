@@ -684,13 +684,35 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 
 	_, err = db.GetChangeProof(
 		context.Background(),
+		roots[len(roots)-1],
+		ids.GenerateTestID(),
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		50,
+	)
+	require.ErrorIs(err, ErrNoEndRoot)
+	require.ErrorIs(err, ErrInsufficientHistory)
+
+	_, err = db.GetChangeProof(
+		context.Background(),
 		roots[0],
 		roots[len(roots)-1],
 		maybe.Nothing[[]byte](),
 		maybe.Nothing[[]byte](),
 		50,
 	)
+	require.NotErrorIs(err, ErrNoEndRoot)
 	require.ErrorIs(err, ErrInsufficientHistory)
+
+	_, err = db.GetChangeProof(
+		context.Background(),
+		roots[1],
+		roots[len(roots)-1],
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		50,
+	)
+	require.NoError(err)
 }
 
 func Test_ChangeProof_BadBounds(t *testing.T) {

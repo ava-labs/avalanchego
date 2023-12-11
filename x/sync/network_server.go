@@ -198,7 +198,14 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
 			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+				// We should only fail to get a change proof if we have insufficient history.
+				// Other errors are unexpected.
 				return err
+			}
+			if errors.Is(err, merkledb.ErrNoEndRoot) {
+				// [s.db] doesn't have [endRoot] in its history.
+				// We can't generate a change/range proof. Drop this request.
+				return nil
 			}
 
 			// [s.db] doesn't have sufficient history to generate change proof.

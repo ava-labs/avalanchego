@@ -67,6 +67,8 @@ type ChangeProofer interface {
 	// Returns ErrEmptyProof if [endRootID] is ids.Empty.
 	// Note that [endRootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a change proof.)
+	// Returns [ErrNoEndRoot], which wraps [ErrInsufficientHistory], if the
+	// history doesn't contain the [endRootID].
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,

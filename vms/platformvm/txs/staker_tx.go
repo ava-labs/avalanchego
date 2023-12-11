@@ -48,9 +48,13 @@ type Staker interface {
 	// PublicKey returns the BLS public key registered by this transaction. If
 	// there was no key registered by this transaction, it will return false.
 	PublicKey() (*bls.PublicKey, bool, error)
-	StartTime() time.Time
 	EndTime() time.Time
 	Weight() uint64
-	PendingPriority() Priority
 	CurrentPriority() Priority
+}
+
+type ScheduledStaker interface {
+	Staker
+	StartTime() time.Time
+	PendingPriority() Priority
 }

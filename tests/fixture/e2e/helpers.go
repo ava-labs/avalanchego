@@ -235,7 +235,7 @@ func StartLocalNetwork(avalancheGoExecPath string, networkDir string) *local.Loc
 			},
 		},
 		tmpnet.DefaultNodeCount,
-		tmpnet.DefaultFundedKeyCount,
+		tmpnet.DefaultPreFundedKeyCount,
 	)
 	require.NoError(err)
 	ginkgo.DeferCleanup(func() {
