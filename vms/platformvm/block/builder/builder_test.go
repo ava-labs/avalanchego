@@ -72,6 +72,115 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.NoError(env.mempool.GetDropReason(txID))
 }
 
+func TestBuildBlockShouldReward(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	var (
+		now    = env.backend.Clk.Time()
+		nodeID = ids.GenerateTestNodeID()
+
+		defaultValidatorStake = 100 * units.MilliAvax
+		validatorStartTime    = now.Add(2 * txexecutor.SyncBound)
+		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
+	)
+
+	// Create a valid [AddValidatorTx]
+	tx, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		nodeID,
+		preFundedKeys[0].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		preFundedKeys[0].PublicKey().Address(),
+	)
+	require.NoError(err)
+	txID := tx.ID()
+
+	// Issue the transaction
+	require.NoError(env.network.IssueTx(context.Background(), tx))
+	require.True(env.mempool.Has(txID))
+
+	// Build and accept a block with the tx
+	blk, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
+	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
+	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
+	require.True(env.blkManager.SetPreference(blk.ID()))
+
+	// Validator should now be pending
+	staker, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.Equal(txID, staker.TxID)
+
+	// Move it from pending to current
+	env.backend.Clk.Set(validatorStartTime)
+	blk, err = env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
+	require.True(env.blkManager.SetPreference(blk.ID()))
+
+	staker, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.Equal(txID, staker.TxID)
+
+	// Should be rewarded at the end of staking period
+	env.backend.Clk.Set(validatorEndTime)
+
+	for {
+		iter, err := env.state.GetCurrentStakerIterator()
+		require.NoError(err)
+		require.True(iter.Next())
+		staker := iter.Value()
+		iter.Release()
+
+		// Check that the right block was built
+		blk, err := env.Builder.BuildBlock(context.Background())
+		require.NoError(err)
+		require.NoError(blk.Verify(context.Background()))
+		require.IsType(&block.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
+
+		expectedTx, err := env.txBuilder.NewRewardValidatorTx(staker.TxID)
+		require.NoError(err)
+		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
+
+		// Commit the [ProposalBlock] with a [CommitBlock]
+		proposalBlk, ok := blk.(snowman.OracleBlock)
+		require.True(ok)
+		options, err := proposalBlk.Options(context.Background())
+		require.NoError(err)
+
+		commit := options[0].(*blockexecutor.Block)
+		require.IsType(&block.BanffCommitBlock{}, commit.Block)
+
+		require.NoError(blk.Accept(context.Background()))
+		require.NoError(commit.Verify(context.Background()))
+		require.NoError(commit.Accept(context.Background()))
+		require.True(env.blkManager.SetPreference(commit.ID()))
+
+		// Stop rewarding once our staker is rewarded
+		if staker.TxID == txID {
+			break
+		}
+	}
+
+	// Staking rewards should have been issued
+	rewardUTXOs, err := env.state.GetRewardUTXOs(txID)
+	require.NoError(err)
+	require.NotEmpty(rewardUTXOs)
+}
+
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
@@ -318,115 +427,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 			require.Equal(tt.expectedShouldReward, shouldReward)
 		})
 	}
-}
-
-func TestBuildBlockShouldReward(t *testing.T) {
-	require := require.New(t)
-
-	env := newEnvironment(t)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	var (
-		now    = env.backend.Clk.Time()
-		nodeID = ids.GenerateTestNodeID()
-
-		defaultValidatorStake = 100 * units.MilliAvax
-		validatorStartTime    = now.Add(2 * txexecutor.SyncBound)
-		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
-	)
-
-	// Create a valid [AddValidatorTx]
-	tx, err := env.txBuilder.NewAddValidatorTx(
-		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		preFundedKeys[0].PublicKey().Address(),
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
-	)
-	require.NoError(err)
-	txID := tx.ID()
-
-	// Issue the transaction
-	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
-
-	// Build and accept a block with the tx
-	blk, err := env.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
-	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.True(env.blkManager.SetPreference(blk.ID()))
-
-	// Validator should now be pending
-	staker, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.Equal(txID, staker.TxID)
-
-	// Move it from pending to current
-	env.backend.Clk.Set(validatorStartTime)
-	blk, err = env.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.True(env.blkManager.SetPreference(blk.ID()))
-
-	staker, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.Equal(txID, staker.TxID)
-
-	// Should be rewarded at the end of staking period
-	env.backend.Clk.Set(validatorEndTime)
-
-	for {
-		iter, err := env.state.GetCurrentStakerIterator()
-		require.NoError(err)
-		require.True(iter.Next())
-		staker := iter.Value()
-		iter.Release()
-
-		// Check that the right block was built
-		blk, err := env.Builder.BuildBlock(context.Background())
-		require.NoError(err)
-		require.NoError(blk.Verify(context.Background()))
-		require.IsType(&block.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
-
-		expectedTx, err := env.txBuilder.NewRewardValidatorTx(staker.TxID)
-		require.NoError(err)
-		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
-
-		// Commit the [ProposalBlock] with a [CommitBlock]
-		proposalBlk, ok := blk.(snowman.OracleBlock)
-		require.True(ok)
-		options, err := proposalBlk.Options(context.Background())
-		require.NoError(err)
-
-		commit := options[0].(*blockexecutor.Block)
-		require.IsType(&block.BanffCommitBlock{}, commit.Block)
-
-		require.NoError(blk.Accept(context.Background()))
-		require.NoError(commit.Verify(context.Background()))
-		require.NoError(commit.Accept(context.Background()))
-		require.True(env.blkManager.SetPreference(commit.ID()))
-
-		// Stop rewarding once our staker is rewarded
-		if staker.TxID == txID {
-			break
-		}
-	}
-
-	// Staking rewards should have been issued
-	rewardUTXOs, err := env.state.GetRewardUTXOs(txID)
-	require.NoError(err)
-	require.NotEmpty(rewardUTXOs)
 }
 
 func TestBuildBlock(t *testing.T) {
