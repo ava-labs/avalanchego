@@ -12,6 +12,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -154,4 +155,18 @@ func (m *MockManager) VerifyTx(arg0 *txs.Tx) error {
 func (mr *MockManagerMockRecorder) VerifyTx(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTx", reflect.TypeOf((*MockManager)(nil).VerifyTx), arg0)
+}
+
+// VerifyUniqueInputs mocks base method.
+func (m *MockManager) VerifyUniqueInputs(arg0 ids.ID, arg1 set.Set[ids.ID]) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyUniqueInputs", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyUniqueInputs indicates an expected call of VerifyUniqueInputs.
+func (mr *MockManagerMockRecorder) VerifyUniqueInputs(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyUniqueInputs", reflect.TypeOf((*MockManager)(nil).VerifyUniqueInputs), arg0, arg1)
 }
