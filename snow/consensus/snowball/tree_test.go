@@ -10,9 +10,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"gonum.org/v1/gonum/mathext/prng"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
 const initialUnaryDescription = "SB(PreferenceStrength = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
@@ -796,22 +797,23 @@ func TestSnowballDoubleAdd(t *testing.T) {
 func TestSnowballConsistent(t *testing.T) {
 	require := require.New(t)
 
-	numColors := 50
-	numNodes := 100
-	params := Parameters{
-		K:               20,
-		AlphaPreference: 15,
-		AlphaConfidence: 15,
-		BetaVirtuous:    20,
-		BetaRogue:       30,
-	}
-	seed := int64(0)
+	var (
+		numColors = 50
+		numNodes  = 100
+		params    = Parameters{
+			K:               20,
+			AlphaPreference: 15,
+			AlphaConfidence: 15,
+			BetaVirtuous:    20,
+			BetaRogue:       30,
+		}
+		seed   uint64 = 0
+		source        = prng.NewMT19937()
+	)
 
-	sampler.Seed(seed)
+	n := NewNetwork(params, numColors, source)
 
-	n := Network{}
-	n.Initialize(params, numColors)
-
+	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		n.AddNode(NewTree)
 	}

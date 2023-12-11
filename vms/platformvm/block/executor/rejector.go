@@ -82,7 +82,7 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 		}
 	}
 
-	r.Mempool.RequestBuildBlock(false)
+	r.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
 
 	return nil
 }
