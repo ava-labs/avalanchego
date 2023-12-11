@@ -234,10 +234,6 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	// Remove selected txs from mempool now that we are returning the block to
-	// the consensus engine.
-	txs := statelessBlk.Txs()
-	b.Mempool.Remove(txs)
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
@@ -281,8 +277,34 @@ func buildBlock(
 		)
 	}
 
+	var (
+		blockTxs      []*txs.Tx
+		remainingSize = targetBlockSize
+	)
+
+	for {
+		builder.txExecutorBackend.Ctx.Log.Error("[builder.buildBlock] mempool: peeking tx",
+			zap.Int("remainingSize", remainingSize),
+			zap.Error(err),
+		)
+		tx := builder.Mempool.Peek()
+		if tx == nil || len(tx.Bytes()) > remainingSize {
+			break
+		}
+		builder.Mempool.Remove([]*txs.Tx{tx})
+
+		txID := tx.ID()
+		builder.txExecutorBackend.Ctx.Log.Error("[builder.buildBlock] mempool: removed tx",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
+		remainingSize -= len(tx.Bytes())
+		blockTxs = append(blockTxs, tx)
+	}
+
 	// If there is no reason to build a block, don't.
-	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
+	if len(blockTxs) == 0 && !forceAdvanceTime {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, ErrNoPendingBlocks
 	}
@@ -292,7 +314,7 @@ func buildBlock(
 		timestamp,
 		parentID,
 		height,
-		builder.Mempool.PeekTxs(targetBlockSize),
+		blockTxs,
 	)
 }
 
