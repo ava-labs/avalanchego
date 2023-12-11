@@ -86,7 +86,11 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	changes.Apply(onAbortState)
 
 	// Apply the changes, if any, from processing the decision txs.
-	// [onCommitState] = [onAbortState] here, either one can be used.
+	// [onCommitState] = [onAbortState] here, either one can be used. It is
+	// only used to ensure that [onDecisionState] contains only the change diff
+	// of all the standard txs *after* the timestamp advancement changes are
+	// applied. [onDecisionState] will be applied to [onCommitState] or
+	// [onAbortState] depending on if the proposal is committed or aborted.
 	onDecisionState, err := wrapState(onCommitState)
 	if err != nil {
 		return err
