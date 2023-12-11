@@ -601,7 +601,6 @@ func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 }
 
 // Assumes [db.commitLock] is read locked.
-// Assumes [db.lock] is not held
 func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	if db.closed {
 		return nil, database.ErrClosed
@@ -1207,7 +1206,6 @@ func (db *merkleDB) initializeRoot() error {
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
 // Assumes [db.commitLock] is read locked.
-// Assumes [db.lock] isn't held.
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
 	start maybe.Maybe[[]byte],
