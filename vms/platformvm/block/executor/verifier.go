@@ -387,7 +387,6 @@ func (v *verifier) proposalBlock(
 		// always be the same as the Banff Proposal Block.
 		timestamp: onAbortState.GetTimestamp(),
 	}
-
 	return nil
 }
 
