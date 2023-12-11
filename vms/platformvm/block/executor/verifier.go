@@ -26,7 +26,6 @@ var (
 	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                       = errors.New("incorrect block height")
 	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
-	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
 	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
 )
 
