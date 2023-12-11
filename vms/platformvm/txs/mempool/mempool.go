@@ -50,7 +50,7 @@ type Mempool interface {
 	Remove(txs []*txs.Tx)
 
 	// Peek returns the oldest tx in the mempool.
-	Peek() *txs.Tx
+	Peek() (tx *txs.Tx, exists bool)
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built. If [emptyBlockPermitted] is true, the notification will be sent
@@ -198,9 +198,9 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	}
 }
 
-func (m *mempool) Peek() *txs.Tx {
-	_, tx, _ := m.unissuedTxs.Oldest()
-	return tx
+func (m *mempool) Peek() (*txs.Tx, bool) {
+	_, tx, exists := m.unissuedTxs.Oldest()
+	return tx, exists
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
