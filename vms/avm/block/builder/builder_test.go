@@ -134,11 +134,11 @@ func TestBuilderBuildBlock(t *testing.T) {
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek(gomock.Any()).Return(tx)
+				mempool.EXPECT().Peek().Return(tx)
 				mempool.EXPECT().Remove([]*txs.Tx{tx})
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest)
 				// Second loop iteration
-				mempool.EXPECT().Peek(gomock.Any()).Return(nil)
+				mempool.EXPECT().Peek().Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				return New(
@@ -179,11 +179,11 @@ func TestBuilderBuildBlock(t *testing.T) {
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek(gomock.Any()).Return(tx)
+				mempool.EXPECT().Peek().Return(tx)
 				mempool.EXPECT().Remove([]*txs.Tx{tx})
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest)
 				// Second loop iteration
-				mempool.EXPECT().Peek(gomock.Any()).Return(nil)
+				mempool.EXPECT().Peek().Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				return New(
@@ -225,11 +225,11 @@ func TestBuilderBuildBlock(t *testing.T) {
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek(gomock.Any()).Return(tx)
+				mempool.EXPECT().Peek().Return(tx)
 				mempool.EXPECT().Remove([]*txs.Tx{tx})
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest)
 				// Second loop iteration
-				mempool.EXPECT().Peek(gomock.Any()).Return(nil)
+				mempool.EXPECT().Peek().Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				return New(
@@ -309,14 +309,14 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek(targetBlockSize).Return(tx1)
+				mempool.EXPECT().Peek().Return(tx1)
 				mempool.EXPECT().Remove([]*txs.Tx{tx1})
 				// Second loop iteration
-				mempool.EXPECT().Peek(targetBlockSize - len(tx1Bytes)).Return(tx2)
+				mempool.EXPECT().Peek().Return(tx2)
 				mempool.EXPECT().Remove([]*txs.Tx{tx2})
 				mempool.EXPECT().MarkDropped(tx2.ID(), blkexecutor.ErrConflictingBlockTxs)
 				// Third loop iteration
-				mempool.EXPECT().Peek(targetBlockSize - len(tx1Bytes)).Return(nil)
+				mempool.EXPECT().Peek().Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				// To marshal the tx/block
@@ -385,10 +385,10 @@ func TestBuilderBuildBlock(t *testing.T) {
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek(gomock.Any()).Return(tx)
+				mempool.EXPECT().Peek().Return(tx)
 				mempool.EXPECT().Remove([]*txs.Tx{tx})
 				// Second loop iteration
-				mempool.EXPECT().Peek(gomock.Any()).Return(nil)
+				mempool.EXPECT().Peek().Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				// To marshal the tx/block
@@ -459,10 +459,10 @@ func TestBuilderBuildBlock(t *testing.T) {
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Peek(gomock.Any()).Return(tx)
+				mempool.EXPECT().Peek().Return(tx)
 				mempool.EXPECT().Remove([]*txs.Tx{tx})
 				// Second loop iteration
-				mempool.EXPECT().Peek(gomock.Any()).Return(nil)
+				mempool.EXPECT().Peek().Return(nil)
 				mempool.EXPECT().RequestBuildBlock()
 
 				// To marshal the tx/block

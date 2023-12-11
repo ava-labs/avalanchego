@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/sampler"
+	"gonum.org/v1/gonum/mathext/prng"
 )
 
 func TestSnowballGovernance(t *testing.T) {
@@ -21,12 +21,12 @@ func TestSnowballGovernance(t *testing.T) {
 		numRed              = 55
 		params              = DefaultParameters
 		seed         uint64 = 0
+		source              = prng.NewMT19937()
 	)
 
-	nBitwise := Network{}
-	nBitwise.Initialize(params, numColors)
+	nBitwise := NewNetwork(params, numColors, source)
 
-	sampler.Seed(seed)
+	source.Seed(seed)
 	for i := 0; i < numRed; i++ {
 		nBitwise.AddNodeSpecificColor(NewTree, 0, []int{1})
 	}
