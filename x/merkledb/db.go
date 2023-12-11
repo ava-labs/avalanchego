@@ -1276,6 +1276,8 @@ func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
+	case db.root.HasValue() && key == db.root.Value().key:
+		return db.root.Value(), nil
 	case hasValue:
 		return db.valueNodeDB.Get(key)
 	default:
