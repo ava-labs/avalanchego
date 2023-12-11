@@ -63,6 +63,9 @@ func (c *DBClient) GetChangeProof(
 	}
 
 	// TODO handle merkledb.ErrInvalidMaxLength
+	// TODO disambiguate between the root not being present due to
+	// the end root not being present and the start root not being
+	// present before the end root. i.e. ErrNoEndRoot vs ErrInsufficientHistory.
 	if resp.GetRootNotPresent() {
 		return nil, merkledb.ErrInsufficientHistory
 	}
