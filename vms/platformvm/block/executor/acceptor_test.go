@@ -125,7 +125,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
 	childID := ids.GenerateTestID()
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
 		onAcceptState:  onAcceptState,
 		atomicRequests: atomicRequests,
@@ -208,7 +208,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
 	childID := ids.GenerateTestID()
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	calledOnAcceptFunc := false
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
 		onAcceptState: onAcceptState,
@@ -282,7 +282,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	parentState := &blockState{
 		proposalBlockState: proposalBlockState{
 			onAbortState:  parentOnAbortState,
@@ -392,7 +392,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	parentState := &blockState{
 		proposalBlockState: proposalBlockState{
 			onAbortState:  parentOnAbortState,
