@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -25,7 +26,8 @@ var (
 	_ common.AppHandler    = (*Network)(nil)
 	_ NodeSampler          = (*peerSampler)(nil)
 
-	labelNames = []string{"handlerID"}
+	handlerLabel = "handlerID"
+	labelNames   = []string{handlerLabel}
 )
 
 // ClientOption configures Client
@@ -56,56 +58,109 @@ type clientOptions struct {
 func NewNetwork(
 	log logging.Logger,
 	sender common.AppSender,
-	metrics prometheus.Registerer,
+	registerer prometheus.Registerer,
 	namespace string,
 ) (*Network, error) {
-	appRequestFailedTime := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "app_request_failed_time",
-		Help:      "app request failed time (ns)",
-	}, labelNames)
-	if err := metrics.Register(appRequestFailedTime); err != nil {
-		return nil, err
+	networkMetrics := metrics{
+		appRequestTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_request_time",
+			Help:      "app request time (ns)",
+		}, labelNames),
+		appRequestCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_request_count",
+			Help:      "app request count (n)",
+		}, labelNames),
+		appResponseTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_response_time",
+			Help:      "app response time (ns)",
+		}, labelNames),
+		appResponseCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_response_count",
+			Help:      "app response count (n)",
+		}, labelNames),
+		appRequestFailedTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_request_failed_time",
+			Help:      "app request failed time (ns)",
+		}, labelNames),
+		appRequestFailedCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_request_failed_count",
+			Help:      "app request failed count (ns)",
+		}, labelNames),
+		appGossipTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_gossip_time",
+			Help:      "app gossip time (ns)",
+		}, labelNames),
+		appGossipCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "app_gossip_count",
+			Help:      "app gossip count (n)",
+		}, labelNames),
+		crossChainAppRequestTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "cross_chain_app_request_time",
+			Help:      "cross chain app request time (ns)",
+		}, labelNames),
+		crossChainAppRequestCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "cross_chain_app_request_count",
+			Help:      "cross chain app request count (n)",
+		}, labelNames),
+		crossChainAppResponseTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "cross_chain_app_response_time",
+			Help:      "cross chain app response time (ns)",
+		}, labelNames),
+		crossChainAppResponseCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "cross_chain_app_response_count",
+			Help:      "cross chain app response count (n)",
+		}, labelNames),
+		crossChainAppRequestFailedTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "cross_chain_app_request_failed_time",
+			Help:      "cross chain app request failed time (ns)",
+		}, labelNames),
+		crossChainAppRequestFailedCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "cross_chain_app_request_failed_count",
+			Help:      "cross chain app request failed count (n)",
+		}, labelNames),
 	}
 
-	appResponseTime := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "app_response_time",
-		Help:      "app response time (ns)",
-	}, labelNames)
-	if err := metrics.Register(appResponseTime); err != nil {
-		return nil, err
-	}
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(networkMetrics.appRequestTime),
+		registerer.Register(networkMetrics.appRequestCount),
+		registerer.Register(networkMetrics.appResponseTime),
+		registerer.Register(networkMetrics.appResponseCount),
+		registerer.Register(networkMetrics.appRequestFailedTime),
+		registerer.Register(networkMetrics.appRequestFailedCount),
+		registerer.Register(networkMetrics.appGossipTime),
+		registerer.Register(networkMetrics.appGossipCount),
+		registerer.Register(networkMetrics.crossChainAppRequestTime),
+		registerer.Register(networkMetrics.crossChainAppRequestCount),
+		registerer.Register(networkMetrics.crossChainAppResponseTime),
+		registerer.Register(networkMetrics.crossChainAppResponseCount),
+		registerer.Register(networkMetrics.crossChainAppRequestFailedTime),
+		registerer.Register(networkMetrics.crossChainAppRequestFailedCount),
+	)
 
-	crossChainAppRequestFailedTime := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "cross_chain_app_request_failed_time",
-		Help:      "cross chain app request failed time (ns)",
-	}, labelNames)
-	if err := metrics.Register(crossChainAppRequestFailedTime); err != nil {
-		return nil, err
-	}
-
-	crossChainAppResponseTime := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "cross_chain_app_response_time",
-		Help:      "cross chain app response time (ns)",
-	}, labelNames)
-	if err := metrics.Register(crossChainAppResponseTime); err != nil {
-		return nil, err
+	if errs.Err != nil {
+		return nil, errs.Err
 	}
 
 	return &Network{
-		Peers:                          &Peers{},
-		log:                            log,
-		sender:                         sender,
-		metrics:                        metrics,
-		appRequestFailedTime:           appRequestFailedTime,
-		appResponseTime:                appResponseTime,
-		crossChainAppRequestFailedTime: crossChainAppRequestFailedTime,
-		crossChainAppResponseTime:      crossChainAppResponseTime,
-		namespace:                      namespace,
-		router:                         newRouter(log, sender, metrics, namespace),
+		Peers:  &Peers{},
+		log:    log,
+		sender: sender,
+		router: newRouter(log, sender, networkMetrics),
 	}, nil
 }
 
@@ -114,15 +169,17 @@ func NewNetwork(
 type Network struct {
 	Peers *Peers
 
-	log       logging.Logger
-	sender    common.AppSender
-	metrics   prometheus.Registerer
-	namespace string
+	log    logging.Logger
+	sender common.AppSender
 
-	appRequestFailedTime           *prometheus.CounterVec
-	appResponseTime                *prometheus.CounterVec
-	crossChainAppRequestFailedTime *prometheus.CounterVec
-	crossChainAppResponseTime      *prometheus.CounterVec
+	appRequestFailedTime            *prometheus.CounterVec
+	appRequestFailedCount           *prometheus.CounterVec
+	appResponseTime                 *prometheus.CounterVec
+	appResponseCount                *prometheus.CounterVec
+	crossChainAppRequestFailedTime  *prometheus.CounterVec
+	crossChainAppRequestFailedCount *prometheus.CounterVec
+	crossChainAppResponseTime       *prometheus.CounterVec
+	crossChainAppResponseCount      *prometheus.CounterVec
 
 	router *router
 }
@@ -179,10 +236,6 @@ func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
 				peers: n.Peers,
 			},
 		},
-		appRequestFailedTime:           n.appRequestFailedTime,
-		appResponseTime:                n.appResponseTime,
-		crossChainAppRequestFailedTime: n.crossChainAppRequestFailedTime,
-		crossChainAppResponseTime:      n.crossChainAppResponseTime,
 	}
 
 	for _, option := range options {
