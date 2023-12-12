@@ -72,7 +72,6 @@ jobs:
           name: tmpnet-data
           path: ~/.tmpnet/networks/1000
   e2e_existing_network:
-    name: e2e with existing network
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
