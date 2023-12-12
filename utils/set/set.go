@@ -75,6 +75,15 @@ func (s *Set[T]) Difference(set Set[T]) {
 	}
 }
 
+// Filter removes all the elements not in [set] from [s].
+func (s *Set[T]) Filter(set Set[T]) {
+	for elt := range *s {
+		if _, ok := set[elt]; !ok {
+			delete(*s, elt)
+		}
+	}
+}
+
 // Contains returns true iff the set contains this element.
 func (s *Set[T]) Contains(elt T) bool {
 	_, contains := (*s)[elt]

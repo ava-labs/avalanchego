@@ -439,6 +439,18 @@ func (n *Node) initNetworking() error {
 		)
 	}
 
+	numSupportedACPs := n.Config.NetworkConfig.SupportedACPs.Len()
+	n.Config.NetworkConfig.SupportedACPs.Filter(constants.CurrentACPs)
+	if numSupportedACPs != n.Config.NetworkConfig.SupportedACPs.Len() {
+		n.Log.Warn("attempted to support unknown ACP")
+	}
+
+	numObjectedACPs := n.Config.NetworkConfig.ObjectedACPs.Len()
+	n.Config.NetworkConfig.ObjectedACPs.Filter(constants.CurrentACPs)
+	if numObjectedACPs != n.Config.NetworkConfig.ObjectedACPs.Len() {
+		n.Log.Warn("attempted to object unknown ACP")
+	}
+
 	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert, n.tlsKeyLogWriterCloser)
 
 	// Configure benchlist
@@ -1272,6 +1284,7 @@ func (n *Node) initInfoAPI() error {
 			VMManager:                     n.VMManager,
 		},
 		n.Log,
+		n.vdrs,
 		n.chainManager,
 		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,

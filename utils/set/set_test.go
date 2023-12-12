@@ -46,6 +46,46 @@ func TestSet(t *testing.T) {
 	require.False(s.Overlaps(s2))
 }
 
+func TestFilter(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        Set[int]
+		b        Set[int]
+		expected Set[int]
+	}{
+		{
+			name:     "{1, 2, 3} | {} = {}",
+			a:        Of(1, 2, 3),
+			b:        Set[int]{},
+			expected: Set[int]{},
+		},
+		{
+			name:     "{} | {1, 2, 3} = {}",
+			a:        Set[int]{},
+			b:        Of(1, 2, 3),
+			expected: Set[int]{},
+		},
+		{
+			name:     "{1, 2, 3} | {1, 3} = {1, 3}",
+			a:        Of(1, 2, 3),
+			b:        Of(1, 3),
+			expected: Of(1, 3),
+		},
+		{
+			name:     "{1, 2} | {1, 3} = {}",
+			a:        Of(1, 2),
+			b:        Of(1, 3),
+			expected: Of(1),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.a.Filter(test.b)
+			require.Equal(t, test.expected, test.a)
+		})
+	}
+}
+
 func TestOf(t *testing.T) {
 	tests := []struct {
 		name     string
