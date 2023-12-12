@@ -5,6 +5,7 @@ package p2p
 
 import (
 	"context"
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -20,6 +21,8 @@ import (
 )
 
 const handlerID = 1337
+
+var handlerPrefix = binary.AppendUvarint(nil, handlerID)
 
 // Tests that the Client callback is called on a successful response
 func TestAppRequestResponse(t *testing.T) {
@@ -46,8 +49,11 @@ func TestAppRequestResponse(t *testing.T) {
 		close(done)
 	}
 
-	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
-	<-sender.SentAppRequest
+	want := []byte("request")
+	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), want, callback))
+	got := <-sender.SentAppRequest
+	require.Equal(handlerPrefix, got[0])
+	require.Equal(want, got[1:])
 
 	require.NoError(network.AppResponse(ctx, wantNodeID, 1, wantResponse))
 	<-done
