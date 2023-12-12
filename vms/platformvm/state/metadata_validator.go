@@ -37,44 +37,6 @@ type validatorMetadata struct {
 	lastUpdated time.Time
 }
 
-// Permissioned validators originally wrote their values as nil.
-// With Banff we wrote the potential reward.
-// With Cortina we wrote the potential reward with the potential delegatee reward.
-// We now write the uptime, reward, and delegatee reward together.
-func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
-	switch len(bytes) {
-	case 0:
-	// nothing was stored
-
-	case database.Uint64Size:
-		// only potential reward was stored
-		var err error
-		metadata.PotentialReward, err = database.ParseUInt64(bytes)
-		if err != nil {
-			return err
-		}
-
-	case preDelegateeRewardSize:
-		// potential reward and uptime was stored but potential delegatee reward
-		// was not
-		tmp := preDelegateeRewardMetadata{}
-		if _, err := metadataCodec.Unmarshal(bytes, &tmp); err != nil {
-			return err
-		}
-
-		metadata.UpDuration = tmp.UpDuration
-		metadata.LastUpdated = tmp.LastUpdated
-		metadata.PotentialReward = tmp.PotentialReward
-	default:
-		// everything was stored
-		if _, err := metadataCodec.Unmarshal(bytes, metadata); err != nil {
-			return err
-		}
-	}
-	metadata.lastUpdated = time.Unix(int64(metadata.LastUpdated), 0)
-	return nil
-}
-
 type validatorState interface {
 	// LoadValidatorMetadata sets the [metadata] of [vdrID] on [subnetID].
 	// GetUptime and SetUptime will return an error if the [vdrID] and
