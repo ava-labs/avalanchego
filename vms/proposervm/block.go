@@ -440,6 +440,11 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 		newTimestamp,
 	)
 	if err != nil {
+		p.vm.ctx.Log.Error("failed to reset block builder scheduler",
+			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
 		return err
 	}
 	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
