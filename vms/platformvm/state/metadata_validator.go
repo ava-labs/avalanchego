@@ -10,22 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// preDelegateeRewardSize is the size of codec marshalling
-// [preDelegateeRewardMetadata].
-//
-// CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
-const preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
-
 var _ validatorState = (*metadata)(nil)
-
-type preDelegateeRewardMetadata struct {
-	UpDuration      time.Duration `v0:"true"`
-	LastUpdated     uint64        `v0:"true"` // Unix time in seconds
-	PotentialReward uint64        `v0:"true"`
-}
 
 type validatorMetadata struct {
 	UpDuration               time.Duration `v0:"true"`

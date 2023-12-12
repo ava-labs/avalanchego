@@ -1954,7 +1954,7 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 	switch err {
 	case nil:
 		var uptime uptimes
-		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, uptime); err != nil {
+		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, &uptime); err != nil {
 			return 0, time.Time{}, err
 		}
 		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
