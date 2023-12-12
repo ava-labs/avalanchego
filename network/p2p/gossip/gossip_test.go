@@ -125,14 +125,12 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(responseSet.Add(item))
 			}
 
-			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
-			require.NoError(err)
-			handler := NewHandler[testTx, *testTx](
+			handler, err := NewHandler[testTx, *testTx](
 				logging.NoLog{},
-				NoOpAccumulator[*testTx]{},
+				nil,
 				responseSet,
-				metrics,
-				tt.targetResponseSize,
+				tt.config,
+				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
 			require.NoError(responseNetwork.AddHandler(0x0, handler))
@@ -320,9 +318,7 @@ func TestPushGossiper(t *testing.T) {
 			)
 			require.NoError(err)
 			client := network.NewClient(0)
-			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
-			require.NoError(err)
-			gossiper := NewPushGossiper[*testTx](client, metrics, units.MiB)
+			gossiper := NewPushGossiper[*testTx](client, "")
 
 			for _, gossipables := range tt.cycles {
 				gossiper.Add(gossipables...)
@@ -350,6 +346,74 @@ func TestPushGossiper(t *testing.T) {
 	}
 }
 
+// Tests that a subscription to a channel gossips correctly
+func TestSubscribe(t *testing.T) {
+	require := require.New(t)
+
+	sender := &common.FakeSender{
+		SentAppGossip: make(chan []byte, 1),
+	}
+	network, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	client := network.NewClient(0)
+
+	gossiper := NewPushGossiper[*testTx](client, "")
+	ctx := context.Background()
+	toGossip := make(chan *testTx)
+
+	go Subscribe[*testTx](ctx, logging.NoLog{}, gossiper, toGossip)
+
+	tx := &testTx{id: ids.ID{1}}
+	toGossip <- tx
+
+	txBytes, err := tx.Marshal()
+	require.NoError(err)
+	want := [][]byte{txBytes}
+
+	// remove the handler prefix
+	gotMsg := &sdk.PushGossip{}
+	sentMsg := <-sender.SentAppGossip
+	require.NoError(proto.Unmarshal(sentMsg[1:], gotMsg))
+
+	require.Equal(want, gotMsg.Gossip)
+}
+
+// Tests that a subscription terminates when the channel is closed
+func TestSubscribeCloseChannel(*testing.T) {
+	gossiper := &PushGossiper[*testTx]{}
+
+	wg := &sync.WaitGroup{}
+	ctx := context.Background()
+	toGossip := make(chan *testTx)
+
+	wg.Add(1)
+	go func() {
+		Subscribe[*testTx](ctx, logging.NoLog{}, gossiper, toGossip)
+		wg.Done()
+	}()
+
+	close(toGossip)
+	wg.Wait()
+}
+
+// Tests that a subscription terminates when the context is cancelled
+func TestSubscribeCancelContext(*testing.T) {
+	gossiper := &PushGossiper[*testTx]{}
+
+	wg := &sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
+	toGossip := make(chan *testTx)
+
+	wg.Add(1)
+	go func() {
+		Subscribe[*testTx](ctx, logging.NoLog{}, gossiper, toGossip)
+		wg.Done()
+	}()
+
+	cancel()
+	wg.Wait()
+}
+
 // Tests that gossip to a peer should forward the gossip if it was not
 // previously known
 func TestPushGossipE2E(t *testing.T) {
@@ -374,18 +438,15 @@ func TestPushGossipE2E(t *testing.T) {
 	forwarderNetwork, err := p2p.NewNetwork(log, forwarder, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	handlerID := uint64(123)
-	client := forwarderNetwork.NewClient(handlerID)
-
-	metrics, err := NewMetrics(prometheus.NewRegistry(), "")
+	forwarderClient := forwarderNetwork.NewClient(handlerID)
 	require.NoError(err)
-	forwarderGossiper := NewPushGossiper[*testTx](client, metrics, units.MiB)
 
-	handler := NewHandler[testTx, *testTx](
+	handler, err := NewHandler[testTx, *testTx](
 		log,
-		forwarderGossiper,
+		forwarderClient,
 		set,
-		metrics,
-		0,
+		HandlerConfig{},
+		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
 	require.NoError(forwarderNetwork.AddHandler(handlerID, handler))
@@ -397,7 +458,7 @@ func TestPushGossipE2E(t *testing.T) {
 	require.NoError(err)
 	issuerClient := issuerNetwork.NewClient(handlerID)
 	require.NoError(err)
-	issuerGossiper := NewPushGossiper[*testTx](issuerClient, metrics, units.MiB)
+	issuerGossiper := NewPushGossiper[*testTx](issuerClient, "")
 
 	want := []*testTx{
 		{id: ids.GenerateTestID()},

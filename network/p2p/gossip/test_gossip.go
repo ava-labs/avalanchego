@@ -3,11 +3,7 @@
 
 package gossip
 
-import (
-	"fmt"
-
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 var (
 	_ Gossipable   = (*testTx)(nil)
@@ -39,10 +35,6 @@ type testSet struct {
 }
 
 func (t *testSet) Add(gossipable *testTx) error {
-	if _, ok := t.txs[gossipable.id]; ok {
-		return fmt.Errorf("%s already present", gossipable.id)
-	}
-
 	t.txs[gossipable.id] = gossipable
 	t.bloom.Add(gossipable)
 	if t.onAdd != nil {
@@ -50,6 +42,11 @@ func (t *testSet) Add(gossipable *testTx) error {
 	}
 
 	return nil
+}
+
+func (t *testSet) Get(id ids.ID) (*testTx, bool) {
+	tx, ok := t.txs[id]
+	return tx, ok
 }
 
 func (t *testSet) Iterate(f func(gossipable *testTx) bool) {
