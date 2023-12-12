@@ -1953,13 +1953,12 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 	uptimeBytes, err := s.localUptimesDB.Get(key)
 	switch err {
 	case nil:
-		upTm := &uptimes{}
-		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, upTm); err != nil {
+		var uptime uptimes
+		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, uptime); err != nil {
 			return 0, time.Time{}, err
 		}
-		upTm.lastUpdated = time.Unix(int64(upTm.LastUpdated), 0)
-		return upTm.Duration, upTm.lastUpdated, nil
-
+		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
+		return uptime.Duration, uptime.lastUpdated, nil
 	case database.ErrNotFound:
 		// no local data for this staker uptime
 		return 0, time.Time{}, database.ErrNotFound
