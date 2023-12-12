@@ -325,11 +325,11 @@ func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeRespons
 }
 
 type ACP struct {
-	SupporterWeight uint64              `json:"supporterWeight"`
-	Supporters      set.Set[ids.NodeID] `json:"supporters"`
-	ObjectorWeight  uint64              `json:"objectorWeight"`
-	Objectors       set.Set[ids.NodeID] `json:"objectors"`
-	ObtainWeight    uint64              `json:"obtainWeight"`
+	SupportWeight json.Uint64         `json:"supportWeight"`
+	Supporters    set.Set[ids.NodeID] `json:"supporters"`
+	ObjectWeight  json.Uint64         `json:"objectWeight"`
+	Objectors     set.Set[ids.NodeID] `json:"objectors"`
+	ObtainWeight  json.Uint64         `json:"obtainWeight"`
 }
 
 type ACPsReply struct {
@@ -357,12 +357,12 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 		for acpNum := range peer.SupportedACPs {
 			acp := reply.getACP(acpNum)
 			acp.Supporters.Add(peer.ID)
-			acp.SupporterWeight += i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID)
+			acp.SupporterWeight += json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
 		}
 		for acpNum := range peer.ObjectedACPs {
 			acp := reply.getACP(acpNum)
 			acp.Objectors.Add(peer.ID)
-			acp.ObjectorWeight += i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID)
+			acp.ObjectorWeight += json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
 		}
 	}
 
@@ -372,7 +372,7 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 	}
 	for acpNum := range constants.CurrentACPs {
 		acp := reply.getACP(acpNum)
-		acp.ObtainWeight = totalWeight - acp.SupporterWeight - acp.ObjectorWeight
+		acp.ObtainWeight = json.Uint64(totalWeight) - acp.SupporterWeight - acp.ObjectorWeight
 	}
 	return nil
 }
