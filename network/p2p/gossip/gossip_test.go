@@ -115,8 +115,11 @@ func TestGossiperGossip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+			ctx := context.Background()
 
-			responseSender := &common.SenderTest{}
+			responseSender := &common.FakeSender{
+				SentAppResponse: make(chan []byte, 1),
+			}
 			responseNetwork := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
 			responseBloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
@@ -133,24 +136,12 @@ func TestGossiperGossip(t *testing.T) {
 			_, err = responseNetwork.NewAppProtocol(0x0, handler)
 			require.NoError(err)
 
-			requestSender := &common.SenderTest{
-				SendAppRequestF: func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
-					go func() {
-						require.NoError(responseNetwork.AppRequest(ctx, ids.EmptyNodeID, requestID, time.Time{}, request))
-					}()
-					return nil
-				},
+			requestSender := &common.FakeSender{
+				SentAppRequest: make(chan []byte, 1),
 			}
 
 			requestNetwork := p2p.NewNetwork(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
 			require.NoError(requestNetwork.Connected(context.Background(), ids.EmptyNodeID, nil))
-
-			gossiped := make(chan struct{})
-			responseSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-				require.NoError(requestNetwork.AppResponse(ctx, nodeID, requestID, appResponseBytes))
-				close(gossiped)
-				return nil
-			}
 
 			bloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
@@ -181,8 +172,9 @@ func TestGossiperGossip(t *testing.T) {
 				received.Add(tx)
 			}
 
-			require.NoError(gossiper.Gossip(context.Background()))
-			<-gossiped
+			require.NoError(gossiper.Gossip(ctx))
+			require.NoError(responseNetwork.AppRequest(ctx, ids.EmptyNodeID, 1, time.Time{}, <-requestSender.SentAppRequest))
+			require.NoError(requestNetwork.AppResponse(ctx, ids.EmptyNodeID, 1, <-responseSender.SentAppResponse))
 
 			require.Len(requestSet.set, tt.expectedLen)
 			require.Subset(tt.expectedPossibleValues, requestSet.set.List())
