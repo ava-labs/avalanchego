@@ -170,3 +170,39 @@ func createTestTxs(count int) []*txs.Tx {
 	}
 	return testTxs
 }
+
+func TestPeekTxs(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
+	require.NoError(err)
+
+	testTxs := createTestTxs(2)
+
+	tx, exists := mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
+
+	require.NoError(mempool.Add(testTxs[0]))
+	require.NoError(mempool.Add(testTxs[1]))
+
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, testTxs[0])
+	require.NotEqual(tx, testTxs[1])
+
+	mempool.Remove([]*txs.Tx{testTxs[0]})
+
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.NotEqual(tx, testTxs[0])
+	require.Equal(tx, testTxs[1])
+
+	mempool.Remove([]*txs.Tx{testTxs[1]})
+
+	tx, exists = mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
+}

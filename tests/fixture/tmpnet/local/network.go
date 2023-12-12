@@ -18,11 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 const (
@@ -48,7 +50,7 @@ func GetDefaultRootDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, ".testnetctl", "networks"), nil
+	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
 }
 
 // Find the next available network ID by attempting to create a
@@ -83,7 +85,7 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 
 // Defines the configuration required for a local network (i.e. one composed of local processes).
 type LocalNetwork struct {
-	testnet.NetworkConfig
+	tmpnet.NetworkConfig
 	LocalConfig
 
 	// Nodes with local configuration
@@ -94,13 +96,13 @@ type LocalNetwork struct {
 }
 
 // Returns the configuration of the network in backend-agnostic form.
-func (ln *LocalNetwork) GetConfig() testnet.NetworkConfig {
+func (ln *LocalNetwork) GetConfig() tmpnet.NetworkConfig {
 	return ln.NetworkConfig
 }
 
 // Returns the nodes of the network in backend-agnostic form.
-func (ln *LocalNetwork) GetNodes() []testnet.Node {
-	nodes := make([]testnet.Node, 0, len(ln.Nodes))
+func (ln *LocalNetwork) GetNodes() []tmpnet.Node {
+	nodes := make([]tmpnet.Node, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		nodes = append(nodes, node)
 	}
@@ -108,12 +110,12 @@ func (ln *LocalNetwork) GetNodes() []testnet.Node {
 }
 
 // Adds a backend-agnostic ephemeral node to the network
-func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
+func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags tmpnet.FlagsMap) (tmpnet.Node, error) {
 	if flags == nil {
-		flags = testnet.FlagsMap{}
+		flags = tmpnet.FlagsMap{}
 	}
 	return ln.AddLocalNode(w, &LocalNode{
-		NodeConfig: testnet.NodeConfig{
+		NodeConfig: tmpnet.NodeConfig{
 			Flags: flags,
 		},
 	}, true /* isEphemeral */)
@@ -224,7 +226,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	if len(ln.Nodes) > 0 && nodeCount > 0 {
 		return errInvalidNodeCount
 	}
-	if len(ln.FundedKeys) > 0 && keyCount > 0 {
+	if len(ln.PreFundedKeys) > 0 && keyCount > 0 {
 		return errInvalidKeyCount
 	}
 
@@ -238,18 +240,18 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	}
 
 	// Ensure each node has keys and an associated node ID. This
-	// ensures the availability of validator node IDs for genesis
-	// generation.
+	// ensures the availability of node IDs and proofs of possession
+	// for genesis generation.
 	for _, node := range ln.Nodes {
 		if err := node.EnsureKeys(); err != nil {
 			return err
 		}
 	}
 
-	// Assume all initial nodes are validator ids
-	validatorIDs := make([]ids.NodeID, 0, len(ln.Nodes))
-	for _, node := range ln.Nodes {
-		validatorIDs = append(validatorIDs, node.NodeID)
+	// Assume all the initial nodes are stakers
+	initialStakers, err := stakersForNodes(networkID, ln.Nodes)
+	if err != nil {
+		return err
 	}
 
 	if keyCount > 0 {
@@ -262,10 +264,10 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 			}
 			keys = append(keys, key)
 		}
-		ln.FundedKeys = keys
+		ln.PreFundedKeys = keys
 	}
 
-	if err := ln.EnsureGenesis(networkID, validatorIDs); err != nil {
+	if err := ln.EnsureGenesis(networkID, initialStakers); err != nil {
 		return err
 	}
 
@@ -298,7 +300,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string
 
 	// Set values common to all nodes
 	flags.SetDefaults(ln.DefaultFlags)
-	flags.SetDefaults(testnet.FlagsMap{
+	flags.SetDefaults(tmpnet.FlagsMap{
 		config.GenesisFileKey:    ln.GetGenesisPath(),
 		config.ChainConfigDirKey: ln.GetChainConfigDir(),
 	})
@@ -385,7 +387,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 			}
 
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, testnet.ErrNotRunning) {
+			if err != nil && !errors.Is(err, tmpnet.ErrNotRunning) {
 				return err
 			}
 			if !healthy {
@@ -409,14 +411,14 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 
 // Retrieve API URIs for all running primary validator nodes. URIs for
 // ephemeral nodes are not returned.
-func (ln *LocalNetwork) GetURIs() []testnet.NodeURI {
-	uris := make([]testnet.NodeURI, 0, len(ln.Nodes))
+func (ln *LocalNetwork) GetURIs() []tmpnet.NodeURI {
+	uris := make([]tmpnet.NodeURI, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it was not running at the time
 		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
-			uris = append(uris, testnet.NodeURI{
+			uris = append(uris, tmpnet.NodeURI{
 				NodeID: node.NodeID,
 				URI:    node.URI,
 			})
@@ -458,7 +460,7 @@ func (ln *LocalNetwork) ReadGenesis() error {
 }
 
 func (ln *LocalNetwork) WriteGenesis() error {
-	bytes, err := testnet.DefaultJSONMarshal(ln.Genesis)
+	bytes, err := tmpnet.DefaultJSONMarshal(ln.Genesis)
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
 	}
@@ -477,7 +479,7 @@ func (ln *LocalNetwork) GetCChainConfigPath() string {
 }
 
 func (ln *LocalNetwork) ReadCChainConfig() error {
-	chainConfig, err := testnet.ReadFlagsMap(ln.GetCChainConfigPath(), "C-Chain config")
+	chainConfig, err := tmpnet.ReadFlagsMap(ln.GetCChainConfigPath(), "C-Chain config")
 	if err != nil {
 		return err
 	}
@@ -496,9 +498,9 @@ func (ln *LocalNetwork) WriteCChainConfig() error {
 
 // Used to marshal/unmarshal persistent local network defaults.
 type localDefaults struct {
-	Flags      testnet.FlagsMap
-	ExecPath   string
-	FundedKeys []*secp256k1.PrivateKey
+	Flags         tmpnet.FlagsMap
+	ExecPath      string
+	PreFundedKeys []*secp256k1.PrivateKey
 }
 
 func (ln *LocalNetwork) GetDefaultsPath() string {
@@ -516,17 +518,17 @@ func (ln *LocalNetwork) ReadDefaults() error {
 	}
 	ln.DefaultFlags = defaults.Flags
 	ln.ExecPath = defaults.ExecPath
-	ln.FundedKeys = defaults.FundedKeys
+	ln.PreFundedKeys = defaults.PreFundedKeys
 	return nil
 }
 
 func (ln *LocalNetwork) WriteDefaults() error {
 	defaults := localDefaults{
-		Flags:      ln.DefaultFlags,
-		ExecPath:   ln.ExecPath,
-		FundedKeys: ln.FundedKeys,
+		Flags:         ln.DefaultFlags,
+		ExecPath:      ln.ExecPath,
+		PreFundedKeys: ln.PreFundedKeys,
 	}
-	bytes, err := testnet.DefaultJSONMarshal(defaults)
+	bytes, err := tmpnet.DefaultJSONMarshal(defaults)
 	if err != nil {
 		return fmt.Errorf("failed to marshal defaults: %w", err)
 	}
@@ -712,4 +714,32 @@ func (ln *LocalNetwork) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
+}
+
+// Returns staker configuration for the given set of nodes.
+func stakersForNodes(networkID uint32, nodes []*LocalNode) ([]genesis.UnparsedStaker, error) {
+	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
+	// will be easier to perform with nodes other than the initial validators since the timing of
+	// staking can be more easily controlled.
+	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to format reward address: %w", err)
+	}
+
+	// Configure provided nodes as initial stakers
+	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
+	for i, node := range nodes {
+		pop, err := node.GetProofOfPossession()
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive proof of possession: %w", err)
+		}
+		initialStakers[i] = genesis.UnparsedStaker{
+			NodeID:        node.NodeID,
+			RewardAddress: rewardAddr,
+			DelegationFee: .01 * reward.PercentDenominator,
+			Signer:        pop,
+		}
+	}
+
+	return initialStakers, nil
 }
