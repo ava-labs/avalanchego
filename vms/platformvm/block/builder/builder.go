@@ -257,7 +257,14 @@ func buildBlock(
 		var blockTxs []*txs.Tx
 		// TODO: Cleanup post-Durango
 		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
-			blockTxs, err = packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+			blockTxs, err = packBlockTxs(
+				parentID,
+				parentState,
+				builder.Mempool,
+				builder.txExecutorBackend,
+				builder.blkManager,
+				timestamp,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to pack block txs: %w", err)
 			}
@@ -272,7 +279,14 @@ func buildBlock(
 		)
 	}
 
-	blockTxs, err := packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+	blockTxs, err := packBlockTxs(
+		parentID,
+		parentState,
+		builder.Mempool,
+		builder.txExecutorBackend,
+		builder.blkManager,
+		timestamp,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
@@ -292,9 +306,15 @@ func buildBlock(
 	)
 }
 
-func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager blockexecutor.Manager, timestamp time.Time) ([]*txs.Tx, error) {
-	preferredID := manager.Preferred()
-	stateDiff, err := state.NewDiff(preferredID, manager)
+func packBlockTxs(
+	parentID ids.ID,
+	parentState state.Chain,
+	mempool mempool.Mempool,
+	backend *txexecutor.Backend,
+	manager blockexecutor.Manager,
+	timestamp time.Time,
+) ([]*txs.Tx, error) {
+	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +368,7 @@ func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager 
 			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
-		err = manager.VerifyUniqueInputs(preferredID, executor.Inputs)
+		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
 		if err != nil {
 			txID := tx.ID()
 			mempool.MarkDropped(txID, err)
@@ -359,9 +379,7 @@ func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager 
 		txDiff.AddTx(tx, status.Committed)
 		err = txDiff.Apply(stateDiff)
 		if err != nil {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
-			continue
+			return nil, err
 		}
 
 		remainingSize -= txSize
