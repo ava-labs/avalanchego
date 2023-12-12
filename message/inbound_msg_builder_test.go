@@ -433,7 +433,7 @@ func TestAppError(t *testing.T) {
 	require.NoError(err)
 
 	require.Equal(nodeID, got.NodeID())
-	require.Equal(AppRequestFailedOp, got.Op())
+	require.Equal(AppErrorOp, got.Op())
 
 	msg, ok := got.Message().(*p2p.AppError)
 	require.True(ok)
