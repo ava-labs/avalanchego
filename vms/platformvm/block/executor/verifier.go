@@ -83,12 +83,12 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	onCommitState, err := wrapState(onDecisionState)
+	onCommitState, err := state.NewDiffOn(onDecisionState)
 	if err != nil {
 		return err
 	}
 
-	onAbortState, err := wrapState(onDecisionState)
+	onAbortState, err := state.NewDiffOn(onDecisionState)
 	if err != nil {
 		return err
 	}
@@ -506,18 +506,4 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 
 	return inputs, atomicRequests, onAcceptFunc, nil
-}
-
-type stateGetter struct {
-	state state.Chain
-}
-
-func (s stateGetter) GetState(ids.ID) (state.Chain, bool) {
-	return s.state, true
-}
-
-func wrapState(parentState state.Chain) (state.Diff, error) {
-	return state.NewDiff(ids.Empty, stateGetter{
-		state: parentState,
-	})
 }

@@ -74,6 +74,20 @@ func NewDiff(
 	}, nil
 }
 
+type stateGetter struct {
+	state Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (Chain, bool) {
+	return s.state, true
+}
+
+func NewDiffOn(parentState Chain) (Diff, error) {
+	return NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
+}
+
 func (d *diff) GetTimestamp() time.Time {
 	return d.timestamp
 }
