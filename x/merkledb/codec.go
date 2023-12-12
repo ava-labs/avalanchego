@@ -38,6 +38,8 @@ const (
 var (
 	_ encoderDecoder = (*codecImpl)(nil)
 
+	log128 = math.Log(128)
+
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
@@ -91,7 +93,7 @@ type codecImpl struct {
 
 func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
 	// total the number of children pointers + bool indicating if it has a value + the value + the child entries for n.children
-	total := uintSize(uint64(len(n.children))) + boolSize() + len(n.value.Value())
+	total := uintSize(uint64(len(n.children))) + boolLen + len(n.value.Value())
 	// for each non-nil entry, we add the additional size of the child entry
 	for index, entry := range n.children {
 		total += childSize(index, entry)
@@ -100,19 +102,16 @@ func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
 }
 
 func childSize(index byte, childEntry *child) int {
-	return uintSize(uint64(index)) + len(ids.Empty) + keySize(childEntry.compressedKey) + boolSize()
+	return uintSize(uint64(index)) + len(ids.Empty) + keySize(childEntry.compressedKey) + boolLen
 }
-
-func boolSize() int {
-	return 1
-}
-
-var log128 = math.Log(128)
 
 func uintSize(value uint64) int {
 	if value == 0 {
 		return 1
 	}
+	// based on the current implementation of binary.PutUvarint
+	// uvarint repeatedly divides by 128 until the value is under 128,
+	// so count the number of times that occurs
 	return 1 + int(math.Log(float64(value))/log128)
 }
 
