@@ -93,15 +93,6 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter, durangoTim
 		return ids.EmptyNodeID, nil, nil, err
 	}
 
-	// We validate the certificate here to attempt to make the validity of the
-	// peer certificate as clear as possible. Specifically, a node running a
-	// prior version using an invalid certificate should not be able to report
-	// healthy.
-	if err := staking.ValidateCertificate(peerCert); err != nil {
-		invalidCerts.Inc()
-		return ids.EmptyNodeID, nil, nil, err
-	}
-
 	nodeID := ids.NodeIDFromCert(peerCert)
 	return nodeID, conn, peerCert, nil
 }

@@ -77,8 +77,10 @@ func FuzzParseCertificate(f *testing.F) {
 		// Verify that any certificate that can't be parsed by
 		// ParseCertificatePermissive also can't be parsed by ParseCertificate.
 		{
-			_, err := ParseCertificatePermissive(certBytes)
-			if err != nil {
+			cert, err := ParseCertificatePermissive(certBytes)
+			if err == nil {
+				require.NoError(ValidateCertificate(cert))
+			} else {
 				_, err = ParseCertificate(certBytes)
 				require.Error(err) //nolint:forbidigo
 			}
