@@ -6,9 +6,10 @@ package state
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParseDelegatorMetadata(t *testing.T) {
