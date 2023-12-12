@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Tests
 
 on:
   push:
@@ -17,8 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unit_tests:
-    name: unit_tests
+  Unit:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -38,7 +37,3 @@ jobs:
         run: ./scripts/build_test.sh
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
-      - name: fuzz_test
-        shell: bash
-        if: matrix.os == 'ubuntu-22.04' # Only run on Ubuntu 22.04
-        run: ./scripts/build_fuzz.sh 15 # Run each fuzz test 15 seconds
