@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
@@ -27,7 +27,7 @@ var (
 )
 
 type Manager interface {
-	states.Versions
+	state.Versions
 
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
@@ -43,15 +43,15 @@ type Manager interface {
 	// preferred state. This should *not* be used to verify transactions in a block.
 	VerifyTx(tx *txs.Tx) error
 
-	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
-	// provided blk or any of its ancestors pinned in memory.
+	// VerifyUniqueInputs returns nil iff no blocks in the inclusive
+	// ancestry of [blkID] consume an input in [inputs].
 	VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error
 }
 
 func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
-	state states.State,
+	state state.State,
 	backend *executor.Backend,
 	clk *mockable.Clock,
 	onAccept func(*txs.Tx) error,
@@ -72,7 +72,7 @@ func NewManager(
 
 type manager struct {
 	backend *executor.Backend
-	state   states.State
+	state   state.State
 	metrics metrics.Metrics
 	mempool mempool.Mempool
 	clk     *mockable.Clock
@@ -93,12 +93,12 @@ type manager struct {
 
 type blockState struct {
 	statelessBlock block.Block
-	onAcceptState  states.Diff
+	onAcceptState  state.Diff
 	importedInputs set.Set[ids.ID]
 	atomicRequests map[ids.ID]*atomic.Requests
 }
 
-func (m *manager) GetState(blkID ids.ID) (states.Chain, bool) {
+func (m *manager) GetState(blkID ids.ID) (state.Chain, bool) {
 	// If the block is in the map, it is processing.
 	if state, ok := m.blkIDToState[blkID]; ok {
 		return state.onAcceptState, true
@@ -155,7 +155,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	stateDiff, err := states.NewDiff(m.preferred, m)
+	stateDiff, err := state.NewDiff(m.preferred, m)
 	if err != nil {
 		return err
 	}

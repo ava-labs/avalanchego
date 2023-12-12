@@ -32,9 +32,6 @@ type Engine interface {
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
 	health.Checker
-
-	// GetVM returns this engine's VM
-	GetVM() VM
 }
 
 type Handler interface {

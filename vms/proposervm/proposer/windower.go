@@ -7,6 +7,8 @@ import (
 	"context"
 	"time"
 
+	"gonum.org/v1/gonum/mathext/prng"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -17,9 +19,13 @@ import (
 
 // Proposer list constants
 const (
-	MaxWindows     = 6
 	WindowDuration = 5 * time.Second
-	MaxDelay       = MaxWindows * WindowDuration
+
+	MaxVerifyWindows = 6
+	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
+
+	MaxBuildWindows = 60
+	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
 )
 
 var _ Windower = (*windower)(nil)
@@ -33,6 +39,7 @@ type Windower interface {
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
+		maxWindows int,
 	) ([]ids.NodeID, error)
 	// Delay returns the amount of time that [validatorID] must wait before
 	// building a block at [chainHeight] when the validator set is defined at
@@ -42,6 +49,7 @@ type Windower interface {
 		chainHeight,
 		pChainHeight uint64,
 		validatorID ids.NodeID,
+		maxWindows int,
 	) (time.Duration, error)
 }
 
@@ -51,7 +59,6 @@ type windower struct {
 	state       validators.State
 	subnetID    ids.ID
 	chainSource uint64
-	sampler     sampler.WeightedWithoutReplacement
 }
 
 func New(state validators.State, subnetID, chainID ids.ID) Windower {
@@ -60,11 +67,10 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 		state:       state,
 		subnetID:    subnetID,
 		chainSource: w.UnpackLong(),
-		sampler:     sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
 }
 
-func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64) ([]ids.NodeID, error) {
+func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
@@ -97,19 +103,21 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		validatorWeights[i] = v.weight
 	}
 
-	if err := w.sampler.Initialize(validatorWeights); err != nil {
+	seed := chainHeight ^ w.chainSource
+
+	source := prng.NewMT19937()
+	source.Seed(seed)
+	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
+	if err := sampler.Initialize(validatorWeights); err != nil {
 		return nil, err
 	}
 
-	numToSample := MaxWindows
+	numToSample := maxWindows
 	if weight < uint64(numToSample) {
 		numToSample = int(weight)
 	}
 
-	seed := chainHeight ^ w.chainSource
-	w.sampler.Seed(int64(seed))
-
-	indices, err := w.sampler.Sample(numToSample)
+	indices, err := sampler.Sample(numToSample)
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +129,12 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	return nodeIDs, nil
 }
 
-func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID) (time.Duration, error) {
+func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
-		return MaxDelay, nil
+		return time.Duration(maxWindows) * WindowDuration, nil
 	}
 
-	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight)
+	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight, maxWindows)
 	if err != nil {
 		return 0, err
 	}

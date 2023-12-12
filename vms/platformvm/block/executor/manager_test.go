@@ -72,3 +72,18 @@ func TestManagerLastAccepted(t *testing.T) {
 
 	require.Equal(t, lastAcceptedID, manager.LastAccepted())
 }
+
+func TestManagerSetPreference(t *testing.T) {
+	require := require.New(t)
+
+	initialPreference := ids.GenerateTestID()
+	manager := &manager{
+		preferred: initialPreference,
+	}
+	require.False(manager.SetPreference(initialPreference))
+
+	newPreference := ids.GenerateTestID()
+	require.True(manager.SetPreference(newPreference))
+	require.False(manager.SetPreference(newPreference))
+	require.True(manager.SetPreference(initialPreference))
+}

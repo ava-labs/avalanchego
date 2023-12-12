@@ -4,6 +4,7 @@
 package sync
 
 import (
+	"bytes"
 	"math/rand"
 	"testing"
 	"time"
@@ -13,7 +14,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -199,7 +199,7 @@ func TestWorkHeapMergeInsertRandom(t *testing.T) {
 		_, _ = rand.Read(bound)
 		bounds = append(bounds, bound)
 	}
-	utils.SortBytes(bounds)
+	slices.SortFunc(bounds, bytes.Compare)
 
 	// Note that start < end for all ranges.
 	// It is possible but extremely unlikely that

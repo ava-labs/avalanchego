@@ -44,6 +44,7 @@ func TestRejectBlock(t *testing.T) {
 						},
 						Creds: []verify.Verifiable{},
 					},
+					[]*txs.Tx{},
 				)
 			},
 			rejectFunc: func(r *rejector, b block.Block) error {
@@ -141,6 +142,8 @@ func TestRejectBlock(t *testing.T) {
 			for _, tx := range blk.Txs() {
 				mempool.EXPECT().Add(tx).Return(nil).Times(1)
 			}
+
+			mempool.EXPECT().RequestBuildBlock(false).Times(1)
 
 			require.NoError(tt.rejectFunc(rejector, blk))
 			// Make sure block and its parent are removed from the state map.
