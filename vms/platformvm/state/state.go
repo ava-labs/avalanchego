@@ -281,7 +281,7 @@ type state struct {
 	indexedUTXOsDB database.Database
 
 	// Node ID --> SubnetID --> Uptime of the node on the subnet
-	modifiedLocalUptimes map[ids.NodeID]map[ids.ID]*uptimes
+	modifiedLocalUptimes map[ids.NodeID]map[ids.ID]*uptimeMetadata
 	localUptimesDB       database.Database
 
 	flatValidatorWeightDiffsDB    database.Database
@@ -426,7 +426,7 @@ func newState(
 
 		indexedUTXOsDB: indexedUTXOsDB,
 
-		modifiedLocalUptimes: make(map[ids.NodeID]map[ids.ID]*uptimes),
+		modifiedLocalUptimes: make(map[ids.NodeID]map[ids.ID]*uptimeMetadata),
 		localUptimesDB:       localUptimesDB,
 
 		flatValidatorWeightDiffsDB:    flatValidatorWeightDiffsDB,
@@ -1950,7 +1950,7 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 	uptimeBytes, err := s.localUptimesDB.Get(key)
 	switch err {
 	case nil:
-		var uptime uptimes
+		var uptime uptimeMetadata
 		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, &uptime); err != nil {
 			return 0, time.Time{}, err
 		}
@@ -1967,10 +1967,10 @@ func (s *state) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Du
 func (s *state) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
 	updatedNodeUptimes, ok := s.modifiedLocalUptimes[vdrID]
 	if !ok {
-		updatedNodeUptimes = make(map[ids.ID]*uptimes, 0)
+		updatedNodeUptimes = make(map[ids.ID]*uptimeMetadata, 0)
 		s.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
 	}
-	updatedNodeUptimes[subnetID] = &uptimes{
+	updatedNodeUptimes[subnetID] = &uptimeMetadata{
 		Duration:    upDuration,
 		LastUpdated: uint64(lastUpdated.Unix()),
 		lastUpdated: lastUpdated,

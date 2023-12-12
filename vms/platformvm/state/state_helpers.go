@@ -9,8 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// helpers types to store data on merkleDB
-type uptimes struct {
+type uptimeMetadata struct {
 	Duration    time.Duration `serialize:"true"`
 	LastUpdated uint64        `serialize:"true"` // Unix time in seconds
 
