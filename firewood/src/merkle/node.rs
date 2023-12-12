@@ -8,7 +8,11 @@ use crate::{
 use bincode::{Error, Options};
 use bitflags::bitflags;
 use enum_as_inner::EnumAsInner;
-use serde::{de::DeserializeOwned, ser::SerializeSeq, Deserialize, Serialize};
+use serde::{
+    de::DeserializeOwned,
+    ser::{SerializeSeq, SerializeTuple},
+    Deserialize, Serialize,
+};
 use sha3::{Digest, Keccak256};
 use std::{
     fmt::Debug,
@@ -482,12 +486,98 @@ impl<T> EncodedNode<T> {
         }
     }
 }
+
 pub enum EncodedNodeType {
     Leaf(LeafNode),
     Branch {
         children: Box<[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>,
         value: Option<Data>,
     },
+}
+
+// TODO: probably can merge with `EncodedNodeType`.
+#[derive(Debug, Deserialize)]
+struct EncodedBranchNode {
+    chd: Vec<(u64, Vec<u8>)>,
+    data: Option<Vec<u8>>,
+    path: Vec<u8>,
+}
+
+// Note that the serializer passed in should always be the same type as T in EncodedNode<T>.
+impl Serialize for EncodedNode<PlainCodec> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let n = match &self.node {
+            EncodedNodeType::Leaf(n) => {
+                let data = Some(n.data.to_vec());
+                let chd: Vec<(u64, Vec<u8>)> = Default::default();
+                let path = from_nibbles(&n.path.encode(true)).collect();
+                EncodedBranchNode { chd, data, path }
+            }
+            EncodedNodeType::Branch { children, value } => {
+                let chd: Vec<(u64, Vec<u8>)> = children
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, c)| c.as_ref().map(|c| (i as u64, c)))
+                    .map(|(i, c)| {
+                        if c.len() >= TRIE_HASH_LEN {
+                            (i, Keccak256::digest(c).to_vec())
+                        } else {
+                            (i, c.to_vec())
+                        }
+                    })
+                    .collect();
+
+                let data = value.as_ref().map(|v| v.0.to_vec());
+                EncodedBranchNode {
+                    chd,
+                    data,
+                    path: Vec::new(),
+                }
+            }
+        };
+
+        let mut s = serializer.serialize_tuple(3)?;
+        s.serialize_element(&n.chd)?;
+        s.serialize_element(&n.data)?;
+        s.serialize_element(&n.path)?;
+        s.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for EncodedNode<PlainCodec> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let node: EncodedBranchNode = Deserialize::deserialize(deserializer)?;
+        if node.chd.is_empty() {
+            let data = if let Some(d) = node.data {
+                Data(d)
+            } else {
+                Data(Vec::new())
+            };
+
+            let path = PartialPath::from_nibbles(Nibbles::<0>::new(&node.path).into_iter()).0;
+            let node = EncodedNodeType::Leaf(LeafNode { path, data });
+            Ok(Self::new(node))
+        } else {
+            let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
+            let value = node.data.map(Data);
+
+            for (i, chd) in node.chd {
+                children[i as usize] = Some(chd);
+            }
+
+            let node = EncodedNodeType::Branch {
+                children: children.into(),
+                value,
+            };
+            Ok(Self::new(node))
+        }
+    }
 }
 
 // Note that the serializer passed in should always be the same type as T in EncodedNode<T>.
@@ -566,10 +656,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                     path,
                     data: Data(data),
                 });
-                Ok(Self {
-                    node,
-                    phantom: PhantomData,
-                })
+                Ok(Self::new(node))
             }
             BranchNode::MSIZE => {
                 let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
@@ -601,10 +688,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                     children: children.into(),
                     value,
                 };
-                Ok(Self {
-                    node,
-                    phantom: PhantomData,
-                })
+                Ok(Self::new(node))
             }
             size => Err(D::Error::custom(format!("invalid size: {size}"))),
         }
@@ -656,6 +740,37 @@ impl BinarySerde for Bincode {
 
     fn serialize_impl<T: Serialize>(&self, t: &T) -> Result<Vec<u8>, Self::SerializeError> {
         self.0.serialize(t)
+    }
+
+    fn deserialize_impl<'de, T: Deserialize<'de>>(
+        &self,
+        bytes: &'de [u8],
+    ) -> Result<T, Self::DeserializeError> {
+        self.0.deserialize(bytes)
+    }
+}
+
+pub struct PlainCodec(pub bincode::DefaultOptions);
+
+impl Debug for PlainCodec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "PlainCodec")
+    }
+}
+
+impl BinarySerde for PlainCodec {
+    type SerializeError = bincode::Error;
+    type DeserializeError = Self::SerializeError;
+
+    fn new() -> Self {
+        Self(bincode::DefaultOptions::new())
+    }
+
+    fn serialize_impl<T: Serialize>(&self, t: &T) -> Result<Vec<u8>, Self::SerializeError> {
+        // Serializes the object directly into a Writer without include the length.
+        let mut writer = Vec::new();
+        self.0.serialize_into(&mut writer, t)?;
+        Ok(writer)
     }
 
     fn deserialize_impl<'de, T: Deserialize<'de>>(

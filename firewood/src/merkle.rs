@@ -1,7 +1,10 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 use crate::nibbles::Nibbles;
-use crate::shale::{self, disk_address::DiskAddress, ObjWriteError, ShaleError, ShaleStore};
+use crate::shale::{
+    self, cached::PlainMem, compact::CompactSpace, disk_address::DiskAddress, ObjWriteError,
+    ShaleError, ShaleStore,
+};
 use crate::v2::api;
 use futures::{StreamExt, TryStreamExt};
 use sha3::Digest;
@@ -28,6 +31,7 @@ pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 type ObjRef<'a> = shale::ObjRef<'a, Node>;
 type ParentRefs<'a> = Vec<(ObjRef<'a>, u8)>;
 type ParentAddresses = Vec<(DiskAddress, u8)>;
+pub type MerkleWithEncoder = Merkle<CompactSpace<Node, PlainMem>, Bincode>;
 
 #[derive(Debug, Error)]
 pub enum MerkleError {
@@ -1399,6 +1403,8 @@ pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
 
 #[cfg(test)]
 mod tests {
+    use crate::merkle::node::PlainCodec;
+
     use super::*;
     use node::tests::{extension, leaf};
     use shale::{cached::DynamicMem, compact::CompactSpace, CachedStore};
@@ -1412,7 +1418,11 @@ mod tests {
         assert_eq!(n, nibbles);
     }
 
-    pub(super) fn create_test_merkle() -> Merkle<CompactSpace<Node, DynamicMem>, Bincode> {
+    fn create_generic_test_merkle<'de, T>() -> Merkle<CompactSpace<Node, DynamicMem>, T>
+    where
+        T: BinarySerde,
+        EncodedNode<T>: serde::Serialize + serde::Deserialize<'de>,
+    {
         const RESERVED: usize = 0x1000;
 
         let mut dm = shale::cached::DynamicMem::new(0x10000, 0);
@@ -1443,9 +1453,13 @@ mod tests {
         Merkle::new(store)
     }
 
-    fn branch(value: Vec<u8>, encoded_child: Option<Vec<u8>>) -> Node {
+    pub(super) fn create_test_merkle() -> Merkle<CompactSpace<Node, DynamicMem>, Bincode> {
+        create_generic_test_merkle::<Bincode>()
+    }
+
+    fn branch(value: Option<Vec<u8>>, encoded_child: Option<Vec<u8>>) -> Node {
         let children = Default::default();
-        let value = Some(Data(value));
+        let value = value.map(Data);
         let mut children_encoded = <[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>::default();
 
         if let Some(child) = encoded_child {
@@ -1462,9 +1476,9 @@ mod tests {
 
     #[test_case(leaf(Vec::new(), Vec::new()) ; "empty leaf encoding")]
     #[test_case(leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf encoding")]
-    #[test_case(branch(b"value".to_vec(), vec![1, 2, 3].into()) ; "branch with chd")]
-    #[test_case(branch(b"value".to_vec(), None); "branch without chd")]
-    #[test_case(branch(Vec::new(), None); "branch without value and chd")]
+    #[test_case(branch(Some(b"value".to_vec()), vec![1, 2, 3].into()) ; "branch with chd")]
+    #[test_case(branch(Some(b"value".to_vec()), None); "branch without chd")]
+    #[test_case(branch(None, None); "branch without value and chd")]
     #[test_case(extension(vec![1, 2, 3], DiskAddress::null(), vec![4, 5].into()) ; "extension without child address")]
     fn encode_(node: Node) {
         let merkle = create_test_merkle();
@@ -1479,17 +1493,32 @@ mod tests {
 
     #[test_case(leaf(Vec::new(), Vec::new()) ; "empty leaf encoding")]
     #[test_case(leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf encoding")]
-    #[test_case(branch(b"value".to_vec(), vec![1, 2, 3].into()) ; "branch with chd")]
-    #[test_case(branch(b"value".to_vec(), None); "branch without chd")]
-    #[test_case(branch(Vec::new(), None); "branch without value and chd")]
-    fn node_encode_decode_(node: Node) {
+    #[test_case(branch(Some(b"value".to_vec()), vec![1, 2, 3].into()) ; "branch with chd")]
+    #[test_case(branch(Some(b"value".to_vec()), None); "branch without chd")]
+    #[test_case(branch(None, None); "branch without value and chd")]
+    fn node_encode_decode(node: Node) {
         let merkle = create_test_merkle();
         let node_ref = merkle.put_node(node.clone()).unwrap();
+
         let encoded = merkle.encode(&node_ref).unwrap();
         let new_node = Node::from(merkle.decode(encoded.as_ref()).unwrap());
-        let new_node_hash = new_node.get_root_hash(merkle.store.as_ref());
-        let expected_hash = node.get_root_hash(merkle.store.as_ref());
-        assert_eq!(new_node_hash, expected_hash);
+
+        assert_eq!(node, new_node);
+    }
+
+    #[test_case(leaf(Vec::new(), Vec::new()) ; "empty leaf encoding")]
+    #[test_case(leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf encoding")]
+    #[test_case(branch(Some(b"value".to_vec()), vec![1, 2, 3].into()) ; "branch with chd")]
+    #[test_case(branch(Some(b"value".to_vec()), Some(Vec::new())); "branch with empty chd")]
+    #[test_case(branch(Some(Vec::new()), vec![1, 2, 3].into()); "branch with empty value")]
+    fn node_encode_decode_plain(node: Node) {
+        let merkle = create_generic_test_merkle::<PlainCodec>();
+        let node_ref = merkle.put_node(node.clone()).unwrap();
+
+        let encoded = merkle.encode(&node_ref).unwrap();
+        let new_node = Node::from(merkle.decode(encoded.as_ref()).unwrap());
+
+        assert_eq!(node, new_node);
     }
 
     #[test]

@@ -6,7 +6,7 @@
 use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, Criterion};
 use firewood::{
     db::{BatchOp, DbConfig},
-    merkle::{Merkle, TrieHash, TRIE_HASH_LEN},
+    merkle::{MerkleWithEncoder, TrieHash, TRIE_HASH_LEN},
     shale::{
         cached::PlainMem,
         compact::{CompactHeader, CompactSpace},
@@ -104,7 +104,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                     )
                     .unwrap();
 
-                    let merkle = Merkle::new(Box::new(store));
+                    let merkle = MerkleWithEncoder::new(Box::new(store));
                     let root = merkle.init_root().unwrap();
 
                     let keys: Vec<Vec<u8>> = repeat_with(|| {
