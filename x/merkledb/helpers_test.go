@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -17,9 +18,13 @@ import (
 )
 
 func getBasicDB() (*merkleDB, error) {
+	return getBasicDBWithDB(memdb.New())
+}
+
+func getBasicDBWithDB(db database.Database) (*merkleDB, error) {
 	return newDatabase(
 		context.Background(),
-		memdb.New(),
+		db,
 		newDefaultConfig(),
 		&mockMetrics{},
 	)

@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -93,7 +94,8 @@ func testAltRoot(t *testing.T, kvs map[string]string) {
 
 	ethTrie := trie.NewEmpty(trie.NewDatabase(rawdb.NewMemoryDatabase()))
 
-	db, err := getBasicDB()
+	kvStore := memdb.New()
+	db, err := getBasicDBWithDB(kvStore)
 	require.NoError(err)
 
 	vcs := ViewChanges{
@@ -116,6 +118,15 @@ func testAltRoot(t *testing.T, kvs map[string]string) {
 	require.Equal(ethRootID, altRootID)
 	require.NoError(trieView.CommitToDB(ctx))
 	dbRoot, err := db.GetAltMerkleRoot(ctx)
+	require.NoError(err)
+	require.Equal(ethRootID, dbRoot)
+
+	require.NoError(db.Close())
+
+	// Make sure the database is still correct after closing and reopening it.
+	db, err = getBasicDBWithDB(kvStore)
+	require.NoError(err)
+	dbRoot, err = db.GetAltMerkleRoot(ctx)
 	require.NoError(err)
 	require.Equal(ethRootID, dbRoot)
 }
