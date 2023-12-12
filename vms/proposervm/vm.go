@@ -299,28 +299,7 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	blk, err := preferredBlock.buildChild(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Following Durango activation make sure we try and reschedule the block building timer
-	if vm.IsDurangoActivated(preferredBlock.Timestamp()) {
-		postForkBlk, ok := preferredBlock.(PostForkBlock)
-		if ok {
-			pChainHeight, err := blk.pChainHeight(ctx)
-			if err != nil {
-				return nil, err
-			}
-			nextStartTime, err := vm.resetPostDurangoScheduler(ctx, postForkBlk, pChainHeight)
-			if err != nil {
-				return nil, err
-			}
-			vm.Scheduler.SetBuildBlockTime(nextStartTime)
-		}
-	}
-
-	return blk, nil
+	return preferredBlock.buildChild(ctx)
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
@@ -359,7 +338,13 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		parentTimestamp = blk.Timestamp()
 	)
 	if vm.IsDurangoActivated(parentTimestamp) {
-		nextStartTime, err = vm.resetPostDurangoScheduler(ctx, blk, pChainHeight)
+		nextStartTime, err = vm.resetPostDurangoScheduler(
+			ctx,
+			blk.Height()+1,
+			pChainHeight,
+			blk.Timestamp(),
+			vm.Clock.Time().Truncate(time.Second),
+		)
 	} else {
 		nextStartTime, err = vm.resetPreDurangoScheduler(ctx, blk, pChainHeight)
 	}
@@ -408,24 +393,26 @@ func (vm *VM) resetPreDurangoScheduler(
 
 func (vm *VM) resetPostDurangoScheduler(
 	ctx context.Context,
-	blk PostForkBlock,
+	blkHeight uint64,
 	pChainHeight uint64,
+	parentTimestamp time.Time,
+	currentTime time.Time,
 ) (time.Time, error) {
-	parentTimestamp := blk.Timestamp()
 	nextStartTime, err := vm.Windower.MinDelayForProposer(
 		ctx,
-		blk.Height()+1,
+		blkHeight,
 		pChainHeight,
 		parentTimestamp,
 		vm.ctx.NodeID,
-		vm.Clock.Time().Truncate(time.Second),
+		currentTime,
 	)
 	if errors.Is(err, proposer.ErrNoSlotsScheduledInNextFuture) {
-		// while there are no slots available in the next figure for vm.ctx.NodeID,
-		// we still want to make sure we reset the time to eventually server build
-		// block requests from innerVM
-		nextStartTime, err = parentTimestamp.Add(proposer.MaxLookAheadWindow), nil
-	} else if err != nil {
+		// This node is not scheduled to propose in any nearby slots. To avoid
+		// costly iteration, stop iterating early and only continue iterating if
+		// needed.
+		return currentTime.Add(proposer.MaxLookAheadWindow), nil
+	}
+	if err != nil {
 		vm.ctx.Log.Debug("failed to calculate min delay for proposer",
 			zap.Error(err),
 		)

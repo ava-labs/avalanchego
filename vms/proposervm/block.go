@@ -376,8 +376,8 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		ctx,
 		blkHeight,
 		parentPChainHeight,
-		blkTimestamp,
 		parentTimestamp,
+		blkTimestamp,
 	)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected block verification failure",
@@ -406,8 +406,8 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,
-		newTimestamp,
 		parentTimestamp,
+		newTimestamp,
 	)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected build block failure",
@@ -429,6 +429,20 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 		zap.Time("blockTimestamp", newTimestamp),
 		zap.Stringer("expectedProposer", expectedProposerID),
 	)
+
+	// We need to reschedule the block builder to the next time we can try to
+	// build a block.
+	nextStartTime, err := p.vm.resetPostDurangoScheduler(
+		ctx,
+		parentHeight+1,
+		parentPChainHeight,
+		parentTimestamp,
+		newTimestamp,
+	)
+	if err != nil {
+		return err
+	}
+	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	// In case the inner VM only issued one pendingTxs message, we should
 	// attempt to re-handle that once it is our turn to build the block.

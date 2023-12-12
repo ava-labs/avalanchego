@@ -67,8 +67,8 @@ type Windower interface {
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
-		blockTime,
-		parentBlockTime time.Time,
+		parentBlockTime,
+		blockTime time.Time,
 	) (ids.NodeID, error)
 
 	MinDelayForProposer(
@@ -161,8 +161,8 @@ func (w *windower) ExpectedProposer(
 	ctx context.Context,
 	chainHeight,
 	pChainHeight uint64,
-	blockTime,
-	parentBlockTime time.Time,
+	parentBlockTime,
+	blockTime time.Time,
 ) (ids.NodeID, error) {
 	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
