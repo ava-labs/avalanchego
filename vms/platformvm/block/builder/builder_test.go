@@ -286,6 +286,10 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.Lock.Unlock()
 	}()
 
+	env.config.DurangoTime = time.Time{}
+
+	require.True(env.config.IsDurangoActivated(env.backend.Clk.Time()))
+
 	var (
 		now                   = env.backend.Clk.Time()
 		defaultValidatorStake = 100 * units.MilliAvax
