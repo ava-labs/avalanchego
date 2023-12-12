@@ -23,24 +23,6 @@ func TestParseDelegatorMetadata(t *testing.T) {
 	}
 	tests := []test{
 		{
-			name:  "nil",
-			bytes: nil,
-			expected: &delegatorMetadata{
-				PotentialReward: 0,
-				StakerStartTime: 0,
-			},
-			expectedErr: nil,
-		},
-		{
-			name:  "nil",
-			bytes: []byte{},
-			expected: &delegatorMetadata{
-				PotentialReward: 0,
-				StakerStartTime: 0,
-			},
-			expectedErr: nil,
-		},
-		{
 			name: "potential reward only no codec",
 			bytes: []byte{
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
