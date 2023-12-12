@@ -14,11 +14,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -31,7 +29,7 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-func TestBlockBuilderAddLocalTx(t *testing.T) {
+func TestBuildBlockBasic(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
@@ -70,6 +68,26 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	// Mempool should not contain the transaction or have marked it as dropped
 	require.False(env.mempool.Has(txID))
 	require.NoError(env.mempool.GetDropReason(txID))
+}
+
+func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	tx, exists := env.mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
+
+	// [BuildBlock] should not build an empty block
+	blk, err := env.Builder.BuildBlock(context.Background())
+	require.ErrorIs(err, ErrNoPendingBlocks)
+	require.Nil(blk)
 }
 
 func TestBuildBlockShouldReward(t *testing.T) {
@@ -471,54 +489,6 @@ func TestBuildBlock(t *testing.T) {
 	}
 
 	tests := []test{
-		{
-			name: "no stakers tx",
-			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There are no txs.
-				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-				mempool.EXPECT().Peek().Return(nil, false)
-
-				clk := &mockable.Clock{}
-				clk.Set(now)
-				return &builder{
-					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
-						Ctx: &snow.Context{
-							Log: logging.NoLog{},
-						},
-						Clk: clk,
-					},
-				}
-			},
-			timestamp:        parentTimestamp,
-			forceAdvanceTime: false,
-			parentStateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime].
-				// Next validator change time is in the future.
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				gomock.InOrder(
-					// expect calls from [getNextStakerToReward]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					}),
-					currentStakerIter.EXPECT().Release(),
-				)
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
-				return s
-			},
-			expectedBlkF: func(*require.Assertions) block.Block {
-				return nil
-			},
-			expectedErr: ErrNoPendingBlocks,
-		},
 		{
 			name: "should advance time",
 			builderF: func(ctrl *gomock.Controller) *builder {
