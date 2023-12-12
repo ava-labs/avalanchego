@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
@@ -210,15 +211,22 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	}()
 
 	var (
-		now      = env.backend.Clk.Time()
-		nextTime = now.Add(2 * txexecutor.SyncBound)
+		now            = env.backend.Clk.Time()
+		nextTime       = now.Add(2 * txexecutor.SyncBound)
+		addValidatorTx = &txs.Tx{}
 	)
 
 	// Add a staker to [env.state]
 	env.state.PutCurrentValidator(&state.Staker{
+		TxID:     addValidatorTx.ID(),
 		NextTime: nextTime,
 		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 	})
+
+	// We'll fail in [shutdownEnvironment] if we fail to look up the
+	// tx that added the staker to [env.state], so add a dummy
+	// tx to write to disk.
+	env.state.AddTx(addValidatorTx, status.Committed)
 
 	// Advance wall clock to [nextTime]
 	env.backend.Clk.Set(nextTime)

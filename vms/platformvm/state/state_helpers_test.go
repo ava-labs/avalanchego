@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
-func TestSuppliesKeyTest(t *testing.T) {
+func TestMerkleSuppliesKey(t *testing.T) {
 	require := require.New(t)
 	subnetID := ids.GenerateTestID()
 
@@ -23,7 +23,7 @@ func TestSuppliesKeyTest(t *testing.T) {
 	require.Equal(subnetID, retrievedSubnetID)
 }
 
-func TestPermissionedSubnetKey(t *testing.T) {
+func TestMerklePermissionedSubnetKey(t *testing.T) {
 	require := require.New(t)
 	subnetID := ids.GenerateTestID()
 	prefix := permissionedSubnetSectionPrefix
