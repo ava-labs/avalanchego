@@ -293,7 +293,7 @@ func InboundAppError(
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
-		op:     AppRequestFailedOp,
+		op:     AppErrorOp,
 		message: &p2p.AppError{
 			ChainId:      chainID[:],
 			RequestId:    requestID,

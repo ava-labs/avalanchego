@@ -445,7 +445,7 @@ func InternalCrossChainAppError(
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
-		op:     CrossChainAppRequestFailedOp,
+		op:     CrossChainAppErrorOp,
 		message: &CrossChainAppRequestFailed{
 			SourceChainID:      sourceChainID,
 			DestinationChainID: destinationChainID,

@@ -1379,7 +1379,7 @@ func TestAppRequest(t *testing.T) {
 			chainRouter, engine := newChainRouterTest(t)
 
 			wg.Add(1)
-			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.AppRequestFailedOp {
+			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.AppErrorOp {
 				engine.AppRequestFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 					defer wg.Done()
 					require.Zero(chainRouter.timedRequests.Len())
@@ -1461,7 +1461,7 @@ func TestCrossChainAppRequest(t *testing.T) {
 			chainRouter, engine := newChainRouterTest(t)
 
 			wg.Add(1)
-			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.CrossChainAppRequestFailedOp {
+			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.CrossChainAppErrorOp {
 				engine.CrossChainAppRequestFailedF = func(_ context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
 					defer wg.Done()
 					require.Zero(chainRouter.timedRequests.Len())

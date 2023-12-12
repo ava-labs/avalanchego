@@ -271,8 +271,8 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg Message) {
 	switch msg.Op() {
-	case message.AppRequestOp, message.AppRequestFailedOp, message.AppResponseOp, message.AppGossipOp,
-		message.CrossChainAppRequestOp, message.CrossChainAppRequestFailedOp, message.CrossChainAppResponseOp:
+	case message.AppRequestOp, message.AppErrorOp, message.AppResponseOp, message.AppGossipOp,
+		message.CrossChainAppRequestOp, message.CrossChainAppErrorOp, message.CrossChainAppResponseOp:
 		h.asyncMessageQueue.Push(ctx, msg)
 	default:
 		h.syncMessageQueue.Push(ctx, msg)
