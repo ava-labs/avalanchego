@@ -15,9 +15,9 @@ import (
 
 type proposalBlockState struct {
 	initiallyPreferCommit bool
+	onDecisionState       state.Diff
 	onCommitState         state.Diff
 	onAbortState          state.Diff
-	onDecisionState       state.Diff
 }
 
 // The state of a block.

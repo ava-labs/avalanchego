@@ -59,11 +59,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onCommitState, err := state.NewDiff(parentID, v.backend)
-	if err != nil {
-		return err
-	}
-	onAbortState, err := state.NewDiff(parentID, v.backend)
+	onDecisionState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
@@ -72,36 +68,40 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
-		onCommitState,
+		onDecisionState,
 		nextChainTime,
 	)
 	if err != nil {
 		return err
 	}
 
-	onCommitState.SetTimestamp(nextChainTime)
-	changes.Apply(onCommitState)
-
-	onAbortState.SetTimestamp(nextChainTime)
-	changes.Apply(onAbortState)
-
-	// Apply the changes, if any, from processing the decision txs.
-	// [onCommitState] = [onAbortState] here, either one can be used. It is
-	// only used to ensure that [onDecisionState] contains only the change diff
-	// of all the standard txs *after* the timestamp advancement changes are
-	// applied. [onDecisionState] will be applied to [onCommitState] or
-	// [onAbortState] depending on if the proposal is committed or aborted.
-	onDecisionState, err := wrapState(onCommitState)
-	if err != nil {
-		return err
-	}
+	onDecisionState.SetTimestamp(nextChainTime)
+	changes.Apply(onDecisionState)
 
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
 	if err != nil {
 		return err
 	}
 
-	return v.proposalBlock(&b.ApricotProposalBlock, onDecisionState, onCommitState, onAbortState, inputs, atomicRequests, onAcceptFunc)
+	onCommitState, err := wrapState(onDecisionState)
+	if err != nil {
+		return err
+	}
+
+	onAbortState, err := wrapState(onDecisionState)
+	if err != nil {
+		return err
+	}
+
+	return v.proposalBlock(
+		&b.ApricotProposalBlock,
+		onDecisionState,
+		onCommitState,
+		onAbortState,
+		inputs,
+		atomicRequests,
+		onAcceptFunc,
+	)
 }
 
 func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -340,10 +340,6 @@ func (v *verifier) abortBlock(b block.Block) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	if err := parentState.onDecisionState.Apply(parentState.onAbortState); err != nil {
-		return err
-	}
-
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
@@ -364,10 +360,6 @@ func (v *verifier) commitBlock(b block.Block) error {
 	parentState, ok := v.getBlkWithOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	if err := parentState.onDecisionState.Apply(parentState.onCommitState); err != nil {
-		return err
 	}
 
 	blkID := b.ID()

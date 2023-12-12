@@ -172,6 +172,16 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 		return err
 	}
 
+	parentState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w %s", errMissingBlockState, parentID)
+	}
+	if parentState.onDecisionState != nil {
+		if err := parentState.onDecisionState.Apply(a.state); err != nil {
+			return err
+		}
+	}
+
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
