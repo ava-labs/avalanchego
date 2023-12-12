@@ -232,6 +232,66 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
+// [timestamp] is min(max(now, parent timestamp), next staker change time)
+func buildBlock(
+	builder *builder,
+	parentID ids.ID,
+	height uint64,
+	timestamp time.Time,
+	forceAdvanceTime bool,
+	parentState state.Chain,
+) (block.Block, error) {
+	// Try rewarding stakers whose staking period ends at the new chain time.
+	// This is done first to prioritize advancing the timestamp as quickly as
+	// possible.
+	stakerTxID, shouldReward, err := getNextStakerToReward(timestamp, parentState)
+	if err != nil {
+		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
+	}
+	if shouldReward {
+		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
+		if err != nil {
+			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
+		}
+
+		var blockTxs []*txs.Tx
+		// TODO: Cleanup post-Durango
+		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
+			blockTxs, err = packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+			if err != nil {
+				return nil, fmt.Errorf("failed to pack block txs: %w", err)
+			}
+		}
+
+		return block.NewBanffProposalBlock(
+			timestamp,
+			parentID,
+			height,
+			rewardValidatorTx,
+			blockTxs,
+		)
+	}
+
+	blockTxs, err := packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack block txs: %w", err)
+	}
+
+	// If there is no reason to build a block, don't.
+	if len(blockTxs) == 0 && !forceAdvanceTime {
+		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
+		return nil, ErrNoPendingBlocks
+	}
+
+	// Issue a block with as many transactions as possible.
+	return block.NewBanffStandardBlock(
+		timestamp,
+		parentID,
+		height,
+		blockTxs,
+	)
+}
+
 func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager blockexecutor.Manager, timestamp time.Time) ([]*txs.Tx, error) {
 	preferredID := manager.Preferred()
 	stateDiff, err := state.NewDiff(preferredID, manager)
@@ -309,66 +369,6 @@ func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager 
 	}
 
 	return blockTxs, nil
-}
-
-// [timestamp] is min(max(now, parent timestamp), next staker change time)
-func buildBlock(
-	builder *builder,
-	parentID ids.ID,
-	height uint64,
-	timestamp time.Time,
-	forceAdvanceTime bool,
-	parentState state.Chain,
-) (block.Block, error) {
-	// Try rewarding stakers whose staking period ends at the new chain time.
-	// This is done first to prioritize advancing the timestamp as quickly as
-	// possible.
-	stakerTxID, shouldReward, err := getNextStakerToReward(timestamp, parentState)
-	if err != nil {
-		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
-	}
-	if shouldReward {
-		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
-		if err != nil {
-			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
-		}
-
-		var blockTxs []*txs.Tx
-		// TODO: Cleanup post-Durango
-		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
-			blockTxs, err = packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
-			if err != nil {
-				return nil, fmt.Errorf("failed to pack block txs: %w", err)
-			}
-		}
-
-		return block.NewBanffProposalBlock(
-			timestamp,
-			parentID,
-			height,
-			rewardValidatorTx,
-			blockTxs,
-		)
-	}
-
-	blockTxs, err := packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to pack block txs: %w", err)
-	}
-
-	// If there is no reason to build a block, don't.
-	if len(blockTxs) == 0 && !forceAdvanceTime {
-		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-		return nil, ErrNoPendingBlocks
-	}
-
-	// Issue a block with as many transactions as possible.
-	return block.NewBanffStandardBlock(
-		timestamp,
-		parentID,
-		height,
-		blockTxs,
-	)
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking
