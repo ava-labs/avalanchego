@@ -26,11 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-var (
-	_ p2p.ValidatorSet = (*testValidatorSet)(nil)
-	_ Gossiper         = (*testGossiper)(nil)
-)
-
 func TestGossiperShutdown(*testing.T) {
 	gossiper := NewPullGossiper[testTx](
 		logging.NoLog{},
@@ -190,8 +185,8 @@ func TestGossiperGossip(t *testing.T) {
 func TestEvery(*testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	calls := 0
-	gossiper := &testGossiper{
-		gossipF: func(context.Context) error {
+	gossiper := &TestGossiper{
+		GossipF: func(context.Context) error {
 			if calls >= 10 {
 				cancel()
 				return nil
@@ -217,8 +212,8 @@ func TestValidatorGossiper(t *testing.T) {
 
 	calls := 0
 	gossiper := ValidatorGossiper{
-		Gossiper: &testGossiper{
-			gossipF: func(context.Context) error {
+		Gossiper: &TestGossiper{
+			GossipF: func(context.Context) error {
 				calls++
 				return nil
 			},
@@ -437,14 +432,6 @@ func TestPushGossipE2E(t *testing.T) {
 	}
 
 	require.Equal(want, gotForwarded)
-}
-
-type testGossiper struct {
-	gossipF func(ctx context.Context) error
-}
-
-func (t *testGossiper) Gossip(ctx context.Context) error {
-	return t.gossipF(ctx)
 }
 
 type testValidatorSet struct {
