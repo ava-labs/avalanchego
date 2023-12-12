@@ -208,9 +208,10 @@ func TestCrossChainAppRequestResponse(t *testing.T) {
 	sender := common.FakeSender{
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
-	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
 
-	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
+	client, err := network.NewClient(handlerID)
 	require.NoError(err)
 
 	wantChainID := ids.GenerateTestID()
@@ -240,9 +241,10 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 	sender := common.FakeSender{
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
-	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
 
-	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
+	client, err := network.NewClient(handlerID)
 	require.NoError(err)
 
 	wantChainID := ids.GenerateTestID()
@@ -302,10 +304,7 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 			}
 			network, err := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
 			require.NoError(err)
-			require.NoError(network.Connected(context.Background(), nodeID, nil))
 			require.NoError(network.AddHandler(handlerID, handler))
-			client, err := network.NewClient(handlerID)
-			require.NoError(err)
 
 			require.Nil(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
 			require.Nil(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
