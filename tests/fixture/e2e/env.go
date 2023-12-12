@@ -16,8 +16,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/local"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -40,7 +40,7 @@ type TestEnvironment struct {
 	// The directory where the test network configuration is stored
 	NetworkDir string
 	// URIs used to access the API endpoints of nodes of the network
-	URIs []testnet.NodeURI
+	URIs []tmpnet.NodeURI
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
 
@@ -57,16 +57,15 @@ func (te *TestEnvironment) Marshal() []byte {
 func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 	require := require.New(ginkgo.GinkgoT())
 
-	persistentNetworkDir := flagVars.PersistentNetworkDir()
+	networkDir := flagVars.NetworkDir()
 
 	// Load or create a test network
 	var network *local.LocalNetwork
-	if len(persistentNetworkDir) > 0 {
-		tests.Outf("{{yellow}}Using a persistent network configured at %s{{/}}\n", persistentNetworkDir)
-
+	if len(networkDir) > 0 {
 		var err error
-		network, err = local.ReadNetwork(persistentNetworkDir)
+		network, err = local.ReadNetwork(networkDir)
 		require.NoError(err)
+		tests.Outf("{{yellow}}Using an existing network configured at %s{{/}}\n", network.Dir)
 	} else {
 		network = StartLocalNetwork(flagVars.AvalancheGoExecPath(), DefaultNetworkDir)
 	}
@@ -76,7 +75,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 	tests.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
 
 	testDataServerURI, err := fixture.ServeTestData(fixture.TestData{
-		FundedKeys: network.FundedKeys,
+		PreFundedKeys: network.PreFundedKeys,
 	})
 	tests.Outf("{{green}}test data server URI: {{/}} %+v\n", testDataServerURI)
 	require.NoError(err)
@@ -90,7 +89,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 
 // Retrieve a random URI to naively attempt to spread API load across
 // nodes.
-func (te *TestEnvironment) GetRandomNodeURI() testnet.NodeURI {
+func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
 	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
@@ -98,33 +97,33 @@ func (te *TestEnvironment) GetRandomNodeURI() testnet.NodeURI {
 }
 
 // Retrieve the network to target for testing.
-func (te *TestEnvironment) GetNetwork() testnet.Network {
+func (te *TestEnvironment) GetNetwork() tmpnet.Network {
 	network, err := local.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)
 	return network
 }
 
 // Retrieve the specified number of funded keys allocated for the caller's exclusive use.
-func (te *TestEnvironment) AllocateFundedKeys(count int) []*secp256k1.PrivateKey {
-	keys, err := fixture.AllocateFundedKeys(te.TestDataServerURI, count)
+func (te *TestEnvironment) AllocatePreFundedKeys(count int) []*secp256k1.PrivateKey {
+	keys, err := fixture.AllocatePreFundedKeys(te.TestDataServerURI, count)
 	te.require.NoError(err)
-	tests.Outf("{{blue}} allocated funded key(s): %+v{{/}}\n", keys)
+	tests.Outf("{{blue}} allocated pre-funded key(s): %+v{{/}}\n", keys)
 	return keys
 }
 
 // Retrieve a funded key allocated for the caller's exclusive use.
-func (te *TestEnvironment) AllocateFundedKey() *secp256k1.PrivateKey {
-	return te.AllocateFundedKeys(1)[0]
+func (te *TestEnvironment) AllocatePreFundedKey() *secp256k1.PrivateKey {
+	return te.AllocatePreFundedKeys(1)[0]
 }
 
 // Create a new keychain with the specified number of test keys.
 func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
-	keys := te.AllocateFundedKeys(count)
+	keys := te.AllocatePreFundedKeys(count)
 	return secp256k1fx.NewKeychain(keys...)
 }
 
 // Create a new private network that is not shared with other tests.
-func (te *TestEnvironment) NewPrivateNetwork() testnet.Network {
+func (te *TestEnvironment) NewPrivateNetwork() tmpnet.Network {
 	// Load the shared network to retrieve its path and exec path
 	sharedNetwork, err := local.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)

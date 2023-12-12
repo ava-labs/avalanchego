@@ -5,6 +5,7 @@ package ids
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -174,26 +175,34 @@ func TestNodeIDMapMarshalling(t *testing.T) {
 	require.Equal(originalMap, unmarshalledMap)
 }
 
-func TestNodeIDLess(t *testing.T) {
-	require := require.New(t)
+func TestNodeIDCompare(t *testing.T) {
+	tests := []struct {
+		a        NodeID
+		b        NodeID
+		expected int
+	}{
+		{
+			a:        NodeID{1},
+			b:        NodeID{0},
+			expected: 1,
+		},
+		{
+			a:        NodeID{1},
+			b:        NodeID{1},
+			expected: 0,
+		},
+		{
+			a:        NodeID{1, 0},
+			b:        NodeID{1, 2},
+			expected: -1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s_%s_%d", test.a, test.b, test.expected), func(t *testing.T) {
+			require := require.New(t)
 
-	id1 := NodeID{}
-	id2 := NodeID{}
-	require.False(id1.Less(id2))
-	require.False(id2.Less(id1))
-
-	id1 = NodeID{1}
-	id2 = NodeID{}
-	require.False(id1.Less(id2))
-	require.True(id2.Less(id1))
-
-	id1 = NodeID{1}
-	id2 = NodeID{1}
-	require.False(id1.Less(id2))
-	require.False(id2.Less(id1))
-
-	id1 = NodeID{1}
-	id2 = NodeID{1, 2}
-	require.True(id1.Less(id2))
-	require.False(id2.Less(id1))
+			require.Equal(test.expected, test.a.Compare(test.b))
+			require.Equal(-test.expected, test.b.Compare(test.a))
+		})
+	}
 }

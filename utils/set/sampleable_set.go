@@ -176,7 +176,7 @@ func (s *SampleableSet[_]) MarshalJSON() ([]byte, error) {
 		}
 	}
 	// Sort for determinism
-	utils.SortBytes(elementBytes)
+	slices.SortFunc(elementBytes, bytes.Compare)
 
 	// Build the JSON
 	var (

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package testnet
+package tmpnet
 
 import (
 	"encoding/base64"
@@ -29,17 +29,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 const (
-	DefaultNodeCount      = 2 // Minimum required to ensure connectivity-based health checks will pass
-	DefaultFundedKeyCount = 50
+	DefaultNodeCount         = 2 // Minimum required to ensure connectivity-based health checks will pass
+	DefaultPreFundedKeyCount = 50
 
 	DefaultGasLimit = uint64(100_000_000) // Gas limit is arbitrary
 
 	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
-	DefaultFundedKeyXChainAmount = 30 * units.MegaAvax
+	DefaultPreFundedKeyXChainAmount = 30 * units.MegaAvax
 
 	// A short min stake duration enables testing of staking logic.
 	DefaultMinStakeDuration = time.Second
@@ -47,16 +47,15 @@ const (
 
 var (
 	// Arbitrarily large amount of AVAX (10^12) to fund keys on the C-Chain for testing
-	DefaultFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
+	DefaultPreFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
 
-	errEmptyValidatorsForGenesis   = errors.New("failed to generate genesis: empty validator IDs")
-	errNoKeysForGenesis            = errors.New("failed to generate genesis: no keys to fund")
-	errInvalidNetworkIDForGenesis  = errors.New("network ID can't be mainnet, testnet or local network ID")
-	errMissingValidatorsForGenesis = errors.New("no genesis validators provided")
-	errMissingBalancesForGenesis   = errors.New("no genesis balances given")
-	errMissingTLSKeyForNodeID      = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingTLSKeyContentKey)
-	errMissingCertForNodeID        = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingCertContentKey)
-	errInvalidKeypair              = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
+	errNoKeysForGenesis           = errors.New("failed to generate genesis: no keys to fund")
+	errInvalidNetworkIDForGenesis = errors.New("network ID can't be mainnet, testnet or local network ID")
+	errMissingStakersForGenesis   = errors.New("no genesis stakers provided")
+	errMissingBalancesForGenesis  = errors.New("no genesis balances given")
+	errMissingTLSKeyForNodeID     = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingTLSKeyContentKey)
+	errMissingCertForNodeID       = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingCertContentKey)
+	errInvalidKeypair             = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
 )
 
 // Defines a mapping of flag keys to values intended to be supplied to
@@ -122,36 +121,33 @@ func DefaultJSONMarshal(v interface{}) ([]byte, error) {
 // NetworkConfig defines configuration shared or
 // common to all nodes in a given network.
 type NetworkConfig struct {
-	Genesis      *genesis.UnparsedConfig
-	CChainConfig FlagsMap
-	DefaultFlags FlagsMap
-	FundedKeys   []*secp256k1.PrivateKey
+	Genesis       *genesis.UnparsedConfig
+	CChainConfig  FlagsMap
+	DefaultFlags  FlagsMap
+	PreFundedKeys []*secp256k1.PrivateKey
 }
 
 // Ensure genesis is generated if not already present.
-func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeID) error {
+func (c *NetworkConfig) EnsureGenesis(networkID uint32, initialStakers []genesis.UnparsedStaker) error {
 	if c.Genesis != nil {
 		return nil
 	}
 
-	if len(validatorIDs) == 0 {
-		return errEmptyValidatorsForGenesis
-	}
-	if len(c.FundedKeys) == 0 {
+	if len(c.PreFundedKeys) == 0 {
 		return errNoKeysForGenesis
 	}
 
 	// Ensure pre-funded keys have arbitrary large balances on both chains to support testing
-	xChainBalances := make(XChainBalanceMap, len(c.FundedKeys))
-	cChainBalances := make(core.GenesisAlloc, len(c.FundedKeys))
-	for _, key := range c.FundedKeys {
-		xChainBalances[key.Address()] = DefaultFundedKeyXChainAmount
+	xChainBalances := make(XChainBalanceMap, len(c.PreFundedKeys))
+	cChainBalances := make(core.GenesisAlloc, len(c.PreFundedKeys))
+	for _, key := range c.PreFundedKeys {
+		xChainBalances[key.Address()] = DefaultPreFundedKeyXChainAmount
 		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
-			Balance: DefaultFundedKeyCChainAmount,
+			Balance: DefaultPreFundedKeyCChainAmount,
 		}
 	}
 
-	genesis, err := NewTestGenesis(networkID, xChainBalances, cChainBalances, validatorIDs)
+	genesis, err := NewTestGenesis(networkID, xChainBalances, cChainBalances, initialStakers)
 	if err != nil {
 		return err
 	}
@@ -204,6 +200,24 @@ func (nc *NodeConfig) EnsureKeys() error {
 	}
 	// Once a staking keypair is guaranteed it is safe to derive the node ID
 	return nc.EnsureNodeID()
+}
+
+// Derives the nodes proof-of-possession. Requires the node to have a
+// BLS signing key.
+func (nc *NodeConfig) GetProofOfPossession() (*signer.ProofOfPossession, error) {
+	signingKey, err := nc.Flags.GetStringVal(config.StakingSignerKeyContentKey)
+	if err != nil {
+		return nil, err
+	}
+	signingKeyBytes, err := base64.StdEncoding.DecodeString(signingKey)
+	if err != nil {
+		return nil, err
+	}
+	secretKey, err := bls.SecretKeyFromBytes(signingKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	return signer.NewProofOfPossession(secretKey), nil
 }
 
 // Ensures a BLS signing key is generated if not already present.
@@ -312,15 +326,15 @@ func NewTestGenesis(
 	networkID uint32,
 	xChainBalances XChainBalanceMap,
 	cChainBalances core.GenesisAlloc,
-	validatorIDs []ids.NodeID,
+	initialStakers []genesis.UnparsedStaker,
 ) (*genesis.UnparsedConfig, error) {
 	// Validate inputs
 	switch networkID {
 	case constants.TestnetID, constants.MainnetID, constants.LocalID:
 		return nil, errInvalidNetworkIDForGenesis
 	}
-	if len(validatorIDs) == 0 {
-		return nil, errMissingValidatorsForGenesis
+	if len(initialStakers) == 0 {
+		return nil, errMissingStakersForGenesis
 	}
 	if len(xChainBalances) == 0 || len(cChainBalances) == 0 {
 		return nil, errMissingBalancesForGenesis
@@ -336,8 +350,8 @@ func NewTestGenesis(
 		return nil, fmt.Errorf("failed to format stake address: %w", err)
 	}
 
-	// Ensure the total stake allows a MegaAvax per validator
-	totalStake := uint64(len(validatorIDs)) * units.MegaAvax
+	// Ensure the total stake allows a MegaAvax per staker
+	totalStake := uint64(len(initialStakers)) * units.MegaAvax
 
 	// The eth address is only needed to link pre-mainnet assets. Until that capability
 	// becomes necessary for testing, use a bogus address.
@@ -367,6 +381,7 @@ func NewTestGenesis(
 		InitialStakeDuration:       365 * 24 * 60 * 60, // 1 year
 		InitialStakeDurationOffset: 90 * 60,            // 90 minutes
 		Message:                    "hello avalanche!",
+		InitialStakers:             initialStakers,
 	}
 
 	// Set X-Chain balances
@@ -408,26 +423,6 @@ func NewTestGenesis(
 		return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
 	}
 	config.CChainGenesis = string(cChainGenesisBytes)
-
-	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
-	// will be easier to perform with nodes other than the initial validators since the timing of
-	// staking can be more easily controlled.
-	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to format reward address: %w", err)
-	}
-
-	// Configure provided validator node IDs as initial stakers
-	for _, validatorID := range validatorIDs {
-		config.InitialStakers = append(
-			config.InitialStakers,
-			genesis.UnparsedStaker{
-				NodeID:        validatorID,
-				RewardAddress: rewardAddr,
-				DelegationFee: .01 * reward.PercentDenominator,
-			},
-		)
-	}
 
 	return config, nil
 }

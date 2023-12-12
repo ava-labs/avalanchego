@@ -194,6 +194,7 @@ func newEnvironment(t *testing.T) *environment {
 		&res.backend,
 		res.blkManager,
 	)
+	res.Builder.StartBlockTimer()
 
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
@@ -419,7 +420,7 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 }
 
 func shutdownEnvironment(env *environment) error {
-	env.Builder.Shutdown()
+	env.Builder.ShutdownBlockTimer()
 
 	if env.isBootstrapped.Get() {
 		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
@@ -436,18 +437,4 @@ func shutdownEnvironment(env *environment) error {
 		env.state.Close(),
 		env.baseDB.Close(),
 	)
-}
-
-func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
-	tx, err := txBuilder.NewCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		constants.AVMID,
-		nil,
-		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	require.NoError(t, err)
-	return tx
 }
