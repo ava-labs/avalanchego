@@ -5,7 +5,6 @@ package p2p
 
 import (
 	"context"
-	"encoding/binary"
 	"testing"
 	"time"
 
@@ -20,9 +19,69 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const handlerID = 1337
+const (
+	handlerID     = 123
+	handlerPrefix = byte(handlerID)
+)
 
-var handlerPrefix = binary.AppendUvarint(nil, handlerID)
+// Tests that the Client prefixes messages with the handler prefix
+func TestClientPrefixesMessages(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sender := FakeSender{
+		SentAppRequest:           make(chan []byte, 1),
+		SentAppGossip:            make(chan []byte, 1),
+		SentAppGossipSpecific:    make(chan []byte, 1),
+		SentCrossChainAppRequest: make(chan []byte, 1),
+	}
+	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(network.Connected(ctx, ids.EmptyNodeID, nil))
+
+	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
+	require.NoError(err)
+
+	want := []byte("message")
+
+	require.NoError(client.AppRequest(
+		ctx,
+		set.Of(ids.EmptyNodeID),
+		want,
+		func(context.Context, ids.NodeID, []byte, error) {},
+	))
+	gotAppRequest := <-sender.SentAppRequest
+	require.Equal(handlerPrefix, gotAppRequest[0])
+	require.Equal(want, gotAppRequest[1:])
+
+	require.NoError(client.AppRequestAny(
+		ctx,
+		want,
+		func(context.Context, ids.NodeID, []byte, error) {},
+	))
+	gotAppRequest = <-sender.SentAppRequest
+	require.Equal(handlerPrefix, gotAppRequest[0])
+	require.Equal(want, gotAppRequest[1:])
+
+	require.NoError(client.CrossChainAppRequest(
+		ctx,
+		ids.Empty,
+		want,
+		func(context.Context, ids.ID, []byte, error) {},
+	))
+	gotCrossChainAppRequest := <-sender.SentCrossChainAppRequest
+	require.Equal(handlerPrefix, gotCrossChainAppRequest[0])
+	require.Equal(want, gotCrossChainAppRequest[1:])
+
+	require.NoError(client.AppGossip(ctx, want))
+	gotAppGossip := <-sender.SentAppGossip
+	require.Equal(handlerPrefix, gotAppGossip[0])
+	require.Equal(want, gotAppGossip[1:])
+
+	require.NoError(client.AppGossipSpecific(ctx, ids.EmptyNodeID, want))
+	gotAppGossip = <-sender.SentAppGossipSpecific
+	require.Equal(handlerPrefix, gotAppGossip[0])
+	require.Equal(want, gotAppGossip[1:])
+}
 
 // Tests that the Client callback is called on a successful response
 func TestAppRequestResponse(t *testing.T) {
@@ -49,11 +108,8 @@ func TestAppRequestResponse(t *testing.T) {
 		close(done)
 	}
 
-	want := []byte("request")
-	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), want, callback))
-	got := <-sender.SentAppRequest
-	require.Equal(handlerPrefix, got[0])
-	require.Equal(want, got[1:])
+	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
+	<-sender.SentAppRequest
 
 	require.NoError(network.AppResponse(ctx, wantNodeID, 1, wantResponse))
 	<-done
