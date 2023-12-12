@@ -107,11 +107,12 @@ func (mr *MockMempoolMockRecorder) MarkDropped(arg0, arg1 interface{}) *gomock.C
 }
 
 // Peek mocks base method.
-func (m *MockMempool) Peek() *txs.Tx {
+func (m *MockMempool) Peek() (*txs.Tx, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Peek")
 	ret0, _ := ret[0].(*txs.Tx)
-	return ret0
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
 // Peek indicates an expected call of Peek.
