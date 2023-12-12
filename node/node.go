@@ -439,7 +439,7 @@ func (n *Node) initNetworking() error {
 		)
 	}
 
-	// We allow nodes to gossip unknown ACPs incase the current ACPs constant
+	// We allow nodes to gossip unknown ACPs in case the current ACPs constant
 	// becomes out of date.
 	var unknownACPs set.Set[uint32]
 	for acp := range n.Config.NetworkConfig.SupportedACPs {

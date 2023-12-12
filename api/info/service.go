@@ -329,7 +329,7 @@ type ACP struct {
 	Supporters    set.Set[ids.NodeID] `json:"supporters"`
 	ObjectWeight  json.Uint64         `json:"objectWeight"`
 	Objectors     set.Set[ids.NodeID] `json:"objectors"`
-	ObtainWeight  json.Uint64         `json:"obtainWeight"`
+	AbstainWeight json.Uint64         `json:"abstainWeight"`
 }
 
 type ACPsReply struct {
@@ -372,7 +372,7 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 	}
 	for acpNum := range constants.CurrentACPs {
 		acp := reply.getACP(acpNum)
-		acp.ObtainWeight = json.Uint64(totalWeight) - acp.SupportWeight - acp.ObjectWeight
+		acp.AbstainWeight = json.Uint64(totalWeight) - acp.SupportWeight - acp.ObjectWeight
 	}
 	return nil
 }
