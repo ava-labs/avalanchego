@@ -356,7 +356,6 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnDecisionState.EXPECT().Apply(parentOnCommitState).Return(nil),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
@@ -428,7 +427,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnDecisionState.EXPECT().Apply(parentOnAbortState).Return(nil),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
