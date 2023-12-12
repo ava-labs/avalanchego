@@ -181,20 +181,28 @@ func TestPeekTxs(t *testing.T) {
 
 	testTxs := createTestTxs(2)
 
-	require.Nil(mempool.Peek())
+	tx, exists := mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
 
 	require.NoError(mempool.Add(testTxs[0]))
 	require.NoError(mempool.Add(testTxs[1]))
 
-	require.Equal(mempool.Peek(), testTxs[0])
-	require.NotEqual(mempool.Peek(), testTxs[1])
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, testTxs[0])
+	require.NotEqual(tx, testTxs[1])
 
 	mempool.Remove([]*txs.Tx{testTxs[0]})
 
-	require.NotEqual(mempool.Peek(), testTxs[0])
-	require.Equal(mempool.Peek(), testTxs[1])
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.NotEqual(tx, testTxs[0])
+	require.Equal(tx, testTxs[1])
 
 	mempool.Remove([]*txs.Tx{testTxs[1]})
 
-	require.Nil(mempool.Peek())
+	tx, exists = mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
 }
