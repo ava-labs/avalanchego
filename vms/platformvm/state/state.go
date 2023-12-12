@@ -916,7 +916,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-// Loads the state from [genesisBls] and [genesis] into [ms].
+// Loads the state from [genesisBls] and [genesis] into [s].
 func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
@@ -1016,7 +1016,7 @@ func (s *state) load() error {
 }
 
 // Loads the chain time and last accepted block ID from disk
-// and populates them in [ms].
+// and populates them in [s].
 func (s *state) loadMerkleMetadata() error {
 	// load chain time
 	chainTimeBytes, err := s.merkleDB.Get(merkleChainTimeKey)
@@ -1036,7 +1036,7 @@ func (s *state) loadMerkleMetadata() error {
 	return nil
 }
 
-// Loads current stakes from disk and populates them in [ms].
+// Loads current stakes from disk and populates them in [s].
 func (s *state) loadCurrentStakers() error {
 	// TODO ABENEGIA: Check missing metadata
 	s.currentStakers = newBaseStakers()
@@ -1195,8 +1195,8 @@ func (s *state) Close() error {
 	)
 }
 
-// If [ms] isn't initialized, initializes it with [genesis].
-// Then loads [ms] from disk.
+// If [s] isn't initialized, initializes it with [genesis].
+// Then loads [s] from disk.
 func (s *state) sync(genesis []byte) error {
 	shouldInit, err := s.shouldInit()
 	if err != nil {
@@ -1220,7 +1220,7 @@ func (s *state) sync(genesis []byte) error {
 	return s.load()
 }
 
-// Creates a genesis from [genesisBytes] and initializes [ms] with it.
+// Creates a genesis from [genesisBytes] and initializes [s] with it.
 func (s *state) init(genesisBytes []byte) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
