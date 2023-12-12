@@ -261,7 +261,7 @@ func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager 
 
 		// Invariant: [tx] has already been syntactically verified.
 
-		txDiff, err := wrapState(stateDiff)
+		txDiff, err := state.NewDiffOn(stateDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -284,7 +284,7 @@ func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager 
 			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 			continue
 		}
-		err = manager.VerifyUniqueInputs(preferredID, inputs)
+		err = manager.VerifyUniqueInputs(preferredID, executor.Inputs)
 		if err != nil {
 			txID := tx.ID()
 			mempool.MarkDropped(txID, err)
@@ -329,7 +329,7 @@ func buildBlock(
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
 
-		blockTxs := []*txs.Tx{}
+		var blockTxs []*txs.Tx
 		// TODO: Cleanup post-Durango
 		if builder.txExecutorBackend.Config.IsDurangoActivated(timestamp) {
 			blockTxs, err = packBlockTxs(builder.Mempool, builder.txExecutorBackend, builder.blkManager, timestamp)
@@ -400,18 +400,4 @@ func getNextStakerToReward(
 		}
 	}
 	return ids.Empty, false, nil
-}
-
-type stateGetter struct {
-	state state.Chain
-}
-
-func (s stateGetter) GetState(ids.ID) (state.Chain, bool) {
-	return s.state, true
-}
-
-func wrapState(parentState state.Chain) (state.Diff, error) {
-	return state.NewDiff(ids.Empty, stateGetter{
-		state: parentState,
-	})
 }

@@ -58,6 +58,20 @@ type diff struct {
 	modifiedUTXOs map[ids.ID]*avax.UTXO
 }
 
+type stateGetter struct {
+	state Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (Chain, bool) {
+	return s.state, true
+}
+
+func NewDiffOn(parentState Chain) (Diff, error) {
+	return NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
+}
+
 func NewDiff(
 	parentID ids.ID,
 	stateVersions Versions,
