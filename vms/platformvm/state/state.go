@@ -1036,7 +1036,7 @@ func (s *state) loadMerkleMetadata() error {
 	return nil
 }
 
-// Loads current stakes from disk and populates them in [s].
+// Loads current stakers from disk and populates them in [s].
 func (s *state) loadCurrentStakers() error {
 	// TODO ABENEGIA: Check missing metadata
 	s.currentStakers = newBaseStakers()
@@ -1062,13 +1062,13 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return err
 		}
+
+		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		if staker.Priority.IsValidator() {
 			// TODO: why not PutValidator/PutDelegator??
-			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			validator.validator = staker
 			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		} else {
-			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.delegators == nil {
 				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
@@ -1325,10 +1325,10 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 }
 
 func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
-	for stakerTxID, data := range currentData {
+	for stakerTxID, stakerData := range currentData {
 		key := merkleCurrentStakersKey(stakerTxID)
 
-		if data.TxBytes == nil {
+		if stakerData.TxBytes == nil {
 			*batchOps = append(*batchOps, database.BatchOp{
 				Key:    key,
 				Delete: true,
@@ -1336,7 +1336,7 @@ func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[
 			continue
 		}
 
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, stakerData)
 		if err != nil {
 			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
