@@ -289,6 +289,7 @@ type state struct {
 
 	validators validators.Manager
 	ctx        *snow.Context
+	cfg        *config.Config
 	metrics    metrics.Metrics
 	rewards    reward.Calculator
 
@@ -452,7 +453,7 @@ func New(
 	db database.Database,
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
-	validators validators.Manager,
+	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
@@ -461,7 +462,7 @@ func New(
 	s, err := newState(
 		db,
 		metrics,
-		validators,
+		cfg,
 		execCfg,
 		ctx,
 		metricsReg,
@@ -505,7 +506,7 @@ func New(
 func newState(
 	db database.Database,
 	metrics metrics.Metrics,
-	validators validators.Manager,
+	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
@@ -628,8 +629,9 @@ func newState(
 	return &state{
 		validatorState: newValidatorState(),
 
-		validators: validators,
+		validators: cfg.Validators,
 		ctx:        ctx,
+		cfg:        cfg,
 		metrics:    metrics,
 		rewards:    rewards,
 		baseDB:     baseDB,
