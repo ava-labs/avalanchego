@@ -58,8 +58,10 @@ func TestMessageRouting(t *testing.T) {
 		SentAppRequest:           make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
-	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	client, err := network.NewAppProtocol(1, testHandler)
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	require.NoError(network.AddHandler(1, testHandler))
+	client, err := network.NewClient(1)
 	require.NoError(err)
 
 	require.NoError(client.AppGossip(ctx, wantMsg))
