@@ -5,19 +5,13 @@ package p2p
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
-	"go.uber.org/mock/gomock"
-
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/mocks"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -25,289 +19,228 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+const handlerID = 1337
+
+// Tests that the Client callback is called on a successful response
 func TestAppRequestResponse(t *testing.T) {
-	handlerID := uint64(0x0)
-	request := []byte("request")
-	response := []byte("response")
-	nodeID := ids.GenerateTestNodeID()
-	chainID := ids.GenerateTestID()
+	require := require.New(t)
+	ctx := context.Background()
 
-	ctxKey := new(string)
-	ctxVal := new(string)
-	*ctxKey = "foo"
-	*ctxVal = "bar"
+	sender := FakeSender{
+		SentAppRequest: make(chan []byte, 1),
+	}
+	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 
+	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
+	require.NoError(err)
+
+	wantResponse := []byte("response")
+	wantNodeID := ids.GenerateTestNodeID()
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
+		require.Equal(wantNodeID, gotNodeID)
+		require.NoError(err)
+		require.Equal(wantResponse, gotResponse)
+
+		close(done)
+	}
+
+	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
+	<-sender.SentAppRequest
+
+	require.NoError(network.AppResponse(ctx, wantNodeID, 1, wantResponse))
+	<-done
+}
+
+// Tests that the Client callback is given an error if the request fails
+func TestAppRequestFailed(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sender := FakeSender{
+		SentAppRequest: make(chan []byte, 1),
+	}
+	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+
+	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
+	require.NoError(err)
+
+	wantNodeID := ids.GenerateTestNodeID()
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
+		require.Equal(wantNodeID, gotNodeID)
+		require.ErrorIs(err, ErrAppRequestFailed)
+		require.Nil(gotResponse)
+
+		close(done)
+	}
+
+	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
+	<-sender.SentAppRequest
+
+	require.NoError(network.AppRequestFailed(ctx, wantNodeID, 1))
+	<-done
+}
+
+// Tests that the Client callback is called on a successful response
+func TestCrossChainAppRequestResponse(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sender := FakeSender{
+		SentCrossChainAppRequest: make(chan []byte, 1),
+	}
+	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+
+	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
+	require.NoError(err)
+
+	wantChainID := ids.GenerateTestID()
+	wantResponse := []byte("response")
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotChainID ids.ID, gotResponse []byte, err error) {
+		require.Equal(wantChainID, gotChainID)
+		require.NoError(err)
+		require.Equal(wantResponse, gotResponse)
+
+		close(done)
+	}
+
+	require.NoError(client.CrossChainAppRequest(ctx, wantChainID, []byte("request"), callback))
+	<-sender.SentCrossChainAppRequest
+
+	require.NoError(network.CrossChainAppResponse(ctx, wantChainID, 1, wantResponse))
+	<-done
+}
+
+// Tests that the Client callback is given an error if the request fails
+func TestCrossChainAppRequestFailed(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+
+	sender := FakeSender{
+		SentCrossChainAppRequest: make(chan []byte, 1),
+	}
+	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+
+	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
+	require.NoError(err)
+
+	wantChainID := ids.GenerateTestID()
+	done := make(chan struct{})
+
+	callback := func(_ context.Context, gotChainID ids.ID, gotResponse []byte, err error) {
+		require.Equal(wantChainID, gotChainID)
+		require.ErrorIs(err, ErrAppRequestFailed)
+		require.Nil(gotResponse)
+
+		close(done)
+	}
+
+	require.NoError(client.CrossChainAppRequest(ctx, wantChainID, []byte("request"), callback))
+	<-sender.SentCrossChainAppRequest
+
+	require.NoError(network.CrossChainAppRequestFailed(ctx, wantChainID, 1))
+	<-done
+}
+
+// Messages for unregistered handlers should be dropped gracefully
+func TestMessageForUnregisteredHandler(t *testing.T) {
 	tests := []struct {
-		name        string
-		requestFunc func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup)
+		name string
+		msg  []byte
 	}{
 		{
-			name: "app request",
-			requestFunc: func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup) {
-				sender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
-					for range nodeIDs {
-						go func() {
-							require.NoError(t, network.AppRequest(ctx, nodeID, requestID, time.Time{}, request))
-						}()
-					}
-
-					return nil
-				}
-				sender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, response []byte) error {
-					go func() {
-						ctx = context.WithValue(ctx, ctxKey, ctxVal)
-						require.NoError(t, network.AppResponse(ctx, nodeID, requestID, response))
-					}()
-
-					return nil
-				}
-				handler.EXPECT().
-					AppRequest(context.Background(), nodeID, gomock.Any(), request).
-					DoAndReturn(func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
-						return response, nil
-					})
-
-				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
-					defer wg.Done()
-
-					require.NoError(t, err)
-					require.Equal(t, ctxVal, ctx.Value(ctxKey))
-					require.Equal(t, nodeID, actualNodeID)
-					require.Equal(t, response, actualResponse)
-				}
-
-				require.NoError(t, client.AppRequestAny(context.Background(), request, callback))
-			},
+			name: "nil",
+			msg:  nil,
 		},
 		{
-			name: "app request failed",
-			requestFunc: func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup) {
-				sender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
-					for range nodeIDs {
-						go func() {
-							require.NoError(t, network.AppRequestFailed(ctx, nodeID, requestID))
-						}()
-					}
-
-					return nil
-				}
-
-				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
-					defer wg.Done()
-
-					require.ErrorIs(t, err, ErrAppRequestFailed)
-					require.Equal(t, nodeID, actualNodeID)
-					require.Nil(t, actualResponse)
-				}
-
-				require.NoError(t, client.AppRequest(context.Background(), set.Of(nodeID), request, callback))
-			},
+			name: "empty",
+			msg:  []byte{},
 		},
 		{
-			name: "cross-chain app request",
-			requestFunc: func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup) {
-				chainID := ids.GenerateTestID()
-				sender.SendCrossChainAppRequestF = func(ctx context.Context, chainID ids.ID, requestID uint32, request []byte) {
-					go func() {
-						require.NoError(t, network.CrossChainAppRequest(ctx, chainID, requestID, time.Time{}, request))
-					}()
-				}
-				sender.SendCrossChainAppResponseF = func(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) {
-					go func() {
-						ctx = context.WithValue(ctx, ctxKey, ctxVal)
-						require.NoError(t, network.CrossChainAppResponse(ctx, chainID, requestID, response))
-					}()
-				}
-				handler.EXPECT().
-					CrossChainAppRequest(context.Background(), chainID, gomock.Any(), request).
-					DoAndReturn(func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
-						return response, nil
-					})
-
-				callback := func(ctx context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
-					defer wg.Done()
-					require.NoError(t, err)
-					require.Equal(t, ctxVal, ctx.Value(ctxKey))
-					require.Equal(t, chainID, actualChainID)
-					require.Equal(t, response, actualResponse)
-				}
-
-				require.NoError(t, client.CrossChainAppRequest(context.Background(), chainID, request, callback))
-			},
-		},
-		{
-			name: "cross-chain app request failed",
-			requestFunc: func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup) {
-				sender.SendCrossChainAppRequestF = func(ctx context.Context, chainID ids.ID, requestID uint32, request []byte) {
-					go func() {
-						require.NoError(t, network.CrossChainAppRequestFailed(ctx, chainID, requestID))
-					}()
-				}
-
-				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
-					defer wg.Done()
-
-					require.ErrorIs(t, err, ErrAppRequestFailed)
-					require.Equal(t, chainID, actualChainID)
-					require.Nil(t, actualResponse)
-				}
-
-				require.NoError(t, client.CrossChainAppRequest(context.Background(), chainID, request, callback))
-			},
-		},
-		{
-			name: "app gossip",
-			requestFunc: func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup) {
-				sender.SendAppGossipF = func(ctx context.Context, gossip []byte) error {
-					go func() {
-						require.NoError(t, network.AppGossip(ctx, nodeID, gossip))
-					}()
-
-					return nil
-				}
-				handler.EXPECT().
-					AppGossip(context.Background(), nodeID, request).
-					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
-						defer wg.Done()
-						return nil
-					})
-
-				require.NoError(t, client.AppGossip(context.Background(), request))
-			},
-		},
-		{
-			name: "app gossip specific",
-			requestFunc: func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup) {
-				sender.SendAppGossipSpecificF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], bytes []byte) error {
-					for n := range nodeIDs {
-						nodeID := n
-						go func() {
-							require.NoError(t, network.AppGossip(ctx, nodeID, bytes))
-						}()
-					}
-
-					return nil
-				}
-				handler.EXPECT().
-					AppGossip(context.Background(), nodeID, request).
-					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
-						defer wg.Done()
-						return nil
-					})
-
-				require.NoError(t, client.AppGossipSpecific(context.Background(), set.Of(nodeID), request))
-			},
+			name: "non-empty",
+			msg:  []byte("foobar"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
-			sender := &common.SenderTest{}
-			handler := mocks.NewMockHandler(ctrl)
-			n := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-			require.NoError(n.Connected(context.Background(), nodeID, nil))
-			client, err := n.NewAppProtocol(handlerID, handler)
+			ctx := context.Background()
+			handler := &testHandler{
+				appGossipF: func(context.Context, ids.NodeID, []byte) {
+					require.Fail("should not be called")
+				},
+				appRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+					require.Fail("should not be called")
+					return nil, nil
+				},
+				crossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+					require.Fail("should not be called")
+					return nil, nil
+				},
+			}
+			network := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+			_, err := network.NewAppProtocol(handlerID, handler)
 			require.NoError(err)
 
-			wg := &sync.WaitGroup{}
-			wg.Add(1)
-			tt.requestFunc(t, n, client, sender, handler, wg)
-			wg.Wait()
+			require.Nil(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, []byte("foobar")))
+			require.Nil(network.AppGossip(ctx, ids.EmptyNodeID, []byte("foobar")))
+			require.Nil(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, []byte("foobar")))
 		})
 	}
 }
 
-func TestNetworkDropMessage(t *testing.T) {
-	unregistered := byte(0x0)
-
+// A response or timeout for a request we never made should return an error
+func TestResponseForUnrequestedRequest(t *testing.T) {
 	tests := []struct {
-		name        string
-		requestFunc func(network *Network) error
-		err         error
+		name string
+		msg  []byte
 	}{
 		{
-			name: "drop unregistered app request message",
-			requestFunc: func(network *Network) error {
-				return network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{unregistered})
-			},
-			err: nil,
+			name: "nil",
+			msg:  nil,
 		},
 		{
-			name: "drop empty app request message",
-			requestFunc: func(network *Network) error {
-				return network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{})
-			},
-			err: nil,
+			name: "empty",
+			msg:  []byte{},
 		},
 		{
-			name: "drop unregistered cross-chain app request message",
-			requestFunc: func(network *Network) error {
-				return network.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{unregistered})
-			},
-			err: nil,
-		},
-		{
-			name: "drop empty cross-chain app request message",
-			requestFunc: func(network *Network) error {
-				return network.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{})
-			},
-			err: nil,
-		},
-		{
-			name: "drop unregistered gossip message",
-			requestFunc: func(network *Network) error {
-				return network.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{unregistered})
-			},
-			err: nil,
-		},
-		{
-			name: "drop empty gossip message",
-			requestFunc: func(network *Network) error {
-				return network.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{})
-			},
-			err: nil,
-		},
-		{
-			name: "drop unrequested app request failed",
-			requestFunc: func(network *Network) error {
-				return network.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
-			},
-			err: ErrUnrequestedResponse,
-		},
-		{
-			name: "drop unrequested app response",
-			requestFunc: func(network *Network) error {
-				return network.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, nil)
-			},
-			err: ErrUnrequestedResponse,
-		},
-		{
-			name: "drop unrequested cross-chain request failed",
-			requestFunc: func(network *Network) error {
-				return network.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0)
-			},
-			err: ErrUnrequestedResponse,
-		},
-		{
-			name: "drop unrequested cross-chain response",
-			requestFunc: func(network *Network) error {
-				return network.CrossChainAppResponse(context.Background(), ids.GenerateTestID(), 0, nil)
-			},
-			err: ErrUnrequestedResponse,
+			name: "non-empty",
+			msg:  []byte("foobar"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+			ctx := context.Background()
+			handler := &testHandler{
+				appGossipF: func(context.Context, ids.NodeID, []byte) {
+					require.Fail("should not be called")
+				},
+				appRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+					require.Fail("should not be called")
+					return nil, nil
+				},
+				crossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+					require.Fail("should not be called")
+					return nil, nil
+				},
+			}
+			network := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+			_, err := network.NewAppProtocol(handlerID, handler)
+			require.NoError(err)
 
-			network := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
+			require.ErrorIs(ErrUnrequestedResponse, network.AppResponse(ctx, ids.EmptyNodeID, 0, []byte("foobar")))
+			require.ErrorIs(ErrUnrequestedResponse, network.AppRequestFailed(ctx, ids.EmptyNodeID, 0))
 
-			err := tt.requestFunc(network)
-			require.ErrorIs(err, tt.err)
+			require.ErrorIs(ErrUnrequestedResponse, network.CrossChainAppResponse(ctx, ids.Empty, 0, []byte("foobar")))
+			require.ErrorIs(ErrUnrequestedResponse, network.CrossChainAppRequestFailed(ctx, ids.Empty, 0))
 		})
 	}
 }
@@ -317,58 +250,25 @@ func TestNetworkDropMessage(t *testing.T) {
 // not attempt to issue another request until the previous one has cleared.
 func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	ctx := context.Background()
 
-	handler := mocks.NewMockHandler(ctrl)
-	sender := &common.SenderTest{
-		SendAppResponseF: func(context.Context, ids.NodeID, uint32, []byte) error {
-			return nil
-		},
+	sender := &FakeSender{
+		SentAppRequest: make(chan []byte, 1),
 	}
+
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	nodeID := ids.GenerateTestNodeID()
-
-	requestSent := &sync.WaitGroup{}
-	sender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
-		for range nodeIDs {
-			requestSent.Add(1)
-			go func() {
-				require.NoError(network.AppRequest(ctx, nodeID, requestID, time.Time{}, request))
-				requestSent.Done()
-			}()
-		}
-
-		return nil
-	}
-
-	timeout := &sync.WaitGroup{}
-	response := []byte("response")
-	handler.EXPECT().AppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, request []byte) ([]byte, error) {
-			timeout.Wait()
-			return response, nil
-		}).AnyTimes()
-
-	require.NoError(network.Connected(context.Background(), nodeID, nil))
-	client, err := network.NewAppProtocol(0x1, handler)
+	client, err := network.NewAppProtocol(0x1, &NoOpHandler{})
 	require.NoError(err)
 
-	onResponse := func(ctx context.Context, nodeID ids.NodeID, got []byte, err error) {
-		require.NoError(err)
-		require.Equal(response, got)
-	}
-
-	require.NoError(client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, onResponse))
-	requestSent.Wait()
+	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
+	// create a request that never gets a response
+	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), []byte{}, noOpCallback))
+	<-sender.SentAppRequest
 
 	// force the network to use the same requestID
 	network.router.requestID = 1
-	timeout.Add(1)
-	err = client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil)
-	requestSent.Wait()
+	err = client.AppRequest(context.Background(), set.Of(ids.EmptyNodeID), []byte{}, noOpCallback)
 	require.ErrorIs(err, ErrRequestPending)
-
-	timeout.Done()
 }
 
 // Sample should always return up to [limit] peers, and less if fewer than
@@ -437,7 +337,7 @@ func TestPeersSample(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			network := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
+			network := NewNetwork(logging.NoLog{}, &FakeSender{}, prometheus.NewRegistry(), "")
 
 			for connected := range tt.connected {
 				require.NoError(network.Connected(context.Background(), connected, nil))
@@ -479,11 +379,9 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			require := require.New(t)
 
 			sent := set.Set[ids.NodeID]{}
-			sender := &common.SenderTest{
-				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
-					for nodeID := range nodeIDs {
-						sent.Add(nodeID)
-					}
+			sender := &MockSender{
+				SendAppRequestF: func(_ context.Context, nodeID ids.NodeID, _ uint32, _ []byte) error {
+					sent.Add(nodeID)
 					return nil
 				},
 			}
@@ -498,6 +396,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
 			require.ErrorIs(err, tt.expected)
+			require.Subset(tt.peers, sent.List())
 		})
 	}
 }
@@ -569,9 +468,9 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			require := require.New(t)
 
 			done := make(chan struct{})
-			sender := &common.SenderTest{
-				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
-					require.Subset(tt.expected, nodeIDs.List())
+			sender := &MockSender{
+				SendAppRequestF: func(_ context.Context, nodeID ids.NodeID, _ uint32, _ []byte) error {
+					require.Subset(tt.expected, []ids.NodeID{nodeID})
 					close(done)
 					return nil
 				},
