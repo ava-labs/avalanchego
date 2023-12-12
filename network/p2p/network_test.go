@@ -236,11 +236,14 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 			_, err := network.NewAppProtocol(handlerID, handler)
 			require.NoError(err)
 
-			require.ErrorIs(ErrUnrequestedResponse, network.AppResponse(ctx, ids.EmptyNodeID, 0, []byte("foobar")))
-			require.ErrorIs(ErrUnrequestedResponse, network.AppRequestFailed(ctx, ids.EmptyNodeID, 0))
-
-			require.ErrorIs(ErrUnrequestedResponse, network.CrossChainAppResponse(ctx, ids.Empty, 0, []byte("foobar")))
-			require.ErrorIs(ErrUnrequestedResponse, network.CrossChainAppRequestFailed(ctx, ids.Empty, 0))
+			err = network.AppResponse(ctx, ids.EmptyNodeID, 0, []byte("foobar"))
+			require.ErrorIs(err, ErrUnrequestedResponse)
+			err = network.AppRequestFailed(ctx, ids.EmptyNodeID, 0)
+			require.ErrorIs(err, ErrUnrequestedResponse)
+			err = network.CrossChainAppResponse(ctx, ids.Empty, 0, []byte("foobar"))
+			require.ErrorIs(err, ErrUnrequestedResponse)
+			err = network.CrossChainAppRequestFailed(ctx, ids.Empty, 0)
+			require.ErrorIs(err, ErrUnrequestedResponse)
 		})
 	}
 }
