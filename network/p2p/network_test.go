@@ -25,6 +25,56 @@ const (
 	handlerPrefix = byte(handlerID)
 )
 
+func TestMessageRouting(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+	wantNodeID := ids.GenerateTestNodeID()
+	wantChainID := ids.GenerateTestID()
+	wantMsg := []byte("message")
+
+	var appGossipCalled, appRequestCalled, crossChainAppRequestCalled bool
+	testHandler := &testHandler{
+		appGossipF: func(_ context.Context, nodeID ids.NodeID, msg []byte) {
+			appGossipCalled = true
+			require.Equal(wantNodeID, nodeID)
+			require.Equal(wantMsg, msg)
+		},
+		appRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, msg []byte) ([]byte, error) {
+			appRequestCalled = true
+			require.Equal(wantNodeID, nodeID)
+			require.Equal(wantMsg, msg)
+			return nil, nil
+		},
+		crossChainAppRequestF: func(_ context.Context, chainID ids.ID, _ time.Time, msg []byte) ([]byte, error) {
+			crossChainAppRequestCalled = true
+			require.Equal(wantChainID, chainID)
+			require.Equal(wantMsg, msg)
+			return nil, nil
+		},
+	}
+
+	sender := &common.FakeSender{
+		SentAppGossip:            make(chan []byte, 1),
+		SentAppRequest:           make(chan []byte, 1),
+		SentCrossChainAppRequest: make(chan []byte, 1),
+	}
+	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	client, err := network.NewAppProtocol(1, testHandler)
+	require.NoError(err)
+
+	require.NoError(client.AppGossip(ctx, wantMsg))
+	require.NoError(network.AppGossip(ctx, wantNodeID, <-sender.SentAppGossip))
+	require.True(appGossipCalled)
+
+	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), wantMsg, func(context.Context, ids.NodeID, []byte, error) {}))
+	require.NoError(network.AppRequest(ctx, wantNodeID, 1, time.Time{}, <-sender.SentAppRequest))
+	require.True(appRequestCalled)
+
+	require.NoError(client.CrossChainAppRequest(ctx, ids.Empty, wantMsg, func(context.Context, ids.ID, []byte, error) {}))
+	require.NoError(network.CrossChainAppRequest(ctx, wantChainID, 1, time.Time{}, <-sender.SentCrossChainAppRequest))
+	require.True(crossChainAppRequestCalled)
+}
+
 // Tests that the Client prefixes messages with the handler prefix
 func TestClientPrefixesMessages(t *testing.T) {
 	require := require.New(t)
