@@ -1045,7 +1045,7 @@ func (s *state) loadCurrentStakers() error {
 	defer iter.Release()
 	for iter.Next() {
 		var data stakingTxAndReward
-		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), data); err != nil {
+		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), &data); err != nil {
 			return fmt.Errorf("failed to deserialize current stakers data: %w", err)
 		}
 
