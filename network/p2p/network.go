@@ -6,7 +6,7 @@ package p2p
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -170,7 +170,7 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 func (n *Network) NewClient(handlerID uint64, options ...ClientOption) (*Client, error) {
 	client := &Client{
 		handlerID:     handlerID,
-		handlerIDStr:  fmt.Sprintf("%d", handlerID),
+		handlerIDStr:  strconv.FormatUint(handlerID, 10),
 		handlerPrefix: binary.AppendUvarint(nil, handlerID),
 		sender:        n.sender,
 		router:        n.router,
