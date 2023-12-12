@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -29,7 +30,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := FakeSender{
+	sender := common.FakeSender{
 		SentAppRequest:           make(chan []byte, 1),
 		SentAppGossip:            make(chan []byte, 1),
 		SentAppGossipSpecific:    make(chan []byte, 1),
@@ -88,7 +89,7 @@ func TestAppRequestResponse(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := FakeSender{
+	sender := common.FakeSender{
 		SentAppRequest: make(chan []byte, 1),
 	}
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -120,7 +121,7 @@ func TestAppRequestFailed(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := FakeSender{
+	sender := common.FakeSender{
 		SentAppRequest: make(chan []byte, 1),
 	}
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -151,7 +152,7 @@ func TestCrossChainAppRequestResponse(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := FakeSender{
+	sender := common.FakeSender{
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -183,7 +184,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := FakeSender{
+	sender := common.FakeSender{
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -250,9 +251,9 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 			_, err := network.NewAppProtocol(handlerID, handler)
 			require.NoError(err)
 
-			require.Nil(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, []byte("foobar")))
-			require.Nil(network.AppGossip(ctx, ids.EmptyNodeID, []byte("foobar")))
-			require.Nil(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, []byte("foobar")))
+			require.Nil(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
+			require.Nil(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
+			require.Nil(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, tt.msg))
 		})
 	}
 }
@@ -317,7 +318,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := &FakeSender{
+	sender := &common.FakeSender{
 		SentAppRequest: make(chan []byte, 1),
 	}
 
@@ -402,7 +403,7 @@ func TestPeersSample(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			network := NewNetwork(logging.NoLog{}, &FakeSender{}, prometheus.NewRegistry(), "")
+			network := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
 
 			for connected := range tt.connected {
 				require.NoError(network.Connected(context.Background(), connected, nil))
@@ -444,9 +445,9 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			require := require.New(t)
 
 			sent := set.Set[ids.NodeID]{}
-			sender := &MockSender{
-				SendAppRequestF: func(_ context.Context, nodeID ids.NodeID, _ uint32, _ []byte) error {
-					sent.Add(nodeID)
+			sender := &common.SenderTest{
+				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
+					sent = nodeIDs
 					return nil
 				},
 			}
@@ -533,9 +534,9 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			require := require.New(t)
 
 			done := make(chan struct{})
-			sender := &MockSender{
-				SendAppRequestF: func(_ context.Context, nodeID ids.NodeID, _ uint32, _ []byte) error {
-					require.Subset(tt.expected, []ids.NodeID{nodeID})
+			sender := &common.SenderTest{
+				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
+					require.Subset(tt.expected, nodeIDs.List())
 					close(done)
 					return nil
 				},

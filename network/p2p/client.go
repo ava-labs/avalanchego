@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -38,17 +39,11 @@ type CrossChainAppResponseCallback func(
 	err error,
 )
 
-type clientSender interface {
-	AppRequestSender
-	AppGossipSender
-	CrossChainAppRequestSender
-}
-
 type Client struct {
 	handlerID     uint64
 	handlerPrefix []byte
 	router        *router
-	sender        clientSender
+	sender        common.AppSender
 	options       *clientOptions
 }
 
@@ -93,7 +88,7 @@ func (c *Client) AppRequest(
 
 		if err := c.sender.SendAppRequest(
 			ctx,
-			nodeID,
+			set.Of(nodeID),
 			requestID,
 			appRequestBytes,
 		); err != nil {
@@ -129,7 +124,7 @@ func (c *Client) AppGossipSpecific(
 ) error {
 	return c.sender.SendAppGossipSpecific(
 		ctx,
-		nodeID,
+		set.Of(nodeID),
 		c.prefixMessage(appGossipBytes),
 	)
 }

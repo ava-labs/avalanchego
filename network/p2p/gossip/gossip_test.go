@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -116,7 +117,7 @@ func TestGossiperGossip(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
 
-			responseSender := &p2p.FakeSender{
+			responseSender := &common.FakeSender{
 				SentAppResponse: make(chan []byte, 1),
 			}
 			responseNetwork := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
@@ -135,7 +136,7 @@ func TestGossiperGossip(t *testing.T) {
 			_, err = responseNetwork.NewAppProtocol(0x0, handler)
 			require.NoError(err)
 
-			requestSender := &p2p.FakeSender{
+			requestSender := &common.FakeSender{
 				SentAppRequest: make(chan []byte, 1),
 			}
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -91,7 +92,7 @@ type responder struct {
 	Handler
 	handlerID uint64
 	log       logging.Logger
-	sender    routerSender
+	sender    common.AppSender
 }
 
 // AppRequest calls the underlying handler and sends back the response to nodeID
