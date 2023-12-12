@@ -932,9 +932,13 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		validatorTx, ok := vdrTx.Unsigned.(txs.ValidatorTx)
+		// We expect genesis validator txs to be either AddValidatorTx or
+		// AddPermissionlessValidatorTx.
+		//
+		// TODO: Enforce stricter type check
+		validatorTx, ok := vdrTx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", vdrTx.Unsigned)
+			return fmt.Errorf("expected a scheduled staker but got %T", vdrTx.Unsigned)
 		}
 
 		stakeAmount := validatorTx.Weight()
@@ -954,7 +958,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, validatorTx.StartTime(), potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1052,12 +1056,12 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return fmt.Errorf("failed to parsing current stakerTx: %w", err)
 		}
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type txs.ScheduledStaker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(tx.ID(), stakerTx, data.PotentialReward)
+		staker, err := NewCurrentStaker(tx.ID(), stakerTx, stakerTx.StartTime(), data.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1097,9 +1101,9 @@ func (s *state) loadPendingStakers() error {
 		if err != nil {
 			return fmt.Errorf("failed to parsing pending stakerTx: %w", err)
 		}
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type txs.ScheduledStaker but got %T", tx.Unsigned)
 		}
 
 		staker, err := NewPendingStaker(tx.ID(), stakerTx)

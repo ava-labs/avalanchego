@@ -13,28 +13,34 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-// RPCChainVMProtocol should be bumped anytime changes are made which require
-// the plugin vm to upgrade to latest avalanchego release to be compatible.
-const RPCChainVMProtocol uint = 30
+const (
+	Client = "avalanchego"
+	// RPCChainVMProtocol should be bumped anytime changes are made which require
+	// the plugin vm to upgrade to latest avalanchego release to be compatible.
+	RPCChainVMProtocol uint = 30
+)
 
 // These are globals that describe network upgrades and node versions
 var (
 	Current = &Semantic{
 		Major: 1,
 		Minor: 10,
-		Patch: 16,
+		Patch: 17,
 	}
 	CurrentApp = &Application{
+		Name:  Client,
 		Major: Current.Major,
 		Minor: Current.Minor,
 		Patch: Current.Patch,
 	}
 	MinimumCompatibleVersion = &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 10,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 9,
 		Patch: 0,
