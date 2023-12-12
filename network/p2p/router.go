@@ -299,12 +299,16 @@ func (r *router) CrossChainAppRequest(
 		return err
 	}
 
-	metricCount, err := r.metrics.crossChainAppRequestCount.GetMetricWithLabelValues(handlerID)
+	labels := prometheus.Labels{
+		handlerLabel: handlerID,
+	}
+
+	metricCount, err := r.metrics.crossChainAppRequestCount.GetMetricWith(labels)
 	if err != nil {
 		return err
 	}
 
-	metricTime, err := r.metrics.crossChainAppRequestTime.GetMetricWithLabelValues(handlerID)
+	metricTime, err := r.metrics.crossChainAppRequestTime.GetMetricWith(labels)
 	if err != nil {
 		return err
 	}
@@ -330,12 +334,16 @@ func (r *router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 
 	pending.callback(ctx, chainID, nil, ErrAppRequestFailed)
 
-	metricCount, err := r.metrics.crossChainAppRequestFailedCount.GetMetricWithLabelValues(pending.handlerID)
+	labels := prometheus.Labels{
+		handlerLabel: pending.handlerID,
+	}
+
+	metricCount, err := r.metrics.crossChainAppRequestFailedCount.GetMetricWith(labels)
 	if err != nil {
 		return err
 	}
 
-	metricTime, err := r.metrics.crossChainAppRequestFailedTime.GetMetricWithLabelValues(pending.handlerID)
+	metricTime, err := r.metrics.crossChainAppRequestFailedTime.GetMetricWith(labels)
 	if err != nil {
 		return err
 	}
@@ -361,12 +369,16 @@ func (r *router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requ
 
 	pending.callback(ctx, chainID, response, nil)
 
-	metricCount, err := r.metrics.crossChainAppResponseCount.GetMetricWithLabelValues(pending.handlerID)
+	labels := prometheus.Labels{
+		handlerLabel: pending.handlerID,
+	}
+
+	metricCount, err := r.metrics.crossChainAppResponseCount.GetMetricWith(labels)
 	if err != nil {
 		return err
 	}
 
-	metricTime, err := r.metrics.crossChainAppResponseTime.GetMetricWithLabelValues(pending.handlerID)
+	metricTime, err := r.metrics.crossChainAppResponseTime.GetMetricWith(labels)
 	if err != nil {
 		return err
 	}
