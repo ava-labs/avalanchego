@@ -5,11 +5,11 @@ package version
 
 import (
 	"fmt"
-	"sync/atomic"
+	"sync"
 )
 
 var (
-	// V1_0_0 is a useful version to use in tests
+	// v1_0_0 is a useful version to use in tests
 	Semantic1_0_0 = &Semantic{
 		Major: 1,
 		Minor: 0,
@@ -24,25 +24,24 @@ type Semantic struct {
 	Minor int `json:"minor" yaml:"minor"`
 	Patch int `json:"patch" yaml:"patch"`
 
-	str atomic.Value
+	initStrOnce sync.Once
+	str         string
 }
 
 // The only difference here between Semantic and Application is that Semantic
 // prepends "v" rather than "avalanche/".
 func (s *Semantic) String() string {
-	strIntf := s.str.Load()
-	if strIntf != nil {
-		return strIntf.(string)
-	}
+	s.initStrOnce.Do(s.initString)
+	return s.str
+}
 
-	str := fmt.Sprintf(
+func (s *Semantic) initString() {
+	s.str = fmt.Sprintf(
 		"v%d.%d.%d",
 		s.Major,
 		s.Minor,
 		s.Patch,
 	)
-	s.str.Store(str)
-	return str
 }
 
 // Compare returns a positive number if s > o, 0 if s == o, or a negative number
