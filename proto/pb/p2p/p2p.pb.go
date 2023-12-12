@@ -698,7 +698,7 @@ type Handshake struct {
 
 	// Network the peer is running on (e.g local, testnet, mainnet)
 	NetworkId uint32 `protobuf:"varint,1,opt,name=network_id,json=networkId,proto3" json:"network_id,omitempty"`
-	// Unix timestamp when this Version message was created
+	// Unix timestamp when this Handshake message was created
 	MyTime uint64 `protobuf:"varint,2,opt,name=my_time,json=myTime,proto3" json:"my_time,omitempty"`
 	// IP address of the peer
 	IpAddr []byte `protobuf:"bytes,3,opt,name=ip_addr,json=ipAddr,proto3" json:"ip_addr,omitempty"`
