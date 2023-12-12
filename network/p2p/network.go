@@ -87,8 +87,8 @@ func (n *Network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID 
 	return n.router.AppResponse(ctx, nodeID, requestID, response)
 }
 
-func (n *Network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	return n.router.AppRequestFailed(ctx, nodeID, requestID)
+func (n *Network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
+	return n.router.AppRequestFailed(ctx, nodeID, requestID, appErr)
 }
 
 func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
@@ -103,8 +103,8 @@ func (n *Network) CrossChainAppResponse(ctx context.Context, chainID ids.ID, req
 	return n.router.CrossChainAppResponse(ctx, chainID, requestID, response)
 }
 
-func (n *Network) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
-	return n.router.CrossChainAppRequestFailed(ctx, chainID, requestID)
+func (n *Network) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
+	return n.router.CrossChainAppRequestFailed(ctx, chainID, requestID, appErr)
 }
 
 func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
