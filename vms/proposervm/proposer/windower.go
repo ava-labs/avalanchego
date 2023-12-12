@@ -110,7 +110,6 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		validatorWeights = validatorsToWeight(validators)
 	)
 
-	source.Seed(seed)
 	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
 	if err := sampler.Initialize(validatorWeights); err != nil {
 		return nil, err
@@ -125,6 +124,7 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	}
 
 	numToSample := int(math.Min(uint64(maxWindows), totalWeight))
+	source.Seed(seed)
 	indices, err := sampler.Sample(numToSample)
 	if err != nil {
 		return nil, err
@@ -176,12 +176,12 @@ func (w *windower) ExpectedProposer(
 		validatorWeights = validatorsToWeight(validators)
 	)
 
-	source.Seed(seed)
 	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
 	if err := sampler.Initialize(validatorWeights); err != nil {
 		return ids.EmptyNodeID, err
 	}
 
+	source.Seed(seed)
 	indices, err := sampler.Sample(1)
 	if err != nil {
 		return ids.EmptyNodeID, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
@@ -219,7 +219,6 @@ func (w *windower) MinDelayForProposer(
 		)
 
 		source.Seed(seed)
-
 		indices, err := sampler.Sample(1)
 		if err != nil {
 			return time.Time{}, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
