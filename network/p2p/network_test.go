@@ -25,6 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+var errFoo = &common.AppError{
+	Code:    123,
+	Message: "foo",
+}
+
 func TestAppRequestResponse(t *testing.T) {
 	handlerID := uint64(0x0)
 	request := []byte("request")
@@ -85,7 +90,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
 					for range nodeIDs {
 						go func() {
-							require.NoError(t, network.AppRequestFailed(ctx, nodeID, requestID))
+							require.NoError(t, network.AppRequestFailed(ctx, nodeID, requestID, errFoo))
 						}()
 					}
 
@@ -95,7 +100,7 @@ func TestAppRequestResponse(t *testing.T) {
 				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
-					require.ErrorIs(t, err, ErrAppRequestFailed)
+					require.ErrorIs(t, err, errFoo)
 					require.Equal(t, nodeID, actualNodeID)
 					require.Nil(t, actualResponse)
 				}
@@ -140,14 +145,14 @@ func TestAppRequestResponse(t *testing.T) {
 			requestFunc: func(t *testing.T, network *Network, client *Client, sender *common.SenderTest, handler *mocks.MockHandler, wg *sync.WaitGroup) {
 				sender.SendCrossChainAppRequestF = func(ctx context.Context, chainID ids.ID, requestID uint32, request []byte) {
 					go func() {
-						require.NoError(t, network.CrossChainAppRequestFailed(ctx, chainID, requestID))
+						require.NoError(t, network.CrossChainAppRequestFailed(ctx, chainID, requestID, errFoo))
 					}()
 				}
 
 				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 
-					require.ErrorIs(t, err, ErrAppRequestFailed)
+					require.ErrorIs(t, err, errFoo)
 					require.Equal(t, chainID, actualChainID)
 					require.Nil(t, actualResponse)
 				}
@@ -273,7 +278,7 @@ func TestNetworkDropMessage(t *testing.T) {
 		{
 			name: "drop unrequested app request failed",
 			requestFunc: func(network *Network) error {
-				return network.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
+				return network.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0, errFoo)
 			},
 			err: ErrUnrequestedResponse,
 		},
@@ -287,7 +292,7 @@ func TestNetworkDropMessage(t *testing.T) {
 		{
 			name: "drop unrequested cross-chain request failed",
 			requestFunc: func(network *Network) error {
-				return network.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0)
+				return network.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0, errFoo)
 			},
 			err: ErrUnrequestedResponse,
 		},
