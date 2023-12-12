@@ -21,12 +21,17 @@ func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
 		// only potential reward was stored
 		var err error
 		metadata.PotentialReward, err = database.ParseUInt64(bytes)
-		return err
+		if err != nil {
+			return err
+		}
 
 	default:
 		_, err := metadataCodec.Unmarshal(bytes, metadata)
-		return err
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func writeDelegatorMetadata(db database.KeyValueWriter, metadata *delegatorMetadata, codecVersion uint16) error {
