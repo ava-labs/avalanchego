@@ -1054,7 +1054,7 @@ func (s *state) loadCurrentStakers() error {
 
 		tx, err := txs.Parse(txs.GenesisCodec, data.TxBytes)
 		if err != nil {
-			return fmt.Errorf("failed to parsing current stakerTx: %w", err)
+			return fmt.Errorf("failed to parse current stakerTx: %w", err)
 		}
 		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
