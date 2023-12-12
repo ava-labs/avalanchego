@@ -157,7 +157,7 @@ func TestAppRequestResponse(t *testing.T) {
 		require.Equal(wantResponse, gotResponse)
 
 		close(done)
-	}
+  }
 
 	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
 	<-sender.SentAppRequest
@@ -175,6 +175,7 @@ func TestAppRequestFailed(t *testing.T) {
 		SentAppRequest: make(chan []byte, 1),
 	}
 	network := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+
 
 	client, err := network.NewAppProtocol(handlerID, &NoOpHandler{})
 	require.NoError(err)
