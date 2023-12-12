@@ -52,7 +52,7 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 
 // ParseCertificatePermissive parses a single certificate from the given ASN.1.
 //
-// This function does not validate that the certificate is validate to be used
+// This function does not validate that the certificate is valid to be used
 // against normal TLS implementations.
 //
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L789-L968
