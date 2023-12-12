@@ -1737,11 +1737,16 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
+	codecVersion := v1
+	if !s.cfg.IsDurangoActivated(s.GetTimestamp()) {
+		codecVersion = v0
+	}
+
 	return utils.Err(
 		s.writeBlocks(),
-		s.writeCurrentStakers(updateValidators, height),
+		s.writeCurrentStakers(updateValidators, height, codecVersion),
 		s.writePendingStakers(),
-		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
+		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
@@ -1967,7 +1972,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
+func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecVersion uint16) error {
 	heightBytes := database.PackUInt64(height)
 	rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
 	nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
@@ -2037,7 +2042,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := metadataCodec.Marshal(v1, metadata)
+				metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -2090,6 +2095,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				delegatorDB,
 				weightDiff,
 				validatorDiff,
+				codecVersion,
 			)
 			if err != nil {
 				return err
@@ -2165,6 +2171,7 @@ func writeCurrentDelegatorDiff(
 	currentDelegatorList linkeddb.LinkedDB,
 	weightDiff *ValidatorWeightDiff,
 	validatorDiff *diffValidator,
+	codecVersion uint16,
 ) error {
 	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
@@ -2180,7 +2187,7 @@ func writeCurrentDelegatorDiff(
 			PotentialReward: staker.PotentialReward,
 			StakerStartTime: staker.StartTime.Unix(),
 		}
-		if err := writeDelegatorMetadata(currentDelegatorList, metadata); err != nil {
+		if err := writeDelegatorMetadata(currentDelegatorList, metadata, codecVersion); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
 		}
 	}
