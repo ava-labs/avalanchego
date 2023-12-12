@@ -369,11 +369,12 @@ func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (
 		return nil, err
 	}
 
-	peerVersion, err := version.ParseApplication(req.Version)
-	if err != nil {
-		return nil, err
+	peerVersion := &version.Application{
+		Name:  req.Name,
+		Major: int(req.Major),
+		Minor: int(req.Minor),
+		Patch: int(req.Patch),
 	}
-
 	return &emptypb.Empty{}, vm.vm.Connected(ctx, nodeID, peerVersion)
 }
 
