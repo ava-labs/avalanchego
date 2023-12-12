@@ -1932,6 +1932,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
+	atomicDB := prefixdb.New([]byte{1}, db)
+	m := atomic.NewMemory(atomicDB)
+	secondCtx.SharedMemory = m.NewSharedMemory(secondCtx.ChainID)
+
 	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
@@ -2022,6 +2026,10 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	ctx := defaultContext(t)
 	ctx.Lock.Lock()
+
+	atomicDB := prefixdb.New([]byte{1}, db)
+	m := atomic.NewMemory(atomicDB)
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}

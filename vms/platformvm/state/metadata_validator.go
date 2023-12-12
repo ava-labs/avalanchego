@@ -131,6 +131,7 @@ type validatorState interface {
 	WriteValidatorMetadata(
 		dbPrimary database.KeyValueWriter,
 		dbSubnet database.KeyValueWriter,
+		codecVersion uint16,
 	) error
 }
 
@@ -231,13 +232,14 @@ func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 func (m *metadata) WriteValidatorMetadata(
 	dbPrimary database.KeyValueWriter,
 	dbSubnet database.KeyValueWriter,
+	codecVersion uint16,
 ) error {
 	for vdrID, updatedSubnets := range m.updatedMetadata {
 		for subnetID := range updatedSubnets {
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := metadataCodec.Marshal(v1, metadata)
+			metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
 			if err != nil {
 				return err
 			}
