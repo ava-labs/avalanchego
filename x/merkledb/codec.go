@@ -100,7 +100,7 @@ func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
 }
 
 func childSize(index byte, childEntry *child) int {
-	return uintSize(uint64(index)) + len(ids.Empty) + keySize(childEntry.compressedKey) + boolSize()
+	return uintSize(uint64(index)) +ids.IDLen + keySize(childEntry.compressedKey) + boolSize()
 }
 
 func boolSize() int {
