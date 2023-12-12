@@ -106,7 +106,7 @@ func (c *codecImpl) childSize(index byte, childEntry *child) int {
 }
 
 // based on the current implementation of codecImpl.encodeUint which uses binary.PutUvarint
-func (_ *codecImpl) uintSize(value uint64) int {
+func (*codecImpl) uintSize(value uint64) int {
 	// catch the call to log(0) and return early
 	if value == 0 {
 		return 1
