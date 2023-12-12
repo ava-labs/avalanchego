@@ -254,7 +254,11 @@ func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager 
 
 	for {
 		tx, exists := mempool.Peek()
-		if !exists || len(tx.Bytes()) > remainingSize {
+		if !exists {
+			break
+		}
+		txSize := len(tx.Bytes())
+		if txSize > remainingSize {
 			break
 		}
 		mempool.Remove([]*txs.Tx{tx})
@@ -300,7 +304,7 @@ func packBlockTxs(mempool mempool.Mempool, backend *txexecutor.Backend, manager 
 			continue
 		}
 
-		remainingSize -= len(tx.Bytes())
+		remainingSize -= txSize
 		blockTxs = append(blockTxs, tx)
 	}
 
