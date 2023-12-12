@@ -93,30 +93,31 @@ type codecImpl struct {
 
 func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
 	// total the number of children pointers + bool indicating if it has a value + the value + the child entries for n.children
-	total := uintSize(uint64(len(n.children))) + boolLen + len(n.value.Value())
+	total := c.uintSize(uint64(len(n.children))) + boolLen + len(n.value.Value())
 	// for each non-nil entry, we add the additional size of the child entry
 	for index, entry := range n.children {
-		total += childSize(index, entry)
+		total += c.childSize(index, entry)
 	}
 	return total
 }
 
-func childSize(index byte, childEntry *child) int {
-	return uintSize(uint64(index)) + ids.IDLen + keySize(childEntry.compressedKey) + boolLen
+func (c *codecImpl) childSize(index byte, childEntry *child) int {
+	return c.uintSize(uint64(index)) + ids.IDLen + c.keySize(childEntry.compressedKey) + boolLen
 }
 
-func uintSize(value uint64) int {
+// based on the current implementation of codecImpl.encodeUint which uses binary.PutUvarint
+func (_ *codecImpl) uintSize(value uint64) int {
+	// catch the call to log(0) and return early
 	if value == 0 {
 		return 1
 	}
-	// based on the current implementation of binary.PutUvarint
-	// uvarint repeatedly divides by 128 until the value is under 128,
+	// binary.PutUvarint repeatedly divides by 128 until the value is under 128,
 	// so count the number of times that occurs
 	return 1 + int(math.Log(float64(value))/log128)
 }
 
-func keySize(p Key) int {
-	return uintSize(uint64(p.length)) + bytesNeeded(p.length)
+func (c *codecImpl) keySize(p Key) int {
+	return c.uintSize(uint64(p.length)) + bytesNeeded(p.length)
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
