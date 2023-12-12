@@ -865,9 +865,21 @@ func TestRouterClearTimeouts(t *testing.T) {
 			timeoutMsg:  message.InboundAppError(ids.EmptyNodeID, ids.Empty, requestID, 123, "error"),
 		},
 		{
+			name:        "AppError",
+			responseOp:  message.AppResponseOp,
+			responseMsg: message.InboundAppError(ids.EmptyNodeID, ids.Empty, requestID, 1234, "custom error"),
+			timeoutMsg:  message.InboundAppError(ids.EmptyNodeID, ids.Empty, requestID, 123, "error"),
+		},
+		{
 			name:        "CrossChainAppResponse",
 			responseOp:  message.CrossChainAppResponseOp,
 			responseMsg: message.InternalCrossChainAppResponse(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, []byte("responseMsg")),
+			timeoutMsg:  message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, 123, "error"),
+		},
+		{
+			name:        "CrossChainAppError",
+			responseOp:  message.CrossChainAppResponseOp,
+			responseMsg: message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, 1234, "custom error"),
 			timeoutMsg:  message.InternalCrossChainAppError(ids.EmptyNodeID, ids.Empty, ids.Empty, requestID, 123, "error"),
 		},
 	}
