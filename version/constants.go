@@ -106,23 +106,9 @@ var (
 )
 
 func init() {
-	var parsedRPCChainVMCompatibility map[uint][]string
-	err := json.Unmarshal(rpcChainVMProtocolCompatibilityBytes, &parsedRPCChainVMCompatibility)
+	err := json.Unmarshal(rpcChainVMProtocolCompatibilityBytes, &RPCChainVMProtocolCompatibility)
 	if err != nil {
 		panic(err)
-	}
-
-	RPCChainVMProtocolCompatibility = make(map[uint][]*Semantic)
-	for rpcChainVMProtocol, versionStrings := range parsedRPCChainVMCompatibility {
-		versions := make([]*Semantic, len(versionStrings))
-		for i, versionString := range versionStrings {
-			version, err := Parse(versionString)
-			if err != nil {
-				panic(err)
-			}
-			versions[i] = version
-		}
-		RPCChainVMProtocolCompatibility[rpcChainVMProtocol] = versions
 	}
 
 	// The mainnet stop vertex is well known. It can be verified on any fully
