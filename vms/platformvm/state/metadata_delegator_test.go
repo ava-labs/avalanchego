@@ -6,21 +6,149 @@ package state
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParseDelegatorMetadata(t *testing.T) {
 	type test struct {
-		name     string
-		version  uint16
-		bytes    []byte
-		expected *delegatorMetadata
+		name        string
+		bytes       []byte
+		expected    *delegatorMetadata
+		expectedErr error
 	}
 	tests := []test{
 		{
-			name:    "delegator metadata v1",
-			version: v1,
+			name:  "nil",
+			bytes: nil,
+			expected: &delegatorMetadata{
+				PotentialReward: 0,
+				StakerStartTime: 0,
+			},
+			expectedErr: nil,
+		},
+		{
+			name:  "nil",
+			bytes: []byte{},
+			expected: &delegatorMetadata{
+				PotentialReward: 0,
+				StakerStartTime: 0,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "potential reward only no codec",
 			bytes: []byte{
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
+			},
+			expected: &delegatorMetadata{
+				PotentialReward: 123,
+				StakerStartTime: 0,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "potential reward only with codec v0",
+			bytes: []byte{
+				// codec version
+				0x00, 0x00,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
+			},
+			expected: &delegatorMetadata{
+				PotentialReward: 123,
+				StakerStartTime: 0,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "potential reward + staker start time with codec v1",
+			bytes: []byte{
+				// codec version
+				0x00, 0x01,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
+				// staker start time
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc8,
+			},
+			expected: &delegatorMetadata{
+				PotentialReward: 123,
+				StakerStartTime: 456,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "invalid codec version",
+			bytes: []byte{
+				// codec version
+				0x00, 0xff,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
+				// staker start time
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc8,
+			},
+			expected:    nil,
+			expectedErr: codec.ErrUnknownVersion,
+		},
+		{
+			name: "short byte len",
+			bytes: []byte{
+				// codec version
+				0x00, 0x01,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
+				// staker start time
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			},
+			expected:    nil,
+			expectedErr: wrappers.ErrInsufficientLength,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			var metadata delegatorMetadata
+			err := parseDelegatorMetadata(tt.bytes, &metadata)
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr != nil {
+				return
+			}
+			require.Equal(tt.expected, &metadata)
+		})
+	}
+}
+
+func TestWriteDelegatorMetadata(t *testing.T) {
+	type test struct {
+		name     string
+		version  uint16
+		metadata *delegatorMetadata
+		expected []byte
+	}
+	tests := []test{
+		{
+			name:    "v0",
+			version: v0,
+			metadata: &delegatorMetadata{
+				PotentialReward: 123,
+				StakerStartTime: 0,
+			},
+			expected: []byte{
+				// codec version
+				0x0, 0x0,
+				// potential reward
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7b,
+			},
+		},
+		{
+			name:    "v1",
+			version: v1,
+			metadata: &delegatorMetadata{
+				PotentialReward: 123,
+				StakerStartTime: 456,
+			},
+			expected: []byte{
 				// codec version
 				0x0, 0x1,
 				// potential reward
@@ -28,39 +156,14 @@ func TestParseDelegatorMetadata(t *testing.T) {
 				// staker start time
 				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0xc8,
 			},
-			expected: &delegatorMetadata{
-				PotentialReward: 123,
-				StakerStartTime: 456,
-			},
-		},
-		{
-			name:    "delegator metadata v0",
-			version: v0,
-			bytes: []byte{
-				// codec version
-				0x0, 0x0,
-				// potential reward
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7b,
-			},
-			expected: &delegatorMetadata{
-				PotentialReward: 123,
-				StakerStartTime: 0,
-			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-
-			// marshal with the right version
-			metadataBytes, err := metadataCodec.Marshal(tt.version, tt.expected)
+			metadataBytes, err := metadataCodec.Marshal(tt.version, tt.metadata)
 			require.NoError(err)
-			require.Equal(metadataBytes, tt.bytes)
-
-			// unmarshal and compare results
-			var metadata delegatorMetadata
-			require.NoError(parseDelegatorMetadata(tt.bytes, &metadata))
-			require.Equal(tt.expected, &metadata)
+			require.Equal(tt.expected, metadataBytes)
 		})
 	}
 }

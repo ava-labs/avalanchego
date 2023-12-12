@@ -17,6 +17,8 @@ type delegatorMetadata struct {
 
 func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
 	switch len(bytes) {
+	case 0:
+		// nothing was stored
 	case database.Uint64Size:
 		// only potential reward was stored
 		var err error
