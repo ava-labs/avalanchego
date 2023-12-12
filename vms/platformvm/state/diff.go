@@ -17,7 +17,8 @@ import (
 )
 
 var (
-	_ Diff = (*diff)(nil)
+	_ Diff     = (*diff)(nil)
+	_ Versions = stateGetter{}
 
 	ErrMissingParentState = errors.New("missing parent state")
 )
