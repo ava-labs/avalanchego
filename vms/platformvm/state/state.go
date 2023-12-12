@@ -1044,7 +1044,7 @@ func (s *state) loadCurrentStakers() error {
 	iter := s.merkleDB.NewIteratorWithPrefix(currentStakersSectionPrefix)
 	defer iter.Release()
 	for iter.Next() {
-		data := &stakersData{}
+		var data stakersData
 		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), data); err != nil {
 			return fmt.Errorf("failed to deserialize current stakers data: %w", err)
 		}
