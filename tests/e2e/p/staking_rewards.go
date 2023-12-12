@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("creating keychain and P-Chain wallet")
 		keychain := secp256k1fx.NewKeychain(rewardKeys...)
-		fundedKey := e2e.Env.AllocateFundedKey()
+		fundedKey := e2e.Env.AllocatePreFundedKey()
 		keychain.Add(fundedKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
 		baseWallet := e2e.NewWallet(keychain, nodeURI)

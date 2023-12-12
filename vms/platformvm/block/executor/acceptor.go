@@ -180,8 +180,23 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 		return err
 	}
 
-	if err := a.state.Commit(); err != nil {
-		return err
+	defer a.state.Abort()
+	batch, err := a.state.CommitBatch()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to commit VM's database for block %s: %w",
+			blkID,
+			err,
+		)
+	}
+
+	// Note that this method writes [batch] to the database.
+	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
+	}
+
+	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
+		onAcceptFunc()
 	}
 
 	a.ctx.Log.Trace(
