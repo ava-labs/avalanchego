@@ -19,7 +19,7 @@ type uptimes struct {
 }
 
 type stakersData struct {
-	TxBytes         []byte `serialize:"true"` // nit signals remove
+	TxBytes         []byte `serialize:"true"` // nil means the staker is removed
 	PotentialReward uint64 `serialize:"true"`
 }
 
