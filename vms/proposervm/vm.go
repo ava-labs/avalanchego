@@ -299,7 +299,28 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	return preferredBlock.buildChild(ctx)
+	blk, err := preferredBlock.buildChild(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Following Durango activation make sure we try and reschedule the block building timer
+	if vm.IsDurangoActivated(preferredBlock.Timestamp()) {
+		postForkBlk, ok := preferredBlock.(PostForkBlock)
+		if ok {
+			pChainHeight, err := blk.pChainHeight(ctx)
+			if err != nil {
+				return nil, err
+			}
+			nextStartTime, err := vm.resetPostDurangoScheduler(ctx, postForkBlk, pChainHeight)
+			if err != nil {
+				return nil, err
+			}
+			vm.Scheduler.SetBuildBlockTime(nextStartTime)
+		}
+	}
+
+	return blk, nil
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
@@ -399,13 +420,17 @@ func (vm *VM) resetPostDurangoScheduler(
 		vm.ctx.NodeID,
 		vm.Clock.Time().Truncate(time.Second),
 	)
-	if err != nil {
+	if errors.Is(err, proposer.ErrNoSlotsScheduledInNextFuture) {
+		// while there are no slots available in the next figure for vm.ctx.NodeID,
+		// we still want to make sure we reset the time to eventually server build
+		// block requests from innerVM
+		nextStartTime, err = parentTimestamp.Add(proposer.MaxLookAheadWindow), nil
+	} else if err != nil {
 		vm.ctx.Log.Debug("failed to calculate min delay for proposer",
 			zap.Error(err),
 		)
-		return time.Time{}, err
 	}
-	return nextStartTime, nil
+	return nextStartTime, err
 }
 
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
