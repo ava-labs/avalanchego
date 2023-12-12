@@ -6,7 +6,6 @@ package mempool
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -52,12 +51,6 @@ type Mempool interface {
 
 	// Peek returns the oldest tx in the mempool.
 	Peek() (tx *txs.Tx, exists bool)
-
-	// Drops all [txs.Staker] transactions whose [StartTime] is before
-	// [minStartTime] from [mempool]. The dropped tx ids are returned.
-	//
-	// TODO: Remove once [StartTime] field is ignored in staker txs
-	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built. If [emptyBlockPermitted] is true, the notification will be sent
@@ -228,39 +221,4 @@ func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
 	case m.toEngine <- common.PendingTxs:
 	default:
 	}
-}
-
-// Drops all [txs.Staker] transactions whose [StartTime] is before
-// [minStartTime] from [mempool]. The dropped tx ids are returned.
-//
-// TODO: Remove once [StartTime] field is ignored in staker txs
-func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
-	var droppedTxIDs []ids.ID
-
-	txIter := m.unissuedTxs.NewIterator()
-	for txIter.Next() {
-		tx := txIter.Value()
-		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
-		if !ok {
-			continue
-		}
-
-		startTime := stakerTx.StartTime()
-		if !startTime.Before(minStartTime) {
-			continue
-		}
-
-		txID := tx.ID()
-		err := fmt.Errorf(
-			"synchrony bound (%s) is later than staker start time (%s)",
-			minStartTime,
-			startTime,
-		)
-
-		m.Remove([]*txs.Tx{tx})
-		m.MarkDropped(txID, err) // cache tx as dropped
-		droppedTxIDs = append(droppedTxIDs, txID)
-	}
-
-	return droppedTxIDs
 }
