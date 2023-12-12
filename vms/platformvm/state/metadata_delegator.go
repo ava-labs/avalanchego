@@ -9,8 +9,8 @@ import (
 )
 
 type delegatorMetadata struct {
-	PotentialReward uint64 `v0:"true"`
-	StakerStartTime int64  `          v1:"true"`
+	PotentialReward uint64 `v1:"true"`
+	StakerStartTime int64  `v1:"true"`
 
 	txID ids.ID
 }
@@ -26,7 +26,8 @@ func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
 		}
 
 	default:
-		if _, err := metadataCodec.Unmarshal(bytes, metadata); err != nil {
+		_, err := metadataCodec.Unmarshal(bytes, metadata)
+		if err != nil {
 			return err
 		}
 	}
@@ -34,6 +35,14 @@ func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
 }
 
 func writeDelegatorMetadata(db database.KeyValueWriter, metadata *delegatorMetadata, codecVersion uint16) error {
+	// The "0" codec is skipped for [delegatorMetadata]. This is to ensure the
+	// [validatorMetadata] codec version is the same as the [delegatorMetadata]
+	// codec version.
+	//
+	// TODO: Cleanup post-Durango activation.
+	if codecVersion == 0 {
+		return database.PutUInt64(db, metadata.txID[:], metadata.PotentialReward)
+	}
 	metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
 	if err != nil {
 		return err

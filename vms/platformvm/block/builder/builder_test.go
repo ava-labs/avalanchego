@@ -32,7 +32,7 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-func TestBlockBuilderAddLocalTx(t *testing.T) {
+func TestBuildBlockBasic(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
@@ -71,6 +71,26 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	// Mempool should not contain the transaction or have marked it as dropped
 	require.False(env.mempool.Has(txID))
 	require.NoError(env.mempool.GetDropReason(txID))
+}
+
+func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	tx, exists := env.mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
+
+	// [BuildBlock] should not build an empty block
+	blk, err := env.Builder.BuildBlock(context.Background())
+	require.ErrorIs(err, ErrNoPendingBlocks)
+	require.Nil(blk)
 }
 
 func TestBuildBlockShouldReward(t *testing.T) {
@@ -168,6 +188,42 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	rewardUTXOs, err := env.state.GetRewardUTXOs(txID)
 	require.NoError(err)
 	require.NotEmpty(rewardUTXOs)
+}
+
+func TestBuildBlockAdvanceTime(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	var (
+		now      = env.backend.Clk.Time()
+		nextTime = now.Add(2 * txexecutor.SyncBound)
+	)
+
+	// Add a staker to [env.state]
+	env.state.PutCurrentValidator(&state.Staker{
+		NextTime: nextTime,
+		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+	})
+
+	// Advance wall clock to [nextTime]
+	env.backend.Clk.Set(nextTime)
+
+	// [BuildBlock] should build a block advancing the time to [NextTime]
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
+	require.Empty(blk.Txs())
+	require.IsType(&block.BanffStandardBlock{}, blk.Block)
+	standardBlk := blk.Block.(*block.BanffStandardBlock)
+	require.Equal(nextTime.Unix(), standardBlk.Timestamp().Unix())
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
