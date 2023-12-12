@@ -1470,9 +1470,7 @@ func (s *state) processCurrentStakers() (
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				txID := staker.TxID
-
-				outputStakers[txID] = &stakersData{
+				outputStakers[staker.TxID] = &stakersData{
 					TxBytes: nil,
 				}
 				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
@@ -1524,8 +1522,7 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				txID := staker.TxID
-				output[txID] = &stakersData{
+				output[staker.TxID] = &stakersData{
 					TxBytes: nil,
 				}
 			}
