@@ -30,20 +30,23 @@ var (
 )
 
 type pendingAppRequest struct {
+	handlerID            string
 	callback             AppResponseCallback
-	appRequestFailedTime metric.Averager
-	appResponseTime      metric.Averager
+	appRequestFailedTime *prometheus.CounterVec
+	appResponseTime      *prometheus.CounterVec
 }
 
 type pendingCrossChainAppRequest struct {
+	handlerID                      string
 	callback                       CrossChainAppResponseCallback
-	crossChainAppRequestFailedTime metric.Averager
-	crossChainAppResponseTime      metric.Averager
+	crossChainAppRequestFailedTime *prometheus.CounterVec
+	crossChainAppResponseTime      *prometheus.CounterVec
 }
 
 // meteredHandler emits metrics for a Handler
 type meteredHandler struct {
 	*responder
+	//TODO use vectors
 	appRequestTime           metric.Averager
 	appGossipTime            metric.Averager
 	crossChainAppRequestTime metric.Averager
@@ -180,7 +183,12 @@ func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 	}
 
 	pending.callback(ctx, nodeID, nil, ErrAppRequestFailed)
-	pending.appRequestFailedTime.Observe(float64(time.Since(start)))
+	metric, err := pending.appRequestFailedTime.GetMetricWithLabelValues(pending.handlerID)
+	if err != nil {
+		return err
+	}
+
+	metric.Add(float64(time.Since(start)))
 	return nil
 }
 
@@ -198,7 +206,12 @@ func (r *router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 	}
 
 	pending.callback(ctx, nodeID, response, nil)
-	pending.appResponseTime.Observe(float64(time.Since(start)))
+	metric, err := pending.appResponseTime.GetMetricWithLabelValues(pending.handlerID)
+	if err != nil {
+		return err
+	}
+
+	metric.Add(float64(time.Since(start)))
 	return nil
 }
 
@@ -273,7 +286,12 @@ func (r *router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 	}
 
 	pending.callback(ctx, chainID, nil, ErrAppRequestFailed)
-	pending.crossChainAppRequestFailedTime.Observe(float64(time.Since(start)))
+	metric, err := pending.crossChainAppRequestFailedTime.GetMetricWithLabelValues(pending.handlerID)
+	if err != nil {
+		return err
+	}
+
+	metric.Add(float64(time.Since(start)))
 	return nil
 }
 
@@ -291,7 +309,12 @@ func (r *router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requ
 	}
 
 	pending.callback(ctx, chainID, response, nil)
-	pending.crossChainAppResponseTime.Observe(float64(time.Since(start)))
+	metric, err := pending.crossChainAppResponseTime.GetMetricWithLabelValues(pending.handlerID)
+	if err != nil {
+		return err
+	}
+
+	metric.Add(float64(time.Since(start)))
 	return nil
 }
 

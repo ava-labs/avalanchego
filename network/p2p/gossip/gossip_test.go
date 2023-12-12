@@ -120,7 +120,8 @@ func TestGossiperGossip(t *testing.T) {
 			responseSender := &common.FakeSender{
 				SentAppResponse: make(chan []byte, 1),
 			}
-			responseNetwork := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
+			responseNetwork, err := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
+			require.NoError(err)
 			responseBloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
 			responseSet := testSet{
@@ -139,7 +140,8 @@ func TestGossiperGossip(t *testing.T) {
 				SentAppRequest: make(chan []byte, 1),
 			}
 
-			requestNetwork := p2p.NewNetwork(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
+			requestNetwork, err := p2p.NewNetwork(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
+			require.NoError(err)
 			require.NoError(requestNetwork.Connected(context.Background(), ids.EmptyNodeID, nil))
 
 			bloom, err := NewBloomFilter(1000, 0.01)

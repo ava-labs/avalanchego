@@ -8,9 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -42,13 +43,14 @@ type CrossChainAppResponseCallback func(
 
 type Client struct {
 	handlerID                      uint64
+	handlerIDStr                   string
 	handlerPrefix                  []byte
 	router                         *router
 	sender                         common.AppSender
-	appRequestFailedTime           metric.Averager
-	appResponseTime                metric.Averager
-	crossChainAppRequestFailedTime metric.Averager
-	crossChainAppResponseTime      metric.Averager
+	appRequestFailedTime           *prometheus.CounterVec
+	appResponseTime                *prometheus.CounterVec
+	crossChainAppRequestFailedTime *prometheus.CounterVec
+	crossChainAppResponseTime      *prometheus.CounterVec
 	options                        *clientOptions
 }
 
@@ -101,6 +103,7 @@ func (c *Client) AppRequest(
 		}
 
 		c.router.pendingAppRequests[requestID] = pendingAppRequest{
+			handlerID:            c.handlerIDStr,
 			callback:             onResponse,
 			appRequestFailedTime: c.appRequestFailedTime,
 			appResponseTime:      c.appResponseTime,
@@ -165,6 +168,7 @@ func (c *Client) CrossChainAppRequest(
 	}
 
 	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
+		handlerID:                      c.handlerIDStr,
 		callback:                       onResponse,
 		crossChainAppRequestFailedTime: c.crossChainAppRequestFailedTime,
 		crossChainAppResponseTime:      c.crossChainAppResponseTime,
