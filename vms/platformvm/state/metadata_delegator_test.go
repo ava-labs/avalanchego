@@ -103,7 +103,7 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 			version: v0,
 			metadata: &delegatorMetadata{
 				PotentialReward: 123,
-				StakerStartTime: 0,
+				StakerStartTime: 456,
 			},
 			expected: []byte{
 				// potential reward
