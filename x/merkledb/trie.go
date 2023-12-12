@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -31,12 +32,6 @@ type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
 	GetProof(ctx context.Context, keyBytes []byte) (*Proof, error)
-
-	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
-	// keys in range [start, end].
-	// If [start] is Nothing, there's no lower bound on the range.
-	// If [end] is Nothing, there's no upper bound on the range.
-	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 }
 
 type trieInternals interface {
@@ -71,6 +66,12 @@ type Trie interface {
 	// database.ErrNotFound if the key is not present
 	GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error)
 
+	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
+	// keys in range [start, end].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
+	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
+
 	// NewView returns a new view on top of this Trie where the passed changes
 	// have been applied.
 	NewView(
@@ -93,13 +94,6 @@ type View interface {
 func isSentinelNodeTheRoot[T Trie](t T) bool {
 	sentinel := t.getSentinelNode()
 	return sentinel.valueDigest.HasValue() || len(sentinel.children) != 1
-}
-func getValueCopy[T Trie](t T, key Key) ([]byte, error) {
-	val, err := t.getValue(key)
-	if err != nil {
-		return nil, err
-	}
-	return slices.Clone(val), nil
 }
 
 func getRoot[T Trie](t T) (*node, error) {

@@ -221,6 +221,7 @@ func newHistoricalView(
 func (t *trieView) getSentinelNode() *node {
 	return t.sentinelNode
 }
+
 func (t *trieView) getTokenSize() int {
 	return t.tokenSize
 }
@@ -338,7 +339,7 @@ func (t *trieView) GetRangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
+	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 	result, err := getRangeProof(t, start, end, maxLength)
 	if t.isInvalid() {

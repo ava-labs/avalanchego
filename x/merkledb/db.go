@@ -96,7 +96,6 @@ type ChangeProofer interface {
 }
 
 type RangeProofer interface {
-
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
 	// If [start] is Nothing, there's no lower bound on the range.
