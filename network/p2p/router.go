@@ -46,7 +46,7 @@ type pendingCrossChainAppRequest struct {
 // meteredHandler emits metrics for a Handler
 type meteredHandler struct {
 	*responder
-	//TODO use vectors
+	// TODO use vectors
 	appRequestTime           metric.Averager
 	appGossipTime            metric.Averager
 	crossChainAppRequestTime metric.Averager

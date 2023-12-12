@@ -154,7 +154,7 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(requestSet.Add(item))
 			}
 
-			requestClient, err := requestNetwork.NewClient(0x0)
+			requestClient := requestNetwork.NewClient(0x0)
 			require.NoError(err)
 
 			config := Config{

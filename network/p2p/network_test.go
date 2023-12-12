@@ -61,8 +61,7 @@ func TestMessageRouting(t *testing.T) {
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.AddHandler(1, testHandler))
-	client, err := network.NewClient(1)
-	require.NoError(err)
+	client := network.NewClient(1)
 
 	require.NoError(client.AppGossip(ctx, wantMsg))
 	require.NoError(network.AppGossip(ctx, wantNodeID, <-sender.SentAppGossip))
@@ -91,9 +90,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.Connected(ctx, ids.EmptyNodeID, nil))
-
-	client, err := network.NewClient(handlerID)
-	require.NoError(err)
+	client := network.NewClient(handlerID)
 
 	want := []byte("message")
 
@@ -147,9 +144,7 @@ func TestAppRequestResponse(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-
-	client, err := network.NewClient(handlerID)
-	require.NoError(err)
+	client := network.NewClient(handlerID)
 
 	wantResponse := []byte("response")
 	wantNodeID := ids.GenerateTestNodeID()
@@ -180,9 +175,7 @@ func TestAppRequestFailed(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-
-	client, err := network.NewClient(handlerID)
-	require.NoError(err)
+	client := network.NewClient(handlerID)
 
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
@@ -212,9 +205,7 @@ func TestCrossChainAppRequestResponse(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-
-	client, err := network.NewClient(handlerID)
-	require.NoError(err)
+	client := network.NewClient(handlerID)
 
 	wantChainID := ids.GenerateTestID()
 	wantResponse := []byte("response")
@@ -245,9 +236,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-
-	client, err := network.NewClient(handlerID)
-	require.NoError(err)
+	client := network.NewClient(handlerID)
 
 	wantChainID := ids.GenerateTestID()
 	done := make(chan struct{})
@@ -381,8 +370,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client, err := network.NewClient(0x1)
-	require.NoError(err)
+	client := network.NewClient(0x1)
 
 	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
 	// create a request that never gets a response
@@ -517,8 +505,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 				require.NoError(n.Connected(context.Background(), peer, &version.Application{}))
 			}
 
-			client, err := n.NewClient(1)
-			require.NoError(err)
+			client := n.NewClient(1)
 
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
 			require.ErrorIs(err, tt.expected)
@@ -608,8 +595,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 				require.NoError(network.Connected(ctx, peer, nil))
 			}
 
-			client, err := network.NewClient(0, tt.option(t, network))
-			require.NoError(err)
+			client := network.NewClient(0, tt.option(t, network))
 
 			if err = client.AppRequestAny(ctx, []byte("request"), nil); err != nil {
 				close(done)
@@ -627,8 +613,6 @@ func TestMultipleClients(t *testing.T) {
 
 	n, err := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	_, err = n.NewClient(0)
-	require.NoError(err)
-	_, err = n.NewClient(0)
-	require.NoError(err)
+	_ = n.NewClient(0)
+	_ = n.NewClient(0)
 }

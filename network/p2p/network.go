@@ -167,7 +167,7 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 
 // NewClient returns a Client that can be used to send messages for the
 // corresponding protocol.
-func (n *Network) NewClient(handlerID uint64, options ...ClientOption) (*Client, error) {
+func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
 	client := &Client{
 		handlerID:     handlerID,
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),
@@ -189,7 +189,7 @@ func (n *Network) NewClient(handlerID uint64, options ...ClientOption) (*Client,
 		option.apply(client.options)
 	}
 
-	return client, nil
+	return client
 }
 
 // AddHandler reserves an identifier for an application protocol
