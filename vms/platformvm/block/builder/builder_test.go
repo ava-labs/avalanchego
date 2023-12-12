@@ -287,15 +287,14 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	}()
 
 	env.config.DurangoTime = time.Time{}
-
 	require.True(env.config.IsDurangoActivated(env.backend.Clk.Time()))
 
 	var (
 		now                   = env.backend.Clk.Time()
 		defaultValidatorStake = 100 * units.MilliAvax
 
-		// Add a validator ending in [MaxFutureStartTime]
-		validatorEndTime = now.Add(txexecutor.MaxFutureStartTime)
+		// Add a validator ending in [MaxStakeDuration]
+		validatorEndTime = now.Add(env.config.MaxStakeDuration)
 	)
 
 	tx1, err := env.txBuilder.NewAddValidatorTx(
@@ -313,8 +312,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	tx1ID := tx1.ID()
 	require.True(env.mempool.Has(tx1ID))
 
-	// Add a validator ending past [MaxFutureStartTime]
-	validator2EndTime := now.Add(txexecutor.MaxFutureStartTime + 24*time.Hour)
+	// Add a validator ending past [MaxStakeDuration]
+	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
 
 	tx2, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
@@ -348,7 +347,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(env.mempool.GetDropReason(tx1ID))
 
 	tx2DropReason := env.mempool.GetDropReason(tx2ID)
-	require.ErrorIs(tx2DropReason, txexecutor.ErrTimestampNotBeforeStartTime)
+	require.ErrorIs(tx2DropReason, txexecutor.ErrStakeTooLong)
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
