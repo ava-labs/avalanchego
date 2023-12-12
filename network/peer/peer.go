@@ -497,11 +497,12 @@ func (p *peer) writeMessages() {
 		return
 	}
 
+	myVersion := p.VersionCompatibility.Version()
 	legacyApplication := &version.Application{
 		Name:  version.LegacyAppName,
-		Major: p.VersionCompatibility.Version().Major,
-		Minor: p.VersionCompatibility.Version().Minor,
-		Patch: p.VersionCompatibility.Version().Patch,
+		Major: myVersion.Major,
+		Minor: myVersion.Minor,
+		Patch: myVersion.Patch,
 	}
 
 	msg, err := p.MessageCreator.Version(
@@ -509,10 +510,10 @@ func (p *peer) writeMessages() {
 		p.Clock.Unix(),
 		mySignedIP.IPPort,
 		legacyApplication.String(),
-		p.VersionCompatibility.Version().Name,
-		uint32(p.VersionCompatibility.Version().Major),
-		uint32(p.VersionCompatibility.Version().Minor),
-		uint32(p.VersionCompatibility.Version().Patch),
+		myVersion.Name,
+		uint32(myVersion.Major),
+		uint32(myVersion.Minor),
+		uint32(myVersion.Patch),
 		mySignedIP.Timestamp,
 		mySignedIP.Signature,
 		p.MySubnets.List(),
@@ -890,8 +891,7 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 		}
 	} else {
 		// Handle legacy version field
-		// TODO deprecate after D upgrade
-		peerVersion, err := version.ParseApplication(msg.MyVersion)
+		peerVersion, err := version.ParseLegacyApplication(msg.MyVersion)
 		if err != nil {
 			p.Log.Debug("failed to parse peer version",
 				zap.Stringer("nodeID", p.id),

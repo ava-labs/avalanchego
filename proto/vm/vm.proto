@@ -306,7 +306,12 @@ message CrossChainAppResponseMsg {
 
 message ConnectedRequest {
   bytes node_id = 1;
-  string version = 2;
+  // Client name (e.g avalanchego)
+  string name = 2;
+  // Client semantic version
+  uint32 major = 3;
+  uint32 minor = 4;
+  uint32 patch = 5;
 }
 
 message DisconnectedRequest {
