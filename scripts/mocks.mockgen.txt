@@ -31,7 +31,6 @@ github.com/ava-labs/avalanchego/vms/avm/state=Chain,State,Diff=vms/avm/state/moc
 github.com/ava-labs/avalanchego/vms/avm/txs/mempool=Mempool=vms/avm/txs/mempool/mock_mempool.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/mock_transferable_in.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go
-github.com/ava-labs/avalanchego/vms/platformvm/block/executor=Manager=vms/platformvm/block/executor/mock_manager.go
 github.com/ava-labs/avalanchego/vms/platformvm/block=Block=vms/platformvm/block/mock_block.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Chain,Diff,State,Versions=vms/platformvm/state/mock_state.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=StakerIterator=vms/platformvm/state/mock_staker_iterator.go
