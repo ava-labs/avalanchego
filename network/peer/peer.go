@@ -962,11 +962,16 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 		}
 	}
 
-	p.supportedACPs.Add(msg.SupportedAcps...)
-	p.supportedACPs.Filter(constants.CurrentACPs)
-
-	p.objectedACPs.Add(msg.ObjectedAcps...)
-	p.objectedACPs.Filter(constants.CurrentACPs)
+	for _, acp := range msg.SupportedAcps {
+		if constants.CurrentACPs.Contains(acp) {
+			p.supportedACPs.Add(acp)
+		}
+	}
+	for _, acp := range msg.ObjectedAcps {
+		if constants.CurrentACPs.Contains(acp) {
+			p.objectedACPs.Add(acp)
+		}
+	}
 
 	if p.supportedACPs.Overlaps(p.objectedACPs) {
 		p.Log.Debug("message with invalid field",

@@ -439,16 +439,23 @@ func (n *Node) initNetworking() error {
 		)
 	}
 
-	numSupportedACPs := n.Config.NetworkConfig.SupportedACPs.Len()
-	n.Config.NetworkConfig.SupportedACPs.Filter(constants.CurrentACPs)
-	if numSupportedACPs != n.Config.NetworkConfig.SupportedACPs.Len() {
-		n.Log.Warn("attempted to support unknown ACP")
+	// We allow nodes to gossip unknown ACPs incase the current ACPs constant
+	// becomes out of date.
+	var unknownACPs set.Set[uint32]
+	for acp := range n.Config.NetworkConfig.SupportedACPs {
+		if !constants.CurrentACPs.Contains(acp) {
+			unknownACPs.Add(acp)
+		}
 	}
-
-	numObjectedACPs := n.Config.NetworkConfig.ObjectedACPs.Len()
-	n.Config.NetworkConfig.ObjectedACPs.Filter(constants.CurrentACPs)
-	if numObjectedACPs != n.Config.NetworkConfig.ObjectedACPs.Len() {
-		n.Log.Warn("attempted to object unknown ACP")
+	for acp := range n.Config.NetworkConfig.ObjectedACPs {
+		if !constants.CurrentACPs.Contains(acp) {
+			unknownACPs.Add(acp)
+		}
+	}
+	if unknownACPs.Len() > 0 {
+		n.Log.Warn("gossipping unknown ACPs",
+			zap.Reflect("acps", unknownACPs),
+		)
 	}
 
 	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert, n.tlsKeyLogWriterCloser)
