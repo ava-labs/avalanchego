@@ -100,7 +100,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	}()
 
 	var (
-		now    = env.backend.Clk.Time()
+		now    = env.state.GetTimestamp()
 		nodeID = ids.GenerateTestNodeID()
 
 		defaultValidatorStake = 100 * units.MilliAvax
@@ -197,7 +197,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	}()
 
 	var (
-		now      = env.backend.Clk.Time()
+		now      = env.state.GetTimestamp()
 		nextTime = now.Add(2 * txexecutor.SyncBound)
 	)
 
@@ -250,7 +250,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	require.True(env.mempool.Has(txID))
 
 	var (
-		now      = env.backend.Clk.Time()
+		now      = env.state.GetTimestamp()
 		nextTime = now.Add(2 * txexecutor.SyncBound)
 	)
 
@@ -287,11 +287,11 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	}()
 
 	env.config.DurangoTime = mockable.MaxTime
-	require.True(env.config.IsCortinaActivated(env.backend.Clk.Time()))
-	require.False(env.config.IsDurangoActivated(env.backend.Clk.Time()))
+	require.True(env.config.IsCortinaActivated(env.state.GetTimestamp()))
+	require.False(env.config.IsDurangoActivated(env.state.GetTimestamp()))
 
 	var (
-		now                   = env.backend.Clk.Time()
+		now                   = env.state.GetTimestamp()
 		defaultValidatorStake = 100 * units.MilliAvax
 
 		// Add a validator with StartTime in the future within [MaxFutureStartTime]
@@ -387,10 +387,10 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	}()
 
 	env.config.DurangoTime = time.Time{}
-	require.True(env.config.IsDurangoActivated(env.backend.Clk.Time()))
+	require.True(env.config.IsDurangoActivated(env.state.GetTimestamp()))
 
 	var (
-		now                   = env.backend.Clk.Time()
+		now                   = env.state.GetTimestamp()
 		defaultValidatorStake = 100 * units.MilliAvax
 
 		// Add a validator ending in [MaxStakeDuration]
