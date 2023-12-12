@@ -65,7 +65,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestParseApplication(t *testing.T) {
+func TestParseLegacyApplication(t *testing.T) {
 	v, err := ParseLegacyApplication("avalanche/1.2.3")
 
 	require.NoError(t, err)
