@@ -1041,10 +1041,7 @@ func (s *state) loadCurrentStakers() error {
 	// TODO ABENEGIA: Check missing metadata
 	s.currentStakers = newBaseStakers()
 
-	prefix := make([]byte, len(currentStakersSectionPrefix))
-	copy(prefix, currentStakersSectionPrefix)
-
-	iter := s.merkleDB.NewIteratorWithPrefix(prefix)
+	iter := s.merkleDB.NewIteratorWithPrefix(currentStakersSectionPrefix)
 	defer iter.Release()
 	for iter.Next() {
 		data := &stakersData{}
