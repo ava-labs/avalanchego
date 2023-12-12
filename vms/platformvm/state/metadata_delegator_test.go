@@ -34,20 +34,6 @@ func TestParseDelegatorMetadata(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "potential reward only with codec v0",
-			bytes: []byte{
-				// codec version
-				0x00, 0x00,
-				// potential reward
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
-			},
-			expected: &delegatorMetadata{
-				PotentialReward: 123,
-				StakerStartTime: 0,
-			},
-			expectedErr: nil,
-		},
-		{
 			name: "potential reward + staker start time with codec v1",
 			bytes: []byte{
 				// codec version
