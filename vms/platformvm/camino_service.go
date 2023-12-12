@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
@@ -701,6 +702,7 @@ type APIDeposit struct {
 	DepositTxID         ids.ID            `json:"depositTxID"`
 	DepositOfferID      ids.ID            `json:"depositOfferID"`
 	UnlockedAmount      utilsjson.Uint64  `json:"unlockedAmount"`
+	UnlockableAmount    utilsjson.Uint64  `json:"unlockableAmount"`
 	ClaimedRewardAmount utilsjson.Uint64  `json:"claimedRewardAmount"`
 	Start               utilsjson.Uint64  `json:"start"`
 	Duration            uint32            `json:"duration"`
@@ -759,6 +761,7 @@ func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, repl
 		if err != nil {
 			return err
 		}
+		reply.Deposits[i].UnlockableAmount = utilsjson.Uint64(deposit.UnlockableAmount(offer, timestamp))
 		reply.AvailableRewards[i] = utilsjson.Uint64(deposit.ClaimableReward(offer, timestamp))
 	}
 	return nil
@@ -1043,7 +1046,7 @@ func (s *CaminoService) GetValidatorsAt(r *http.Request, args *GetValidatorsAtAr
 	height := uint64(args.Height)
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
-		zap.String("method", "getValidatorsAt"),
+		zap.String("method", "getValidatorsAt-camino"),
 		zap.Uint64("height", height),
 		zap.Stringer("subnetID", args.SubnetID),
 	)
@@ -1072,4 +1075,43 @@ func (s *CaminoService) GetValidatorsAt(r *http.Request, args *GetValidatorsAtAr
 		}
 	}
 	return nil
+}
+
+// GetCurrentSupply returns an upper bound on the supply of CAM in the system including potential rewards from not expired or not-locked deposit offers.
+// Overrides avax service GetCurrentSupply.
+func (s *CaminoService) GetCurrentSupply(_ *http.Request, args *GetCurrentSupplyArgs, reply *GetCurrentSupplyReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getCurrentSupply-camino"),
+	)
+
+	supply, err := s.vm.state.GetCurrentSupply(args.SubnetID)
+	if err != nil {
+		return err
+	}
+
+	allOffers, err := s.vm.state.GetAllDepositOffers()
+	if err != nil {
+		return err
+	}
+
+	chainTimestamp := s.vm.clock.Unix()
+
+	for _, offer := range allOffers {
+		if chainTimestamp <= offer.End && offer.Flags&deposit.OfferFlagLocked == 0 {
+			if offer.TotalMaxAmount != 0 {
+				supply, err = math.Add64(supply, offer.MaxRemainingRewardByTotalMaxAmount())
+				if err != nil {
+					return err
+				}
+			} else if offer.TotalMaxRewardAmount != 0 {
+				supply, err = math.Add64(supply, offer.RemainingReward())
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	reply.Supply = utilsjson.Uint64(supply)
+	return err
 }

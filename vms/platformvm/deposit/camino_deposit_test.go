@@ -34,7 +34,7 @@ func TestTotalReward(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			rewardsPeriodDuration := tt.DepositDuration - uint64(tt.NoRewardsPeriodDuration)
-			expectedRewardAmount := (tt.Amount * tt.InterestRateNominator * rewardsPeriodDuration) / uint64(interestRateDenominator)
+			expectedRewardAmount := tt.Amount * tt.InterestRateNominator * rewardsPeriodDuration / InterestRateDenominator
 
 			dep := Deposit{
 				Amount:   tt.Amount,

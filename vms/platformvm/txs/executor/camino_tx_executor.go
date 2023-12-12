@@ -1673,7 +1673,7 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 	chainTimestamp := uint64(chainTime.Unix())
 
 	for _, offer := range allOffers {
-		if offer.IsActiveAt(chainTimestamp) {
+		if chainTimestamp <= offer.End && offer.Flags&deposits.OfferFlagLocked == 0 {
 			if offer.TotalMaxAmount != 0 {
 				availableSupply -= offer.MaxRemainingRewardByTotalMaxAmount()
 			} else if offer.TotalMaxRewardAmount != 0 {

@@ -27,6 +27,7 @@ func TestAddDepositOfferTxSyntacticVerify(t *testing.T) {
 		MinDuration:      1,
 		MaxDuration:      1,
 		MinAmount:        deposit.OfferMinDepositAmount,
+		TotalMaxAmount:   1,
 	}
 
 	baseTx := BaseTx{BaseTx: avax.BaseTx{
@@ -47,11 +48,43 @@ func TestAddDepositOfferTxSyntacticVerify(t *testing.T) {
 			},
 			expectedErr: errEmptyDepositOfferCreatorAddress,
 		},
+		"Non-zero RewardedAmount": {
+			tx: &AddDepositOfferTx{
+				BaseTx:                     baseTx,
+				DepositOfferCreatorAddress: creatorAddress,
+				DepositOffer: &deposit.Offer{
+					UpgradeVersionID: codec.UpgradeVersion1,
+					RewardedAmount:   1,
+				},
+			},
+			expectedErr: errNotZeroDepositOfferAmounts,
+		},
+		"Non-zero DepositedAmount": {
+			tx: &AddDepositOfferTx{
+				BaseTx:                     baseTx,
+				DepositOfferCreatorAddress: creatorAddress,
+				DepositOffer: &deposit.Offer{
+					UpgradeVersionID: codec.UpgradeVersion1,
+					DepositedAmount:  1,
+				},
+			},
+			expectedErr: errNotZeroDepositOfferAmounts,
+		},
+		"Zero TotalMaxAmount and TotalMaxRewardAmount": {
+			tx: &AddDepositOfferTx{
+				BaseTx:                     baseTx,
+				DepositOfferCreatorAddress: creatorAddress,
+				DepositOffer: &deposit.Offer{
+					UpgradeVersionID: codec.UpgradeVersion1,
+				},
+			},
+			expectedErr: errZeroDepositOfferLimits,
+		},
 		"Bad deposit offer": {
 			tx: &AddDepositOfferTx{
 				BaseTx:                     baseTx,
 				DepositOfferCreatorAddress: creatorAddress,
-				DepositOffer:               &deposit.Offer{UpgradeVersionID: codec.UpgradeVersion1},
+				DepositOffer:               &deposit.Offer{UpgradeVersionID: codec.UpgradeVersion1, TotalMaxAmount: 1},
 			},
 			expectedErr: errBadDepositOffer,
 		},

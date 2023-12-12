@@ -5717,40 +5717,56 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 						End:                  uint64(chainTime.Add(-1 * time.Second).Unix()),
 						TotalMaxRewardAmount: 101,
 					},
-					{ // [1], not started
+					{ // [1], not started yet with TotalMaxAmount
+						UpgradeVersionID:      1,
+						Start:                 uint64(chainTime.Add(1 * time.Second).Unix()),
+						End:                   uint64(chainTime.Add(2 * time.Second).Unix()),
+						MaxDuration:           100,
+						TotalMaxAmount:        102,
+						InterestRateNominator: deposit.InterestRateDenominator / 2,
+					},
+					{ // [2], not started yet with TotalMaxRewardAmount
 						UpgradeVersionID:     1,
 						Start:                uint64(chainTime.Add(1 * time.Second).Unix()),
 						End:                  uint64(chainTime.Add(2 * time.Second).Unix()),
-						TotalMaxRewardAmount: 102,
+						TotalMaxRewardAmount: 103,
 					},
-					{ // [2], disabled
+					{ // [3], disabled
 						UpgradeVersionID:     1,
 						Start:                uint64(chainTime.Unix()),
 						End:                  uint64(chainTime.Add(1 * time.Second).Unix()),
 						Flags:                deposit.OfferFlagLocked,
-						TotalMaxRewardAmount: 103,
+						TotalMaxRewardAmount: 104,
 					},
-					{ // [3]
+					{ // [4] active // shouldn't be possible, cause offers must always have one of the limits
 						Start: uint64(chainTime.Unix()),
 						End:   uint64(chainTime.Add(1 * time.Second).Unix()),
 					},
-					{ // [4] with TotalMaxAmount
+					{ // [5] active, no interest rate
+						UpgradeVersionID: 1,
+						Start:            uint64(chainTime.Unix()),
+						End:              uint64(chainTime.Add(1 * time.Second).Unix()),
+						MaxDuration:      100,
+						TotalMaxAmount:   102,
+					},
+					{ // [6] active with TotalMaxAmount
 						MaxDuration:           100,
 						InterestRateNominator: 100,
 						Start:                 uint64(chainTime.Unix()),
 						End:                   uint64(chainTime.Add(1 * time.Second).Unix()),
-						TotalMaxAmount:        104,
+						TotalMaxAmount:        105,
 						DepositedAmount:       50,
 					},
-					{ // [5] with TotalMaxRewardAmount
+					{ // [7] active with TotalMaxRewardAmount
 						UpgradeVersionID:     1,
 						Start:                uint64(chainTime.Add(-1 * time.Second).Unix()),
 						End:                  uint64(chainTime.Add(1 * time.Second).Unix()),
-						TotalMaxRewardAmount: 105,
+						TotalMaxRewardAmount: 106,
 						RewardedAmount:       50,
 					},
 				}
-				promisedSupply := existingOffers[4].MaxRemainingRewardByTotalMaxAmount() + existingOffers[5].RemainingReward()
+				promisedSupply := existingOffers[1].MaxRemainingRewardByTotalMaxAmount() + existingOffers[2].RemainingReward() +
+					existingOffers[6].MaxRemainingRewardByTotalMaxAmount() + existingOffers[7].RemainingReward()
 				currentSupply := cfg.RewardConfig.SupplyCap - promisedSupply - offer1.TotalMaxRewardAmount + 1
 
 				s := state.NewMockDiff(c)

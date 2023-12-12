@@ -18,14 +18,14 @@ import (
 
 const (
 	interestRateBase               = 365 * 24 * 60 * 60
-	interestRateDenominator        = 1_000_000 * interestRateBase
+	InterestRateDenominator uint64 = 1_000_000 * interestRateBase
 	OfferMinDepositAmount   uint64 = 1 * units.MilliAvax
 )
 
 var (
-	bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
+	bigInterestRateDenominator = (&big.Int{}).SetInt64(int64(InterestRateDenominator))
 
-	errWrongLimitValues           = errors.New("can only use either TotalMaxAmount or TotalMaxRewardAmount")
+	errWrongLimitValues           = errors.New("can only use either TotalMaxAmount or TotalMaxRewardAmount, can't use neither of them")
 	errDepositedMoreThanMaxAmount = errors.New("offer deposited amount is more than offer total max amount")
 	errRewardedMoreThanMaxAmount  = errors.New("offer deposits total reward amount is more than offer total max reward amount")
 	errMinAmountTooSmall          = errors.New("offer minAmount is too small")
@@ -111,7 +111,7 @@ func (o *Offer) IsActiveAt(timestamp uint64) bool {
 }
 
 func (o *Offer) InterestRateFloat64() float64 {
-	return float64(o.InterestRateNominator) / float64(interestRateDenominator)
+	return float64(o.InterestRateNominator) / float64(InterestRateDenominator)
 }
 
 func (o *Offer) Verify() error {
