@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,12 +25,21 @@ var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[testTx, *testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
+
+	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
 )
 
 // Gossiper gossips Gossipables to other nodes
 type Gossiper interface {
 	// Gossip runs a cycle of gossip. Returns an error if we failed to gossip.
 	Gossip(ctx context.Context) error
+}
+
+// Accumulator allows a caller to accumulate gossipables to be gossiped
+type Accumulator[T Gossipable] interface {
+	Gossiper
+	// Add queues gossipables to be gossiped
+	Add(gossipables ...T)
 }
 
 // GossipableAny exists to help create non-nil pointers to a concrete Gossipable
@@ -180,6 +190,112 @@ func (p *PullGossiper[T, U]) handleResponse(
 	p.receivedBytes.Add(float64(receivedBytes))
 }
 
+// NewPushGossiper returns an instance of PushGossiper
+func NewPushGossiper[T Gossipable](client *p2p.Client, namespace string) *PushGossiper[T] {
+	return &PushGossiper[T]{
+		client: client,
+		sentN: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_sent_n",
+			Help:      "amount of gossip sent (n)",
+		}),
+		sentBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_sent_bytes",
+			Help:      "amount of gossip sent (bytes)",
+		}),
+	}
+}
+
+// PushGossiper broadcasts gossip to peers randomly in the network
+type PushGossiper[T Gossipable] struct {
+	client *p2p.Client
+
+	sentN     prometheus.Counter
+	sentBytes prometheus.Counter
+
+	lock   sync.Mutex
+	queued []T
+}
+
+// Gossip flushes any queued gossipables
+func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if len(p.queued) == 0 {
+		return nil
+	}
+
+	msg := &sdk.PushGossip{
+		Gossip: make([][]byte, 0, len(p.queued)),
+	}
+
+	sentBytes := 0
+	for _, tx := range p.queued {
+		bytes, err := tx.Marshal()
+		if err != nil {
+			return err
+		}
+
+		msg.Gossip = append(msg.Gossip, bytes)
+		sentBytes += len(bytes)
+	}
+
+	p.queued = nil
+
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	p.sentN.Add(float64(len(msg.Gossip)))
+	p.sentBytes.Add(float64(sentBytes))
+
+	return p.client.AppGossip(ctx, msgBytes)
+}
+
+func (p *PushGossiper[T]) Add(gossipables ...T) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.queued = append(p.queued, gossipables...)
+}
+
+// Subscribe gossips a gossipable whenever one is made available
+func Subscribe[T Gossipable](
+	ctx context.Context,
+	log logging.Logger,
+	gossiper Accumulator[T],
+	gossipables <-chan T,
+) {
+	for {
+		select {
+		case gossipable, ok := <-gossipables:
+			if !ok {
+				log.Debug(
+					"shutting down push gossip subscription",
+					zap.String("reason", "channel closed"),
+				)
+				return
+			}
+
+			gossiper.Add(gossipable)
+
+			if err := gossiper.Gossip(ctx); err != nil {
+				log.Warn("push gossip failed", zap.Error(err))
+				continue
+			}
+		case <-ctx.Done():
+			log.Debug(
+				"shutting down push gossip subscription",
+				zap.String("reason", "context cancelled"),
+			)
+			return
+		}
+	}
+}
+
 // Every calls [Gossip] every [frequency] amount of time.
 func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency time.Duration) {
 	ticker := time.NewTicker(frequency)
@@ -201,5 +317,15 @@ func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency
 type NoOpGossiper struct{}
 
 func (NoOpGossiper) Gossip(context.Context) error {
+	return nil
+}
+
+type NoOpAccumulator[T Gossipable] struct{}
+
+func (NoOpAccumulator[_]) Gossip(context.Context) error {
+	return nil
+}
+
+func (NoOpAccumulator[T]) Add(...T) error {
 	return nil
 }
