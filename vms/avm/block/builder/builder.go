@@ -93,12 +93,12 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		remainingSize = targetBlockSize
 	)
 	for {
-		tx := b.mempool.Peek()
+		tx, exists := b.mempool.Peek()
 		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
 		// that we will only stop building a block once there are no
 		// transactions in the mempool or the block is at least
 		// [targetBlockSize - mempool.MaxTxSize] bytes full.
-		if tx == nil || len(tx.Bytes()) > remainingSize {
+		if !exists || len(tx.Bytes()) > remainingSize {
 			break
 		}
 		b.mempool.Remove([]*txs.Tx{tx})

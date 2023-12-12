@@ -33,13 +33,13 @@ import (
 )
 
 const (
-	DefaultNodeCount      = 2 // Minimum required to ensure connectivity-based health checks will pass
-	DefaultFundedKeyCount = 50
+	DefaultNodeCount         = 2 // Minimum required to ensure connectivity-based health checks will pass
+	DefaultPreFundedKeyCount = 50
 
 	DefaultGasLimit = uint64(100_000_000) // Gas limit is arbitrary
 
 	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
-	DefaultFundedKeyXChainAmount = 30 * units.MegaAvax
+	DefaultPreFundedKeyXChainAmount = 30 * units.MegaAvax
 
 	// A short min stake duration enables testing of staking logic.
 	DefaultMinStakeDuration = time.Second
@@ -47,7 +47,7 @@ const (
 
 var (
 	// Arbitrarily large amount of AVAX (10^12) to fund keys on the C-Chain for testing
-	DefaultFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
+	DefaultPreFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
 
 	errNoKeysForGenesis           = errors.New("failed to generate genesis: no keys to fund")
 	errInvalidNetworkIDForGenesis = errors.New("network ID can't be mainnet, testnet or local network ID")
@@ -121,10 +121,10 @@ func DefaultJSONMarshal(v interface{}) ([]byte, error) {
 // NetworkConfig defines configuration shared or
 // common to all nodes in a given network.
 type NetworkConfig struct {
-	Genesis      *genesis.UnparsedConfig
-	CChainConfig FlagsMap
-	DefaultFlags FlagsMap
-	FundedKeys   []*secp256k1.PrivateKey
+	Genesis       *genesis.UnparsedConfig
+	CChainConfig  FlagsMap
+	DefaultFlags  FlagsMap
+	PreFundedKeys []*secp256k1.PrivateKey
 }
 
 // Ensure genesis is generated if not already present.
@@ -133,17 +133,17 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, initialStakers []genesis
 		return nil
 	}
 
-	if len(c.FundedKeys) == 0 {
+	if len(c.PreFundedKeys) == 0 {
 		return errNoKeysForGenesis
 	}
 
 	// Ensure pre-funded keys have arbitrary large balances on both chains to support testing
-	xChainBalances := make(XChainBalanceMap, len(c.FundedKeys))
-	cChainBalances := make(core.GenesisAlloc, len(c.FundedKeys))
-	for _, key := range c.FundedKeys {
-		xChainBalances[key.Address()] = DefaultFundedKeyXChainAmount
+	xChainBalances := make(XChainBalanceMap, len(c.PreFundedKeys))
+	cChainBalances := make(core.GenesisAlloc, len(c.PreFundedKeys))
+	for _, key := range c.PreFundedKeys {
+		xChainBalances[key.Address()] = DefaultPreFundedKeyXChainAmount
 		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
-			Balance: DefaultFundedKeyCChainAmount,
+			Balance: DefaultPreFundedKeyCChainAmount,
 		}
 	}
 

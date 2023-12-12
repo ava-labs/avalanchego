@@ -14,6 +14,7 @@ func TestNewDefaultApplication(t *testing.T) {
 	require := require.New(t)
 
 	v := &Application{
+		Name:  LegacyAppName,
 		Major: 1,
 		Minor: 2,
 		Patch: 3,
@@ -33,11 +34,13 @@ func TestComparingVersions(t *testing.T) {
 	}{
 		{
 			myVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
 			},
 			peerVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
@@ -47,11 +50,13 @@ func TestComparingVersions(t *testing.T) {
 		},
 		{
 			myVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 4,
 			},
 			peerVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
@@ -61,11 +66,13 @@ func TestComparingVersions(t *testing.T) {
 		},
 		{
 			myVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
 			},
 			peerVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 4,
@@ -75,11 +82,13 @@ func TestComparingVersions(t *testing.T) {
 		},
 		{
 			myVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 3,
 				Patch: 3,
 			},
 			peerVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
@@ -89,11 +98,13 @@ func TestComparingVersions(t *testing.T) {
 		},
 		{
 			myVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
 			},
 			peerVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 3,
 				Patch: 3,
@@ -103,11 +114,13 @@ func TestComparingVersions(t *testing.T) {
 		},
 		{
 			myVersion: &Application{
+				Name:  Client,
 				Major: 2,
 				Minor: 2,
 				Patch: 3,
 			},
 			peerVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
@@ -117,11 +130,13 @@ func TestComparingVersions(t *testing.T) {
 		},
 		{
 			myVersion: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 3,
 			},
 			peerVersion: &Application{
+				Name:  Client,
 				Major: 2,
 				Minor: 2,
 				Patch: 3,

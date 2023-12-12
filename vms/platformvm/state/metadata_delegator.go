@@ -26,16 +26,15 @@ func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
 		}
 
 	default:
-		_, err := metadataCodec.Unmarshal(bytes, metadata)
-		if err != nil {
+		if _, err := metadataCodec.Unmarshal(bytes, metadata); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func writeDelegatorMetadata(db database.KeyValueWriter, metadata *delegatorMetadata) error {
-	metadataBytes, err := metadataCodec.Marshal(v1, metadata)
+func writeDelegatorMetadata(db database.KeyValueWriter, metadata *delegatorMetadata, codecVersion uint16) error {
+	metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
 	if err != nil {
 		return err
 	}
