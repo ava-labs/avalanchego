@@ -520,7 +520,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 					return merkledb.ViewChanges{}, err
 				}
 
-				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					PotentialReward: txIDAndReward.reward,
 				})
@@ -579,7 +579,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 					return merkledb.ViewChanges{}, err
 				}
 
-				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakersData{
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					PotentialReward: txIDAndReward.reward,
 				})

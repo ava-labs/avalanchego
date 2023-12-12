@@ -17,7 +17,7 @@ type uptimeMetadata struct {
 	lastUpdated time.Time
 }
 
-type stakersData struct {
+type stakingTxAndReward struct {
 	TxBytes         []byte `serialize:"true"` // nil means the staker is removed
 	PotentialReward uint64 `serialize:"true"`
 }

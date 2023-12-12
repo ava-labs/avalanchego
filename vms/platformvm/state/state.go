@@ -1044,7 +1044,7 @@ func (s *state) loadCurrentStakers() error {
 	iter := s.merkleDB.NewIteratorWithPrefix(currentStakersSectionPrefix)
 	defer iter.Release()
 	for iter.Next() {
-		var data stakersData
+		var data stakingTxAndReward
 		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), data); err != nil {
 			return fmt.Errorf("failed to deserialize current stakers data: %w", err)
 		}
@@ -1089,7 +1089,7 @@ func (s *state) loadPendingStakers() error {
 	iter := s.merkleDB.NewIteratorWithPrefix(prefix)
 	defer iter.Release()
 	for iter.Next() {
-		var data stakersData
+		var data stakingTxAndReward
 		if _, err := txs.GenesisCodec.Unmarshal(iter.Value(), &data); err != nil {
 			return fmt.Errorf("failed to deserialize pending stakers data: %w", err)
 		}
@@ -1324,7 +1324,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return database.GetID(s.blockIDDB, key)
 }
 
-func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
+func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakingTxAndReward) error {
 	for stakerTxID, stakerData := range currentData {
 		key := merkleCurrentStakersKey(stakerTxID)
 
@@ -1377,14 +1377,14 @@ func (s *state) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uin
 
 // DB Operations
 func (s *state) processCurrentStakers() (
-	map[ids.ID]*stakersData,
+	map[ids.ID]*stakingTxAndReward,
 	map[weightDiffKey]*ValidatorWeightDiff,
 	map[ids.NodeID]*bls.PublicKey,
 	map[weightDiffKey]*diffValidator,
 	error,
 ) {
 	var (
-		outputStakers = make(map[ids.ID]*stakersData)
+		outputStakers = make(map[ids.ID]*stakingTxAndReward)
 		outputWeights = make(map[weightDiffKey]*ValidatorWeightDiff)
 		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
 		outputValSet  = make(map[weightDiffKey]*diffValidator)
@@ -1418,7 +1418,7 @@ func (s *state) processCurrentStakers() (
 					return nil, nil, nil, nil, fmt.Errorf("failed loading current validator tx, %w", err)
 				}
 
-				outputStakers[txID] = &stakersData{
+				outputStakers[txID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					PotentialReward: potentialReward,
 				}
@@ -1438,7 +1438,7 @@ func (s *state) processCurrentStakers() (
 					blkKey = validatorDiff.validator.PublicKey
 				)
 
-				outputStakers[txID] = &stakersData{
+				outputStakers[txID] = &stakingTxAndReward{
 					TxBytes: nil,
 				}
 				outputWeights[weightKey].Amount = weight
@@ -1460,7 +1460,7 @@ func (s *state) processCurrentStakers() (
 					return nil, nil, nil, nil, fmt.Errorf("failed loading current delegator tx, %w", err)
 				}
 
-				outputStakers[staker.TxID] = &stakersData{
+				outputStakers[staker.TxID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					PotentialReward: staker.PotentialReward,
 				}
@@ -1470,7 +1470,7 @@ func (s *state) processCurrentStakers() (
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				outputStakers[staker.TxID] = &stakersData{
+				outputStakers[staker.TxID] = &stakingTxAndReward{
 					TxBytes: nil,
 				}
 				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
@@ -1482,8 +1482,8 @@ func (s *state) processCurrentStakers() (
 	return outputStakers, outputWeights, outputBlsKey, outputValSet, nil
 }
 
-func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
-	output := make(map[ids.ID]*stakersData)
+func (s *state) processPendingStakers() (map[ids.ID]*stakingTxAndReward, error) {
+	output := make(map[ids.ID]*stakingTxAndReward)
 	for subnetID, subnetValidatorDiffs := range s.pendingStakers.validatorDiffs {
 		delete(s.pendingStakers.validatorDiffs, subnetID)
 		for _, validatorDiff := range subnetValidatorDiffs {
@@ -1496,13 +1496,13 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed loading pending validator tx, %w", err)
 				}
-				output[txID] = &stakersData{
+				output[txID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					PotentialReward: 0,
 				}
 			case deleted:
 				txID := validatorDiff.validator.TxID
-				output[txID] = &stakersData{
+				output[txID] = &stakingTxAndReward{
 					TxBytes: nil,
 				}
 			}
@@ -1515,14 +1515,14 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakersData, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed loading pending delegator tx, %w", err)
 				}
-				output[staker.TxID] = &stakersData{
+				output[staker.TxID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					PotentialReward: 0,
 				}
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
-				output[staker.TxID] = &stakersData{
+				output[staker.TxID] = &stakingTxAndReward{
 					TxBytes: nil,
 				}
 			}
@@ -1535,7 +1535,7 @@ func (s *state) NewView() (merkledb.TrieView, error) {
 	return s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{})
 }
 
-func (s *state) getMerkleChanges(currentData, pendingData map[ids.ID]*stakersData) ([]database.BatchOp, error) {
+func (s *state) getMerkleChanges(currentData, pendingData map[ids.ID]*stakingTxAndReward) ([]database.BatchOp, error) {
 	batchOps := make([]database.BatchOp, 0)
 	err := utils.Err(
 		s.writeMetadata(&batchOps),
@@ -1552,7 +1552,7 @@ func (s *state) getMerkleChanges(currentData, pendingData map[ids.ID]*stakersDat
 	return batchOps, err
 }
 
-func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
+func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakingTxAndReward) error {
 	changes, err := s.getMerkleChanges(currentData, pendingData)
 	if err != nil {
 		return err
@@ -1572,7 +1572,7 @@ func (s *state) writeMerkleState(currentData, pendingData map[ids.ID]*stakersDat
 	return nil
 }
 
-func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[ids.ID]*stakersData) error {
+func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[ids.ID]*stakingTxAndReward) error {
 	for stakerTxID, data := range pendingData {
 		key := merklePendingStakersKey(stakerTxID)
 
