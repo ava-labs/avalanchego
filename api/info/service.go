@@ -354,15 +354,20 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 	reply.ACPs = make(map[uint32]*ACP, constants.CurrentACPs.Len())
 	peers := i.networking.PeerInfo(nil)
 	for _, peer := range peers {
+		weight := json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
+		if weight == 0 {
+			continue
+		}
+
 		for acpNum := range peer.SupportedACPs {
 			acp := reply.getACP(acpNum)
 			acp.Supporters.Add(peer.ID)
-			acp.SupportWeight += json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
+			acp.SupportWeight += weight
 		}
 		for acpNum := range peer.ObjectedACPs {
 			acp := reply.getACP(acpNum)
 			acp.Objectors.Add(peer.ID)
-			acp.ObjectWeight += json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
+			acp.ObjectWeight += weight
 		}
 	}
 
