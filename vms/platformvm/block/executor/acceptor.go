@@ -201,11 +201,11 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 	}
 
 	// Note that this method writes [batch] to the database.
-	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
+	if err := a.ctx.SharedMemory.Apply(parentState.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
-	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
+	if onAcceptFunc := parentState.onAcceptFunc; onAcceptFunc != nil {
 		onAcceptFunc()
 	}
 
