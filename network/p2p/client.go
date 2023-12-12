@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	ErrAppRequestFailed = errors.New("app request failed")
-	ErrRequestPending   = errors.New("request pending")
-	ErrNoPeers          = errors.New("no peers")
+	ErrRequestPending = errors.New("request pending")
+	ErrNoPeers        = errors.New("no peers")
 )
 
 // AppResponseCallback is called upon receiving an AppResponse for an AppRequest
