@@ -36,6 +36,9 @@ func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
 }
 
 func writeDelegatorMetadata(db database.KeyValueWriter, metadata *delegatorMetadata, codecVersion uint16) error {
+	if codecVersion == 0 {
+		return database.PutUInt64(db, metadata.txID[:], metadata.PotentialReward)
+	}
 	metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
 	if err != nil {
 		return err

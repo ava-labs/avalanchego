@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -136,8 +138,6 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 				StakerStartTime: 0,
 			},
 			expected: []byte{
-				// codec version
-				0x00, 0x00,
 				// potential reward
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
 			},
@@ -162,9 +162,12 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			metadataBytes, err := metadataCodec.Marshal(tt.version, tt.metadata)
+			db := memdb.New()
+			tt.metadata.txID = ids.GenerateTestID()
+			require.NoError(writeDelegatorMetadata(db, tt.metadata, tt.version))
+			bytes, err := db.Get(tt.metadata.txID[:])
 			require.NoError(err)
-			require.Equal(tt.expected, metadataBytes)
+			require.Equal(tt.expected, bytes)
 		})
 	}
 }
