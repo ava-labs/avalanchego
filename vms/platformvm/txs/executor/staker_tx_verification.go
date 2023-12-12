@@ -179,7 +179,7 @@ func verifyAddValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
+	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -265,7 +265,7 @@ func verifyAddSubnetValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -450,7 +450,7 @@ func verifyAddDelegatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
+	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -570,7 +570,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -717,7 +717,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(backend, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
 }
 
 // Returns an error if the given tx is invalid.
@@ -771,28 +771,31 @@ func verifyTransferSubnetOwnershipTx(
 func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time) error {
 	// Pre Durango activation, start time must be after current chain time.
 	// Post Durango activation, start time is not validated
-	if !isDurangoActive {
-		if !chainTime.Before(stakerTime) {
-			return fmt.Errorf(
-				"%w: %s >= %s",
-				ErrTimestampNotBeforeStartTime,
-				chainTime,
-				stakerTime,
-			)
-		}
+	if isDurangoActive {
+		return nil
 	}
 
+	if !chainTime.Before(stakerTime) {
+		return fmt.Errorf(
+			"%w: %s >= %s",
+			ErrTimestampNotBeforeStartTime,
+			chainTime,
+			stakerTime,
+		)
+	}
 	return nil
 }
 
-func verifyStakerStartsSoon(backend *Backend, chainTime, stakerStartTime time.Time) error {
-	if !backend.Config.IsDurangoActivated(chainTime) {
-		// Make sure the tx doesn't start too far in the future. This is done last
-		// to allow the verifier visitor to explicitly check for this error.
-		maxStartTime := chainTime.Add(MaxFutureStartTime)
-		if stakerStartTime.After(maxStartTime) {
-			return ErrFutureStakeTime
-		}
+func verifyStakerStartsSoon(isDurangoActive bool, chainTime, stakerStartTime time.Time) error {
+	if isDurangoActive {
+		return nil
+	}
+
+	// Make sure the tx doesn't start too far in the future. This is done last
+	// to allow the verifier visitor to explicitly check for this error.
+	maxStartTime := chainTime.Add(MaxFutureStartTime)
+	if stakerStartTime.After(maxStartTime) {
+		return ErrFutureStakeTime
 	}
 	return nil
 }

@@ -1389,7 +1389,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	require.NoError(blk.Accept(context.Background()))
 	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
 
-	// Should be pending
+	// Should be current
 	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.NotNil(staker)
