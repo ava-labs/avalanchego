@@ -122,11 +122,11 @@ func TestMessage(t *testing.T) {
 			bytesSaved:       false,
 		},
 		{
-			desc: "version message with no compression",
-			op:   VersionOp,
+			desc: "Handshake message with no compression",
+			op:   HandshakeOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_Version{
-					Version: &p2p.Version{
+				Message: &p2p.Message_Handshake{
+					Handshake: &p2p.Handshake{
 						NetworkId:      uint32(1337),
 						MyTime:         uint64(nowUnix),
 						IpAddr:         []byte(net.IPv6zero),
