@@ -11,6 +11,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+permissions:
+  contents: read
+
 # Cancel ongoing workflow runs if a new one is started
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -56,7 +59,7 @@ jobs:
         with:
           go-version: '~1.20.12'
           check-latest: true
-      - name: Build the avalanchego binary
+      - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
       - name: Run e2e tests
@@ -68,3 +71,57 @@ jobs:
         with:
           name: tmpnet-data
           path: ~/.tmpnet/networks/1000
+  e2e_existing_network:
+    name: e2e with existing network
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.12'
+          check-latest: true
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests with existing network
+        shell: bash
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: tmpnet-data
+          path: ~/.tmpnet/networks/1000
+  Upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.12'
+          check-latest: true
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh
+      - name: Run e2e tests
+        shell: bash
+        # 1.10.7 is the first version compatible with the ephnet fixture by
+        # virtue of writing a process context file on node start.
+        run: ./scripts/tests.upgrade.sh 1.10.7
+      - name: Upload ephnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ephnet-data
+          path: ~/.ephnet/networks/1000
+  Lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.12'
+          check-latest: true
+      - name: Run static analysis tests
+        shell: bash
+        run: scripts/lint.sh
