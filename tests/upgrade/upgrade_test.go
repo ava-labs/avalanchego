@@ -69,7 +69,9 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			node.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 			require.NoError(node.WriteConfig())
 
-			require.NoError(node.Start(ginkgo.GinkgoWriter, avalancheGoExecPath))
+			// Ensure the new node starts with the upgrade binary
+			node.ExecPath = avalancheGoExecPathToUpgradeTo
+			require.NoError(node.Start(ginkgo.GinkgoWriter, "" /* defaultExecPath */))
 
 			ginkgo.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.GetID()))
 			e2e.WaitForHealthy(node)

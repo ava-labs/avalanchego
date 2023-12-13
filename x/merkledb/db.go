@@ -481,9 +481,17 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 func (db *merkleDB) prefetchPath(view *trieView, keyBytes []byte) error {
 	return view.visitPathToKey(ToKey(keyBytes), func(n *node) error {
 		if !n.hasValue() {
+			// this value is already in the cache, so skip writing
+			// to avoid grabbing the cache write lock
+			if _, ok := db.intermediateNodeDB.nodeCache.Get(n.key); ok {
+				return nil
+			}
 			return db.intermediateNodeDB.nodeCache.Put(n.key, n)
 		}
-
+		// this value is already in the cache, so skip writing
+		if _, ok := db.valueNodeDB.nodeCache.Get(n.key); ok {
+			return nil
+		}
 		db.valueNodeDB.nodeCache.Put(n.key, n)
 		return nil
 	})
