@@ -126,6 +126,9 @@ type Config struct {
 	PingFrequency      time.Duration     `json:"pingFrequency"`
 	AllowPrivateIPs    bool              `json:"allowPrivateIPs"`
 
+	SupportedACPs set.Set[uint32] `json:"supportedACPs"`
+	ObjectedACPs  set.Set[uint32] `json:"objectedACPs"`
+
 	// The compression type to use when compressing outbound messages.
 	// Assumes all peers support this compression type.
 	CompressionType compression.Type `json:"compressionType"`
