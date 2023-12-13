@@ -15,9 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -134,8 +134,7 @@ func NewNetwork(
 		}, labelNames),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		registerer.Register(metrics.appRequestTime),
 		registerer.Register(metrics.appRequestCount),
 		registerer.Register(metrics.appResponseTime),
@@ -151,9 +150,8 @@ func NewNetwork(
 		registerer.Register(metrics.crossChainAppRequestFailedTime),
 		registerer.Register(metrics.crossChainAppRequestFailedCount),
 	)
-
-	if errs.Err != nil {
-		return nil, errs.Err
+	if err != nil {
+		return nil, err
 	}
 
 	return &Network{
