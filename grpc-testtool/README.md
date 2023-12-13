@@ -19,3 +19,29 @@ There are 3 RPC specs that must be implemented:
 2. The sync proto, which supports retrieving range and change proofs
 3. The process-server proto, which currently only retrieves metrics
 
+# Running
+
+To run a single test and make sure things are working, first check out and build the go and rust code.
+These have to be in the same directory. See the corresponding README for specific build requirements.
+
+```sh
+BASE=$HOME
+cd $BASE && git clone git@github.com:ava-labs/merkledb-tester.git
+cd $BASE && git clone git@github.com:ava-labs/firewood.git
+```
+
+Then, build the rust process server and symlink it to where the testtool expects it:
+
+```sh
+cd $BASE/firewood
+cargo build --release
+ln -sf $BASE/firewood/target/release/process-server $BASE/merkledb-tester/process/process-server
+```
+
+Then, run the test you want:
+
+```sh
+cd $BASE/merkledb-tester
+go test -timeout 2m -run TestConsistency github.com/ava-labs/merkledb-tester/tests/consistency -v
+go test -timeout 2m -run TestPutPerformance github.com/ava-labs/merkledb-tester/tests/performance -v
+```
