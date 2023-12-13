@@ -31,7 +31,7 @@ var (
 	_ Gossiper         = (*testGossiper)(nil)
 )
 
-func TestGossiperShutdown(t *testing.T) {
+func TestGossiperShutdown(*testing.T) {
 	gossiper := NewPullGossiper[testTx](
 		logging.NoLog{},
 		nil,
