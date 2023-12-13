@@ -80,52 +80,35 @@ func NewMetrics(
 	metrics prometheus.Registerer,
 	namespace string,
 ) (Metrics, error) {
-	sentCount := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "gossip_sent_count",
-		Help:      "amount of gossip sent (n)",
-	}, metricLabels)
-
-	sentBytes := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "gossip_sent_bytes",
-		Help:      "amount of gossip sent (bytes)",
-	}, metricLabels)
-
-	receivedCount := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "gossip_received_count",
-		Help:      "amount of gossip received (n)",
-	}, metricLabels)
-
-	receivedBytes := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "gossip_received_bytes",
-		Help:      "amount of gossip received (bytes)",
-	}, metricLabels)
-
-	if err := metrics.Register(sentCount); err != nil {
-		return Metrics{}, err
+	m := Metrics{
+		sentCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_sent_count",
+			Help:      "amount of gossip sent (n)",
+		}, metricLabels),
+		sentBytes: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_sent_bytes",
+			Help:      "amount of gossip sent (bytes)",
+		}, metricLabels),
+		receivedCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_received_count",
+			Help:      "amount of gossip received (n)",
+		}, metricLabels),
+		receivedBytes: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "gossip_received_bytes",
+			Help:      "amount of gossip received (bytes)",
+		}, metricLabels),
 	}
-
-	if err := metrics.Register(sentBytes); err != nil {
-		return Metrics{}, err
-	}
-
-	if err := metrics.Register(receivedCount); err != nil {
-		return Metrics{}, err
-	}
-
-	if err := metrics.Register(receivedBytes); err != nil {
-		return Metrics{}, err
-	}
-
-	return Metrics{
-		sentCount:     sentCount,
-		sentBytes:     sentBytes,
-		receivedCount: receivedCount,
-		receivedBytes: receivedBytes,
-	}, nil
+	err := utils.Err(
+		metrics.Register(m.sentCount),
+		metrics.Register(m.sentBytes),
+		metrics.Register(m.receivedCount),
+		metrics.Register(m.receivedBytes),
+	)
+	return m, err
 }
 
 func (v ValidatorGossiper) Gossip(ctx context.Context) error {
