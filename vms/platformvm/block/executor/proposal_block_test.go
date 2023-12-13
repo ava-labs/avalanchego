@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -151,7 +152,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(shutdownEnvironment(env))
 	}()
 	env.clk.Set(defaultGenesisTime)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env.config.BanffTime = time.Time{}        // activate Banff
+	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
@@ -641,9 +643,11 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				require.NoError(err)
 
 				// store Staker0 to state
+				addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 				staker0, err := state.NewCurrentStaker(
 					addStaker0.ID(),
-					addStaker0.Unsigned.(*txs.AddValidatorTx),
+					addValTx,
+					addValTx.StartTime(),
 					0,
 				)
 				require.NoError(err)
@@ -741,9 +745,11 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addSubnetValTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -799,9 +805,11 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -912,9 +920,11 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			require.NoError(err)
 
 			// store Staker0 to state
+			addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 			staker, err = state.NewCurrentStaker(
 				addStaker0.ID(),
-				addStaker0.Unsigned.(*txs.AddValidatorTx),
+				addValTx,
+				addValTx.StartTime(),
 				0,
 			)
 			require.NoError(err)
@@ -999,9 +1009,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1091,9 +1103,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1182,9 +1196,11 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1273,9 +1289,11 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1318,4 +1336,171 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// Test validator weight after delegation
 	vdrWeight = env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
+}
+
+func TestAddValidatorProposalBlock(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, nil)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+	env.config.BanffTime = time.Time{}   // activate Banff
+	env.config.DurangoTime = time.Time{} // activate Durango
+
+	now := env.clk.Time()
+
+	// Create validator tx
+	var (
+		validatorStartTime = now.Add(2 * executor.SyncBound)
+		validatorEndTime   = validatorStartTime.Add(env.config.MinStakeDuration)
+		nodeID             = ids.GenerateTestNodeID()
+	)
+
+	addValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		nodeID,
+		preFundedKeys[0].PublicKey().Address(),
+		10000,
+		[]*secp256k1.PrivateKey{
+			preFundedKeys[0],
+			preFundedKeys[1],
+			preFundedKeys[4],
+		},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
+
+	// Add validator through a [StandardBlock]
+	preferredID := env.blkManager.Preferred()
+	preferred, err := env.blkManager.GetStatelessBlock(preferredID)
+	require.NoError(err)
+
+	statelessBlk, err := block.NewBanffStandardBlock(
+		now.Add(executor.SyncBound),
+		preferredID,
+		preferred.Height()+1,
+		[]*txs.Tx{addValidatorTx},
+	)
+	require.NoError(err)
+	blk := env.blkManager.NewBlock(statelessBlk)
+	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
+	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
+
+	// Should be pending
+	staker, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.NotNil(staker)
+
+	// Promote validator from pending to current
+	env.clk.Set(validatorStartTime)
+	now = env.clk.Time()
+
+	preferredID = env.blkManager.Preferred()
+	preferred, err = env.blkManager.GetStatelessBlock(preferredID)
+	require.NoError(err)
+
+	statelessBlk, err = block.NewBanffStandardBlock(
+		now,
+		preferredID,
+		preferred.Height()+1,
+		nil,
+	)
+	require.NoError(err)
+	blk = env.blkManager.NewBlock(statelessBlk)
+	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
+	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
+
+	// Should be current
+	staker, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.NotNil(staker)
+
+	// Advance time until next staker change time is [validatorEndTime]
+	for {
+		nextStakerChangeTime, err := executor.GetNextStakerChangeTime(env.state)
+		require.NoError(err)
+		if nextStakerChangeTime.Equal(validatorEndTime) {
+			break
+		}
+
+		preferredID = env.blkManager.Preferred()
+		preferred, err = env.blkManager.GetStatelessBlock(preferredID)
+		require.NoError(err)
+
+		statelessBlk, err = block.NewBanffStandardBlock(
+			nextStakerChangeTime,
+			preferredID,
+			preferred.Height()+1,
+			nil,
+		)
+		require.NoError(err)
+		blk = env.blkManager.NewBlock(statelessBlk)
+		require.NoError(blk.Verify(context.Background()))
+		require.NoError(blk.Accept(context.Background()))
+		require.True(env.blkManager.SetPreference(statelessBlk.ID()))
+	}
+
+	env.clk.Set(validatorEndTime)
+	now = env.clk.Time()
+
+	// Create another validator tx
+	validatorStartTime = now.Add(2 * executor.SyncBound)
+	validatorEndTime = validatorStartTime.Add(env.config.MinStakeDuration)
+	nodeID = ids.GenerateTestNodeID()
+
+	addValidatorTx2, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		nodeID,
+		preFundedKeys[0].PublicKey().Address(),
+		10000,
+		[]*secp256k1.PrivateKey{
+			preFundedKeys[0],
+			preFundedKeys[1],
+			preFundedKeys[4],
+		},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
+
+	// Add validator through a [ProposalBlock] and reward the last one
+	preferredID = env.blkManager.Preferred()
+	preferred, err = env.blkManager.GetStatelessBlock(preferredID)
+	require.NoError(err)
+
+	rewardValidatorTx, err := env.txBuilder.NewRewardValidatorTx(addValidatorTx.ID())
+	require.NoError(err)
+
+	statelessProposalBlk, err := block.NewBanffProposalBlock(
+		now,
+		preferredID,
+		preferred.Height()+1,
+		rewardValidatorTx,
+		[]*txs.Tx{addValidatorTx2},
+	)
+	require.NoError(err)
+	blk = env.blkManager.NewBlock(statelessProposalBlk)
+	require.NoError(blk.Verify(context.Background()))
+
+	options, err := blk.(snowman.OracleBlock).Options(context.Background())
+	require.NoError(err)
+	commitBlk := options[0]
+	require.NoError(commitBlk.Verify(context.Background()))
+
+	require.NoError(blk.Accept(context.Background()))
+	require.NoError(commitBlk.Accept(context.Background()))
+
+	// Should be pending
+	staker, err = env.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.NotNil(staker)
+
+	rewardUTXOs, err := env.state.GetRewardUTXOs(addValidatorTx.ID())
+	require.NoError(err)
+	require.NotEmpty(rewardUTXOs)
 }

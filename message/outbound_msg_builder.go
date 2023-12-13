@@ -23,9 +23,15 @@ type OutboundMsgBuilder interface {
 		myTime uint64,
 		ip ips.IPPort,
 		myVersion string,
+		client string,
+		major uint32,
+		minor uint32,
+		patch uint32,
 		myVersionTime uint64,
 		sig []byte,
 		trackedSubnets []ids.ID,
+		supportedACPs []uint32,
+		objectedACPs []uint32,
 	) (OutboundMessage, error)
 
 	PeerList(
@@ -229,9 +235,15 @@ func (b *outMsgBuilder) Version(
 	myTime uint64,
 	ip ips.IPPort,
 	myVersion string,
+	client string,
+	major uint32,
+	minor uint32,
+	patch uint32,
 	myVersionTime uint64,
 	sig []byte,
 	trackedSubnets []ids.ID,
+	supportedACPs []uint32,
+	objectedACPs []uint32,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
@@ -247,6 +259,14 @@ func (b *outMsgBuilder) Version(
 					MyVersionTime:  myVersionTime,
 					Sig:            sig,
 					TrackedSubnets: subnetIDBytes,
+					Client: &p2p.Client{
+						Name:  client,
+						Major: major,
+						Minor: minor,
+						Patch: patch,
+					},
+					SupportedAcps: supportedACPs,
+					ObjectedAcps:  objectedACPs,
 				},
 			},
 		},

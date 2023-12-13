@@ -120,9 +120,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
-			tx.Unsigned.(*txs.AddValidatorTx),
+			addValTx,
+			addValTx.StartTime(),
 			0,
 		)
 		require.NoError(t, err)
@@ -148,9 +150,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
-			tx.Unsigned.(*txs.AddValidatorTx),
+			addValTx,
+			addValTx.StartTime(),
 			0,
 		)
 		require.NoError(t, err)
@@ -481,9 +485,11 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.ErrorIs(err, ErrNotValidator)
 	}
 
+	addValTx := addDSTx.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addDSTx.ID(),
-		addDSTx.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		dsStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -617,9 +623,11 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
-		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		addSubnetValTx,
+		defaultValidateStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -771,9 +779,11 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
+		addSubnetValTx := subnetTx.Unsigned.(*txs.AddSubnetValidatorTx)
 		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
-			subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+			addSubnetValTx,
+			defaultValidateStartTime,
 			0,
 		)
 		require.NoError(err)
@@ -875,9 +885,11 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
+		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
-			tx.Unsigned.(*txs.AddValidatorTx),
+			addValTx,
+			startTime,
 			0,
 		)
 		require.NoError(err)
