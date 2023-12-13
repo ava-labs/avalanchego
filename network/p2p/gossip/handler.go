@@ -145,10 +145,6 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 
 		receivedBytes += len(bytes)
 
-		if _, ok := h.set.Get(gossipable.GetID()); ok {
-			continue
-		}
-
 		if err := h.set.Add(gossipable); err != nil {
 			h.log.Debug(
 				"failed to add gossip to the known set",
