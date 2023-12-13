@@ -35,6 +35,7 @@ var (
 	_ Gossiper = (*NoOpGossiper)(nil)
 
 	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
+	_ Accumulator[*testTx] = (*NoOpAccumulator[*testTx])(nil)
 
 	metricLabels = []string{typeLabel}
 )
@@ -360,10 +361,10 @@ func (NoOpGossiper) Gossip(context.Context) error {
 
 type NoOpAccumulator[T Gossipable] struct{}
 
-func (NoOpAccumulator[_]) Gossip(context.Context) error {
+func (NoOpAccumulator[T]) Gossip(context.Context) error {
 	return nil
 }
 
-func (NoOpAccumulator[T]) Add(...T) error {
-	return nil
+func (NoOpAccumulator[T]) Add(...T) {
+	return
 }
