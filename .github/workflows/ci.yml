@@ -21,6 +21,7 @@ concurrency:
 
 env:
   go_version: '~1.20.12'
+  tmpnet_data_path: ~/.tmpnet/networks/1000
 
 jobs:
   Unit:
@@ -72,8 +73,9 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: e2e-artifact
-          path: ~/.tmpnet/networks/1000
+          name: e2e-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
@@ -92,8 +94,9 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: e2e-existing-network-tmpnet-artifact
-          path: ~/.tmpnet/networks/1000
+          name: e2e-existing-network-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
   Upgrade:
     runs-on: ubuntu-latest
     steps:
@@ -107,15 +110,14 @@ jobs:
         run: ./scripts/build.sh
       - name: Run e2e tests
         shell: bash
-        # 1.10.7 is the first version compatible with the ephnet fixture by
-        # virtue of writing a process context file on node start.
-        run: ./scripts/tests.upgrade.sh 1.10.7
-      - name: Upload ephnet network dir
+        run: ./scripts/tests.upgrade.sh
+      - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: upgrade-artifact
-          path: ~/.ephnet/networks/1000
+          name: upgrade-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
   Lint:
     runs-on: ubuntu-latest
     steps:
