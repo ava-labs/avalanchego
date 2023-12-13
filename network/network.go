@@ -271,6 +271,8 @@ func NewNetwork(
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
+		SupportedACPs:        config.SupportedACPs.List(),
+		ObjectedACPs:         config.ObjectedACPs.List(),
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
 		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),
