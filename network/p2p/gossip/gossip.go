@@ -396,40 +396,6 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.queued = append(p.queued, gossipables...)
 }
 
-// Subscribe gossips a gossipable whenever one is made available
-func Subscribe[T Gossipable](
-	ctx context.Context,
-	log logging.Logger,
-	gossiper Accumulator[T],
-	gossipables <-chan T,
-) {
-	for {
-		select {
-		case gossipable, ok := <-gossipables:
-			if !ok {
-				log.Debug(
-					"shutting down push gossip subscription",
-					zap.String("reason", "channel closed"),
-				)
-				return
-			}
-
-			gossiper.Add(gossipable)
-
-			if err := gossiper.Gossip(ctx); err != nil {
-				log.Warn("push gossip failed", zap.Error(err))
-				continue
-			}
-		case <-ctx.Done():
-			log.Debug(
-				"shutting down push gossip subscription",
-				zap.String("reason", "context cancelled"),
-			)
-			return
-		}
-	}
-}
-
 // Every calls [Gossip] every [frequency] amount of time.
 func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency time.Duration) {
 	ticker := time.NewTicker(frequency)
