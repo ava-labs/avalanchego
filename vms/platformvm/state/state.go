@@ -1348,8 +1348,8 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		// tx is a genesis transactions, hence it's guaranteed to be
-		// pre Durango. It's fine to use tx.StartTime
+		// Note: We use [StartTime()] here because genesis transactions are
+		// guaranteed to be pre-Durango activation.
 		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, validatorTx.StartTime(), potentialReward)
 		if err != nil {
 			return err
