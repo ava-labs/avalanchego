@@ -63,6 +63,7 @@ func TestMessageRouting(t *testing.T) {
 		SentAppRequest:           make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
+  
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.AddHandler(1, testHandler))
@@ -92,10 +93,12 @@ func TestClientPrefixesMessages(t *testing.T) {
 		SentAppGossipSpecific:    make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
+  
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.Connected(ctx, ids.EmptyNodeID, nil))
 	client := network.NewClient(handlerID)
+
 
 	want := []byte("message")
 
@@ -133,7 +136,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	require.Equal(handlerPrefix, gotAppGossip[0])
 	require.Equal(want, gotAppGossip[1:])
 
-	require.NoError(client.AppGossipSpecific(ctx, ids.EmptyNodeID, want))
+	require.NoError(client.AppGossipSpecific(ctx, set.Of(ids.EmptyNodeID), want))
 	gotAppGossip = <-sender.SentAppGossipSpecific
 	require.Equal(handlerPrefix, gotAppGossip[0])
 	require.Equal(want, gotAppGossip[1:])
@@ -352,11 +355,12 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 
 			err = network.AppResponse(ctx, ids.EmptyNodeID, 0, []byte("foobar"))
 			require.ErrorIs(err, ErrUnrequestedResponse)
-			err = network.AppRequestFailed(ctx, ids.EmptyNodeID, 0, common.ErrUndefined)
+			err = network.AppRequestFailed(ctx, ids.EmptyNodeID, 0, common.ErrTimeout)
 			require.ErrorIs(err, ErrUnrequestedResponse)
 			err = network.CrossChainAppResponse(ctx, ids.Empty, 0, []byte("foobar"))
 			require.ErrorIs(err, ErrUnrequestedResponse)
-			err = network.CrossChainAppRequestFailed(ctx, ids.Empty, 0, common.ErrUndefined)
+			err = network.CrossChainAppRequestFailed(ctx, ids.Empty, 0, common.ErrTimeout)
+
 			require.ErrorIs(err, ErrUnrequestedResponse)
 		})
 	}

@@ -181,6 +181,7 @@ func TestValidatorsSample(t *testing.T) {
 
 			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
 			require.NoError(err)
+
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
