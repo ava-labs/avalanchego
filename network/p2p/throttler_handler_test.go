@@ -37,15 +37,15 @@ func TestThrottlerHandlerAppGossip(t *testing.T) {
 			require := require.New(t)
 
 			called := false
-			handler := ThrottlerHandler{
-				Handler: testHandler{
+			handler := NewThrottlerHandler(
+				testHandler{
 					appGossipF: func(context.Context, ids.NodeID, []byte) {
 						called = true
 					},
 				},
-				Throttler: tt.Throttler,
-				Log:       logging.NoLog{},
-			}
+				tt.Throttler,
+				logging.NoLog{},
+			)
 
 			handler.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte("foobar"))
 			require.Equal(tt.expected, called)
@@ -73,11 +73,11 @@ func TestThrottlerHandlerAppRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := ThrottlerHandler{
-				Handler:   NoOpHandler{},
-				Throttler: tt.Throttler,
-				Log:       logging.NoLog{},
-			}
+			handler := NewThrottlerHandler(
+				NoOpHandler{},
+				tt.Throttler,
+				logging.NoLog{},
+			)
 			_, err := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, []byte("foobar"))
 			require.ErrorIs(err, tt.expectedErr)
 		})

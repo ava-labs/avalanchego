@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	ErrAppRequestFailed = errors.New("app request failed")
-	ErrRequestPending   = errors.New("request pending")
-	ErrNoPeers          = errors.New("no peers")
+	ErrRequestPending = errors.New("request pending")
+	ErrNoPeers        = errors.New("no peers")
 )
 
 // AppResponseCallback is called upon receiving an AppResponse for an AppRequest
@@ -41,6 +40,7 @@ type CrossChainAppResponseCallback func(
 
 type Client struct {
 	handlerID     uint64
+	handlerIDStr  string
 	handlerPrefix []byte
 	router        *router
 	sender        common.AppSender
@@ -96,8 +96,8 @@ func (c *Client) AppRequest(
 		}
 
 		c.router.pendingAppRequests[requestID] = pendingAppRequest{
-			AppResponseCallback: onResponse,
-			metrics:             c.router.handlers[c.handlerID].metrics,
+			handlerID: c.handlerIDStr,
+			callback:  onResponse,
 		}
 		c.router.requestID += 2
 	}
@@ -159,8 +159,8 @@ func (c *Client) CrossChainAppRequest(
 	}
 
 	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
-		CrossChainAppResponseCallback: onResponse,
-		metrics:                       c.router.handlers[c.handlerID].metrics,
+		handlerID: c.handlerIDStr,
+		callback:  onResponse,
 	}
 	c.router.requestID += 2
 

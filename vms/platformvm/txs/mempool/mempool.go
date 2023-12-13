@@ -6,7 +6,6 @@ package mempool
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -45,29 +44,13 @@ var (
 )
 
 type Mempool interface {
-	// we may want to be able to stop valid transactions
-	// from entering the mempool, e.g. during blocks creation
-	EnableAdding()
-	DisableAdding()
-
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Following Banff activation, all mempool transactions,
-	// (both decision and staker) are included into Standard blocks.
-	// HasTxs allow to check for availability of any mempool transaction.
-	HasTxs() bool
-	// PeekTxs returns the next txs for Banff blocks
-	// up to maxTxsBytes without removing them from the mempool.
-	PeekTxs(maxTxsBytes int) []*txs.Tx
-
-	// Drops all [txs.Staker] transactions whose [StartTime] is before
-	// [minStartTime] from [mempool]. The dropped tx ids are returned.
-	//
-	// TODO: Remove once [StartTime] field is ignored in staker txs
-	DropExpiredStakerTxs(minStartTime time.Time) []ids.ID
+	// Peek returns the oldest tx in the mempool.
+	Peek() (tx *txs.Tx, exists bool)
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built. If [emptyBlockPermitted] is true, the notification will be sent
@@ -86,9 +69,6 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
-	// If true, drop transactions added to the mempool via Add.
-	dropIncoming bool
-
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
@@ -137,24 +117,11 @@ func New(
 
 		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
-		dropIncoming:  false, // enable tx adding by default
 		toEngine:      toEngine,
 	}, nil
 }
 
-func (m *mempool) EnableAdding() {
-	m.dropIncoming = false
-}
-
-func (m *mempool) DisableAdding() {
-	m.dropIncoming = true
-}
-
 func (m *mempool) Add(tx *txs.Tx) error {
-	if m.dropIncoming {
-		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
-	}
-
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return errCantIssueAdvanceTimeTx
@@ -231,23 +198,9 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	}
 }
 
-func (m *mempool) HasTxs() bool {
-	return m.unissuedTxs.Len() > 0
-}
-
-func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	var txs []*txs.Tx
-	txIter := m.unissuedTxs.NewIterator()
-	size := 0
-	for txIter.Next() {
-		tx := txIter.Value()
-		size += len(tx.Bytes())
-		if size > maxTxsBytes {
-			return txs
-		}
-		txs = append(txs, tx)
-	}
-	return txs
+func (m *mempool) Peek() (*txs.Tx, bool) {
+	_, tx, exists := m.unissuedTxs.Oldest()
+	return tx, exists
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
@@ -260,7 +213,7 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	if !emptyBlockPermitted && !m.HasTxs() {
+	if !emptyBlockPermitted && m.unissuedTxs.Len() == 0 {
 		return
 	}
 
@@ -268,39 +221,4 @@ func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
 	case m.toEngine <- common.PendingTxs:
 	default:
 	}
-}
-
-// Drops all [txs.Staker] transactions whose [StartTime] is before
-// [minStartTime] from [mempool]. The dropped tx ids are returned.
-//
-// TODO: Remove once [StartTime] field is ignored in staker txs
-func (m *mempool) DropExpiredStakerTxs(minStartTime time.Time) []ids.ID {
-	var droppedTxIDs []ids.ID
-
-	txIter := m.unissuedTxs.NewIterator()
-	for txIter.Next() {
-		tx := txIter.Value()
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
-		if !ok {
-			continue
-		}
-
-		startTime := stakerTx.StartTime()
-		if !startTime.Before(minStartTime) {
-			continue
-		}
-
-		txID := tx.ID()
-		err := fmt.Errorf(
-			"synchrony bound (%s) is later than staker start time (%s)",
-			minStartTime,
-			startTime,
-		)
-
-		m.Remove([]*txs.Tx{tx})
-		m.MarkDropped(txID, err) // cache tx as dropped
-		droppedTxIDs = append(droppedTxIDs, txID)
-	}
-
-	return droppedTxIDs
 }

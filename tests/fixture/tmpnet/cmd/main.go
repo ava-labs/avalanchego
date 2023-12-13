@@ -46,10 +46,10 @@ func main() {
 	rootCmd.AddCommand(versionCmd)
 
 	var (
-		rootDir        string
-		execPath       string
-		nodeCount      uint8
-		fundedKeyCount uint8
+		rootDir           string
+		execPath          string
+		nodeCount         uint8
+		preFundedKeyCount uint8
 	)
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network",
@@ -68,7 +68,7 @@ func main() {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), local.DefaultNetworkStartTimeout)
 			defer cancel()
-			network, err := local.StartNetwork(ctx, os.Stdout, rootDir, network, int(nodeCount), int(fundedKeyCount))
+			network, err := local.StartNetwork(ctx, os.Stdout, rootDir, network, int(nodeCount), int(preFundedKeyCount))
 			if err != nil {
 				return err
 			}
@@ -95,7 +95,7 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
 	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(local.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
-	startNetworkCmd.PersistentFlags().Uint8Var(&fundedKeyCount, "funded-key-count", tmpnet.DefaultFundedKeyCount, "Number of funded keys the network should start with")
+	startNetworkCmd.PersistentFlags().Uint8Var(&preFundedKeyCount, "pre-funded-key-count", tmpnet.DefaultPreFundedKeyCount, "Number of pre-funded keys the network should start with")
 	rootCmd.AddCommand(startNetworkCmd)
 
 	var networkDir string
