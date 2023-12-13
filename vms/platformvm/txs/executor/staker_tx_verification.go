@@ -106,12 +106,13 @@ func verifyAddValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
@@ -198,12 +199,13 @@ func verifyAddSubnetValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	switch {
 	case duration < backend.Config.MinStakeDuration:
@@ -355,12 +357,13 @@ func verifyAddDelegatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	switch {
 	case duration < backend.Config.MinStakeDuration:
@@ -473,12 +476,13 @@ func verifyAddPermissionlessValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	// Ensure the proposed validator starts after the current time
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
@@ -593,12 +597,13 @@ func verifyAddPermissionlessDelegatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	// Ensure the proposed validator starts after the current time
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
