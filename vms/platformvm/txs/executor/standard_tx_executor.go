@@ -535,11 +535,6 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
-	// Pre Durango fork, stakers are added as pending first, then promoted
-	// to current when chainTime reaches their start time.
-	// Post Durango fork, stakers are immediately marked as current.
-	// Their start time is current chain time.
-
 	var (
 		chainTime = e.State.GetTimestamp()
 		txID      = e.Tx.ID()
@@ -548,13 +543,22 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	)
 
 	if !e.Config.IsDurangoActivated(chainTime) {
+		// Pre-Durango, stakers set a future [StartTime] and are added to the
+		// pending staker set. They are promoted to the current staker set once
+		// the chain time reaches [StartTime].
 		staker, err = state.NewPendingStaker(txID, stakerTx.(txs.ScheduledStaker))
 	} else {
+		// Post-Durango, stakers are immediately added to the current staker
+		// set. Their [StartTime] is the current chain time.
 		var (
 			potentialReward = uint64(0)
 			stakeDuration   = stakerTx.EndTime().Sub(chainTime)
 		)
-		if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
+
+		// Only calculate the potentialReward for permissionless stakers.
+		// Recall that we only need to check if this is a permissioned
+		// validator as there are no permissioned delegators
+		if !stakerTx.CurrentPriority().IsPermissionedValidator() {
 			subnetID := stakerTx.SubnetID()
 			currentSupply, err := e.State.GetCurrentSupply(subnetID)
 			if err != nil {
@@ -572,9 +576,9 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 				currentSupply,
 			)
 
-			updatedSupply := currentSupply + potentialReward
-			e.State.SetCurrentSupply(subnetID, updatedSupply)
+			e.State.SetCurrentSupply(subnetID, currentSupply+potentialReward)
 		}
+
 		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
 	}
 	if err != nil {
