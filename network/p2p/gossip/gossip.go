@@ -22,6 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+const (
+	typeLabel = "type"
+	pushType  = "push"
+	pullType  = "pull"
+)
+
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[testTx, *testTx])(nil)
@@ -30,12 +36,6 @@ var (
 	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
 
 	metricLabels = []string{typeLabel}
-)
-
-const (
-	typeLabel = "type"
-	pushType  = "push"
-	pullType  = "pull"
 )
 
 // Gossiper gossips Gossipables to other nodes
