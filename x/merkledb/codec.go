@@ -110,13 +110,14 @@ func (c *codecImpl) childSize(index byte, childEntry *child) int {
 
 // based on the current implementation of codecImpl.encodeUint which uses binary.PutUvarint
 func (*codecImpl) uintSize(value uint64) int {
-	// catch the call to log(0) and return early
-	if value == 0 {
-		return 1
-	}
 	// binary.PutUvarint repeatedly divides by 128 until the value is under 128,
-	// so count the number of times that occurs
-	return 1 + int(math.Log(float64(value))/log128)
+	// so count the number of times that will occur
+	i := 0
+	for value >= 0x80 {
+		value >>= 7
+		i++
+	}
+	return i + 1
 }
 
 func (c *codecImpl) keySize(p Key) int {
