@@ -126,6 +126,24 @@ func init() {
 	}
 }
 
+func newPrefundedGenesis(
+	balance int,
+	addresses ...common.Address,
+) *core.Genesis {
+	alloc := core.GenesisAlloc{}
+	for _, address := range addresses {
+		alloc[address] = core.GenesisAccount{
+			Balance: big.NewInt(int64(balance)),
+		}
+	}
+
+	return &core.Genesis{
+		Config:     params.TestChainConfig,
+		Difficulty: big.NewInt(0),
+		Alloc:      alloc,
+	}
+}
+
 // BuildGenesisTest returns the genesis bytes for Coreth VM to be used in testing
 func BuildGenesisTest(t *testing.T, genesisJSON string) []byte {
 	ss := StaticService{}
