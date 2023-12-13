@@ -1465,17 +1465,16 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		defaultStartTime := int64(0)
-		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-			defaultStartTime = scheduledStakerTx.StartTime().Unix()
-		}
 		metadata := &validatorMetadata{
 			txID: txID,
-			// use the start values as the fallback
-			// in case they are not stored in the database
-			// Note: we don't provide [LastUpdated] here because we expect it to
+		}
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			// Populate [StakerStartTime] and using the tx in the event it is
+			// not stored in the database.
+			//
+			// Note: We do not populate [LastUpdated] since it is expected to
 			// always be present on disk.
-			StakerStartTime: defaultStartTime,
+			metadata.StakerStartTime = scheduledStakerTx.StartTime().Unix()
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1517,16 +1516,15 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := int64(0)
-		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-			defaultStartTime = scheduledStakerTx.StartTime().Unix()
-		}
 		metadata := &validatorMetadata{
 			txID: txID,
-			// use the start time as the fallback value
-			// in case it's not stored in the database
-			StakerStartTime: defaultStartTime,
-			LastUpdated:     uint64(defaultStartTime),
+		}
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			// Populate [StakerStartTime] and [LastUpdated] using the tx in the
+			// event it is not stored in the database.
+			startTime := scheduledStakerTx.StartTime().Unix()
+			metadata.StakerStartTime = startTime
+			metadata.LastUpdated = uint64(startTime)
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1573,15 +1571,13 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			metadataBytes := delegatorIt.Value()
-			defaultStartTime := int64(0)
-			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-				defaultStartTime = scheduledStakerTx.StartTime().Unix()
-			}
 			metadata := &delegatorMetadata{
-				// use the start values as the fallback
-				// in case they are not stored in the database
-				StakerStartTime: defaultStartTime,
-				txID:            txID,
+				txID: txID,
+			}
+			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+				// Populate [StakerStartTime] using the tx in the event it is
+				// not stored in the database.
+				metadata.StakerStartTime = scheduledStakerTx.StartTime().Unix()
 			}
 			err = parseDelegatorMetadata(metadataBytes, metadata)
 			if err != nil {
