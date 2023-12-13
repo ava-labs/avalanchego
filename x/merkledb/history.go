@@ -98,10 +98,6 @@ func (th *trieHistory) getValueChanges(
 	}
 
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
-	// TODO when we update to minimum go version 1.20.X, make this return another
-	// wrapped error ErrNoEndRoot. In NetworkServer.HandleChangeProofRequest, if we return
-	// that error, we know we shouldn't try to generate a range proof since we
-	// lack the necessary history.
 	endRootChanges, ok := th.lastChanges[endRoot]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrNoEndRoot, endRoot)

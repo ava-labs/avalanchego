@@ -23,7 +23,9 @@ var (
 		{
 			name: "generic with replacer and best",
 			sampler: &weightedWithoutReplacementGeneric{
-				u: &uniformReplacer{},
+				u: &uniformReplacer{
+					rng: globalRNG,
+				},
 				w: &weightedBest{
 					samplers: []Weighted{
 						&weightedArray{},
