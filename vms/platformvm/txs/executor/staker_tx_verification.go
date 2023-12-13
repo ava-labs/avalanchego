@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -45,7 +46,7 @@ var (
 // network requirements for [subnetValidator]. An error is returned if they
 // are not fulfilled.
 func verifySubnetValidatorPrimaryNetworkRequirements(
-	backend *Backend,
+	config *config.Config,
 	chainState state.Chain,
 	subnetValidator txs.Validator,
 ) error {
@@ -71,7 +72,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 		currentChainTime = chainState.GetTimestamp()
 		stakerStart      = subnetValidator.StartTime()
 	)
-	if backend.Config.IsDurangoActivated(currentChainTime) {
+	if config.IsDurangoActivated(currentChainTime) {
 		stakerStart = currentChainTime
 	}
 	if !txs.BoundedBy(
@@ -240,7 +241,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
+	if err := verifySubnetValidatorPrimaryNetworkRequirements(backend.Config, chainState, tx.Validator); err != nil {
 		return err
 	}
 
@@ -541,7 +542,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
-		if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
+		if err := verifySubnetValidatorPrimaryNetworkRequirements(backend.Config, chainState, tx.Validator); err != nil {
 			return err
 		}
 
