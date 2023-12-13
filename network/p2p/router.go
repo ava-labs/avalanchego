@@ -165,7 +165,7 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 //
 // Any error condition propagated outside Handler application logic is
 // considered fatal
-func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 	start := time.Now()
 	pending, ok := r.clearAppRequest(requestID)
 	if !ok {
@@ -173,7 +173,7 @@ func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 		return ErrUnrequestedResponse
 	}
 
-	pending.callback(ctx, nodeID, nil, ErrAppRequestFailed)
+	pending.callback(ctx, nodeID, nil, appErr)
 
 	labels := prometheus.Labels{
 		handlerLabel: pending.handlerID,
@@ -324,7 +324,7 @@ func (r *router) CrossChainAppRequest(
 //
 // Any error condition propagated outside Handler application logic is
 // considered fatal
-func (r *router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+func (r *router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
 	start := time.Now()
 	pending, ok := r.clearCrossChainAppRequest(requestID)
 	if !ok {
@@ -332,7 +332,7 @@ func (r *router) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID,
 		return ErrUnrequestedResponse
 	}
 
-	pending.callback(ctx, chainID, nil, ErrAppRequestFailed)
+	pending.callback(ctx, chainID, nil, appErr)
 
 	labels := prometheus.Labels{
 		handlerLabel: pending.handlerID,
