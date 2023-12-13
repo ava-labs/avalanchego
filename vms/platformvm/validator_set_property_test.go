@@ -373,7 +373,6 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 }
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
-	stakerTx := signedTx.Unsigned.(txs.Staker)
 	if err := vm.Network.IssueTx(context.Background(), signedTx); err != nil {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
@@ -392,6 +391,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed setting preference: %w", err)
 	}
 
+	stakerTx := signedTx.Unsigned.(txs.Staker)
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 
