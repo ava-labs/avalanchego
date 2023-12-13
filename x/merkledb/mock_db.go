@@ -430,6 +430,49 @@ func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getEditableNode", reflect.TypeOf((*MockMerkleDB)(nil).getEditableNode), arg0, arg1)
 }
 
+// getNode mocks base method.
+func (m *MockMerkleDB) getNode(arg0 Key, arg1 bool) (*node, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getNode", arg0, arg1)
+	ret0, _ := ret[0].(*node)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// getNode indicates an expected call of getNode.
+func (mr *MockMerkleDBMockRecorder) getNode(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getNode", reflect.TypeOf((*MockMerkleDB)(nil).getNode), arg0, arg1)
+}
+
+// getSentinelNode mocks base method.
+func (m *MockMerkleDB) getSentinelNode() *node {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getSentinelNode")
+	ret0, _ := ret[0].(*node)
+	return ret0
+}
+
+// getSentinelNode indicates an expected call of getSentinelNode.
+func (mr *MockMerkleDBMockRecorder) getSentinelNode() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getSentinelNode", reflect.TypeOf((*MockMerkleDB)(nil).getSentinelNode))
+}
+
+// getTokenSize mocks base method.
+func (m *MockMerkleDB) getTokenSize() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getTokenSize")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// getTokenSize indicates an expected call of getTokenSize.
+func (mr *MockMerkleDBMockRecorder) getTokenSize() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getTokenSize", reflect.TypeOf((*MockMerkleDB)(nil).getTokenSize))
+}
+
 // getValue mocks base method.
 func (m *MockMerkleDB) getValue(arg0 Key) ([]byte, error) {
 	m.ctrl.T.Helper()
