@@ -180,7 +180,7 @@ func verifyAddValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -266,7 +266,7 @@ func verifyAddSubnetValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -451,7 +451,7 @@ func verifyAddDelegatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -571,7 +571,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -718,7 +718,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // Returns an error if the given tx is invalid.
