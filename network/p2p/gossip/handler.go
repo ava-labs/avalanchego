@@ -202,7 +202,7 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 
 	forwardMsgBytes, err := proto.Marshal(forwardMsg)
 	if err != nil {
-		h.log.Debug(
+		h.log.Error(
 			"failed to marshal forward gossip message",
 			zap.Error(err),
 		)
@@ -215,7 +215,7 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 	h.pushGossipSentBytes.Add(float64(sentBytes))
 
 	if err := h.client.AppGossip(ctx, forwardMsgBytes); err != nil {
-		h.log.Debug(
+		h.log.Error(
 			"failed to forward gossip",
 			zap.Error(err),
 		)
