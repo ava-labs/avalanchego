@@ -93,7 +93,10 @@ type codecImpl struct {
 
 func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
 	// total the number of children pointers + bool indicating if it has a value + the value + the child entries for n.children
-	total := c.uintSize(uint64(len(n.children))) + boolLen + c.uintSize(uint64(len(n.value.Value()))) + len(n.value.Value())
+	total := c.uintSize(uint64(len(n.children))) + boolLen
+	if n.value.HasValue() {
+		total += c.uintSize(uint64(len(n.value.Value()))) + len(n.value.Value())
+	}
 	// for each non-nil entry, we add the additional size of the child entry
 	for index, entry := range n.children {
 		total += c.childSize(index, entry)
