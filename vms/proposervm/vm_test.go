@@ -222,7 +222,7 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 	vm.Clock.Set(vm.Clock.Time().Truncate(time.Second))
 
 	for {
-		nextTime, err := vm.MinDelayForProposer(
+		delay, err := vm.MinDelayForProposer(
 			ctx,
 			chainTip.Height()+1,
 			pchainHeight,
@@ -233,7 +233,7 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 
 		switch err {
 		case nil:
-			vm.Clock.Set(nextTime)
+			vm.Clock.Set(chainTip.Timestamp().Add(delay))
 			return nil
 		case proposer.ErrNoSlotsScheduledInNextFuture:
 			// repeat slot search

@@ -70,10 +70,10 @@ func (mr *MockWindowerMockRecorder) ExpectedProposer(arg0, arg1, arg2, arg3, arg
 }
 
 // MinDelayForProposer mocks base method.
-func (m *MockWindower) MinDelayForProposer(arg0 context.Context, arg1, arg2 uint64, arg3 time.Time, arg4 ids.NodeID, arg5 time.Time) (time.Time, error) {
+func (m *MockWindower) MinDelayForProposer(arg0 context.Context, arg1, arg2 uint64, arg3 time.Time, arg4 ids.NodeID, arg5 time.Time) (time.Duration, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MinDelayForProposer", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(time.Time)
+	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

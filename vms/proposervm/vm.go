@@ -398,7 +398,7 @@ func (vm *VM) resetPostDurangoScheduler(
 	parentTimestamp time.Time,
 	currentTime time.Time,
 ) (time.Time, error) {
-	nextStartTime, err := vm.Windower.MinDelayForProposer(
+	delay, err := vm.Windower.MinDelayForProposer(
 		ctx,
 		blkHeight,
 		pChainHeight,
@@ -417,7 +417,7 @@ func (vm *VM) resetPostDurangoScheduler(
 			zap.Error(err),
 		)
 	}
-	return nextStartTime, err
+	return parentTimestamp.Add(delay), err
 }
 
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
