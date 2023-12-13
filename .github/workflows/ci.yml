@@ -19,6 +19,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  go_version: '~1.20.12'
+
 jobs:
   Unit:
     runs-on: ${{ matrix.os }}
@@ -29,7 +32,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.12'
+          go-version: ${{ env.go_version }}
           check-latest: true
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
@@ -46,7 +49,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.12'
+          go-version: ${{ env.go_version }}
           check-latest: true
       - name: fuzz_test
         shell: bash
@@ -57,7 +60,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.12'
+          go-version: ${{ env.go_version }}
           check-latest: true
       - name: Build AvalancheGo Binary
         shell: bash
@@ -69,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: tmpnet-data
+          name: e2e-artifact
           path: ~/.tmpnet/networks/1000
   e2e_existing_network:
     runs-on: ubuntu-latest
@@ -77,7 +80,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.12'
+          go-version: ${{ env.go_version }}
           check-latest: true
       - name: Build AvalancheGo Binary
         shell: bash
@@ -89,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: tmpnet-data
+          name: e2e-existing-network-tmpnet-artifact
           path: ~/.tmpnet/networks/1000
   Upgrade:
     runs-on: ubuntu-latest
@@ -97,7 +100,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.12'
+          go-version: ${{ env.go_version }}
           check-latest: true
       - name: Build AvalancheGo Binary
         shell: bash
@@ -119,7 +122,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '~1.20.12'
+          go-version: ${{ env.go_version }}
           check-latest: true
       - name: Run static analysis tests
         shell: bash
