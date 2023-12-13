@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -256,25 +257,28 @@ func (p *PullGossiper[T, U]) handleResponse(
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics, maxGossipSize int) *PushGossiper[T] {
 	return &PushGossiper[T]{
-		client:  client,
-		metrics: metrics,
+		client:        client,
+		metrics:       metrics,
+		maxGossipSize: maxGossipSize,
 		labels: prometheus.Labels{
 			typeLabel: pushType,
 		},
+		pending: buffer.NewUnboundedDeque[T](0),
 	}
 }
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
-	client  *p2p.Client
-	metrics Metrics
+	client        *p2p.Client
+	metrics       Metrics
+	maxGossipSize int
 
 	labels prometheus.Labels
 
-	lock   sync.Mutex
-	queued []T
+	lock    sync.Mutex
+	pending buffer.Deque[T]
 }
 
 // Gossip flushes any queued gossipables
@@ -282,26 +286,39 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if len(p.queued) == 0 {
+	if p.pending.Len() == 0 {
 		return nil
 	}
 
 	msg := &sdk.PushGossip{
-		Gossip: make([][]byte, 0, len(p.queued)),
+		Gossip: make([][]byte, 0, p.pending.Len()),
 	}
 
 	sentBytes := 0
-	for _, tx := range p.queued {
-		bytes, err := tx.Marshal()
+
+	for {
+		gossipable, ok := p.pending.PeekLeft()
+		if !ok {
+			break
+		}
+
+		bytes, err := gossipable.Marshal()
 		if err != nil {
+			// remove this item so we don't get stuck in a loop
+			_, _ = p.pending.PopLeft()
 			return err
+		}
+
+		// limit outbound gossip size
+		if sentBytes+len(bytes) > p.maxGossipSize {
+			break
 		}
 
 		msg.Gossip = append(msg.Gossip, bytes)
 		sentBytes += len(bytes)
-	}
 
-	p.queued = nil
+		p.pending.PopLeft()
+	}
 
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
@@ -328,7 +345,9 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.queued = append(p.queued, gossipables...)
+	for _, gossipable := range gossipables {
+		p.pending.PushRight(gossipable)
+	}
 }
 
 // Every calls [Gossip] every [frequency] amount of time.
