@@ -417,6 +417,14 @@ func (vm *VM) getPostDurangoSlotTime(
 			zap.Error(err),
 		)
 	}
+
+	// Note: The P-chain does not currently try to target any block time. It
+	// notifies the consensus engine as soon as a new block may be built. To
+	// avoid fast runs of blocks there is an additional minimum delay that
+	// validators can specify. This delay may be an issue for high performance,
+	// custom VMs. Until the P-chain is modified to target a specific block
+	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	delay = math.Max(delay, vm.MinBlkDelay)
 	return currentTime.Add(delay), err
 }
 
