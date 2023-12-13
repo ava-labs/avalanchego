@@ -38,8 +38,6 @@ const (
 var (
 	_ encoderDecoder = (*codecImpl)(nil)
 
-	log128 = math.Log(128)
-
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
