@@ -165,7 +165,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				}
 
 				nodeBytes := codec.encodeDBNode(&node)
-
+				require.Len(nodeBytes, codec.encodedDBNodeSize(&node))
 				var gotNode dbNode
 				require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
 				require.Equal(node, gotNode)
