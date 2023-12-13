@@ -819,19 +819,7 @@ func (t *trieView) insert(
 		}
 		t.root = maybe.Some(newRoot)
 
-		if commonPrefix == key {
-			// [key] is a prefix of [t.root.key] so it should be the new root.
-			newRoot.setValue(value)
-			return newRoot, nil
-		}
-
-		// Neither [key] nor [t.root.key] is a prefix of the other.
-		// Make a new root whose children are the old root and the new node.
-		newRoot.addChildWithID(oldRoot, t.tokenSize, oldRootID)
-		newValueNode := newNode(key)
-		newValueNode.setValue(value)
-		newRoot.addChild(newValueNode, t.tokenSize)
-		return newValueNode, t.recordNewNode(newValueNode)
+		closestNode = newRoot
 	}
 
 	// a node with that exact key already exists so update its value
