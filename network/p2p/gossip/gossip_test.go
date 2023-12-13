@@ -129,7 +129,7 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(err)
 			handler := NewHandler[testTx, *testTx](
 				logging.NoLog{},
-				nil,
+				NoOpAccumulator[*testTx]{},
 				responseSet,
 				metrics,
 				tt.targetResponseSize,
@@ -374,14 +374,15 @@ func TestPushGossipE2E(t *testing.T) {
 	forwarderNetwork, err := p2p.NewNetwork(log, forwarder, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	handlerID := uint64(123)
-	forwarderClient := forwarderNetwork.NewClient(handlerID)
-	require.NoError(err)
+	client := forwarderNetwork.NewClient(handlerID)
 
 	metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 	require.NoError(err)
+	forwarderGossiper := NewPushGossiper[*testTx](client, metrics, units.MiB)
+
 	handler := NewHandler[testTx, *testTx](
 		log,
-		forwarderClient,
+		forwarderGossiper,
 		set,
 		metrics,
 		0,
