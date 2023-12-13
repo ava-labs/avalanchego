@@ -17,7 +17,8 @@ import (
 )
 
 var (
-	_ Diff = (*diff)(nil)
+	_ Diff     = (*diff)(nil)
+	_ Versions = stateGetter{}
 
 	ErrMissingParentState = errors.New("missing parent state")
 )
@@ -72,6 +73,20 @@ func NewDiff(
 		timestamp:     parentState.GetTimestamp(),
 		subnetOwners:  make(map[ids.ID]fx.Owner),
 	}, nil
+}
+
+type stateGetter struct {
+	state Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (Chain, bool) {
+	return s.state, true
+}
+
+func NewDiffOn(parentState Chain) (Diff, error) {
+	return NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
 }
 
 func (d *diff) GetTimestamp() time.Time {
