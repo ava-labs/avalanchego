@@ -733,7 +733,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		// Case: Validator's start time too early
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,
-			uint64(defaultGenesisTime.Unix()),
+			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
 			nodeID,
 			ids.ShortEmpty,
