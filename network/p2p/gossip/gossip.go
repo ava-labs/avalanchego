@@ -361,7 +361,7 @@ func (NoOpGossiper) Gossip(context.Context) error {
 
 type NoOpAccumulator[T Gossipable] struct{}
 
-func (NoOpAccumulator[T]) Gossip(context.Context) error {
+func (NoOpAccumulator[_]) Gossip(context.Context) error {
 	return nil
 }
 
