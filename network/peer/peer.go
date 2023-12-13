@@ -128,6 +128,9 @@ type peer struct {
 	// trackedSubnets is the subset of subnetIDs the peer sent us in the Version
 	// message that we are also tracking.
 	trackedSubnets set.Set[ids.ID]
+	// options of ACPs provided in the Version message.
+	supportedACPs set.Set[uint32]
+	objectedACPs  set.Set[uint32]
 
 	observedUptimesLock sync.RWMutex
 	// [observedUptimesLock] must be held while accessing [observedUptime]
@@ -246,10 +249,9 @@ func (p *peer) Info() Info {
 		publicIPStr = p.ip.IPPort.String()
 	}
 
-	trackedSubnets := p.trackedSubnets.List()
-	uptimes := make(map[ids.ID]json.Uint32, len(trackedSubnets))
+	uptimes := make(map[ids.ID]json.Uint32, p.trackedSubnets.Len())
 
-	for _, subnetID := range trackedSubnets {
+	for subnetID := range p.trackedSubnets {
 		uptime, exist := p.ObservedUptime(subnetID)
 		if !exist {
 			continue
@@ -271,7 +273,9 @@ func (p *peer) Info() Info {
 		LastReceived:          p.LastReceived(),
 		ObservedUptime:        json.Uint32(primaryUptime),
 		ObservedSubnetUptimes: uptimes,
-		TrackedSubnets:        trackedSubnets,
+		TrackedSubnets:        p.trackedSubnets,
+		SupportedACPs:         p.supportedACPs,
+		ObjectedACPs:          p.objectedACPs,
 	}
 }
 
@@ -517,6 +521,8 @@ func (p *peer) writeMessages() {
 		mySignedIP.Timestamp,
 		mySignedIP.Signature,
 		p.MySubnets.List(),
+		p.SupportedACPs,
+		p.ObjectedACPs,
 	)
 	if err != nil {
 		p.Log.Error("failed to create message",
@@ -954,6 +960,29 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 		if p.MySubnets.Contains(subnetID) {
 			p.trackedSubnets.Add(subnetID)
 		}
+	}
+
+	for _, acp := range msg.SupportedAcps {
+		if constants.CurrentACPs.Contains(acp) {
+			p.supportedACPs.Add(acp)
+		}
+	}
+	for _, acp := range msg.ObjectedAcps {
+		if constants.CurrentACPs.Contains(acp) {
+			p.objectedACPs.Add(acp)
+		}
+	}
+
+	if p.supportedACPs.Overlaps(p.objectedACPs) {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.VersionOp),
+			zap.String("field", "ACPs"),
+			zap.Reflect("supportedACPs", p.supportedACPs),
+			zap.Reflect("objectedACPs", p.objectedACPs),
+		)
+		p.StartClose()
+		return
 	}
 
 	// "net.IP" type in Golang is 16-byte
