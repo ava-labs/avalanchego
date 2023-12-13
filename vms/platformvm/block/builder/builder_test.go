@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
@@ -198,6 +197,192 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	rewardUTXOs, err := env.state.GetRewardUTXOs(txID)
 	require.NoError(err)
 	require.NotEmpty(rewardUTXOs)
+}
+
+func TestBuildBlockAdvanceTime(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	var (
+		now      = env.backend.Clk.Time()
+		nextTime = now.Add(2 * txexecutor.SyncBound)
+	)
+
+	// Add a staker to [env.state]
+	env.state.PutCurrentValidator(&state.Staker{
+		NextTime: nextTime,
+		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+	})
+
+	// Advance wall clock to [nextTime]
+	env.backend.Clk.Set(nextTime)
+
+	// [BuildBlock] should build a block advancing the time to [NextTime]
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
+	require.Empty(blk.Txs())
+	require.IsType(&block.BanffStandardBlock{}, blk.Block)
+	standardBlk := blk.Block.(*block.BanffStandardBlock)
+	require.Equal(nextTime.Unix(), standardBlk.Timestamp().Unix())
+}
+
+func TestBuildBlockForceAdvanceTime(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	// Create a valid transaction
+	tx, err := env.txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
+	txID := tx.ID()
+
+	// Issue the transaction
+	require.NoError(env.network.IssueTx(context.Background(), tx))
+	require.True(env.mempool.Has(txID))
+
+	var (
+		now      = env.backend.Clk.Time()
+		nextTime = now.Add(2 * txexecutor.SyncBound)
+	)
+
+	// Add a staker to [env.state]
+	env.state.PutCurrentValidator(&state.Staker{
+		NextTime: nextTime,
+		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+	})
+
+	// Advance wall clock to [nextTime] + [txexecutor.SyncBound]
+	env.backend.Clk.Set(nextTime.Add(txexecutor.SyncBound))
+
+	// [BuildBlock] should build a block advancing the time to [nextTime],
+	// not the current wall clock.
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
+	require.Equal([]*txs.Tx{tx}, blk.Txs())
+	require.IsType(&block.BanffStandardBlock{}, blk.Block)
+	standardBlk := blk.Block.(*block.BanffStandardBlock)
+	require.Equal(nextTime.Unix(), standardBlk.Timestamp().Unix())
+}
+
+func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	var (
+		now                   = env.backend.Clk.Time()
+		defaultValidatorStake = 100 * units.MilliAvax
+
+		// Add a validator with StartTime in the future within [MaxFutureStartTime]
+		validatorStartTime = now.Add(txexecutor.MaxFutureStartTime - 1*time.Second)
+		validatorEndTime   = validatorStartTime.Add(360 * 24 * time.Hour)
+	)
+
+	tx1, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		ids.GenerateTestNodeID(),
+		ts.Keys[0].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(),
+	)
+	require.NoError(err)
+	require.NoError(env.mempool.Add(tx1))
+	tx1ID := tx1.ID()
+	require.True(env.mempool.Has(tx1ID))
+
+	// Add a validator with StartTime before current chain time
+	validator2StartTime := now.Add(-5 * time.Second)
+	validator2EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
+
+	tx2, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validator2StartTime.Unix()),
+		uint64(validator2EndTime.Unix()),
+		ids.GenerateTestNodeID(),
+		ts.Keys[1].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{ts.Keys[1]},
+		ts.Keys[1].PublicKey().Address(),
+	)
+	require.NoError(err)
+	require.NoError(env.mempool.Add(tx2))
+	tx2ID := tx2.ID()
+	require.True(env.mempool.Has(tx2ID))
+
+	// Add a validator with StartTime in the future past [MaxFutureStartTime]
+	validator3StartTime := now.Add(txexecutor.MaxFutureStartTime + 5*time.Second)
+	validator3EndTime := validator2StartTime.Add(360 * 24 * time.Hour)
+
+	tx3, err := env.txBuilder.NewAddValidatorTx(
+		defaultValidatorStake,
+		uint64(validator3StartTime.Unix()),
+		uint64(validator3EndTime.Unix()),
+		ids.GenerateTestNodeID(),
+		ts.Keys[2].PublicKey().Address(),
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{ts.Keys[2]},
+		ts.Keys[2].PublicKey().Address(),
+	)
+	require.NoError(err)
+	require.NoError(env.mempool.Add(tx3))
+	tx3ID := tx3.ID()
+	require.True(env.mempool.Has(tx3ID))
+
+	// Only tx1 should be in a built block
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
+	require.Len(blk.Txs(), 1)
+	require.Equal(tx1ID, blk.Txs()[0].ID())
+
+	// Mempool should have none of the txs
+	require.False(env.mempool.Has(tx1ID))
+	require.False(env.mempool.Has(tx2ID))
+	require.False(env.mempool.Has(tx3ID))
+
+	// Only tx2 and tx3 should be dropped
+	require.NoError(env.mempool.GetDropReason(tx1ID))
+
+	tx2DropReason := env.mempool.GetDropReason(tx2ID)
+	require.ErrorIs(tx2DropReason, txexecutor.ErrTimestampNotBeforeStartTime)
+
+	tx3DropReason := env.mempool.GetDropReason(tx3ID)
+	require.ErrorIs(tx3DropReason, txexecutor.ErrFutureStakeTime)
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
@@ -444,244 +629,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 			}
 			require.Equal(tt.expectedTxID, txID)
 			require.Equal(tt.expectedShouldReward, shouldReward)
-		})
-	}
-}
-
-func TestBuildBlock(t *testing.T) {
-	env := newEnvironment(t)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	var (
-		now             = env.backend.Clk.Time()
-		parentID        = ids.GenerateTestID()
-		height          = uint64(1337)
-		parentTimestamp = now.Add(-2 * time.Second)
-
-		defaultValidatorStake = 100 * units.MilliAvax
-		validatorStartTime    = now.Add(2 * txexecutor.SyncBound)
-		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
-	)
-
-	tx, err := env.txBuilder.NewAddValidatorTx(
-		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.GenerateTestNodeID(),
-		ts.Keys[0].PublicKey().Address(),
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(),
-	)
-	require.NoError(t, err)
-
-	type test struct {
-		name             string
-		builderF         func(*gomock.Controller) *builder
-		timestamp        time.Time
-		forceAdvanceTime bool
-		parentStateF     func(*gomock.Controller) state.Chain
-		expectedBlkF     func(*require.Assertions) block.Block
-		expectedErr      error
-	}
-
-	tests := []test{
-		{
-			name: "should advance time",
-			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There are no txs.
-				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-				mempool.EXPECT().Peek().Return(nil, false)
-
-				clk := &mockable.Clock{}
-				clk.Set(now)
-				return &builder{
-					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
-						Clk: clk,
-					},
-				}
-			},
-			timestamp:        now.Add(-1 * time.Second),
-			forceAdvanceTime: true,
-			parentStateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-
-				// add current validator that ends at [now] - 1 second.
-				// That is, it ends in the past but after the current chain time.
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime]
-				// when determining whether to issue a reward tx.
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				gomock.InOrder(
-					// expect calls from [getNextStakerToReward]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(-1 * time.Second),
-						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					}),
-					currentStakerIter.EXPECT().Release(),
-				)
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
-				return s
-			},
-			expectedBlkF: func(require *require.Assertions) block.Block {
-				expectedBlk, err := block.NewBanffStandardBlock(
-					now.Add(-1*time.Second), // note the advanced time
-					parentID,
-					height,
-					nil, // empty block to advance time
-				)
-				require.NoError(err)
-				return expectedBlk
-			},
-			expectedErr: nil,
-		},
-		{
-			name: "has a staker tx no force",
-			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There is a tx.
-				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-
-				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx, true),
-					mempool.EXPECT().Remove([]*txs.Tx{tx}),
-					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil, false),
-				)
-
-				clk := &mockable.Clock{}
-				clk.Set(now)
-				return &builder{
-					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
-						Clk: clk,
-					},
-				}
-			},
-			timestamp:        parentTimestamp,
-			forceAdvanceTime: false,
-			parentStateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime].
-				// Next validator change time is in the future.
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				gomock.InOrder(
-					// expect calls from [getNextStakerToReward]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					}),
-					currentStakerIter.EXPECT().Release(),
-				)
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
-				return s
-			},
-			expectedBlkF: func(require *require.Assertions) block.Block {
-				expectedBlk, err := block.NewBanffStandardBlock(
-					parentTimestamp,
-					parentID,
-					height,
-					[]*txs.Tx{tx},
-				)
-				require.NoError(err)
-				return expectedBlk
-			},
-			expectedErr: nil,
-		},
-		{
-			name: "has a staker tx with force",
-			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There are no decision txs
-				// There is a staker tx.
-				mempool.EXPECT().DropExpiredStakerTxs(gomock.Any()).Return([]ids.ID{})
-
-				gomock.InOrder(
-					mempool.EXPECT().Peek().Return(tx, true),
-					mempool.EXPECT().Remove([]*txs.Tx{tx}),
-					// Second loop iteration
-					mempool.EXPECT().Peek().Return(nil, false),
-				)
-
-				clk := &mockable.Clock{}
-				clk.Set(now)
-				return &builder{
-					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
-						Clk: clk,
-					},
-				}
-			},
-			timestamp:        parentTimestamp,
-			forceAdvanceTime: true,
-			parentStateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime].
-				// Next validator change time is in the future.
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				gomock.InOrder(
-					// expect calls from [getNextStakerToReward]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					}),
-					currentStakerIter.EXPECT().Release(),
-				)
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
-				return s
-			},
-			expectedBlkF: func(require *require.Assertions) block.Block {
-				expectedBlk, err := block.NewBanffStandardBlock(
-					parentTimestamp,
-					parentID,
-					height,
-					[]*txs.Tx{tx},
-				)
-				require.NoError(err)
-				return expectedBlk
-			},
-			expectedErr: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
-			gotBlk, err := buildBlock(
-				tt.builderF(ctrl),
-				parentID,
-				height,
-				tt.timestamp,
-				tt.forceAdvanceTime,
-				tt.parentStateF(ctrl),
-			)
-			if tt.expectedErr != nil {
-				require.ErrorIs(err, tt.expectedErr)
-				return
-			}
-			require.NoError(err)
-			require.Equal(tt.expectedBlkF(require), gotBlk)
 		})
 	}
 }

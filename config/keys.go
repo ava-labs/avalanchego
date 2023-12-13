@@ -13,6 +13,8 @@ const (
 	GenesisFileKey                                     = "genesis-file"
 	GenesisFileContentKey                              = "genesis-file-content"
 	NetworkNameKey                                     = "network-id"
+	ACPSupportKey                                      = "acp-support"
+	ACPObjectKey                                       = "acp-object"
 	TxFeeKey                                           = "tx-fee"
 	CreateAssetTxFeeKey                                = "create-asset-tx-fee"
 	CreateSubnetTxFeeKey                               = "create-subnet-tx-fee"

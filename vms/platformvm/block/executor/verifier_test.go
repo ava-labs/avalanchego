@@ -313,6 +313,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	parentOnDecisionState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
@@ -321,8 +322,9 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			parentID: {
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: parentOnCommitState,
-					onAbortState:  parentOnAbortState,
+					onDecisionState: parentOnDecisionState,
+					onCommitState:   parentOnCommitState,
+					onAbortState:    parentOnAbortState,
 				},
 			},
 		},
@@ -382,6 +384,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	parentOnDecisionState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
@@ -390,8 +393,9 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			parentID: {
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: parentOnCommitState,
-					onAbortState:  parentOnAbortState,
+					onDecisionState: parentOnDecisionState,
+					onCommitState:   parentOnCommitState,
+					onAbortState:    parentOnAbortState,
 				},
 			},
 		},
@@ -549,9 +553,11 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := ts.GenesisTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 
+			onDecisionState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			onAbortState, err := state.NewDiff(parentID, backend)
@@ -560,8 +566,9 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: onCommitState,
-					onAbortState:  onAbortState,
+					onDecisionState: onDecisionState,
+					onCommitState:   onCommitState,
+					onAbortState:    onAbortState,
 				},
 			}
 
@@ -642,9 +649,11 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := ts.GenesisTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 
+			onDecisionState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
 			onAbortState, err := state.NewDiff(parentID, backend)
@@ -653,8 +662,9 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 				timestamp:      test.parentTime,
 				statelessBlock: parentStatelessBlk,
 				proposalBlockState: proposalBlockState{
-					onCommitState: onCommitState,
-					onAbortState:  onAbortState,
+					onDecisionState: onDecisionState,
+					onCommitState:   onCommitState,
+					onAbortState:    onAbortState,
 				},
 			}
 
