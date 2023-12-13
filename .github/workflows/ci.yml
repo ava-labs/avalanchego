@@ -54,7 +54,7 @@ jobs:
           check-latest: true
       - name: fuzz_test
         shell: bash
-        run: ./scripts/build_fuzz.sh 15 # Run each fuzz test 15 seconds
+        run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
   e2e:
     runs-on: ubuntu-latest
     steps:

@@ -1469,8 +1469,8 @@ func (s *state) loadCurrentValidators() error {
 			txID: txID,
 		}
 		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-			// Populate [StakerStartTime] and using the tx in the event it is
-			// not stored in the database.
+			// Populate [StakerStartTime] using the tx as a default in the event
+			// it was added pre-durango and is not stored in the database.
 			//
 			// Note: We do not populate [LastUpdated] since it is expected to
 			// always be present on disk.
@@ -1520,8 +1520,8 @@ func (s *state) loadCurrentValidators() error {
 			txID: txID,
 		}
 		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-			// Populate [StakerStartTime] and [LastUpdated] using the tx in the
-			// event it is not stored in the database.
+			// Populate [StakerStartTime] and [LastUpdated] using the tx as a
+			// default in the event they are not stored in the database.
 			startTime := scheduledStakerTx.StartTime().Unix()
 			metadata.StakerStartTime = startTime
 			metadata.LastUpdated = uint64(startTime)
@@ -1575,8 +1575,9 @@ func (s *state) loadCurrentValidators() error {
 				txID: txID,
 			}
 			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-				// Populate [StakerStartTime] using the tx in the event it is
-				// not stored in the database.
+				// Populate [StakerStartTime] using the tx as a default in the
+				// event it was added pre-durango and is not stored in the
+				// database.
 				metadata.StakerStartTime = scheduledStakerTx.StartTime().Unix()
 			}
 			err = parseDelegatorMetadata(metadataBytes, metadata)
@@ -2027,13 +2028,14 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 				//
 				// Invariant: It's impossible for a delegator to have been
 				// rewarded in the same block that the validator was added.
+				startTime := staker.StartTime.Unix()
 				metadata := &validatorMetadata{
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
 					UpDuration:               0,
-					LastUpdated:              uint64(staker.StartTime.Unix()),
-					StakerStartTime:          staker.StartTime.Unix(),
+					LastUpdated:              uint64(startTime),
+					StakerStartTime:          startTime,
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}
