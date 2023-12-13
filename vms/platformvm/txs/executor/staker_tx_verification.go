@@ -113,7 +113,6 @@ func verifyAddValidatorTx(
 		startTime = tx.StartTime()
 	}
 	duration := tx.EndTime().Sub(startTime)
-
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
