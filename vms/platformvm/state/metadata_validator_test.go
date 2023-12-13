@@ -254,7 +254,7 @@ func TestParseValidatorMetadata(t *testing.T) {
 			name: "invalid codec version",
 			bytes: []byte{
 				// codec version
-				0x00, 0xff,
+				0x00, 0x02,
 				// up duration
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
 				// last updated
