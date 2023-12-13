@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -26,12 +26,11 @@ func init() {
 	c1 := linearcodec.New([]string{v0tag, v1tag}, math.MaxInt32)
 	metadataCodec = codec.NewManager(math.MaxInt32)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		metadataCodec.RegisterCodec(v0, c0),
 		metadataCodec.RegisterCodec(v1, c1),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 }

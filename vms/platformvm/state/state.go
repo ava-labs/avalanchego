@@ -1348,8 +1348,8 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		// tx is a genesis transactions, hence it's guaranteed to be
-		// pre Durango. It's fine to use tx.StartTime
+		// Note: We use [StartTime()] here because genesis transactions are
+		// guaranteed to be pre-Durango activation.
 		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, validatorTx.StartTime(), potentialReward)
 		if err != nil {
 			return err
@@ -1465,17 +1465,16 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := validatorIt.Value()
-		defaultStartTime := int64(0)
-		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-			defaultStartTime = scheduledStakerTx.StartTime().Unix()
-		}
 		metadata := &validatorMetadata{
 			txID: txID,
-			// use the start values as the fallback
-			// in case they are not stored in the database
-			// Note: we don't provide [LastUpdated] here because we expect it to
+		}
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			// Populate [StakerStartTime] using the tx as a default in the event
+			// it was added pre-durango and is not stored in the database.
+			//
+			// Note: We do not populate [LastUpdated] since it is expected to
 			// always be present on disk.
-			StakerStartTime: defaultStartTime,
+			metadata.StakerStartTime = scheduledStakerTx.StartTime().Unix()
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1517,16 +1516,15 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := int64(0)
-		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-			defaultStartTime = scheduledStakerTx.StartTime().Unix()
-		}
 		metadata := &validatorMetadata{
 			txID: txID,
-			// use the start time as the fallback value
-			// in case it's not stored in the database
-			StakerStartTime: defaultStartTime,
-			LastUpdated:     uint64(defaultStartTime),
+		}
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			// Populate [StakerStartTime] and [LastUpdated] using the tx as a
+			// default in the event they are not stored in the database.
+			startTime := scheduledStakerTx.StartTime().Unix()
+			metadata.StakerStartTime = startTime
+			metadata.LastUpdated = uint64(startTime)
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1573,15 +1571,14 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			metadataBytes := delegatorIt.Value()
-			defaultStartTime := int64(0)
-			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
-				defaultStartTime = scheduledStakerTx.StartTime().Unix()
-			}
 			metadata := &delegatorMetadata{
-				// use the start values as the fallback
-				// in case they are not stored in the database
-				StakerStartTime: defaultStartTime,
-				txID:            txID,
+				txID: txID,
+			}
+			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+				// Populate [StakerStartTime] using the tx as a default in the
+				// event it was added pre-durango and is not stored in the
+				// database.
+				metadata.StakerStartTime = scheduledStakerTx.StartTime().Unix()
 			}
 			err = parseDelegatorMetadata(metadataBytes, metadata)
 			if err != nil {
@@ -2031,13 +2028,14 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 				//
 				// Invariant: It's impossible for a delegator to have been
 				// rewarded in the same block that the validator was added.
+				startTime := staker.StartTime.Unix()
 				metadata := &validatorMetadata{
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
 					UpDuration:               0,
-					LastUpdated:              uint64(staker.StartTime.Unix()),
-					StakerStartTime:          staker.StartTime.Unix(),
+					LastUpdated:              uint64(startTime),
+					StakerStartTime:          startTime,
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}

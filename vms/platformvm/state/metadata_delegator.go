@@ -16,22 +16,15 @@ type delegatorMetadata struct {
 }
 
 func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
+	var err error
 	switch len(bytes) {
 	case database.Uint64Size:
 		// only potential reward was stored
-		var err error
 		metadata.PotentialReward, err = database.ParseUInt64(bytes)
-		if err != nil {
-			return err
-		}
-
 	default:
-		_, err := metadataCodec.Unmarshal(bytes, metadata)
-		if err != nil {
-			return err
-		}
+		_, err = metadataCodec.Unmarshal(bytes, metadata)
 	}
-	return nil
+	return err
 }
 
 func writeDelegatorMetadata(db database.KeyValueWriter, metadata *delegatorMetadata, codecVersion uint16) error {
