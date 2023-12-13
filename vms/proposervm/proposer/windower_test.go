@@ -351,31 +351,54 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		blockTime       = parentBlockTime.Add(time.Second)
 	)
 
-	proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
-	require.NoError(err)
-	require.Equal(validatorIDs[2], proposerID)
+	{
+		// base case. Next tests are variations on top of this.
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
+		require.NoError(err)
+		require.Equal(validatorIDs[2], proposerID)
+
+		// proposerID is the scheduled proposer. It may start with no further delay
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		require.NoError(err)
+		require.Zero(delay)
+	}
 
 	{
 		// proposerID won't change within the same slot
 		blockTime = parentBlockTime.Add(WindowDuration).Add(-1 * time.Second)
-		proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[2], proposerID)
+
+		// proposerID is the scheduled proposer. It may start with no further delay
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		require.NoError(err)
+		require.Zero(delay)
 	}
 
 	{
 		// proposerID changes with new slot
 		blockTime = parentBlockTime.Add(WindowDuration)
-		proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[0], proposerID)
+
+		// proposerID is the scheduled proposer. It may start with no further delay
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		require.NoError(err)
+		require.Zero(delay)
 	}
 
 	{
 		// proposerID changes with new slot
 		blockTime = parentBlockTime.Add(2 * WindowDuration)
-		proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[9], proposerID)
+
+		// proposerID is the scheduled proposer. It may start with no further delay
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		require.NoError(err)
+		require.Zero(delay)
 	}
 }
