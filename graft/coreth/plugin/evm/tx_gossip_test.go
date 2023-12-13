@@ -60,11 +60,9 @@ func TestEthTxGossip(t *testing.T) {
 
 	// sender for the peer requesting gossip from [vm]
 	peerSender := &common.SenderTest{}
-	router := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
-
-	// we're only making client requests, so we don't need a server handler
-	client, err := router.NewAppProtocol(ethTxGossipProtocol, nil)
+	network, err := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
 	require.NoError(err)
+	client := network.NewClient(ethTxGossipProtocol)
 
 	emptyBloomFilter, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
 	require.NoError(err)
@@ -90,7 +88,7 @@ func TestEthTxGossip(t *testing.T) {
 
 	sender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 		go func() {
-			require.NoError(router.AppResponse(ctx, nodeID, requestID, appResponseBytes))
+			require.NoError(network.AppResponse(ctx, nodeID, requestID, appResponseBytes))
 		}()
 		return nil
 	}
@@ -167,11 +165,9 @@ func TestAtomicTxGossip(t *testing.T) {
 
 	// sender for the peer requesting gossip from [vm]
 	peerSender := &common.SenderTest{}
-	network := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
-
-	// we're only making client requests, so we don't need a server handler
-	client, err := network.NewAppProtocol(atomicTxGossipProtocol, nil)
+	network, err := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
 	require.NoError(err)
+	client := network.NewClient(atomicTxGossipProtocol)
 
 	emptyBloomFilter, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
 	require.NoError(err)
