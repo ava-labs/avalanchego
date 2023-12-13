@@ -322,7 +322,7 @@ func TestPushGossiper(t *testing.T) {
 			client := network.NewClient(0)
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
-			gossiper := NewPushGossiper[*testTx](client, metrics)
+			gossiper := NewPushGossiper[*testTx](client, metrics, units.MiB)
 
 			for _, gossipables := range tt.cycles {
 				gossiper.Add(gossipables...)
@@ -396,7 +396,7 @@ func TestPushGossipE2E(t *testing.T) {
 	require.NoError(err)
 	issuerClient := issuerNetwork.NewClient(handlerID)
 	require.NoError(err)
-	issuerGossiper := NewPushGossiper[*testTx](issuerClient, metrics)
+	issuerGossiper := NewPushGossiper[*testTx](issuerClient, metrics, units.MiB)
 
 	want := []*testTx{
 		{id: ids.GenerateTestID()},
