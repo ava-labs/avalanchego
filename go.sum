@@ -68,6 +68,12 @@ github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kd
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213155704-a292e180c9af h1:9jX5CG9Fy0Bc/eT4dw2w+sMvd5whfF3dgxQbK0TNQhY=
 github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213155704-a292e180c9af/go.mod h1:iVmPithYL2YetoILf9LM+o4UGMMuNT3vxd6vC14QJ1k=
+github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213162913-414691707fb6 h1:vuDs/ceG0+1LGbsaBSqUROQ0WM2GhoK31dXEmV5FJ0g=
+github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213162913-414691707fb6/go.mod h1:iVmPithYL2YetoILf9LM+o4UGMMuNT3vxd6vC14QJ1k=
+github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213163545-bb4eebc788fb h1:NHkkdT3DDnstTclu81so2036qAUDtTwTnJP5ItjTmWM=
+github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213163545-bb4eebc788fb/go.mod h1:iVmPithYL2YetoILf9LM+o4UGMMuNT3vxd6vC14QJ1k=
+github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213164033-748e4ee0fe73 h1:pAvQ1YfhyZ6382FczI0anBVY6GS6DNy1Ifd82PCmb+Q=
+github.com/ava-labs/coreth v0.12.9-rc.9.0.20231213164033-748e4ee0fe73/go.mod h1:iVmPithYL2YetoILf9LM+o4UGMMuNT3vxd6vC14QJ1k=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34 h1:mg9Uw6oZFJKytJxgxnl3uxZOs/SB8CVHg6Io4Tf99Zc=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34/go.mod h1:pJxaT9bUgeRNVmNRgtCHb7sFDIRKy7CzTQVi8gGNT6g=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
