@@ -373,7 +373,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	}
 }
 
-// We consider a case where this node is not current proposer, nor is scheduled to propose in the next future
+// We consider cases where this node is not current proposer (may be scheduled in the next future or not).
 // We check that scheduler is called nonetheless, to be able to process innerVM block requests
 func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 	require := require.New(t)
@@ -389,22 +389,16 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 	)
 
 	innerBlk := snowman.NewMockBlock(ctrl)
-	innerBlk.EXPECT().Height().Return(parentHeight + 1)
-
-	innerVM := mocks.NewMockChainVM(ctrl)
+	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
 
 	vdrState := validators.NewMockState(ctrl)
-	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil)
+	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
 
 	windower := proposer.NewMockWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(selectedProposer, nil) // return a proposer different from thisNode, to check whether scheduler is reset
-	windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(time.Time{}, proposer.ErrNoSlotsScheduledInNextFuture) // let there be no slot available in the next future
+		Return(selectedProposer, nil).AnyTimes() // return a proposer different from thisNode, to check whether scheduler is reset
 
-	// we mock the scheduler setting the exact time we expect it to be reset to
 	scheduler := scheduler.NewMockScheduler(ctrl)
-	scheduler.EXPECT().SetBuildBlockTime(parentTimestamp.Add(proposer.MaxLookAheadWindow))
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
@@ -415,7 +409,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 		},
-		ChainVM: innerVM,
+		ChainVM: mocks.NewMockChainVM(ctrl),
 		ctx: &snow.Context{
 			NodeID:         thisNodeID,
 			ValidatorState: vdrState,
@@ -430,11 +424,41 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		vm:       vm,
 	}
 
-	_, err = blk.buildChild(
-		context.Background(),
-		parentID,
-		parentTimestamp,
-		pChainHeight-1,
-	)
-	require.ErrorIs(err, errProposerWindowNotStarted)
+	{
+		// no slots within inspected window
+
+		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(time.Time{}, proposer.ErrNoSlotsScheduledInNextFuture).AnyTimes()
+
+		// we mock the scheduler setting the exact time we expect it to be reset to
+		expectedSchedulerTime := parentTimestamp.Add(proposer.MaxLookAheadWindow)
+		scheduler.EXPECT().SetBuildBlockTime(expectedSchedulerTime).AnyTimes()
+
+		_, err = blk.buildChild(
+			context.Background(),
+			parentID,
+			parentTimestamp,
+			pChainHeight-1,
+		)
+		require.ErrorIs(err, errProposerWindowNotStarted)
+	}
+
+	{
+		// a slot within inspected window
+
+		expectedSchedulerTime := parentTimestamp.Add(proposer.MaxLookAheadWindow).Add(-1 * time.Minute)
+		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(expectedSchedulerTime, nil).AnyTimes()
+
+		// we mock the scheduler setting the exact time we expect it to be reset to
+		scheduler.EXPECT().SetBuildBlockTime(expectedSchedulerTime).AnyTimes()
+
+		_, err = blk.buildChild(
+			context.Background(),
+			parentID,
+			parentTimestamp,
+			pChainHeight-1,
+		)
+		require.ErrorIs(err, errProposerWindowNotStarted)
+	}
 }
