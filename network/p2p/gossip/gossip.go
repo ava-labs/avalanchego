@@ -365,6 +365,4 @@ func (NoOpAccumulator[_]) Gossip(context.Context) error {
 	return nil
 }
 
-func (NoOpAccumulator[T]) Add(...T) {
-	return
-}
+func (NoOpAccumulator[T]) Add(...T) {}
