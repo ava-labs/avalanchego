@@ -6,7 +6,6 @@ github.com/ava-labs/avalanchego/database=Iterator=database/mock_iterator.go
 github.com/ava-labs/avalanchego/message=OutboundMessage=message/mock_message.go
 github.com/ava-labs/avalanchego/message=OutboundMsgBuilder=message/mock_outbound_message_builder.go
 github.com/ava-labs/avalanchego/network/peer=GossipTracker=network/peer/mock_gossip_tracker.go
-github.com/ava-labs/avalanchego/network/p2p=Handler=network/p2p/mocks/mock_handler.go
 github.com/ava-labs/avalanchego/snow/consensus/snowman=Block=snow/consensus/snowman/mock_block.go
 github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex=LinearizableVM=snow/engine/avalanche/vertex/mock_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=BuildBlockWithContextChainVM=snow/engine/snowman/block/mocks/build_block_with_context_vm.go
