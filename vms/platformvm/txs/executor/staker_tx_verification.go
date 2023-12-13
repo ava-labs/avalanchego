@@ -144,8 +144,7 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -221,8 +220,7 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -387,8 +385,7 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -484,8 +481,7 @@ func verifyAddPermissionlessValidatorTx(
 	}
 	duration := tx.EndTime().Sub(startTime)
 
-	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -605,8 +601,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 	duration := tx.EndTime().Sub(startTime)
 
-	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
 	}
 
