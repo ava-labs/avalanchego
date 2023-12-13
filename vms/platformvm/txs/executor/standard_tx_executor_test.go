@@ -1440,13 +1440,13 @@ func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 // mock implementations that can be used in tests
 // for verifying TransformSubnetTx.
 type transformSubnetTxVerifyEnv struct {
-	latestForkTime time.Time
-	fx             *fx.MockFx
-	flowChecker    *utxo.MockVerifier
-	unsignedTx     *txs.TransformSubnetTx
-	tx             *txs.Tx
-	state          *state.MockDiff
-	staker         *state.Staker
+	banffTime   time.Time
+	fx          *fx.MockFx
+	flowChecker *utxo.MockVerifier
+	unsignedTx  *txs.TransformSubnetTx
+	tx          *txs.Tx
+	state       *state.MockDiff
+	staker      *state.Staker
 }
 
 // Returns mock implementations that can be used in tests
@@ -1460,12 +1460,12 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 	unsignedTx, tx := newTransformSubnetTx(t)
 	mockState := state.NewMockDiff(ctrl)
 	return transformSubnetTxVerifyEnv{
-		latestForkTime: now,
-		fx:             mockFx,
-		flowChecker:    mockFlowChecker,
-		unsignedTx:     unsignedTx,
-		tx:             tx,
-		state:          mockState,
+		banffTime:   now,
+		fx:          mockFx,
+		flowChecker: mockFlowChecker,
+		unsignedTx:  unsignedTx,
+		tx:          tx,
+		state:       mockState,
 		staker: &state.Staker{
 			TxID:   ids.GenerateTestID(),
 			NodeID: ids.GenerateTestNodeID(),
@@ -1491,9 +1491,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
+							BanffTime: env.banffTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1517,9 +1515,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
+							BanffTime: env.banffTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1544,9 +1540,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.latestForkTime,
-							CortinaTime:      env.latestForkTime,
-							DurangoTime:      env.latestForkTime,
+							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
@@ -1577,9 +1571,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.latestForkTime,
-							CortinaTime:      env.latestForkTime,
-							DurangoTime:      env.latestForkTime,
+							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
@@ -1615,9 +1607,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.latestForkTime,
-							CortinaTime:      env.latestForkTime,
-							DurangoTime:      env.latestForkTime,
+							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
