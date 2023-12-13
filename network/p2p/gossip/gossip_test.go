@@ -31,17 +31,13 @@ var (
 )
 
 func TestGossiperShutdown(t *testing.T) {
-	require := require.New(t)
-
-	metrics := prometheus.NewRegistry()
-	gossiper, err := NewPullGossiper[testTx](
-		Config{},
+	gossiper := NewPullGossiper[testTx](
 		logging.NoLog{},
 		nil,
 		nil,
-		metrics,
+		Metrics{},
+		0,
 	)
-	require.NoError(err)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	wg := &sync.WaitGroup{}
@@ -59,7 +55,7 @@ func TestGossiperShutdown(t *testing.T) {
 func TestGossiperGossip(t *testing.T) {
 	tests := []struct {
 		name                   string
-		config                 HandlerConfig
+		targetResponseSize     int
 		requester              []*testTx // what we have
 		responder              []*testTx // what the peer we're requesting gossip from has
 		expectedPossibleValues []*testTx // possible values we can have
@@ -69,48 +65,38 @@ func TestGossiperGossip(t *testing.T) {
 			name: "no gossip - no one knows anything",
 		},
 		{
-			name: "no gossip - requester knows more than responder",
-			config: HandlerConfig{
-				TargetResponseSize: 1024,
-			},
+			name:                   "no gossip - requester knows more than responder",
+			targetResponseSize:     1024,
 			requester:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name: "no gossip - requester knows everything responder knows",
-			config: HandlerConfig{
-				TargetResponseSize: 1024,
-			},
+			name:                   "no gossip - requester knows everything responder knows",
+			targetResponseSize:     1024,
 			requester:              []*testTx{{id: ids.ID{0}}},
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name: "gossip - requester knows nothing",
-			config: HandlerConfig{
-				TargetResponseSize: 1024,
-			},
+			name:                   "gossip - requester knows nothing",
+			targetResponseSize:     1024,
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
 		},
 		{
-			name: "gossip - requester knows less than responder",
-			config: HandlerConfig{
-				TargetResponseSize: 1024,
-			},
+			name:                   "gossip - requester knows less than responder",
+			targetResponseSize:     1024,
 			requester:              []*testTx{{id: ids.ID{0}}},
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedLen:            2,
 		},
 		{
-			name: "gossip - target response size exceeded",
-			config: HandlerConfig{
-				TargetResponseSize: 32,
-			},
+			name:                   "gossip - target response size exceeded",
+			targetResponseSize:     32,
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedLen:            2,
@@ -138,12 +124,14 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(responseSet.Add(item))
 			}
 
-			handler, err := NewHandler[testTx, *testTx](
+			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
+			require.NoError(err)
+			handler := NewHandler[testTx, *testTx](
 				logging.NoLog{},
 				nil,
 				responseSet,
-				tt.config,
-				prometheus.NewRegistry(),
+				metrics,
+				tt.targetResponseSize,
 			)
 			require.NoError(err)
 			require.NoError(responseNetwork.AddHandler(0x0, handler))
@@ -168,15 +156,13 @@ func TestGossiperGossip(t *testing.T) {
 
 			requestClient := requestNetwork.NewClient(0x0)
 
-			config := Config{
-				PollSize: 1,
-			}
-			gossiper, err := NewPullGossiper[testTx, *testTx](
-				config,
+			require.NoError(err)
+			gossiper := NewPullGossiper[testTx, *testTx](
 				logging.NoLog{},
 				requestSet,
 				requestClient,
-				prometheus.NewRegistry(),
+				metrics,
+				1,
 			)
 			require.NoError(err)
 			received := set.Set[*testTx]{}
@@ -333,7 +319,9 @@ func TestPushGossiper(t *testing.T) {
 			)
 			require.NoError(err)
 			client := network.NewClient(0)
-			gossiper := NewPushGossiper[*testTx](client, "")
+			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
+			require.NoError(err)
+			gossiper := NewPushGossiper[*testTx](client, metrics)
 
 			for _, gossipables := range tt.cycles {
 				gossiper.Add(gossipables...)
@@ -388,12 +376,14 @@ func TestPushGossipE2E(t *testing.T) {
 	forwarderClient := forwarderNetwork.NewClient(handlerID)
 	require.NoError(err)
 
-	handler, err := NewHandler[testTx, *testTx](
+	metrics, err := NewMetrics(prometheus.NewRegistry(), "")
+	require.NoError(err)
+	handler := NewHandler[testTx, *testTx](
 		log,
 		forwarderClient,
 		set,
-		HandlerConfig{},
-		prometheus.NewRegistry(),
+		metrics,
+		0,
 	)
 	require.NoError(err)
 	require.NoError(forwarderNetwork.AddHandler(handlerID, handler))
@@ -405,7 +395,7 @@ func TestPushGossipE2E(t *testing.T) {
 	require.NoError(err)
 	issuerClient := issuerNetwork.NewClient(handlerID)
 	require.NoError(err)
-	issuerGossiper := NewPushGossiper[*testTx](issuerClient, "")
+	issuerGossiper := NewPushGossiper[*testTx](issuerClient, metrics)
 
 	want := []*testTx{
 		{id: ids.GenerateTestID()},

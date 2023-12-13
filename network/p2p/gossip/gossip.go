@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -27,6 +27,14 @@ var (
 	_ Gossiper = (*NoOpGossiper)(nil)
 
 	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
+
+	metricLabels = []string{typeLabel}
+)
+
+const (
+	typeLabel = "type"
+	pushType  = "push"
+	pullType  = "pull"
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -57,6 +65,68 @@ type ValidatorGossiper struct {
 	Validators p2p.ValidatorSet
 }
 
+// Metrics that are tracked across a gossip protocol. A given protocol should
+// only use a single instance of Metrics.
+type Metrics struct {
+	sentCount     *prometheus.CounterVec
+	sentBytes     *prometheus.CounterVec
+	receivedCount *prometheus.CounterVec
+	receivedBytes *prometheus.CounterVec
+}
+
+// NewMetrics returns a common set of metrics
+func NewMetrics(
+	metrics prometheus.Registerer,
+	namespace string,
+) (Metrics, error) {
+	sentCount := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "gossip_sent_count",
+		Help:      "amount of gossip sent (n)",
+	}, metricLabels)
+
+	sentBytes := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "gossip_sent_bytes",
+		Help:      "amount of gossip sent (bytes)",
+	}, metricLabels)
+
+	receivedCount := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "gossip_received_count",
+		Help:      "amount of gossip received (n)",
+	}, metricLabels)
+
+	receivedBytes := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "gossip_received_bytes",
+		Help:      "amount of gossip received (bytes)",
+	}, metricLabels)
+
+	if err := metrics.Register(sentCount); err != nil {
+		return Metrics{}, err
+	}
+
+	if err := metrics.Register(sentBytes); err != nil {
+		return Metrics{}, err
+	}
+
+	if err := metrics.Register(receivedCount); err != nil {
+		return Metrics{}, err
+	}
+
+	if err := metrics.Register(receivedBytes); err != nil {
+		return Metrics{}, err
+	}
+
+	return Metrics{
+		sentCount:     sentCount,
+		sentBytes:     sentBytes,
+		receivedCount: receivedCount,
+		receivedBytes: receivedBytes,
+	}, nil
+}
+
 func (v ValidatorGossiper) Gossip(ctx context.Context) error {
 	if !v.Validators.Has(ctx, v.NodeID) {
 		return nil
@@ -65,49 +135,32 @@ func (v ValidatorGossiper) Gossip(ctx context.Context) error {
 	return v.Gossiper.Gossip(ctx)
 }
 
-type Config struct {
-	Namespace string
-	PollSize  int
-}
-
 func NewPullGossiper[T any, U GossipableAny[T]](
-	config Config,
 	log logging.Logger,
 	set Set[U],
 	client *p2p.Client,
-	metrics prometheus.Registerer,
-) (*PullGossiper[T, U], error) {
-	p := &PullGossiper[T, U]{
-		config: config,
-		log:    log,
-		set:    set,
-		client: client,
-		receivedN: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "gossip_received_n",
-			Help:      "amount of gossip received (n)",
-		}),
-		receivedBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "gossip_received_bytes",
-			Help:      "amount of gossip received (bytes)",
-		}),
+	metrics Metrics,
+	pollSize int,
+) *PullGossiper[T, U] {
+	return &PullGossiper[T, U]{
+		log:      log,
+		set:      set,
+		client:   client,
+		metrics:  metrics,
+		pollSize: pollSize,
+		labels: prometheus.Labels{
+			typeLabel: pullType,
+		},
 	}
-
-	err := utils.Err(
-		metrics.Register(p.receivedN),
-		metrics.Register(p.receivedBytes),
-	)
-	return p, err
 }
 
 type PullGossiper[T any, U GossipableAny[T]] struct {
-	config        Config
-	log           logging.Logger
-	set           Set[U]
-	client        *p2p.Client
-	receivedN     prometheus.Counter
-	receivedBytes prometheus.Counter
+	log      logging.Logger
+	set      Set[U]
+	client   *p2p.Client
+	metrics  Metrics
+	pollSize int
+	labels   prometheus.Labels
 }
 
 func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
@@ -125,7 +178,7 @@ func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
 		return err
 	}
 
-	for i := 0; i < p.config.PollSize; i++ {
+	for i := 0; i < p.pollSize; i++ {
 		if err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse); err != nil {
 			return err
 		}
@@ -186,33 +239,39 @@ func (p *PullGossiper[T, U]) handleResponse(
 		}
 	}
 
-	p.receivedN.Add(float64(len(response.Gossip)))
-	p.receivedBytes.Add(float64(receivedBytes))
+	receivedCountMetric, err := p.metrics.receivedCount.GetMetricWith(p.labels)
+	if err != nil {
+		p.log.Error("failed to get received count metric", zap.Error(err))
+		return
+	}
+
+	receivedBytesMetric, err := p.metrics.receivedBytes.GetMetricWith(p.labels)
+	if err != nil {
+		p.log.Error("failed to get received bytes metric", zap.Error(err))
+		return
+	}
+
+	receivedCountMetric.Add(float64(len(response.Gossip)))
+	receivedBytesMetric.Add(float64(receivedBytes))
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](client *p2p.Client, namespace string) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics) *PushGossiper[T] {
 	return &PushGossiper[T]{
-		client: client,
-		sentN: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "gossip_sent_n",
-			Help:      "amount of gossip sent (n)",
-		}),
-		sentBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "gossip_sent_bytes",
-			Help:      "amount of gossip sent (bytes)",
-		}),
+		client:  client,
+		metrics: metrics,
+		labels: prometheus.Labels{
+			typeLabel: pushType,
+		},
 	}
 }
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
-	client *p2p.Client
+	client  *p2p.Client
+	metrics Metrics
 
-	sentN     prometheus.Counter
-	sentBytes prometheus.Counter
+	labels prometheus.Labels
 
 	lock   sync.Mutex
 	queued []T
@@ -249,8 +308,18 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return err
 	}
 
-	p.sentN.Add(float64(len(msg.Gossip)))
-	p.sentBytes.Add(float64(sentBytes))
+	sentCountMetric, err := p.metrics.sentCount.GetMetricWith(p.labels)
+	if err != nil {
+		return fmt.Errorf("failed to get sent count metric: %w", err)
+	}
+
+	sentBytesMetric, err := p.metrics.sentBytes.GetMetricWith(p.labels)
+	if err != nil {
+		return fmt.Errorf("failed to get sent bytes metric: %w", err)
+	}
+
+	sentCountMetric.Add(float64(len(msg.Gossip)))
+	sentBytesMetric.Add(float64(sentBytes))
 
 	return p.client.AppGossip(ctx, msgBytes)
 }

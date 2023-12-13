@@ -5,84 +5,45 @@ package gossip
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ p2p.Handler = (*Handler[testTx, *testTx])(nil)
 
-type HandlerConfig struct {
-	Namespace          string
-	TargetResponseSize int
-}
-
 func NewHandler[T any, U GossipableAny[T]](
 	log logging.Logger,
 	client *p2p.Client,
 	set Set[U],
-	config HandlerConfig,
-	metrics prometheus.Registerer,
-) (*Handler[T, U], error) {
-	h := &Handler[T, U]{
+	metrics Metrics,
+	targetResponseSize int,
+) *Handler[T, U] {
+	return &Handler[T, U]{
 		Handler:            p2p.NoOpHandler{},
 		log:                log,
 		client:             client,
 		set:                set,
-		targetResponseSize: config.TargetResponseSize,
-		pullGossipSentN: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "pull_gossip_sent_n",
-			Help:      "amount of pull gossip sent (n)",
-		}),
-		pullGossipSentBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "pull_gossip_sent_bytes",
-			Help:      "amount of pull gossip sent (bytes)",
-		}),
-		pushGossipReceivedN: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "push_gossip_received_n",
-			Help:      "amount of push gossip received (n)",
-		}),
-		pushGossipReceivedBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "push_gossip_received_bytes",
-			Help:      "amount of push gossip received (n)",
-		}),
-		pushGossipSentN: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "push_gossip_sent_n",
-			Help:      "amount of push gossip sent (n)",
-		}),
-		pushGossipSentBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: config.Namespace,
-			Name:      "push_gossip_sent_bytes",
-			Help:      "amount of push gossip sent (n)",
-		}),
+		metrics:            metrics,
+		targetResponseSize: targetResponseSize,
+		pullLabels: prometheus.Labels{
+			typeLabel: pullType,
+		},
+		pushLabels: prometheus.Labels{
+			typeLabel: pushType,
+		},
 	}
-
-	err := utils.Err(
-		metrics.Register(h.pullGossipSentN),
-		metrics.Register(h.pullGossipSentBytes),
-		metrics.Register(h.pushGossipReceivedN),
-		metrics.Register(h.pushGossipReceivedBytes),
-		metrics.Register(h.pushGossipSentN),
-		metrics.Register(h.pushGossipSentBytes),
-	)
-	return h, err
 }
 
 type Handler[T any, U GossipableAny[T]] struct {
@@ -90,14 +51,11 @@ type Handler[T any, U GossipableAny[T]] struct {
 	log                logging.Logger
 	set                Set[U]
 	client             *p2p.Client
+	metrics            Metrics
 	targetResponseSize int
 
-	pullGossipSentN         prometheus.Counter
-	pullGossipSentBytes     prometheus.Counter
-	pushGossipReceivedN     prometheus.Counter
-	pushGossipReceivedBytes prometheus.Counter
-	pushGossipSentN         prometheus.Counter
-	pushGossipSentBytes     prometheus.Counter
+	pullLabels prometheus.Labels
+	pushLabels prometheus.Labels
 }
 
 func (h Handler[T, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
@@ -149,8 +107,18 @@ func (h Handler[T, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, 
 		Gossip: gossipBytes,
 	}
 
-	h.pullGossipSentN.Add(float64(len(response.Gossip)))
-	h.pullGossipSentBytes.Add(float64(responseSize))
+	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(h.pullLabels)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sent count metric: %w", err)
+	}
+
+	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(h.pullLabels)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sent bytes metric: %w", err)
+	}
+
+	sentCountMetric.Add(float64(len(response.Gossip)))
+	sentBytesMetric.Add(float64(responseSize))
 
 	return proto.Marshal(response)
 }
@@ -209,11 +177,6 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 		return
 	}
 
-	h.pushGossipReceivedN.Add(float64(len(msg.Gossip)))
-	h.pushGossipReceivedBytes.Add(float64(receivedBytes))
-	h.pushGossipSentN.Add(float64(len(forwardMsg.Gossip)))
-	h.pushGossipSentBytes.Add(float64(sentBytes))
-
 	if err := h.client.AppGossip(ctx, forwardMsgBytes); err != nil {
 		h.log.Error(
 			"failed to forward gossip",
@@ -221,4 +184,33 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 		)
 		return
 	}
+
+	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(h.pushLabels)
+	if err != nil {
+		h.log.Error("failed to get received count metric", zap.Error(err))
+		return
+	}
+
+	receivedBytesMetric, err := h.metrics.receivedBytes.GetMetricWith(h.pushLabels)
+	if err != nil {
+		h.log.Error("failed to get received bytes metric", zap.Error(err))
+		return
+	}
+
+	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(h.pushLabels)
+	if err != nil {
+		h.log.Error("failed to get sent count metric", zap.Error(err))
+		return
+	}
+
+	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(h.pushLabels)
+	if err != nil {
+		h.log.Error("failed to get sent bytes metric", zap.Error(err))
+		return
+	}
+
+	receivedCountMetric.Add(float64(len(msg.Gossip)))
+	receivedBytesMetric.Add(float64(receivedBytes))
+	sentCountMetric.Add(float64(len(forwardMsg.Gossip)))
+	sentBytesMetric.Add(float64(sentBytes))
 }
