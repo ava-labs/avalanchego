@@ -813,7 +813,14 @@ func (t *trieView) insert(
 			newRoot            = newNode(commonPrefix)
 			oldRootID          = oldRoot.calculateID(t.db.metrics)
 		)
-		newRoot.addChildWithID(oldRoot, t.tokenSize, oldRootID) // todo comment
+
+		// Call addChildWithID instead of addChild so the old root is added
+		// to the new root with the correct ID.
+		// TODO:
+		// [oldRootID] shouldn't need to be calculated here.
+		// Either oldRootID should already be calculated or will be calculated at the end with the other nodes
+		// Initialize the t.changes.rootID during newTrieView and then use that here instead of oldRootID
+		newRoot.addChildWithID(oldRoot, t.tokenSize, oldRootID)
 		if err := t.recordNewNode(newRoot); err != nil {
 			return nil, err
 		}
