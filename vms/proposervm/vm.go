@@ -338,7 +338,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		parentTimestamp = blk.Timestamp()
 	)
 	if vm.IsDurangoActivated(parentTimestamp) {
-		nextStartTime, err = vm.resetPostDurangoScheduler(
+		nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
 			blk.Height()+1,
 			pChainHeight,
@@ -346,7 +346,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 			vm.Clock.Time().Truncate(time.Second),
 		)
 	} else {
-		nextStartTime, err = vm.resetPreDurangoScheduler(ctx, blk, pChainHeight)
+		nextStartTime, err = vm.getPreDurangoSlotTime(ctx, blk, pChainHeight)
 	}
 	if err != nil {
 		return nil
@@ -361,7 +361,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	return nil
 }
 
-func (vm *VM) resetPreDurangoScheduler(
+func (vm *VM) getPreDurangoSlotTime(
 	ctx context.Context,
 	blk PostForkBlock,
 	pChainHeight uint64,
@@ -391,7 +391,7 @@ func (vm *VM) resetPreDurangoScheduler(
 	return nextStartTime, nil
 }
 
-func (vm *VM) resetPostDurangoScheduler(
+func (vm *VM) getPostDurangoSlotTime(
 	ctx context.Context,
 	blkHeight uint64,
 	pChainHeight uint64,
@@ -417,7 +417,7 @@ func (vm *VM) resetPostDurangoScheduler(
 			zap.Error(err),
 		)
 	}
-	return parentTimestamp.Add(delay), err
+	return currentTime.Add(delay), err
 }
 
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {

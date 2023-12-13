@@ -432,7 +432,7 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 
 	// We need to reschedule the block builder to the next time we can try to
 	// build a block.
-	nextStartTime, err := p.vm.resetPostDurangoScheduler(
+	nextStartTime, err := p.vm.getPostDurangoSlotTime(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,

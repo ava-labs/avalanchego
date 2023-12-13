@@ -78,7 +78,7 @@ type Windower interface {
 	// In the Post Durango windowing scheme, every validator active
 	// at [pChainHeight] gets one and only one slot to propose a block.
 	// [MinDelayForProposer] specifies how long [nodeID] needs to wait
-	// for its slot to start. Delay is specified as starting from [parentBlockTime].
+	// for its slot to start. Delay is specified as starting from [startTime].
 	// For efficiency reasons, we cap the slot search to [MaxLookAheadWindow] delay.
 	MinDelayForProposer(
 		ctx context.Context,
