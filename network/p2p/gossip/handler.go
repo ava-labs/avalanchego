@@ -135,6 +135,7 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 	receivedBytes := 0
 	sentBytes := 0
 	for _, bytes := range msg.Gossip {
+		receivedBytes += len(bytes)
 		gossipable := U(new(T))
 		if err := gossipable.Unmarshal(bytes); err != nil {
 			h.log.Debug("failed to unmarshal gossip",
@@ -143,8 +144,6 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 			)
 			continue
 		}
-
-		receivedBytes += len(bytes)
 
 		if err := h.set.Add(gossipable); err != nil {
 			h.log.Debug(
