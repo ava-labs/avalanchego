@@ -119,12 +119,12 @@ func (c *Client) AppGossip(
 // AppGossipSpecific sends a gossip message to a predetermined set of peers.
 func (c *Client) AppGossipSpecific(
 	ctx context.Context,
-	nodeID ids.NodeID,
+	nodeIDs set.Set[ids.NodeID],
 	appGossipBytes []byte,
 ) error {
 	return c.sender.SendAppGossipSpecific(
 		ctx,
-		set.Of(nodeID),
+		nodeIDs,
 		c.prefixMessage(appGossipBytes),
 	)
 }
