@@ -125,6 +125,7 @@ func (c *genericCodec) size(
 		if value.IsNil() {
 			return 0, false, errMarshalNil
 		}
+
 		return c.size(value.Elem(), typeStack)
 
 	case reflect.Interface:
