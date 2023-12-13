@@ -38,12 +38,6 @@ var (
 	metricLabels = []string{typeLabel}
 )
 
-const (
-	typeLabel = "type"
-	pushType  = "push"
-	pullType  = "pull"
-)
-
 // Gossiper gossips Gossipables to other nodes
 type Gossiper interface {
 	// Gossip runs a cycle of gossip. Returns an error if we failed to gossip.
