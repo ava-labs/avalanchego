@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
