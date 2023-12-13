@@ -31,7 +31,7 @@ var (
 	_ Gossiper         = (*testGossiper)(nil)
 )
 
-func TestGossiperShutdown(*testing.T) {
+func TestGossiperShutdown(t *testing.T) {
 	gossiper := NewPullGossiper[testTx](
 		logging.NoLog{},
 		nil,
@@ -125,12 +125,14 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(responseSet.Add(item))
 			}
 
-			handler, err := NewHandler[testTx, *testTx](
+			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
+			require.NoError(err)
+			handler := NewHandler[testTx, *testTx](
 				logging.NoLog{},
 				nil,
 				responseSet,
-				tt.config,
-				prometheus.NewRegistry(),
+				metrics,
+				tt.targetResponseSize,
 			)
 			require.NoError(err)
 			require.NoError(responseNetwork.AddHandler(0x0, handler))
@@ -318,7 +320,9 @@ func TestPushGossiper(t *testing.T) {
 			)
 			require.NoError(err)
 			client := network.NewClient(0)
-			gossiper := NewPushGossiper[*testTx](client, "")
+			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
+			require.NoError(err)
+			gossiper := NewPushGossiper[*testTx](client, metrics)
 
 			for _, gossipables := range tt.cycles {
 				gossiper.Add(gossipables...)
@@ -373,12 +377,14 @@ func TestPushGossipE2E(t *testing.T) {
 	forwarderClient := forwarderNetwork.NewClient(handlerID)
 	require.NoError(err)
 
-	handler, err := NewHandler[testTx, *testTx](
+	metrics, err := NewMetrics(prometheus.NewRegistry(), "")
+	require.NoError(err)
+	handler := NewHandler[testTx, *testTx](
 		log,
 		forwarderClient,
 		set,
-		HandlerConfig{},
-		prometheus.NewRegistry(),
+		metrics,
+		0,
 	)
 	require.NoError(err)
 	require.NoError(forwarderNetwork.AddHandler(handlerID, handler))
@@ -390,7 +396,7 @@ func TestPushGossipE2E(t *testing.T) {
 	require.NoError(err)
 	issuerClient := issuerNetwork.NewClient(handlerID)
 	require.NoError(err)
-	issuerGossiper := NewPushGossiper[*testTx](issuerClient, "")
+	issuerGossiper := NewPushGossiper[*testTx](issuerClient, metrics)
 
 	want := []*testTx{
 		{id: ids.GenerateTestID()},
