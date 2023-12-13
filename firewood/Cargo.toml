@@ -16,7 +16,7 @@ homepage = "https://avalabs.org"
 readme = "../README.md"
 
 [dependencies]
-aquamarine = "0.3.1"
+aquamarine = "0.4.0"
 async-trait = "0.1.57"
 bytemuck = { version = "1.13.1", features = ["derive"] }
 enum-as-inner = "0.6.0"
