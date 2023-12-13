@@ -25,6 +25,11 @@ const (
 	handlerPrefix = byte(handlerID)
 )
 
+var errFoo = &common.AppError{
+	Code:    123,
+	Message: "foo",
+}
+
 func TestMessageRouting(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
@@ -182,7 +187,7 @@ func TestAppRequestFailed(t *testing.T) {
 
 	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
 		require.Equal(wantNodeID, gotNodeID)
-		require.ErrorIs(err, ErrAppRequestFailed)
+		require.ErrorIs(err, errFoo)
 		require.Nil(gotResponse)
 
 		close(done)
@@ -191,7 +196,7 @@ func TestAppRequestFailed(t *testing.T) {
 	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
 	<-sender.SentAppRequest
 
-	require.NoError(network.AppRequestFailed(ctx, wantNodeID, 1))
+	require.NoError(network.AppRequestFailed(ctx, wantNodeID, 1, errFoo))
 	<-done
 }
 
@@ -243,7 +248,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 
 	callback := func(_ context.Context, gotChainID ids.ID, gotResponse []byte, err error) {
 		require.Equal(wantChainID, gotChainID)
-		require.ErrorIs(err, ErrAppRequestFailed)
+		require.ErrorIs(err, errFoo)
 		require.Nil(gotResponse)
 
 		close(done)
@@ -252,7 +257,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 	require.NoError(client.CrossChainAppRequest(ctx, wantChainID, []byte("request"), callback))
 	<-sender.SentCrossChainAppRequest
 
-	require.NoError(network.CrossChainAppRequestFailed(ctx, wantChainID, 1))
+	require.NoError(network.CrossChainAppRequestFailed(ctx, wantChainID, 1, errFoo))
 	<-done
 }
 
@@ -347,11 +352,11 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 
 			err = network.AppResponse(ctx, ids.EmptyNodeID, 0, []byte("foobar"))
 			require.ErrorIs(err, ErrUnrequestedResponse)
-			err = network.AppRequestFailed(ctx, ids.EmptyNodeID, 0)
+			err = network.AppRequestFailed(ctx, ids.EmptyNodeID, 0, common.ErrUndefined)
 			require.ErrorIs(err, ErrUnrequestedResponse)
 			err = network.CrossChainAppResponse(ctx, ids.Empty, 0, []byte("foobar"))
 			require.ErrorIs(err, ErrUnrequestedResponse)
-			err = network.CrossChainAppRequestFailed(ctx, ids.Empty, 0)
+			err = network.CrossChainAppRequestFailed(ctx, ids.Empty, 0, common.ErrUndefined)
 			require.ErrorIs(err, ErrUnrequestedResponse)
 		})
 	}
