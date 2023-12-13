@@ -61,7 +61,7 @@ func NewNetwork(
 	registerer prometheus.Registerer,
 	namespace string,
 ) (*Network, error) {
-	networkMetrics := metrics{
+	metrics := metrics{
 		appRequestTime: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "app_request_time",
@@ -136,20 +136,20 @@ func NewNetwork(
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		registerer.Register(networkMetrics.appRequestTime),
-		registerer.Register(networkMetrics.appRequestCount),
-		registerer.Register(networkMetrics.appResponseTime),
-		registerer.Register(networkMetrics.appResponseCount),
-		registerer.Register(networkMetrics.appRequestFailedTime),
-		registerer.Register(networkMetrics.appRequestFailedCount),
-		registerer.Register(networkMetrics.appGossipTime),
-		registerer.Register(networkMetrics.appGossipCount),
-		registerer.Register(networkMetrics.crossChainAppRequestTime),
-		registerer.Register(networkMetrics.crossChainAppRequestCount),
-		registerer.Register(networkMetrics.crossChainAppResponseTime),
-		registerer.Register(networkMetrics.crossChainAppResponseCount),
-		registerer.Register(networkMetrics.crossChainAppRequestFailedTime),
-		registerer.Register(networkMetrics.crossChainAppRequestFailedCount),
+		registerer.Register(metrics.appRequestTime),
+		registerer.Register(metrics.appRequestCount),
+		registerer.Register(metrics.appResponseTime),
+		registerer.Register(metrics.appResponseCount),
+		registerer.Register(metrics.appRequestFailedTime),
+		registerer.Register(metrics.appRequestFailedCount),
+		registerer.Register(metrics.appGossipTime),
+		registerer.Register(metrics.appGossipCount),
+		registerer.Register(metrics.crossChainAppRequestTime),
+		registerer.Register(metrics.crossChainAppRequestCount),
+		registerer.Register(metrics.crossChainAppResponseTime),
+		registerer.Register(metrics.crossChainAppResponseCount),
+		registerer.Register(metrics.crossChainAppRequestFailedTime),
+		registerer.Register(metrics.crossChainAppRequestFailedCount),
 	)
 
 	if errs.Err != nil {
@@ -160,7 +160,7 @@ func NewNetwork(
 		Peers:  &Peers{},
 		log:    log,
 		sender: sender,
-		router: newRouter(log, sender, networkMetrics),
+		router: newRouter(log, sender, metrics),
 	}, nil
 }
 
@@ -171,15 +171,6 @@ type Network struct {
 
 	log    logging.Logger
 	sender common.AppSender
-
-	appRequestFailedTime            *prometheus.CounterVec
-	appRequestFailedCount           *prometheus.CounterVec
-	appResponseTime                 *prometheus.CounterVec
-	appResponseCount                *prometheus.CounterVec
-	crossChainAppRequestFailedTime  *prometheus.CounterVec
-	crossChainAppRequestFailedCount *prometheus.CounterVec
-	crossChainAppResponseTime       *prometheus.CounterVec
-	crossChainAppResponseCount      *prometheus.CounterVec
 
 	router *router
 }

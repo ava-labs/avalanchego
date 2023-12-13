@@ -63,7 +63,7 @@ func TestMessageRouting(t *testing.T) {
 		SentAppRequest:           make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
-  
+
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.AddHandler(1, testHandler))
@@ -93,12 +93,11 @@ func TestClientPrefixesMessages(t *testing.T) {
 		SentAppGossipSpecific:    make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
-  
+
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	require.NoError(network.Connected(ctx, ids.EmptyNodeID, nil))
 	client := network.NewClient(handlerID)
-
 
 	want := []byte("message")
 
@@ -383,6 +382,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
 	// create a request that never gets a response
+	network.router.requestID = 1
 	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), []byte{}, noOpCallback))
 	<-sender.SentAppRequest
 

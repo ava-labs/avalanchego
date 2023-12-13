@@ -122,7 +122,7 @@ func TestGossiperGossip(t *testing.T) {
 			}
 			responseNetwork, err := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
 			require.NoError(err)
-      
+
 			responseBloom, err := NewBloomFilter(1000, 0.01)
 			require.NoError(err)
 			responseSet := testSet{
