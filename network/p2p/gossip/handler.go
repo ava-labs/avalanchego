@@ -59,7 +59,7 @@ type Handler[T any, U GossipableAny[T]] struct {
 	pushLabels prometheus.Labels
 }
 
-func (h Handler[T, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+func (h Handler[_, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
 	request := &sdk.PullGossipRequest{}
 	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, err
