@@ -544,14 +544,15 @@ func (vm *VMClient) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 	return err
 }
 
-func (vm *VMClient) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
-	_, err := vm.client.CrossChainAppRequestFailed(
-		ctx,
-		&vmpb.CrossChainAppRequestFailedMsg{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-		},
-	)
+func (vm *VMClient) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
+	msg := &vmpb.CrossChainAppRequestFailedMsg{
+		ChainId:      chainID[:],
+		RequestId:    requestID,
+		ErrorCode:    appErr.Code,
+		ErrorMessage: appErr.Message,
+	}
+
+	_, err := vm.client.CrossChainAppRequestFailed(ctx, msg)
 	return err
 }
 
@@ -592,14 +593,15 @@ func (vm *VMClient) AppResponse(ctx context.Context, nodeID ids.NodeID, requestI
 	return err
 }
 
-func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, err := vm.client.AppRequestFailed(
-		ctx,
-		&vmpb.AppRequestFailedMsg{
-			NodeId:    nodeID.Bytes(),
-			RequestId: requestID,
-		},
-	)
+func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
+	msg := &vmpb.AppRequestFailedMsg{
+		NodeId:       nodeID.Bytes(),
+		RequestId:    requestID,
+		ErrorCode:    appErr.Code,
+		ErrorMessage: appErr.Message,
+	}
+
+	_, err := vm.client.AppRequestFailed(ctx, msg)
 	return err
 }
 

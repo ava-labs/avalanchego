@@ -105,7 +105,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 
 		// Invariant: [tx] has already been syntactically verified.
 
-		txDiff, err := wrapState(stateDiff)
+		txDiff, err := state.NewDiffOn(stateDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -169,18 +169,4 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	return b.manager.NewBlock(statelessBlk), nil
-}
-
-type stateGetter struct {
-	state state.Chain
-}
-
-func (s stateGetter) GetState(ids.ID) (state.Chain, bool) {
-	return s.state, true
-}
-
-func wrapState(parentState state.Chain) (state.Diff, error) {
-	return state.NewDiff(ids.Empty, stateGetter{
-		state: parentState,
-	})
 }

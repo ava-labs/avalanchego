@@ -63,28 +63,48 @@ func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []by
 	return nil, nil
 }
 
+func NewValidatorHandler(
+	handler Handler,
+	validatorSet ValidatorSet,
+	log logging.Logger,
+) *ValidatorHandler {
+	return &ValidatorHandler{
+		handler:      handler,
+		validatorSet: validatorSet,
+		log:          log,
+	}
+}
+
 // ValidatorHandler drops messages from non-validators
 type ValidatorHandler struct {
-	Handler
-	ValidatorSet ValidatorSet
-	Log          logging.Logger
+	handler      Handler
+	validatorSet ValidatorSet
+	log          logging.Logger
 }
 
 func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
-	if !v.ValidatorSet.Has(ctx, nodeID) {
-		v.Log.Debug("dropping message", zap.Stringer("nodeID", nodeID))
+	if !v.validatorSet.Has(ctx, nodeID) {
+		v.log.Debug(
+			"dropping message",
+			zap.Stringer("nodeID", nodeID),
+			zap.String("reason", "not a validator"),
+		)
 		return
 	}
 
-	v.Handler.AppGossip(ctx, nodeID, gossipBytes)
+	v.handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
 func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if !v.ValidatorSet.Has(ctx, nodeID) {
+	if !v.validatorSet.Has(ctx, nodeID) {
 		return nil, ErrNotValidator
 	}
 
-	return v.Handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+	return v.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
+
+func (v ValidatorHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	return v.handler.CrossChainAppRequest(ctx, chainID, deadline, requestBytes)
 }
 
 // responder automatically sends the response for a given request
