@@ -132,6 +132,7 @@ func (c *genericCodec) size(
 		if value.IsNil() {
 			return 0, false, errMarshalNil
 		}
+
 		underlyingValue := value.Interface()
 		underlyingType := reflect.TypeOf(underlyingValue)
 		if typeStack.Contains(underlyingType) {
