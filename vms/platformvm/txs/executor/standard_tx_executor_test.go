@@ -48,7 +48,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	}()
 
 	chainTime := env.state.GetTimestamp()
-	startTime := defaultValidateStartTime.Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(1 * time.Second)
 
 	tests := []struct {
 		banffTime     time.Time
@@ -385,6 +385,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}()
 
 	nodeID := genesisNodeIDs[0]
+	env.config.BanffTime = env.state.GetTimestamp()
 
 	{
 		// Case: Proposed validator currently validating primary network
@@ -815,6 +816,8 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 
 	nodeID := ids.GenerateTestNodeID()
 
+	env.config.BanffTime = env.state.GetTimestamp()
+
 	{
 		// Case: Validator's start time too early
 		tx, err := env.txBuilder.NewAddValidatorTx(
@@ -869,7 +872,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 
 	{
 		// Case: Validator in current validator set of primary network
-		startTime := defaultValidateStartTime.Add(1 * time.Second)
+		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,                            // stake amount
 			uint64(startTime.Unix()),                                // start time
@@ -908,7 +911,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 
 	{
 		// Case: Validator in pending validator set of primary network
-		startTime := defaultValidateStartTime.Add(1 * time.Second)
+		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,                            // stake amount
 			uint64(startTime.Unix()),                                // start time
@@ -944,7 +947,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 
 	{
 		// Case: Validator doesn't have enough tokens to cover stake amount
-		startTime := defaultValidateStartTime.Add(1 * time.Second)
+		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
 			env.config.MinValidatorStake,
 			uint64(startTime.Unix()),
@@ -984,18 +987,19 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
 	}()
 
 	var (
-		nodeID            = ids.GenerateTestNodeID()
-		validatorDuration = defaultMinStakingDuration
-		dummyEndTime      = env.state.GetTimestamp().Add(validatorDuration)
+		nodeID  = ids.GenerateTestNodeID()
+		now     = env.state.GetTimestamp()
+		endTime = now.Add(defaultMaxStakingDuration)
 	)
 
 	addValTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
 		0,
-		uint64(dummyEndTime.Unix()),
+		uint64(endTime.Unix()),
 		nodeID,
 		ids.ShortEmpty,
 		reward.PercentDenominator,
@@ -1007,20 +1011,19 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 	require.NoError(err)
 
-	executor := StandardTxExecutor{
+	require.NoError(addValTx.Unsigned.Visit(&StandardTxExecutor{
 		Backend: &env.backend,
 		State:   onAcceptState,
 		Tx:      addValTx,
-	}
-	require.NoError(addValTx.Unsigned.Visit(&executor))
+	}))
 
 	// Check that a current validator is added
 	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	require.Equal(addValTx.ID(), val.TxID)
-	require.Equal(env.state.GetTimestamp(), val.StartTime)
-	require.Equal(val.StartTime.Add(validatorDuration), val.EndTime)
+	require.Equal(now, val.StartTime)
+	require.Equal(endTime, val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
