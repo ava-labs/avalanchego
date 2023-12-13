@@ -1943,8 +1943,14 @@ func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.I
 		}
 	}
 
-	_, err := state.GetChainSubnet(chainID)
-	return err == nil, err
+	switch _, err := state.GetChainSubnet(chainID); {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, database.ErrNotFound):
+		return false, nil
+	default:
+		return false, err
+	}
 }
 
 // ValidatedByArgs is the arguments for calling ValidatedBy
