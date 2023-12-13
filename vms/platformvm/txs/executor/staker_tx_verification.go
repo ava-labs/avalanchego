@@ -70,13 +70,13 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	// is a subset of the time they validate the primary network.
 	var (
 		currentChainTime = chainState.GetTimestamp()
-		stakerStart      = subnetValidator.StartTime()
+		startTime        = currentChainTime
 	)
-	if config.IsDurangoActivated(currentChainTime) {
-		stakerStart = currentChainTime
+	if !config.IsDurangoActivated(currentChainTime) {
+		startTime = subnetValidator.StartTime()
 	}
 	if !txs.BoundedBy(
-		stakerStart,
+		startTime,
 		subnetValidator.EndTime(),
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
