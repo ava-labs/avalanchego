@@ -114,7 +114,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: ephnet-data
+          name: upgrade-artifact
           path: ~/.ephnet/networks/1000
   Lint:
     runs-on: ubuntu-latest
