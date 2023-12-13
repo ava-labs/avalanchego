@@ -156,9 +156,15 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 			require.NoError(err)
 
-			data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
-			require.NoError(err)
-			effectiveAlphaValidatorDuration = time.Duration(data[0].EndTime-data[0].StartTime) * time.Second
+			e2e.Eventually(func() bool {
+				data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
+				require.NoError(err)
+				if len(data) == 0 {
+					return false
+				}
+				effectiveAlphaValidatorDuration = time.Duration(data[0].EndTime-data[0].StartTime) * time.Second
+				return true
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to retrieve current validator")
 		})
 
 		ginkgo.By("adding beta node as a validator", func() {
@@ -227,10 +233,16 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 			require.NoError(err)
 
-			data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
-			require.NoError(err)
-			delegatorData := data[0].Delegators[0]
-			effectiveGammaDelegatorDuration = time.Duration(delegatorData.EndTime-delegatorData.StartTime) * time.Second
+			e2e.Eventually(func() bool {
+				data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
+				require.NoError(err)
+				if len(data) == 0 {
+					return false
+				}
+				delegatorData := data[0].Delegators[0]
+				effectiveGammaDelegatorDuration = time.Duration(delegatorData.EndTime-delegatorData.StartTime) * time.Second
+				return true
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to retrieve current validator")
 		})
 
 		ginkgo.By("adding delta as delegator to the beta node", func() {
