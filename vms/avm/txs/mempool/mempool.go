@@ -59,6 +59,7 @@ type Mempool interface {
 	// unissued. This allows previously dropped txs to be possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
+	Iterate(f func(tx *txs.Tx) bool)
 }
 
 type mempool struct {
@@ -205,4 +206,13 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
+}
+
+func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
+	itr := m.unissuedTxs.NewIterator()
+	for itr.Next() {
+		if !f(itr.Value()) {
+			return
+		}
+	}
 }

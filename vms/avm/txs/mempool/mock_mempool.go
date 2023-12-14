@@ -94,6 +94,18 @@ func (mr *MockMempoolMockRecorder) Has(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Has", reflect.TypeOf((*MockMempool)(nil).Has), arg0)
 }
 
+// Iterate mocks base method.
+func (m *MockMempool) Iterate(arg0 func(*txs.Tx) bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Iterate", arg0)
+}
+
+// Iterate indicates an expected call of Iterate.
+func (mr *MockMempoolMockRecorder) Iterate(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Iterate", reflect.TypeOf((*MockMempool)(nil).Iterate), arg0)
+}
+
 // MarkDropped mocks base method.
 func (m *MockMempool) MarkDropped(arg0 ids.ID, arg1 error) {
 	m.ctrl.T.Helper()

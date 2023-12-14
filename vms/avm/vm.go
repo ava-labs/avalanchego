@@ -5,12 +5,12 @@ package avm
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
-
-	stdjson "encoding/json"
+	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -53,7 +54,20 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
-const assetToFxCacheSize = 1024
+const (
+	assetToFxCacheSize = 1024
+
+	txGossipHandlerID = 0
+
+	maxValidatorSetStaleness                 = time.Minute
+	txGossipMaxGossipSize                    = 20 * units.KiB
+	txGossipPollSize                         = 10
+	txGossipThrottlingPeriod                 = 10 * time.Second
+	txGossipThrottlingLimit                  = 2
+	txGossipBloomMaxExpectedElements         = 8 * 1024
+	txGossipBloomFalsePositiveProbability    = 0.01
+	txGossipBloomMaxFalsePositiveProbability = 0.05
+)
 
 var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
@@ -117,15 +131,16 @@ type VM struct {
 	// These values are only initialized after the chain has been linearized.
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
-	network      network.Network
+	network      *network.Network
+	mempool      mempool.Mempool
 }
 
-func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
-	return nil
+func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	return vm.network.Connected(ctx, nodeID, version)
 }
 
-func (*VM) Disconnected(context.Context, ids.NodeID) error {
-	return nil
+func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	return vm.network.Disconnected(ctx, nodeID)
 }
 
 /*
@@ -147,7 +162,7 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	_ chan<- common.Message,
+	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -229,6 +244,34 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+
+	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
+	if err != nil {
+		return fmt.Errorf("failed to create mempool: %w", err)
+	}
+	vm.mempool = mempool
+
+	network, err := network.New(
+		vm.ctx,
+		vm.parser,
+		vm.chainManager,
+		vm.mempool,
+		vm.appSender,
+		vm.registerer,
+		txGossipHandlerID,
+		maxValidatorSetStaleness,
+		txGossipMaxGossipSize,
+		txGossipPollSize,
+		txGossipThrottlingPeriod,
+		txGossipThrottlingLimit,
+		txGossipBloomMaxExpectedElements,
+		txGossipBloomFalsePositiveProbability,
+		txGossipBloomMaxFalsePositiveProbability,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+	vm.network = network
 
 	vm.state = state
 
@@ -396,20 +439,15 @@ func (*VM) VerifyHeightIndex(context.Context) error {
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
+func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, _ chan<- common.Message) error {
 	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
 		return err
 	}
 
-	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
-	if err != nil {
-		return fmt.Errorf("failed to create mempool: %w", err)
-	}
-
 	vm.chainManager = blockexecutor.NewManager(
-		mempool,
+		vm.mempool,
 		vm.metrics,
 		vm.state,
 		vm.txBackend,
@@ -421,15 +459,7 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 		vm.txBackend,
 		vm.chainManager,
 		&vm.clock,
-		mempool,
-	)
-
-	vm.network = network.New(
-		vm.ctx,
-		vm.parser,
-		vm.chainManager,
-		mempool,
-		vm.appSender,
+		vm.mempool,
 	)
 
 	// Note: It's important only to switch the networking stack after the full

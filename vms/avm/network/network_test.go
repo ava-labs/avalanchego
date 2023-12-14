@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -25,6 +27,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+)
+
+const (
+	txGossipHandlerID                        = 0
+	maxValidatorSetStaleness                 = time.Second
+	txGossipMaxGossipSize                    = 1
+	txGossipPollSize                         = 1
+	txGossipThrottlingPeriod                 = time.Second
+	txGossipThrottlingLimit                  = 1
+	txGossipBloomMaxElements                 = 10
+	txGossipBloomFalsePositiveProbability    = 0.1
+	txGossipBloomMaxFalsePositiveProbability = 0.5
 )
 
 var errTest = errors.New("test error")
@@ -148,7 +162,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			})
 			require.NoError(err)
 
-			n := New(
+			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
@@ -156,7 +170,18 @@ func TestNetworkAppGossip(t *testing.T) {
 				executor.NewMockManager(ctrl), // Manager is unused in this test
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
+				prometheus.NewRegistry(),
+				txGossipHandlerID,
+				maxValidatorSetStaleness,
+				txGossipMaxGossipSize,
+				txGossipPollSize,
+				txGossipThrottlingPeriod,
+				txGossipThrottlingLimit,
+				txGossipBloomMaxElements,
+				txGossipBloomFalsePositiveProbability,
+				txGossipBloomMaxFalsePositiveProbability,
 			)
+			require.NoError(err)
 			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
 		})
 	}
@@ -287,7 +312,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			})
 			require.NoError(err)
 
-			n := New(
+			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
@@ -295,7 +320,18 @@ func TestNetworkIssueTx(t *testing.T) {
 				tt.managerFunc(ctrl),
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
+				prometheus.NewRegistry(),
+				txGossipHandlerID,
+				maxValidatorSetStaleness,
+				txGossipMaxGossipSize,
+				txGossipPollSize,
+				txGossipThrottlingPeriod,
+				txGossipThrottlingLimit,
+				txGossipBloomMaxElements,
+				txGossipBloomFalsePositiveProbability,
+				txGossipBloomMaxFalsePositiveProbability,
 			)
+			require.NoError(err)
 			err = n.IssueTx(context.Background(), &txs.Tx{})
 			require.ErrorIs(err, tt.expectedErr)
 		})
@@ -313,7 +349,7 @@ func TestNetworkGossipTx(t *testing.T) {
 
 	appSender := common.NewMockSender(ctrl)
 
-	nIntf := New(
+	n, err := New(
 		&snow.Context{
 			Log: logging.NoLog{},
 		},
@@ -321,9 +357,18 @@ func TestNetworkGossipTx(t *testing.T) {
 		executor.NewMockManager(ctrl),
 		mempool.NewMockMempool(ctrl),
 		appSender,
+		prometheus.NewRegistry(),
+		txGossipHandlerID,
+		maxValidatorSetStaleness,
+		txGossipMaxGossipSize,
+		txGossipPollSize,
+		txGossipThrottlingPeriod,
+		txGossipThrottlingLimit,
+		txGossipBloomMaxElements,
+		txGossipBloomFalsePositiveProbability,
+		txGossipBloomMaxFalsePositiveProbability,
 	)
-	require.IsType(&network{}, nIntf)
-	n := nIntf.(*network)
+	require.NoError(err)
 
 	// Case: Tx was recently gossiped
 	txID := ids.GenerateTestID()
