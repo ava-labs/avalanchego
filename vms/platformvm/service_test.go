@@ -496,7 +496,7 @@ func TestGetStake(t *testing.T) {
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesisNodeIDs[0]
 	delegatorStartTime := defaultValidateStartTime
-	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
+	delegatorEndTime := delegatorStartTime.Add(defaultMinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
