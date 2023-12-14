@@ -618,6 +618,9 @@ func (t *trieView) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
+	if hashRoot.rlp == nil {
+		hashRoot.calculateRLP()
+	}
 	return rlpToAltID(hashRoot.rlp), nil
 }
 
@@ -901,16 +904,17 @@ func (t *trieView) insert(
 	}
 
 	branchNode := newNode(key.Take(closestNode.key.length + t.tokenSize + commonPrefixLength))
+	closestNode.addChild(branchNode, t.tokenSize)
 	nodeWithValue := branchNode
 
 	if key.length == branchNode.key.length {
 		// the branch node has exactly the key to be inserted as its key, so set the value on the branch node
 		branchNode.setValue(value)
-		closestNode.addChild(branchNode, t.tokenSize)
+		// closestNode.addChild(branchNode, t.tokenSize)
 	} else {
 		// the key to be inserted is a child of the branch node
 		// create a new node and add the value to it
-		closestNode.addChild(branchNode, t.tokenSize)
+		// closestNode.addChild(branchNode, t.tokenSize)
 		newNode := newNode(key)
 		newNode.setValue(value)
 		branchNode.addChild(newNode, t.tokenSize)
