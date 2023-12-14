@@ -302,7 +302,7 @@ func (n *Network) PopulateNodeConfig(node *Node, nodeParentDir string) error {
 	dataDir := node.GetDataDir()
 	if len(dataDir) == 0 {
 		// NodeID will have been set by EnsureKeys
-		dataDir = filepath.Join(nodeParentDir, node.ID.String())
+		dataDir = filepath.Join(nodeParentDir, node.NodeID.String())
 		flags[config.DataDirKey] = dataDir
 	}
 
@@ -352,7 +352,7 @@ func (n *Network) Start(w io.Writer) error {
 		}
 
 		// Collect bootstrap nodes for subsequently started nodes to use
-		bootstrapIDs = append(bootstrapIDs, node.ID.String())
+		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
 		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
 	}
 
@@ -367,7 +367,7 @@ func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	healthyNodes := set.NewSet[ids.NodeID](len(n.Nodes))
 	for healthyNodes.Len() < len(n.Nodes) {
 		for _, node := range n.Nodes {
-			if healthyNodes.Contains(node.ID) {
+			if healthyNodes.Contains(node.NodeID) {
 				continue
 			}
 
@@ -379,8 +379,8 @@ func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
 				continue
 			}
 
-			healthyNodes.Add(node.ID)
-			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.ID, node.URI); err != nil {
+			healthyNodes.Add(node.NodeID)
+			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
 				return err
 			}
 		}
@@ -404,8 +404,8 @@ func (n *Network) GetURIs() []NodeURI {
 		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
 			uris = append(uris, NodeURI{
-				ID:  node.ID,
-				URI: node.URI,
+				NodeID: node.NodeID,
+				URI:    node.URI,
 			})
 		}
 	}
@@ -418,7 +418,7 @@ func (n *Network) Stop() error {
 	// Assume the nodes are loaded and the pids are current
 	for _, node := range n.Nodes {
 		if err := node.Stop(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.ID, err))
+			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
 	if len(errs) > 0 {
@@ -691,7 +691,7 @@ func (n *Network) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 		}
 
 		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
-		bootstrapIDs = append(bootstrapIDs, node.ID.String())
+		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
 	}
 
 	if len(bootstrapIDs) == 0 {
@@ -719,7 +719,7 @@ func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker,
 			return nil, fmt.Errorf("failed to derive proof of possession: %w", err)
 		}
 		initialStakers[i] = genesis.UnparsedStaker{
-			NodeID:        node.ID,
+			NodeID:        node.NodeID,
 			RewardAddress: rewardAddr,
 			DelegationFee: .01 * reward.PercentDenominator,
 			Signer:        pop,

@@ -91,7 +91,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
-	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.ID, nodeURI.URI)
+	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	return nodeURI
 }
 

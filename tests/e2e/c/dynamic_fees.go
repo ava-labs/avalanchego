@@ -48,8 +48,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		ginkgo.By("initializing a coreth client")
 		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
-			ID:  node.ID,
-			URI: node.URI,
+			NodeID: node.NodeID,
+			URI:    node.URI,
 		}
 		ethClient := e2e.NewEthClient(nodeURI)
 

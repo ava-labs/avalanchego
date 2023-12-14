@@ -76,7 +76,7 @@ func checkConnectedPeers(existingNodes []*tmpnet.Node, newNode *tmpnet.Node) {
 
 	for _, existingNode := range existingNodes {
 		// Check that the existing node is a peer of the new node
-		require.True(peerIDs.Contains(existingNode.ID))
+		require.True(peerIDs.Contains(existingNode.NodeID))
 
 		// Check that the new node is a peer
 		infoClient := info.NewClient(existingNode.URI)
@@ -84,7 +84,7 @@ func checkConnectedPeers(existingNodes []*tmpnet.Node, newNode *tmpnet.Node) {
 		require.NoError(err)
 		isPeer := false
 		for _, peer := range peers {
-			if peer.ID == newNode.ID {
+			if peer.ID == newNode.NodeID {
 				isPeer = true
 				break
 			}

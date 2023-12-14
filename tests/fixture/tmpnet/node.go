@@ -165,12 +165,12 @@ func (n *Node) Start(w io.Writer, defaultExecPath string) error {
 	}
 
 	// Determine appropriate level of node description detail
-	nodeDescription := fmt.Sprintf("node %q", n.ID)
+	nodeDescription := fmt.Sprintf("node %q", n.NodeID)
 	isEphemeralNode := filepath.Base(filepath.Dir(n.GetDataDir())) == defaultEphemeralDirName
 	if isEphemeralNode {
 		nodeDescription = "ephemeral " + nodeDescription
 	}
-	nonDefaultNodeDir := filepath.Base(n.GetDataDir()) != n.ID.String()
+	nonDefaultNodeDir := filepath.Base(n.GetDataDir()) != n.NodeID.String()
 	if nonDefaultNodeDir {
 		// Only include the data dir if its base is not the default (the node ID)
 		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, n.GetDataDir())
@@ -261,7 +261,7 @@ func (n *Node) Stop() error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see node process stop %q before timeout: %w", n.ID, ctx.Err())
+			return fmt.Errorf("failed to see node process stop %q before timeout: %w", n.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -310,12 +310,12 @@ func (n *Node) WaitForProcessContext(ctx context.Context) error {
 	for len(n.URI) == 0 {
 		err := n.ReadProcessContext()
 		if err != nil {
-			return fmt.Errorf("failed to read process context for node %q: %w", n.ID, err)
+			return fmt.Errorf("failed to read process context for node %q: %w", n.NodeID, err)
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.ID, ctx.Err())
+			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}

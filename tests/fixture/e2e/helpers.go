@@ -62,7 +62,7 @@ const (
 
 // Create a new wallet for the provided keychain against the specified node URI.
 func NewWallet(keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {
-	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.ID, nodeURI.URI)
+	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
 		URI:          nodeURI.URI,
 		AVAXKeychain: keychain,
@@ -81,7 +81,7 @@ func NewWallet(keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.W
 
 // Create a new eth client targeting the specified node URI.
 func NewEthClient(nodeURI tmpnet.NodeURI) ethclient.Client {
-	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.ID, nodeURI.URI)
+	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)
@@ -136,7 +136,7 @@ func AddEphemeralNode(network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.No
 	// Ensure node is stopped on teardown. It's configuration is not removed to enable
 	// collection in CI to aid in troubleshooting failures.
 	ginkgo.DeferCleanup(func() {
-		tests.Outf("Shutting down ephemeral node %s\n", node.ID)
+		tests.Outf("Shutting down ephemeral node %s\n", node.NodeID)
 		require.NoError(node.Stop())
 	})
 
@@ -213,7 +213,7 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 	require.NoError(err)
 
 	defer func() {
-		tests.Outf("Shutting down ephemeral node %s\n", node.ID)
+		tests.Outf("Shutting down ephemeral node %s\n", node.NodeID)
 		require.NoError(node.Stop())
 	}()
 

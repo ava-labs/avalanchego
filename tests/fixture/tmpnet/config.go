@@ -153,14 +153,14 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, initialStakers []genesis
 
 // NodeURI associates a node ID with its API URI.
 type NodeURI struct {
-	ID  ids.NodeID
-	URI string
+	NodeID ids.NodeID
+	URI    string
 }
 
 // NodeConfig defines configuration for an AvalancheGo node.
 type NodeConfig struct {
-	ID    ids.NodeID
-	Flags FlagsMap
+	NodeID ids.NodeID
+	Flags  FlagsMap
 }
 
 func NewNodeConfig() *NodeConfig {
@@ -306,7 +306,7 @@ func (nc *NodeConfig) EnsureNodeID() error {
 		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
 	}
 	stakingCert := staking.CertificateFromX509(tlsCert.Leaf)
-	nc.ID = ids.NodeIDFromCert(stakingCert)
+	nc.NodeID = ids.NodeIDFromCert(stakingCert)
 
 	return nil
 }
