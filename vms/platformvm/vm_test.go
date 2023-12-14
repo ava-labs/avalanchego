@@ -493,13 +493,13 @@ func TestAddValidatorCommit(t *testing.T) {
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	nodeID := ids.GenerateTestNodeID()
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)

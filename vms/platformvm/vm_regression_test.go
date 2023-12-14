@@ -47,13 +47,13 @@ import (
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
@@ -468,14 +468,14 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
 	vm, baseDB, mutableSharedMemory := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	nodeID := ids.GenerateTestNodeID()
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
@@ -679,14 +679,14 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
 	vm, baseDB, mutableSharedMemory := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
@@ -997,14 +997,14 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
@@ -1224,6 +1224,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1231,8 +1232,6 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -1445,13 +1444,14 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
-	vm.DurangoTime = mockable.MaxTime
 	subnetID := testSubnet1.TxID
 
 	// setup time
@@ -1728,13 +1728,14 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// setup
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
-	vm.DurangoTime = mockable.MaxTime
 
 	// setup time
 	currentTime := defaultGenesisTime
@@ -1889,13 +1890,14 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// setup
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
-	vm.DurangoTime = mockable.MaxTime
 	subnetID := testSubnet1.TxID
 
 	// setup time
@@ -2101,14 +2103,14 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	// setup
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.DurangoTime = mockable.MaxTime
+
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	subnetID := testSubnet1.TxID
 
