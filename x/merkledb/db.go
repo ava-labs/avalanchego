@@ -631,7 +631,7 @@ func (db *merkleDB) GetRangeProofAtRoot(
 		return nil, ErrEmptyProof
 	}
 
-	historicalTrie, err := db.getHistoricalTrieForRange(rootID, start, end)
+	historicalTrie, err := db.getTrieAtRootForRange(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -694,7 +694,7 @@ func (db *merkleDB) GetChangeProof(
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalTrie, err := db.getHistoricalTrieForRange(endRootID, start, largestKey)
+	historicalTrie, err := db.getTrieAtRootForRange(endRootID, start, largestKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1181,7 +1181,7 @@ func (db *merkleDB) initializeRoot() error {
 // If [end] is Nothing, there's no upper bound on the range.
 // Assumes [db.commitLock] is read locked.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getHistoricalTrieForRange(
+func (db *merkleDB) getTrieAtRootForRange(
 	rootID ids.ID,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
@@ -1195,7 +1195,7 @@ func (db *merkleDB) getHistoricalTrieForRange(
 	if err != nil {
 		return nil, err
 	}
-	return newHistoricalView(db, changeHistory)
+	return newViewWithChanges(db, changeHistory)
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].

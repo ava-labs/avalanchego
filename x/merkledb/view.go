@@ -182,7 +182,7 @@ func newTrieView(
 
 // Creates a view of the db at a historical root using the provided [changes].
 // Returns ErrNoChanges if [changes] is empty.
-func newHistoricalView(
+func newViewWithChanges(
 	db *merkleDB,
 	changes *changeSummary,
 ) (*view, error) {
