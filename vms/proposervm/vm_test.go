@@ -218,7 +218,10 @@ func initTestProposerVM(
 }
 
 func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
-	ctx := context.Background()
+	var (
+		ctx             = context.Background()
+		parentTimestamp = chainTip.Timestamp()
+	)
 	vm.Clock.Set(vm.Clock.Time().Truncate(time.Second))
 
 	for {
@@ -226,18 +229,19 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 			ctx,
 			chainTip.Height()+1,
 			pchainHeight,
-			chainTip.Timestamp(),
+			parentTimestamp,
 			vm.ctx.NodeID,
 			vm.Clock.Time(),
 		)
 
 		switch err {
 		case nil:
-			vm.Clock.Set(chainTip.Timestamp().Add(delay))
+			parentTimestamp = parentTimestamp.Add(delay)
+			vm.Clock.Set(parentTimestamp)
 			return nil
 		case proposer.ErrNoSlotsScheduledInNextFuture:
 			// repeat slot search
-			vm.Clock.Set(vm.Clock.Time().Add(proposer.MaxLookAheadWindow))
+			vm.Clock.Set(parentTimestamp.Add(proposer.MaxLookAheadWindow))
 		default:
 			return err
 		}

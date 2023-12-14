@@ -214,17 +214,19 @@ func (w *windower) MinDelayForProposer(
 	}
 
 	var (
-		slot = TimeToSlot(parentBlockTime, startTime)
+		initialSlot = TimeToSlot(parentBlockTime, startTime)
+		finalSlot   = uint64(MaxLookAheadWindow / WindowDuration)
 
 		source           = prng.NewMT19937_64()
 		validatorWeights = validatorsToWeight(validators)
 		sampler          = sampler.NewDeterministicWeightedWithoutReplacement(source)
 	)
+
 	if err := sampler.Initialize(validatorWeights); err != nil {
 		return 0, err
 	}
 
-	for time.Duration(slot)*WindowDuration <= MaxLookAheadWindow {
+	for slot := initialSlot; slot <= finalSlot; slot++ {
 		seed := chainHeight ^ bits.Reverse64(slot) ^ w.chainSource
 		source.Seed(seed)
 		indices, err := sampler.Sample(1)
@@ -233,11 +235,10 @@ func (w *windower) MinDelayForProposer(
 		}
 
 		if validators[indices[0]].id == nodeID {
-			slotStartTime := parentBlockTime.Add(time.Duration(slot) * WindowDuration)
-			return math.Max(0, slotStartTime.Sub(startTime)), nil
+			return time.Duration(slot-initialSlot) * WindowDuration, nil
 		}
-		slot += 1
 	}
+
 	return 0, ErrNoSlotsScheduledInNextFuture
 }
 
@@ -274,5 +275,8 @@ func validatorsToWeight(validators []validatorData) []uint64 {
 }
 
 func TimeToSlot(baseTime, targetTime time.Time) uint64 {
+	if !targetTime.After(baseTime) {
+		return 0
+	}
 	return uint64(targetTime.Sub(baseTime) / WindowDuration)
 }

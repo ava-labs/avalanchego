@@ -410,7 +410,7 @@ func (vm *VM) getPostDurangoSlotTime(
 		// This node is not scheduled to propose in any nearby slots. To avoid
 		// costly iteration, stop iterating early and only continue iterating if
 		// needed.
-		return currentTime.Add(proposer.MaxLookAheadWindow), nil
+		return parentTimestamp.Add(proposer.MaxLookAheadWindow), nil
 	}
 	if err != nil {
 		vm.ctx.Log.Debug("failed to calculate min delay for proposer",
@@ -425,7 +425,7 @@ func (vm *VM) getPostDurangoSlotTime(
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the subnet config.
 	delay = math.Max(delay, vm.MinBlkDelay)
-	return currentTime.Add(delay), err
+	return parentTimestamp.Add(delay), err
 }
 
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
