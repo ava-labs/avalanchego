@@ -307,7 +307,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
-
 				// Note the duration is more than the maximum
 				tx.Validator.End = 2 + uint64(unsignedTransformTx.MaxStakeDuration)
 				return &tx
@@ -328,10 +327,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				mockState := state.NewMockChain(ctrl)
-				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
-				mockState.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
-				return mockState
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
+				return state
 			},
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
