@@ -605,7 +605,9 @@ func (db *merkleDB) GetRangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	return db.GetRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProof")
+	defer span.End()
+	return getRangeProof(db, start, end, maxLength)
 }
 
 func (db *merkleDB) GetRangeProofAtRoot(
