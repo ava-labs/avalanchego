@@ -440,6 +440,9 @@ func (db *merkleDB) Close() error {
 		return database.ErrClosed
 	}
 
+	// mark all children as no longer valid because the db has closed
+	db.invalidateChildrenExcept(nil)
+
 	db.closed = true
 	db.valueNodeDB.Close()
 	// Flush intermediary nodes to disk.
@@ -1357,6 +1360,5 @@ func cacheEntrySize(key Key, n *node) int {
 	if n == nil {
 		return cacheEntryOverHead + len(key.Bytes())
 	}
-	// nodes cache their bytes representation so the total memory consumed is roughly twice that
-	return cacheEntryOverHead + len(key.Bytes()) + 2*len(n.bytes())
+	return cacheEntryOverHead + len(key.Bytes()) + codec.encodedDBNodeSize(&n.dbNode)
 }

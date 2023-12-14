@@ -278,7 +278,6 @@ func (t *trieView) calculateNodeIDsHelper(n *node) ids.ID {
 			// This child wasn't changed.
 			continue
 		}
-		n.onNodeChanged()
 		childEntry.hasValue = childNodeChange.after.hasValue()
 
 		// Try updating the child and its descendants in a goroutine.
