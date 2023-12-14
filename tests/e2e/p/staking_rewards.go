@@ -58,6 +58,20 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		ginkgo.By("waiting until beta node is healthy")
 		e2e.WaitForHealthy(betaNode)
 
+		ginkgo.By("retrieving alpha node id and pop")
+		alphaNodeURI := alphaNode.GetProcessContext().URI
+		alphaInfoClient := info.NewClient(alphaNodeURI)
+		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(e2e.DefaultContext())
+		require.NoError(err)
+
+		ginkgo.By("retrieving beta node id and pop")
+		betaNodeURI := betaNode.GetProcessContext().URI
+		betaInfoClient := info.NewClient(betaNodeURI)
+		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
+		require.NoError(err)
+
+		pvmClient := platformvm.NewClient(alphaNodeURI)
+
 		ginkgo.By("generating reward keys")
 
 		alphaValidationRewardKey, err := secp256k1.NewPrivateKey()
@@ -90,20 +104,11 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		fundedKey := e2e.Env.AllocatePreFundedKey()
 		keychain.Add(fundedKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.NewWallet(keychain, nodeURI)
+		baseWallet := e2e.NewWallet(keychain, tmpnet.NodeURI{
+			NodeID: alphaNodeID,
+			URI:    alphaNodeURI,
+		})
 		pWallet := baseWallet.P()
-
-		ginkgo.By("retrieving alpha node id and pop")
-		alphaInfoClient := info.NewClient(alphaNode.GetProcessContext().URI)
-		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(e2e.DefaultContext())
-		require.NoError(err)
-
-		ginkgo.By("retrieving beta node id and pop")
-		betaInfoClient := info.NewClient(betaNode.GetProcessContext().URI)
-		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
-		require.NoError(err)
-
-		pvmClient := platformvm.NewClient(alphaNode.GetProcessContext().URI)
 
 		const (
 			delegationPercent = 0.10 // 10%
