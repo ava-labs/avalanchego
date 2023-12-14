@@ -33,7 +33,10 @@ func (n *node) calculateRLP() {
 
 func (n *node) isAccountNode() bool {
 	keyLen := n.key.Length() / 8
-	isAccount := keyLen == 32 && n.value.HasValue()
+	isAccount := keyLen == 32
+	if isAccount && n.value.IsNothing() {
+		panic("account node with no value")
+	}
 	return isAccount
 }
 
