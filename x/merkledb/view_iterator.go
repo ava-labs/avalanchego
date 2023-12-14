@@ -11,26 +11,26 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func (t *trieView) NewIterator() database.Iterator {
-	return t.NewIteratorWithStartAndPrefix(nil, nil)
+func (v *view) NewIterator() database.Iterator {
+	return v.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
-func (t *trieView) NewIteratorWithStart(start []byte) database.Iterator {
-	return t.NewIteratorWithStartAndPrefix(start, nil)
+func (v *view) NewIteratorWithStart(start []byte) database.Iterator {
+	return v.NewIteratorWithStartAndPrefix(start, nil)
 }
 
-func (t *trieView) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	return t.NewIteratorWithStartAndPrefix(nil, prefix)
+func (v *view) NewIteratorWithPrefix(prefix []byte) database.Iterator {
+	return v.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
-func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+func (v *view) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	var (
-		changes   = make([]KeyChange, 0, len(t.changes.values))
+		changes   = make([]KeyChange, 0, len(v.changes.values))
 		startKey  = ToKey(start)
 		prefixKey = ToKey(prefix)
 	)
 
-	for key, change := range t.changes.values {
+	for key, change := range v.changes.values {
 		if len(start) > 0 && startKey.Greater(key) || !key.HasPrefix(prefixKey) {
 			continue
 		}
@@ -46,8 +46,8 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 	})
 
 	return &viewIterator{
-		view:          t,
-		parentIter:    t.parentTrie.NewIteratorWithStartAndPrefix(start, prefix),
+		view:          v,
+		parentIter:    v.parentTrie.NewIteratorWithStartAndPrefix(start, prefix),
 		sortedChanges: changes,
 	}
 }
@@ -55,7 +55,7 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 // viewIterator walks over both the in memory database and the underlying database
 // at the same time.
 type viewIterator struct {
-	view       *trieView
+	view       *view
 	parentIter database.Iterator
 
 	key, value []byte

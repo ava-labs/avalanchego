@@ -179,7 +179,7 @@ type Config struct {
 	Tracer     trace.Tracer
 }
 
-// merkleDB can only be edited by committing changes from a trieView.
+// merkleDB can only be edited by committing changes from a view.
 type merkleDB struct {
 	// Must be held when reading/writing fields.
 	lock sync.RWMutex
@@ -216,7 +216,7 @@ type merkleDB struct {
 	rootID ids.ID
 
 	// Valid children of this trie.
-	childViews []*trieView
+	childViews []*view
 
 	// calculateNodeIDsSema controls the number of goroutines inside
 	// [calculateNodeIDsHelper] at any given time.
@@ -264,7 +264,7 @@ func newDatabase(
 		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:           make([]*trieView, 0, defaultPreallocationSize),
+		childViews:           make([]*view, 0, defaultPreallocationSize),
 		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 		tokenSize:            BranchFactorToTokenSize[config.BranchFactor],
 	}
@@ -879,7 +879,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 
 // commitChanges commits the changes in [trieToCommit] to [db].
 // Assumes [trieToCommit]'s node IDs have been calculated.
-func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) error {
+func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -965,7 +965,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 // moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
 // assumes [db.lock] is held
-func (db *merkleDB) moveChildViewsToDB(trieToCommit *trieView) {
+func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 	trieToCommit.validityTrackingLock.Lock()
 	defer trieToCommit.validityTrackingLock.Unlock()
 
@@ -973,7 +973,7 @@ func (db *merkleDB) moveChildViewsToDB(trieToCommit *trieView) {
 		childView.updateParent(db)
 		db.childViews = append(db.childViews, childView)
 	}
-	trieToCommit.childViews = make([]*trieView, 0, defaultPreallocationSize)
+	trieToCommit.childViews = make([]*view, 0, defaultPreallocationSize)
 }
 
 // CommitToDB is a no-op for db since it is already in sync with itself.
@@ -1122,7 +1122,7 @@ func (db *merkleDB) VerifyChangeProof(
 
 // Invalidates and removes any child views that aren't [exception].
 // Assumes [db.lock] is held.
-func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
+func (db *merkleDB) invalidateChildrenExcept(exception *view) {
 	isTrackedView := false
 
 	for _, childView := range db.childViews {
@@ -1132,7 +1132,7 @@ func (db *merkleDB) invalidateChildrenExcept(exception *trieView) {
 			isTrackedView = true
 		}
 	}
-	db.childViews = make([]*trieView, 0, defaultPreallocationSize)
+	db.childViews = make([]*view, 0, defaultPreallocationSize)
 	if isTrackedView {
 		db.childViews = append(db.childViews, exception)
 	}

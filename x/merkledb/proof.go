@@ -796,7 +796,7 @@ func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byt
 // If [insertChildrenGreaterThan] is Nothing, no children are > [insertChildrenGreaterThan].
 // Assumes [t.lock] is held.
 func addPathInfo(
-	t *trieView,
+	t *view,
 	proofPath []ProofNode,
 	insertChildrenLessThan maybe.Maybe[Key],
 	insertChildrenGreaterThan maybe.Maybe[Key],
@@ -856,7 +856,7 @@ func addPathInfo(
 }
 
 // getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
-func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int) (*trieView, error) {
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int) (*view, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
