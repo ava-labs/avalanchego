@@ -126,7 +126,6 @@ func AdvanceTimeTo(
 		// Invariant: [rewards.Calculate] can never return a [potentialReward]
 		//            such that [supply + potentialReward > maximumSupply].
 		changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
-		numChanges += 1
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
