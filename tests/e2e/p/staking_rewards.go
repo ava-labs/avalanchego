@@ -70,8 +70,6 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
-		pvmClient := platformvm.NewClient(alphaNodeURI)
-
 		ginkgo.By("generating reward keys")
 
 		alphaValidationRewardKey, err := secp256k1.NewPrivateKey()
@@ -115,6 +113,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			delegationShare   = reward.PercentDenominator * delegationPercent
 			weight            = 2_000 * units.Avax
 		)
+
+		pvmClient := platformvm.NewClient(alphaNodeURI)
 
 		ginkgo.By("retrieving supply before inserting validators")
 		supplyAtValidatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
