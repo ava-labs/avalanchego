@@ -69,10 +69,7 @@ func AdvanceTimeTo(
 		return 0, err
 	}
 
-	var (
-		numChanges      uint64 = 0
-		updatedSupplies        = make(map[ids.ID]uint64)
-	)
+	numChanges := uint64(0)
 
 	pendingStakerIterator, err := stateDiff.GetPendingStakerIterator()
 	if err != nil {
@@ -109,12 +106,9 @@ func AdvanceTimeTo(
 			continue
 		}
 
-		supply, ok := updatedSupplies[stakerToRemove.SubnetID]
-		if !ok {
-			supply, err = stateDiff.GetCurrentSupply(stakerToRemove.SubnetID)
-			if err != nil {
-				return 0, err
-			}
+		supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
+		if err != nil {
+			return 0, err
 		}
 
 		rewards, err := GetRewardsCalculator(backend, stateDiff, stakerToRemove.SubnetID)
@@ -131,7 +125,8 @@ func AdvanceTimeTo(
 
 		// Invariant: [rewards.Calculate] can never return a [potentialReward]
 		//            such that [supply + potentialReward > maximumSupply].
-		updatedSupplies[stakerToRemove.SubnetID] = supply + potentialReward
+		changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
+		numChanges += 1
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
@@ -169,12 +164,7 @@ func AdvanceTimeTo(
 			break
 		}
 
-		stateDiff.DeleteCurrentValidator(stakerToRemove)
-		numChanges += 1
-	}
-
-	for subnetID, supply := range updatedSupplies {
-		stateDiff.SetCurrentSupply(subnetID, supply)
+		changes.DeleteCurrentValidator(stakerToRemove)
 		numChanges += 1
 	}
 
