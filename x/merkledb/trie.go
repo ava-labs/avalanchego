@@ -24,13 +24,15 @@ type ViewChanges struct {
 }
 
 type MerkleRootGetter interface {
-	// GetMerkleRoot returns the merkle root of the Trie
+	// GetMerkleRoot returns the merkle root of the trie.
+	// Returns ids.Empty if the trie is empty.
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
 }
 
 type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
+	// Returns ErrEmptyProof if the trie is empty.
 	GetProof(ctx context.Context, keyBytes []byte) (*Proof, error)
 }
 
@@ -46,8 +48,10 @@ type trieInternals interface {
 	// get the node associated with the key without locking
 	getNode(key Key, hasValue bool) (*node, error)
 
-	// get the sentinel node without locking
-	getSentinelNode() *node
+	// If this trie is non-empty, returns the root node.
+	// Must be copied before modification.
+	// Otherwise returns Nothing.
+	getRoot() maybe.Maybe[*node]
 
 	getTokenSize() int
 }
@@ -70,6 +74,7 @@ type Trie interface {
 	// keys in range [start, end].
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
+	// Returns ErrEmptyProof if the trie is empty.
 	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	// NewView returns a new view on top of this Trie where the passed changes
@@ -88,39 +93,25 @@ type View interface {
 	CommitToDB(ctx context.Context) error
 }
 
-// isSentinelNodeTheRoot returns true if the sentinel node of the passed in trie has a value and or multiple child nodes
-// When this is true, the root of the trie is the sentinel node
-// When this is false, the root of the trie is the sentinel node's single child
-func isSentinelNodeTheRoot[T Trie](t T) bool {
-	sentinel := t.getSentinelNode()
-	return sentinel.valueDigest.HasValue() || len(sentinel.children) != 1
-}
-
-func getRoot[T Trie](t T) (*node, error) {
-	sentinel := t.getSentinelNode()
-	if !isSentinelNodeTheRoot(t) {
-		// sentinel has one child, which is the root
-		for index, childEntry := range sentinel.children {
-			return t.getNode(
-				sentinel.key.Extend(ToToken(index, t.getTokenSize()), childEntry.compressedKey),
-				childEntry.hasValue)
-		}
-	}
-
-	return sentinel, nil
-}
-
 // Returns the nodes along the path to [key].
 // The first node is the root, and the last node is either the node with the
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
 func visitPathToKey[T Trie](t T, key Key, visitNode func(*node) error) error {
+	maybeRoot := t.getRoot()
+	if maybeRoot.IsNothing() {
+		return nil
+	}
+	root := maybeRoot.Value()
+	if !key.HasPrefix(root.key) {
+		return nil
+	}
 	var (
-		// all node paths start at the sentinelNode since its nil key is a prefix of all keys
-		currentNode = t.getSentinelNode()
+		// all node paths start at the root
+		currentNode = root
+		tokenSize   = t.getTokenSize()
 		err         error
-		tSize       = t.getTokenSize()
 	)
 	if err := visitNode(currentNode); err != nil {
 		return err
@@ -128,14 +119,14 @@ func visitPathToKey[T Trie](t T, key Key, visitNode func(*node) error) error {
 	// while the entire path hasn't been matched
 	for currentNode.key.length < key.length {
 		// confirm that a child exists and grab its ID before attempting to load it
-		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.length, tSize)]
+		nextChildEntry, hasChild := currentNode.children[key.Token(currentNode.key.length, tokenSize)]
 
-		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentNode.key.length+tSize, tSize) {
+		if !hasChild || !key.iteratedHasPrefix(nextChildEntry.compressedKey, currentNode.key.length+tokenSize, tokenSize) {
 			// there was no child along the path or the child that was there doesn't match the remaining path
 			return nil
 		}
 		// grab the next node along the path
-		currentNode, err = t.getNode(key.Take(currentNode.key.length+tSize+nextChildEntry.compressedKey.length), nextChildEntry.hasValue)
+		currentNode, err = t.getNode(key.Take(currentNode.key.length+tokenSize+nextChildEntry.compressedKey.length), nextChildEntry.hasValue)
 		if err != nil {
 			return err
 		}
@@ -148,6 +139,11 @@ func visitPathToKey[T Trie](t T, key Key, visitNode func(*node) error) error {
 
 // Returns a proof that [bytesPath] is in or not in trie [t].
 func getProof[T Trie](t T, key []byte) (*Proof, error) {
+	root := t.getRoot()
+	if root.IsNothing() {
+		return nil, ErrEmptyProof
+	}
+
 	proof := &Proof{
 		Key: ToKey(key),
 	}
@@ -155,25 +151,18 @@ func getProof[T Trie](t T, key []byte) (*Proof, error) {
 	var closestNode *node
 	if err := visitPathToKey(t, proof.Key, func(n *node) error {
 		closestNode = n
+		// From root --> node from left --> right.
 		proof.Path = append(proof.Path, n.asProofNode())
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	root, err := getRoot(t)
-	if err != nil {
-		return nil, err
-	}
-	// The sentinel node is always the first node in the path.
-	// If the sentinel node is not the root, remove it from the proofPath.
-	if root != t.getSentinelNode() {
-		proof.Path = proof.Path[1:]
 
-		// if there are no nodes in the proof path, add the root to serve as an exclusion proof
-		if len(proof.Path) == 0 {
-			proof.Path = []ProofNode{root.asProofNode()}
-			return proof, nil
-		}
+	if len(proof.Path) == 0 {
+		// No key in [t] is a prefix of [key].
+		// The root alone proves that [key] isn't in [t].
+		proof.Path = append(proof.Path, root.Value().asProofNode())
+		return proof, nil
 	}
 
 	if closestNode.key == proof.Key {
@@ -211,12 +200,17 @@ func getRangeProof[T Trie](
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
+
 	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	}
+
+	if t.getRoot().IsNothing() {
+		return nil, ErrEmptyProof
 	}
 
 	var result RangeProof
@@ -274,17 +268,5 @@ func getRangeProof[T Trie](
 		result.StartProof = result.StartProof[i:]
 	}
 
-	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
-		// If the range is empty, return the root proof.
-		root, err := getRoot(t)
-		if err != nil {
-			return nil, err
-		}
-		rootProof, err := getProof(t, root.key.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		result.EndProof = rootProof.Path
-	}
 	return &result, nil
 }
