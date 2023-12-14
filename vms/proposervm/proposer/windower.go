@@ -30,14 +30,14 @@ const (
 	MaxBuildWindows = 60
 	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
 
-	MaxLookAheadWindow = time.Hour
+	MaxLookAheadSlots  = 720 // 5 secs windows in 1 hour
+	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration
 )
 
 var (
 	_ Windower = (*windower)(nil)
 
-	ErrNoProposersAvailable         = errors.New("no proposers available")
-	ErrNoSlotsScheduledInNextFuture = errors.New("no slots scheduled in next future")
+	ErrNoProposersAvailable = errors.New("no proposers available")
 )
 
 type Windower interface {
@@ -88,7 +88,7 @@ type Windower interface {
 		pChainHeight uint64,
 		parentBlockTime time.Time,
 		nodeID ids.NodeID,
-		startTime time.Time,
+		initialSlot uint64,
 	) (time.Duration, error)
 }
 
@@ -206,7 +206,7 @@ func (w *windower) MinDelayForProposer(
 	pChainHeight uint64,
 	parentBlockTime time.Time,
 	nodeID ids.NodeID,
-	startTime time.Time,
+	initialSlot uint64,
 ) (time.Duration, error) {
 	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
@@ -214,8 +214,7 @@ func (w *windower) MinDelayForProposer(
 	}
 
 	var (
-		initialSlot = TimeToSlot(parentBlockTime, startTime)
-		finalSlot   = uint64(MaxLookAheadWindow / WindowDuration)
+		maxSlot = initialSlot + MaxLookAheadSlots
 
 		source           = prng.NewMT19937_64()
 		validatorWeights = validatorsToWeight(validators)
@@ -226,7 +225,7 @@ func (w *windower) MinDelayForProposer(
 		return 0, err
 	}
 
-	for slot := initialSlot; slot <= finalSlot; slot++ {
+	for slot := initialSlot; slot < maxSlot; slot++ {
 		seed := chainHeight ^ bits.Reverse64(slot) ^ w.chainSource
 		source.Seed(seed)
 		indices, err := sampler.Sample(1)
@@ -235,11 +234,12 @@ func (w *windower) MinDelayForProposer(
 		}
 
 		if validators[indices[0]].id == nodeID {
-			return time.Duration(slot-initialSlot) * WindowDuration, nil
+			return time.Duration(slot) * WindowDuration, nil
 		}
 	}
 
-	return 0, ErrNoSlotsScheduledInNextFuture
+	// no slots scheduled for the max window we inspect. Return max delay
+	return time.Duration(maxSlot) * WindowDuration, nil
 }
 
 func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([]validatorData, error) {

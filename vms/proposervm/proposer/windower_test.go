@@ -348,95 +348,106 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		chainHeight     = uint64(1)
 		pChainHeight    = uint64(0)
 		parentBlockTime = time.Now().Truncate(time.Second)
-		blockTime       = parentBlockTime.Add(time.Second)
+		currentSlot     = uint64(0)
 	)
 
 	{
 		// base case. Next tests are variations on top of this.
+		var (
+			expectedDelay = time.Duration(currentSlot) * WindowDuration
+			blockTime     = parentBlockTime.Add(expectedDelay)
+		)
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[2], proposerID)
-
-		// proposerID is the scheduled proposer. It may start with no further delay
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
-		require.NoError(err)
-		require.Zero(delay)
-	}
-
-	{
-		// proposerID won't change within the same slot
-		blockTime = parentBlockTime.Add(WindowDuration).Add(-1 * time.Second)
-		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
-		require.NoError(err)
-		require.Equal(validatorIDs[2], proposerID)
-
-		// proposerID is the scheduled proposer. It may start with no further delay
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
-		require.NoError(err)
-		require.Zero(delay)
 	}
 
 	{
 		// proposerID changes with new slot
+		var (
+			currentSlot   = uint64(1)
+			expectedDelay = time.Duration(currentSlot) * WindowDuration
+			blockTime     = parentBlockTime.Add(expectedDelay)
+		)
 		blockTime = parentBlockTime.Add(WindowDuration)
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[0], proposerID)
-
-		// proposerID is the scheduled proposer. It may start with no further delay
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
-		require.NoError(err)
-		require.Zero(delay)
 	}
 
 	{
 		// proposerID changes with new slot
-		blockTime = parentBlockTime.Add(2 * WindowDuration)
+		var (
+			currentSlot   = uint64(2)
+			expectedDelay = time.Duration(currentSlot) * WindowDuration
+			blockTime     = parentBlockTime.Add(expectedDelay)
+		)
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[9], proposerID)
-
-		// proposerID is the scheduled proposer. It may start with no further delay
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
-		require.NoError(err)
-		require.Zero(delay)
 	}
 
 	{
-		// ExpectedProposer can return the proposer starting the end of the lookup window
-		blockTime = parentBlockTime.Add(MaxLookAheadWindow)
+		// proposerID at last inspected slot
+		var (
+			currentSlot   = MaxLookAheadSlots
+			expectedDelay = time.Duration(currentSlot) * WindowDuration
+			blockTime     = parentBlockTime.Add(expectedDelay)
+		)
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[4], proposerID)
+	}
+}
 
-		// MinDelayForProposer won't err when blockTime is at the end of the lookup window
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
-		require.NoError(err)
-		require.Zero(delay)
+func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		subnetID = ids.ID{0, 1}
+		chainID  = ids.ID{0, 2}
+
+		validatorsCount = 10
+	)
+
+	validatorIDs := make([]ids.NodeID, validatorsCount)
+	for i := range validatorIDs {
+		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
+	}
+	vdrState := &validators.TestState{
+		T: t,
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
+			for _, id := range validatorIDs {
+				vdrs[id] = &validators.GetValidatorOutput{
+					NodeID: id,
+					Weight: 1,
+				}
+			}
+			return vdrs, nil
+		},
 	}
 
-	{
-		// ExpectedProposer can return the proposer starting right after end of the lookup window
-		blockTime = parentBlockTime.Add(MaxLookAheadWindow + WindowDuration - time.Second)
+	w := New(vdrState, subnetID, chainID)
+
+	var (
+		dummyCtx        = context.Background()
+		chainHeight     = uint64(1)
+		pChainHeight    = uint64(0)
+		parentBlockTime = time.Now().Truncate(time.Second)
+	)
+
+	for slot := uint64(0); slot < 3*MaxLookAheadSlots; slot++ {
+		var (
+			expectedDelay = time.Duration(slot) * WindowDuration
+			blockTime     = parentBlockTime.Add(expectedDelay)
+		)
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
-		require.Equal(validatorIDs[4], proposerID)
 
-		// MinDelayForProposer won't err when blockTime is at the end of the lookup window
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		// proposerID is the scheduled proposer. It may start with the expected delay
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, slot)
 		require.NoError(err)
-		require.Zero(delay)
-	}
-
-	{
-		// ExpectedProposer can return the proposer starting right after end of the lookup window
-		blockTime = parentBlockTime.Add(MaxLookAheadWindow + WindowDuration)
-		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
-		require.NoError(err)
-		require.Equal(validatorIDs[6], proposerID)
-
-		// MinDelayForProposer won't err when blockTime is at the end of the lookup window
-		_, err = w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
-		require.ErrorIs(err, ErrNoSlotsScheduledInNextFuture)
+		require.Equal(expectedDelay, delay)
 	}
 }

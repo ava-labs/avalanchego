@@ -429,7 +429,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 	{
 		// no slots within inspected window
 		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(time.Duration(0), proposer.ErrNoSlotsScheduledInNextFuture).AnyTimes()
+			Return(proposer.MaxLookAheadWindow, nil).AnyTimes()
 
 		// we mock the scheduler setting the exact time we expect it to be reset to
 		expectedSchedulerTime := parentTimestamp.Add(proposer.MaxLookAheadWindow)

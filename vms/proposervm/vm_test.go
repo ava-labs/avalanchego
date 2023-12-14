@@ -231,7 +231,7 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 			pchainHeight,
 			parentTimestamp,
 			vm.ctx.NodeID,
-			vm.Clock.Time(),
+			proposer.TimeToSlot(parentTimestamp, vm.Clock.Time()),
 		)
 
 		switch err {
@@ -239,9 +239,6 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 			parentTimestamp = parentTimestamp.Add(delay)
 			vm.Clock.Set(parentTimestamp)
 			return nil
-		case proposer.ErrNoSlotsScheduledInNextFuture:
-			// repeat slot search
-			vm.Clock.Set(parentTimestamp.Add(proposer.MaxLookAheadWindow))
 		default:
 			return err
 		}

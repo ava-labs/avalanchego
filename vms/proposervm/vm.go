@@ -404,14 +404,8 @@ func (vm *VM) getPostDurangoSlotTime(
 		pChainHeight,
 		parentTimestamp,
 		vm.ctx.NodeID,
-		currentTime,
+		proposer.TimeToSlot(parentTimestamp, currentTime),
 	)
-	if errors.Is(err, proposer.ErrNoSlotsScheduledInNextFuture) {
-		// This node is not scheduled to propose in any nearby slots. To avoid
-		// costly iteration, stop iterating early and only continue iterating if
-		// needed.
-		return parentTimestamp.Add(proposer.MaxLookAheadWindow), nil
-	}
 	if err != nil {
 		vm.ctx.Log.Debug("failed to calculate min delay for proposer",
 			zap.Error(err),
