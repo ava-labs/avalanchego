@@ -286,6 +286,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		env.ctx.Lock.Unlock()
 	}()
 
+	// The [StartTime] in a staker tx is only validated pre-Durango.
+	// TODO: Delete this test post-Durango activation.
 	env.config.DurangoTime = mockable.MaxTime
 	require.True(env.config.IsCortinaActivated(env.state.GetTimestamp()))
 	require.False(env.config.IsDurangoActivated(env.state.GetTimestamp()))
@@ -386,6 +388,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.Lock.Unlock()
 	}()
 
+	// Post-Durango, [StartTime] is no longer validated. Staking durations are
+	// based on the current chain timestamp and must be validated.
 	env.config.DurangoTime = time.Time{}
 	require.True(env.config.IsDurangoActivated(env.state.GetTimestamp()))
 
@@ -430,7 +434,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	tx2ID := tx2.ID()
 	require.True(env.mempool.Has(tx2ID))
 
-	// Only tx1 should be in a built block
+	// Only tx1 should be in a built block since [MaxStakeDuration] is satisfied.
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 

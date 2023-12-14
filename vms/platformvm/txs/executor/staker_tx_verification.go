@@ -45,7 +45,7 @@ var (
 // network requirements for [subnetValidator]. An error is returned if they
 // are not fulfilled.
 func verifySubnetValidatorPrimaryNetworkRequirements(
-	backend *Backend,
+	isDurangoActive bool,
 	chainState state.Chain,
 	subnetValidator txs.Validator,
 ) error {
@@ -69,13 +69,13 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	// is a subset of the time they validate the primary network.
 	var (
 		currentChainTime = chainState.GetTimestamp()
-		stakerStart      = subnetValidator.StartTime()
+		startTime        = currentChainTime
 	)
-	if backend.Config.IsDurangoActivated(currentChainTime) {
-		stakerStart = currentChainTime
+	if !isDurangoActive {
+		startTime = subnetValidator.StartTime()
 	}
 	if !txs.BoundedBy(
-		stakerStart,
+		startTime,
 		subnetValidator.EndTime(),
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
@@ -105,13 +105,13 @@ func verifyAddValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
-
+	duration := tx.EndTime().Sub(startTime)
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
@@ -143,7 +143,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -179,7 +179,7 @@ func verifyAddValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -197,12 +197,13 @@ func verifyAddSubnetValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	switch {
 	case duration < backend.Config.MinStakeDuration:
@@ -219,7 +220,7 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -240,7 +241,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
+	if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
 		return err
 	}
 
@@ -265,7 +266,7 @@ func verifyAddSubnetValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -354,12 +355,13 @@ func verifyAddDelegatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	switch {
 	case duration < backend.Config.MinStakeDuration:
@@ -384,7 +386,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -450,7 +452,7 @@ func verifyAddDelegatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -472,15 +474,16 @@ func verifyAddPermissionlessValidatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -541,7 +544,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
-		if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
+		if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
 			return err
 		}
 
@@ -570,7 +573,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -592,15 +595,16 @@ func verifyAddPermissionlessDelegatorTx(
 
 	var (
 		currentTimestamp = chainState.GetTimestamp()
-		duration         = tx.EndTime().Sub(currentTimestamp)
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
-		duration = tx.EndTime().Sub(tx.StartTime())
+		startTime = tx.StartTime()
 	}
+	duration := tx.EndTime().Sub(startTime)
 
 	// Ensure the proposed validator starts after the current time
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime()); err != nil {
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
 	}
 
@@ -717,7 +721,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, tx.StartTime())
+	return verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
 }
 
 // Returns an error if the given tx is invalid.
