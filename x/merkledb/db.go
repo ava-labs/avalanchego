@@ -443,6 +443,13 @@ func (db *merkleDB) Close() error {
 	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
+func (db *merkleDB) isClosed() bool {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.closed
+}
+
 func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
