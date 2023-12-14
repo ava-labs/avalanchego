@@ -2111,7 +2111,6 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 		vm.ctx.Lock.Unlock()
 	}()
-
 	subnetID := testSubnet1.TxID
 
 	// setup time
