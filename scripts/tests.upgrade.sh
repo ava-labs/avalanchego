@@ -3,14 +3,21 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/tests.upgrade.sh 1.7.16
-# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.7.16 # Customization of avalanchego path
+# ./scripts/tests.upgrade.sh                                                # Use default version
+# ./scripts/tests.upgrade.sh 1.10.18                                        # Specify a version
+# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.10.18 # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
 
-VERSION="${1:-}"
+# 1.10.17 is the first version compatible with bls signing keys being
+# included in the genesis. Attempting to upgrade from prior versions
+# will result in nodes failing to boot due to the hash of the genesis
+# not matching the hash of the committed genesis block.
+DEFAULT_VERSION="1.10.17"
+
+VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
   echo "Usage: ${0} [VERSION]" >>/dev/stderr

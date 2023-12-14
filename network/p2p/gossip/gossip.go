@@ -23,6 +23,7 @@ import (
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[testTx, *testTx])(nil)
+	_ Gossiper = (*NoOpGossiper)(nil)
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -195,4 +196,10 @@ func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency
 			return
 		}
 	}
+}
+
+type NoOpGossiper struct{}
+
+func (NoOpGossiper) Gossip(context.Context) error {
+	return nil
 }

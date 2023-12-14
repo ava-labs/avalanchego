@@ -9,7 +9,6 @@ package mempool
 
 import (
 	reflect "reflect"
-	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -51,20 +50,6 @@ func (m *MockMempool) Add(arg0 *txs.Tx) error {
 func (mr *MockMempoolMockRecorder) Add(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockMempool)(nil).Add), arg0)
-}
-
-// DropExpiredStakerTxs mocks base method.
-func (m *MockMempool) DropExpiredStakerTxs(arg0 time.Time) []ids.ID {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DropExpiredStakerTxs", arg0)
-	ret0, _ := ret[0].([]ids.ID)
-	return ret0
-}
-
-// DropExpiredStakerTxs indicates an expected call of DropExpiredStakerTxs.
-func (mr *MockMempoolMockRecorder) DropExpiredStakerTxs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DropExpiredStakerTxs", reflect.TypeOf((*MockMempool)(nil).DropExpiredStakerTxs), arg0)
 }
 
 // Get mocks base method.

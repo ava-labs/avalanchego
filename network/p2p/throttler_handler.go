@@ -20,25 +20,41 @@ var (
 	_            Handler = (*ThrottlerHandler)(nil)
 )
 
+func NewThrottlerHandler(handler Handler, throttler Throttler, log logging.Logger) *ThrottlerHandler {
+	return &ThrottlerHandler{
+		handler:   handler,
+		throttler: throttler,
+		log:       log,
+	}
+}
+
 type ThrottlerHandler struct {
-	Handler
-	Throttler Throttler
-	Log       logging.Logger
+	handler   Handler
+	throttler Throttler
+	log       logging.Logger
 }
 
 func (t ThrottlerHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
-	if !t.Throttler.Handle(nodeID) {
-		t.Log.Debug("dropping message", zap.Stringer("nodeID", nodeID))
+	if !t.throttler.Handle(nodeID) {
+		t.log.Debug(
+			"dropping message",
+			zap.Stringer("nodeID", nodeID),
+			zap.String("reason", "throttled"),
+		)
 		return
 	}
 
-	t.Handler.AppGossip(ctx, nodeID, gossipBytes)
+	t.handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
 func (t ThrottlerHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if !t.Throttler.Handle(nodeID) {
+	if !t.throttler.Handle(nodeID) {
 		return nil, fmt.Errorf("dropping message from %s: %w", nodeID, ErrThrottled)
 	}
 
-	return t.Handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+	return t.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
+
+func (t ThrottlerHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	return t.handler.CrossChainAppRequest(ctx, chainID, deadline, requestBytes)
 }
