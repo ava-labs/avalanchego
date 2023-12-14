@@ -30,8 +30,8 @@ const (
 	MaxBuildWindows = 60
 	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
 
-	MaxLookAheadSlots  = 720 // 1 hour
-	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration
+	MaxLookAheadSlots  uint64 = 720 // 1 hour
+	MaxLookAheadWindow        = time.Duration(MaxLookAheadSlots) * WindowDuration
 )
 
 var (
@@ -67,13 +67,12 @@ type Windower interface {
 	// at [pChainHeight] gets specific slots it can propose in (instead
 	// of being able to propose from a given time on as it happens Pre-Durango).
 	// [ExpectedProposer] calculates which nodeID is scheduled to propose
-	// a block of height [blockHeight] at [blockTime].
+	// a block of height [blockHeight] at [slot].
 	ExpectedProposer(
 		ctx context.Context,
 		blockHeight,
-		pChainHeight uint64,
-		parentBlockTime,
-		blockTime time.Time,
+		pChainHeight,
+		slot uint64,
 	) (ids.NodeID, error)
 
 	// In the Post-Durango windowing scheme, every validator active
@@ -171,9 +170,8 @@ func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, 
 func (w *windower) ExpectedProposer(
 	ctx context.Context,
 	blockHeight,
-	pChainHeight uint64,
-	parentBlockTime,
-	blockTime time.Time,
+	pChainHeight,
+	slot uint64,
 ) (ids.NodeID, error) {
 	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
@@ -181,7 +179,6 @@ func (w *windower) ExpectedProposer(
 	}
 
 	var (
-		slot             = uint64(blockTime.Sub(parentBlockTime) / WindowDuration)
 		seed             = blockHeight ^ bits.Reverse64(slot) ^ w.chainSource
 		source           = prng.NewMT19937_64()
 		validatorWeights = validatorsToWeight(validators)
@@ -205,7 +202,7 @@ func (w *windower) MinDelayForProposer(
 	chainHeight,
 	pChainHeight uint64,
 	nodeID ids.NodeID,
-	initialSlot uint64,
+	slot uint64,
 ) (time.Duration, error) {
 	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
@@ -213,7 +210,7 @@ func (w *windower) MinDelayForProposer(
 	}
 
 	var (
-		maxSlot = initialSlot + MaxLookAheadSlots
+		maxSlot = slot + MaxLookAheadSlots
 
 		source           = prng.NewMT19937_64()
 		validatorWeights = validatorsToWeight(validators)
@@ -224,7 +221,7 @@ func (w *windower) MinDelayForProposer(
 		return 0, err
 	}
 
-	for slot := initialSlot; slot < maxSlot; slot++ {
+	for slot := slot; slot < maxSlot; slot++ {
 		seed := chainHeight ^ bits.Reverse64(slot) ^ w.chainSource
 		source.Seed(seed)
 		indices, err := sampler.Sample(1)

@@ -376,8 +376,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		ctx,
 		blkHeight,
 		parentPChainHeight,
-		parentTimestamp,
-		blkTimestamp,
+		proposer.TimeToSlot(parentTimestamp, blkTimestamp),
 	)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected block verification failure",
@@ -406,8 +405,7 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,
-		parentTimestamp,
-		newTimestamp,
+		proposer.TimeToSlot(parentTimestamp, newTimestamp),
 	)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected build block failure",
