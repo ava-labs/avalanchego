@@ -101,10 +101,11 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		keychain := secp256k1fx.NewKeychain(rewardKeys...)
 		fundedKey := e2e.Env.AllocatePreFundedKey()
 		keychain.Add(fundedKey)
-		baseWallet := e2e.NewWallet(keychain, tmpnet.NodeURI{
+		nodeURI := tmpnet.NodeURI{
 			NodeID: alphaNodeID,
 			URI:    alphaNodeURI,
-		})
+		}
+		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
 
 		const (
