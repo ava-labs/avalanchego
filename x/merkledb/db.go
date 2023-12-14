@@ -32,13 +32,13 @@ import (
 )
 
 const (
-
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
 	clearBatchSize                       = units.MiB
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
+	cacheEntryOverHead                   = 8
 )
 
 var (
@@ -1352,10 +1352,10 @@ func getBufferFromPool(bufferPool *sync.Pool, size int) []byte {
 	return buffer
 }
 
-// cacheEntrySize returns a rough approximation of the memory consumed by storing the key and node
+// cacheEntrySize returns a rough approximation of the memory consumed by storing the key and node.
 func cacheEntrySize(key Key, n *node) int {
 	if n == nil {
-		return len(key.Bytes())
+		return cacheEntryOverHead + len(key.Bytes())
 	}
-	return len(key.Bytes()) + codec.encodedDBNodeSize(&n.dbNode)
+	return cacheEntryOverHead + len(key.Bytes()) + codec.encodedDBNodeSize(&n.dbNode)
 }
