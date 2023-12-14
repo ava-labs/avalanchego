@@ -360,6 +360,13 @@ func (h *handler) AwaitStopped(ctx context.Context) (time.Duration, error) {
 	}
 }
 
+func firstN(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
+}
+
 func (h *handler) dispatchSync(ctx context.Context) {
 	defer h.closeDispatcher(ctx)
 
@@ -377,7 +384,7 @@ func (h *handler) dispatchSync(ctx context.Context) {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing sync message: %s",
 				err,
-				msg,
+				firstN(msg.String(), 100),
 			))
 			return
 		}
