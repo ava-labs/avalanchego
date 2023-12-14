@@ -1255,7 +1255,7 @@ func TestGetRangeProofAtRootEmptyRootID(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
-	_, err = db.getRangeProofAtRoot(
+	_, err = db.GetRangeProofAtRoot(
 		context.Background(),
 		ids.Empty,
 		maybe.Nothing[[]byte](),
