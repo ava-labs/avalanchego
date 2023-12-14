@@ -362,12 +362,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				mockState := state.NewMockChain(ctrl)
-				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
-				mockState.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				// State says validator exists
-				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, nil)
-				return mockState
+				state.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, nil)
+				return state
 			},
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
