@@ -171,6 +171,8 @@ type Config struct {
 	Reg        prometheus.Registerer
 	TraceLevel TraceLevel
 	Tracer     trace.Tracer
+
+	ForceRebuild bool
 }
 
 // merkleDB can only be edited by committing changes from a trieView.
@@ -277,7 +279,7 @@ func newDatabase(
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
 	switch err {
 	case nil:
-		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
+		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) || config.ForceRebuild {
 			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
 				return nil, err
 			}
