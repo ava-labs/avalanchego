@@ -37,7 +37,7 @@ var (
 	)
 	ErrVisitPathToKey         = errors.New("failed to visit expected node during insertion")
 	ErrStartAfterEnd          = errors.New("start key > end key")
-	ErrNoValidRoot            = errors.New("a valid root was not provided to the trieView constructor")
+	ErrNoChanges              = errors.New("no changes provided")
 	ErrParentNotDatabase      = errors.New("parent trie is not database")
 	ErrNodesAlreadyCalculated = errors.New("cannot modify the trie after the node changes have been calculated")
 )
@@ -96,9 +96,8 @@ type trieView struct {
 
 	db *merkleDB
 
-	// The nil key node
-	// It is either the root of the trie or the root of the trie is its single child node
-	sentinelNode *node
+	// The root of the trie represented by this view.
+	root maybe.Maybe[*node]
 
 	tokenSize int
 }
@@ -142,26 +141,17 @@ func (t *trieView) NewView(
 }
 
 // Creates a new view with the given [parentTrie].
-// Assumes [parentTrie] isn't locked.
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
 	changes ViewChanges,
 ) (*trieView, error) {
-	sentinelNode, err := parentTrie.getEditableNode(Key{}, false /* hasValue */)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrNoValidRoot
-		}
-		return nil, err
-	}
-
 	newView := &trieView{
-		sentinelNode: sentinelNode,
-		db:           db,
-		parentTrie:   parentTrie,
-		changes:      newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
-		tokenSize:    db.tokenSize,
+		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		tokenSize:  db.tokenSize,
 	}
 
 	for _, op := range changes.BatchOps {
@@ -192,32 +182,32 @@ func newTrieView(
 	return newView, nil
 }
 
-// Creates a view of the db at a historical root using the provided changes
+// Creates a view of the db at a historical root using the provided [changes].
+// Returns ErrNoChanges if [changes] is empty.
 func newHistoricalTrieView(
 	db *merkleDB,
 	changes *changeSummary,
 ) (*trieView, error) {
 	if changes == nil {
-		return nil, ErrNoValidRoot
-	}
-
-	passedSentinelChange, ok := changes.nodes[Key{}]
-	if !ok {
-		return nil, ErrNoValidRoot
+		return nil, ErrNoChanges
 	}
 
 	newView := &trieView{
-		sentinelNode: passedSentinelChange.after,
-		db:           db,
-		parentTrie:   db,
-		changes:      changes,
-		tokenSize:    db.tokenSize,
+		root:       changes.rootChange.after,
+		db:         db,
+		parentTrie: db,
+		changes:    changes,
+		tokenSize:  db.tokenSize,
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
 	newView.calculateNodesOnce.Do(func() {})
 	newView.nodesAlreadyCalculated.Set(true)
 	return newView, nil
+}
+
+func (t *trieView) getRoot() maybe.Maybe[*node] {
+	return t.root
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
@@ -230,6 +220,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			return
 		}
 		defer t.nodesAlreadyCalculated.Set(true)
+
+		oldRoot := maybe.Bind(t.root, (*node).clone)
 
 		// We wait to create the span until after checking that we need to actually
 		// calculateNodeIDs to make traces more useful (otherwise there may be a span
@@ -250,15 +242,17 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.changes.rootID = t.calculateNodeIDsHelper(t.sentinelNode)
-		t.db.calculateNodeIDsSema.Release(1)
+		if !t.root.IsNothing() {
+			_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
+			t.changes.rootID = t.calculateNodeIDsHelper(t.root.Value())
+			t.db.calculateNodeIDsSema.Release(1)
+		} else {
+			t.changes.rootID = ids.Empty
+		}
 
-		// If the sentinel node is not the root, the trie's root is the sentinel node's only child
-		if !isSentinelNodeTheRoot(t.sentinelNode) {
-			for _, childEntry := range t.sentinelNode.children {
-				t.changes.rootID = childEntry.id
-			}
+		t.changes.rootChange = change[maybe.Maybe[*node]]{
+			before: oldRoot,
+			after:  t.root,
 		}
 
 		// ensure no ancestor changes occurred during execution
@@ -320,10 +314,14 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	return t.getProof(ctx, key)
 }
 
-// Returns a proof that [bytesPath] is in or not in trie [t].
+// Returns a proof that [key] is in or not in [t].
 func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.getProof")
 	defer span.End()
+
+	if t.root.IsNothing() {
+		return nil, ErrEmptyProof
+	}
 
 	proof := &Proof{
 		Key: ToKey(key),
@@ -332,26 +330,18 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	var closestNode *node
 	if err := t.visitPathToKey(proof.Key, func(n *node) error {
 		closestNode = n
+		// From root --> node from left --> right.
 		proof.Path = append(proof.Path, n.asProofNode())
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	root, err := t.getRoot()
-	if err != nil {
-		return nil, err
-	}
 
-	// The sentinel node is always the first node in the path.
-	// If the sentinel node is not the root, remove it from the proofPath.
-	if root != t.sentinelNode {
-		proof.Path = proof.Path[1:]
-
-		// if there are no nodes in the proof path, add the root to serve as an exclusion proof
-		if len(proof.Path) == 0 {
-			proof.Path = []ProofNode{root.asProofNode()}
-			return proof, nil
-		}
+	if len(proof.Path) == 0 {
+		// No key in [t] is a prefix of [key].
+		// The root alone proves that [key] isn't in [t].
+		proof.Path = append(proof.Path, t.root.Value().asProofNode())
+		return proof, nil
 	}
 
 	if closestNode.key == proof.Key {
@@ -407,6 +397,10 @@ func (t *trieView) GetRangeProof(
 		return nil, err
 	}
 
+	if t.root.IsNothing() {
+		return nil, ErrEmptyProof
+	}
+
 	var result RangeProof
 
 	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
@@ -460,19 +454,6 @@ func (t *trieView) GetRangeProof(
 			result.StartProof[i].Key == result.EndProof[i].Key; i++ {
 		}
 		result.StartProof = result.StartProof[i:]
-	}
-
-	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
-		// If the range is empty, return the root proof.
-		root, err := t.getRoot()
-		if err != nil {
-			return nil, err
-		}
-		rootProof, err := t.getProof(ctx, root.key.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		result.EndProof = rootProof.Path
 	}
 
 	if t.isInvalid() {
@@ -630,14 +611,14 @@ func (t *trieView) remove(key Key) error {
 	keyNode, err := t.getNode(key, true)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			// key didn't exist
+			// [key] isn't in the trie.
 			return nil
 		}
 		return err
 	}
 
-	// node doesn't contain a value
 	if !keyNode.hasValue() {
+		// [key] doesn't have a value.
 		return nil
 	}
 
@@ -655,43 +636,50 @@ func (t *trieView) remove(key Key) error {
 	}
 
 	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if len(nodeToDelete.children) != 0 {
-		// merge this node and its child into a single node if possible
-		return t.compressNodePath(parent, nodeToDelete)
-	}
 
 	// if the removed node has no children, the node can be removed from the trie
-	if err := t.recordNodeDeleted(nodeToDelete); err != nil {
-		return err
-	}
-	if parent != nil {
+	if len(nodeToDelete.children) == 0 {
+		if err := t.recordNodeDeleted(nodeToDelete); err != nil {
+			return err
+		}
+
+		if nodeToDelete.key == t.root.Value().key {
+			// We deleted the root. The trie is empty now.
+			t.root = maybe.Nothing[*node]()
+			return nil
+		}
+
+		// Note [parent] != nil since [nodeToDelete.key] != [t.root.key].
+		// i.e. There's the root and at least one more node.
 		parent.removeChild(nodeToDelete, t.tokenSize)
 
 		// merge the parent node and its child into a single node if possible
 		return t.compressNodePath(grandParent, parent)
 	}
-	return nil
+
+	// merge this node and its descendants into a single node if possible
+	return t.compressNodePath(parent, nodeToDelete)
 }
 
-// Merges together nodes in the inclusive descendants of [node] that
+// Merges together nodes in the inclusive descendants of [n] that
 // have no value and a single child into one node with a compressed
 // path until a node that doesn't meet those criteria is reached.
-// [parent] is [node]'s parent.
+// [parent] is [n]'s parent. If [parent] is nil, [n] is the root
+// node and [t.root] is updated to [n].
 // Assumes at least one of the following is true:
-// * [node] has a value.
-// * [node] has children.
+// * [n] has a value.
+// * [n] has children.
 // Must not be called after [calculateNodeIDs] has returned.
-func (t *trieView) compressNodePath(parent, node *node) error {
+func (t *trieView) compressNodePath(parent, n *node) error {
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
 
-	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
-	if parent == nil || len(node.children) != 1 || node.hasValue() {
+	if len(n.children) != 1 || n.hasValue() {
 		return nil
 	}
 
-	if err := t.recordNodeDeleted(node); err != nil {
+	if err := t.recordNodeDeleted(n); err != nil {
 		return err
 	}
 
@@ -702,13 +690,20 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	// There is only one child, but we don't know the index.
 	// "Cycle" over the key/values to find the only child.
 	// Note this iteration once because len(node.children) == 1.
-	for index, entry := range node.children {
-		childKey = node.key.Extend(ToToken(index, t.tokenSize), entry.compressedKey)
+	for index, entry := range n.children {
+		childKey = n.key.Extend(ToToken(index, t.tokenSize), entry.compressedKey)
 		childEntry = entry
 	}
 
-	// [node] is the first node with multiple children.
-	// combine it with the [node] passed in.
+	if parent == nil {
+		root, err := t.getNode(childKey, childEntry.hasValue)
+		if err != nil {
+			return err
+		}
+		t.root = maybe.Some(root)
+		return nil
+	}
+
 	parent.setChildEntry(childKey.Token(parent.key.length, t.tokenSize),
 		&child{
 			compressedKey: childKey.Skip(parent.key.length + t.tokenSize),
@@ -718,15 +713,21 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 	return t.recordNodeChange(parent)
 }
 
-// Returns the nodes along the path to [key].
-// The first node is the root, and the last node is either the node with the
-// given [key], if it's in the trie, or the node with the largest prefix of
-// the [key] if it isn't in the trie.
-// Always returns at least the root node.
+// Calls [visitNode] on each node along the path to [key].
+// The first node (if any) is the root, and the last node is either the
+// node with the given [key], if it's in [t], or the node with the
+// largest prefix of [key] otherwise.
 func (t *trieView) visitPathToKey(key Key, visitNode func(*node) error) error {
+	if t.root.IsNothing() {
+		return nil
+	}
+	root := t.root.Value()
+	if !key.HasPrefix(root.key) {
+		return nil
+	}
 	var (
-		// all node paths start at the sentinelNode since its nil key is a prefix of all keys
-		currentNode = t.sentinelNode
+		// all node paths start at the root
+		currentNode = root
 		err         error
 	)
 	if err := visitNode(currentNode); err != nil {
@@ -785,12 +786,47 @@ func (t *trieView) insert(
 		return nil, ErrNodesAlreadyCalculated
 	}
 
+	if t.root.IsNothing() {
+		// the trie is empty, so create a new root node.
+		root := newNode(key)
+		root.setValue(value)
+		t.root = maybe.Some(root)
+		return root, t.recordNewNode(root)
+	}
+
+	// Find the node that most closely matches [key].
 	var closestNode *node
 	if err := t.visitPathToKey(key, func(n *node) error {
 		closestNode = n
+		// Need to recalculate ID for all nodes on path to [key].
 		return t.recordNodeChange(n)
 	}); err != nil {
 		return nil, err
+	}
+
+	if closestNode == nil {
+		// [t.root.key] isn't a prefix of [key].
+		var (
+			oldRoot            = t.root.Value()
+			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, t.tokenSize)
+			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
+			newRoot            = newNode(commonPrefix)
+			oldRootID          = oldRoot.calculateID(t.db.metrics)
+		)
+
+		// Call addChildWithID instead of addChild so the old root is added
+		// to the new root with the correct ID.
+		// TODO:
+		// [oldRootID] shouldn't need to be calculated here.
+		// Either oldRootID should already be calculated or will be calculated at the end with the other nodes
+		// Initialize the t.changes.rootID during newTrieView and then use that here instead of oldRootID
+		newRoot.addChildWithID(oldRoot, t.tokenSize, oldRootID)
+		if err := t.recordNewNode(newRoot); err != nil {
+			return nil, err
+		}
+		t.root = maybe.Some(newRoot)
+
+		closestNode = newRoot
 	}
 
 	// a node with that exact key already exists so update its value
@@ -890,24 +926,7 @@ func (t *trieView) recordNodeChange(after *node) error {
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
-	// don't delete the root.
-	if after.key.length == 0 {
-		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
-	}
 	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
-}
-
-func (t *trieView) getRoot() (*node, error) {
-	if !isSentinelNodeTheRoot(t.sentinelNode) {
-		// sentinelNode has one child, which is the root
-		for index, childEntry := range t.sentinelNode.children {
-			return t.getNode(
-				t.sentinelNode.key.Extend(ToToken(index, t.tokenSize), childEntry.compressedKey),
-				childEntry.hasValue)
-		}
-	}
-
-	return t.sentinelNode, nil
 }
 
 // Records that the node associated with the given key has been changed.
