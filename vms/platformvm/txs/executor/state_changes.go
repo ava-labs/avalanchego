@@ -64,6 +64,14 @@ func AdvanceTimeTo(
 	parentState state.Chain,
 	newChainTime time.Time,
 ) (uint64, error) {
+	// We promote pending stakers to current stakers first and remove
+	// completed stakers from the current staker set. We assume that any
+	// promoted staker will not immediately be removed from the current staker
+	// set. This is guaranteed by the following invariants.
+	//
+	// Invariant: MinStakeDuration > 0 => guarantees [StartTime] != [EndTime]
+	// Invariant: [newChainTime] <= nextStakerChangeTime.
+
 	changes, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return 0, err
@@ -77,18 +85,7 @@ func AdvanceTimeTo(
 	}
 	defer pendingStakerIterator.Release()
 
-	// Add to the staker set any pending stakers whose start time is at or
-	// before the new timestamp
-
-	// Note: we process pending stakers ready to be promoted to current ones and
-	// then we process current stakers to be demoted out of stakers set. It is
-	// guaranteed that no promoted stakers would be demoted immediately. A
-	// failure of this invariant would cause a staker to be added to
-	// StateChanges and be persisted among current stakers even if it already
-	// expired. The following invariants ensure this does not happens:
-	// Invariant: minimum stake duration is > 0, so staker.StartTime != staker.EndTime.
-	// Invariant: [newChainTime] does not skip stakers set change times.
-
+	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
 		if stakerToRemove.StartTime.After(newChainTime) {
@@ -143,6 +140,7 @@ func AdvanceTimeTo(
 		}
 	}
 
+	// Remove any current stakers whose [EndTime] <= [newChainTime].
 	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
 	if err != nil {
 		return 0, err
