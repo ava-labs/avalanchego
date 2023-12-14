@@ -20,14 +20,14 @@ func TestValueNodeDB(t *testing.T) {
 
 	baseDB := memdb.New()
 
-	size := 10
+	cacheSize := 10_000
 	db := newValueNodeDB(
 		baseDB,
 		&sync.Pool{
 			New: func() interface{} { return make([]byte, 0) },
 		},
 		&mockMetrics{},
-		size,
+		cacheSize,
 	)
 
 	// Getting a key that doesn't exist should return an error.
