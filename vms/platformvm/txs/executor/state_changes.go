@@ -57,21 +57,21 @@ func VerifyNewChainTime(
 	return nil
 }
 
-// AdvanceTimeTo applies all state changes to [stateDiff] resulting from
+// AdvanceTimeTo applies all state changes to [parentState] resulting from
 // advancing the chain time to [newChainTime].
 func AdvanceTimeTo(
 	backend *Backend,
-	stateDiff state.Diff,
+	parentState state.Chain,
 	newChainTime time.Time,
 ) (uint64, error) {
-	changes, err := state.NewDiffOn(stateDiff)
+	changes, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return 0, err
 	}
 
 	numChanges := uint64(0)
 
-	pendingStakerIterator, err := stateDiff.GetPendingStakerIterator()
+	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return 0, err
 	}
@@ -111,7 +111,7 @@ func AdvanceTimeTo(
 			return 0, err
 		}
 
-		rewards, err := GetRewardsCalculator(backend, stateDiff, stakerToRemove.SubnetID)
+		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
 		if err != nil {
 			return 0, err
 		}
@@ -144,7 +144,7 @@ func AdvanceTimeTo(
 		}
 	}
 
-	currentStakerIterator, err := stateDiff.GetCurrentStakerIterator()
+	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
 	if err != nil {
 		return 0, err
 	}
@@ -168,12 +168,12 @@ func AdvanceTimeTo(
 		numChanges += 1
 	}
 
-	if err := changes.Apply(stateDiff); err != nil {
+	if err := changes.Apply(parentState); err != nil {
 		return 0, err
 	}
 
 	// Note: [numChanges] does not count the timestamp change.
-	stateDiff.SetTimestamp(newChainTime)
+	parentState.SetTimestamp(newChainTime)
 
 	return numChanges, nil
 }
