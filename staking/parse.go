@@ -120,7 +120,7 @@ func ParseCertificatePermissive(bytes []byte) (*Certificate, error) {
 }
 
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L215-L306
-func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (any, x509.SignatureAlgorithm, error) {
+func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto.PublicKey, x509.SignatureAlgorithm, error) {
 	der := cryptobyte.String(publicKey.RightAlign())
 	switch {
 	case oid.Equal(oidPublicKeyRSA):
