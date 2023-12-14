@@ -78,7 +78,7 @@ func Test_TrieView_Iterator_DBClosed(t *testing.T) {
 	require.False(iterator.Next())
 	require.Nil(iterator.Key())
 	require.Nil(iterator.Value())
-	err := iterator.Error()
+	err = iterator.Error()
 	require.ErrorIs(err, ErrInvalid)
 }
 
