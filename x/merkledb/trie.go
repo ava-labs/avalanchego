@@ -200,7 +200,6 @@ func getRangeProof[T Trie](
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-
 	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
 		return nil, ErrStartAfterEnd
 	}
