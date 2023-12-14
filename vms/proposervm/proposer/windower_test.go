@@ -409,9 +409,34 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		require.NoError(err)
 		require.Equal(validatorIDs[4], proposerID)
 
-		// MinDelayForProposer will err when blockTime is at the end of the lookup window
+		// MinDelayForProposer won't err when blockTime is at the end of the lookup window
 		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
-		require.ErrorIs(err, ErrNoSlotsScheduledInNextFuture)
+		require.NoError(err)
 		require.Zero(delay)
+	}
+
+	{
+		// ExpectedProposer can return the proposer starting right after end of the lookup window
+		blockTime = parentBlockTime.Add(MaxLookAheadWindow + WindowDuration - time.Second)
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
+		require.NoError(err)
+		require.Equal(validatorIDs[4], proposerID)
+
+		// MinDelayForProposer won't err when blockTime is at the end of the lookup window
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		require.NoError(err)
+		require.Zero(delay)
+	}
+
+	{
+		// ExpectedProposer can return the proposer starting right after end of the lookup window
+		blockTime = parentBlockTime.Add(MaxLookAheadWindow + WindowDuration)
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
+		require.NoError(err)
+		require.Equal(validatorIDs[6], proposerID)
+
+		// MinDelayForProposer won't err when blockTime is at the end of the lookup window
+		_, err = w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		require.ErrorIs(err, ErrNoSlotsScheduledInNextFuture)
 	}
 }
