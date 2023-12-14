@@ -401,4 +401,17 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		require.NoError(err)
 		require.Zero(delay)
 	}
+
+	{
+		// ExpectedProposer can return the proposer starting the end of the lookup window
+		blockTime = parentBlockTime.Add(MaxLookAheadWindow)
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
+		require.NoError(err)
+		require.Equal(validatorIDs[4], proposerID)
+
+		// MinDelayForProposer will err when blockTime is at the end of the lookup window
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, blockTime)
+		require.ErrorIs(err, ErrNoSlotsScheduledInNextFuture)
+		require.Zero(delay)
+	}
 }
