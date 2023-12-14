@@ -35,6 +35,7 @@ func Test_TrieView_Iterator(t *testing.T) {
 	require.NoError(db.Put(key2, value2))
 
 	view, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
 	iterator := view.NewIterator()
 	require.NotNil(iterator)
 
