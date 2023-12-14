@@ -242,11 +242,11 @@ func (p *PullGossiper[T, U]) handleResponse(
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics, maxGossipSize int) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
 	return &PushGossiper[T]{
-		client:        client,
-		metrics:       metrics,
-		maxGossipSize: maxGossipSize,
+		client:           client,
+		metrics:          metrics,
+		targetGossipSize: targetGossipSize,
 		labels: prometheus.Labels{
 			typeLabel: pushType,
 		},
@@ -256,9 +256,9 @@ func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics, maxGossi
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
-	client        *p2p.Client
-	metrics       Metrics
-	maxGossipSize int
+	client           *p2p.Client
+	metrics          Metrics
+	targetGossipSize int
 
 	labels prometheus.Labels
 
@@ -280,8 +280,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	}
 
 	sentBytes := 0
-
-	for sentBytes < p.targetGossipSize  {
+	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
 			break
@@ -297,11 +296,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		msg.Gossip = append(msg.Gossip, bytes)
 		sentBytes += len(bytes)
 		p.pending.PopLeft()
-
-		// limit outbound gossip size
-		if sentBytes > p.maxGossipSize {
-			break
-		}
 	}
 
 	msgBytes, err := proto.Marshal(msg)
