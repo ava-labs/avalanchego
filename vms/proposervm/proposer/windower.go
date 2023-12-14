@@ -63,7 +63,7 @@ type Windower interface {
 		maxWindows int,
 	) (time.Duration, error)
 
-	// In the Post Durango windowing scheme, every validator active
+	// In the Post-Durango windowing scheme, every validator active
 	// at [pChainHeight] gets one and only one slot to propose a block.
 	// [ExpectedProposer] calculates which nodeID is scheduled to propose
 	// a block of height [blockHeight] at [blockTime].
@@ -75,7 +75,7 @@ type Windower interface {
 		blockTime time.Time,
 	) (ids.NodeID, error)
 
-	// In the Post Durango windowing scheme, every validator active
+	// In the Post-Durango windowing scheme, every validator active
 	// at [pChainHeight] gets one and only one slot to propose a block.
 	// [MinDelayForProposer] specifies how long [nodeID] needs to wait
 	// for its slot to start. Delay is specified as starting from [startTime].
