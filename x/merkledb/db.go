@@ -202,7 +202,7 @@ type merkleDB struct {
 	history *trieHistory
 
 	// True iff the db has been closed.
-	closed bool
+	closed utils.Atomic[bool]
 
 	metrics merkleMetrics
 
@@ -361,7 +361,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 	ops := make([]database.BatchOp, len(proof.KeyChanges))
@@ -384,7 +384,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
@@ -423,7 +423,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 }
 
 func (db *merkleDB) Compact(start []byte, limit []byte) error {
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 	return db.baseDB.Compact(start, limit)
@@ -436,11 +436,11 @@ func (db *merkleDB) Close() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
-	db.closed = true
+	db.closed.Set(true)
 	db.valueNodeDB.Close()
 	// Flush intermediary nodes to disk.
 	if err := db.intermediateNodeDB.Flush(); err != nil {
@@ -455,7 +455,7 @@ func (db *merkleDB) PrefetchPaths(keys [][]byte) error {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
@@ -477,7 +477,7 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 	tempView, err := newTrieView(db, db, ViewChanges{})
@@ -568,7 +568,7 @@ func (db *merkleDB) getValue(key Key) ([]byte, error) {
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getValueWithoutLock(key Key) ([]byte, error) {
-	if db.closed {
+	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}
 
@@ -589,7 +589,7 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return ids.Empty, database.ErrClosed
 	}
 
@@ -610,7 +610,7 @@ func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 
 // Assumes [db.commitLock] is read locked.
 func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	if db.closed {
+	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}
 
@@ -657,7 +657,7 @@ func (db *merkleDB) getRangeProofAtRoot(
 	maxLength int,
 ) (*RangeProof, error) {
 	switch {
-	case db.closed:
+	case db.closed.Get():
 		return nil, database.ErrClosed
 	case maxLength <= 0:
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
@@ -692,7 +692,7 @@ func (db *merkleDB) GetChangeProof(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}
 
@@ -784,7 +784,7 @@ func (db *merkleDB) NewView(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}
 
@@ -805,7 +805,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return false, database.ErrClosed
 	}
 
@@ -820,7 +820,7 @@ func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}
 	return db.baseDB.HealthCheck(ctx)
@@ -857,7 +857,7 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
@@ -876,7 +876,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
@@ -900,7 +900,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
@@ -918,7 +918,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	defer db.lock.Unlock()
 
 	switch {
-	case db.closed:
+	case db.closed.Get():
 		return database.ErrClosed
 	case trieToCommit == nil:
 		return nil
@@ -1079,7 +1079,7 @@ func (db *merkleDB) VerifyChangeProof(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	if db.closed {
+	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
@@ -1280,7 +1280,7 @@ func (db *merkleDB) getEditableNode(key Key, hasValue bool) (*node, error) {
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 	switch {
-	case db.closed:
+	case db.closed.Get():
 		return nil, database.ErrClosed
 	case db.root.HasValue() && key == db.root.Value().key:
 		return db.root.Value(), nil
