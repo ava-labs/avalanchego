@@ -100,7 +100,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	}()
 
 	var (
-		now    = env.state.GetTimestamp()
+		now    = env.backend.Clk.Time()
 		nodeID = ids.GenerateTestNodeID()
 
 		defaultValidatorStake = 100 * units.MilliAvax
