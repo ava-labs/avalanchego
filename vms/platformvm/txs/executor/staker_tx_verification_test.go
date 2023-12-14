@@ -102,9 +102,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						DurangoTime: time.Time{},
-					},
 				}
 			},
 			stateF: func(*gomock.Controller) state.Chain {
@@ -122,10 +119,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			name: "not bootstrapped",
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						DurangoTime: time.Time{},
-					},
+					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
 			},
@@ -281,7 +275,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
-
 				// Note the duration is 1 less than the minimum
 				tx.Validator.End = tx.Validator.Start + uint64(unsignedTransformTx.MinStakeDuration) - 1
 				return &tx
