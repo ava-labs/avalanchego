@@ -646,6 +646,8 @@ func (db *merkleDB) GetChangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetChangeProof")
+	defer span.End()
 	switch {
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1:
 		return nil, ErrStartAfterEnd
