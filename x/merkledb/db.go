@@ -440,6 +440,9 @@ func (db *merkleDB) Close() error {
 		return database.ErrClosed
 	}
 
+	// mark all children as no longer valid because the db has closed
+	db.invalidateChildrenExcept(nil)
+
 	db.closed = true
 	db.valueNodeDB.Close()
 	// Flush intermediary nodes to disk.
