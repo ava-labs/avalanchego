@@ -352,35 +352,17 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		pChainHeight = uint64(0)
 	)
 
-	{
-		currentSlot := uint64(0)
-		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, currentSlot)
-		require.NoError(err)
-		require.Equal(validatorIDs[2], proposerID)
+	expectedProposers := map[uint64]ids.NodeID{
+		0:                 validatorIDs[2],
+		1:                 validatorIDs[0],
+		2:                 validatorIDs[9],
+		MaxLookAheadSlots: validatorIDs[4],
 	}
 
-	{
-		// proposerID changes with new slot
-		currentSlot := uint64(1)
-		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, currentSlot)
+	for slot, expectedProposerID := range expectedProposers {
+		actualProposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
 		require.NoError(err)
-		require.Equal(validatorIDs[0], proposerID)
-	}
-
-	{
-		// proposerID changes with new slot
-		currentSlot := uint64(2)
-		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, currentSlot)
-		require.NoError(err)
-		require.Equal(validatorIDs[9], proposerID)
-	}
-
-	{
-		// proposerID at last inspected slot
-		currentSlot := MaxLookAheadSlots
-		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, currentSlot)
-		require.NoError(err)
-		require.Equal(validatorIDs[4], proposerID)
+		require.Equal(expectedProposerID, actualProposerID)
 	}
 }
 
