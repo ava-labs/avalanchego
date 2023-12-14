@@ -65,19 +65,15 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	// Apply the changes, if any, from advancing the chain time.
-	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(
+	// Advance the time to [b.Timestamp()].
+	_, err = executor.AdvanceTimeTo(
 		v.txExecutorBackend,
 		onDecisionState,
-		nextChainTime,
+		b.Timestamp(),
 	)
 	if err != nil {
 		return err
 	}
-
-	onDecisionState.SetTimestamp(nextChainTime)
-	changes.Apply(onDecisionState)
 
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
 	if err != nil {
@@ -116,12 +112,11 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
-	// Apply the changes, if any, from advancing the chain time.
-	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(
+	// Advance the time to [b.Timestamp()].
+	numChanges, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
 		onAcceptState,
-		nextChainTime,
+		b.Timestamp(),
 	)
 	if err != nil {
 		return err
@@ -129,12 +124,9 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 
 	// If this block doesn't perform any changes, then it should never have been
 	// issued.
-	if changes.Len() == 0 && len(b.Transactions) == 0 {
+	if numChanges == 0 && len(b.Transactions) == 0 {
 		return errBanffStandardBlockWithoutChanges
 	}
-
-	onAcceptState.SetTimestamp(nextChainTime)
-	changes.Apply(onAcceptState)
 
 	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
 }

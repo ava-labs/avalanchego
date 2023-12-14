@@ -114,12 +114,10 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 		return nil, err
 	}
 
-	changes, err := AdvanceTimeTo(v.Backend, state, nextBlkTime)
+	_, err = AdvanceTimeTo(v.Backend, state, nextBlkTime)
 	if err != nil {
 		return nil, err
 	}
-	changes.Apply(state)
-	state.SetTimestamp(nextBlkTime)
 
 	return state, nil
 }

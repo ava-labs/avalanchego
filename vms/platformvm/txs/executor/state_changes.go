@@ -57,65 +57,28 @@ func VerifyNewChainTime(
 	return nil
 }
 
-type StateChanges interface {
-	Apply(onAccept state.Diff)
-	Len() int
-}
-
-type stateChanges struct {
-	updatedSupplies           map[ids.ID]uint64
-	currentValidatorsToAdd    []*state.Staker
-	currentDelegatorsToAdd    []*state.Staker
-	pendingValidatorsToRemove []*state.Staker
-	pendingDelegatorsToRemove []*state.Staker
-	currentValidatorsToRemove []*state.Staker
-}
-
-func (s *stateChanges) Apply(stateDiff state.Diff) {
-	for subnetID, supply := range s.updatedSupplies {
-		stateDiff.SetCurrentSupply(subnetID, supply)
-	}
-
-	for _, currentValidatorToAdd := range s.currentValidatorsToAdd {
-		stateDiff.PutCurrentValidator(currentValidatorToAdd)
-	}
-	for _, pendingValidatorToRemove := range s.pendingValidatorsToRemove {
-		stateDiff.DeletePendingValidator(pendingValidatorToRemove)
-	}
-	for _, currentDelegatorToAdd := range s.currentDelegatorsToAdd {
-		stateDiff.PutCurrentDelegator(currentDelegatorToAdd)
-	}
-	for _, pendingDelegatorToRemove := range s.pendingDelegatorsToRemove {
-		stateDiff.DeletePendingDelegator(pendingDelegatorToRemove)
-	}
-	for _, currentValidatorToRemove := range s.currentValidatorsToRemove {
-		stateDiff.DeleteCurrentValidator(currentValidatorToRemove)
-	}
-}
-
-func (s *stateChanges) Len() int {
-	return len(s.currentValidatorsToAdd) + len(s.currentDelegatorsToAdd) +
-		len(s.pendingValidatorsToRemove) + len(s.pendingDelegatorsToRemove) +
-		len(s.currentValidatorsToRemove)
-}
-
-// AdvanceTimeTo does not modify [parentState].
-// Instead it returns all the StateChanges caused by advancing the chain time to
-// the [newChainTime].
+// AdvanceTimeTo applies all state changes to [stateDiff] resulting from
+// advancing the chain time to [newChainTime].
 func AdvanceTimeTo(
 	backend *Backend,
-	parentState state.Chain,
+	stateDiff state.Diff,
 	newChainTime time.Time,
-) (StateChanges, error) {
-	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
+) (uint64, error) {
+	changes, err := state.NewDiffOn(stateDiff)
 	if err != nil {
-		return nil, err
+		return 0, err
+	}
+
+	var (
+		numChanges      uint64 = 0
+		updatedSupplies        = make(map[ids.ID]uint64)
+	)
+
+	pendingStakerIterator, err := stateDiff.GetPendingStakerIterator()
+	if err != nil {
+		return 0, err
 	}
 	defer pendingStakerIterator.Release()
-
-	changes := &stateChanges{
-		updatedSupplies: make(map[ids.ID]uint64),
-	}
 
 	// Add to the staker set any pending stakers whose start time is at or
 	// before the new timestamp
@@ -140,22 +103,23 @@ func AdvanceTimeTo(
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
-			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
+			changes.PutCurrentValidator(&stakerToAdd)
+			changes.DeletePendingValidator(stakerToRemove)
+			numChanges += 2
 			continue
 		}
 
-		supply, ok := changes.updatedSupplies[stakerToRemove.SubnetID]
+		supply, ok := updatedSupplies[stakerToRemove.SubnetID]
 		if !ok {
-			supply, err = parentState.GetCurrentSupply(stakerToRemove.SubnetID)
+			supply, err = stateDiff.GetCurrentSupply(stakerToRemove.SubnetID)
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
 		}
 
-		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+		rewards, err := GetRewardsCalculator(backend, stateDiff, stakerToRemove.SubnetID)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 
 		potentialReward := rewards.Calculate(
@@ -167,25 +131,27 @@ func AdvanceTimeTo(
 
 		// Invariant: [rewards.Calculate] can never return a [potentialReward]
 		//            such that [supply + potentialReward > maximumSupply].
-		changes.updatedSupplies[stakerToRemove.SubnetID] = supply + potentialReward
+		updatedSupplies[stakerToRemove.SubnetID] = supply + potentialReward
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
-			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
+			changes.PutCurrentValidator(&stakerToAdd)
+			changes.DeletePendingValidator(stakerToRemove)
+			numChanges += 2
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
-			changes.currentDelegatorsToAdd = append(changes.currentDelegatorsToAdd, &stakerToAdd)
-			changes.pendingDelegatorsToRemove = append(changes.pendingDelegatorsToRemove, stakerToRemove)
+			changes.PutCurrentDelegator(&stakerToAdd)
+			changes.DeletePendingDelegator(stakerToRemove)
+			numChanges += 2
 
 		default:
-			return nil, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
+			return 0, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
 	}
 
-	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
+	currentStakerIterator, err := stateDiff.GetCurrentStakerIterator()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	defer currentStakerIterator.Release()
 
@@ -203,9 +169,23 @@ func AdvanceTimeTo(
 			break
 		}
 
-		changes.currentValidatorsToRemove = append(changes.currentValidatorsToRemove, stakerToRemove)
+		stateDiff.DeleteCurrentValidator(stakerToRemove)
+		numChanges += 1
 	}
-	return changes, nil
+
+	for subnetID, supply := range updatedSupplies {
+		stateDiff.SetCurrentSupply(subnetID, supply)
+		numChanges += 1
+	}
+
+	if err := changes.Apply(stateDiff); err != nil {
+		return 0, err
+	}
+
+	// Note: [numChanges] does not count the timestamp change.
+	stateDiff.SetTimestamp(newChainTime)
+
+	return numChanges, nil
 }
 
 func GetRewardsCalculator(

@@ -319,12 +319,10 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	changes, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp)
+	_, err = txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp)
 	if err != nil {
 		return nil, err
 	}
-	changes.Apply(stateDiff)
-	stateDiff.SetTimestamp(timestamp)
 
 	var (
 		blockTxs      []*txs.Tx
