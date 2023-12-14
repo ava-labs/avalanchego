@@ -115,11 +115,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		supplyAtValidatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
 		require.NoError(err)
 
-		ginkgo.By("retrieving current chain time before inserting validators")
-		now, err := pvmClient.GetTimestamp(e2e.DefaultContext())
-		require.NoError(err)
-
-		alphaValidatorsEndTime := now.Add(validationPeriod)
+		alphaValidatorsEndTime := time.Now().Add(validationPeriod)
 		tests.Outf("alpha node validation period ending at: %v\n", alphaValidatorsEndTime)
 
 		ginkgo.By("adding alpha node as a validator", func() {
@@ -150,7 +146,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		betaValidatorEndTime := now.Add(validationPeriod)
+		betaValidatorEndTime := time.Now().Add(validationPeriod)
 		tests.Outf("beta node validation period ending at: %v\n", betaValidatorEndTime)
 
 		ginkgo.By("adding beta node as a validator", func() {
@@ -185,11 +181,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		supplyAtDelegatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
 		require.NoError(err)
 
-		ginkgo.By("retrieving current chain time before inserting delegators")
-		now, err = pvmClient.GetTimestamp(e2e.DefaultContext())
-		require.NoError(err)
-
-		gammaDelegatorEndTime := now.Add(delegationPeriod)
+		gammaDelegatorEndTime := time.Now().Add(delegationPeriod)
 		tests.Outf("gamma delegation period ending at: %v\n", gammaDelegatorEndTime)
 
 		ginkgo.By("adding gamma as delegator to the alpha node", func() {
@@ -214,7 +206,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		deltaDelegatorEndTime := now.Add(delegationPeriod)
+		deltaDelegatorEndTime := time.Now().Add(delegationPeriod)
 		tests.Outf("delta delegation period ending at: %v\n", deltaDelegatorEndTime)
 
 		ginkgo.By("adding delta as delegator to the beta node", func() {
