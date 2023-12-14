@@ -31,8 +31,6 @@ import (
 
 const defaultHistoryLength = 300
 
-var emptyKey Key
-
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
 	db, err := New(ctx, db, config)
@@ -153,7 +151,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 
 	require.NoError(db.Close())
 
-	// reloading the db, should set the root back to the one that was saved to [baseDB]
+	// reloading the db should set the root back to the one that was saved to [baseDB]
 	db, err = New(
 		context.Background(),
 		baseDB,
@@ -804,8 +802,8 @@ func TestMerkleDBClear(t *testing.T) {
 	iter := db.NewIterator()
 	defer iter.Release()
 	require.False(iter.Next())
-	require.Equal(emptyRootID, db.getMerkleRoot())
-	require.Equal(emptyKey, db.sentinelNode.key)
+	require.Equal(ids.Empty, db.getMerkleRoot())
+	require.True(db.root.IsNothing())
 
 	// Assert caches are empty.
 	require.Zero(db.valueNodeDB.nodeCache.Len())
@@ -948,6 +946,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			}
 
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, maxProofLen)
+			if root == ids.Empty {
+				require.ErrorIs(err, ErrEmptyProof)
+				continue
+			}
 			require.NoError(err)
 			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
 
@@ -979,6 +981,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, maxProofLen)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
+				continue
+			}
+			if root == ids.Empty {
+				require.ErrorIs(err, ErrEmptyProof)
 				continue
 			}
 			require.NoError(err)
@@ -1241,4 +1247,41 @@ func insertRandomKeyValues(
 			}
 		}
 	}
+}
+
+func TestGetRangeProofAtRootEmptyRootID(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	_, err = db.getRangeProofAtRoot(
+		context.Background(),
+		ids.Empty,
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		10,
+	)
+	require.ErrorIs(err, ErrEmptyProof)
+}
+
+func TestGetChangeProofEmptyRootID(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	require.NoError(db.Put([]byte("key"), []byte("value")))
+
+	rootID := db.getMerkleRoot()
+
+	_, err = db.GetChangeProof(
+		context.Background(),
+		rootID,
+		ids.Empty,
+		maybe.Nothing[[]byte](),
+		maybe.Nothing[[]byte](),
+		10,
+	)
+	require.ErrorIs(err, ErrEmptyProof)
 }
