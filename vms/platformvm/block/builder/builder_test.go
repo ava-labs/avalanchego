@@ -33,10 +33,7 @@ func TestBuildBlockBasic(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -74,10 +71,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	tx, exists := env.mempool.Peek()
 	require.False(exists)
@@ -94,10 +88,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		now    = env.backend.Clk.Time()
@@ -203,10 +194,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		now      = env.backend.Clk.Time()
@@ -239,10 +227,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -293,10 +278,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		now                   = env.backend.Clk.Time()
@@ -389,10 +371,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -441,11 +420,9 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
 	env.isBootstrapped.Set(false)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
 
 	require.True(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }

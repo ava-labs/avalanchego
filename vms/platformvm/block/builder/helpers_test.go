@@ -119,87 +119,102 @@ type environment struct {
 func newEnvironment(t *testing.T) *environment {
 	require := require.New(t)
 
-	res := &environment{
+	env := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
 		clk:            defaultClock(),
 	}
-	res.isBootstrapped.Set(true)
+	env.isBootstrapped.Set(true)
 
-	res.baseDB = versiondb.New(memdb.New())
-	res.ctx, res.msm = defaultCtx(res.baseDB)
+	env.baseDB = versiondb.New(memdb.New())
+	env.ctx, env.msm = defaultCtx(env.baseDB)
 
-	res.ctx.Lock.Lock()
-	defer res.ctx.Lock.Unlock()
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 
-	res.fx = defaultFx(t, res.clk, res.ctx.Log, res.isBootstrapped.Get())
+	env.fx = defaultFx(t, env.clk, env.ctx.Log, env.isBootstrapped.Get())
 
-	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
+	rewardsCalc := reward.NewCalculator(env.config.RewardConfig)
+	env.state = defaultState(t, env.config, env.ctx, env.baseDB, rewardsCalc)
 
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
-	res.uptimes = uptime.NewManager(res.state, res.clk)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+	env.atomicUTXOs = avax.NewAtomicUTXOManager(env.ctx.SharedMemory, txs.Codec)
+	env.uptimes = uptime.NewManager(env.state, env.clk)
+	env.utxosHandler = utxo.NewHandler(env.ctx, env.clk, env.fx)
 
-	res.txBuilder = txbuilder.New(
-		res.ctx,
-		res.config,
-		res.clk,
-		res.fx,
-		res.state,
-		res.atomicUTXOs,
-		res.utxosHandler,
+	env.txBuilder = txbuilder.New(
+		env.ctx,
+		env.config,
+		env.clk,
+		env.fx,
+		env.state,
+		env.atomicUTXOs,
+		env.utxosHandler,
 	)
 
-	genesisID := res.state.GetLastAccepted()
-	res.backend = txexecutor.Backend{
-		Config:       res.config,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
-		Uptimes:      res.uptimes,
+	genesisID := env.state.GetLastAccepted()
+	env.backend = txexecutor.Backend{
+		Config:       env.config,
+		Ctx:          env.ctx,
+		Clk:          env.clk,
+		Bootstrapped: env.isBootstrapped,
+		Fx:           env.fx,
+		FlowChecker:  env.utxosHandler,
+		Uptimes:      env.uptimes,
 		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
-	res.sender = &common.SenderTest{T: t}
+	env.sender = &common.SenderTest{T: t}
 
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	env.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
 
-	res.blkManager = blockexecutor.NewManager(
-		res.mempool,
+	env.blkManager = blockexecutor.NewManager(
+		env.mempool,
 		metrics,
-		res.state,
-		&res.backend,
+		env.state,
+		&env.backend,
 		pvalidators.TestManager,
 	)
 
-	res.network = network.New(
-		res.backend.Ctx,
-		res.blkManager,
-		res.mempool,
-		res.backend.Config.PartialSyncPrimaryNetwork,
-		res.sender,
+	env.network = network.New(
+		env.backend.Ctx,
+		env.blkManager,
+		env.mempool,
+		env.backend.Config.PartialSyncPrimaryNetwork,
+		env.sender,
 	)
 
-	res.Builder = New(
-		res.mempool,
-		res.txBuilder,
-		&res.backend,
-		res.blkManager,
+	env.Builder = New(
+		env.mempool,
+		env.txBuilder,
+		&env.backend,
+		env.blkManager,
 	)
-	res.Builder.StartBlockTimer()
+	env.Builder.StartBlockTimer()
 
-	res.blkManager.SetPreference(genesisID)
-	addSubnet(t, res)
+	env.blkManager.SetPreference(genesisID)
+	addSubnet(t, env)
 
-	return res
+	t.Cleanup(func() {
+		env.Builder.ShutdownBlockTimer()
+
+		if env.isBootstrapped.Get() {
+			validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+
+			require.NoError(env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+
+			require.NoError(env.state.Commit())
+		}
+
+		require.NoError(env.state.Close())
+		require.NoError(env.baseDB.Close())
+	})
+
+	return env
 }
 
 func addSubnet(t *testing.T, env *environment) {
@@ -417,24 +432,4 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 	require.NoError(err)
 
 	return genesisBytes
-}
-
-func shutdownEnvironment(env *environment) error {
-	env.Builder.ShutdownBlockTimer()
-
-	if env.isBootstrapped.Get() {
-		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
-			return err
-		}
-		if err := env.state.Commit(); err != nil {
-			return err
-		}
-	}
-
-	return utils.Err(
-		env.state.Close(),
-		env.baseDB.Close(),
-	)
 }
