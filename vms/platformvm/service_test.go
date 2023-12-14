@@ -417,8 +417,6 @@ func TestGetBalance(t *testing.T) {
 		}
 		require.Equal(json.Uint64(balance), reply.Balance)
 		require.Equal(json.Uint64(balance), reply.Unlocked)
-		require.Equal(json.Uint64(balance), reply.Balance)
-		require.Equal(json.Uint64(balance), reply.Unlocked)
 		require.Equal(json.Uint64(0), reply.LockedStakeable)
 		require.Equal(json.Uint64(0), reply.LockedNotStakeable)
 	}
