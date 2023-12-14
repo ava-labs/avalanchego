@@ -42,7 +42,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 		msig          func(c *gomock.Controller) AliasGetter
 		expectedError error
 	}{
-		"OK: 2 addrs, theshold 2": {
+		"OK: 2 addrs, threshold 2": {
 			in:      &Input{SigIndices: []uint32{0, 1}},
 			signers: []*secp256k1.PrivateKey{key1, key2},
 			owners: &OutputOwners{

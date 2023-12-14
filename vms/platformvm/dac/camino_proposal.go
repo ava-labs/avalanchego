@@ -5,6 +5,7 @@ package dac
 
 import (
 	"errors"
+	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +17,8 @@ import (
 const FractionDenominator = 1_000_000
 
 var (
+	fractionDenominatorBig = big.NewInt(FractionDenominator)
+
 	errNoOptions                  = errors.New("no options")
 	errNotUniqueOption            = errors.New("not unique option")
 	errWrongOptionIndex           = errors.New("wrong option index")
@@ -32,6 +35,7 @@ type Verifier interface {
 	BaseFeeProposal(*BaseFeeProposal) error
 	AddMemberProposal(*AddMemberProposal) error
 	ExcludeMemberProposal(*ExcludeMemberProposal) error
+	GeneralProposal(*GeneralProposal) error
 	FeeDistributionProposal(*FeeDistributionProposal) error
 }
 
@@ -39,6 +43,7 @@ type Executor interface {
 	BaseFeeProposal(*BaseFeeProposalState) error
 	AddMemberProposal(*AddMemberProposalState) error
 	ExcludeMemberProposal(*ExcludeMemberProposalState) error
+	GeneralProposal(*GeneralProposalState) error
 	FeeDistributionProposal(*FeeDistributionProposalState) error
 }
 
@@ -46,6 +51,7 @@ type BondTxIDsGetter interface {
 	BaseFeeProposal(*BaseFeeProposalState) ([]ids.ID, error)
 	AddMemberProposal(*AddMemberProposalState) ([]ids.ID, error)
 	ExcludeMemberProposal(*ExcludeMemberProposalState) ([]ids.ID, error)
+	GeneralProposal(*GeneralProposalState) ([]ids.ID, error)
 	FeeDistributionProposal(*FeeDistributionProposalState) ([]ids.ID, error)
 }
 

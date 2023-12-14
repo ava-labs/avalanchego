@@ -223,23 +223,7 @@ func (e *proposalVerifier) ExcludeMemberProposal(proposal *dac.ExcludeMemberProp
 		}
 
 		// verify that proposer has active validator
-
-		// get proposer nodeID
-		proposerNodeShortID, err := e.state.GetShortIDLink(e.addProposalTx.ProposerAddress, state.ShortLinkKeyRegisterNode)
-		switch {
-		case err == database.ErrNotFound:
-			return errNoActiveValidator
-		case err != nil:
-			return err
-		}
-		proposerNodeID := ids.NodeID(proposerNodeShortID)
-
-		// get proposer active validator
-		_, err = e.state.GetCurrentValidator(constants.PrimaryNetworkID, proposerNodeID)
-		switch {
-		case err == database.ErrNotFound:
-			return errNoActiveValidator
-		case err != nil:
+		if err := mustHaveActiveValidator(e.state, e.addProposalTx.ProposerAddress); err != nil {
 			return err
 		}
 	}
@@ -349,6 +333,30 @@ func (e *proposalBondTxIDsGetter) ExcludeMemberProposal(proposal *dac.ExcludeMem
 	return []ids.ID{pendingValidator.TxID}, nil
 }
 
+// GeneralProposal
+
+func (e *proposalVerifier) GeneralProposal(*dac.GeneralProposal) error {
+	// verify that proposer is consortium member
+	proposerAddressState, err := e.state.GetAddressStates(e.addProposalTx.ProposerAddress)
+	switch {
+	case err != nil:
+		return err
+	case proposerAddressState.IsNot(as.AddressStateConsortiumMember):
+		return fmt.Errorf("%w (proposer)", errNotConsortiumMember)
+	}
+
+	// verify that proposer has active validator
+	return mustHaveActiveValidator(e.state, e.addProposalTx.ProposerAddress)
+}
+
+func (*proposalExecutor) GeneralProposal(*dac.GeneralProposalState) error {
+	return nil
+}
+
+func (*proposalBondTxIDsGetter) GeneralProposal(*dac.GeneralProposalState) ([]ids.ID, error) {
+	return nil, nil
+}
+
 // FeeDistributionProposal
 
 func (e *proposalVerifier) FeeDistributionProposal(*dac.FeeDistributionProposal) error {
@@ -393,4 +401,24 @@ func (e *proposalExecutor) FeeDistributionProposal(proposal *dac.FeeDistribution
 
 func (*proposalBondTxIDsGetter) FeeDistributionProposal(*dac.FeeDistributionProposalState) ([]ids.ID, error) {
 	return nil, nil
+}
+
+// Helpers
+
+func mustHaveActiveValidator(s state.Chain, address ids.ShortID) error {
+	// get nodeID
+	proposerNodeShortID, err := s.GetShortIDLink(address, state.ShortLinkKeyRegisterNode)
+	switch {
+	case err == database.ErrNotFound:
+		return errNoActiveValidator
+	case err != nil:
+		return err
+	}
+	proposerNodeID := ids.NodeID(proposerNodeShortID)
+
+	// get active validator
+	if _, err = s.GetCurrentValidator(constants.PrimaryNetworkID, proposerNodeID); err == database.ErrNotFound {
+		return errNoActiveValidator
+	}
+	return err
 }

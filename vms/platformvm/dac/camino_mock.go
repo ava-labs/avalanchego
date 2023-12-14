@@ -93,3 +93,18 @@ func (mr *MockBondTxIDsGetterMockRecorder) FeeDistributionProposal(arg0 interfac
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FeeDistributionProposal", reflect.TypeOf((*MockBondTxIDsGetter)(nil).FeeDistributionProposal), arg0)
 }
+
+// GeneralProposal mocks base method.
+func (m *MockBondTxIDsGetter) GeneralProposal(arg0 *GeneralProposalState) ([]ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GeneralProposal", arg0)
+	ret0, _ := ret[0].([]ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GeneralProposal indicates an expected call of GeneralProposal.
+func (mr *MockBondTxIDsGetterMockRecorder) GeneralProposal(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GeneralProposal", reflect.TypeOf((*MockBondTxIDsGetter)(nil).GeneralProposal), arg0)
+}
