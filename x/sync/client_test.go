@@ -339,11 +339,11 @@ func TestGetRangeProof(t *testing.T) {
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = nil
 				response.StartProof = nil
 				response.EndProof = nil
+				response.KeyValues = nil
 			},
-			expectedErr: merkledb.ErrNoMerkleProof,
+			expectedErr: merkledb.ErrEmptyProof,
 		},
 	}
 
@@ -524,7 +524,7 @@ func TestGetChangeProof(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
-	startRoot, err := serverDB.GetMerkleRoot(context.Background()) // TODO uncomment
+	startRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
 	// create changes
@@ -565,6 +565,8 @@ func TestGetChangeProof(t *testing.T) {
 
 	endRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
+
+	fakeRootID := ids.GenerateTestID()
 
 	tests := map[string]struct {
 		db                        DB
@@ -662,24 +664,11 @@ func TestGetChangeProof(t *testing.T) {
 			},
 			expectedErr: merkledb.ErrInvalidProof,
 		},
-		"range proof response happy path": {
-			request: &pb.SyncGetChangeProofRequest{
-				// Server doesn't have the (non-existent) start root
-				// so should respond with range proof.
-				StartRootHash: ids.Empty[:],
-				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
-			},
-			modifyChangeProofResponse: nil,
-			expectedErr:               nil,
-			expectRangeProof:          true,
-		},
 		"range proof response; remove first key": {
 			request: &pb.SyncGetChangeProofRequest{
 				// Server doesn't have the (non-existent) start root
 				// so should respond with range proof.
-				StartRootHash: ids.Empty[:],
+				StartRootHash: fakeRootID[:],
 				EndRootHash:   endRoot[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,

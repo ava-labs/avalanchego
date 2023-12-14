@@ -81,21 +81,14 @@ func FuzzCodecKey(f *testing.F) {
 		) {
 			require := require.New(t)
 			codec := codec.(*codecImpl)
-			reader := bytes.NewReader(b)
-			startLen := reader.Len()
-			got, err := codec.decodeKey(reader)
+			got, err := codec.decodeKey(b)
 			if err != nil {
 				t.SkipNow()
 			}
-			endLen := reader.Len()
-			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
-			var buf bytes.Buffer
-			codec.encodeKey(&buf, got)
-			bufBytes := buf.Bytes()
-			require.Len(bufBytes, numRead)
-			require.Equal(b[:numRead], bufBytes)
+			gotBytes := codec.encodeKey(got)
+			require.Equal(b, gotBytes)
 		},
 	)
 }
@@ -248,7 +241,6 @@ func FuzzEncodeHashValues(f *testing.F) {
 
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 	codec := codec.(*codecImpl)
-	bytes := bytes.NewReader(binary.AppendUvarint(nil, math.MaxInt))
-	_, err := codec.decodeKey(bytes)
+	_, err := codec.decodeKey(binary.AppendUvarint(nil, math.MaxInt))
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
