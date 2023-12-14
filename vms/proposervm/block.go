@@ -434,8 +434,8 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,
+		proposer.TimeToSlot(parentTimestamp, newTimestamp),
 		parentTimestamp,
-		newTimestamp,
 	)
 	if err != nil {
 		p.vm.ctx.Log.Error("failed to reset block builder scheduler",

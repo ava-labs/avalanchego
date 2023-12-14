@@ -342,8 +342,8 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 			ctx,
 			blk.Height()+1,
 			pChainHeight,
+			proposer.TimeToSlot(blk.Timestamp(), vm.Clock.Time().Truncate(time.Second)),
 			blk.Timestamp(),
-			vm.Clock.Time().Truncate(time.Second),
 		)
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(ctx, blk, pChainHeight)
@@ -393,17 +393,17 @@ func (vm *VM) getPreDurangoSlotTime(
 
 func (vm *VM) getPostDurangoSlotTime(
 	ctx context.Context,
-	blkHeight uint64,
-	pChainHeight uint64,
+	blkHeight,
+	pChainHeight,
+	slot uint64,
 	parentTimestamp time.Time,
-	currentTime time.Time,
 ) (time.Time, error) {
 	delay, err := vm.Windower.MinDelayForProposer(
 		ctx,
 		blkHeight,
 		pChainHeight,
 		vm.ctx.NodeID,
-		proposer.TimeToSlot(parentTimestamp, currentTime),
+		slot,
 	)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to calculate min delay for proposer",
