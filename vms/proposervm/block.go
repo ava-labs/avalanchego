@@ -401,11 +401,12 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 	newTimestamp time.Time,
 ) error {
 	parentHeight := p.innerBlk.Height()
+	slot := proposer.TimeToSlot(parentTimestamp, newTimestamp)
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,
-		proposer.TimeToSlot(parentTimestamp, newTimestamp),
+		slot,
 	)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected build block failure",
@@ -425,6 +426,7 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 	p.vm.ctx.Log.Debug("build block dropped",
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
+		zap.Uint64("slot", slot),
 		zap.Stringer("expectedProposer", expectedProposerID),
 	)
 
@@ -434,7 +436,7 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,
-		proposer.TimeToSlot(parentTimestamp, newTimestamp),
+		slot,
 		parentTimestamp,
 	)
 	if err != nil {
