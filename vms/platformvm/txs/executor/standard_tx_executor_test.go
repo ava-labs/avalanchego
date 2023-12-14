@@ -992,7 +992,7 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 
 	var (
 		nodeID  = ids.GenerateTestNodeID()
-		now     = env.state.GetTimestamp()
+		now     = env.backend.Clk.Time()
 		endTime = now.Add(defaultMaxStakingDuration)
 	)
 
