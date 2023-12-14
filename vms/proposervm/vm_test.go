@@ -229,7 +229,6 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 			ctx,
 			chainTip.Height()+1,
 			pchainHeight,
-			parentTimestamp,
 			vm.ctx.NodeID,
 			proposer.TimeToSlot(parentTimestamp, vm.Clock.Time()),
 		)

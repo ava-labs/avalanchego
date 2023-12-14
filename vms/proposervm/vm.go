@@ -402,7 +402,6 @@ func (vm *VM) getPostDurangoSlotTime(
 		ctx,
 		blkHeight,
 		pChainHeight,
-		parentTimestamp,
 		vm.ctx.NodeID,
 		proposer.TimeToSlot(parentTimestamp, currentTime),
 	)

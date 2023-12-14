@@ -369,7 +369,6 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 			expectedDelay = time.Duration(currentSlot) * WindowDuration
 			blockTime     = parentBlockTime.Add(expectedDelay)
 		)
-		blockTime = parentBlockTime.Add(WindowDuration)
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, blockTime)
 		require.NoError(err)
 		require.Equal(validatorIDs[0], proposerID)
@@ -446,7 +445,7 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 		require.NoError(err)
 
 		// proposerID is the scheduled proposer. It may start with the expected delay
-		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, parentBlockTime, proposerID, slot)
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, proposerID, slot)
 		require.NoError(err)
 		require.Equal(expectedDelay, delay)
 	}

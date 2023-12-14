@@ -428,7 +428,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 
 	{
 		// no slots within inspected window
-		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(proposer.MaxLookAheadWindow, nil).AnyTimes()
 
 		// we mock the scheduler setting the exact time we expect it to be reset to
@@ -448,7 +448,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		// a slot within inspected window
 		delay := proposer.MaxLookAheadWindow - time.Minute
 		expectedSchedulerTime := parentTimestamp.Add(delay)
-		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(delay, nil).AnyTimes()
 
 		// we mock the scheduler setting the exact time we expect it to be reset to

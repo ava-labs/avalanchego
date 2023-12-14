@@ -30,7 +30,7 @@ const (
 	MaxBuildWindows = 60
 	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
 
-	MaxLookAheadSlots  = 720 // 5 secs windows in 1 hour
+	MaxLookAheadSlots  = 720 // 1 hour
 	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration
 )
 
@@ -80,13 +80,13 @@ type Windower interface {
 	// at [pChainHeight] gets specific slots it can propose in (instead
 	// of being able to propose from a given time on as it happens Pre-Durango).
 	// [MinDelayForProposer] specifies how long [nodeID] needs to wait
-	// for its slot to start. Delay is specified as starting from [startTime].
-	// For efficiency reasons, we cap the slot search to [MaxLookAheadWindow] delay.
+	// for its slot to start. Delay is specified as starting from slot zero start.
+	// (which is parent timestamp). For efficiency reasons, we cap the slot search
+	// to [MaxLookAheadWindow] slots.
 	MinDelayForProposer(
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
-		parentBlockTime time.Time,
 		nodeID ids.NodeID,
 		initialSlot uint64,
 	) (time.Duration, error)
@@ -204,7 +204,6 @@ func (w *windower) MinDelayForProposer(
 	ctx context.Context,
 	chainHeight,
 	pChainHeight uint64,
-	parentBlockTime time.Time,
 	nodeID ids.NodeID,
 	initialSlot uint64,
 ) (time.Duration, error) {
@@ -275,7 +274,7 @@ func validatorsToWeight(validators []validatorData) []uint64 {
 }
 
 func TimeToSlot(baseTime, targetTime time.Time) uint64 {
-	if !targetTime.After(baseTime) {
+	if targetTime.Before(baseTime) {
 		return 0
 	}
 	return uint64(targetTime.Sub(baseTime) / WindowDuration)
