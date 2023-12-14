@@ -197,7 +197,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	}()
 
 	var (
-		now      = env.state.GetTimestamp()
+		now      = env.backend.Clk.Time()
 		nextTime = now.Add(2 * txexecutor.SyncBound)
 	)
 
@@ -250,7 +250,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	require.True(env.mempool.Has(txID))
 
 	var (
-		now      = env.state.GetTimestamp()
+		now      = env.backend.Clk.Time()
 		nextTime = now.Add(2 * txexecutor.SyncBound)
 	)
 
