@@ -291,7 +291,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	env.config.DurangoTime = mockable.MaxTime
 
 	var (
-		now                   = env.state.GetTimestamp()
+		now                   = env.backend.Clk.Time()
 		defaultValidatorStake = 100 * units.MilliAvax
 
 		// Add a validator with StartTime in the future within [MaxFutureStartTime]
@@ -391,7 +391,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	env.config.DurangoTime = time.Time{}
 
 	var (
-		now                   = env.state.GetTimestamp()
+		now                   = env.backend.Clk.Time()
 		defaultValidatorStake = 100 * units.MilliAvax
 
 		// Add a validator ending in [MaxStakeDuration]
