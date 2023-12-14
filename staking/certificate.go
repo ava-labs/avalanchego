@@ -3,11 +3,14 @@
 
 package staking
 
-import "crypto/x509"
+import (
+	"crypto"
+	"crypto/x509"
+)
 
 type Certificate struct {
 	Raw       []byte
-	PublicKey any
+	PublicKey crypto.PublicKey
 	// TODO: Remove after v1.11.x activates.
 	SignatureAlgorithm x509.SignatureAlgorithm
 }
