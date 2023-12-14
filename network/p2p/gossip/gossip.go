@@ -281,7 +281,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 	sentBytes := 0
 
-	for {
+	for sentBytes < p.targetGossipSize  {
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
 			break
