@@ -244,3 +244,12 @@ func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 	_, err := codec.decodeKey(binary.AppendUvarint(nil, math.MaxInt))
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
+
+func TestUintSize(t *testing.T) {
+	c := codec.(*codecImpl)
+	for i := uint64(0); i < math.MaxInt16; i++ {
+		expectedSize := c.uintSize(i)
+		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), i)
+		require.Equal(t, expectedSize, actualSize, i)
+	}
+}

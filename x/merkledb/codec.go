@@ -91,20 +91,11 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
-	// total the number of children pointers + bool indicating if it has a value + the value + the child entries for n.children
-	total := c.uintSize(uint64(len(n.children))) + boolLen
-	if n.value.HasValue() {
-		total += c.uintSize(uint64(len(n.value.Value()))) + len(n.value.Value())
-	}
-	// for each non-nil entry, we add the additional size of the child entry
-	for index, entry := range n.children {
-		total += c.childSize(index, entry)
-	}
-	return total
-}
-
 func (c *codecImpl) childSize(index byte, childEntry *child) int {
+	// * index
+	// * child ID
+	// * child key
+	// * bool indicating whether the child has a value
 	return c.uintSize(uint64(index)) + ids.IDLen + c.keySize(childEntry.compressedKey) + boolLen
 }
 
@@ -122,6 +113,23 @@ func (*codecImpl) uintSize(value uint64) int {
 
 func (c *codecImpl) keySize(p Key) int {
 	return c.uintSize(uint64(p.length)) + bytesNeeded(p.length)
+}
+
+func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
+	// * number of children
+	// * bool indicating whether [n] has a value
+	// * the value (optional)
+	// * children
+	size := c.uintSize(uint64(len(n.children))) + boolLen
+	if n.value.HasValue() {
+		valueLen := len(n.value.Value())
+		size += c.uintSize(uint64(valueLen)) + valueLen
+	}
+	// for each non-nil entry, we add the additional size of the child entry
+	for index, entry := range n.children {
+		size += c.childSize(index, entry)
+	}
+	return size
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
