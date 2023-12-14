@@ -4,7 +4,6 @@
 package p
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -19,11 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -32,8 +31,8 @@ import (
 )
 
 const (
-	estimatedDelegationPeriod = 15 * time.Second
-	estimatedValidationPeriod = 30 * time.Second
+	delegationPeriod = 15 * time.Second
+	validationPeriod = 30 * time.Second
 )
 
 var _ = ginkgo.Describe("[Staking Rewards]", func() {
@@ -112,32 +111,26 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			weight            = 2_000 * units.Avax
 		)
 
-		var (
-			alphaValidatorsEndTime          time.Time
-			effectiveAlphaValidatorDuration time.Duration
-			effectiveGammaDelegatorDuration time.Duration
-
-			betaValidatorsEndTime time.Time
-		)
-
 		ginkgo.By("retrieving supply before inserting validators")
 		supplyAtValidatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
 		require.NoError(err)
 
-		ginkgo.By("adding alpha node as a validator", func() {
-			// following Durango activation delegator start time will match
-			// the timestamp of the block including its add delegator tx
-			validatorChainTime, err := pvmClient.GetTimestamp(e2e.DefaultContext())
-			require.NoError(err)
-			validatorStartTime := time.Unix(math.Max(validatorChainTime.Unix(), time.Now().Unix()), 0)
-			alphaValidatorsEndTime = validatorStartTime.Add(estimatedValidationPeriod)
+		ginkgo.By("retrieving current chain time before inserting validators")
+		now, err := pvmClient.GetTimestamp(e2e.DefaultContext())
+		require.NoError(err)
 
-			_, err = pWallet.IssueAddPermissionlessValidatorTx(
+		alphaValidatorsEndTime := now.Add(validationPeriod)
+		tests.Outf("alpha node validation period ending at: %v\n", alphaValidatorsEndTime)
+
+		ginkgo.By("adding alpha node as a validator", func() {
+			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						End:    uint64(alphaValidatorsEndTime.Unix()),
-						Wght:   weight,
+						// Post-Durango, the [Start] is no longer user-specified and is
+						// set to the on-chain timestamp at tx acceptance.
+						End:  uint64(alphaValidatorsEndTime.Unix()),
+						Wght: weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
@@ -155,32 +148,20 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
-
-			e2e.Eventually(func() bool {
-				data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
-				require.NoError(err)
-				if len(data) == 0 {
-					return false
-				}
-				effectiveAlphaValidatorDuration = time.Duration(data[0].EndTime-data[0].StartTime) * time.Second
-				return true
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to retrieve current validator")
 		})
 
-		ginkgo.By("adding beta node as a validator", func() {
-			// following Durango activation delegator start time will match
-			// the timestamp of the block including its add delegator tx
-			validatorChainTime, err := pvmClient.GetTimestamp(e2e.DefaultContext())
-			require.NoError(err)
-			validatorStartTime := time.Unix(math.Max(validatorChainTime.Unix(), time.Now().Unix()), 0)
-			betaValidatorsEndTime = validatorStartTime.Add(estimatedValidationPeriod)
+		betaValidatorEndTime := now.Add(validationPeriod)
+		tests.Outf("beta node validation period ending at: %v\n", betaValidatorEndTime)
 
-			_, err = pWallet.IssueAddPermissionlessValidatorTx(
+		ginkgo.By("adding beta node as a validator", func() {
+			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						End:    uint64(betaValidatorsEndTime.Unix()),
-						Wght:   weight,
+						// Post-Durango, the [Start] is no longer user-specified and is
+						// set to the on-chain timestamp at tx acceptance.
+						End:  uint64(betaValidatorEndTime.Unix()),
+						Wght: weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
@@ -204,23 +185,22 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		supplyAtDelegatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)
 		require.NoError(err)
 
+		ginkgo.By("retrieving current chain time before inserting delegators")
+		now, err = pvmClient.GetTimestamp(e2e.DefaultContext())
+		require.NoError(err)
+
+		gammaDelegatorEndTime := now.Add(delegationPeriod)
+		tests.Outf("gamma delegation period ending at: %v\n", gammaDelegatorEndTime)
+
 		ginkgo.By("adding gamma as delegator to the alpha node", func() {
-			// following Durango activation delegator start time will match
-			// the timestamp of the block including its add delegator tx
-			delegatorChainTime, err := pvmClient.GetTimestamp(e2e.DefaultContext())
-			require.NoError(err)
-			delegatorStartTime := time.Unix(math.Max(delegatorChainTime.Unix(), time.Now().Unix()), 0)
-			delegatorsEndTime := delegatorStartTime.Add(estimatedDelegationPeriod)
-
-			fmt.Fprintf(ginkgo.GinkgoWriter, "delegator start time: %v\n", delegatorStartTime)
-			fmt.Fprintf(ginkgo.GinkgoWriter, "delegator end time: %v\n", delegatorsEndTime)
-
-			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
+			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						End:    uint64(delegatorsEndTime.Unix()),
-						Wght:   weight,
+						// Post-Durango, the [Start] is no longer user-specified and is
+						// set to the on-chain timestamp at tx acceptance.
+						End:  uint64(gammaDelegatorEndTime.Unix()),
+						Wght: weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
@@ -232,33 +212,20 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				e2e.WithDefaultContext(),
 			)
 			require.NoError(err)
-
-			e2e.Eventually(func() bool {
-				data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
-				require.NoError(err)
-				if len(data) == 0 {
-					return false
-				}
-				delegatorData := data[0].Delegators[0]
-				effectiveGammaDelegatorDuration = time.Duration(delegatorData.EndTime-delegatorData.StartTime) * time.Second
-				return true
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to retrieve current validator")
 		})
 
-		ginkgo.By("adding delta as delegator to the beta node", func() {
-			// following Durango activation delegator start time will match
-			// the timestamp of the block including its add delegator tx
-			delegatorChainTime, err := pvmClient.GetTimestamp(e2e.DefaultContext())
-			require.NoError(err)
-			delegatorStartTime := time.Unix(math.Max(delegatorChainTime.Unix(), time.Now().Unix()), 0)
-			delegatorsEndTime := delegatorStartTime.Add(estimatedDelegationPeriod)
+		deltaDelegatorEndTime := now.Add(delegationPeriod)
+		tests.Outf("delta delegation period ending at: %v\n", deltaDelegatorEndTime)
 
-			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
+		ginkgo.By("adding delta as delegator to the beta node", func() {
+			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						End:    uint64(delegatorsEndTime.Unix()),
-						Wght:   weight,
+						// Post-Durango, the [Start] is no longer user-specified and is
+						// set to the on-chain timestamp at tx acceptance.
+						End:  uint64(deltaDelegatorEndTime.Unix()),
+						Wght: weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
@@ -275,10 +242,18 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		ginkgo.By("stopping beta node to prevent it and its delegator from receiving a validation reward")
 		require.NoError(betaNode.Stop())
 
+		ginkgo.By("retrieving staking periods from the chain")
+		data, err := pvmClient.GetCurrentValidators(e2e.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
+		require.NoError(err)
+		require.Len(data, 1)
+		actualAlphaValidationPeriod := time.Duration(data[0].EndTime-data[0].StartTime) * time.Second
+		delegatorData := data[0].Delegators[0]
+		actualGammaDelegationPeriod := time.Duration(delegatorData.EndTime-delegatorData.StartTime) * time.Second
+
 		ginkgo.By("waiting until all validation periods are over")
 		// The beta validator was the last added and so has the latest end time. The
 		// delegation periods are shorter than the validation periods.
-		time.Sleep(time.Until(time.Unix(math.Max(alphaValidatorsEndTime.Unix(), betaValidatorsEndTime.Unix()), 0)))
+		time.Sleep(time.Until(betaValidatorEndTime))
 
 		ginkgo.By("waiting until the alpha and beta nodes are no longer validators")
 		e2e.Eventually(func() bool {
@@ -322,8 +297,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("determining expected validation and delegation rewards")
 		calculator := reward.NewCalculator(rewardConfig)
-		expectedValidationReward := calculator.Calculate(effectiveAlphaValidatorDuration, weight, supplyAtValidatorsStart)
-		potentialDelegationReward := calculator.Calculate(effectiveGammaDelegatorDuration, weight, supplyAtDelegatorsStart)
+		expectedValidationReward := calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtValidatorsStart)
+		potentialDelegationReward := calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtDelegatorsStart)
 		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		ginkgo.By("checking expected rewards against actual rewards")

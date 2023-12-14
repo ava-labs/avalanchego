@@ -409,6 +409,7 @@ func TestGetBalance(t *testing.T) {
 		reply := GetBalanceResponse{}
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
+
 		require.Equal(json.Uint64(defaultBalance), reply.Balance)
 		require.Equal(json.Uint64(defaultBalance), reply.Unlocked)
 		require.Equal(json.Uint64(0), reply.LockedStakeable)
