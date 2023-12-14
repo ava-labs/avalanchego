@@ -29,11 +29,8 @@ const (
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
 
-	estimatedKeyLen           = 64
-	estimatedValueLen         = 64
-	estimatedCompressedKeyLen = 8
-	// Child index, child compressed key, child ID, child has value
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedKeyLen + ids.IDLen + boolLen
+	estimatedKeyLen   = 64
+	estimatedValueLen = 64
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
@@ -62,6 +59,7 @@ type encoderDecoder interface {
 type encoder interface {
 	// Assumes [n] is non-nil.
 	encodeDBNode(n *dbNode) []byte
+	encodedDBNodeSize(n *dbNode) int
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
@@ -93,15 +91,51 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
+func (c *codecImpl) childSize(index byte, childEntry *child) int {
+	// * index
+	// * child ID
+	// * child key
+	// * bool indicating whether the child has a value
+	return c.uintSize(uint64(index)) + ids.IDLen + c.keySize(childEntry.compressedKey) + boolLen
+}
+
+// based on the current implementation of codecImpl.encodeUint which uses binary.PutUvarint
+func (*codecImpl) uintSize(value uint64) int {
+	// binary.PutUvarint repeatedly divides by 128 until the value is under 128,
+	// so count the number of times that will occur
+	i := 0
+	for value >= 0x80 {
+		value >>= 7
+		i++
+	}
+	return i + 1
+}
+
+func (c *codecImpl) keySize(p Key) int {
+	return c.uintSize(uint64(p.length)) + bytesNeeded(p.length)
+}
+
+func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
+	// * number of children
+	// * bool indicating whether [n] has a value
+	// * the value (optional)
+	// * children
+	size := c.uintSize(uint64(len(n.children))) + boolLen
+	if n.value.HasValue() {
+		valueLen := len(n.value.Value())
+		size += c.uintSize(uint64(valueLen)) + valueLen
+	}
+	// for each non-nil entry, we add the additional size of the child entry
+	for index, entry := range n.children {
+		size += c.childSize(index, entry)
+	}
+	return size
+}
+
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
-	var (
-		numChildren = len(n.children)
-		// Estimate size of [n] to prevent memory allocations
-		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
+	buf := bytes.NewBuffer(make([]byte, 0, c.encodedDBNodeSize(n)))
 	c.encodeMaybeByteSlice(buf, n.value)
-	c.encodeUint(buf, uint64(numChildren))
+	c.encodeUint(buf, uint64(len(n.children)))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	keys := maps.Keys(n.children)
