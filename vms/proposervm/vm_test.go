@@ -219,27 +219,27 @@ func initTestProposerVM(
 
 func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
 	var (
-		ctx             = context.Background()
-		parentTimestamp = chainTip.Timestamp()
+		ctx              = context.Background()
+		childBlockHeight = chainTip.Height() + 1
+		parentTimestamp  = chainTip.Timestamp()
 	)
-	vm.Clock.Set(vm.Clock.Time().Truncate(time.Second))
 
 	for {
+		slot := proposer.TimeToSlot(parentTimestamp, vm.Clock.Time().Truncate(time.Second))
 		delay, err := vm.MinDelayForProposer(
 			ctx,
-			chainTip.Height()+1,
+			childBlockHeight,
 			pchainHeight,
 			vm.ctx.NodeID,
-			proposer.TimeToSlot(parentTimestamp, vm.Clock.Time()),
+			slot,
 		)
-
-		switch err {
-		case nil:
-			parentTimestamp = parentTimestamp.Add(delay)
-			vm.Clock.Set(parentTimestamp)
-			return nil
-		default:
+		if err != nil {
 			return err
+		}
+
+		vm.Clock.Set(parentTimestamp.Add(delay))
+		if delay < proposer.MaxLookAheadWindow {
+			return nil
 		}
 	}
 }
