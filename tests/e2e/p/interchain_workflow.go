@@ -43,7 +43,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		network := e2e.Env.GetNetwork()
 
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
-			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
+			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
 			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
@@ -91,7 +91,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		e2e.WaitForHealthy(node)
 
 		ginkgo.By("retrieving new node's id and pop")
-		infoClient := info.NewClient(node.GetProcessContext().URI)
+		infoClient := info.NewClient(node.URI)
 		nodeID, nodePOP, err := infoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 

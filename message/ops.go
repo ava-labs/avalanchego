@@ -51,12 +51,12 @@ const (
 	ChitsOp
 	// Application:
 	AppRequestOp
-	AppRequestFailedOp
+	AppErrorOp
 	AppResponseOp
 	AppGossipOp
 	// Cross chain:
 	CrossChainAppRequestOp
-	CrossChainAppRequestFailedOp
+	CrossChainAppErrorOp
 	CrossChainAppResponseOp
 	// Internal:
 	ConnectedOp
@@ -115,9 +115,9 @@ var (
 		GetAncestorsFailedOp,
 		GetFailedOp,
 		QueryFailedOp,
-		AppRequestFailedOp,
+		AppErrorOp,
 		CrossChainAppRequestOp,
-		CrossChainAppRequestFailedOp,
+		CrossChainAppErrorOp,
 		CrossChainAppResponseOp,
 		ConnectedOp,
 		ConnectedSubnetOp,
@@ -165,12 +165,12 @@ var (
 	AsynchronousOps = []Op{
 		// Application
 		AppRequestOp,
-		AppRequestFailedOp,
+		AppErrorOp,
 		AppGossipOp,
 		AppResponseOp,
 		// Cross chain
 		CrossChainAppRequestOp,
-		CrossChainAppRequestFailedOp,
+		CrossChainAppErrorOp,
 		CrossChainAppResponseOp,
 	}
 
@@ -182,8 +182,8 @@ var (
 		GetAncestorsFailedOp:            AncestorsOp,
 		GetFailedOp:                     PutOp,
 		QueryFailedOp:                   ChitsOp,
-		AppRequestFailedOp:              AppResponseOp,
-		CrossChainAppRequestFailedOp:    CrossChainAppResponseOp,
+		AppErrorOp:                      AppResponseOp,
+		CrossChainAppErrorOp:            CrossChainAppResponseOp,
 	}
 	UnrequestedOps = set.Of(
 		GetAcceptedFrontierOp,
@@ -265,8 +265,8 @@ func (op Op) String() string {
 	// Application
 	case AppRequestOp:
 		return "app_request"
-	case AppRequestFailedOp:
-		return "app_request_failed"
+	case AppErrorOp:
+		return "app_error"
 	case AppResponseOp:
 		return "app_response"
 	case AppGossipOp:
@@ -274,8 +274,8 @@ func (op Op) String() string {
 	// Cross chain
 	case CrossChainAppRequestOp:
 		return "cross_chain_app_request"
-	case CrossChainAppRequestFailedOp:
-		return "cross_chain_app_request_failed"
+	case CrossChainAppErrorOp:
+		return "cross_chain_app_error"
 	case CrossChainAppResponseOp:
 		return "cross_chain_app_response"
 		// Internal
@@ -347,6 +347,8 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.AppRequest, nil
 	case *p2p.Message_AppResponse:
 		return msg.AppResponse, nil
+	case *p2p.Message_AppError:
+		return msg.AppError, nil
 	case *p2p.Message_AppGossip:
 		return msg.AppGossip, nil
 	default:
@@ -400,6 +402,8 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return AppRequestOp, nil
 	case *p2p.Message_AppResponse:
 		return AppResponseOp, nil
+	case *p2p.Message_AppError:
+		return AppErrorOp, nil
 	case *p2p.Message_AppGossip:
 		return AppGossipOp, nil
 	default:
