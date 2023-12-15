@@ -32,7 +32,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     let db = Db::new(opts.db.clone(), &cfg.build()).await?;
     let latest_hash = db.root_hash().await?;
     let latest_rev = db.revision(latest_hash).await?;
-    let mut stream = latest_rev.stream::<Vec<_>>(None)?;
+    let mut stream = latest_rev.stream();
     loop {
         match stream.next().await {
             None => break,

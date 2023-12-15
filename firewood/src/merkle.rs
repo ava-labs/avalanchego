@@ -24,7 +24,6 @@ pub use node::{
     NodeType, PartialPath,
 };
 pub use proof::{Proof, ProofError};
-use stream::IteratorState;
 pub use stream::MerkleKeyValueStream;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 
@@ -1221,16 +1220,16 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
         self.store.flush_dirty()
     }
 
-    pub(crate) fn get_iter<K: AsRef<[u8]>>(
+    pub(crate) fn iter(&self, root: DiskAddress) -> MerkleKeyValueStream<'_, S, T> {
+        MerkleKeyValueStream::new(self, root)
+    }
+
+    pub(crate) fn iter_from(
         &self,
-        key: Option<K>,
         root: DiskAddress,
-    ) -> Result<MerkleKeyValueStream<'_, S, T>, MerkleError> {
-        Ok(MerkleKeyValueStream {
-            key_state: IteratorState::new(key),
-            merkle_root: root,
-            merkle: self,
-        })
+        key: Box<[u8]>,
+    ) -> MerkleKeyValueStream<'_, S, T> {
+        MerkleKeyValueStream::from_key(self, root, key)
     }
 
     pub(super) async fn range_proof<K: api::KeyType + Send + Sync>(
@@ -1241,13 +1240,15 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
         limit: Option<usize>,
     ) -> Result<Option<api::RangeProof<Vec<u8>, Vec<u8>>>, api::Error> {
         // limit of 0 is always an empty RangeProof
-        if let Some(0) = limit {
+        if limit == Some(0) {
             return Ok(None);
         }
 
-        let mut stream = self
-            .get_iter(first_key, root)
-            .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+        let mut stream = match first_key {
+            // TODO: fix the call-site to force the caller to do the allocation
+            Some(key) => self.iter_from(root, key.as_ref().to_vec().into_boxed_slice()),
+            None => self.iter(root),
+        };
 
         // fetch the first key from the stream
         let first_result = stream.next().await;
@@ -1264,7 +1265,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
             .map_err(|e| api::Error::InternalError(Box::new(e)))?;
         let limit = limit.map(|old_limit| old_limit - 1);
 
-        let mut middle = vec![(first_key, first_data)];
+        let mut middle = vec![(first_key.into_vec(), first_data)];
 
         // we stop streaming if either we hit the limit or the key returned was larger
         // than the largest key requested
@@ -1283,8 +1284,9 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
                     };
 
                     // keep going if the key returned is less than the last key requested
-                    ready(kv.0.as_slice() <= last_key.as_ref())
+                    ready(&*kv.0 <= last_key.as_ref())
                 })
+                .map(|kv_result| kv_result.map(|(k, v)| (k.into_vec(), v)))
                 .try_collect::<Vec<(Vec<u8>, Vec<u8>)>>()
                 .await?,
         );

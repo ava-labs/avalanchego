@@ -318,13 +318,15 @@ impl<S: ShaleStore<Node> + Send + Sync> api::DbView for DbRev<S> {
 }
 
 impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
-    pub fn stream<K: KeyType>(
+    pub fn stream(&self) -> merkle::MerkleKeyValueStream<'_, S, Bincode> {
+        self.merkle.iter(self.header.kv_root)
+    }
+
+    pub fn stream_from(
         &self,
-        start_key: Option<K>,
-    ) -> Result<merkle::MerkleKeyValueStream<'_, S, Bincode>, api::Error> {
-        self.merkle
-            .get_iter(start_key, self.header.kv_root)
-            .map_err(|e| api::Error::InternalError(Box::new(e)))
+        start_key: Box<[u8]>,
+    ) -> merkle::MerkleKeyValueStream<'_, S, Bincode> {
+        self.merkle.iter_from(self.header.kv_root, start_key)
     }
 
     fn flush_dirty(&mut self) -> Option<()> {

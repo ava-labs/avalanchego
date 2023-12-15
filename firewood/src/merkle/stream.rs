@@ -1,290 +1,398 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{node::Node, LeafNode, Merkle, MerkleError, NodeType, ObjRef};
+use super::{node::Node, BranchNode, Merkle, NodeType, ObjRef};
 use crate::{
     shale::{DiskAddress, ShaleStore},
     v2::api,
 };
-use futures::Stream;
+use futures::{stream::FusedStream, Stream};
+use helper_types::{Either, MustUse};
 use std::task::Poll;
 
-pub(super) enum IteratorState<'a> {
-    /// Start iterating at the beginning of the trie,
-    /// returning the lowest key/value pair first
-    StartAtBeginning,
+type Key = Box<[u8]>;
+type Value = Vec<u8>;
+
+enum IteratorState<'a> {
     /// Start iterating at the specified key
-    StartAtKey(Vec<u8>),
-    /// Continue iterating after the given last_node and parents
+    StartAtKey(Key),
+    /// Continue iterating after the last node in the `visited_node_path`
     Iterating {
-        last_node: ObjRef<'a>,
-        parents: Vec<(ObjRef<'a>, u8)>,
+        visited_node_path: Vec<(ObjRef<'a>, u8)>,
     },
 }
-impl IteratorState<'_> {
-    pub(super) fn new<K: AsRef<[u8]>>(starting: Option<K>) -> Self {
-        match starting {
-            None => Self::StartAtBeginning,
-            Some(key) => Self::StartAtKey(key.as_ref().to_vec()),
-        }
-    }
-}
 
-// The default state is to start at the beginning
-impl<'a> Default for IteratorState<'a> {
-    fn default() -> Self {
-        Self::StartAtBeginning
+impl IteratorState<'_> {
+    fn new() -> Self {
+        Self::StartAtKey(vec![].into_boxed_slice())
+    }
+
+    fn with_key(key: Key) -> Self {
+        Self::StartAtKey(key)
     }
 }
 
 /// A MerkleKeyValueStream iterates over keys/values for a merkle trie.
-/// This iterator is not fused. If you read past the None value, you start
-/// over at the beginning. If you need a fused iterator, consider using
-/// std::iter::fuse
 pub struct MerkleKeyValueStream<'a, S, T> {
-    pub(super) key_state: IteratorState<'a>,
-    pub(super) merkle_root: DiskAddress,
-    pub(super) merkle: &'a Merkle<S, T>,
+    key_state: IteratorState<'a>,
+    merkle_root: DiskAddress,
+    merkle: &'a Merkle<S, T>,
+}
+
+impl<'a, S: ShaleStore<Node> + Send + Sync, T> FusedStream for MerkleKeyValueStream<'a, S, T> {
+    fn is_terminated(&self) -> bool {
+        matches!(&self.key_state, IteratorState::Iterating { visited_node_path } if visited_node_path.is_empty())
+    }
+}
+
+impl<'a, S, T> MerkleKeyValueStream<'a, S, T> {
+    pub(super) fn new(merkle: &'a Merkle<S, T>, merkle_root: DiskAddress) -> Self {
+        let key_state = IteratorState::new();
+
+        Self {
+            merkle,
+            key_state,
+            merkle_root,
+        }
+    }
+
+    pub(super) fn from_key(merkle: &'a Merkle<S, T>, merkle_root: DiskAddress, key: Key) -> Self {
+        let key_state = IteratorState::with_key(key);
+
+        Self {
+            merkle,
+            key_state,
+            merkle_root,
+        }
+    }
 }
 
 impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'a, S, T> {
-    type Item = Result<(Vec<u8>, Vec<u8>), api::Error>;
+    type Item = Result<(Key, Value), api::Error>;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        // Note that this sets the key_state to StartAtBeginning temporarily
-        let found_key = match std::mem::take(&mut self.key_state) {
-            IteratorState::StartAtBeginning => {
-                let root_node = self
-                    .merkle
-                    .get_node(self.merkle_root)
-                    .map_err(|e| api::Error::InternalError(Box::new(e)))?;
-                let mut last_node = root_node;
-                let mut parents = vec![];
-                let leaf = loop {
-                    match last_node.inner() {
-                        NodeType::Branch(branch) => {
-                            let Some((leftmost_position, leftmost_address)) = branch
-                                .children
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(i, addr)| addr.map(|addr| (i, addr)))
-                                .next()
-                            else {
-                                // we already exhausted the branch node. This happens with an empty trie
-                                // ... or a corrupt one
-                                return if parents.is_empty() {
-                                    // empty trie
-                                    Poll::Ready(None)
-                                } else {
-                                    // branch with NO children, not at the top
-                                    Poll::Ready(Some(Err(api::Error::InternalError(Box::new(
-                                        MerkleError::ParentLeafBranch,
-                                    )))))
-                                };
-                            };
+        // destructuring is necessary here because we need mutable access to `key_state`
+        // at the same time as immutable access to `merkle`
+        let Self {
+            key_state,
+            merkle_root,
+            merkle,
+        } = &mut *self;
 
-                            let next = self
-                                .merkle
-                                .get_node(leftmost_address)
-                                .map_err(|e| api::Error::InternalError(Box::new(e)))?;
-
-                            parents.push((last_node, leftmost_position as u8));
-
-                            last_node = next;
-                        }
-                        NodeType::Leaf(leaf) => break leaf,
-                        NodeType::Extension(_) => todo!(),
-                    }
-                };
-
-                // last_node should have a leaf; compute the key and value
-                let current_key = key_from_parents_and_leaf(&parents, leaf);
-
-                self.key_state = IteratorState::Iterating { last_node, parents };
-
-                current_key
-            }
+        match key_state {
             IteratorState::StartAtKey(key) => {
-                // TODO: support finding the next key after K
-                let root_node = self
-                    .merkle
-                    .get_node(self.merkle_root)
+                let root_node = merkle
+                    .get_node(*merkle_root)
                     .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
-                let (found_node, parents) = self
-                    .merkle
-                    .get_node_and_parents_by_key(root_node, &key)
-                    .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+                // traverse the trie along each nibble until we find a node with a value
+                // TODO: merkle.iter_by_key(key) will simplify this entire code-block.
+                let (found_node, mut visited_node_path) = {
+                    let mut visited_node_path = vec![];
 
-                let Some(last_node) = found_node else {
-                    return Poll::Ready(None);
+                    let found_node = merkle
+                        .get_node_by_key_with_callbacks(
+                            root_node,
+                            &key,
+                            |node_addr, i| visited_node_path.push((node_addr, i)),
+                            |_, _| {},
+                        )
+                        .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+
+                    let mut visited_node_path = visited_node_path
+                        .into_iter()
+                        .map(|(node, pos)| merkle.get_node(node).map(|node| (node, pos)))
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+
+                    let last_visited_node_not_branch = visited_node_path
+                        .last()
+                        .map(|(node, _)| {
+                            matches!(node.inner(), NodeType::Leaf(_) | NodeType::Extension(_))
+                        })
+                        .unwrap_or_default();
+
+                    // we only want branch in the visited node-path to start
+                    if last_visited_node_not_branch {
+                        visited_node_path.pop();
+                    }
+
+                    (found_node, visited_node_path)
                 };
 
-                let returned_key_value = match last_node.inner() {
-                    NodeType::Branch(branch) => (key, branch.value.to_owned().unwrap().to_vec()),
-                    NodeType::Leaf(leaf) => (key, leaf.data.to_vec()),
-                    NodeType::Extension(_) => todo!(),
-                };
+                if let Some(found_node) = found_node {
+                    let value = match found_node.inner() {
+                        NodeType::Branch(branch) => branch.value.as_ref(),
+                        NodeType::Leaf(leaf) => Some(&leaf.data),
+                        NodeType::Extension(_) => None,
+                    };
 
-                self.key_state = IteratorState::Iterating { last_node, parents };
+                    let next_result = value.map(|value| {
+                        let value = value.to_vec();
 
-                return Poll::Ready(Some(Ok(returned_key_value)));
+                        Ok((std::mem::take(key), value))
+                    });
+
+                    visited_node_path.push((found_node, 0));
+
+                    self.key_state = IteratorState::Iterating { visited_node_path };
+
+                    return Poll::Ready(next_result);
+                }
+
+                self.key_state = IteratorState::Iterating { visited_node_path };
+
+                self.poll_next(_cx)
             }
-            IteratorState::Iterating {
-                last_node,
-                mut parents,
-            } => {
-                match last_node.inner() {
-                    NodeType::Branch(branch) => {
-                        // previously rendered the value from a branch node, so walk down to the first available child
-                        let Some((child_position, child_address)) = branch
-                            .children
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(child_position, &addr)| {
-                                addr.map(|addr| (child_position, addr))
-                            })
-                            .next()
-                        else {
-                            // Branch node with no children?
-                            return Poll::Ready(Some(Err(api::Error::InternalError(Box::new(
-                                MerkleError::ParentLeafBranch,
-                            )))));
-                        };
 
-                        parents.push((last_node, child_position as u8)); // remember where we walked down from
+            IteratorState::Iterating { visited_node_path } => {
+                let next = find_next_result(merkle, visited_node_path)
+                    .map_err(|e| api::Error::InternalError(Box::new(e)))
+                    .transpose();
 
-                        let current_node = self
-                            .merkle
-                            .get_node(child_address)
-                            .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+                Poll::Ready(next)
+            }
+        }
+    }
+}
 
-                        let found_key = key_from_parents(&parents);
+enum NodeRef<'a> {
+    New(ObjRef<'a>),
+    Visited(ObjRef<'a>),
+}
 
-                        self.key_state = IteratorState::Iterating {
-                            // continue iterating from here
-                            last_node: current_node,
-                            parents,
-                        };
+#[derive(Debug)]
+enum InnerNode<'a> {
+    New(&'a NodeType),
+    Visited(&'a NodeType),
+}
 
-                        found_key
-                    }
-                    NodeType::Leaf(leaf) => {
-                        let mut next = parents.pop().map(|(node, position)| (node, Some(position)));
-                        loop {
-                            match next {
-                                None => return Poll::Ready(None),
-                                Some((parent, child_position)) => {
-                                    // Assume all parents are branch nodes
-                                    let children = parent.inner().as_branch().unwrap().chd();
+impl<'a> NodeRef<'a> {
+    fn inner(&self) -> InnerNode<'_> {
+        match self {
+            Self::New(node) => InnerNode::New(node.inner()),
+            Self::Visited(node) => InnerNode::Visited(node.inner()),
+        }
+    }
 
-                                    // we use wrapping_add here because the value might be u8::MAX indicating that
-                                    // we want to go down branch
-                                    let start_position =
-                                        child_position.map(|pos| pos + 1).unwrap_or_default();
+    fn into_node(self) -> ObjRef<'a> {
+        match self {
+            Self::New(node) => node,
+            Self::Visited(node) => node,
+        }
+    }
+}
 
-                                    let Some((found_position, found_address)) = children
-                                        .iter()
-                                        .enumerate()
-                                        .skip(start_position as usize)
-                                        .filter_map(|(offset, addr)| {
-                                            addr.map(|addr| (offset as u8, addr))
-                                        })
-                                        .next()
-                                    else {
-                                        next = parents
-                                            .pop()
-                                            .map(|(node, position)| (node, Some(position)));
-                                        continue;
-                                    };
+fn find_next_result<'a, S: ShaleStore<Node>, T>(
+    merkle: &'a Merkle<S, T>,
+    visited_path: &mut Vec<(ObjRef<'a>, u8)>,
+) -> Result<Option<(Key, Value)>, super::MerkleError> {
+    let next = find_next_node_with_data(merkle, visited_path)?.map(|(next_node, value)| {
+        let partial_path = match next_node.inner() {
+            NodeType::Leaf(leaf) => leaf.path.iter().copied(),
+            NodeType::Extension(extension) => extension.path.iter().copied(),
+            _ => [].iter().copied(),
+        };
 
-                                    // we push (node, None) which will start at the beginning of the next branch node
-                                    let child = self
-                                        .merkle
-                                        .get_node(found_address)
-                                        .map(|node| (node, None))
-                                        .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+        let key = key_from_nibble_iter(nibble_iter_from_parents(visited_path).chain(partial_path));
 
-                                    // stop_descending if:
-                                    //  - on a branch and it has a value; OR
-                                    //  - on a leaf
-                                    let stop_descending = match child.0.inner() {
-                                        NodeType::Branch(branch) => branch.value.is_some(),
-                                        NodeType::Leaf(_) => true,
-                                        NodeType::Extension(_) => todo!(),
-                                    };
+        visited_path.push((next_node, 0));
 
-                                    next = Some(child);
+        (key, value)
+    });
 
-                                    parents.push((parent, found_position));
+    Ok(next)
+}
 
-                                    if stop_descending {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        // recompute current_key
-                        // TODO: Can we keep current_key updated as we walk the tree instead of building it from the top all the time?
-                        let current_key = key_from_parents_and_leaf(&parents, leaf);
+fn find_next_node_with_data<'a, S: ShaleStore<Node>, T>(
+    merkle: &'a Merkle<S, T>,
+    visited_path: &mut Vec<(ObjRef<'a>, u8)>,
+) -> Result<Option<(ObjRef<'a>, Vec<u8>)>, super::MerkleError> {
+    use InnerNode::*;
 
-                        self.key_state = IteratorState::Iterating {
-                            last_node: next.unwrap().0,
-                            parents,
-                        };
+    let Some((visited_parent, visited_pos)) = visited_path.pop() else {
+        return Ok(None);
+    };
 
-                        current_key
-                    }
+    let mut node = NodeRef::Visited(visited_parent);
+    let mut pos = visited_pos;
+    let mut first_loop = true;
 
-                    NodeType::Extension(_) => todo!(),
+    loop {
+        match node.inner() {
+            New(NodeType::Leaf(leaf)) => {
+                let value = leaf.data.to_vec();
+                return Ok(Some((node.into_node(), value)));
+            }
+
+            Visited(NodeType::Leaf(_)) | Visited(NodeType::Extension(_)) => {
+                let Some((next_parent, next_pos)) = visited_path.pop() else {
+                    return Ok(None);
+                };
+
+                node = NodeRef::Visited(next_parent);
+                pos = next_pos;
+            }
+
+            New(NodeType::Extension(extension)) => {
+                let child = merkle.get_node(extension.chd())?;
+
+                pos = 0;
+                visited_path.push((node.into_node(), pos));
+
+                node = NodeRef::New(child);
+            }
+
+            Visited(NodeType::Branch(branch)) => {
+                // if the first node that we check is a visited branch, that means that the branch had a value
+                // and we need to visit the first child, for all other cases, we need to visit the next child
+                let compare_op = if first_loop {
+                    <u8 as PartialOrd>::ge // >=
+                } else {
+                    <u8 as PartialOrd>::gt
+                };
+
+                let children = get_children_iter(branch)
+                    .filter(move |(_, child_pos)| compare_op(child_pos, &pos));
+
+                let found_next_node =
+                    next_node(merkle, children, visited_path, &mut node, &mut pos)?;
+
+                if !found_next_node {
+                    return Ok(None);
                 }
             }
-        };
 
-        // figure out the value to return from the state
-        // if we get here, we're sure to have something to return
-        // TODO: It's possible to return a reference to the data since the last_node is
-        // saved in the iterator
-        let return_value = match &self.key_state {
-            IteratorState::Iterating {
-                last_node,
-                parents: _,
-            } => {
-                let value = match last_node.inner() {
-                    NodeType::Branch(branch) => branch.value.to_owned().unwrap().to_vec(),
-                    NodeType::Leaf(leaf) => leaf.data.to_vec(),
-                    NodeType::Extension(_) => todo!(),
-                };
+            New(NodeType::Branch(branch)) => {
+                if let Some(value) = branch.value.as_ref() {
+                    let value = value.to_vec();
+                    return Ok(Some((node.into_node(), value)));
+                }
 
-                (found_key, value)
+                let children = get_children_iter(branch);
+
+                let found_next_node =
+                    next_node(merkle, children, visited_path, &mut node, &mut pos)?;
+
+                if !found_next_node {
+                    return Ok(None);
+                }
             }
-            _ => unreachable!(),
-        };
+        }
 
-        Poll::Ready(Some(Ok(return_value)))
+        first_loop = false;
     }
 }
 
-/// Compute a key from a set of parents
-fn key_from_parents(parents: &[(ObjRef, u8)]) -> Vec<u8> {
-    parents[1..]
-        .chunks_exact(2)
-        .map(|parents| (parents[0].1 << 4) + parents[1].1)
-        .collect::<Vec<u8>>()
+fn get_children_iter(branch: &BranchNode) -> impl Iterator<Item = (DiskAddress, u8)> {
+    branch
+        .children
+        .into_iter()
+        .enumerate()
+        .filter_map(|(pos, child_addr)| child_addr.map(|child_addr| (child_addr, pos as u8)))
 }
-fn key_from_parents_and_leaf(parents: &[(ObjRef, u8)], leaf: &LeafNode) -> Vec<u8> {
-    let mut iter = parents[1..]
+
+/// This function is a little complicated because we need to be able to early return from the parent
+/// when we return `false`. `MustUse` forces the caller to check the inner value of `Result::Ok`.
+/// It also replaces `node`
+fn next_node<'a, S, T, Iter>(
+    merkle: &'a Merkle<S, T>,
+    mut children: Iter,
+    parents: &mut Vec<(ObjRef<'a>, u8)>,
+    node: &mut NodeRef<'a>,
+    pos: &mut u8,
+) -> Result<MustUse<bool>, super::MerkleError>
+where
+    Iter: Iterator<Item = (DiskAddress, u8)>,
+    S: ShaleStore<Node>,
+{
+    if let Some((child_addr, child_pos)) = children.next() {
+        let child = merkle.get_node(child_addr)?;
+
+        *pos = child_pos;
+        let node = std::mem::replace(node, NodeRef::New(child));
+        parents.push((node.into_node(), *pos));
+    } else {
+        let Some((next_parent, next_pos)) = parents.pop() else {
+            return Ok(false.into());
+        };
+
+        *node = NodeRef::Visited(next_parent);
+        *pos = next_pos;
+    }
+
+    Ok(true.into())
+}
+
+/// create an iterator over the key-nibbles from all parents _excluding_ the sentinal node.
+fn nibble_iter_from_parents<'a>(parents: &'a [(ObjRef, u8)]) -> impl Iterator<Item = u8> + 'a {
+    parents
         .iter()
-        .map(|parent| parent.1)
-        .chain(leaf.path.to_vec());
-    let mut data = Vec::with_capacity(iter.size_hint().0);
-    while let (Some(hi), Some(lo)) = (iter.next(), iter.next()) {
+        .skip(1) // always skip the sentinal node
+        .flat_map(|(parent, child_nibble)| match parent.inner() {
+            NodeType::Branch(_) => Either::Left(std::iter::once(*child_nibble)),
+            NodeType::Extension(extension) => Either::Right(extension.path.iter().copied()),
+            NodeType::Leaf(leaf) => Either::Right(leaf.path.iter().copied()),
+        })
+}
+
+fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
+    let mut data = Vec::with_capacity(nibbles.size_hint().0 / 2);
+
+    while let (Some(hi), Some(lo)) = (nibbles.next(), nibbles.next()) {
         data.push((hi << 4) + lo);
     }
-    data
+
+    data.into_boxed_slice()
+}
+
+mod helper_types {
+    use std::ops::Not;
+
+    /// Enums enable stack-based dynamic-dispatch as opposed to heap-based `Box<dyn Trait>`.
+    /// This helps us with match arms that return different types that implement the same trait.
+    /// It's possible that [rust-lang/rust#63065](https://github.com/rust-lang/rust/issues/63065) will make this unnecessary.
+    ///
+    /// And this can be replaced by the `either` crate from crates.io if we ever need more functionality.
+    pub(super) enum Either<T, U> {
+        Left(T),
+        Right(U),
+    }
+
+    impl<T, U> Iterator for Either<T, U>
+    where
+        T: Iterator,
+        U: Iterator<Item = T::Item>,
+    {
+        type Item = T::Item;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self {
+                Self::Left(left) => left.next(),
+                Self::Right(right) => right.next(),
+            }
+        }
+    }
+
+    #[must_use]
+    pub(super) struct MustUse<T>(T);
+
+    impl<T> From<T> for MustUse<T> {
+        fn from(t: T) -> Self {
+            Self(t)
+        }
+    }
+
+    impl<T: Not> Not for MustUse<T> {
+        type Output = T::Output;
+
+        fn not(self) -> Self::Output {
+            self.0.not()
+        }
+    }
 }
 
 // CAUTION: only use with nibble iterators
@@ -316,9 +424,8 @@ mod tests {
     async fn iterate_empty() {
         let merkle = create_test_merkle();
         let root = merkle.init_root().unwrap();
-        let mut it = merkle.get_iter(Some(b"x"), root).unwrap();
-        let next = it.next().await;
-        assert!(next.is_none());
+        let stream = merkle.iter_from(root, b"x".to_vec().into_boxed_slice());
+        check_stream_is_done(stream).await;
     }
 
     #[test_case(Some(&[u8::MIN]); "Starting at first key")]
@@ -335,22 +442,78 @@ mod tests {
             merkle.insert([k], vec![k], root).unwrap();
         }
 
-        let mut it = merkle.get_iter(start, root).unwrap();
+        let mut stream = match start {
+            Some(start) => merkle.iter_from(root, start.to_vec().into_boxed_slice()),
+            None => merkle.iter(root),
+        };
+
         // we iterate twice because we should get a None then start over
         for k in start.map(|r| r[0]).unwrap_or_default()..=u8::MAX {
-            let next = it.next().await.map(|kv| {
+            let next = stream.next().await.map(|kv| {
                 let (k, v) = kv.unwrap();
-                assert_eq!(k, v);
+                assert_eq!(&*k, &*v);
                 k
             });
 
-            assert_eq!(next, Some(vec![k]));
+            assert_eq!(next, Some(vec![k].into_boxed_slice()));
         }
 
-        assert!(it.next().await.is_none());
+        check_stream_is_done(stream).await;
     }
 
-    #[ignore]
+    #[tokio::test]
+    async fn fused_empty() {
+        let merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+        check_stream_is_done(merkle.iter(root)).await;
+    }
+
+    #[tokio::test]
+    async fn fused_full() {
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        let last = vec![0x00, 0x00, 0x00];
+
+        let mut key_values = vec![vec![0x00], vec![0x00, 0x00], last.clone()];
+
+        // branchs with paths (or extensions) will be present as well as leaves with siblings
+        for kv in u8::MIN..=u8::MAX {
+            let mut last = last.clone();
+            last.push(kv);
+            key_values.push(last);
+        }
+
+        for kv in key_values.iter() {
+            merkle.insert(kv, kv.clone(), root).unwrap();
+        }
+
+        let mut stream = merkle.iter(root);
+
+        for kv in key_values.iter() {
+            let next = stream.next().await.unwrap().unwrap();
+            assert_eq!(&*next.0, &*next.1);
+            assert_eq!(&next.1, kv);
+        }
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn root_with_empty_data() {
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        let key = vec![].into_boxed_slice();
+        let value = vec![0x00];
+
+        merkle.insert(&key, value.clone(), root).unwrap();
+
+        let mut stream = merkle.iter(root);
+
+        assert_eq!(stream.next().await.unwrap().unwrap(), (key, value));
+    }
+
     #[tokio::test]
     async fn get_branch_and_leaf() {
         let mut merkle = create_test_merkle();
@@ -369,25 +532,27 @@ mod tests {
 
         merkle.insert(branch, branch.to_vec(), root).unwrap();
 
-        let mut stream = merkle.get_iter(None::<&[u8]>, root).unwrap();
+        let mut stream = merkle.iter(root);
 
         assert_eq!(
             stream.next().await.unwrap().unwrap(),
-            (branch.to_vec(), branch.to_vec())
+            (branch.to_vec().into_boxed_slice(), branch.to_vec())
         );
 
         assert_eq!(
             stream.next().await.unwrap().unwrap(),
-            (first_leaf.to_vec(), first_leaf.to_vec())
+            (first_leaf.to_vec().into_boxed_slice(), first_leaf.to_vec())
         );
 
         assert_eq!(
             stream.next().await.unwrap().unwrap(),
-            (second_leaf.to_vec(), second_leaf.to_vec())
+            (
+                second_leaf.to_vec().into_boxed_slice(),
+                second_leaf.to_vec()
+            )
         );
     }
 
-    #[ignore]
     #[tokio::test]
     async fn start_at_key_not_in_trie() {
         let mut merkle = create_test_merkle();
@@ -410,23 +575,217 @@ mod tests {
             merkle.insert(key, key.to_vec(), root).unwrap();
         }
 
-        let mut stream = merkle.get_iter(Some([intermediate]), root).unwrap();
+        let mut stream = merkle.iter_from(root, vec![intermediate].into_boxed_slice());
 
         let first_expected = key_values[1].as_slice();
         let first = stream.next().await.unwrap().unwrap();
 
-        assert_eq!(first.0, first.1);
-        assert_eq!(first.0, first_expected);
+        assert_eq!(&*first.0, &*first.1);
+        assert_eq!(first.1, first_expected);
 
         let second_expected = key_values[2].as_slice();
         let second = stream.next().await.unwrap().unwrap();
 
-        assert_eq!(second.0, second.1);
-        assert_eq!(second.0, second_expected);
+        assert_eq!(&*second.0, &*second.1);
+        assert_eq!(second.1, second_expected);
 
-        let done = stream.next().await;
+        check_stream_is_done(stream).await;
+    }
 
-        assert!(done.is_none());
+    #[tokio::test]
+    async fn start_at_key_on_branch_with_no_value() {
+        let sibling_path = 0x00;
+        let branch_path = 0x0f;
+        let children = 0..=0x0f;
+
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        children.clone().for_each(|child_path| {
+            let key = vec![sibling_path, child_path];
+
+            merkle.insert(&key, key.clone(), root).unwrap();
+        });
+
+        let mut keys: Vec<_> = children
+            .map(|child_path| {
+                let key = vec![branch_path, child_path];
+
+                merkle.insert(&key, key.clone(), root).unwrap();
+
+                key
+            })
+            .collect();
+
+        keys.sort();
+
+        let start = keys.iter().position(|key| key[0] == branch_path).unwrap();
+        let keys = &keys[start..];
+
+        let mut stream = merkle.iter_from(root, vec![branch_path].into_boxed_slice());
+
+        for key in keys {
+            let next = stream.next().await.unwrap().unwrap();
+
+            assert_eq!(&*next.0, &*next.1);
+            assert_eq!(&*next.0, key);
+        }
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn start_at_key_on_branch_with_value() {
+        let sibling_path = 0x00;
+        let branch_path = 0x0f;
+        let branch_key = vec![branch_path];
+
+        let children = (0..=0xf).map(|val| (val << 4) + val); // 0x00, 0x11, ... 0xff
+
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        merkle
+            .insert(&branch_key, branch_key.clone(), root)
+            .unwrap();
+
+        children.clone().for_each(|child_path| {
+            let key = vec![sibling_path, child_path];
+
+            merkle.insert(&key, key.clone(), root).unwrap();
+        });
+
+        let mut keys: Vec<_> = children
+            .map(|child_path| {
+                let key = vec![branch_path, child_path];
+
+                merkle.insert(&key, key.clone(), root).unwrap();
+
+                key
+            })
+            .chain(Some(branch_key.clone()))
+            .collect();
+
+        keys.sort();
+
+        let start = keys.iter().position(|key| key == &branch_key).unwrap();
+        let keys = &keys[start..];
+
+        let mut stream = merkle.iter_from(root, branch_key.into_boxed_slice());
+
+        for key in keys {
+            let next = stream.next().await.unwrap().unwrap();
+
+            assert_eq!(&*next.0, &*next.1);
+            assert_eq!(&*next.0, key);
+        }
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn start_at_key_on_extension() {
+        let missing = 0x0a;
+        let children = (0..=0x0f).filter(|x| *x != missing);
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        let keys: Vec<_> = children
+            .map(|child_path| {
+                let key = vec![child_path];
+
+                merkle.insert(&key, key.clone(), root).unwrap();
+
+                key
+            })
+            .collect();
+
+        let keys = &keys[(missing as usize)..];
+
+        let mut stream = merkle.iter_from(root, vec![missing].into_boxed_slice());
+
+        for key in keys {
+            let next = stream.next().await.unwrap().unwrap();
+
+            assert_eq!(&*next.0, &*next.1);
+            assert_eq!(&*next.0, key);
+        }
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn start_at_key_between_siblings() {
+        let missing = 0xaa;
+        let children = (0..=0xf)
+            .map(|val| (val << 4) + val) // 0x00, 0x11, ... 0xff
+            .filter(|x| *x != missing);
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        let keys: Vec<_> = children
+            .map(|child_path| {
+                let key = vec![child_path];
+
+                merkle.insert(&key, key.clone(), root).unwrap();
+
+                key
+            })
+            .collect();
+
+        let keys = &keys[((missing >> 4) as usize)..];
+
+        let mut stream = merkle.iter_from(root, vec![missing].into_boxed_slice());
+
+        for key in keys {
+            let next = stream.next().await.unwrap().unwrap();
+
+            assert_eq!(&*next.0, &*next.1);
+            assert_eq!(&*next.0, key);
+        }
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn start_at_key_greater_than_all_others() {
+        let greatest = 0xff;
+        let children = (0..=0xf)
+            .map(|val| (val << 4) + val) // 0x00, 0x11, ... 0xff
+            .filter(|x| *x != greatest);
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        let keys: Vec<_> = children
+            .map(|child_path| {
+                let key = vec![child_path];
+
+                merkle.insert(&key, key.clone(), root).unwrap();
+
+                key
+            })
+            .collect();
+
+        let keys = &keys[((greatest >> 4) as usize)..];
+
+        let mut stream = merkle.iter_from(root, vec![greatest].into_boxed_slice());
+
+        for key in keys {
+            let next = stream.next().await.unwrap().unwrap();
+
+            assert_eq!(&*next.0, &*next.1);
+            assert_eq!(&*next.0, key);
+        }
+
+        check_stream_is_done(stream).await;
+    }
+
+    async fn check_stream_is_done<S>(mut stream: S)
+    where
+        S: FusedStream + Unpin,
+    {
+        assert!(stream.next().await.is_none());
+        assert!(stream.is_terminated());
     }
 
     #[test]
