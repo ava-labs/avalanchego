@@ -203,6 +203,7 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	// After Durango, we never allow unsigned blocks.
 	shouldBuildUnsignedBlock := false
 	if p.vm.IsDurangoActivated(parentTimestamp) {
 		err = p.shouldBuildBlockPostDurango(
