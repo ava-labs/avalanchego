@@ -87,7 +87,7 @@ type Windower interface {
 		blockHeight,
 		pChainHeight uint64,
 		nodeID ids.NodeID,
-		initialSlot uint64,
+		startSlot uint64,
 	) (time.Duration, error)
 }
 
@@ -204,7 +204,7 @@ func (w *windower) MinDelayForProposer(
 	blockHeight,
 	pChainHeight uint64,
 	nodeID ids.NodeID,
-	slot uint64,
+	startSlot uint64,
 ) (time.Duration, error) {
 	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
@@ -212,7 +212,7 @@ func (w *windower) MinDelayForProposer(
 	}
 
 	var (
-		maxSlot = slot + MaxLookAheadSlots
+		maxSlot = startSlot + MaxLookAheadSlots
 
 		source           = prng.NewMT19937_64()
 		validatorWeights = validatorsToWeight(validators)
@@ -223,7 +223,7 @@ func (w *windower) MinDelayForProposer(
 		return 0, err
 	}
 
-	for slot := slot; slot < maxSlot; slot++ {
+	for slot := startSlot; slot < maxSlot; slot++ {
 		seed := postDurangoSeed(w.chainSource, blockHeight, slot)
 		source.Seed(seed)
 		indices, err := sampler.Sample(1)
