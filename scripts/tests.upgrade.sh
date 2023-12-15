@@ -11,10 +11,13 @@ if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   exit 255
 fi
 
-# 1.10.17 is the first version compatible with bls signing keys being
-# included in the genesis. Attempting to upgrade from prior versions
-# will result in nodes failing to boot due to the hash of the genesis
-# not matching the hash of the committed genesis block.
+# The AvalancheGo local network does not support long-lived
+# backwards-compatible networks. When a breaking change is made to the
+# local network, this flag must be updated to the last compatible
+# version with the latest code.
+#
+# v1.10.17 includes the AWM activation on the C-Chain local network
+# and the inclusion of BLS Public Keys in the network genesis.
 DEFAULT_VERSION="1.10.17"
 
 VERSION="${1:-${DEFAULT_VERSION}}"

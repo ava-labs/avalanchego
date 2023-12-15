@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		network := e2e.Env.GetNetwork()
 
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
-			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
+			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
 			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
@@ -59,14 +59,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		e2e.WaitForHealthy(betaNode)
 
 		ginkgo.By("retrieving alpha node id and pop")
-		alphaNodeURI := alphaNode.GetProcessContext().URI
-		alphaInfoClient := info.NewClient(alphaNodeURI)
+		alphaInfoClient := info.NewClient(alphaNode.URI)
 		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
 		ginkgo.By("retrieving beta node id and pop")
-		betaNodeURI := betaNode.GetProcessContext().URI
-		betaInfoClient := info.NewClient(betaNodeURI)
+		betaInfoClient := info.NewClient(betaNode.URI)
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
@@ -103,7 +101,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		keychain.Add(fundedKey)
 		nodeURI := tmpnet.NodeURI{
 			NodeID: alphaNodeID,
-			URI:    alphaNodeURI,
+			URI:    alphaNode.URI,
 		}
 		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
@@ -114,7 +112,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			weight            = 2_000 * units.Avax
 		)
 
-		pvmClient := platformvm.NewClient(alphaNodeURI)
+		pvmClient := platformvm.NewClient(alphaNode.URI)
 
 		ginkgo.By("retrieving supply before inserting validators")
 		supplyAtValidatorsStart, _, err := pvmClient.GetCurrentSupply(e2e.DefaultContext(), constants.PrimaryNetworkID)

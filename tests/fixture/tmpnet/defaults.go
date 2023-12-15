@@ -1,18 +1,17 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package local
+package tmpnet
 
 import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
 const (
 	// Constants defining the names of shell variables whose value can
-	// configure local network orchestration.
+	// configure temporary network orchestration.
 	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
 	NetworkDirEnvName      = "TMPNET_NETWORK_DIR"
 	RootDirEnvName         = "TMPNET_ROOT_DIR"
@@ -22,10 +21,10 @@ const (
 	DefaultNodeStopTimeout     = 5 * time.Second
 )
 
-// A set of flags appropriate for local testing.
-func LocalFlags() tmpnet.FlagsMap {
+// A set of flags appropriate for testing.
+func DefaultFlags() FlagsMap {
 	// Supply only non-default configuration to ensure that default values will be used.
-	return tmpnet.FlagsMap{
+	return FlagsMap{
 		config.NetworkPeerListGossipFreqKey: "250ms",
 		config.NetworkMaxReconnectDelayKey:  "1s",
 		config.PublicIPKey:                  "127.0.0.1",
@@ -37,16 +36,16 @@ func LocalFlags() tmpnet.FlagsMap {
 		config.IndexEnabledKey:              true,
 		config.LogDisplayLevelKey:           "INFO",
 		config.LogLevelKey:                  "DEBUG",
-		config.MinStakeDurationKey:          tmpnet.DefaultMinStakeDuration.String(),
+		config.MinStakeDurationKey:          DefaultMinStakeDuration.String(),
 	}
 }
 
-// C-Chain config for local testing.
-func LocalCChainConfig() tmpnet.FlagsMap {
+// C-Chain config for testing.
+func DefaultCChainConfig() FlagsMap {
 	// Supply only non-default configuration to ensure that default
 	// values will be used. Available C-Chain configuration options are
 	// defined in the `github.com/ava-labs/coreth/evm` package.
-	return tmpnet.FlagsMap{
+	return FlagsMap{
 		"log-level": "trace",
 	}
 }
