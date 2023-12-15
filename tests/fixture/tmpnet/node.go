@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package local
+package tmpnet
 
 import (
 	"context"
@@ -21,88 +21,69 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var errNodeAlreadyRunning = errors.New("failed to start local node: node is already running")
+var errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
 
-// Defines local-specific node configuration. Supports setting default
-// and node-specific values.
+// Defines configuration to execute a node.
 //
 // TODO(marun) Support persisting this configuration per-node when
 // node restart is implemented. Currently it can be supplied for node
 // start but won't survive restart.
-type LocalConfig struct {
+type NodeRuntimeConfig struct {
 	// Path to avalanchego binary
 	ExecPath string
 }
 
-// Stores the configuration and process details of a node in a local network.
-type LocalNode struct {
-	tmpnet.NodeConfig
-	LocalConfig
+// Stores the configuration and process details of a node in a temporary network.
+type Node struct {
+	NodeConfig
+	NodeRuntimeConfig
 	node.NodeProcessContext
 
 	// Configuration is intended to be stored at the path identified in NodeConfig.Flags[config.DataDirKey]
 }
 
-func NewLocalNode(dataDir string) *LocalNode {
-	return &LocalNode{
-		NodeConfig: tmpnet.NodeConfig{
-			Flags: tmpnet.FlagsMap{
+func NewNode(dataDir string) *Node {
+	return &Node{
+		NodeConfig: NodeConfig{
+			Flags: FlagsMap{
 				config.DataDirKey: dataDir,
 			},
 		},
 	}
 }
 
-// Attempt to read configuration and process details for a local node
+// Attempt to read configuration and process details for a node
 // from the specified directory.
-func ReadNode(dataDir string) (*LocalNode, error) {
-	node := NewLocalNode(dataDir)
+func ReadNode(dataDir string) (*Node, error) {
+	node := NewNode(dataDir)
 	if _, err := os.Stat(node.GetConfigPath()); err != nil {
-		return nil, fmt.Errorf("failed to read local node config file: %w", err)
+		return nil, fmt.Errorf("failed to read node config file: %w", err)
 	}
 	return node, node.ReadAll()
 }
 
-// Retrieve the ID of the node. The returned value may be nil if the
-// node configuration has not yet been populated or read.
-func (n *LocalNode) GetID() ids.NodeID {
-	return n.NodeConfig.NodeID
-}
-
-// Retrieve backend-agnostic node configuration.
-func (n *LocalNode) GetConfig() tmpnet.NodeConfig {
-	return n.NodeConfig
-}
-
-// Retrieve backend-agnostic process details.
-func (n *LocalNode) GetProcessContext() node.NodeProcessContext {
-	return n.NodeProcessContext
-}
-
-func (n *LocalNode) GetDataDir() string {
+func (n *Node) GetDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
-func (n *LocalNode) GetConfigPath() string {
+func (n *Node) GetConfigPath() string {
 	return filepath.Join(n.GetDataDir(), "config.json")
 }
 
-func (n *LocalNode) ReadConfig() error {
+func (n *Node) ReadConfig() error {
 	bytes, err := os.ReadFile(n.GetConfigPath())
 	if err != nil {
-		return fmt.Errorf("failed to read local node config: %w", err)
+		return fmt.Errorf("failed to read node config: %w", err)
 	}
-	flags := tmpnet.FlagsMap{}
+	flags := FlagsMap{}
 	if err := json.Unmarshal(bytes, &flags); err != nil {
-		return fmt.Errorf("failed to unmarshal local node config: %w", err)
+		return fmt.Errorf("failed to unmarshal node config: %w", err)
 	}
-	config := tmpnet.NodeConfig{Flags: flags}
+	config := NodeConfig{Flags: flags}
 	if err := config.EnsureNodeID(); err != nil {
 		return err
 	}
@@ -110,27 +91,27 @@ func (n *LocalNode) ReadConfig() error {
 	return nil
 }
 
-func (n *LocalNode) WriteConfig() error {
+func (n *Node) WriteConfig() error {
 	if err := os.MkdirAll(n.GetDataDir(), perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create node dir: %w", err)
 	}
 
-	bytes, err := tmpnet.DefaultJSONMarshal(n.Flags)
+	bytes, err := DefaultJSONMarshal(n.Flags)
 	if err != nil {
-		return fmt.Errorf("failed to marshal local node config: %w", err)
+		return fmt.Errorf("failed to marshal node config: %w", err)
 	}
 
 	if err := os.WriteFile(n.GetConfigPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write local node config: %w", err)
+		return fmt.Errorf("failed to write node config: %w", err)
 	}
 	return nil
 }
 
-func (n *LocalNode) GetProcessContextPath() string {
+func (n *Node) GetProcessContextPath() string {
 	return filepath.Join(n.GetDataDir(), config.DefaultProcessContextFilename)
 }
 
-func (n *LocalNode) ReadProcessContext() error {
+func (n *Node) ReadProcessContext() error {
 	path := n.GetProcessContextPath()
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		// The absence of the process context file indicates the node is not running
@@ -140,28 +121,28 @@ func (n *LocalNode) ReadProcessContext() error {
 
 	bytes, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read local node process context: %w", err)
+		return fmt.Errorf("failed to read node process context: %w", err)
 	}
 	processContext := node.NodeProcessContext{}
 	if err := json.Unmarshal(bytes, &processContext); err != nil {
-		return fmt.Errorf("failed to unmarshal local node process context: %w", err)
+		return fmt.Errorf("failed to unmarshal node process context: %w", err)
 	}
 	n.NodeProcessContext = processContext
 	return nil
 }
 
-func (n *LocalNode) ReadAll() error {
+func (n *Node) ReadAll() error {
 	if err := n.ReadConfig(); err != nil {
 		return err
 	}
 	return n.ReadProcessContext()
 }
 
-func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
+func (n *Node) Start(w io.Writer, defaultExecPath string) error {
 	// Avoid attempting to start an already running node.
 	proc, err := n.GetProcess()
 	if err != nil {
-		return fmt.Errorf("failed to start local node: %w", err)
+		return fmt.Errorf("failed to start node: %w", err)
 	}
 	if proc != nil {
 		return errNodeAlreadyRunning
@@ -208,7 +189,7 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 	// found in a reasonable amount of time, the node is unlikely to have
 	// started successfully.
 	if err := n.WaitForProcessContext(context.Background()); err != nil {
-		return fmt.Errorf("failed to start local node: %w", err)
+		return fmt.Errorf("failed to start node: %w", err)
 	}
 
 	_, err = fmt.Fprintf(w, "Started %s\n", nodeDescription)
@@ -218,7 +199,7 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 // Retrieve the node process if it is running. As part of determining
 // process liveness, the node's process context will be refreshed if
 // live or cleared if not running.
-func (n *LocalNode) GetProcess() (*os.Process, error) {
+func (n *Node) GetProcess() (*os.Process, error) {
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
 	if err := n.ReadProcessContext(); err != nil {
@@ -251,7 +232,7 @@ func (n *LocalNode) GetProcess() (*os.Process, error) {
 
 // Signals the node process to stop and waits for the node process to
 // stop running.
-func (n *LocalNode) Stop() error {
+func (n *Node) Stop() error {
 	proc, err := n.GetProcess()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve process to stop: %w", err)
@@ -265,7 +246,7 @@ func (n *LocalNode) Stop() error {
 	}
 
 	// Wait for the node process to stop
-	ticker := time.NewTicker(tmpnet.DefaultNodeTickerInterval)
+	ticker := time.NewTicker(DefaultNodeTickerInterval)
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
 	defer cancel()
@@ -286,7 +267,7 @@ func (n *LocalNode) Stop() error {
 	}
 }
 
-func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
+func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. GetProcess will also ensure that the node's
 	// API URI is current.
@@ -295,7 +276,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to determine process status: %w", err)
 	}
 	if proc == nil {
-		return false, tmpnet.ErrNotRunning
+		return false, ErrNotRunning
 	}
 
 	// Check that the node is reporting healthy
@@ -320,8 +301,8 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 	return false, fmt.Errorf("failed to query node health: %w", err)
 }
 
-func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
-	ticker := time.NewTicker(tmpnet.DefaultNodeTickerInterval)
+func (n *Node) WaitForProcessContext(ctx context.Context) error {
+	ticker := time.NewTicker(DefaultNodeTickerInterval)
 	defer ticker.Stop()
 
 	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)
