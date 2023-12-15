@@ -240,22 +240,21 @@ func TestExpectedProposerChangeByHeight(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	var (
-		dummyCtx        = context.Background()
-		chainHeight     = uint64(1)
-		pChainHeight    = uint64(0)
-		parentBlockTime = time.Now().Truncate(time.Second)
-		blockTime       = parentBlockTime.Add(time.Second)
-		slot            = TimeToSlot(parentBlockTime, blockTime)
+		dummyCtx            = context.Background()
+		pChainHeight uint64 = 0
+		slot         uint64 = 0
 	)
 
-	proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
-	require.NoError(err)
-	require.Equal(validatorIDs[2], proposerID)
+	expectedProposers := map[uint64]ids.NodeID{
+		1: validatorIDs[2],
+		2: validatorIDs[1],
+	}
 
-	chainHeight = 2
-	proposerID, err = w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
-	require.NoError(err)
-	require.Equal(validatorIDs[1], proposerID)
+	for chainHeight, expectedProposerID := range expectedProposers {
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
+		require.NoError(err)
+		require.Equal(expectedProposerID, proposerID)
+	}
 }
 
 func TestExpectedProposerChangeByChain(t *testing.T) {
@@ -295,25 +294,24 @@ func TestExpectedProposerChangeByChain(t *testing.T) {
 		},
 	}
 
-	w0 := New(vdrState, subnetID, chainID0)
-	w1 := New(vdrState, subnetID, chainID1)
-
 	var (
-		dummyCtx        = context.Background()
-		chainHeight     = uint64(1)
-		pChainHeight    = uint64(0)
-		parentBlockTime = time.Now().Truncate(time.Second)
-		blockTime       = parentBlockTime.Add(time.Second)
-		slot            = TimeToSlot(parentBlockTime, blockTime)
+		dummyCtx            = context.Background()
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
+		slot         uint64 = 0
 	)
 
-	proposerID, err := w0.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
-	require.NoError(err)
-	require.Equal(validatorIDs[5], proposerID)
+	expectedProposers := map[ids.ID]ids.NodeID{
+		chainID0: validatorIDs[5],
+		chainID1: validatorIDs[3],
+	}
 
-	proposerID, err = w1.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
-	require.NoError(err)
-	require.Equal(validatorIDs[3], proposerID)
+	for chainID, expectedProposerID := range expectedProposers {
+		w := New(vdrState, subnetID, chainID)
+		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
+		require.NoError(err)
+		require.Equal(expectedProposerID, proposerID)
+	}
 }
 
 func TestExpectedProposerChangeBySlot(t *testing.T) {
@@ -347,9 +345,9 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	var (
-		dummyCtx     = context.Background()
-		chainHeight  = uint64(1)
-		pChainHeight = uint64(0)
+		dummyCtx            = context.Background()
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
 	)
 
 	expectedProposers := map[uint64]ids.NodeID{
@@ -406,7 +404,8 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
 		require.NoError(err)
 
-		// proposerID is the scheduled proposer. It may start with the expected delay
+		// proposerID is the scheduled proposer. It should start with the
+		// expected delay
 		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, proposerID, slot)
 		require.NoError(err)
 		require.Equal(time.Duration(slot)*WindowDuration, delay)

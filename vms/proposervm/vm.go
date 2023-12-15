@@ -338,12 +338,13 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		parentTimestamp = blk.Timestamp()
 	)
 	if vm.IsDurangoActivated(parentTimestamp) {
+		currentTime := vm.Clock.Time().Truncate(time.Second)
 		nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
 			blk.Height()+1,
 			pChainHeight,
-			proposer.TimeToSlot(blk.Timestamp(), vm.Clock.Time().Truncate(time.Second)),
-			blk.Timestamp(),
+			proposer.TimeToSlot(parentTimestamp, currentTime),
+			parentTimestamp,
 		)
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(ctx, blk, pChainHeight)
@@ -355,7 +356,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 
 	vm.ctx.Log.Debug("set preference",
 		zap.Stringer("blkID", blk.ID()),
-		zap.Time("blockTimestamp", blk.Timestamp()),
+		zap.Time("blockTimestamp", parentTimestamp),
 		zap.Time("nextStartTime", nextStartTime),
 	)
 	return nil

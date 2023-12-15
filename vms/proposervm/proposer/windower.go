@@ -30,8 +30,8 @@ const (
 	MaxBuildWindows = 60
 	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
 
-	MaxLookAheadSlots  uint64 = 720 // 1 hour
-	MaxLookAheadWindow        = time.Duration(MaxLookAheadSlots) * WindowDuration
+	MaxLookAheadSlots  = 720
+	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 1 hour
 )
 
 var (
@@ -41,33 +41,33 @@ var (
 )
 
 type Windower interface {
-	// Proposers returns the proposer list for building a block at [chainHeight]
+	// Proposers returns the proposer list for building a block at [blockHeight]
 	// when the validator set is defined at [pChainHeight]. The list is returned
 	// in order. The minimum delay of a validator is the index they appear times
 	// [WindowDuration].
 	Proposers(
 		ctx context.Context,
-		chainHeight,
+		blockHeight,
 		pChainHeight uint64,
 		maxWindows int,
 	) ([]ids.NodeID, error)
 
 	// Delay returns the amount of time that [validatorID] must wait before
-	// building a block at [chainHeight] when the validator set is defined at
+	// building a block at [blockHeight] when the validator set is defined at
 	// [pChainHeight].
 	Delay(
 		ctx context.Context,
-		chainHeight,
+		blockHeight,
 		pChainHeight uint64,
 		validatorID ids.NodeID,
 		maxWindows int,
 	) (time.Duration, error)
 
-	// In the Post-Durango windowing scheme, every validator active
-	// at [pChainHeight] gets specific slots it can propose in (instead
-	// of being able to propose from a given time on as it happens Pre-Durango).
-	// [ExpectedProposer] calculates which nodeID is scheduled to propose
-	// a block of height [blockHeight] at [slot].
+	// In the Post-Durango windowing scheme, every validator active at
+	// [pChainHeight] gets specific slots it can propose in (instead of being
+	// able to propose from a given time on as it happens Pre-Durango).
+	// [ExpectedProposer] calculates which nodeID is scheduled to propose a
+	// block of height [blockHeight] at [slot].
 	ExpectedProposer(
 		ctx context.Context,
 		blockHeight,
@@ -75,16 +75,16 @@ type Windower interface {
 		slot uint64,
 	) (ids.NodeID, error)
 
-	// In the Post-Durango windowing scheme, every validator active
-	// at [pChainHeight] gets specific slots it can propose in (instead
-	// of being able to propose from a given time on as it happens Pre-Durango).
-	// [MinDelayForProposer] specifies how long [nodeID] needs to wait
-	// for its slot to start. Delay is specified as starting from slot zero start.
-	// (which is parent timestamp). For efficiency reasons, we cap the slot search
-	// to [MaxLookAheadWindow] slots.
+	// In the Post-Durango windowing scheme, every validator active at
+	// [pChainHeight] gets specific slots it can propose in (instead of being
+	// able to propose from a given time on as it happens Pre-Durango).
+	// [MinDelayForProposer] specifies how long [nodeID] needs to wait for its
+	// slot to start. Delay is specified as starting from slot zero start.
+	// (which is parent timestamp). For efficiency reasons, we cap the slot
+	// search to [MaxLookAheadWindow] slots.
 	MinDelayForProposer(
 		ctx context.Context,
-		chainHeight,
+		blockHeight,
 		pChainHeight uint64,
 		nodeID ids.NodeID,
 		initialSlot uint64,
@@ -108,14 +108,16 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	}
 }
 
-func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
+func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
 	validators, err := w.sortedValidators(ctx, pChainHeight)
 	if err != nil {
 		return nil, err
 	}
 
+	// Note: The 32-bit prng is used here for legacy reasons. All other usages
+	// of a prng in this file should use the 64-bit version.
 	var (
-		seed             = chainHeight ^ w.chainSource
+		seed             = preDurangoSeed(w.chainSource, blockHeight)
 		source           = prng.NewMT19937()
 		validatorWeights = validatorsToWeight(validators)
 	)
@@ -147,12 +149,12 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	return nodeIDs, nil
 }
 
-func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
+func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
 		return time.Duration(maxWindows) * WindowDuration, nil
 	}
 
-	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight, maxWindows)
+	proposers, err := w.Proposers(ctx, blockHeight, pChainHeight, maxWindows)
 	if err != nil {
 		return 0, err
 	}
@@ -179,7 +181,7 @@ func (w *windower) ExpectedProposer(
 	}
 
 	var (
-		seed             = blockHeight ^ bits.Reverse64(slot) ^ w.chainSource
+		seed             = postDurangoSeed(w.chainSource, blockHeight, slot)
 		source           = prng.NewMT19937_64()
 		validatorWeights = validatorsToWeight(validators)
 	)
@@ -199,7 +201,7 @@ func (w *windower) ExpectedProposer(
 
 func (w *windower) MinDelayForProposer(
 	ctx context.Context,
-	chainHeight,
+	blockHeight,
 	pChainHeight uint64,
 	nodeID ids.NodeID,
 	slot uint64,
@@ -222,7 +224,7 @@ func (w *windower) MinDelayForProposer(
 	}
 
 	for slot := slot; slot < maxSlot; slot++ {
-		seed := chainHeight ^ bits.Reverse64(slot) ^ w.chainSource
+		seed := postDurangoSeed(w.chainSource, blockHeight, slot)
 		source.Seed(seed)
 		indices, err := sampler.Sample(1)
 		if err != nil {
@@ -262,6 +264,13 @@ func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([
 	return validators, nil
 }
 
+func TimeToSlot(baseTime, targetTime time.Time) uint64 {
+	if targetTime.Before(baseTime) {
+		return 0
+	}
+	return uint64(targetTime.Sub(baseTime) / WindowDuration)
+}
+
 func validatorsToWeight(validators []validatorData) []uint64 {
 	weights := make([]uint64, len(validators))
 	for i, validator := range validators {
@@ -270,9 +279,14 @@ func validatorsToWeight(validators []validatorData) []uint64 {
 	return weights
 }
 
-func TimeToSlot(baseTime, targetTime time.Time) uint64 {
-	if targetTime.Before(baseTime) {
-		return 0
-	}
-	return uint64(targetTime.Sub(baseTime) / WindowDuration)
+func preDurangoSeed(chainSource, height uint64) uint64 {
+	return chainSource ^ height
+}
+
+func postDurangoSeed(chainSource, height, slot uint64) uint64 {
+	// Slot is reversed to utilize a different state space in the seed than the
+	// height. If the slot was not reversed the state space would collide,
+	// biasing the seed generation. For example, without reversing the slot
+	// postDurangoSeed(0,0,1) would equal postDurangoSeed(0,1,0).
+	return chainSource ^ height ^ bits.Reverse64(slot)
 }
