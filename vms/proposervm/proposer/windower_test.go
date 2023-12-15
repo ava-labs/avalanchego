@@ -420,9 +420,9 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	var (
-		dummyCtx     = context.Background()
-		chainHeight  = uint64(1)
-		pChainHeight = uint64(0)
+		dummyCtx            = context.Background()
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
 	)
 
 	for slot := uint64(0); slot < 3*MaxLookAheadSlots; slot++ {
