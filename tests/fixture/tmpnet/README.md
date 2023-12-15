@@ -202,6 +202,13 @@ this file (i.e. `source network.env`) in a shell will configure ginkgo
 e2e and the `tmpnetctl` cli to target the network path specified in
 the env var.
 
+Set `TMPNET_ROOT_DIR` to specify the root directory in which to create
+the configuration directory of new networks
+(e.g. `$TMPNET_ROOT_DIR/[network-dir]`). The default root directory is
+`~/.tmpdir/networks`. Configuring the root directory is only relevant
+when creating new networks as the path of existing networks will
+already have been set.
+
 ### Node configuration
 
 The data dir for a node is set by default to
