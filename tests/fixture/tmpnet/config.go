@@ -113,11 +113,6 @@ func ReadFlagsMap(path string, description string) (*FlagsMap, error) {
 	return flagsMap, nil
 }
 
-// Marshal to json with default prefix and indent.
-func DefaultJSONMarshal(v interface{}) ([]byte, error) {
-	return json.MarshalIndent(v, "", "  ")
-}
-
 // NetworkConfig defines configuration shared or
 // common to all nodes in a given network.
 type NetworkConfig struct {
