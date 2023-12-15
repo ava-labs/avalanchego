@@ -173,17 +173,17 @@ func PackSetFeeConfig(input commontype.FeeConfig) ([]byte, error) {
 
 // UnpackSetFeeConfigInput attempts to unpack [input] as SetFeeConfigInput
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-// if [skipLenCheck] is false, it will return an error if the length of [input] is not [feeConfigInputLen]
-func UnpackSetFeeConfigInput(input []byte, skipLenCheck bool) (commontype.FeeConfig, error) {
+// if [useStrictMode] is true, it will return an error if the length of [input] is not [feeConfigInputLen]
+func UnpackSetFeeConfigInput(input []byte, useStrictMode bool) (commontype.FeeConfig, error) {
 	// Initially we had this check to ensure that the input was the correct length.
 	// However solidity does not always pack the input to the correct length, and allows
 	// for extra padding bytes to be added to the end of the input. Therefore, we have removed
 	// this check with the DUpgrade. We still need to keep this check for backwards compatibility.
-	if !skipLenCheck && len(input) != feeConfigInputLen {
+	if useStrictMode && len(input) != feeConfigInputLen {
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
 	inputStruct := FeeConfigABIStruct{}
-	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input)
+	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input, useStrictMode)
 	if err != nil {
 		return commontype.FeeConfig{}, err
 	}
@@ -213,8 +213,9 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 
-	// We skip the fixed length check with DUpgrade
-	feeConfig, err := UnpackSetFeeConfigInput(input, contract.IsDUpgradeActivated(accessibleState))
+	// do not use strict mode after DUpgrade
+	useStrictMode := !contract.IsDUpgradeActivated(accessibleState)
+	feeConfig, err := UnpackSetFeeConfigInput(input, useStrictMode)
 	if err != nil {
 		return nil, remainingGas, err
 	}

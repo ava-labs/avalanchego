@@ -233,58 +233,72 @@ func TestPackSetFeeConfigInput(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          []byte
-		skipLenCheck   bool
+		strictMode     bool
 		expectedErr    string
 		expectedOldErr string
 		expectedOutput commontype.FeeConfig
 	}{
 		{
-			name:           "empty input",
+			name:           "empty input strict mode",
 			input:          []byte{},
-			skipLenCheck:   false,
+			strictMode:     true,
 			expectedErr:    ErrInvalidLen.Error(),
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
-			name:           "empty input skip len check",
+			name:           "empty input",
 			input:          []byte{},
-			skipLenCheck:   true,
+			strictMode:     false,
 			expectedErr:    "attempting to unmarshall an empty string",
+			expectedOldErr: ErrInvalidLen.Error(),
+		},
+		{
+			name:           "input with insufficient len strict mode",
+			input:          []byte{123},
+			strictMode:     true,
+			expectedErr:    ErrInvalidLen.Error(),
+			expectedOldErr: ErrInvalidLen.Error(),
+		},
+		{
+			name:           "input with insufficient len",
+			input:          []byte{123},
+			strictMode:     false,
+			expectedErr:    "length insufficient",
+			expectedOldErr: ErrInvalidLen.Error(),
+		},
+		{
+			name:           "input with extra bytes strict mode",
+			input:          append(testInputBytes, make([]byte, 32)...),
+			strictMode:     true,
+			expectedErr:    ErrInvalidLen.Error(),
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
 			name:           "input with extra bytes",
 			input:          append(testInputBytes, make([]byte, 32)...),
-			skipLenCheck:   false,
-			expectedErr:    ErrInvalidLen.Error(),
-			expectedOldErr: ErrInvalidLen.Error(),
-		},
-		{
-			name:           "input with extra bytes skip len check",
-			input:          append(testInputBytes, make([]byte, 32)...),
-			skipLenCheck:   true,
+			strictMode:     false,
 			expectedErr:    "",
 			expectedOldErr: ErrInvalidLen.Error(),
 			expectedOutput: testFeeConfig,
 		},
 		{
-			name:           "input with extra bytes (not divisible by 32)",
+			name:           "input with extra bytes (not divisible by 32) strict mode",
 			input:          append(testInputBytes, make([]byte, 33)...),
-			skipLenCheck:   false,
+			strictMode:     true,
 			expectedErr:    ErrInvalidLen.Error(),
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
-			name:           "input with extra bytes (not divisible by 32) skip len check",
+			name:           "input with extra bytes (not divisible by 32)",
 			input:          append(testInputBytes, make([]byte, 33)...),
-			skipLenCheck:   true,
-			expectedErr:    "improperly formatted input",
+			strictMode:     false,
+			expectedOutput: testFeeConfig,
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			unpacked, err := UnpackSetFeeConfigInput(test.input, test.skipLenCheck)
+			unpacked, err := UnpackSetFeeConfigInput(test.input, test.strictMode)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr)
 			} else {
@@ -374,7 +388,7 @@ func testOldPackSetFeeConfigInputEqual(t *testing.T, feeConfig commontype.FeeCon
 		require.Equal(t, input, input2)
 
 		value, err := OldUnpackFeeConfig(input)
-		unpacked, err2 := UnpackSetFeeConfigInput(input, false)
+		unpacked, err2 := UnpackSetFeeConfigInput(input, true)
 		if err != nil {
 			require.ErrorContains(t, err2, err.Error())
 			return

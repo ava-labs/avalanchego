@@ -58,17 +58,17 @@ func PackMintNativeCoin(address common.Address, amount *big.Int) ([]byte, error)
 
 // UnpackMintNativeCoinInput attempts to unpack [input] as address and amount.
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-// if [skipLenCheck] is false, it will return an error if the length of [input] is not [mintInputLen]
-func UnpackMintNativeCoinInput(input []byte, skipLenCheck bool) (common.Address, *big.Int, error) {
+// if [useStrictMode] is true, it will return an error if the length of [input] is not [mintInputLen]
+func UnpackMintNativeCoinInput(input []byte, useStrictMode bool) (common.Address, *big.Int, error) {
 	// Initially we had this check to ensure that the input was the correct length.
 	// However solidity does not always pack the input to the correct length, and allows
 	// for extra padding bytes to be added to the end of the input. Therefore, we have removed
 	// this check with the DUpgrade. We still need to keep this check for backwards compatibility.
-	if !skipLenCheck && len(input) != mintInputLen {
+	if useStrictMode && len(input) != mintInputLen {
 		return common.Address{}, nil, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
 	inputStruct := MintNativeCoinInput{}
-	err := NativeMinterABI.UnpackInputIntoInterface(&inputStruct, "mintNativeCoin", input)
+	err := NativeMinterABI.UnpackInputIntoInterface(&inputStruct, "mintNativeCoin", input, useStrictMode)
 
 	return inputStruct.Addr, inputStruct.Amount, err
 }
@@ -84,8 +84,8 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 
-	// We skip the fixed length check with DUpgrade
-	to, amount, err := UnpackMintNativeCoinInput(input, contract.IsDUpgradeActivated(accessibleState))
+	useStrictMode := !contract.IsDUpgradeActivated(accessibleState)
+	to, amount, err := UnpackMintNativeCoinInput(input, useStrictMode)
 	if err != nil {
 		return nil, remainingGas, err
 	}

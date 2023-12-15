@@ -53,7 +53,7 @@ func FuzzPackReadAllowlistTest(f *testing.F) {
 func FuzzPackReadAllowlistTestSkipCheck(f *testing.F) {
 	f.Fuzz(func(t *testing.T, b []byte) {
 		require := require.New(t)
-		res, err := UnpackReadAllowListInput(b, false)
+		res, err := UnpackReadAllowListInput(b, true)
 		oldRes, oldErr := OldUnpackReadAllowList(b)
 		if oldErr != nil {
 			require.ErrorContains(err, oldErr.Error())
@@ -77,7 +77,7 @@ func testPackReadAllowlistTest(t *testing.T, address common.Address) {
 		require.NoError(err)
 		// exclude 4 bytes for function selector
 		input = input[4:]
-		unpacked, err := UnpackReadAllowListInput(input, false)
+		unpacked, err := UnpackReadAllowListInput(input, true)
 		require.NoError(err)
 		require.Equal(address, unpacked)
 
@@ -99,7 +99,7 @@ func testPackReadAllowlistTest(t *testing.T, address common.Address) {
 		// exclude 4 bytes for function selector
 		input2 = input2[4:]
 		require.Equal(input, input2)
-		unpacked, err = UnpackReadAllowListInput(input2, false)
+		unpacked, err = UnpackReadAllowListInput(input2, true)
 		require.NoError(err)
 		unpacked2, err := OldUnpackReadAllowList(input)
 		require.NoError(err)
@@ -121,7 +121,7 @@ func FuzzPackModifyAllowListTest(f *testing.F) {
 func FuzzPackModifyAllowlistTestSkipCheck(f *testing.F) {
 	f.Fuzz(func(t *testing.T, b []byte) {
 		require := require.New(t)
-		res, err := UnpackModifyAllowListInput(b, AdminRole, false)
+		res, err := UnpackModifyAllowListInput(b, AdminRole, true)
 		oldRes, oldErr := OldUnpackModifyAllowList(b, AdminRole)
 		if oldErr != nil {
 			require.ErrorContains(err, oldErr.Error())
@@ -141,7 +141,7 @@ func testPackModifyAllowListTest(t *testing.T, address common.Address, role Role
 		require.NoError(err)
 		// exclude 4 bytes for function selector
 		input = input[4:]
-		unpacked, err := UnpackModifyAllowListInput(input, role, false)
+		unpacked, err := UnpackModifyAllowListInput(input, role, true)
 		require.NoError(err)
 		require.Equal(address, unpacked)
 
@@ -167,7 +167,7 @@ func testPackModifyAllowListTest(t *testing.T, address common.Address, role Role
 		// exclude 4 bytes for function selector
 		input2 = input2[4:]
 		require.Equal(input, input2)
-		unpacked, err = UnpackModifyAllowListInput(input2, role, false)
+		unpacked, err = UnpackModifyAllowListInput(input2, role, true)
 		require.NoError(err)
 		unpacked2, err := OldUnpackModifyAllowList(input, role)
 		require.NoError(err)

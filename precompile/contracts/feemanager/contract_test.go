@@ -20,6 +20,17 @@ import (
 )
 
 var (
+	regressionBytes     = "8f10b58600000000000000000000000000000000000000000000000000000000017d78400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000012a05f20000000000000000000000000000000000000000000000000000000000047868c0000000000000000000000000000000000000000000000000000000000000005400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001bc16d674ec800000000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000"
+	regressionFeeConfig = commontype.FeeConfig{
+		GasLimit:                 big.NewInt(25000000),
+		TargetBlockRate:          2,
+		MinBaseFee:               big.NewInt(5000000000),
+		TargetGas:                big.NewInt(75000000),
+		BaseFeeChangeDenominator: big.NewInt(84),
+		MinBlockGasCost:          big.NewInt(0),
+		MaxBlockGasCost:          big.NewInt(2000000000000000000),
+		BlockGasCostStep:         big.NewInt(1000000000000000000),
+	}
 	testFeeConfig = commontype.FeeConfig{
 		GasLimit:        big.NewInt(8_000_000),
 		TargetBlockRate: 2, // in seconds
@@ -319,6 +330,47 @@ var (
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
+				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				require.EqualValues(t, testBlockNumber, lastChangedAt)
+			},
+		},
+		// from https://github.com/ava-labs/subnet-evm/issues/487
+		"setFeeConfig regression test should fail before DUpgrade": {
+			Caller:     allowlist.TestEnabledAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			Input:      common.Hex2Bytes(regressionBytes),
+			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				return config
+			},
+			SuppliedGas: SetFeeConfigGasCost,
+			ExpectedErr: ErrInvalidLen.Error(),
+			ReadOnly:    false,
+			SetupBlockContext: func(mbc *contract.MockBlockContext) {
+				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
+				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
+			},
+		},
+		"setFeeConfig regression test should succeed after DUpgrade": {
+			Caller:     allowlist.TestEnabledAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			Input:      common.Hex2Bytes(regressionBytes),
+			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
+				return config
+			},
+			SuppliedGas: SetFeeConfigGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			SetupBlockContext: func(mbc *contract.MockBlockContext) {
+				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
+				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
+			},
+			AfterHook: func(t testing.TB, state contract.StateDB) {
+				feeConfig := GetStoredFeeConfig(state)
+				require.Equal(t, regressionFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
 			},

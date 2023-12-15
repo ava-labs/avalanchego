@@ -63,14 +63,14 @@ func PackModifyAllowList(address common.Address, role Role) ([]byte, error) {
 	return AllowListABI.Pack(funcName, address)
 }
 
-func UnpackModifyAllowListInput(input []byte, r Role, skipLenCheck bool) (common.Address, error) {
-	if !skipLenCheck && len(input) != allowListInputLen {
+func UnpackModifyAllowListInput(input []byte, r Role, useStrictMode bool) (common.Address, error) {
+	if useStrictMode && len(input) != allowListInputLen {
 		return common.Address{}, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))
 	}
 
 	funcName := r.GetSetterFunctionName()
 	var modifyAddress common.Address
-	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, funcName, input)
+	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, funcName, input, useStrictMode)
 	return modifyAddress, err
 }
 
@@ -82,8 +82,9 @@ func createAllowListRoleSetter(precompileAddr common.Address, role Role) contrac
 			return nil, 0, err
 		}
 
-		// We skip the fixed length check with DUpgrade
-		modifyAddress, err := UnpackModifyAllowListInput(input, role, contract.IsDUpgradeActivated(evm))
+		// do not use strict mode after DUpgrade
+		useStrictMode := !contract.IsDUpgradeActivated(evm)
+		modifyAddress, err := UnpackModifyAllowListInput(input, role, useStrictMode)
 
 		if err != nil {
 			return nil, remainingGas, err
@@ -113,13 +114,13 @@ func PackReadAllowList(address common.Address) ([]byte, error) {
 	return AllowListABI.Pack("readAllowList", address)
 }
 
-func UnpackReadAllowListInput(input []byte, skipLenCheck bool) (common.Address, error) {
-	if !skipLenCheck && len(input) != allowListInputLen {
+func UnpackReadAllowListInput(input []byte, useStrictMode bool) (common.Address, error) {
+	if useStrictMode && len(input) != allowListInputLen {
 		return common.Address{}, fmt.Errorf("invalid input length for read allow list: %d", len(input))
 	}
 
 	var modifyAddress common.Address
-	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, "readAllowList", input)
+	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, "readAllowList", input, useStrictMode)
 	return modifyAddress, err
 }
 
@@ -137,7 +138,8 @@ func createReadAllowList(precompileAddr common.Address) contract.RunStatefulPrec
 		}
 
 		// We skip the fixed length check with DUpgrade
-		readAddress, err := UnpackReadAllowListInput(input, contract.IsDUpgradeActivated(evm))
+		useStrictMode := !contract.IsDUpgradeActivated(evm)
+		readAddress, err := UnpackReadAllowListInput(input, useStrictMode)
 		if err != nil {
 			return nil, remainingGas, err
 		}

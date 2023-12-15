@@ -52,60 +52,61 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          []byte
-		skipLenCheck   bool
+		strictMode     bool
 		expectedErr    string
 		expectedOldErr string
 		expectedAddr   common.Address
 		expectedAmount *big.Int
 	}{
 		{
-			name:           "empty input",
+			name:           "empty input strict mode",
 			input:          []byte{},
-			skipLenCheck:   false,
+			strictMode:     true,
 			expectedErr:    ErrInvalidLen.Error(),
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
-			name:           "empty input skip len check",
+			name:           "empty input",
 			input:          []byte{},
-			skipLenCheck:   true,
+			strictMode:     false,
 			expectedErr:    "attempting to unmarshall an empty string",
+			expectedOldErr: ErrInvalidLen.Error(),
+		},
+		{
+			name:           "input with extra bytes strict mode",
+			input:          append(testInputBytes, make([]byte, 32)...),
+			strictMode:     true,
+			expectedErr:    ErrInvalidLen.Error(),
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
 			name:           "input with extra bytes",
 			input:          append(testInputBytes, make([]byte, 32)...),
-			skipLenCheck:   false,
-			expectedErr:    ErrInvalidLen.Error(),
-			expectedOldErr: ErrInvalidLen.Error(),
-		},
-		{
-			name:           "input with extra bytes skip len check",
-			input:          append(testInputBytes, make([]byte, 32)...),
-			skipLenCheck:   true,
+			strictMode:     false,
 			expectedErr:    "",
 			expectedOldErr: ErrInvalidLen.Error(),
 			expectedAddr:   constants.BlackholeAddr,
 			expectedAmount: common.Big2,
 		},
 		{
-			name:           "input with extra bytes (not divisible by 32)",
+			name:           "input with extra bytes (not divisible by 32) strict mode",
 			input:          append(testInputBytes, make([]byte, 33)...),
-			skipLenCheck:   false,
+			strictMode:     true,
 			expectedErr:    ErrInvalidLen.Error(),
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 		{
-			name:           "input with extra bytes (not divisible by 32) skip len check",
+			name:           "input with extra bytes (not divisible by 32)",
 			input:          append(testInputBytes, make([]byte, 33)...),
-			skipLenCheck:   true,
-			expectedErr:    "improperly formatted input",
+			strictMode:     false,
+			expectedAddr:   constants.BlackholeAddr,
+			expectedAmount: common.Big2,
 			expectedOldErr: ErrInvalidLen.Error(),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			unpackedAddress, unpackedAmount, err := UnpackMintNativeCoinInput(test.input, test.skipLenCheck)
+			unpackedAddress, unpackedAmount, err := UnpackMintNativeCoinInput(test.input, test.strictMode)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr)
 			} else {
@@ -145,7 +146,7 @@ func testOldPackMintNativeCoinEqual(t *testing.T, addr common.Address, amount *b
 
 		input = input[4:]
 		to, assetAmount, err := OldUnpackMintNativeCoinInput(input)
-		unpackedAddr, unpackedAmount, err2 := UnpackMintNativeCoinInput(input, false)
+		unpackedAddr, unpackedAmount, err2 := UnpackMintNativeCoinInput(input, true)
 		if err != nil {
 			require.ErrorContains(t, err2, err.Error())
 			return
