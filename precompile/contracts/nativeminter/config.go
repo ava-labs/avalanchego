@@ -16,7 +16,7 @@ import (
 
 var _ precompileconfig.Config = &Config{}
 
-// Config implements the StatefulPrecompileConfig interface while adding in the
+// Config implements the precompileconfig.Config interface while adding in the
 // ContractNativeMinter specific precompile config.
 type Config struct {
 	allowlist.AllowListConfig
@@ -49,6 +49,9 @@ func NewDisableConfig(blockTimestamp *uint64) *Config {
 		},
 	}
 }
+
+// Key returns the key for the ContractNativeMinter precompileconfig.
+// This should be the same key as used in the precompile module.
 func (*Config) Key() string { return ConfigKey }
 
 // Equal returns true if [cfg] is a [*ContractNativeMinterConfig] and it has been configured identical to [c].

@@ -21,6 +21,7 @@ const ConfigKey = "contractNativeMinterConfig"
 
 var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000001")
 
+// Module is the precompile module. It is used to register the precompile contract.
 var Module = modules.Module{
 	ConfigKey:    ConfigKey,
 	Address:      ContractAddress,
@@ -36,11 +37,14 @@ func init() {
 	}
 }
 
+// MakeConfig returns a new precompile config instance.
+// This is required to Marshal/Unmarshal the precompile config.
 func (*configurator) MakeConfig() precompileconfig.Config {
 	return new(Config)
 }
 
-// Configure configures [state] with the desired admins based on [cfg].
+// Configure configures [state] with the given [cfg] precompileconfig.
+// This function is called by the EVM once per precompile contract activation.
 func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {

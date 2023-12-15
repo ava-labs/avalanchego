@@ -4,10 +4,12 @@
 package feemanager
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -43,14 +45,29 @@ var (
 	// Singleton StatefulPrecompiledContract for setting fee configs by permissioned callers.
 	FeeManagerPrecompile contract.StatefulPrecompiledContract = createFeeManagerPrecompile()
 
-	setFeeConfigSignature              = contract.CalculateFunctionSelector("setFeeConfig(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)")
-	getFeeConfigSignature              = contract.CalculateFunctionSelector("getFeeConfig()")
-	getFeeConfigLastChangedAtSignature = contract.CalculateFunctionSelector("getFeeConfigLastChangedAt()")
-
 	feeConfigLastChangedAtKey = common.Hash{'l', 'c', 'a'}
 
 	ErrCannotChangeFee = errors.New("non-enabled cannot change fee config")
+	ErrInvalidLen      = errors.New("invalid input length for fee config Input")
+
+	// IFeeManagerRawABI contains the raw ABI of FeeManager contract.
+	//go:embed contract.abi
+	FeeManagerRawABI string
+
+	FeeManagerABI = contract.ParseABI(FeeManagerRawABI)
 )
+
+// FeeConfigABIStruct is the ABI struct for FeeConfig type.
+type FeeConfigABIStruct struct {
+	GasLimit                 *big.Int
+	TargetBlockRate          *big.Int
+	MinBaseFee               *big.Int
+	TargetGas                *big.Int
+	BaseFeeChangeDenominator *big.Int
+	MinBlockGasCost          *big.Int
+	MaxBlockGasCost          *big.Int
+	BlockGasCostStep         *big.Int
+}
 
 // GetFeeManagerStatus returns the role of [address] for the fee config manager list.
 func GetFeeManagerStatus(stateDB contract.StateDB, address common.Address) allowlist.Role {
@@ -61,86 +78,6 @@ func GetFeeManagerStatus(stateDB contract.StateDB, address common.Address) allow
 // fee config manager list. assumes [role] has already been verified as valid.
 func SetFeeManagerStatus(stateDB contract.StateDB, address common.Address, role allowlist.Role) {
 	allowlist.SetAllowListRole(stateDB, ContractAddress, address, role)
-}
-
-// PackGetFeeConfigInput packs the getFeeConfig signature
-func PackGetFeeConfigInput() []byte {
-	return getFeeConfigSignature
-}
-
-// PackGetLastChangedAtInput packs the getFeeConfigLastChangedAt signature
-func PackGetLastChangedAtInput() []byte {
-	return getFeeConfigLastChangedAtSignature
-}
-
-// PackFeeConfig packs [feeConfig] without the selector into the appropriate arguments for fee config operations.
-func PackFeeConfig(feeConfig commontype.FeeConfig) ([]byte, error) {
-	//  input(feeConfig)
-	return packFeeConfigHelper(feeConfig, false)
-}
-
-// PackSetFeeConfig packs [feeConfig] with the selector into the appropriate arguments for setting fee config operations.
-func PackSetFeeConfig(feeConfig commontype.FeeConfig) ([]byte, error) {
-	// function selector (4 bytes) + input(feeConfig)
-	return packFeeConfigHelper(feeConfig, true)
-}
-
-func packFeeConfigHelper(feeConfig commontype.FeeConfig, useSelector bool) ([]byte, error) {
-	hashes := []common.Hash{
-		common.BigToHash(feeConfig.GasLimit),
-		common.BigToHash(new(big.Int).SetUint64(feeConfig.TargetBlockRate)),
-		common.BigToHash(feeConfig.MinBaseFee),
-		common.BigToHash(feeConfig.TargetGas),
-		common.BigToHash(feeConfig.BaseFeeChangeDenominator),
-		common.BigToHash(feeConfig.MinBlockGasCost),
-		common.BigToHash(feeConfig.MaxBlockGasCost),
-		common.BigToHash(feeConfig.BlockGasCostStep),
-	}
-
-	if useSelector {
-		res := make([]byte, len(setFeeConfigSignature)+feeConfigInputLen)
-		err := contract.PackOrderedHashesWithSelector(res, setFeeConfigSignature, hashes)
-		return res, err
-	}
-
-	res := make([]byte, len(hashes)*common.HashLength)
-	err := contract.PackOrderedHashes(res, hashes)
-	return res, err
-}
-
-// UnpackFeeConfigInput attempts to unpack [input] into the arguments to the fee config precompile
-// assumes that [input] does not include selector (omits first 4 bytes in PackSetFeeConfigInput)
-func UnpackFeeConfigInput(input []byte) (commontype.FeeConfig, error) {
-	if len(input) != feeConfigInputLen {
-		return commontype.FeeConfig{}, fmt.Errorf("invalid input length for fee config Input: %d", len(input))
-	}
-	feeConfig := commontype.FeeConfig{}
-	for i := minFeeConfigFieldKey; i <= numFeeConfigField; i++ {
-		listIndex := i - 1
-		packedElement := contract.PackedHash(input, listIndex)
-		switch i {
-		case gasLimitKey:
-			feeConfig.GasLimit = new(big.Int).SetBytes(packedElement)
-		case targetBlockRateKey:
-			feeConfig.TargetBlockRate = new(big.Int).SetBytes(packedElement).Uint64()
-		case minBaseFeeKey:
-			feeConfig.MinBaseFee = new(big.Int).SetBytes(packedElement)
-		case targetGasKey:
-			feeConfig.TargetGas = new(big.Int).SetBytes(packedElement)
-		case baseFeeChangeDenominatorKey:
-			feeConfig.BaseFeeChangeDenominator = new(big.Int).SetBytes(packedElement)
-		case minBlockGasCostKey:
-			feeConfig.MinBlockGasCost = new(big.Int).SetBytes(packedElement)
-		case maxBlockGasCostKey:
-			feeConfig.MaxBlockGasCost = new(big.Int).SetBytes(packedElement)
-		case blockGasCostStepKey:
-			feeConfig.BlockGasCostStep = new(big.Int).SetBytes(packedElement)
-		default:
-			// This should never encounter an unknown fee config key
-			panic(fmt.Sprintf("unknown fee config key: %d", i))
-		}
-	}
-	return feeConfig, nil
 }
 
 // GetStoredFeeConfig returns fee config from contract storage in given state
@@ -219,6 +156,52 @@ func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.FeeConfig, bl
 	return nil
 }
 
+// PackSetFeeConfig packs [inputStruct] of type SetFeeConfigInput into the appropriate arguments for setFeeConfig.
+func PackSetFeeConfig(input commontype.FeeConfig) ([]byte, error) {
+	inputStruct := FeeConfigABIStruct{
+		GasLimit:                 input.GasLimit,
+		TargetBlockRate:          new(big.Int).SetUint64(input.TargetBlockRate),
+		MinBaseFee:               input.MinBaseFee,
+		TargetGas:                input.TargetGas,
+		BaseFeeChangeDenominator: input.BaseFeeChangeDenominator,
+		MinBlockGasCost:          input.MinBlockGasCost,
+		MaxBlockGasCost:          input.MaxBlockGasCost,
+		BlockGasCostStep:         input.BlockGasCostStep,
+	}
+	return FeeManagerABI.Pack("setFeeConfig", inputStruct.GasLimit, inputStruct.TargetBlockRate, inputStruct.MinBaseFee, inputStruct.TargetGas, inputStruct.BaseFeeChangeDenominator, inputStruct.MinBlockGasCost, inputStruct.MaxBlockGasCost, inputStruct.BlockGasCostStep)
+}
+
+// UnpackSetFeeConfigInput attempts to unpack [input] as SetFeeConfigInput
+// assumes that [input] does not include selector (omits first 4 func signature bytes)
+// if [skipLenCheck] is false, it will return an error if the length of [input] is not [feeConfigInputLen]
+func UnpackSetFeeConfigInput(input []byte, skipLenCheck bool) (commontype.FeeConfig, error) {
+	// Initially we had this check to ensure that the input was the correct length.
+	// However solidity does not always pack the input to the correct length, and allows
+	// for extra padding bytes to be added to the end of the input. Therefore, we have removed
+	// this check with the DUpgrade. We still need to keep this check for backwards compatibility.
+	if !skipLenCheck && len(input) != feeConfigInputLen {
+		return commontype.FeeConfig{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
+	}
+	inputStruct := FeeConfigABIStruct{}
+	err := FeeManagerABI.UnpackInputIntoInterface(&inputStruct, "setFeeConfig", input)
+	if err != nil {
+		return commontype.FeeConfig{}, err
+	}
+
+	result := commontype.FeeConfig{
+		GasLimit:                 inputStruct.GasLimit,
+		TargetBlockRate:          inputStruct.TargetBlockRate.Uint64(),
+		MinBaseFee:               inputStruct.MinBaseFee,
+		TargetGas:                inputStruct.TargetGas,
+		BaseFeeChangeDenominator: inputStruct.BaseFeeChangeDenominator,
+		MinBlockGasCost:          inputStruct.MinBlockGasCost,
+		MaxBlockGasCost:          inputStruct.MaxBlockGasCost,
+		BlockGasCostStep:         inputStruct.BlockGasCostStep,
+	}
+
+	return result, nil
+}
+
 // setFeeConfig checks if the caller has permissions to set the fee config.
 // The execution function parses [input] into FeeConfig structure and sets contract storage accordingly.
 func setFeeConfig(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
@@ -230,7 +213,8 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 
-	feeConfig, err := UnpackFeeConfigInput(input)
+	// We skip the fixed length check with DUpgrade
+	feeConfig, err := UnpackSetFeeConfigInput(input, contract.IsDUpgradeActivated(accessibleState))
 	if err != nil {
 		return nil, remainingGas, err
 	}
@@ -250,6 +234,63 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 	return []byte{}, remainingGas, nil
 }
 
+// PackGetFeeConfig packs the include selector (first 4 func signature bytes).
+// This function is mostly used for tests.
+func PackGetFeeConfig() ([]byte, error) {
+	return FeeManagerABI.Pack("getFeeConfig")
+}
+
+// PackGetFeeConfigOutput attempts to pack given [outputStruct] of type GetFeeConfigOutput
+// to conform the ABI outputs.
+func PackGetFeeConfigOutput(output commontype.FeeConfig) ([]byte, error) {
+	outputStruct := FeeConfigABIStruct{
+		GasLimit:                 output.GasLimit,
+		TargetBlockRate:          new(big.Int).SetUint64(output.TargetBlockRate),
+		MinBaseFee:               output.MinBaseFee,
+		TargetGas:                output.TargetGas,
+		BaseFeeChangeDenominator: output.BaseFeeChangeDenominator,
+		MinBlockGasCost:          output.MinBlockGasCost,
+		MaxBlockGasCost:          output.MaxBlockGasCost,
+		BlockGasCostStep:         output.BlockGasCostStep,
+	}
+	return FeeManagerABI.PackOutput("getFeeConfig",
+		outputStruct.GasLimit,
+		outputStruct.TargetBlockRate,
+		outputStruct.MinBaseFee,
+		outputStruct.TargetGas,
+		outputStruct.BaseFeeChangeDenominator,
+		outputStruct.MinBlockGasCost,
+		outputStruct.MaxBlockGasCost,
+		outputStruct.BlockGasCostStep,
+	)
+}
+
+// UnpackGetFeeConfigOutput attempts to unpack [output] as GetFeeConfigOutput
+// assumes that [output] does not include selector (omits first 4 func signature bytes)
+func UnpackGetFeeConfigOutput(output []byte, skipLenCheck bool) (commontype.FeeConfig, error) {
+	if !skipLenCheck && len(output) != feeConfigInputLen {
+		return commontype.FeeConfig{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(output))
+	}
+	outputStruct := FeeConfigABIStruct{}
+	err := FeeManagerABI.UnpackIntoInterface(&outputStruct, "getFeeConfig", output)
+
+	if err != nil {
+		return commontype.FeeConfig{}, err
+	}
+
+	result := commontype.FeeConfig{
+		GasLimit:                 outputStruct.GasLimit,
+		TargetBlockRate:          outputStruct.TargetBlockRate.Uint64(),
+		MinBaseFee:               outputStruct.MinBaseFee,
+		TargetGas:                outputStruct.TargetGas,
+		BaseFeeChangeDenominator: outputStruct.BaseFeeChangeDenominator,
+		MinBlockGasCost:          outputStruct.MinBlockGasCost,
+		MaxBlockGasCost:          outputStruct.MaxBlockGasCost,
+		BlockGasCostStep:         outputStruct.BlockGasCostStep,
+	}
+	return result, nil
+}
+
 // getFeeConfig returns the stored fee config as an output.
 // The execution function reads the contract state for the stored fee config and returns the output.
 func getFeeConfig(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
@@ -259,13 +300,36 @@ func getFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 
 	feeConfig := GetStoredFeeConfig(accessibleState.GetStateDB())
 
-	output, err := PackFeeConfig(feeConfig)
+	output, err := PackGetFeeConfigOutput(feeConfig)
 	if err != nil {
 		return nil, remainingGas, err
 	}
 
 	// Return the fee config as output and the remaining gas
 	return output, remainingGas, err
+}
+
+// PackGetFeeConfigLastChangedAt packs the include selector (first 4 func signature bytes).
+// This function is mostly used for tests.
+func PackGetFeeConfigLastChangedAt() ([]byte, error) {
+	return FeeManagerABI.Pack("getFeeConfigLastChangedAt")
+}
+
+// PackGetFeeConfigLastChangedAtOutput attempts to pack given blockNumber of type *big.Int
+// to conform the ABI outputs.
+func PackGetFeeConfigLastChangedAtOutput(blockNumber *big.Int) ([]byte, error) {
+	return FeeManagerABI.PackOutput("getFeeConfigLastChangedAt", blockNumber)
+}
+
+// UnpackGetFeeConfigLastChangedAtOutput attempts to unpack given [output] into the *big.Int type output
+// assumes that [output] does not include selector (omits first 4 func signature bytes)
+func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
+	res, err := FeeManagerABI.Unpack("getFeeConfigLastChangedAt", output)
+	if err != nil {
+		return new(big.Int), err
+	}
+	unpacked := *abi.ConvertType(res[0], new(*big.Int)).(**big.Int)
+	return unpacked, nil
 }
 
 // getFeeConfigLastChangedAt returns the block number that fee config was last changed in.
@@ -276,28 +340,37 @@ func getFeeConfigLastChangedAt(accessibleState contract.AccessibleState, caller 
 	}
 
 	lastChangedAt := GetFeeConfigLastChangedAt(accessibleState.GetStateDB())
+	packedOutput, err := PackGetFeeConfigLastChangedAtOutput(lastChangedAt)
+	if err != nil {
+		return nil, remainingGas, err
+	}
 
-	// Return an empty output and the remaining gas
-	return common.BigToHash(lastChangedAt).Bytes(), remainingGas, err
+	return packedOutput, remainingGas, err
 }
 
-// createFeeManagerPrecompile returns a StatefulPrecompiledContract
-// with getters and setters for the chain's fee config. Access to the getters/setters
-// is controlled by an allow list for ContractAddress.
+// createFeeManagerPrecompile returns a StatefulPrecompiledContract with getters and setters for the precompile.
+// Access to the getters/setters is controlled by an allow list for ContractAddress.
 func createFeeManagerPrecompile() contract.StatefulPrecompiledContract {
-	feeManagerFunctions := allowlist.CreateAllowListFunctions(ContractAddress)
+	var functions []*contract.StatefulPrecompileFunction
+	functions = append(functions, allowlist.CreateAllowListFunctions(ContractAddress)...)
 
-	setFeeConfigFunc := contract.NewStatefulPrecompileFunction(setFeeConfigSignature, setFeeConfig)
-	getFeeConfigFunc := contract.NewStatefulPrecompileFunction(getFeeConfigSignature, getFeeConfig)
-	getFeeConfigLastChangedAtFunc := contract.NewStatefulPrecompileFunction(getFeeConfigLastChangedAtSignature, getFeeConfigLastChangedAt)
+	abiFunctionMap := map[string]contract.RunStatefulPrecompileFunc{
+		"getFeeConfig":              getFeeConfig,
+		"getFeeConfigLastChangedAt": getFeeConfigLastChangedAt,
+		"setFeeConfig":              setFeeConfig,
+	}
 
-	feeManagerFunctions = append(feeManagerFunctions, setFeeConfigFunc, getFeeConfigFunc, getFeeConfigLastChangedAtFunc)
+	for name, function := range abiFunctionMap {
+		method, ok := FeeManagerABI.Methods[name]
+		if !ok {
+			panic(fmt.Errorf("given method (%s) does not exist in the ABI", name))
+		}
+		functions = append(functions, contract.NewStatefulPrecompileFunction(method.ID, function))
+	}
 	// Construct the contract with no fallback function.
-	contract, err := contract.NewStatefulPrecompileContract(nil, feeManagerFunctions)
-	// TODO Change this to be returned as an error after refactoring this precompile
-	// to use the new precompile template.
+	statefulContract, err := contract.NewStatefulPrecompileContract(nil, functions)
 	if err != nil {
 		panic(err)
 	}
-	return contract
+	return statefulContract
 }

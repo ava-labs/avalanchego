@@ -20,6 +20,15 @@ func TestVerify(t *testing.T) {
 	enableds := []common.Address{allowlist.TestEnabledAddr}
 	managers := []common.Address{allowlist.TestManagerAddr}
 	tests := map[string]testutils.ConfigVerifyTest{
+		"valid config": {
+			Config: NewConfig(utils.NewUint64(3), admins, enableds, managers, nil),
+			ChainConfig: func() precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
+				return config
+			}(),
+			ExpectedError: "",
+		},
 		"invalid allow list config in native minter allowlist": {
 			Config:        NewConfig(utils.NewUint64(3), admins, admins, nil, nil),
 			ExpectedError: "cannot set address",
@@ -67,7 +76,7 @@ func TestEqual(t *testing.T) {
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
-		"different timestamps": {
+		"different timestamp": {
 			Config:   NewConfig(utils.NewUint64(3), admins, nil, nil, nil),
 			Other:    NewConfig(utils.NewUint64(4), admins, nil, nil, nil),
 			Expected: false,

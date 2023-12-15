@@ -1,40 +1,18 @@
 [
     {
-      "inputs": [],
-      "name": "allowFeeRecipients",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "areFeeRecipientsAllowed",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "isAllowed",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "currentRewardAddress",
-      "outputs": [
+      "inputs": [
         {
           "internalType": "address",
-          "name": "rewardAddress",
+          "name": "addr",
           "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
         }
       ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "disableRewards",
+      "name": "mintNativeCoin",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -92,7 +70,7 @@
           "type": "address"
         }
       ],
-      "name": "setNone",
+      "name": "setManager",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -105,7 +83,7 @@
           "type": "address"
         }
       ],
-      "name": "setRewardAddress",
+      "name": "setNone",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

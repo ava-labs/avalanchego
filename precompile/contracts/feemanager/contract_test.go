@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
+	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
@@ -116,6 +117,7 @@ var (
 			ExpectedRes: []byte{},
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
+				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
@@ -133,11 +135,16 @@ var (
 				err := StoreFeeConfig(state, testFeeConfig, blockContext)
 				require.NoError(t, err)
 			},
-			Input:       PackGetFeeConfigInput(),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackGetFeeConfig()
+				require.NoError(t, err)
+
+				return input
+			},
 			SuppliedGas: GetFeeConfigGasCost,
 			ReadOnly:    true,
 			ExpectedRes: func() []byte {
-				res, err := PackFeeConfig(testFeeConfig)
+				res, err := PackGetFeeConfigOutput(testFeeConfig)
 				if err != nil {
 					panic(err)
 				}
@@ -151,16 +158,21 @@ var (
 			},
 		},
 		"get initial fee config": {
-			Caller:      allowlist.TestNoRoleAddr,
-			BeforeHook:  allowlist.SetDefaultRoles(Module.Address),
-			Input:       PackGetFeeConfigInput(),
+			Caller:     allowlist.TestNoRoleAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackGetFeeConfig()
+				require.NoError(t, err)
+
+				return input
+			},
 			SuppliedGas: GetFeeConfigGasCost,
 			Config: &Config{
 				InitialFeeConfig: &testFeeConfig,
 			},
 			ReadOnly: true,
 			ExpectedRes: func() []byte {
-				res, err := PackFeeConfig(testFeeConfig)
+				res, err := PackGetFeeConfigOutput(testFeeConfig)
 				if err != nil {
 					panic(err)
 				}
@@ -185,10 +197,21 @@ var (
 				err := StoreFeeConfig(state, testFeeConfig, blockContext)
 				require.NoError(t, err)
 			},
-			Input:       PackGetLastChangedAtInput(),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackGetFeeConfigLastChangedAt()
+				require.NoError(t, err)
+
+				return input
+			},
 			SuppliedGas: GetLastChangedAtGasCost,
 			ReadOnly:    true,
-			ExpectedRes: common.BigToHash(testBlockNumber).Bytes(),
+			ExpectedRes: func() []byte {
+				res, err := PackGetFeeConfigLastChangedAtOutput(testBlockNumber)
+				if err != nil {
+					panic(err)
+				}
+				return res
+			}(),
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
@@ -247,6 +270,58 @@ var (
 			SuppliedGas: SetFeeConfigGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+		},
+		"set config with extra padded bytes should fail before DUpgrade": {
+			Caller:     allowlist.TestEnabledAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackSetFeeConfig(testFeeConfig)
+				require.NoError(t, err)
+
+				input = append(input, make([]byte, 32)...)
+				return input
+			},
+			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				return config
+			},
+			SuppliedGas: SetFeeConfigGasCost,
+			ReadOnly:    false,
+			ExpectedErr: ErrInvalidLen.Error(),
+			SetupBlockContext: func(mbc *contract.MockBlockContext) {
+				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
+				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
+			},
+		},
+		"set config with extra padded bytes should succeed with DUpgrade": {
+			Caller:     allowlist.TestEnabledAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackSetFeeConfig(testFeeConfig)
+				require.NoError(t, err)
+
+				input = append(input, make([]byte, 32)...)
+				return input
+			},
+			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
+				return config
+			},
+			SuppliedGas: SetFeeConfigGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			SetupBlockContext: func(mbc *contract.MockBlockContext) {
+				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
+				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
+			},
+			AfterHook: func(t testing.TB, state contract.StateDB) {
+				feeConfig := GetStoredFeeConfig(state)
+				require.Equal(t, testFeeConfig, feeConfig)
+				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				require.EqualValues(t, testBlockNumber, lastChangedAt)
+			},
 		},
 	}
 )

@@ -50,6 +50,9 @@ type PrecompileTest struct {
 	// ChainConfig is the chain config to use for the precompile's block context
 	// If nil, the default chain config will be used.
 	ChainConfig precompileconfig.ChainConfig
+	// ChainConfigFn is a function that returns the chain config to use for the precompile's block context
+	// If specified, ChainConfig will be ignored.
+	ChainConfigFn func(t testing.TB) precompileconfig.ChainConfig
 }
 
 type PrecompileRunparams struct {
@@ -91,6 +94,9 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state cont
 	}
 
 	chainConfig := test.ChainConfig
+	if test.ChainConfigFn != nil {
+		chainConfig = test.ChainConfigFn(t)
+	}
 	if chainConfig == nil {
 		mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
 		mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
