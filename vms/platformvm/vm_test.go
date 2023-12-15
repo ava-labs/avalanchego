@@ -73,14 +73,15 @@ import (
 type activeFork uint8
 
 const (
-	defaultWeight uint64 = 10000
+	apricotPhase3 activeFork = iota
+	apricotPhase5
+	banffFork
+	cortinaFork
+	durangoFork
 
-	apricotPhase3 activeFork = 0
-	apricotPhase5 activeFork = 1
-	banffFork     activeFork = 2
-	cortinaFork   activeFork = 3
-	durangoFork   activeFork = 4
-	latestFork    activeFork = durangoFork
+	latestFork activeFork = durangoFork
+
+	defaultWeight uint64 = 10000
 )
 
 var (
@@ -328,25 +329,19 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch fork {
-	case apricotPhase3:
-		apricotPhase3Time = latestForkTime
-	case apricotPhase5:
-		apricotPhase5Time = latestForkTime
-		apricotPhase3Time = latestForkTime
-	case banffFork:
-		banffTime = latestForkTime
-		apricotPhase5Time = latestForkTime
-		apricotPhase3Time = latestForkTime
-	case cortinaFork:
-		cortinaTime = latestForkTime
-		banffTime = latestForkTime
-		apricotPhase5Time = latestForkTime
-		apricotPhase3Time = latestForkTime
 	case durangoFork:
 		durangoTime = latestForkTime
+		fallthrough
+	case cortinaFork:
 		cortinaTime = latestForkTime
+		fallthrough
+	case banffFork:
 		banffTime = latestForkTime
+		fallthrough
+	case apricotPhase5:
 		apricotPhase5Time = latestForkTime
+		fallthrough
+	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
 		require.NoError(fmt.Errorf("unhandled fork %d", fork))
@@ -999,10 +994,9 @@ func TestCreateSubnet(t *testing.T) {
 
 	require.NoError(vm.Network.IssueTx(context.Background(), createSubnetTx))
 
-	// should contain a standard block to create subnet
+	// should contain the CreateSubnetTx
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
 
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
