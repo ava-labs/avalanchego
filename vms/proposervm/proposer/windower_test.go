@@ -18,27 +18,22 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var (
+	subnetID      = ids.GenerateTestID()
+	randomChainID = ids.GenerateTestID()
+	fixedChainID  = ids.ID{0, 2}
+)
+
 func TestWindowerNoValidators(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID = ids.GenerateTestID()
-		chainID  = ids.GenerateTestID()
-		nodeID   = ids.GenerateTestNodeID()
-	)
-
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return nil, nil
-		},
-	}
-
-	w := New(vdrState, subnetID, chainID)
+	_, vdrState := makeValidators(t, 0)
+	w := New(vdrState, subnetID, randomChainID)
 
 	var (
 		chainHeight  uint64 = 1
 		pChainHeight uint64 = 0
+		nodeID              = ids.GenerateTestNodeID()
 		slot         uint64 = 1
 	)
 	delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
@@ -54,8 +49,6 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		subnetID       = ids.GenerateTestID()
-		chainID        = ids.GenerateTestID()
 		validatorID    = ids.GenerateTestNodeID()
 		nonValidatorID = ids.GenerateTestNodeID()
 	)
@@ -72,7 +65,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		},
 	}
 
-	w := New(vdrState, subnetID, chainID)
+	w := New(vdrState, subnetID, randomChainID)
 
 	validatorDelay, err := w.Delay(context.Background(), 1, 0, validatorID, MaxVerifyWindows)
 	require.NoError(err)
@@ -86,30 +79,8 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 func TestDelayChangeByHeight(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID = ids.ID{0, 1}
-		chainID  = ids.ID{0, 2}
-	)
-
-	validatorIDs := make([]ids.NodeID, MaxVerifyWindows)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
-
-	w := New(vdrState, subnetID, chainID)
+	validatorIDs, vdrState := makeValidators(t, MaxVerifyWindows)
+	w := New(vdrState, subnetID, fixedChainID)
 
 	expectedDelays1 := []time.Duration{
 		2 * WindowDuration,
@@ -145,8 +116,6 @@ func TestDelayChangeByHeight(t *testing.T) {
 func TestDelayChangeByChain(t *testing.T) {
 	require := require.New(t)
 
-	subnetID := ids.ID{0, 1}
-
 	source := rand.NewSource(int64(0))
 	rng := rand.New(source) // #nosec G404
 
@@ -158,24 +127,7 @@ func TestDelayChangeByChain(t *testing.T) {
 	_, err = rng.Read(chainID1[:])
 	require.NoError(err)
 
-	validatorIDs := make([]ids.NodeID, MaxVerifyWindows)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
-
+	validatorIDs, vdrState := makeValidators(t, MaxVerifyWindows)
 	w0 := New(vdrState, subnetID, chainID0)
 	w1 := New(vdrState, subnetID, chainID1)
 
@@ -213,32 +165,8 @@ func TestDelayChangeByChain(t *testing.T) {
 func TestExpectedProposerChangeByHeight(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID = ids.ID{0, 1}
-		chainID  = ids.ID{0, 2}
-
-		validatorsCount = 10
-	)
-
-	validatorIDs := make([]ids.NodeID, validatorsCount)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
-
-	w := New(vdrState, subnetID, chainID)
+	validatorIDs, vdrState := makeValidators(t, 10)
+	w := New(vdrState, subnetID, fixedChainID)
 
 	var (
 		dummyCtx            = context.Background()
@@ -261,11 +189,6 @@ func TestExpectedProposerChangeByHeight(t *testing.T) {
 func TestExpectedProposerChangeByChain(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID        = ids.ID{0, 1}
-		validatorsCount = 10
-	)
-
 	source := rand.NewSource(int64(0))
 	rng := rand.New(source) // #nosec G404
 
@@ -277,23 +200,7 @@ func TestExpectedProposerChangeByChain(t *testing.T) {
 	_, err = rng.Read(chainID1[:])
 	require.NoError(err)
 
-	validatorIDs := make([]ids.NodeID, validatorsCount)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
+	validatorIDs, vdrState := makeValidators(t, 10)
 
 	var (
 		dummyCtx            = context.Background()
@@ -318,32 +225,8 @@ func TestExpectedProposerChangeByChain(t *testing.T) {
 func TestExpectedProposerChangeBySlot(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID = ids.ID{0, 1}
-		chainID  = ids.ID{0, 2}
-
-		validatorsCount = 10
-	)
-
-	validatorIDs := make([]ids.NodeID, validatorsCount)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
-
-	w := New(vdrState, subnetID, chainID)
+	validatorIDs, vdrState := makeValidators(t, 10)
+	w := New(vdrState, subnetID, fixedChainID)
 
 	var (
 		dummyCtx            = context.Background()
@@ -395,32 +278,8 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID = ids.ID{0, 1}
-		chainID  = ids.ID{0, 2}
-
-		validatorsCount = 10
-	)
-
-	validatorIDs := make([]ids.NodeID, validatorsCount)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
-
-	w := New(vdrState, subnetID, chainID)
+	_, vdrState := makeValidators(t, 10)
+	w := New(vdrState, subnetID, fixedChainID)
 
 	var (
 		dummyCtx            = context.Background()
@@ -443,32 +302,8 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 func TestMinDelayForProposer(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID = ids.ID{0, 1}
-		chainID  = ids.ID{0, 2}
-
-		validatorsCount = 10
-	)
-
-	validatorIDs := make([]ids.NodeID, validatorsCount)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
-
-	w := New(vdrState, subnetID, chainID)
+	validatorIDs, vdrState := makeValidators(t, 10)
+	w := New(vdrState, subnetID, fixedChainID)
 
 	var (
 		dummyCtx            = context.Background()
@@ -538,32 +373,8 @@ func TestTimeToSlot(t *testing.T) {
 func TestProposerDistribution(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		subnetID = ids.ID{0, 1}
-		chainID  = ids.ID{0, 2}
-
-		validatorsCount = 10
-	)
-
-	validatorIDs := make([]ids.NodeID, validatorsCount)
-	for i := range validatorIDs {
-		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
-	}
-	vdrState := &validators.TestState{
-		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
-			for _, id := range validatorIDs {
-				vdrs[id] = &validators.GetValidatorOutput{
-					NodeID: id,
-					Weight: 1,
-				}
-			}
-			return vdrs, nil
-		},
-	}
-
-	w := New(vdrState, subnetID, chainID)
+	validatorIDs, vdrState := makeValidators(t, 10)
+	w := New(vdrState, subnetID, fixedChainID)
 
 	var (
 		dummyCtx               = context.Background()
@@ -601,4 +412,26 @@ func TestProposerDistribution(t *testing.T) {
 
 	maxSTDDeviation := float64(maxDeviation) / stdDeviation
 	require.Less(maxSTDDeviation, 3.)
+}
+
+func makeValidators(t *testing.T, count int) ([]ids.NodeID, *validators.TestState) {
+	validatorIDs := make([]ids.NodeID, count)
+	for i := range validatorIDs {
+		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
+	}
+
+	vdrState := &validators.TestState{
+		T: t,
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
+			for _, id := range validatorIDs {
+				vdrs[id] = &validators.GetValidatorOutput{
+					NodeID: id,
+					Weight: 1,
+				}
+			}
+			return vdrs, nil
+		},
+	}
+	return validatorIDs, vdrState
 }
