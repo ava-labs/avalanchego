@@ -15,9 +15,7 @@ const (
 	NetworkDirEnvName = "TMPNET_NETWORK_DIR"
 	RootDirEnvName    = "TMPNET_ROOT_DIR"
 
-	DefaultNetworkTimeout  = 2 * time.Minute
-	DefaultNodeInitTimeout = 10 * time.Second
-	DefaultNodeStopTimeout = 5 * time.Second
+	DefaultNetworkTimeout = 2 * time.Minute
 
 	// Minimum required to ensure connectivity-based health checks will pass
 	DefaultNodeCount = 2
