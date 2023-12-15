@@ -502,6 +502,10 @@ func TestTimeToSlot(t *testing.T) {
 		expectedSlot uint64
 	}{
 		{
+			timeOffset:   -WindowDuration,
+			expectedSlot: 0,
+		},
+		{
 			timeOffset:   -time.Second,
 			expectedSlot: 0,
 		},
