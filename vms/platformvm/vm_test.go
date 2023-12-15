@@ -321,11 +321,11 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
-		dTime             = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
 	)
 
 	// always reset latestForkTime (a package level variable)
-	// to ensure test independency
+	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch fork {
 	case apricotPhase3:
@@ -343,7 +343,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		apricotPhase5Time = latestForkTime
 		apricotPhase3Time = latestForkTime
 	case durangoFork:
-		dTime = latestForkTime
+		durangoTime = latestForkTime
 		cortinaTime = latestForkTime
 		banffTime = latestForkTime
 		apricotPhase5Time = latestForkTime
@@ -371,7 +371,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		ApricotPhase5Time:      apricotPhase5Time,
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
-		DurangoTime:            dTime,
+		DurangoTime:            durangoTime,
 	}}
 
 	db := memdb.New()
@@ -999,7 +999,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	require.NoError(vm.Network.IssueTx(context.Background(), createSubnetTx))
 
-	// should contain standard block to create subnet
+	// should contain a standard block to create subnet
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)

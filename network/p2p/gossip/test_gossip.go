@@ -4,8 +4,9 @@
 package gossip
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -32,13 +33,17 @@ func (t *testTx) Unmarshal(bytes []byte) error {
 }
 
 type testSet struct {
-	set   set.Set[*testTx]
+	txs   map[ids.ID]*testTx
 	bloom *BloomFilter
 	onAdd func(tx *testTx)
 }
 
-func (t testSet) Add(gossipable *testTx) error {
-	t.set.Add(gossipable)
+func (t *testSet) Add(gossipable *testTx) error {
+	if _, ok := t.txs[gossipable.id]; ok {
+		return fmt.Errorf("%s already present", gossipable.id)
+	}
+
+	t.txs[gossipable.id] = gossipable
 	t.bloom.Add(gossipable)
 	if t.onAdd != nil {
 		t.onAdd(gossipable)
@@ -47,15 +52,15 @@ func (t testSet) Add(gossipable *testTx) error {
 	return nil
 }
 
-func (t testSet) Iterate(f func(gossipable *testTx) bool) {
-	for tx := range t.set {
+func (t *testSet) Iterate(f func(gossipable *testTx) bool) {
+	for _, tx := range t.txs {
 		if !f(tx) {
 			return
 		}
 	}
 }
 
-func (t testSet) GetFilter() ([]byte, []byte, error) {
+func (t *testSet) GetFilter() ([]byte, []byte, error) {
 	bloom, err := t.bloom.Bloom.MarshalBinary()
 	return bloom, t.bloom.Salt[:], err
 }

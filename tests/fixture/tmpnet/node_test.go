@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package local
+package tmpnet
 
 import (
 	"testing"
@@ -14,7 +14,7 @@ func TestNodeSerialization(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	node := NewLocalNode(tmpDir)
+	node := NewNode(tmpDir)
 	require.NoError(node.EnsureKeys())
 	require.NoError(node.WriteConfig())
 
