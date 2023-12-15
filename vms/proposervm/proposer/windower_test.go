@@ -475,21 +475,53 @@ func TestMinDelayForProposer(t *testing.T) {
 	)
 
 	expectedDelays := map[ids.NodeID]time.Duration{
-		validatorIDs[0]: 1 * WindowDuration,
-		validatorIDs[1]: 15 * WindowDuration,
-		validatorIDs[2]: 0 * WindowDuration,
-		validatorIDs[3]: 5 * WindowDuration,
-		validatorIDs[4]: 10 * WindowDuration,
-		validatorIDs[5]: 18 * WindowDuration,
-		validatorIDs[6]: 12 * WindowDuration,
-		validatorIDs[7]: 3 * WindowDuration,
-		validatorIDs[8]: 23 * WindowDuration,
-		validatorIDs[9]: 2 * WindowDuration,
+		validatorIDs[0]:          1 * WindowDuration,
+		validatorIDs[1]:          15 * WindowDuration,
+		validatorIDs[2]:          0 * WindowDuration,
+		validatorIDs[3]:          5 * WindowDuration,
+		validatorIDs[4]:          10 * WindowDuration,
+		validatorIDs[5]:          18 * WindowDuration,
+		validatorIDs[6]:          12 * WindowDuration,
+		validatorIDs[7]:          3 * WindowDuration,
+		validatorIDs[8]:          23 * WindowDuration,
+		validatorIDs[9]:          2 * WindowDuration,
+		ids.GenerateTestNodeID(): MaxLookAheadWindow,
 	}
 
 	for nodeID, expectedDelay := range expectedDelays {
 		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot)
 		require.NoError(err)
 		require.Equal(expectedDelay, delay)
+	}
+}
+
+func TestTimeToSlot(t *testing.T) {
+	parentTime := time.Now()
+	tests := []struct {
+		timeOffset   time.Duration
+		expectedSlot uint64
+	}{
+		{
+			timeOffset:   -time.Second,
+			expectedSlot: 0,
+		},
+		{
+			timeOffset:   0,
+			expectedSlot: 0,
+		},
+		{
+			timeOffset:   WindowDuration,
+			expectedSlot: 1,
+		},
+		{
+			timeOffset:   2 * WindowDuration,
+			expectedSlot: 2,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.timeOffset.String(), func(t *testing.T) {
+			slot := TimeToSlot(parentTime, parentTime.Add(test.timeOffset))
+			require.Equal(t, test.expectedSlot, slot)
+		})
 	}
 }
