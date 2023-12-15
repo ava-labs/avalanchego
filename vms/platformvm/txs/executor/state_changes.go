@@ -128,16 +128,16 @@ func AdvanceTimeTo(
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
 			changes.PutCurrentValidator(&stakerToAdd)
 			changes.DeletePendingValidator(stakerToRemove)
-			changed = true
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
 			changes.PutCurrentDelegator(&stakerToAdd)
 			changes.DeletePendingDelegator(stakerToRemove)
-			changed = true
 
 		default:
 			return false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
+
+		changed = true
 	}
 
 	// Remove any current stakers whose [EndTime] <= [newChainTime].
