@@ -34,11 +34,9 @@ func TestWindowerNoValidators(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	var (
-		chainHeight     uint64 = 1
-		pChainHeight    uint64 = 0
-		parentBlockTime        = time.Now().Truncate(time.Second)
-		blockTime              = parentBlockTime.Add(time.Second)
-		slot                   = TimeToSlot(parentBlockTime, blockTime)
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
+		slot         uint64 = 1
 	)
 	delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
 	require.NoError(err)
@@ -350,11 +348,38 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 		pChainHeight uint64 = 0
 	)
 
+	proposers := []ids.NodeID{
+		validatorIDs[2],
+		validatorIDs[0],
+		validatorIDs[9],
+		validatorIDs[7],
+		validatorIDs[0],
+		validatorIDs[3],
+		validatorIDs[3],
+		validatorIDs[3],
+		validatorIDs[3],
+		validatorIDs[3],
+		validatorIDs[4],
+		validatorIDs[0],
+		validatorIDs[6],
+		validatorIDs[3],
+		validatorIDs[2],
+		validatorIDs[1],
+		validatorIDs[6],
+		validatorIDs[0],
+		validatorIDs[5],
+		validatorIDs[1],
+		validatorIDs[9],
+		validatorIDs[6],
+		validatorIDs[0],
+		validatorIDs[8],
+	}
 	expectedProposers := map[uint64]ids.NodeID{
-		0:                 validatorIDs[2],
-		1:                 validatorIDs[0],
-		2:                 validatorIDs[9],
-		MaxLookAheadSlots: validatorIDs[4],
+		MaxLookAheadSlots:     validatorIDs[4],
+		MaxLookAheadSlots + 1: validatorIDs[6],
+	}
+	for slot, expectedProposerID := range proposers {
+		expectedProposers[uint64(slot)] = expectedProposerID
 	}
 
 	for slot, expectedProposerID := range expectedProposers {
@@ -409,5 +434,62 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, proposerID, slot)
 		require.NoError(err)
 		require.Equal(time.Duration(slot)*WindowDuration, delay)
+	}
+}
+
+func TestMinDelayForProposer(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		subnetID = ids.ID{0, 1}
+		chainID  = ids.ID{0, 2}
+
+		validatorsCount = 10
+	)
+
+	validatorIDs := make([]ids.NodeID, validatorsCount)
+	for i := range validatorIDs {
+		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
+	}
+	vdrState := &validators.TestState{
+		T: t,
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
+			for _, id := range validatorIDs {
+				vdrs[id] = &validators.GetValidatorOutput{
+					NodeID: id,
+					Weight: 1,
+				}
+			}
+			return vdrs, nil
+		},
+	}
+
+	w := New(vdrState, subnetID, chainID)
+
+	var (
+		dummyCtx            = context.Background()
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
+		slot         uint64 = 0
+	)
+
+	expectedDelays := map[ids.NodeID]time.Duration{
+		validatorIDs[0]: 1 * WindowDuration,
+		validatorIDs[1]: 15 * WindowDuration,
+		validatorIDs[2]: 0 * WindowDuration,
+		validatorIDs[3]: 5 * WindowDuration,
+		validatorIDs[4]: 10 * WindowDuration,
+		validatorIDs[5]: 18 * WindowDuration,
+		validatorIDs[6]: 12 * WindowDuration,
+		validatorIDs[7]: 3 * WindowDuration,
+		validatorIDs[8]: 23 * WindowDuration,
+		validatorIDs[9]: 2 * WindowDuration,
+	}
+
+	for nodeID, expectedDelay := range expectedDelays {
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot)
+		require.NoError(err)
+		require.Equal(expectedDelay, delay)
 	}
 }
