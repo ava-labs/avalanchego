@@ -127,7 +127,7 @@ func createPrecompileHook(abifilename string, template string) bind.BindHook {
 			// these functions are not needed for binded contract.
 			// AllowList struct can provide the same functionality,
 			// so we don't need to generate them.
-			for _, key := range allowlist.AllowListFuncKeys {
+			for key := range allowlist.AllowListABI.Methods {
 				delete(funcs, key)
 			}
 		}
@@ -149,8 +149,7 @@ func createPrecompileHook(abifilename string, template string) bind.BindHook {
 }
 
 func allowListEnabled(funcs map[string]*bind.TmplMethod) bool {
-	keys := allowlist.AllowListFuncKeys
-	for _, key := range keys {
+	for key := range allowlist.AllowListABI.Methods {
 		if _, ok := funcs[key]; !ok {
 			return false
 		}

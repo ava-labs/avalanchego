@@ -466,34 +466,51 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
 		"read allow list no role": {
-			Caller:      TestNoRoleAddr,
-			BeforeHook:  SetDefaultRoles(contractAddress),
-			Input:       PackReadAllowList(TestNoRoleAddr),
+			Caller:     TestNoRoleAddr,
+			BeforeHook: SetDefaultRoles(contractAddress),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackReadAllowList(TestNoRoleAddr)
+				require.NoError(t, err)
+
+				return input
+			},
 			SuppliedGas: ReadAllowListGasCost,
 			ReadOnly:    false,
 			ExpectedRes: common.Hash(NoRole).Bytes(),
 		},
 		"read allow list admin role": {
-			Caller:      TestAdminAddr,
-			BeforeHook:  SetDefaultRoles(contractAddress),
-			Input:       PackReadAllowList(TestAdminAddr),
-			SuppliedGas: ReadAllowListGasCost,
+			Caller:     TestAdminAddr,
+			BeforeHook: SetDefaultRoles(contractAddress),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackReadAllowList(TestAdminAddr)
+				require.NoError(t, err)
+
+				return input
+			}, SuppliedGas: ReadAllowListGasCost,
 			ReadOnly:    false,
 			ExpectedRes: common.Hash(AdminRole).Bytes(),
 		},
 		"read allow list with readOnly enabled": {
-			Caller:      TestAdminAddr,
-			BeforeHook:  SetDefaultRoles(contractAddress),
-			Input:       PackReadAllowList(TestNoRoleAddr),
-			SuppliedGas: ReadAllowListGasCost,
+			Caller:     TestAdminAddr,
+			BeforeHook: SetDefaultRoles(contractAddress),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackReadAllowList(TestNoRoleAddr)
+				require.NoError(t, err)
+
+				return input
+			}, SuppliedGas: ReadAllowListGasCost,
 			ReadOnly:    true,
 			ExpectedRes: common.Hash(NoRole).Bytes(),
 		},
 		"read allow list out of gas": {
-			Caller:      TestAdminAddr,
-			BeforeHook:  SetDefaultRoles(contractAddress),
-			Input:       PackReadAllowList(TestNoRoleAddr),
-			SuppliedGas: ReadAllowListGasCost - 1,
+			Caller:     TestAdminAddr,
+			BeforeHook: SetDefaultRoles(contractAddress),
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackReadAllowList(TestNoRoleAddr)
+				require.NoError(t, err)
+
+				return input
+			}, SuppliedGas: ReadAllowListGasCost - 1,
 			ReadOnly:    true,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
