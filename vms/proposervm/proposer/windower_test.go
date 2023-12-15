@@ -5,6 +5,7 @@ package proposer
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestWindowerNoValidators(t *testing.T) {
@@ -528,4 +531,74 @@ func TestTimeToSlot(t *testing.T) {
 			require.Equal(t, test.expectedSlot, slot)
 		})
 	}
+}
+
+// Ensure that the proposer distribution is within 3 standard deviations of the
+// expected value assuming a truly random binomial distribution.
+func TestProposerDistribution(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		subnetID = ids.ID{0, 1}
+		chainID  = ids.ID{0, 2}
+
+		validatorsCount = 10
+	)
+
+	validatorIDs := make([]ids.NodeID, validatorsCount)
+	for i := range validatorIDs {
+		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
+	}
+	vdrState := &validators.TestState{
+		T: t,
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
+			for _, id := range validatorIDs {
+				vdrs[id] = &validators.GetValidatorOutput{
+					NodeID: id,
+					Weight: 1,
+				}
+			}
+			return vdrs, nil
+		},
+	}
+
+	w := New(vdrState, subnetID, chainID)
+
+	var (
+		dummyCtx               = context.Background()
+		pChainHeight    uint64 = 0
+		numChainHeights uint64 = 100
+		numSlots        uint64 = 100
+	)
+
+	proposerFrequency := make(map[ids.NodeID]int)
+	for chainHeight := uint64(0); chainHeight < numChainHeights; chainHeight++ {
+		for slot := uint64(0); slot < numSlots; slot++ {
+			proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
+			require.NoError(err)
+			proposerFrequency[proposerID]++
+		}
+	}
+
+	var (
+		totalNumberOfSamples      = numChainHeights * numSlots
+		probabilityOfBeingSampled = 1 / float64(len(validatorIDs))
+		expectedNumberOfSamples   = uint64(probabilityOfBeingSampled * float64(totalNumberOfSamples))
+		variance                  = float64(totalNumberOfSamples) * probabilityOfBeingSampled * (1 - probabilityOfBeingSampled)
+		stdDeviation              = math.Sqrt(variance)
+		maxDeviation              uint64
+	)
+	for _, sampled := range proposerFrequency {
+		maxDeviation = safemath.Max(
+			maxDeviation,
+			safemath.AbsDiff(
+				uint64(sampled),
+				expectedNumberOfSamples,
+			),
+		)
+	}
+
+	maxSTDDeviation := float64(maxDeviation) / stdDeviation
+	require.Less(maxSTDDeviation, 3.)
 }
