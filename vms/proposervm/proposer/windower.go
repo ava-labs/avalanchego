@@ -109,34 +109,25 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 }
 
 func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
-	validators, err := w.sortedValidators(ctx, pChainHeight)
+	// Note: The 32-bit prng is used here for legacy reasons. All other usages
+	// of a prng in this file should use the 64-bit version.
+	source := prng.NewMT19937()
+	sampler, validators, err := w.makeSampler(ctx, pChainHeight, source)
 	if err != nil {
 		return nil, err
 	}
 
-	// Note: The 32-bit prng is used here for legacy reasons. All other usages
-	// of a prng in this file should use the 64-bit version.
-	var (
-		seed             = preDurangoSeed(w.chainSource, blockHeight)
-		source           = prng.NewMT19937()
-		validatorWeights = validatorsToWeight(validators)
-	)
-
-	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
-	if err := sampler.Initialize(validatorWeights); err != nil {
-		return nil, err
-	}
-
 	var totalWeight uint64
-	for _, weight := range validatorWeights {
-		totalWeight, err = math.Add64(totalWeight, weight)
+	for _, validator := range validators {
+		totalWeight, err = math.Add64(totalWeight, validator.weight)
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	source.Seed(w.chainSource ^ blockHeight)
+
 	numToSample := int(math.Min(uint64(maxWindows), totalWeight))
-	source.Seed(seed)
 	indices, err := sampler.Sample(numToSample)
 	if err != nil {
 		return nil, err
@@ -175,28 +166,19 @@ func (w *windower) ExpectedProposer(
 	pChainHeight,
 	slot uint64,
 ) (ids.NodeID, error) {
-	validators, err := w.sortedValidators(ctx, pChainHeight)
+	source := prng.NewMT19937_64()
+	sampler, validators, err := w.makeSampler(ctx, pChainHeight, source)
 	if err != nil {
 		return ids.EmptyNodeID, err
 	}
 
-	var (
-		seed             = postDurangoSeed(w.chainSource, blockHeight, slot)
-		source           = prng.NewMT19937_64()
-		validatorWeights = validatorsToWeight(validators)
+	return w.expectedProposer(
+		validators,
+		source,
+		sampler,
+		blockHeight,
+		slot,
 	)
-
-	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
-	if err := sampler.Initialize(validatorWeights); err != nil {
-		return ids.EmptyNodeID, err
-	}
-
-	source.Seed(seed)
-	indices, err := sampler.Sample(1)
-	if err != nil {
-		return ids.EmptyNodeID, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
-	}
-	return validators[indices[0]].id, nil
 }
 
 func (w *windower) MinDelayForProposer(
@@ -206,32 +188,26 @@ func (w *windower) MinDelayForProposer(
 	nodeID ids.NodeID,
 	startSlot uint64,
 ) (time.Duration, error) {
-	validators, err := w.sortedValidators(ctx, pChainHeight)
+	source := prng.NewMT19937_64()
+	sampler, validators, err := w.makeSampler(ctx, pChainHeight, source)
 	if err != nil {
 		return 0, err
 	}
 
-	var (
-		maxSlot = startSlot + MaxLookAheadSlots
-
-		source           = prng.NewMT19937_64()
-		validatorWeights = validatorsToWeight(validators)
-		sampler          = sampler.NewDeterministicWeightedWithoutReplacement(source)
-	)
-
-	if err := sampler.Initialize(validatorWeights); err != nil {
-		return 0, err
-	}
-
+	maxSlot := startSlot + MaxLookAheadSlots
 	for slot := startSlot; slot < maxSlot; slot++ {
-		seed := postDurangoSeed(w.chainSource, blockHeight, slot)
-		source.Seed(seed)
-		indices, err := sampler.Sample(1)
+		expectedNodeID, err := w.expectedProposer(
+			validators,
+			source,
+			sampler,
+			blockHeight,
+			slot,
+		)
 		if err != nil {
-			return 0, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
+			return 0, err
 		}
 
-		if validators[indices[0]].id == nodeID {
+		if expectedNodeID == nodeID {
 			return time.Duration(slot) * WindowDuration, nil
 		}
 	}
@@ -240,14 +216,33 @@ func (w *windower) MinDelayForProposer(
 	return time.Duration(maxSlot) * WindowDuration, nil
 }
 
+func (w *windower) makeSampler(
+	ctx context.Context,
+	pChainHeight uint64,
+	source sampler.Source,
+) (sampler.WeightedWithoutReplacement, []validatorData, error) {
+	validators, err := w.sortedValidators(ctx, pChainHeight)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	weights := make([]uint64, len(validators))
+	for i, validator := range validators {
+		weights[i] = validator.weight
+	}
+
+	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
+	return sampler, validators, sampler.Initialize(weights)
+}
+
+// Get the canconical representation of the validator set at the provided
+// p-chain height.
 func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([]validatorData, error) {
-	// get the validator set by the p-chain height
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
 		return nil, err
 	}
 
-	// convert the map of validators to a slice
 	validators := make([]validatorData, 0, len(validatorsMap))
 	for k, v := range validatorsMap {
 		validators = append(validators, validatorData{
@@ -256,12 +251,30 @@ func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([
 		})
 	}
 
-	// canonically sort validators
-	// Note: validators are sorted by ID, sorting by weight would not create a
-	// canonically sorted list
+	// Note: validators are sorted by ID. Sorting by weight would not create a
+	// canonically sorted list.
 	utils.Sort(validators)
 
 	return validators, nil
+}
+
+func (w *windower) expectedProposer(
+	validators []validatorData,
+	source *prng.MT19937_64,
+	sampler sampler.WeightedWithoutReplacement,
+	blockHeight,
+	slot uint64,
+) (ids.NodeID, error) {
+	// Slot is reversed to utilize a different state space in the seed than the
+	// height. If the slot was not reversed the state space would collide;
+	// biasing the seed generation. For example, without reversing the slot
+	// height=0 and slot=1 would equal height=1 and slot=0.
+	source.Seed(w.chainSource ^ blockHeight ^ bits.Reverse64(slot))
+	indices, err := sampler.Sample(1)
+	if err != nil {
+		return ids.EmptyNodeID, fmt.Errorf("%w, %w", err, ErrNoProposersAvailable)
+	}
+	return validators[indices[0]].id, nil
 }
 
 func TimeToSlot(baseTime, targetTime time.Time) uint64 {
@@ -269,24 +282,4 @@ func TimeToSlot(baseTime, targetTime time.Time) uint64 {
 		return 0
 	}
 	return uint64(targetTime.Sub(baseTime) / WindowDuration)
-}
-
-func validatorsToWeight(validators []validatorData) []uint64 {
-	weights := make([]uint64, len(validators))
-	for i, validator := range validators {
-		weights[i] = validator.weight
-	}
-	return weights
-}
-
-func preDurangoSeed(chainSource, height uint64) uint64 {
-	return chainSource ^ height
-}
-
-func postDurangoSeed(chainSource, height, slot uint64) uint64 {
-	// Slot is reversed to utilize a different state space in the seed than the
-	// height. If the slot was not reversed the state space would collide,
-	// biasing the seed generation. For example, without reversing the slot
-	// postDurangoSeed(0,0,1) would equal postDurangoSeed(0,1,0).
-	return chainSource ^ height ^ bits.Reverse64(slot)
 }
