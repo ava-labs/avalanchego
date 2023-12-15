@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package local
+package tmpnet
 
 import (
 	"context"
@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -37,10 +36,10 @@ const (
 )
 
 var (
-	errInvalidNodeCount      = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
-	errInvalidKeyCount       = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
-	errLocalNetworkDirNotSet = errors.New("local network directory not set - has Create() been called?")
-	errInvalidNetworkDir     = errors.New("failed to write local network: invalid network directory")
+	errInvalidNodeCount      = errors.New("failed to populate network config: non-zero node count is only valid for a network without nodes")
+	errInvalidKeyCount       = errors.New("failed to populate network config: non-zero key count is only valid for a network without keys")
+	errNetworkDirNotSet      = errors.New("network directory not set - has Create() been called?")
+	errInvalidNetworkDir     = errors.New("failed to write network: invalid network directory")
 	errMissingBootstrapNodes = errors.New("failed to add node due to missing bootstrap nodes")
 )
 
@@ -83,39 +82,25 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 	}
 }
 
-// Defines the configuration required for a local network (i.e. one composed of local processes).
-type LocalNetwork struct {
-	tmpnet.NetworkConfig
-	LocalConfig
+// Defines the configuration required for a tempoary network
+type Network struct {
+	NetworkConfig
+	NodeRuntimeConfig
 
-	// Nodes with local configuration
-	Nodes []*LocalNode
+	// Nodes comprising the network
+	Nodes []*Node
 
 	// Path where network configuration will be stored
 	Dir string
 }
 
-// Returns the configuration of the network in backend-agnostic form.
-func (ln *LocalNetwork) GetConfig() tmpnet.NetworkConfig {
-	return ln.NetworkConfig
-}
-
-// Returns the nodes of the network in backend-agnostic form.
-func (ln *LocalNetwork) GetNodes() []tmpnet.Node {
-	nodes := make([]tmpnet.Node, 0, len(ln.Nodes))
-	for _, node := range ln.Nodes {
-		nodes = append(nodes, node)
-	}
-	return nodes
-}
-
 // Adds a backend-agnostic ephemeral node to the network
-func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags tmpnet.FlagsMap) (tmpnet.Node, error) {
+func (n *Network) AddEphemeralNode(w io.Writer, flags FlagsMap) (*Node, error) {
 	if flags == nil {
-		flags = tmpnet.FlagsMap{}
+		flags = FlagsMap{}
 	}
-	return ln.AddLocalNode(w, &LocalNode{
-		NodeConfig: tmpnet.NodeConfig{
+	return n.AddNode(w, &Node{
+		NodeConfig: NodeConfig{
 			Flags: flags,
 		},
 	}, true /* isEphemeral */)
@@ -127,11 +112,11 @@ func StartNetwork(
 	ctx context.Context,
 	w io.Writer,
 	rootDir string,
-	network *LocalNetwork,
+	network *Network,
 	nodeCount int,
 	keyCount int,
-) (*LocalNetwork, error) {
-	if _, err := fmt.Fprintf(w, "Preparing configuration for new local network with %s\n", network.ExecPath); err != nil {
+) (*Network, error) {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new temporary network with %s\n", network.ExecPath); err != nil {
 		return nil, err
 	}
 
@@ -178,7 +163,7 @@ func StartNetwork(
 	// nodes know where to write their configuration.
 	network.Dir = networkDir
 
-	if err := network.PopulateLocalNetworkConfig(networkID, nodeCount, keyCount); err != nil {
+	if err := network.PopulateNetworkConfig(networkID, nodeCount, keyCount); err != nil {
 		return nil, err
 	}
 
@@ -204,10 +189,10 @@ func StartNetwork(
 }
 
 // Read a network from the provided directory.
-func ReadNetwork(dir string) (*LocalNetwork, error) {
-	network := &LocalNetwork{Dir: dir}
+func ReadNetwork(dir string) (*Network, error) {
+	network := &Network{Dir: dir}
 	if err := network.ReadAll(); err != nil {
-		return nil, fmt.Errorf("failed to read local network: %w", err)
+		return nil, fmt.Errorf("failed to read network: %w", err)
 	}
 	return network, nil
 }
@@ -222,34 +207,34 @@ func StopNetwork(dir string) error {
 }
 
 // Ensure the network has the configuration it needs to start.
-func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount int, keyCount int) error {
-	if len(ln.Nodes) > 0 && nodeCount > 0 {
+func (n *Network) PopulateNetworkConfig(networkID uint32, nodeCount int, keyCount int) error {
+	if len(n.Nodes) > 0 && nodeCount > 0 {
 		return errInvalidNodeCount
 	}
-	if len(ln.PreFundedKeys) > 0 && keyCount > 0 {
+	if len(n.PreFundedKeys) > 0 && keyCount > 0 {
 		return errInvalidKeyCount
 	}
 
 	if nodeCount > 0 {
 		// Add the specified number of nodes
-		nodes := make([]*LocalNode, 0, nodeCount)
+		nodes := make([]*Node, 0, nodeCount)
 		for i := 0; i < nodeCount; i++ {
-			nodes = append(nodes, NewLocalNode(""))
+			nodes = append(nodes, NewNode(""))
 		}
-		ln.Nodes = nodes
+		n.Nodes = nodes
 	}
 
 	// Ensure each node has keys and an associated node ID. This
 	// ensures the availability of node IDs and proofs of possession
 	// for genesis generation.
-	for _, node := range ln.Nodes {
+	for _, node := range n.Nodes {
 		if err := node.EnsureKeys(); err != nil {
 			return err
 		}
 	}
 
 	// Assume all the initial nodes are stakers
-	initialStakers, err := stakersForNodes(networkID, ln.Nodes)
+	initialStakers, err := stakersForNodes(networkID, n.Nodes)
 	if err != nil {
 		return err
 	}
@@ -264,27 +249,27 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 			}
 			keys = append(keys, key)
 		}
-		ln.PreFundedKeys = keys
+		n.PreFundedKeys = keys
 	}
 
-	if err := ln.EnsureGenesis(networkID, initialStakers); err != nil {
+	if err := n.EnsureGenesis(networkID, initialStakers); err != nil {
 		return err
 	}
 
-	if ln.CChainConfig == nil {
-		ln.CChainConfig = LocalCChainConfig()
+	if n.CChainConfig == nil {
+		n.CChainConfig = DefaultCChainConfig()
 	}
 
 	// Default flags need to be set in advance of node config
 	// population to ensure correct node configuration.
-	if ln.DefaultFlags == nil {
-		ln.DefaultFlags = LocalFlags()
+	if n.DefaultFlags == nil {
+		n.DefaultFlags = DefaultFlags()
 	}
 
-	for _, node := range ln.Nodes {
+	for _, node := range n.Nodes {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
-		if err := ln.PopulateNodeConfig(node, ln.Dir); err != nil {
+		if err := n.PopulateNodeConfig(node, n.Dir); err != nil {
 			return err
 		}
 	}
@@ -295,18 +280,18 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 // Ensure the provided node has the configuration it needs to start. If the data dir is
 // not set, it will be defaulted to [nodeParentDir]/[node ID]. Requires that the
 // network has valid genesis data.
-func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string) error {
+func (n *Network) PopulateNodeConfig(node *Node, nodeParentDir string) error {
 	flags := node.Flags
 
 	// Set values common to all nodes
-	flags.SetDefaults(ln.DefaultFlags)
-	flags.SetDefaults(tmpnet.FlagsMap{
-		config.GenesisFileKey:    ln.GetGenesisPath(),
-		config.ChainConfigDirKey: ln.GetChainConfigDir(),
+	flags.SetDefaults(n.DefaultFlags)
+	flags.SetDefaults(FlagsMap{
+		config.GenesisFileKey:    n.GetGenesisPath(),
+		config.ChainConfigDirKey: n.GetChainConfigDir(),
 	})
 
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
-	flags[config.NetworkNameKey] = strconv.FormatUint(uint64(ln.Genesis.NetworkID), 10)
+	flags[config.NetworkNameKey] = strconv.FormatUint(uint64(n.Genesis.NetworkID), 10)
 
 	// Ensure keys are added if necessary
 	if err := node.EnsureKeys(); err != nil {
@@ -325,13 +310,13 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string
 }
 
 // Starts a network for the first time
-func (ln *LocalNetwork) Start(w io.Writer) error {
-	if len(ln.Dir) == 0 {
-		return errLocalNetworkDirNotSet
+func (n *Network) Start(w io.Writer) error {
+	if len(n.Dir) == 0 {
+		return errNetworkDirNotSet
 	}
 
 	// Ensure configuration on disk is current
-	if err := ln.WriteAll(); err != nil {
+	if err := n.WriteAll(); err != nil {
 		return err
 	}
 
@@ -344,11 +329,11 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 	// 3rd node: 1st and 2nd nodes
 	// ...
 	//
-	bootstrapIDs := make([]string, 0, len(ln.Nodes))
-	bootstrapIPs := make([]string, 0, len(ln.Nodes))
+	bootstrapIDs := make([]string, 0, len(n.Nodes))
+	bootstrapIPs := make([]string, 0, len(n.Nodes))
 
 	// Configure networking and start each node
-	for _, node := range ln.Nodes {
+	for _, node := range n.Nodes {
 		// Update network configuration
 		node.SetNetworkingConfigDefaults(0, 0, bootstrapIDs, bootstrapIPs)
 
@@ -362,7 +347,7 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 		// its staking port. The network will start faster with this
 		// synchronization due to the avoidance of exponential backoff
 		// if a node tries to connect to a beacon that is not ready.
-		if err := node.Start(w, ln.ExecPath); err != nil {
+		if err := node.Start(w, n.ExecPath); err != nil {
 			return err
 		}
 
@@ -375,19 +360,19 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 }
 
 // Wait until all nodes in the network are healthy.
-func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
+func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
 	defer ticker.Stop()
 
-	healthyNodes := set.NewSet[ids.NodeID](len(ln.Nodes))
-	for healthyNodes.Len() < len(ln.Nodes) {
-		for _, node := range ln.Nodes {
+	healthyNodes := set.NewSet[ids.NodeID](len(n.Nodes))
+	for healthyNodes.Len() < len(n.Nodes) {
+		for _, node := range n.Nodes {
 			if healthyNodes.Contains(node.NodeID) {
 				continue
 			}
 
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, tmpnet.ErrNotRunning) {
+			if err != nil && !errors.Is(err, ErrNotRunning) {
 				return err
 			}
 			if !healthy {
@@ -411,14 +396,14 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 
 // Retrieve API URIs for all running primary validator nodes. URIs for
 // ephemeral nodes are not returned.
-func (ln *LocalNetwork) GetURIs() []tmpnet.NodeURI {
-	uris := make([]tmpnet.NodeURI, 0, len(ln.Nodes))
-	for _, node := range ln.Nodes {
+func (n *Network) GetURIs() []NodeURI {
+	uris := make([]NodeURI, 0, len(n.Nodes))
+	for _, node := range n.Nodes {
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it was not running at the time
 		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
-			uris = append(uris, tmpnet.NodeURI{
+			uris = append(uris, NodeURI{
 				NodeID: node.NodeID,
 				URI:    node.URI,
 			})
@@ -428,10 +413,10 @@ func (ln *LocalNetwork) GetURIs() []tmpnet.NodeURI {
 }
 
 // Stop all nodes in the network.
-func (ln *LocalNetwork) Stop() error {
+func (n *Network) Stop() error {
 	var errs []error
 	// Assume the nodes are loaded and the pids are current
-	for _, node := range ln.Nodes {
+	for _, node := range n.Nodes {
 		if err := node.Stop(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
@@ -442,12 +427,12 @@ func (ln *LocalNetwork) Stop() error {
 	return nil
 }
 
-func (ln *LocalNetwork) GetGenesisPath() string {
-	return filepath.Join(ln.Dir, "genesis.json")
+func (n *Network) GetGenesisPath() string {
+	return filepath.Join(n.Dir, "genesis.json")
 }
 
-func (ln *LocalNetwork) ReadGenesis() error {
-	bytes, err := os.ReadFile(ln.GetGenesisPath())
+func (n *Network) ReadGenesis() error {
+	bytes, err := os.ReadFile(n.GetGenesisPath())
 	if err != nil {
 		return fmt.Errorf("failed to read genesis: %w", err)
 	}
@@ -455,107 +440,107 @@ func (ln *LocalNetwork) ReadGenesis() error {
 	if err := json.Unmarshal(bytes, &genesis); err != nil {
 		return fmt.Errorf("failed to unmarshal genesis: %w", err)
 	}
-	ln.Genesis = &genesis
+	n.Genesis = &genesis
 	return nil
 }
 
-func (ln *LocalNetwork) WriteGenesis() error {
-	bytes, err := tmpnet.DefaultJSONMarshal(ln.Genesis)
+func (n *Network) WriteGenesis() error {
+	bytes, err := DefaultJSONMarshal(n.Genesis)
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
 	}
-	if err := os.WriteFile(ln.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
 	return nil
 }
 
-func (ln *LocalNetwork) GetChainConfigDir() string {
-	return filepath.Join(ln.Dir, "chains")
+func (n *Network) GetChainConfigDir() string {
+	return filepath.Join(n.Dir, "chains")
 }
 
-func (ln *LocalNetwork) GetCChainConfigPath() string {
-	return filepath.Join(ln.GetChainConfigDir(), "C", "config.json")
+func (n *Network) GetCChainConfigPath() string {
+	return filepath.Join(n.GetChainConfigDir(), "C", "config.json")
 }
 
-func (ln *LocalNetwork) ReadCChainConfig() error {
-	chainConfig, err := tmpnet.ReadFlagsMap(ln.GetCChainConfigPath(), "C-Chain config")
+func (n *Network) ReadCChainConfig() error {
+	chainConfig, err := ReadFlagsMap(n.GetCChainConfigPath(), "C-Chain config")
 	if err != nil {
 		return err
 	}
-	ln.CChainConfig = *chainConfig
+	n.CChainConfig = *chainConfig
 	return nil
 }
 
-func (ln *LocalNetwork) WriteCChainConfig() error {
-	path := ln.GetCChainConfigPath()
+func (n *Network) WriteCChainConfig() error {
+	path := n.GetCChainConfigPath()
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create C-Chain config dir: %w", err)
 	}
-	return ln.CChainConfig.Write(path, "C-Chain config")
+	return n.CChainConfig.Write(path, "C-Chain config")
 }
 
-// Used to marshal/unmarshal persistent local network defaults.
-type localDefaults struct {
-	Flags         tmpnet.FlagsMap
+// Used to marshal/unmarshal persistent network defaults.
+type networkDefaults struct {
+	Flags         FlagsMap
 	ExecPath      string
 	PreFundedKeys []*secp256k1.PrivateKey
 }
 
-func (ln *LocalNetwork) GetDefaultsPath() string {
-	return filepath.Join(ln.Dir, "defaults.json")
+func (n *Network) GetDefaultsPath() string {
+	return filepath.Join(n.Dir, "defaults.json")
 }
 
-func (ln *LocalNetwork) ReadDefaults() error {
-	bytes, err := os.ReadFile(ln.GetDefaultsPath())
+func (n *Network) ReadDefaults() error {
+	bytes, err := os.ReadFile(n.GetDefaultsPath())
 	if err != nil {
 		return fmt.Errorf("failed to read defaults: %w", err)
 	}
-	defaults := localDefaults{}
+	defaults := networkDefaults{}
 	if err := json.Unmarshal(bytes, &defaults); err != nil {
 		return fmt.Errorf("failed to unmarshal defaults: %w", err)
 	}
-	ln.DefaultFlags = defaults.Flags
-	ln.ExecPath = defaults.ExecPath
-	ln.PreFundedKeys = defaults.PreFundedKeys
+	n.DefaultFlags = defaults.Flags
+	n.ExecPath = defaults.ExecPath
+	n.PreFundedKeys = defaults.PreFundedKeys
 	return nil
 }
 
-func (ln *LocalNetwork) WriteDefaults() error {
-	defaults := localDefaults{
-		Flags:         ln.DefaultFlags,
-		ExecPath:      ln.ExecPath,
-		PreFundedKeys: ln.PreFundedKeys,
+func (n *Network) WriteDefaults() error {
+	defaults := networkDefaults{
+		Flags:         n.DefaultFlags,
+		ExecPath:      n.ExecPath,
+		PreFundedKeys: n.PreFundedKeys,
 	}
-	bytes, err := tmpnet.DefaultJSONMarshal(defaults)
+	bytes, err := DefaultJSONMarshal(defaults)
 	if err != nil {
 		return fmt.Errorf("failed to marshal defaults: %w", err)
 	}
-	if err := os.WriteFile(ln.GetDefaultsPath(), bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(n.GetDefaultsPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write defaults: %w", err)
 	}
 	return nil
 }
 
-func (ln *LocalNetwork) EnvFilePath() string {
-	return filepath.Join(ln.Dir, "network.env")
+func (n *Network) EnvFilePath() string {
+	return filepath.Join(n.Dir, "network.env")
 }
 
-func (ln *LocalNetwork) EnvFileContents() string {
-	return fmt.Sprintf("export %s=%s", NetworkDirEnvName, ln.Dir)
+func (n *Network) EnvFileContents() string {
+	return fmt.Sprintf("export %s=%s", NetworkDirEnvName, n.Dir)
 }
 
 // Write an env file that sets the network dir env when sourced.
-func (ln *LocalNetwork) WriteEnvFile() error {
-	if err := os.WriteFile(ln.EnvFilePath(), []byte(ln.EnvFileContents()), perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write local network env file: %w", err)
+func (n *Network) WriteEnvFile() error {
+	if err := os.WriteFile(n.EnvFilePath(), []byte(n.EnvFileContents()), perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write network env file: %w", err)
 	}
 	return nil
 }
 
-func (ln *LocalNetwork) WriteNodes() error {
-	for _, node := range ln.Nodes {
+func (n *Network) WriteNodes() error {
+	for _, node := range n.Nodes {
 		if err := node.WriteConfig(); err != nil {
 			return err
 		}
@@ -564,42 +549,42 @@ func (ln *LocalNetwork) WriteNodes() error {
 }
 
 // Write network configuration to disk.
-func (ln *LocalNetwork) WriteAll() error {
-	if len(ln.Dir) == 0 {
+func (n *Network) WriteAll() error {
+	if len(n.Dir) == 0 {
 		return errInvalidNetworkDir
 	}
-	if err := ln.WriteGenesis(); err != nil {
+	if err := n.WriteGenesis(); err != nil {
 		return err
 	}
-	if err := ln.WriteCChainConfig(); err != nil {
+	if err := n.WriteCChainConfig(); err != nil {
 		return err
 	}
-	if err := ln.WriteDefaults(); err != nil {
+	if err := n.WriteDefaults(); err != nil {
 		return err
 	}
-	if err := ln.WriteEnvFile(); err != nil {
+	if err := n.WriteEnvFile(); err != nil {
 		return err
 	}
-	return ln.WriteNodes()
+	return n.WriteNodes()
 }
 
 // Read network configuration from disk.
-func (ln *LocalNetwork) ReadConfig() error {
-	if err := ln.ReadGenesis(); err != nil {
+func (n *Network) ReadConfig() error {
+	if err := n.ReadGenesis(); err != nil {
 		return err
 	}
-	if err := ln.ReadCChainConfig(); err != nil {
+	if err := n.ReadCChainConfig(); err != nil {
 		return err
 	}
-	return ln.ReadDefaults()
+	return n.ReadDefaults()
 }
 
 // Read node configuration and process context from disk.
-func (ln *LocalNetwork) ReadNodes() error {
-	nodes := []*LocalNode{}
+func (n *Network) ReadNodes() error {
+	nodes := []*Node{}
 
 	// Node configuration / process context is stored in child directories
-	entries, err := os.ReadDir(ln.Dir)
+	entries, err := os.ReadDir(n.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to read network path: %w", err)
 	}
@@ -608,10 +593,10 @@ func (ln *LocalNetwork) ReadNodes() error {
 			continue
 		}
 
-		nodeDir := filepath.Join(ln.Dir, entry.Name())
+		nodeDir := filepath.Join(n.Dir, entry.Name())
 		node, err := ReadNode(nodeDir)
 		if errors.Is(err, os.ErrNotExist) {
-			// If no config file exists, assume this is not the path of a local node
+			// If no config file exists, assume this is not the path of a node
 			continue
 		} else if err != nil {
 			return err
@@ -620,30 +605,30 @@ func (ln *LocalNetwork) ReadNodes() error {
 		nodes = append(nodes, node)
 	}
 
-	ln.Nodes = nodes
+	n.Nodes = nodes
 
 	return nil
 }
 
 // Read network and node configuration from disk.
-func (ln *LocalNetwork) ReadAll() error {
-	if err := ln.ReadConfig(); err != nil {
+func (n *Network) ReadAll() error {
+	if err := n.ReadConfig(); err != nil {
 		return err
 	}
-	return ln.ReadNodes()
+	return n.ReadNodes()
 }
 
-func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral bool) (*LocalNode, error) {
+func (n *Network) AddNode(w io.Writer, node *Node, isEphemeral bool) (*Node, error) {
 	// Assume network configuration has been written to disk and is current in memory
 
 	if node == nil {
 		// Set an empty data dir so that PopulateNodeConfig will know
 		// to set the default of `[network dir]/[node id]`.
-		node = NewLocalNode("")
+		node = NewNode("")
 	}
 
 	// Default to a data dir of [network-dir]/[node-ID]
-	nodeParentDir := ln.Dir
+	nodeParentDir := n.Dir
 	if isEphemeral {
 		// For an ephemeral node, default to a data dir of [network-dir]/[ephemeral-dir]/[node-ID]
 		// to provide a clear separation between nodes that are expected to expose stable API
@@ -653,14 +638,14 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 		// The data for an ephemeral node is still stored in the file tree rooted at the network
 		// dir to ensure that recursively archiving the network dir in CI will collect all node
 		// data used for a test run.
-		nodeParentDir = filepath.Join(ln.Dir, defaultEphemeralDirName)
+		nodeParentDir = filepath.Join(n.Dir, defaultEphemeralDirName)
 	}
 
-	if err := ln.PopulateNodeConfig(node, nodeParentDir); err != nil {
+	if err := n.PopulateNodeConfig(node, nodeParentDir); err != nil {
 		return nil, err
 	}
 
-	bootstrapIPs, bootstrapIDs, err := ln.GetBootstrapIPsAndIDs()
+	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs()
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +661,7 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 		return nil, err
 	}
 
-	err = node.Start(w, ln.ExecPath)
+	err = node.Start(w, n.ExecPath)
 	if err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
@@ -690,16 +675,16 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 	return node, nil
 }
 
-func (ln *LocalNetwork) GetBootstrapIPsAndIDs() ([]string, []string, error) {
+func (n *Network) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 	// Collect staking addresses of running nodes for use in bootstrapping a node
-	if err := ln.ReadNodes(); err != nil {
-		return nil, nil, fmt.Errorf("failed to read local network nodes: %w", err)
+	if err := n.ReadNodes(); err != nil {
+		return nil, nil, fmt.Errorf("failed to read network nodes: %w", err)
 	}
 	var (
-		bootstrapIPs = make([]string, 0, len(ln.Nodes))
-		bootstrapIDs = make([]string, 0, len(ln.Nodes))
+		bootstrapIPs = make([]string, 0, len(n.Nodes))
+		bootstrapIDs = make([]string, 0, len(n.Nodes))
 	)
-	for _, node := range ln.Nodes {
+	for _, node := range n.Nodes {
 		if len(node.StakingAddress) == 0 {
 			// Node is not running
 			continue
@@ -717,7 +702,7 @@ func (ln *LocalNetwork) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 }
 
 // Returns staker configuration for the given set of nodes.
-func stakersForNodes(networkID uint32, nodes []*LocalNode) ([]genesis.UnparsedStaker, error) {
+func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker, error) {
 	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
 	// will be easier to perform with nodes other than the initial validators since the timing of
 	// staking can be more easily controlled.
