@@ -20,10 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 const (
@@ -84,8 +82,12 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 
 // Defines the configuration required for a tempoary network
 type Network struct {
-	NetworkConfig
 	NodeRuntimeConfig
+
+	Genesis       *genesis.UnparsedConfig
+	CChainConfig  FlagsMap
+	DefaultFlags  FlagsMap
+	PreFundedKeys []*secp256k1.PrivateKey
 
 	// Nodes comprising the network
 	Nodes []*Node
@@ -100,9 +102,7 @@ func (n *Network) AddEphemeralNode(w io.Writer, flags FlagsMap) (*Node, error) {
 		flags = FlagsMap{}
 	}
 	return n.AddNode(w, &Node{
-		NodeConfig: NodeConfig{
-			Flags: flags,
-		},
+		Flags: flags,
 	}, true /* isEphemeral */)
 }
 
@@ -233,27 +233,20 @@ func (n *Network) PopulateNetworkConfig(networkID uint32, nodeCount int, keyCoun
 		}
 	}
 
-	// Assume all the initial nodes are stakers
-	initialStakers, err := stakersForNodes(networkID, n.Nodes)
-	if err != nil {
-		return err
-	}
-
 	if keyCount > 0 {
-		// Ensure there are keys for genesis generation to fund
-		keys := make([]*secp256k1.PrivateKey, 0, keyCount)
-		for i := 0; i < keyCount; i++ {
-			key, err := secp256k1.NewPrivateKey()
-			if err != nil {
-				return fmt.Errorf("failed to generate private key: %w", err)
-			}
-			keys = append(keys, key)
+		keys, err := NewPrivateKeys(keyCount)
+		if err != nil {
+			return err
 		}
 		n.PreFundedKeys = keys
 	}
 
-	if err := n.EnsureGenesis(networkID, initialStakers); err != nil {
-		return err
+	if n.Genesis == nil {
+		genesis, err := NewTestGenesis(networkID, n.Nodes, n.PreFundedKeys)
+		if err != nil {
+			return err
+		}
+		n.Genesis = genesis
 	}
 
 	if n.CChainConfig == nil {
@@ -335,7 +328,7 @@ func (n *Network) Start(w io.Writer) error {
 	// Configure networking and start each node
 	for _, node := range n.Nodes {
 		// Update network configuration
-		node.SetNetworkingConfigDefaults(0, 0, bootstrapIDs, bootstrapIPs)
+		node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
 
 		// Write configuration to disk in preparation for node start
 		if err := node.WriteConfig(); err != nil {
@@ -649,13 +642,7 @@ func (n *Network) AddNode(w io.Writer, node *Node, isEphemeral bool) (*Node, err
 	if err != nil {
 		return nil, err
 	}
-
-	var (
-		// Use dynamic port allocation.
-		httpPort    uint16 = 0
-		stakingPort uint16 = 0
-	)
-	node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
+	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
 
 	if err := node.WriteConfig(); err != nil {
 		return nil, err
@@ -699,32 +686,4 @@ func (n *Network) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
-}
-
-// Returns staker configuration for the given set of nodes.
-func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker, error) {
-	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
-	// will be easier to perform with nodes other than the initial validators since the timing of
-	// staking can be more easily controlled.
-	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to format reward address: %w", err)
-	}
-
-	// Configure provided nodes as initial stakers
-	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
-	for i, node := range nodes {
-		pop, err := node.GetProofOfPossession()
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive proof of possession: %w", err)
-		}
-		initialStakers[i] = genesis.UnparsedStaker{
-			NodeID:        node.NodeID,
-			RewardAddress: rewardAddr,
-			DelegationFee: .01 * reward.PercentDenominator,
-			Signer:        pop,
-		}
-	}
-
-	return initialStakers, nil
 }
