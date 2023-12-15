@@ -63,7 +63,7 @@ func AdvanceTimeTo(
 	backend *Backend,
 	parentState state.Chain,
 	newChainTime time.Time,
-) (uint64, error) {
+) (bool, error) {
 	// We promote pending stakers to current stakers first and remove
 	// completed stakers from the current staker set. We assume that any
 	// promoted staker will not immediately be removed from the current staker
@@ -74,14 +74,14 @@ func AdvanceTimeTo(
 
 	changes, err := state.NewDiffOn(parentState)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 
-	numChanges := uint64(0)
+	changed := false
 
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 	defer pendingStakerIterator.Release()
 
@@ -99,18 +99,18 @@ func AdvanceTimeTo(
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
 			changes.PutCurrentValidator(&stakerToAdd)
 			changes.DeletePendingValidator(stakerToRemove)
-			numChanges += 2
+			changed = true
 			continue
 		}
 
 		supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
 		if err != nil {
-			return 0, err
+			return false, err
 		}
 
 		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
 		if err != nil {
-			return 0, err
+			return false, err
 		}
 
 		potentialReward := rewards.Calculate(
@@ -128,22 +128,22 @@ func AdvanceTimeTo(
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
 			changes.PutCurrentValidator(&stakerToAdd)
 			changes.DeletePendingValidator(stakerToRemove)
-			numChanges += 2
+			changed = true
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
 			changes.PutCurrentDelegator(&stakerToAdd)
 			changes.DeletePendingDelegator(stakerToRemove)
-			numChanges += 2
+			changed = true
 
 		default:
-			return 0, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
+			return false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
 	}
 
 	// Remove any current stakers whose [EndTime] <= [newChainTime].
 	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 	defer currentStakerIterator.Release()
 
@@ -162,17 +162,16 @@ func AdvanceTimeTo(
 		}
 
 		changes.DeleteCurrentValidator(stakerToRemove)
-		numChanges += 1
+		changed = true
 	}
 
 	if err := changes.Apply(parentState); err != nil {
-		return 0, err
+		return false, err
 	}
 
-	// Note: [numChanges] does not count the timestamp change.
 	parentState.SetTimestamp(newChainTime)
 
-	return numChanges, nil
+	return changed, nil
 }
 
 func GetRewardsCalculator(
