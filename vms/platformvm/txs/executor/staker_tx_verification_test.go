@@ -304,7 +304,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
-				state.EXPECT().GetTimestamp().Return(time.Unix(1, 0)) // must be after durango forkmockState.EXPECT().GetTimestamp().Return(now) // must be after durango fork
+				state.EXPECT().GetTimestamp().Return(time.Unix(1, 0)) // must be after durango fork
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return state
 			},
