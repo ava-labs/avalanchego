@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/local"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
 type FlagVars struct {
@@ -24,7 +24,7 @@ func (v *FlagVars) NetworkDir() string {
 	if len(v.networkDir) > 0 {
 		return v.networkDir
 	}
-	return os.Getenv(local.NetworkDirEnvName)
+	return os.Getenv(tmpnet.NetworkDirEnvName)
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -40,14 +40,14 @@ func RegisterFlags() *FlagVars {
 	flag.StringVar(
 		&vars.avalancheGoExecPath,
 		"avalanchego-path",
-		os.Getenv(local.AvalancheGoPathEnvName),
-		fmt.Sprintf("avalanchego executable path (required if not using an existing network). Also possible to configure via the %s env variable.", local.AvalancheGoPathEnvName),
+		os.Getenv(tmpnet.AvalancheGoPathEnvName),
+		fmt.Sprintf("avalanchego executable path (required if not using an existing network). Also possible to configure via the %s env variable.", tmpnet.AvalancheGoPathEnvName),
 	)
 	flag.StringVar(
 		&vars.networkDir,
 		"network-dir",
 		"",
-		fmt.Sprintf("[optional] the dir containing the configuration of an existing network to target for testing. Will only be used if --use-existing-network is specified. Also possible to configure via the %s env variable.", local.NetworkDirEnvName),
+		fmt.Sprintf("[optional] the dir containing the configuration of an existing network to target for testing. Will only be used if --use-existing-network is specified. Also possible to configure via the %s env variable.", tmpnet.NetworkDirEnvName),
 	)
 	flag.BoolVar(
 		&vars.useExistingNetwork,
