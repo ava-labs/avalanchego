@@ -334,20 +334,26 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 
 	var (
-		nextStartTime   time.Time
-		parentTimestamp = blk.Timestamp()
+		childBlockHeight = blk.Height() + 1
+		parentTimestamp  = blk.Timestamp()
+		nextStartTime    time.Time
 	)
 	if vm.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
 		nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
-			blk.Height()+1,
+			childBlockHeight,
 			pChainHeight,
 			proposer.TimeToSlot(parentTimestamp, currentTime),
 			parentTimestamp,
 		)
 	} else {
-		nextStartTime, err = vm.getPreDurangoSlotTime(ctx, blk, pChainHeight)
+		nextStartTime, err = vm.getPreDurangoSlotTime(
+			ctx,
+			childBlockHeight,
+			pChainHeight,
+			parentTimestamp,
+		)
 	}
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
@@ -372,10 +378,11 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 
 func (vm *VM) getPreDurangoSlotTime(
 	ctx context.Context,
-	blk PostForkBlock,
+	blkHeight,
 	pChainHeight uint64,
+	parentTimestamp time.Time,
 ) (time.Time, error) {
-	delay, err := vm.Windower.Delay(ctx, blk.Height()+1, pChainHeight, vm.ctx.NodeID, proposer.MaxBuildWindows)
+	delay, err := vm.Windower.Delay(ctx, blkHeight, pChainHeight, vm.ctx.NodeID, proposer.MaxBuildWindows)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -387,7 +394,6 @@ func (vm *VM) getPreDurangoSlotTime(
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the subnet config.
 	delay = math.Max(delay, vm.MinBlkDelay)
-	parentTimestamp := blk.Timestamp()
 	return parentTimestamp.Add(delay), nil
 }
 
