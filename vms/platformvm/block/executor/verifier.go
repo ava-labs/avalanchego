@@ -124,7 +124,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 
 	// If this block doesn't perform any changes, then it should never have been
 	// issued.
-	if changed && len(b.Transactions) == 0 {
+	if !changed && len(b.Transactions) == 0 {
 		return errBanffStandardBlockWithoutChanges
 	}
 
