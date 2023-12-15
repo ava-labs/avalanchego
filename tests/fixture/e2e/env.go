@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -29,10 +30,9 @@ var Env *TestEnvironment
 func InitSharedTestEnvironment(envBytes []byte) {
 	require := require.New(ginkgo.GinkgoT())
 	require.Nil(Env, "env already initialized")
-	Env = &TestEnvironment{
-		require: require,
-	}
+	Env = &TestEnvironment{}
 	require.NoError(json.Unmarshal(envBytes, Env))
+	Env.require = require
 }
 
 type TestEnvironment struct {
@@ -53,7 +53,7 @@ func (te *TestEnvironment) Marshal() []byte {
 }
 
 // Initialize a new test environment with a shared network (either pre-existing or newly created).
-func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
+func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(ginkgo.GinkgoT())
 
 	networkDir := flagVars.NetworkDir()
@@ -65,9 +65,24 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 		network, err = tmpnet.ReadNetwork(networkDir)
 		require.NoError(err)
 		tests.Outf("{{yellow}}Using an existing network configured at %s{{/}}\n", network.Dir)
+
+		// Set the desired subnet configuration to ensure subsequent creation.
+		for _, subnet := range desiredNetwork.Subnets {
+			if existing := network.GetSubnet(subnet.Name); existing != nil {
+				// Already present
+				continue
+			}
+			network.Subnets = append(network.Subnets, subnet)
+		}
 	} else {
-		network = StartNetwork(flagVars.AvalancheGoExecPath(), DefaultNetworkDir)
+		network = desiredNetwork
+		StartNetwork(network, DefaultNetworkDir, flagVars.AvalancheGoExecPath(), flagVars.PluginDir())
 	}
+
+	// A new network will always need subnet creation and an existing
+	// network will also need subnets to be created the first time it
+	// is used.
+	require.NoError(network.CreateSubnets(DefaultContext(), ginkgo.GinkgoWriter))
 
 	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")
@@ -83,6 +98,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 		NetworkDir:        network.Dir,
 		URIs:              uris,
 		TestDataServerURI: testDataServerURI,
+		require:           require,
 	}
 }
 
@@ -127,10 +143,22 @@ func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
 	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
 	te.require.NoError(err)
 
+	network := &tmpnet.Network{}
+
 	// The private networks dir is under the shared network dir to ensure it
 	// will be included in the artifact uploaded in CI.
 	privateNetworksDir := filepath.Join(sharedNetwork.Dir, PrivateNetworksDirName)
 	te.require.NoError(os.MkdirAll(privateNetworksDir, perms.ReadWriteExecute))
 
-	return StartNetwork(sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath, privateNetworksDir)
+	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)
+	te.require.NoError(err)
+
+	StartNetwork(
+		network,
+		privateNetworksDir,
+		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
+		pluginDir,
+	)
+
+	return network
 }

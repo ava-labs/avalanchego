@@ -87,3 +87,12 @@ func NewPrivateKeys(keyCount int) ([]*secp256k1.PrivateKey, error) {
 	}
 	return keys, nil
 }
+
+func GetVMID(vmName string) (ids.ID, error) {
+	if len(vmName) > 32 {
+		return ids.Empty, fmt.Errorf("VM name must be <= 32 bytes, found %d", len(vmName))
+	}
+	b := make([]byte, 32)
+	copy(b, []byte(vmName))
+	return ids.ToID(b)
+}

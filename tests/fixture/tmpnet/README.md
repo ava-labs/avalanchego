@@ -34,6 +34,7 @@ the following non-test files:
 | node.go           | Node        | Orchestrates and configures nodes              |
 | node_config.go    | Node        | Reads and writes node configuration            |
 | node_process.go   | NodeProcess | Orchestrates node processes                    |
+| subnet.go         | Subnet      | Orchestrates subnets                           |
 | utils.go          |             | Defines shared utility functions               |
 
 ## Usage
@@ -103,6 +104,10 @@ avalanchego on node start. The use of dynamic ports supports testing
 with many temporary networks without having to manually select compatible
 port ranges.
 
+## Subnet configuration
+
+TODO(marun)
+
 ## Configuration on disk
 
 A temporary network relies on configuration written to disk in the following structure:
@@ -125,11 +130,16 @@ HOME
             │   │   └── ...
             │   └── process.json                         // Node process details (PID, API URI, staking address)
             ├── chains
-            │   └── C
-            │       └── config.json                      // C-Chain config for all nodes
+            │   ├── C
+            │   │   └── config.json                      // C-Chain config for all nodes
+            │   └── raZ51bwfepaSaZ1MNSRNYNs3ZPfj...U7pa3
+            │       └── config.json                      // Custom chain configuration for all nodes
             ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
-            └── network.env                              // Sets network dir env var to simplify network usage
+            ├── network.env                              // Sets network dir env var to simplify network usage
+            └── subnets                                  // Parent directory for subnet definitions
+                ├─ subnet-a.json                         // Configuration for subnet-a and its chain(s)
+                └─ subnet-b.json                         // Configuration for subnet-b and its chain(s)
 ```
 
 ### Common networking configuration
