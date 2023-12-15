@@ -69,7 +69,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 		network = StartNetwork(flagVars.AvalancheGoExecPath(), DefaultNetworkDir)
 	}
 
-	uris := network.GetURIs()
+	uris := tmpnet.GetNodeURIs(network.Nodes)
 	require.NotEmpty(uris, "network contains no nodes")
 	tests.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
 
