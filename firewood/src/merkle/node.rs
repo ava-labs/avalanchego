@@ -722,6 +722,7 @@ pub trait BinarySerde {
     ) -> Result<T, Self::DeserializeError>;
 }
 
+#[derive(Default)]
 pub struct Bincode(pub bincode::DefaultOptions);
 
 impl Debug for Bincode {
@@ -750,6 +751,7 @@ impl BinarySerde for Bincode {
     }
 }
 
+#[derive(Default)]
 pub struct PlainCodec(pub bincode::DefaultOptions);
 
 impl Debug for PlainCodec {
