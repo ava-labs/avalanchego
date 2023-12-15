@@ -156,12 +156,12 @@ func (abi ABI) PackOutput(name string, args ...interface{}) ([]byte, error) {
 }
 
 // getInputs gets input arguments of the given [name] method.
-func (abi ABI) getInputs(name string, data []byte) (Arguments, error) {
+func (abi ABI) getInputs(name string, data []byte, useStrictMode bool) (Arguments, error) {
 	// since there can't be naming collisions with contracts and events,
 	// we need to decide whether we're calling a method or an event
 	var args Arguments
 	if method, ok := abi.Methods[name]; ok {
-		if len(data)%32 != 0 {
+		if useStrictMode && len(data)%32 != 0 {
 			return nil, fmt.Errorf("abi: improperly formatted input: %s - Bytes: [%+v]", string(data), data)
 		}
 		args = method.Inputs
@@ -196,8 +196,8 @@ func (abi ABI) getArguments(name string, data []byte) (Arguments, error) {
 }
 
 // UnpackInput unpacks the input according to the ABI specification.
-func (abi ABI) UnpackInput(name string, data []byte) ([]interface{}, error) {
-	args, err := abi.getInputs(name, data)
+func (abi ABI) UnpackInput(name string, data []byte, useStrictMode bool) ([]interface{}, error) {
+	args, err := abi.getInputs(name, data, useStrictMode)
 	if err != nil {
 		return nil, err
 	}
@@ -216,8 +216,8 @@ func (abi ABI) Unpack(name string, data []byte) ([]interface{}, error) {
 // UnpackInputIntoInterface unpacks the input in v according to the ABI specification.
 // It performs an additional copy. Please only use, if you want to unpack into a
 // structure that does not strictly conform to the ABI structure (e.g. has additional arguments)
-func (abi ABI) UnpackInputIntoInterface(v interface{}, name string, data []byte) error {
-	args, err := abi.getInputs(name, data)
+func (abi ABI) UnpackInputIntoInterface(v interface{}, name string, data []byte, useStrictMode bool) error {
+	args, err := abi.getInputs(name, data, useStrictMode)
 	if err != nil {
 		return err
 	}
