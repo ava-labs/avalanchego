@@ -139,7 +139,7 @@ func (vm *VM) Initialize(
 		vm.db,
 		genesisBytes,
 		registerer,
-		vm.Config.Validators,
+		&vm.Config,
 		execConfig,
 		vm.ctx,
 		vm.metrics,
