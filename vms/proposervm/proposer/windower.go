@@ -221,26 +221,11 @@ func (w *windower) makeSampler(
 	pChainHeight uint64,
 	source sampler.Source,
 ) (sampler.WeightedWithoutReplacement, []validatorData, error) {
-	validators, err := w.sortedValidators(ctx, pChainHeight)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	weights := make([]uint64, len(validators))
-	for i, validator := range validators {
-		weights[i] = validator.weight
-	}
-
-	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
-	return sampler, validators, sampler.Initialize(weights)
-}
-
-// Get the canconical representation of the validator set at the provided
-// p-chain height.
-func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([]validatorData, error) {
+	// Get the canconical representation of the validator set at the provided
+	// p-chain height.
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	validators := make([]validatorData, 0, len(validatorsMap))
@@ -255,7 +240,13 @@ func (w *windower) sortedValidators(ctx context.Context, pChainHeight uint64) ([
 	// canonically sorted list.
 	utils.Sort(validators)
 
-	return validators, nil
+	weights := make([]uint64, len(validators))
+	for i, validator := range validators {
+		weights[i] = validator.weight
+	}
+
+	sampler := sampler.NewDeterministicWeightedWithoutReplacement(source)
+	return sampler, validators, sampler.Initialize(weights)
 }
 
 func (w *windower) expectedProposer(
