@@ -245,10 +245,13 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 		var cred *secp256k1fx.Credential
 		switch credImpl := credIntf.(type) {
 		case *secp256k1fx.Credential:
+			fxCred.FxID = secp256k1fx.ID
 			cred = credImpl
 		case *nftfx.Credential:
+			fxCred.FxID = nftfx.ID
 			cred = &credImpl.Credential
 		case *propertyfx.Credential:
+			fxCred.FxID = propertyfx.ID
 			cred = &credImpl.Credential
 		default:
 			return errUnknownCredentialType
