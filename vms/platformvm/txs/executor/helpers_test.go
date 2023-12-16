@@ -119,12 +119,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
+func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina)
-	clk := defaultClock(postBanff || postCortina)
+	config := defaultConfig(postBanff, postCortina, postDurango)
+	clk := defaultClock(postBanff || postCortina || postDurango)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx, msm := defaultCtx(baseDB)
@@ -215,6 +215,7 @@ func addSubnet(
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(
@@ -280,7 +281,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig(postBanff, postCortina bool) *config.Config {
+func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 	banffTime := mockable.MaxTime
 	if postBanff {
 		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
@@ -288,6 +289,10 @@ func defaultConfig(postBanff, postCortina bool) *config.Config {
 	cortinaTime := mockable.MaxTime
 	if postCortina {
 		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+	}
+	durangoTime := mockable.MaxTime
+	if postDurango {
+		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
 	}
 
 	return &config.Config{
@@ -312,6 +317,7 @@ func defaultConfig(postBanff, postCortina bool) *config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
+		DurangoTime:       durangoTime,
 	}
 }
 
