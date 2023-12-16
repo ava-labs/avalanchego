@@ -19,6 +19,15 @@ const (
 	DefaultNetworkStartTimeout = 2 * time.Minute
 	DefaultNodeInitTimeout     = 10 * time.Second
 	DefaultNodeStopTimeout     = 5 * time.Second
+
+	// Minimum required to ensure connectivity-based health checks will pass
+	DefaultNodeCount = 2
+
+	// Arbitrary number of pre-funded keys to create by default
+	DefaultPreFundedKeyCount = 50
+
+	// A short minimum stake duration enables testing of staking logic.
+	DefaultMinStakeDuration = time.Second
 )
 
 // A set of flags appropriate for testing.
