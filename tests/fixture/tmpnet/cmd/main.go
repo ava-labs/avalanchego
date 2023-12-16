@@ -83,8 +83,8 @@ func main() {
 				return err
 			}
 
-			fmt.Fprintf(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:")
-			fmt.Fprintf(os.Stdout, "\n - source %s\n", network.EnvFilePath())
+			fmt.Fprintf(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:\n")
+			fmt.Fprintf(os.Stdout, " - source %s\n", network.EnvFilePath())
 			fmt.Fprintf(os.Stdout, " - %s\n", network.EnvFileContents())
 			fmt.Fprintf(os.Stdout, " - export %s=%s\n", tmpnet.NetworkDirEnvName, latestSymlinkPath)
 
