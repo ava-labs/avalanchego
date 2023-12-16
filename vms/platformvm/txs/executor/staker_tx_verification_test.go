@@ -302,7 +302,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
 					Config: &config.Config{
-						DurangoTime: time.Time{}, // activate latest fork
+						DurangoTime: activeForkTime, // activate latest fork
 					},
 					Bootstrapped: bootstrapped,
 				}
