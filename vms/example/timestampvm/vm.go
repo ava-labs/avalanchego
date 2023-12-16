@@ -443,7 +443,7 @@ func (*VM) AppResponse(_ context.Context, _ ids.NodeID, _ uint32, _ []byte) erro
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (*VM) AppRequestFailed(_ context.Context, _ ids.NodeID, _ uint32) error {
+func (*VM) AppRequestFailed(_ context.Context, _ ids.NodeID, _ uint32, _ *common.AppError) error {
 	return nil
 }
 
@@ -451,7 +451,7 @@ func (*VM) CrossChainAppRequest(_ context.Context, _ ids.ID, _ uint32, _ time.Ti
 	return nil
 }
 
-func (*VM) CrossChainAppRequestFailed(_ context.Context, _ ids.ID, _ uint32) error {
+func (*VM) CrossChainAppRequestFailed(_ context.Context, _ ids.ID, _ uint32, _ *common.AppError) error {
 	return nil
 }
 
