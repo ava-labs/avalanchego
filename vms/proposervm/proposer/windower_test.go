@@ -333,6 +333,27 @@ func TestMinDelayForProposer(t *testing.T) {
 	}
 }
 
+func BenchmarkMinDelayForProposer(b *testing.B) {
+	require := require.New(b)
+
+	_, vdrState := makeValidators(b, 10)
+	w := New(vdrState, subnetID, fixedChainID)
+
+	var (
+		dummyCtx            = context.Background()
+		pChainHeight uint64 = 0
+		chainHeight  uint64 = 1
+		nodeID              = ids.GenerateTestNodeID() // Ensure to exhaust the search
+		slot         uint64 = 0
+	)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot)
+		require.NoError(err)
+	}
+}
+
 func TestTimeToSlot(t *testing.T) {
 	parentTime := time.Now()
 	tests := []struct {
@@ -419,7 +440,7 @@ func TestProposerDistribution(t *testing.T) {
 	require.Less(maxSTDDeviation, 3.)
 }
 
-func makeValidators(t *testing.T, count int) ([]ids.NodeID, *validators.TestState) {
+func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validators.TestState) {
 	validatorIDs := make([]ids.NodeID, count)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})

@@ -81,7 +81,7 @@ type Windower interface {
 	// [MinDelayForProposer] specifies how long [nodeID] needs to wait for its
 	// slot to start. Delay is specified as starting from slot zero start.
 	// (which is parent timestamp). For efficiency reasons, we cap the slot
-	// search to [MaxLookAheadWindow] slots.
+	// search to [MaxLookAheadSlots].
 	MinDelayForProposer(
 		ctx context.Context,
 		blockHeight,
