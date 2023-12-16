@@ -14,15 +14,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/local"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 const cliVersion = "0.0.1"
 
 var (
-	errAvalancheGoRequired = fmt.Errorf("--avalanchego-path or %s are required", local.AvalancheGoPathEnvName)
-	errNetworkDirRequired  = fmt.Errorf("--network-dir or %s are required", local.NetworkDirEnvName)
+	errAvalancheGoRequired = fmt.Errorf("--avalanchego-path or %s are required", tmpnet.AvalancheGoPathEnvName)
+	errNetworkDirRequired  = fmt.Errorf("--network-dir or %s are required", tmpnet.NetworkDirEnvName)
 )
 
 func main() {
@@ -53,7 +52,7 @@ func main() {
 	)
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network",
-		Short: "Start a new local network",
+		Short: "Start a new temporary network",
 		RunE: func(*cobra.Command, []string) error {
 			if len(execPath) == 0 {
 				return errAvalancheGoRequired
@@ -61,14 +60,14 @@ func main() {
 
 			// Root dir will be defaulted on start if not provided
 
-			network := &local.LocalNetwork{
-				LocalConfig: local.LocalConfig{
+			network := &tmpnet.Network{
+				NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
 					ExecPath: execPath,
 				},
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), local.DefaultNetworkStartTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkStartTimeout)
 			defer cancel()
-			network, err := local.StartNetwork(ctx, os.Stdout, rootDir, network, int(nodeCount), int(preFundedKeyCount))
+			network, err := tmpnet.StartNetwork(ctx, os.Stdout, rootDir, network, int(nodeCount), int(preFundedKeyCount))
 			if err != nil {
 				return err
 			}
@@ -87,13 +86,13 @@ func main() {
 			fmt.Fprintf(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:")
 			fmt.Fprintf(os.Stdout, "\n - source %s\n", network.EnvFilePath())
 			fmt.Fprintf(os.Stdout, " - %s\n", network.EnvFileContents())
-			fmt.Fprintf(os.Stdout, " - export %s=%s\n", local.NetworkDirEnvName, latestSymlinkPath)
+			fmt.Fprintf(os.Stdout, " - export %s=%s\n", tmpnet.NetworkDirEnvName, latestSymlinkPath)
 
 			return nil
 		},
 	}
-	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
-	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(local.AvalancheGoPathEnvName), "The path to an avalanchego binary")
+	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
+	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
 	startNetworkCmd.PersistentFlags().Uint8Var(&preFundedKeyCount, "pre-funded-key-count", tmpnet.DefaultPreFundedKeyCount, "Number of pre-funded keys the network should start with")
 	rootCmd.AddCommand(startNetworkCmd)
@@ -101,19 +100,19 @@ func main() {
 	var networkDir string
 	stopNetworkCmd := &cobra.Command{
 		Use:   "stop-network",
-		Short: "Stop a local network",
+		Short: "Stop a temporary network",
 		RunE: func(*cobra.Command, []string) error {
 			if len(networkDir) == 0 {
 				return errNetworkDirRequired
 			}
-			if err := local.StopNetwork(networkDir); err != nil {
+			if err := tmpnet.StopNetwork(networkDir); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stdout, "Stopped network configured at: %s\n", networkDir)
 			return nil
 		},
 	}
-	stopNetworkCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(local.NetworkDirEnvName), "The path to the configuration directory of a local network")
+	stopNetworkCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(tmpnet.NetworkDirEnvName), "The path to the configuration directory of a temporary network")
 	rootCmd.AddCommand(stopNetworkCmd)
 
 	if err := rootCmd.Execute(); err != nil {
