@@ -53,8 +53,6 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.DurangoTime = mockable.MaxTime
-
 	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
@@ -472,8 +470,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.DurangoTime = mockable.MaxTime
-
 	nodeID := ids.GenerateTestNodeID()
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
@@ -681,8 +677,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
@@ -998,8 +992,6 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
@@ -1443,8 +1435,6 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.DurangoTime = mockable.MaxTime
-
 	subnetID := testSubnet1.TxID
 
 	// setup time
@@ -1727,8 +1717,6 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.DurangoTime = mockable.MaxTime
-
 	// setup time
 	currentTime := defaultGenesisTime
 	vm.clock.Set(currentTime)
@@ -1887,8 +1875,6 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	subnetID := testSubnet1.TxID
 
@@ -2100,8 +2086,6 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.DurangoTime = mockable.MaxTime
 
 	subnetID := testSubnet1.TxID
 
