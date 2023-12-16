@@ -322,7 +322,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 
 				// Note the duration is more than the maximum
-				tx.Validator.End = 2 + uint64(unsignedTransformTx.MaxStakeDuration) + 1
+				tx.Validator.End = uint64(unsignedTransformTx.MaxStakeDuration) + 2
 				return &tx
 			},
 			expectedErr: ErrStakeTooLong,
