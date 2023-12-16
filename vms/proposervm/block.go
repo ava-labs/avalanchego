@@ -142,7 +142,8 @@ func (p *postForkCommonComponents) Verify(
 			)
 		}
 
-		shouldHaveProposer := true // post Durango this is always the case
+		// After Durango, we never allow unsigned blocks.
+		shouldHaveProposer := true
 		if p.vm.IsDurangoActivated(parentTimestamp) {
 			err := p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 			if err != nil {
