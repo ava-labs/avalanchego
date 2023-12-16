@@ -73,7 +73,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t)
+	vm, _, mutableSharedMemory := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -400,7 +400,7 @@ func TestGetBalance(t *testing.T) {
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t)
-	for _, utxo := range genesis.UTXOs {
+	for idx, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
 				fmt.Sprintf("P-%s", utxo.Address),
@@ -409,9 +409,14 @@ func TestGetBalance(t *testing.T) {
 		reply := GetBalanceResponse{}
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
-
-		require.Equal(json.Uint64(defaultBalance), reply.Balance)
-		require.Equal(json.Uint64(defaultBalance), reply.Unlocked)
+		balance := defaultBalance
+		if idx == 0 {
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			balance = defaultBalance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
+		}
+		require.Equal(json.Uint64(balance), reply.Balance)
+		require.Equal(json.Uint64(balance), reply.Unlocked)
 		require.Equal(json.Uint64(0), reply.LockedStakeable)
 		require.Equal(json.Uint64(0), reply.LockedNotStakeable)
 	}
@@ -495,11 +500,12 @@ func TestGetStake(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesisNodeIDs[0]
-	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
+	delegatorStartTime := defaultValidateStartTime
+	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		uint64(defaultGenesisTime.Unix()),
-		delegatorEndTime,
+		uint64(delegatorStartTime.Unix()),
+		uint64(delegatorEndTime.Unix()),
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -511,7 +517,7 @@ func TestGetStake(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -629,15 +635,15 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := genesisNodeIDs[1]
-	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
-	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
+	delegatorStartTime := defaultValidateStartTime
+	delegatorEndTime := delegatorStartTime.Add(defaultMinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 
 	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		delegatorStartTime,
-		delegatorEndTime,
+		uint64(delegatorStartTime.Unix()),
+		uint64(delegatorEndTime.Unix()),
 		validatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -649,7 +655,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -691,8 +697,8 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
-		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
-		require.Equal(uint64(delegator.EndTime), delegatorEndTime)
+		require.Equal(int64(delegator.StartTime), delegatorStartTime.Unix())
+		require.Equal(int64(delegator.EndTime), delegatorEndTime.Unix())
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
 	require.True(found)
