@@ -268,9 +268,9 @@ func (w *windower) expectedProposer(
 	return validators[indices[0]].id, nil
 }
 
-func TimeToSlot(baseTime, targetTime time.Time) uint64 {
-	if targetTime.Before(baseTime) {
+func TimeToSlot(start, now time.Time) uint64 {
+	if now.Before(start) {
 		return 0
 	}
-	return uint64(targetTime.Sub(baseTime) / WindowDuration)
+	return uint64(now.Sub(start) / WindowDuration)
 }
