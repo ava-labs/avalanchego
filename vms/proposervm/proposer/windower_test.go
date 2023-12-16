@@ -384,6 +384,11 @@ func TestProposerDistribution(t *testing.T) {
 	)
 
 	proposerFrequency := make(map[ids.NodeID]int)
+	for _, validatorID := range validatorIDs {
+		// Initialize the map to 0s to include validators that are never sampled
+		// in the analysis.
+		proposerFrequency[validatorID] = 0
+	}
 	for chainHeight := uint64(0); chainHeight < numChainHeights; chainHeight++ {
 		for slot := uint64(0); slot < numSlots; slot++ {
 			proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
