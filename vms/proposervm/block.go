@@ -434,6 +434,9 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 
 	// We need to reschedule the block builder to the next time we can try to
 	// build a block.
+	//
+	// TODO: After Durango activates, restructure this logic to separate
+	// updating the scheduler from verifying the proposerID.
 	nextStartTime, err := p.vm.getPostDurangoSlotTime(
 		ctx,
 		parentHeight+1,
