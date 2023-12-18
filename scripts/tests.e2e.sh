@@ -27,6 +27,10 @@ go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
 ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
+# Enable subnet testing
+./scripts/build_timestampvm.sh
+echo ""
+
 #################################
 # Since TMPNET_NETWORK_DIR may be set in the environment (e.g. to configure ginkgo
 # or tmpnetctl), configuring the use of an existing network with this script
@@ -60,4 +64,5 @@ fi
 
 #################################
 # - Execute in random order to identify unwanted dependency
+echo ""
 ginkgo ${GINKGO_ARGS} -v --randomize-all ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"
