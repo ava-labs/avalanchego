@@ -67,10 +67,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 
 	// Ensure that the period this validator validates the specified subnet
 	// is a subset of the time they validate the primary network.
-	var (
-		currentChainTime = chainState.GetTimestamp()
-		startTime        = currentChainTime
-	)
+	startTime := chainState.GetTimestamp()
 	if !isDurangoActive {
 		startTime = subnetValidator.StartTime()
 	}
@@ -354,12 +351,13 @@ func verifyAddDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		endTime          = tx.EndTime()
 		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
 		startTime = tx.StartTime()
 	}
-	duration := tx.EndTime().Sub(startTime)
+	duration := endTime.Sub(startTime)
 
 	switch {
 	case duration < backend.Config.MinStakeDuration:
@@ -405,27 +403,22 @@ func verifyAddDelegatorTx(
 		maximumWeight = safemath.Min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
-	txID := sTx.ID()
-	var newStaker *state.Staker
-	if isDurangoActive {
-		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
-	} else {
-		newStaker, err = state.NewPendingStaker(txID, tx)
-	}
-	if err != nil {
-		return nil, err
-	}
-
 	if !txs.BoundedBy(
-		newStaker.StartTime,
-		newStaker.EndTime,
+		startTime,
+		endTime,
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
 		return nil, ErrPeriodMismatch
 	}
-	overDelegated, err := overDelegated(chainState, primaryNetworkValidator, maximumWeight, newStaker)
+	overDelegated, err := overDelegated(
+		chainState,
+		primaryNetworkValidator,
+		maximumWeight,
+		tx.Validator.Wght,
+		startTime,
+		endTime,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -592,12 +585,13 @@ func verifyAddPermissionlessDelegatorTx(
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+		endTime          = tx.EndTime()
 		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
 		startTime = tx.StartTime()
 	}
-	duration := tx.EndTime().Sub(startTime)
+	duration := endTime.Sub(startTime)
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
@@ -651,27 +645,22 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 	maximumWeight = safemath.Min(maximumWeight, delegatorRules.maxValidatorStake)
 
-	txID := sTx.ID()
-	var newStaker *state.Staker
-	if isDurangoActive {
-		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
-	} else {
-		newStaker, err = state.NewPendingStaker(txID, tx)
-	}
-	if err != nil {
-		return err
-	}
-
 	if !txs.BoundedBy(
-		newStaker.StartTime,
-		newStaker.EndTime,
+		startTime,
+		endTime,
 		validator.StartTime,
 		validator.EndTime,
 	) {
 		return ErrPeriodMismatch
 	}
-	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
+	overDelegated, err := overDelegated(
+		chainState,
+		validator,
+		maximumWeight,
+		tx.Validator.Wght,
+		startTime,
+		endTime,
+	)
 	if err != nil {
 		return err
 	}

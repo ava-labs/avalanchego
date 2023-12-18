@@ -24,8 +24,9 @@ import (
 var (
 	_ txs.Visitor = (*StandardTxExecutor)(nil)
 
-	errEmptyNodeID              = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
 )
 
 type StandardTxExecutor struct {
@@ -546,18 +547,16 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 		// Pre-Durango, stakers set a future [StartTime] and are added to the
 		// pending staker set. They are promoted to the current staker set once
 		// the chain time reaches [StartTime].
-		staker, err = state.NewPendingStaker(txID, stakerTx.(txs.ScheduledStaker))
+		scheduledStakerTx, ok := stakerTx.(txs.ScheduledStaker)
+		if !ok {
+			return fmt.Errorf("%w: %T", errMissingStartTimePreDurango, stakerTx)
+		}
+		staker, err = state.NewPendingStaker(txID, scheduledStakerTx)
 	} else {
-		// Post-Durango, stakers are immediately added to the current staker
-		// set. Their [StartTime] is the current chain time.
-		var (
-			potentialReward = uint64(0)
-			stakeDuration   = stakerTx.EndTime().Sub(chainTime)
-		)
-
 		// Only calculate the potentialReward for permissionless stakers.
 		// Recall that we only need to check if this is a permissioned
 		// validator as there are no permissioned delegators
+		var potentialReward uint64
 		if !stakerTx.CurrentPriority().IsPermissionedValidator() {
 			subnetID := stakerTx.SubnetID()
 			currentSupply, err := e.State.GetCurrentSupply(subnetID)
@@ -570,6 +569,9 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 				return err
 			}
 
+			// Post-Durango, stakers are immediately added to the current staker
+			// set. Their [StartTime] is the current chain time.
+			stakeDuration := stakerTx.EndTime().Sub(chainTime)
 			potentialReward = rewards.Calculate(
 				stakeDuration,
 				stakerTx.Weight(),
