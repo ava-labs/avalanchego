@@ -1024,13 +1024,13 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
+		vm.MinValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
 		extraNodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[1]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.GenerateTestShortID(),
 	)
 	require.NoError(err)
@@ -1108,7 +1108,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		ts.GenesisNodeIDs[2]: ts.Weight,
 		ts.GenesisNodeIDs[3]: ts.Weight,
 		ts.GenesisNodeIDs[4]: ts.Weight,
-		extraNodeID:          vm.MaxValidatorStake,
+		extraNodeID:          vm.MinValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
