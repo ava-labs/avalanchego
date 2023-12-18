@@ -807,7 +807,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -976,6 +976,51 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrFlowCheckFailed)
 	}
+}
+
+func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		chainTime = env.state.GetTimestamp()
+		endTime   = chainTime.Add(defaultMaxStakingDuration)
+	)
+
+	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		0,
+		uint64(endTime.Unix()),
+		nodeID,
+		ids.ShortEmpty,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	require.NoError(addValTx.Unsigned.Visit(&StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addValTx,
+	}))
+
+	// Check that a current validator is added
+	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	require.Equal(addValTx.ID(), val.TxID)
+	require.Equal(chainTime, val.StartTime)
+	require.Equal(endTime, val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

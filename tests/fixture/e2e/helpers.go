@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -43,11 +42,6 @@ const (
 	// checks. Useful for speeding up iteration during test
 	// development.
 	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
-
-	// Validator start time must be a minimum of SyncBound from the
-	// current time for validator addition to succeed, and adding 20
-	// seconds provides a buffer in case of any delay in processing.
-	DefaultValidatorStartTimeDiff = executor.SyncBound + 20*time.Second
 
 	DefaultGasLimit = uint64(21000) // Standard gas limit
 
