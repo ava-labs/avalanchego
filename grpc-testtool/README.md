@@ -41,7 +41,6 @@ ln -sf $BASE/firewood/target/release/process-server $BASE/merkledb-tester/proces
 Then, run the test you want:
 
 ```sh
-cd $BASE/merkledb-tester
-go test -timeout 2m -run TestConsistency github.com/ava-labs/merkledb-tester/tests/consistency -v
-go test -timeout 2m -run TestPutPerformance github.com/ava-labs/merkledb-tester/tests/performance -v
+cd $BASE/merkledb-tester/tests
+go test -timeout 2m -run TestAll/Performance github.com/ava-labs/merkledb-tester/tests -v -count=1
 ```
