@@ -98,10 +98,9 @@ var (
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// subnet that exists at genesis in defaultVM
-	// Its controlKeys are test.Keys[0], test.Keys[1], test.Keys[2]
+	// Its controlKeys are ts.SubnetControlKeys
 	// Its threshold is 2
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = ts.Keys[0:3]
+	testSubnet1 *txs.Tx
 
 	errMissing = errors.New("missing")
 )
@@ -655,7 +654,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		testSubnet1.ID(),
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -703,7 +702,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		testSubnet1.ID(),
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[1], ts.SubnetControlKeys[2]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -899,7 +898,7 @@ func TestCreateChain(t *testing.T) {
 		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
 		nil,
 		"name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)

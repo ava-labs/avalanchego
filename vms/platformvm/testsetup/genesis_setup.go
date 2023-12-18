@@ -24,6 +24,10 @@ var (
 	// each key controls an address that has [Balance] AVAX at genesis
 	Keys = secp256k1.TestKeys()
 
+	// many UTs add a subnet right after genesis. They should use
+	// SubnetControlKeys to control the subnet
+	SubnetControlKeys = Keys[0:3]
+
 	// Node IDs of genesis validators. Initialized in init function
 	GenesisNodeIDs []ids.NodeID
 

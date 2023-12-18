@@ -51,8 +51,7 @@ var (
 	defaultTxFee   = uint64(100)
 	lastAcceptedID = ids.GenerateTestID()
 
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = ts.Keys[0:3]
+	testSubnet1 *txs.Tx
 
 	errMissing = errors.New("missing")
 )
