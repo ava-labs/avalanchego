@@ -693,13 +693,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
+		vm.MinValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
 		nodeID0,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[1]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -865,13 +865,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the second new validator
 	addValidatorTx1, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
+		vm.MinValidatorStake,
 		uint64(newValidatorStartTime1.Unix()),
 		uint64(newValidatorEndTime1.Unix()),
 		nodeID1,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[2]},
+		[]*secp256k1.PrivateKey{ts.Keys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -972,11 +972,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	{
 		staker0, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
 		require.NoError(err)
-		require.Equal(uint64(60000000), staker0.PotentialReward)
+		require.Equal(uint64(600000), staker0.PotentialReward)
 
 		staker1, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
 		require.NoError(err)
-		require.Equal(uint64(59999999), staker1.PotentialReward)
+		require.Equal(uint64(599999), staker1.PotentialReward)
 
 		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
 		require.ErrorIs(err, database.ErrNotFound)
