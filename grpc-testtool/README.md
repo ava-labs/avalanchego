@@ -42,5 +42,5 @@ Then, run the test you want:
 
 ```sh
 cd $BASE/merkledb-tester/tests
-go test -timeout 2m -run TestAll/Performance github.com/ava-labs/merkledb-tester/tests -v -count=1
+go test -timeout 5m github.com/ava-labs/merkledb-tester/... -v -count=1
 ```
