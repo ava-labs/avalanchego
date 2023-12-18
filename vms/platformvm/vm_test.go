@@ -530,7 +530,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	// Verify that new validator now in current validator set (Durango is active)
+	// Verify that new validator now in current validator set
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 }
@@ -711,7 +711,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	// Verify that new validator is in pending validator set
+	// Verify that new validator is in current validator set
 	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
 	require.NoError(err)
 }

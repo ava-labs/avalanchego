@@ -58,6 +58,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		}
 		// This tx already passed syntactic verification.
+		startTime  = now.Add(time.Second)
+		endTime    = startTime.Add(time.Second * time.Duration(unsignedTransformTx.MinStakeDuration))
 		verifiedTx = txs.AddPermissionlessValidatorTx{
 			BaseTx: txs.BaseTx{
 				SyntacticallyVerified: true,
@@ -70,10 +72,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
-
-				// Post Durango we don't need to specify StartTime.
-				// Current chain time will be picked to start validation
-				End:  uint64(now.Add(time.Duration(unsignedTransformTx.MinStakeDuration) * time.Second).Unix()),
+				// Note: [Start] is not set here as it will be ignored
+				// Post-Durango in favor of the current chain time
+				End:  uint64(endTime.Unix()),
 				Wght: unsignedTransformTx.MinValidatorStake,
 			},
 			Subnet: subnetID,
@@ -321,8 +322,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 
 				// Note the duration is more than the maximum
-				endTime := now.Add(time.Duration(unsignedTransformTx.MaxStakeDuration) * time.Second).Add(time.Second)
-				tx.Validator.End = uint64(endTime.Unix())
+				tx.Validator.End = uint64(unsignedTransformTx.MaxStakeDuration) + 2
 				return &tx
 			},
 			expectedErr: ErrStakeTooLong,
