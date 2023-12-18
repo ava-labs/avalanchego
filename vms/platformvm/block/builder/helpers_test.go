@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -77,7 +76,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(true /*postBanff*/, true /*postCortina*/),
+		config:         ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -91,7 +90,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.fx = defaultFx(t, res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(t, res.config.Validators, res.ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
@@ -193,7 +192,7 @@ func addSubnet(t *testing.T, env *environment) {
 
 func defaultState(
 	t *testing.T,
-	vals validators.Manager,
+	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
@@ -207,7 +206,7 @@ func defaultState(
 		db,
 		genesis,
 		prometheus.NewRegistry(),
-		vals,
+		cfg,
 		execCfg,
 		ctx,
 		metrics.Noop,

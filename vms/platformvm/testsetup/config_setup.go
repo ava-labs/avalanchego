@@ -17,7 +17,7 @@ import (
 
 var TxFee = uint64(100) // a default Tx Fee
 
-func Config(postBanff, postCortina bool) *config.Config {
+func Config(postBanff, postCortina, postDurango bool) *config.Config {
 	forkTime := ValidateEndTime.Add(-2 * time.Second)
 	banffTime := mockable.MaxTime
 	if postBanff {
@@ -26,6 +26,10 @@ func Config(postBanff, postCortina bool) *config.Config {
 	cortinaTime := mockable.MaxTime
 	if postCortina {
 		cortinaTime = ValidateStartTime.Add(-2 * time.Second)
+	}
+	durangoTime := mockable.MaxTime
+	if postDurango {
+		durangoTime = ValidateStartTime.Add(-2 * time.Second)
 	}
 
 	return &config.Config{
@@ -52,6 +56,6 @@ func Config(postBanff, postCortina bool) *config.Config {
 		ApricotPhase5Time: forkTime,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
-		DurangoTime:       mockable.MaxTime,
+		DurangoTime:       durangoTime,
 	}
 }
