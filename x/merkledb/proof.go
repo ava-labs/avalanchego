@@ -31,11 +31,13 @@ var (
 	ErrNonIncreasingValues         = errors.New("keys sent are not in increasing order")
 	ErrStateFromOutsideOfRange     = errors.New("state key falls outside of the start->end range")
 	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")
+	ErrExtraProofNodes             = errors.New("extra proof nodes in path")
+	ErrDataInMissingRootProof      = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
+	ErrEmptyProof                  = errors.New("proof is empty")
 	ErrNoMerkleProof               = errors.New("empty key response must include merkle proof")
 	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")
 	ErrNoStartProof                = errors.New("no start proof")
 	ErrNoEndProof                  = errors.New("no end proof")
-	ErrNoProof                     = errors.New("proof has no nodes")
 	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
@@ -121,7 +123,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 type Proof struct {
 	// Nodes in the proof path from root --> target key
 	// (or node that would be where key is if it doesn't exist).
-	// Must always be non-empty (i.e. have the root node).
+	// Always contains at least the root.
 	Path []ProofNode
 	// This is a proof that [key] exists/doesn't exist.
 	Key Key
@@ -137,8 +139,9 @@ type Proof struct {
 func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize int) error {
 	// Make sure the proof is well-formed.
 	if len(proof.Path) == 0 {
-		return ErrNoProof
+		return ErrEmptyProof
 	}
+
 	if err := verifyProofPath(proof.Path, maybe.Some(proof.Key)); err != nil {
 		return err
 	}
@@ -249,16 +252,12 @@ type RangeProof struct {
 	// they are also in [EndProof].
 	StartProof []ProofNode
 
-	// If no upper range bound was given, [KeyValues] is empty,
-	// and [StartProof] is non-empty, this is empty.
+	// If no upper range bound was given and [KeyValues] is empty, this is empty.
 	//
-	// If no upper range bound was given, [KeyValues] is empty,
-	// and [StartProof] is empty, this is the root.
+	// If no upper range bound was given and [KeyValues] is non-empty, this is
+	// a proof for the largest key in [KeyValues].
 	//
-	// If an upper range bound was given and [KeyValues] is empty,
-	// this is a proof for the upper range bound.
-	//
-	// Otherwise, this is a proof for the largest key in [KeyValues].
+	// Otherwise this is a proof for the upper range bound.
 	EndProof []ProofNode
 
 	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
@@ -287,11 +286,9 @@ func (proof *RangeProof) Verify(
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
-		return ErrNoMerkleProof
-	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) > 0 && len(proof.EndProof) != 0:
+		return ErrEmptyProof
+	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.EndProof) != 0:
 		return ErrUnexpectedEndProof
-	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) != 1:
-		return ErrShouldJustBeRoot
 	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
 		return ErrNoEndProof
 	}

@@ -36,3 +36,6 @@ export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 # While CGO_ENABLED doesn't need to be explicitly set, it produces a much more
 # clear error due to the default value change in go1.20.
 export CGO_ENABLED=1
+
+# Disable version control fallbacks
+export GOPROXY="https://proxy.golang.org"

@@ -19,6 +19,6 @@ type GenesisAsset struct {
 	txs.CreateAssetTx `serialize:"true"`
 }
 
-func (g *GenesisAsset) Less(other *GenesisAsset) bool {
-	return g.Alias < other.Alias
+func (g *GenesisAsset) Compare(other *GenesisAsset) int {
+	return utils.Compare(g.Alias, other.Alias)
 }

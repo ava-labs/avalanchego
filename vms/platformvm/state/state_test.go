@@ -165,7 +165,9 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	state, err := newState(
 		db,
 		metrics.Noop,
-		validators.NewManager(),
+		&config.Config{
+			Validators: validators.NewManager(),
+		},
 		execCfg,
 		&snow.Context{},
 		prometheus.NewRegistry(),
@@ -617,7 +619,7 @@ func TestParsedStateBlock(t *testing.T) {
 			Unsigned: &txs.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
-		})
+		}, []*txs.Tx{})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
