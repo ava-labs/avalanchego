@@ -9,9 +9,9 @@ _Note: `defaultSyncableInterval` must be divisible by `CommitInterval` (= 4096).
 
 State sync is faster than bootstrapping and uses less bandwidth and computation:
 - Nodes joining the network do not process all the state transitions.
-- The amount of data sent over the network is porportionate to the amount of state not the chain's length
+- The amount of data sent over the network is proportionate to the amount of state not the chain's length
 
-_Note: nodes joining the network thorugh state sync will not have historical state prior to the syncable block._
+_Note: nodes joining the network through state sync will not have historical state prior to the syncable block._
 
 ## What is the chain state?
 The node needs the following data from its peers to continue processing blocks from a syncable block:
@@ -26,7 +26,7 @@ State sync code is structured as follows:
   - `LeafsRequestHandler`: handles requests for trie data (leafs)
   - `CodeRequestHandler`: handles requests for contract code
   - `BlockRequestHandler`: handles requests for blocks
-  - _Note: There are response size and time limits in place so peers joining the network do not overload peers providing data.  Additionally, the engine tracks the CPU usage of each peer for such messsages and throttles inbound requests accordingly._
+  - _Note: There are response size and time limits in place so peers joining the network do not overload peers providing data.  Additionally, the engine tracks the CPU usage of each peer for such messages and throttles inbound requests accordingly._
 - `sync/client`: Validates responses from peers and provides support for syncing tries.
 - `sync/statesync`: Uses `sync/client` to sync EVM related state: Accounts, storage tries, and contract code.
 - `plugin/evm/`: The engine expects the VM to implement `StateSyncableVM` interface,
@@ -47,7 +47,7 @@ The above information is called a _state summary_, and each syncable block corre
 
 1. The engine calls `StateSyncEnabled`. The VM returns `true` to initiate state sync, or `false` to start  bootstrapping. In `subnet-evm`, this is controlled by the `state-sync-enabled` flag.
 1. The engine calls `GetOngoingSyncStateSummary`. If the VM has a previously interrupted sync to resume it returns that summary. Otherwise, it returns `ErrNotFound`.  By default, `subnet-evm` will resume an interrupted sync.
-1. The engine samples peers for their latest available summaries, then verifies the correctness and availablility of each sampled summary with validators. The messaging flow is documented [here](https://github.com/ava-labs/avalanchego/blob/master/snow/engine/snowman/block/README.md).
+1. The engine samples peers for their latest available summaries, then verifies the correctness and availability of each sampled summary with validators. The messaging flow is documented [here](https://github.com/ava-labs/avalanchego/blob/master/snow/engine/snowman/block/README.md).
 1. The engine calls `Accept` on the chosen summary. The VM may return `false` to skip syncing to this summary (`subnet-evm` skips state sync for less than `defaultStateSyncMinBlocks = 300_000` blocks). If the VM decides to perform the sync, it must return `true` without blocking and fetch the state from its peers asynchronously.
 1. The VM sends `common.StateSyncDone` on the `toEngine` channel on completion.
 1. The engine calls `VM.SetState(Bootstrapping)`. Then, blocks after the syncable block are processed one by one.
@@ -112,4 +112,4 @@ While state sync is faster than normal bootstrapping, the process may take sever
 | `state-sync-skip-resume` | `bool` | set to true to avoid resuming an ongoing sync | `false` |
 | `state-sync-min-blocks` | `uint64` | Minimum number of blocks the chain must be ahead of local state to prefer state sync over bootstrapping | `300,000` |
 | `state-sync-server-trie-cache` | `int` | Size of trie cache to serve state sync data in MB. Should be set to multiples of `64`. | `64` |
-| `state-sync-ids` | `string` | a comma seperated list of `NodeID-` prefixed node IDs to sync data from. If not provided, peers are randomly selected. | |
+| `state-sync-ids` | `string` | a comma separated list of `NodeID-` prefixed node IDs to sync data from. If not provided, peers are randomly selected. | |

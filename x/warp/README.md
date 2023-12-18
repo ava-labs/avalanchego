@@ -21,7 +21,7 @@ The Avalanche Warp Precompile enables this flow to send a message from blockchai
 1. Call the Warp Precompile `sendWarpMessage` function with the arguments for the `UnsignedMessage`
 2. Warp Precompile emits an event / log containing the `UnsignedMessage` specified by the caller of `sendWarpMessage`
 3. Network accepts the block containing the `UnsignedMessage` in the log, so that validators are willing to sign the message
-4. An off-chain relayer queries the validators for their signatures of the message and aggregate the signatures to create a `SignedMessage`
+4. An off-chain relayer queries the validators for their signatures of the message and aggregates the signatures to create a `SignedMessage`
 5. The off-chain relayer encodes the `SignedMessage` as the [predicate](#predicate-encoding) in the AccessList of a transaction to deliver on blockchain B
 6. The transaction is delivered on blockchain B, the signature is verified prior to executing the block, and the message is accessible via the Warp Precompile's `getVerifiedWarpMessage` during the execution of that transaction
 
