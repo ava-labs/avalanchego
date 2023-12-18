@@ -1105,7 +1105,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
+	vm, _, _ := defaultVM(t, ts.CortinaFork) // defaultVM reset latestForkTime
+
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := ts.MaxValidatorStake / 5
 
@@ -1116,8 +1118,6 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2StartTime := delegator1EndTime
 	delegator2EndTime := delegator2StartTime.Add(3 * ts.MinStakingDuration)
 	delegator2Stake := ts.MaxValidatorStake - validatorStake
-
-	vm, _, _ := defaultVM(t, ts.CortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {

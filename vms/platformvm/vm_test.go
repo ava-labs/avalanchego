@@ -217,7 +217,6 @@ func defaultVM(t *testing.T, fork ts.ActiveFork) (*VM, database.Database, *ts.Mu
 	vm := &VM{
 		Config: *ts.Config(fork, latestForkTime),
 	}
-	vm.DurangoTime = vm.CortinaTime // activate DFork as well
 
 	baseDB := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, baseDB)
