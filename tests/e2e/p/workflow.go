@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -70,10 +71,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			// Use a random node ID to ensure that repeated test runs
 			// will succeed against a network that persists across runs.
-			nodeID := ids.GenerateTestNodeID()
+			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
+			require.NoError(err)
 
 			vdr := &txs.Validator{
-				NodeID: nodeID,
+				NodeID: validatorID,
 				End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
 				Wght:   minValStake,
 			}
