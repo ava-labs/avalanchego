@@ -97,10 +97,7 @@ type environment struct {
 func newEnvironment(t *testing.T, fork ts.ActiveFork, ctrl *gomock.Controller) *environment {
 	r := require.New(t)
 
-	var (
-		forkTime = ts.ValidateStartTime.Add(ts.ValidateEndTime.Sub(ts.ValidateStartTime) / 2)
-	)
-
+	forkTime := ts.ValidateStartTime
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         ts.Config(fork, forkTime),
