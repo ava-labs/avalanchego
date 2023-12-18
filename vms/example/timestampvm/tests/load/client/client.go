@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/timestampvm/timestampvm"
+	"github.com/ava-labs/avalanchego/vms/example/timestampvm"
 )
 
 // Client defines timestampvm client operations.
