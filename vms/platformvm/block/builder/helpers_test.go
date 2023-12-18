@@ -5,7 +5,6 @@ package builder
 
 import (
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -76,8 +75,9 @@ func newEnvironment(t *testing.T) *environment {
 	r := require.New(t)
 
 	var (
+		// Note unlike other packages we pick the latest fork here
 		fork     = ts.LatestFork
-		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+		forkTime = ts.ValidateStartTime
 	)
 
 	res := &environment{

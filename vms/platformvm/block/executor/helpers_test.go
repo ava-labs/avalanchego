@@ -94,12 +94,11 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
+func newEnvironment(t *testing.T, fork ts.ActiveFork, ctrl *gomock.Controller) *environment {
 	r := require.New(t)
 
 	var (
-		fork     = ts.LatestFork
-		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+		forkTime = ts.ValidateStartTime.Add(ts.ValidateEndTime.Sub(ts.ValidateStartTime) / 2)
 	)
 
 	res := &environment{
@@ -207,7 +206,7 @@ func addSubnet(t *testing.T, env *environment) {
 			ts.Keys[2].PublicKey().Address(),
 		},
 		[]*secp256k1.PrivateKey{ts.Keys[4]},
-		ts.Keys[4].PublicKey().Address(),
+		ts.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 
