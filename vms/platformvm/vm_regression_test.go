@@ -207,8 +207,6 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require := require.New(t)
 
 			vm, _, _ := defaultVM(t, apricotPhase3)
-			vm.ApricotPhase3Time = test.ap3Time
-
 			vm.ctx.Lock.Lock()
 			defer func() {
 				require.NoError(vm.Shutdown(context.Background()))

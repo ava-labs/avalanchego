@@ -554,7 +554,11 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 			potentialReward = uint64(0)
 			stakeDuration   = stakerTx.EndTime().Sub(chainTime)
 		)
-		if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
+
+		// Only calculate the potentialReward for permissionless stakers.
+		// Recall that we only need to check if this is a permissioned
+		// validator as there are no permissioned delegators
+		if !stakerTx.CurrentPriority().IsPermissionedValidator() {
 			subnetID := stakerTx.SubnetID()
 			currentSupply, err := e.State.GetCurrentSupply(subnetID)
 			if err != nil {
@@ -572,8 +576,7 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 				currentSupply,
 			)
 
-			updatedSupply := currentSupply + potentialReward
-			e.State.SetCurrentSupply(subnetID, updatedSupply)
+			e.State.SetCurrentSupply(subnetID, currentSupply+potentialReward)
 		}
 
 		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
