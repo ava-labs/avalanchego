@@ -74,7 +74,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *ts.MutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t)
+	vm, _, mutableSharedMemory := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -502,11 +502,12 @@ func TestGetStake(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := ts.GenesisNodeIDs[0]
-	delegatorEndTime := uint64(ts.GenesisTime.Add(ts.MinStakingDuration).Unix())
+	delegatorStartTime := ts.ValidateStartTime
+	delegatorEndTime := delegatorStartTime.Add(ts.MinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		uint64(ts.GenesisTime.Unix()),
-		delegatorEndTime,
+		uint64(delegatorStartTime.Unix()),
+		uint64(delegatorEndTime.Unix()),
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
@@ -518,7 +519,7 @@ func TestGetStake(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -636,15 +637,15 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := ts.GenesisNodeIDs[1]
-	delegatorStartTime := uint64(ts.ValidateStartTime.Unix())
-	delegatorEndTime := uint64(ts.ValidateStartTime.Add(ts.MinStakingDuration).Unix())
+	delegatorStartTime := ts.ValidateStartTime
+	delegatorEndTime := ts.ValidateStartTime.Add(ts.MinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 
 	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		delegatorStartTime,
-		delegatorEndTime,
+		uint64(delegatorStartTime.Unix()),
+		uint64(delegatorEndTime.Unix()),
 		validatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
@@ -656,7 +657,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -698,8 +699,8 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
-		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
-		require.Equal(uint64(delegator.EndTime), delegatorEndTime)
+		require.Equal(int64(delegator.StartTime), delegatorStartTime.Unix())
+		require.Equal(int64(delegator.EndTime), delegatorEndTime.Unix())
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
 	require.True(found)

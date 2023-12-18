@@ -29,8 +29,12 @@ type uniformBest struct {
 func NewBestUniform(expectedSampleSize int) Uniform {
 	return &uniformBest{
 		samplers: []Uniform{
-			&uniformReplacer{},
-			&uniformResample{},
+			&uniformReplacer{
+				rng: globalRNG,
+			},
+			&uniformResample{
+				rng: globalRNG,
+			},
 		},
 		maxSampleSize:       expectedSampleSize,
 		benchmarkIterations: 100,

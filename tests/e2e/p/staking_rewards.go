@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		network := e2e.Env.GetNetwork()
 
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
-			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
+			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
 			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
@@ -87,23 +87,23 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("creating keychain and P-Chain wallet")
 		keychain := secp256k1fx.NewKeychain(rewardKeys...)
-		fundedKey := e2e.Env.AllocateFundedKey()
+		fundedKey := e2e.Env.AllocatePreFundedKey()
 		keychain.Add(fundedKey)
 		nodeURI := e2e.Env.GetRandomNodeURI()
 		baseWallet := e2e.NewWallet(keychain, nodeURI)
 		pWallet := baseWallet.P()
 
 		ginkgo.By("retrieving alpha node id and pop")
-		alphaInfoClient := info.NewClient(alphaNode.GetProcessContext().URI)
+		alphaInfoClient := info.NewClient(alphaNode.URI)
 		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
 		ginkgo.By("retrieving beta node id and pop")
-		betaInfoClient := info.NewClient(betaNode.GetProcessContext().URI)
+		betaInfoClient := info.NewClient(betaNode.URI)
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
-		pvmClient := platformvm.NewClient(alphaNode.GetProcessContext().URI)
+		pvmClient := platformvm.NewClient(alphaNode.URI)
 
 		const (
 			delegationPercent = 0.10 // 10%

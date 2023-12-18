@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -92,7 +91,7 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(config.Validators, ctx, baseDB, rewards)
+	baseState := defaultState(config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
@@ -179,7 +178,7 @@ func addSubnet(
 }
 
 func defaultState(
-	vals validators.Manager,
+	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
@@ -194,7 +193,7 @@ func defaultState(
 		db,
 		genesis,
 		prometheus.NewRegistry(),
-		vals,
+		cfg,
 		execCfg,
 		ctx,
 		metrics.Noop,

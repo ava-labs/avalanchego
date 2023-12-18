@@ -159,13 +159,9 @@ func sendRangeProofRequest(
 }
 
 func TestGetRangeProof(t *testing.T) {
-	// TODO use time as random seed instead of 1
-	// once we move to go 1.20 which allows for
-	// joining multiple errors with %w. Right now,
-	// for some of these tests, we may get different
-	// errors based on randomness but we can only
-	// assert one error.
-	r := rand.New(rand.NewSource(1)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	smallTrieKeyCount := defaultRequestKeyLimit
 	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, smallTrieKeyCount, 1)
@@ -280,19 +276,7 @@ func TestGetRangeProof(t *testing.T) {
 				response.StartProof = proof.StartProof
 				response.EndProof = proof.EndProof
 			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-		"removed last key in response": {
-			db: largeTrieDB,
-			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
-			},
-			expectedErr: merkledb.ErrProofNodeNotForKey,
+			expectedErr: errInvalidRangeProof,
 		},
 		"removed key from middle of response": {
 			db: largeTrieDB,
@@ -319,7 +303,7 @@ func TestGetRangeProof(t *testing.T) {
 			},
 			expectedErr: merkledb.ErrNoEndProof,
 		},
-		"end proof nodes removed": {
+		"end proof removed": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
 				RootHash:   largeTrieRoot[:],
@@ -339,11 +323,11 @@ func TestGetRangeProof(t *testing.T) {
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = nil
 				response.StartProof = nil
 				response.EndProof = nil
+				response.KeyValues = nil
 			},
-			expectedErr: merkledb.ErrNoMerkleProof,
+			expectedErr: merkledb.ErrEmptyProof,
 		},
 	}
 
@@ -503,13 +487,9 @@ func sendChangeProofRequest(
 }
 
 func TestGetChangeProof(t *testing.T) {
-	// TODO use time as random seed instead of 1
-	// once we move to go 1.20 which allows for
-	// joining multiple errors with %w. Right now,
-	// for some of these tests, we may get different
-	// errors based on randomness but we can only
-	// assert one error.
-	r := rand.New(rand.NewSource(1)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	serverDB, err := merkledb.New(
 		context.Background(),
@@ -524,7 +504,7 @@ func TestGetChangeProof(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
-	startRoot, err := serverDB.GetMerkleRoot(context.Background()) // TODO uncomment
+	startRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
 	// create changes
@@ -565,6 +545,8 @@ func TestGetChangeProof(t *testing.T) {
 
 	endRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
+
+	fakeRootID := ids.GenerateTestID()
 
 	tests := map[string]struct {
 		db                        DB
@@ -623,19 +605,7 @@ func TestGetChangeProof(t *testing.T) {
 			modifyChangeProofResponse: func(response *merkledb.ChangeProof) {
 				response.KeyChanges = response.KeyChanges[1:]
 			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-		"removed last key in response": {
-			request: &pb.SyncGetChangeProofRequest{
-				StartRootHash: startRoot[:],
-				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
-			},
-			modifyChangeProofResponse: func(response *merkledb.ChangeProof) {
-				response.KeyChanges = response.KeyChanges[:len(response.KeyChanges)-2]
-			},
-			expectedErr: merkledb.ErrProofNodeNotForKey,
+			expectedErr: errInvalidChangeProof,
 		},
 		"removed key from middle of response": {
 			request: &pb.SyncGetChangeProofRequest{
@@ -662,24 +632,11 @@ func TestGetChangeProof(t *testing.T) {
 			},
 			expectedErr: merkledb.ErrInvalidProof,
 		},
-		"range proof response happy path": {
-			request: &pb.SyncGetChangeProofRequest{
-				// Server doesn't have the (non-existent) start root
-				// so should respond with range proof.
-				StartRootHash: ids.Empty[:],
-				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
-			},
-			modifyChangeProofResponse: nil,
-			expectedErr:               nil,
-			expectRangeProof:          true,
-		},
 		"range proof response; remove first key": {
 			request: &pb.SyncGetChangeProofRequest{
 				// Server doesn't have the (non-existent) start root
 				// so should respond with range proof.
-				StartRootHash: ids.Empty[:],
+				StartRootHash: fakeRootID[:],
 				EndRootHash:   endRoot[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
@@ -688,7 +645,7 @@ func TestGetChangeProof(t *testing.T) {
 			modifyRangeProofResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[1:]
 			},
-			expectedErr:      merkledb.ErrInvalidProof,
+			expectedErr:      errInvalidRangeProof,
 			expectRangeProof: true,
 		},
 	}

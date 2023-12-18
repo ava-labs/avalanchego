@@ -259,6 +259,10 @@ message AppRequestFailedMsg {
   bytes node_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
+  // Application-defined error code
+  sint32 error_code = 3;
+  // Application-defined error message
+  string error_message = 4;
 }
 
 message AppResponseMsg {
@@ -293,6 +297,10 @@ message CrossChainAppRequestFailedMsg {
   bytes chain_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
+  // Application-defined error code
+  sint32 error_code = 3;
+  // Application-defined error message
+  string error_message = 4;
 }
 
 message CrossChainAppResponseMsg {
@@ -306,7 +314,12 @@ message CrossChainAppResponseMsg {
 
 message ConnectedRequest {
   bytes node_id = 1;
-  string version = 2;
+  // Client name (e.g avalanchego)
+  string name = 2;
+  // Client semantic version
+  uint32 major = 3;
+  uint32 minor = 4;
+  uint32 patch = 5;
 }
 
 message DisconnectedRequest {

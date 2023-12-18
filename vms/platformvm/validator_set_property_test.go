@@ -725,8 +725,8 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	require := require.New(t)
 
 	var (
-		fork     = ts.CortinaFork
-		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+		fork     = ts.DurangoFork
+		forkTime = ts.GenesisTime
 	)
 	vm := &VM{
 		Config: *ts.Config(fork, forkTime),

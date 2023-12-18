@@ -26,8 +26,6 @@ var (
 	CreateSubnetTxFee = 100 * TxFee
 )
 
-// [Config] assumes forkTime is not before GenesisTime. This ensures
-// that forks are lined up in time as they happened (Apricot, Banff, Cortina,...)
 func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime
@@ -38,26 +36,20 @@ func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 	)
 
 	switch fork {
-	case ApricotPhase3Fork:
-		apricotPhase3Time = forkTime
-	case ApricotPhase5Fork:
-		apricotPhase5Time = forkTime
-		apricotPhase3Time = GenesisTime
-	case BanffFork:
-		banffTime = forkTime
-		apricotPhase5Time = GenesisTime
-		apricotPhase3Time = GenesisTime
+	case DurangoFork:
+		durangoTime = forkTime
+		fallthrough
 	case CortinaFork:
 		cortinaTime = forkTime
-		banffTime = GenesisTime
-		apricotPhase5Time = GenesisTime
-		apricotPhase3Time = GenesisTime
-	case DFork:
-		durangoTime = forkTime
-		cortinaTime = GenesisTime
-		banffTime = GenesisTime
-		apricotPhase5Time = GenesisTime
-		apricotPhase3Time = GenesisTime
+		fallthrough
+	case BanffFork:
+		banffTime = forkTime
+		fallthrough
+	case ApricotPhase5Fork:
+		apricotPhase5Time = forkTime
+		fallthrough
+	case ApricotPhase3Fork:
+		apricotPhase3Time = forkTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}

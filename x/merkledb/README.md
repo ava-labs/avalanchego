@@ -1,44 +1,138 @@
-# Path Based Merkelized Radix Trie
+# MerkleDB
 
-## TODOs
+## Structure
 
-- [ ] Remove special casing around the root node from the physical structure of the hashed tree.
-- [ ] Analyze performance of using database snapshots rather than in-memory history
-- [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees
 
-## Introduction
+A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store (sometimes just called "a store") using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries implement a key-value store.
 
-The Merkle Trie is a data structure that allows efficient and secure verification of the contents. It is a combination of a [Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [Radix Trie](https://en.wikipedia.org/wiki/Radix_tree).
+Like all tries, a MerkleDB instance is composed of nodes. Conceputally, a node has:
+  * A unique _key_ which identifies its position in the trie. A node's key is a prefix of its childrens' keys.
+  * A unique _ID_, which is the hash of the node.
+  * A _children_ array, where each element is the ID of the child at that index. A child at a lower index is to the "left" of children at higher indices.
+  * An optional value. If a node has a value, then the node's key maps to its value in the key-value store. Otherwise the key isn't present in the store.
 
-The trie contains `Merkle Nodes`, which store key/value and children information.
+and looks like this:
+```
+Node
++--------------------------------------------+
+| ID:                              32 bytes  |
+| Key:                              ? bytes  |
+| Value:                 Some(value) | None  |
+| Children:                                  |
+|   0:                Some(child0ID) | None  |
+|   1:                Some(child2ID) | None  |
+|   ...                                      |
+|   BranchFactor-1:  Some(child15ID) | None  |
++--------------------------------------------+
+```
 
-Each `Merkle Node` represents a key path into the trie. It stores the key, the value (if one exists), its ID, and the IDs of its children nodes. The children have keys that contain the current node's key path as a prefix, and the index of each child indicates the next nibble in that child's key. For example, if we have two nodes, Node 1 with key path `0x91A` and Node 2 with key path `0x91A4`, Node 2 is stored in index `0x4` of Node 1's children (since 0x4 is the first value after the common prefix).
+This conceptual picture differs slightly from the implementation of the `node` in MerkleDB but is still useful in understanding how MerkleDB works. 
 
-To reduce the depth of nodes in the trie, a `Merkle Node` utilizes path compression. Instead of having a long chain of nodes each containing only a single nibble of the key, we can "compress" the path by recording additional key information with each of a node's children. For example, if we have three nodes, Node 1 with key path `0x91A`, Node 2 with key path `0x91A4`, and Node 3 with key path `0x91A5132`, then Node 1 has a key of `0x91A`. Node 2 is stored at index `0x4` of Node 1's children since `4` is the next nibble in Node 2's key after skipping the common nibbles from Node 1's key. Node 3 is stored at index `0x5` of Node 1's children. Rather than have extra nodes for the remainder of Node 3's key, we instead store the rest of the key (`132`) in Node 1's children info.
+## Root IDs and Revisions
+
+The ID of the root node is called the _root ID_, or sometimes just the _root_ of the trie. If any node in a MerkleDB instance changes, the root ID will change. This follows from the fact that changing a node changes its ID, which changes its parent's reference to it, which changes the parent, which changes the parent's ID, and so on until the root.
+
+The root ID also serves as a unique identifier of a given state; instances with the same key-value mappings always have the same root ID, and instances with different key-value mappings always have different root IDs. We call a state with a given root ID a _revision_, and we sometimes say that a MerkleDB instance is "at" a given revision or root ID. The two are equivalent.
+
+## Views
+
+A _view_ is a proposal to modify a MerkleDB. If a view is _committed_, its changes are written to the MerkleDB. It can be queried, and when it is, it will return the state that the MerkleDB will contain if the view is committed.
+
+A view can be built atop the MerkleDB itself, or it can be built atop another view. Views can be chained together. For example, we might have:
 
 ```
-+-----------------------------------+
-| Merkle Node                       |
-|                                   |
-| ID: 0x0131                        |  an id representing the current node, derived from the node's value and all children ids
-| Key: 0x91                         |  prefix of the key, representing the location of the node in the trie
-| Value: 0x00                       |  the value, if one exists, that is stored at the key (keyPrefix + compressedKey)
-| Children:                         |  a map of children node ids for any nodes in the trie that have this node's key as a prefix
-|   0: [:0x00542F]                  |  child 0 represents a node with key 0x910 with ID 0x00542F
-|   1: [0x432:0xA0561C]             |  child 1 represents a node with key 0x911432 with ID 0xA0561C
-|   ...                             |
-|   15: [0x9A67B:0x02FB093]         |  child 15 represents a node with key 0x91F9A67B with ID 0x02FB093
-+-----------------------------------+
+    db
+  /    \
+view1  view2
+  |
+view3
 ```
+
+where `view1` and `view2` are built atop MerkleDB instance `db` and `view3` is built atop `view1`. Equivalently, we say that `db` is the parent of `view1` and `view2`, and `view3` is a child of `view1`. `view1` and `view2` are _siblings_.
+
+`view1` contains all the key-value pairs in `db`, except those modified by `view1`. That is, if `db` has key-value pair `(k,v)`, and `view1` doesn't modify that pair, then `view1` will return `v` when queried for the value of `k`. If `db` has `(k,v)` but `view1` modifies the pair to `(k, v')` then it will return `v'` when queried for the value of `k`. Similar for `view2`.
+
+`view3` has all of the key-value pairs as `view1`, except those modified in `view3`. That is, it has the state after the changes in `view1` are applied to `db`, followed by those in `view3`.
+
+A view can be committed only if its parent is the MerkleDB (and not another view). A view can only be committed once. In the above diagram, `view3` can't be committed until `view1` is committed.
+
+### Validity
+
+When a view is committed, its siblings and all of their descendants are _invalidated_. An invalid view can't be read or committed. Method calls on it will return `ErrInvalid`.
+
+In the diagram above, if `view1` were committed, `view2` would be invalidated. It `view2` were committed, `view1` and `view3` would be invalidated.
+
+## Proofs
+
+### Simple Proofs
+
+MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that it has a key-value pair `(k,v)`, or that `k` is not present.
+
+Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.) To put a finer point on it, the flow is:
+
+```mermaid
+flowchart TD
+    A[Client] -->|"ProofRequest(k,r)"| B(Server)
+    B --> |"Proof(k,r)"| C(Client)
+    C --> |Proof Valid| D(Client trusts key-value pair from proof)
+    C --> |Proof Invalid| E(Client doesn't trust key-value pair from proof) 
+```
+
+`ProofRequest(k,r)` is a request for the value that `k` maps to in the MerkleDB instance with root `r` and a proof for that data's correctness.
+
+`Proof(k,r)` is a proof that purports to show either that key-value pair `(k,v)` exists in the revision at `r`, or that `k` isn't in the revision.
+
+### Range Proofs
+
+MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is similar to the merkle proofs described above, except for multiple key-value pairs. Similar to above, the flow is:
+
+```mermaid
+flowchart TD
+    A[Client] -->|"RangeProofRequest(start,end,r)"| B(Server)
+    B --> |"RangeProof(start,end,r)"| C(Client)
+    C --> |Proof Valid| D(Client trusts key-value pairs)
+    C --> |Proof Invalid| E(Client doesn't trust key-value pairs) 
+```
+
+`RangeProofRequest(start,end,r)` is a request for all of the key-value pairs, in order, between keys `start` and `end` at revision `r`.
+
+`RangeProof(start,end,r)` contains a list of key-value pairs `kvs`, sorted by increasing key. It purports to show that, at revision `r`:
+* Each element of `kvs` is a key-value pair in the store.
+* There are no keys at/after `start` but before the first key in `kvs`.
+* For adjacent key-value pairs `(k1,v1)` and `(k2,v2)` in `kvs`, there doesn't exist a key-value pair `(k3,v3)` in the store such that `k1 < k3 < k2`. In other words, `kvs` is a contiguous set of key-value pairs.
+
+Clients can use range proofs to efficiently download many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
+
+Like simple proofs, range proofs can be verified without any additional context or knowledge of the contents of the key-value store.
+
+### Change Proofs
+
+Finally, MerkleDB instances can produce and verify _change proofs_. A change proof proves that a set of key-value changes were applied to a MerkleDB instance in the process of changing its root from `r` to `r'`. For example, suppose there's an instance with root `r`
+
+```mermaid
+flowchart TD
+    A[Client] -->|"ChangeProofRequest(start,end,r,r')"| B(Server)
+    B --> |"ChangeProof(start,end,r,r')"| C(Client)
+    C --> |Proof Valid| D(Client trusts key-value pair changes)
+    C --> |Proof Invalid| E(Client doesn't trust key-value changes) 
+```
+
+`ChangeProofRequest(start,end,r,r')` is a request for all key-value pairs, in order, between keys `start` and `end`, that occurred after the root of was `r` and before the root was `r'`.
+
+`ChangeProof(start,end,r,r')` contains a set of key-value pairs `kvs`. It purports to show that:
+* Each element of `kvs` is a key-value pair in the at revision `r'` but not at revision `r`.
+* There are no key-value changes between `r` and `r'` such that the key is at/after `start` but before the first key in `kvs`.
+* For adjacent key-value changes `(k1,v1)` and `(k2,v2)` in `kvs`, there doesn't exist a key-value change `(k3,v3)` between `r` and `r'` such that `k1 < k3 < k2`. In other words, `kvs` is a contiguous set of key-value changes.
+
+Change proofs are useful for applying changes between revisions. For example, suppose a client has a MerkleDB instance at revision `r`. The client learns that the state has been updated and that the new root is `r'`. The client can request a change proof from a server at revision `r'`, and apply the changes in the change proof to change its state from `r` to `r'`. Note that `r` and `r'` need not be "consecutive" revisions. For example, it's possible that the state goes from revision `r` to `r1` to `r2` to `r'`. The client apply changes to get directly from `r` to `r'`, without ever needing to be at revision `r1` or `r2`.
 
 ## Serialization
 
 ### Node
 
-Nodes are persisted in an underlying database. In order to persist nodes, we must first serialize them.
-Serialization is done by the `encoder` interface defined in `codec.go`.
+Nodes are persisted in an underlying database. In order to persist nodes, we must first serialize them. Serialization is done by the `encoder` interface defined in `codec.go`.
 
-The node serialization format is as follows:
+The node serialization format is:
 
 ```
 +----------------------------------------------------+
@@ -91,9 +185,9 @@ For each child of the node, we have an additional:
 +----------------------------------------------------+
 | Child index (varint)                               |
 +----------------------------------------------------+
-| Child compressed key length (varint)              |
+| Child compressed key length (varint)               |
 +----------------------------------------------------+
-| Child compressed key (variable length bytes)      |
+| Child compressed key (variable length bytes)       |
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
 +----------------------------------------------------+
@@ -134,10 +228,10 @@ The second is at child index `14`, has compressed key `0x0F0F0F` and ID (in hex)
 | Child index (varint)                                               |
 | 0x00                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key length (varint)                              |
+| Child compressed key length (varint)                               |
 | 0x02                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key (variable length bytes)                      |
+| Child compressed key (variable length bytes)                       |
 | 0x10                                                               |
 +--------------------------------------------------------------------+
 | Child ID (32 bytes)                                                |
@@ -146,10 +240,10 @@ The second is at child index `14`, has compressed key `0x0F0F0F` and ID (in hex)
 | Child index (varint)                                               |
 | 0x0E                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key length (varint)                              |
+| Child compressed key length (varint)                               |
 | 0x06                                                               |
 +--------------------------------------------------------------------+
-| Child compressed key (variable length bytes)                      |
+| Child compressed key (variable length bytes)                       |
 | 0xFFF0                                                             |
 +--------------------------------------------------------------------+
 | Child ID (32 bytes)                                                |
@@ -216,22 +310,18 @@ Bytes are encoded by simply copying them onto the buffer.
 ## Design choices
 
 ### []byte copying
-Nodes contain a []byte which represents its value.  This slice should never be edited internally.  This allows usage without having to make copies of it for safety.
-Anytime these values leave the library, for example in `Get`, `GetValue`, `GetProof`, `GetRangeProof`, etc, they need to be copied into a new slice to prevent
-edits made outside the library from being reflected in the DB/TrieViews.
+
+A node may contain a value, which is represented in Go as a `[]byte`. This slice is never edited, allowing it to be used without copying it first in many places. When a value leaves the library, for example when returned in `Get`, `GetValue`, `GetProof`, `GetRangeProof`, etc., the value is copied to prevent edits made outside the library from being reflected in the database.
 
 ### Split Node Storage
-The nodes are stored under two different prefixes depending on if the node contains a value.  
-If it does contain a value it is stored within the ValueNodeDB and if it doesn't it is stored in the IntermediateNodeDB.
-By splitting the nodes up by value, it allows better key/value iteration and a more compact key format.
 
-### Single node type
+Nodes with values ("value nodes") are persisted under one database prefix, while nodes without values ("intermediate nodes") are persisted under another database prefix. This separation allows for easy iteration over all key-value pairs in the database, as this is simply iterating over the database prefix containing value nodes. 
 
-A `Merkle Node` holds the IDs of its children, its value, as well as any key extension. This simplifies some logic and allows all of the data about a node to be loaded in a single database read. This trades off a small amount of storage efficiency (some fields may be `nil` but are still stored for every node).
+### Single Node Type
 
-### Validity
+MerkleDB uses one type to represent nodes, rather than having multiple types (e.g. branch nodes, value nodes, extension nodes) as other Merkle Trie implementations do.
 
-A `trieView` is built atop another trie, and there may be other `trieView`s built atop the same trie. We call these *siblings*. If one sibling is committed to database, we *invalidate* all other siblings and their descendants. Operations on an invalid trie return `ErrInvalid`. The children of the committed `trieView` are updated so that their new `parentTrie` is the database.
+Not using extension nodes results in worse storage efficiency (some nodes may have mostly empty children) but simpler code.
 
 ### Locking
 
@@ -252,3 +342,9 @@ This pattern is safe because the `merkleDB` is locked, so no data under the view
 To prevent deadlocks, `trieView` and `merkleDB` never acquire the `commitLock` of descendant views.
 That is, locking is always done from a view toward to the underlying `merkleDB`, never the other way around.
 The `validityTrackingLock` goes the opposite way. A view can lock the `validityTrackingLock` of its children, but not its ancestors. Because of this, any function that takes the `validityTrackingLock` must not take the `commitLock` as this may cause a deadlock. Keeping `commitLock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.
+
+## TODOs
+
+- [ ] Remove special casing around the root node from the physical structure of the hashed tree.
+- [ ] Analyze performance of using database snapshots rather than in-memory history
+- [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees

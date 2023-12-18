@@ -6,10 +6,11 @@ package testsetup
 type ActiveFork uint8
 
 const (
-	ApricotPhase3Fork ActiveFork = 0
-	ApricotPhase5Fork ActiveFork = 1
-	BanffFork         ActiveFork = 2
-	CortinaFork       ActiveFork = 3
-	DFork             ActiveFork = 4
-	LatestFork        ActiveFork = DFork
+	ApricotPhase3Fork ActiveFork = iota
+	ApricotPhase5Fork
+	BanffFork
+	CortinaFork
+	DurangoFork
+
+	LatestFork ActiveFork = DurangoFork
 )

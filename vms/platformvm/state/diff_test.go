@@ -637,7 +637,7 @@ func TestDiffStacking(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create a second diff on first diff and verify that subnet owner returns correctly
-	stackedDiff, err := wrapState(statesDiff)
+	stackedDiff, err := NewDiffOn(statesDiff)
 	require.NoError(err)
 	owner, err = stackedDiff.GetSubnetOwner(subnetID)
 	require.NoError(err)
@@ -673,18 +673,4 @@ func TestDiffStacking(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner3, owner)
-}
-
-type stateGetter struct {
-	state Chain
-}
-
-func (s stateGetter) GetState(ids.ID) (Chain, bool) {
-	return s.state, true
-}
-
-func wrapState(parentState Chain) (Diff, error) {
-	return NewDiff(ids.Empty, stateGetter{
-		state: parentState,
-	})
 }
