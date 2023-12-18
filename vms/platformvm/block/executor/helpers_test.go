@@ -201,9 +201,9 @@ func addSubnet(env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.Keys[0].PublicKey().Address(),
-			ts.Keys[1].PublicKey().Address(),
-			ts.Keys[2].PublicKey().Address(),
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+			ts.SubnetControlKeys[1].PublicKey().Address(),
+			ts.SubnetControlKeys[2].PublicKey().Address(),
 		},
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ts.Keys[0].PublicKey().Address(),

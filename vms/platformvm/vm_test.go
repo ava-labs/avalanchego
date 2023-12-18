@@ -375,9 +375,12 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	// chain time ahead
 	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from test.Keys[0], test.Keys[1], test.Keys[2] needed to add validator to this subnet
-		// control test.Keys are test.Keys[0], test.Keys[1], test.Keys[2]
-		[]ids.ShortID{ts.Keys[0].PublicKey().Address(), ts.Keys[1].PublicKey().Address(), ts.Keys[2].PublicKey().Address()},
+		2, // threshold; 2 sigs needed to add validator to this subnet
+		[]ids.ShortID{
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+			ts.SubnetControlKeys[1].PublicKey().Address(),
+			ts.SubnetControlKeys[2].PublicKey().Address(),
+		},
 		[]*secp256k1.PrivateKey{ts.Keys[0]}, // pays tx fee
 		ts.Keys[0].PublicKey().Address(),    // change addr
 	)
@@ -947,8 +950,8 @@ func TestCreateSubnet(t *testing.T) {
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
 		[]ids.ShortID{ // control test.Keys
-			ts.Keys[0].PublicKey().Address(),
-			ts.Keys[1].PublicKey().Address(),
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+			ts.SubnetControlKeys[1].PublicKey().Address(),
 		},
 		[]*secp256k1.PrivateKey{ts.Keys[0]}, // payer
 		ts.Keys[0].PublicKey().Address(),    // change addr
@@ -2194,7 +2197,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	// Create a subnet
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1,
-		[]ids.ShortID{ts.Keys[0].PublicKey().Address()},
+		[]ids.ShortID{ts.SubnetControlKeys[0].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ts.Keys[0].Address(),
 	)

@@ -796,7 +796,9 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// chain time ahead
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
-		[]ids.ShortID{ts.Keys[0].PublicKey().Address()},
+		[]ids.ShortID{
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+		},
 		[]*secp256k1.PrivateKey{ts.Keys[len(ts.Keys)-1]}, // pays tx fee
 		ts.Keys[0].PublicKey().Address(),                 // change addr
 	)
