@@ -90,12 +90,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
+func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina)
-	clk := defaultClock(postBanff || postCortina)
+	config := defaultConfig(postBanff, postCortina, postDurango)
+	clk := defaultClock(postBanff || postCortina || postDurango)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx, msm := defaultCtx(baseDB)
@@ -103,7 +103,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(config.Validators, ctx, baseDB, rewards)
+	baseState := defaultState(config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
@@ -111,7 +111,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	txBuilder := builder.New(
 		ctx,
-		&config,
+		config,
 		clk,
 		fx,
 		baseState,
@@ -120,7 +120,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	)
 
 	backend := Backend{
-		Config:       &config,
+		Config:       config,
 		Ctx:          ctx,
 		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
@@ -132,7 +132,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 
 	env := &environment{
 		isBootstrapped: &isBootstrapped,
-		config:         &config,
+		config:         config,
 		clk:            clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
@@ -186,10 +186,11 @@ func addSubnet(
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(
-	validators validators.Manager,
+	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
@@ -204,7 +205,7 @@ func defaultState(
 		db,
 		genesis,
 		prometheus.NewRegistry(),
-		validators,
+		cfg,
 		execCfg,
 		ctx,
 		metrics.Noop,
@@ -255,7 +256,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig(postBanff, postCortina bool) config.Config {
+func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 	banffTime := mockable.MaxTime
 	if postBanff {
 		banffTime = ts.ValidateEndTime.Add(-2 * time.Second)
@@ -264,8 +265,12 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 	if postCortina {
 		cortinaTime = ts.ValidateStartTime.Add(-2 * time.Second)
 	}
+	durangoTime := mockable.MaxTime
+	if postDurango {
+		durangoTime = ts.ValidateStartTime.Add(-2 * time.Second)
+	}
 
-	return config.Config{
+	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
@@ -287,6 +292,7 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 		ApricotPhase5Time: ts.ValidateEndTime,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
+		DurangoTime:       durangoTime,
 	}
 }
 
