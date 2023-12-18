@@ -166,7 +166,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
-	latestForkTime := ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
+	latestForkTime := ts.GenesisTime.Add(time.Second) // same forkTime used in defaultVM
 
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
@@ -189,16 +189,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 	delegator4Stake := ts.MaxValidatorStake - validatorStake - ts.MinValidatorStake
 
 	tests := []struct {
-		name    string
-		ap3Time time.Time
+		name string
+		fork ts.ActiveFork
 	}{
 		{
-			name:    "pre-upgrade is no longer restrictive",
-			ap3Time: validatorEndTime,
+			name: "pre-upgrade is no longer restrictive",
+			fork: ts.ApricotPhase3Fork,
 		},
 		{
-			name:    "post-upgrade calculate max stake correctly",
-			ap3Time: ts.GenesisTime,
+			name: "post-upgrade calculate max stake correctly",
+			fork: ts.ApricotPhase5Fork,
 		},
 	}
 
@@ -206,8 +206,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, ts.ApricotPhase3Fork)
-			vm.ApricotPhase3Time = test.ap3Time
+			vm, _, _ := defaultVM(t, test.fork)
 
 			vm.ctx.Lock.Lock()
 			defer func() {
