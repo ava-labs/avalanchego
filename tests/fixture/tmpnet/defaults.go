@@ -50,6 +50,15 @@ func DefaultFlags() FlagsMap {
 		config.LogDisplayLevelKey:               logging.Off.String(), // Display logging not needed since nodes run headless
 		config.LogLevelKey:                      logging.Debug.String(),
 		config.MinStakeDurationKey:              DefaultMinStakeDuration.String(),
+
+		// Disable rate limiting
+		config.InboundThrottlerVdrAllocSizeKey:             "107374182",
+		config.InboundThrottlerMaxProcessingMsgsPerNodeKey: "100000",
+		config.InboundThrottlerBandwidthRefillRateKey:      "1073741824",
+		config.InboundThrottlerBandwidthMaxBurstSizeKey:    "1073741824",
+		config.CPUVdrAllocKey:                              "100000",
+		config.DiskVdrAllocKey:                             "10737418240000",
+		config.OutboundThrottlerVdrAllocSizeKey:            "107374182",
 	}
 }
 
