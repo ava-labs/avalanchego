@@ -724,8 +724,9 @@ func TestTimestampListGenerator(t *testing.T) {
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	require := require.New(t)
 
+	forkTime := ts.GenesisTime
 	vm := &VM{
-		Config: *ts.Config(ts.LatestFork, ts.ValidateStartTime.Add(-2*time.Second)),
+		Config: *ts.Config(ts.LatestFork, forkTime),
 	}
 	vm.clock.Set(vm.CortinaTime.Add(time.Second))
 
