@@ -74,7 +74,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *ts.MutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, latestFork)
+	vm, _, mutableSharedMemory := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, memdb.New())

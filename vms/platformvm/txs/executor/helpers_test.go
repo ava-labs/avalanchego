@@ -82,8 +82,27 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := ts.Config(postBanff, postCortina, postDurango)
-	clk := defaultClock(postBanff || postCortina || postDurango)
+	var (
+		fork     ts.ActiveFork
+		forkTime time.Time
+	)
+	switch {
+	case postDurango:
+		fork = ts.DurangoFork
+		forkTime = ts.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
+	case postCortina:
+		fork = ts.CortinaFork
+		forkTime = ts.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
+	case postBanff:
+		fork = ts.BanffFork
+		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+	default:
+		fork = ts.ApricotPhase5Fork
+		forkTime = ts.GenesisTime
+	}
+
+	config := ts.Config(fork, forkTime)
+	clk := defaultClock(forkTime)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx, msm := ts.Context(r, baseDB)
@@ -156,7 +175,7 @@ func addSubnet(
 			ts.Keys[1].PublicKey().Address(),
 			ts.Keys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[4]},
 		ts.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
@@ -212,14 +231,9 @@ func defaultState(
 	return state
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
-	now := ts.GenesisTime
-	if postFork {
-		// 1 second after Banff fork
-		now = ts.ValidateEndTime.Add(-2 * time.Second)
-	}
+func defaultClock(forkTime time.Time) *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(now)
+	clk.Set(forkTime)
 	return clk
 }
 

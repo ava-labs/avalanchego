@@ -97,9 +97,14 @@ type environment struct {
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	r := require.New(t)
 
+	var (
+		fork     = ts.DurangoFork
+		forkTime = ts.ValidateStartTime.Add(-2 * time.Second)
+	)
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
+		config:         ts.Config(fork, forkTime),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -199,7 +204,7 @@ func addSubnet(env *environment) {
 			ts.Keys[1].PublicKey().Address(),
 			ts.Keys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[4]},
 		ts.Keys[0].PublicKey().Address(),
 	)
 	if err != nil {

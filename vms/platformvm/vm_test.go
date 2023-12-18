@@ -65,18 +65,6 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-type activeFork uint8
-
-const (
-	apricotPhase3 activeFork = iota
-	apricotPhase5
-	banffFork
-	cortinaFork
-	durangoFork
-
-	latestFork activeFork = durangoFork
-)
-
 var (
 	latestForkTime = ts.ValidateEndTime.Add(-5 * ts.MinStakingDuration)
 
@@ -219,42 +207,15 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T, _ activeFork) (*VM, database.Database, *ts.MutableSharedMemory) {
+func defaultVM(t *testing.T, fork ts.ActiveFork) (*VM, database.Database, *ts.MutableSharedMemory) {
 	require := require.New(t)
 
-	// TODO ABENEGIA: MOVE TO TEST SETUP PACKAGE
-	// var (
-	// 	apricotPhase3Time = mockable.MaxTime
-	// 	apricotPhase5Time = mockable.MaxTime
-	// 	banffTime         = mockable.MaxTime
-	// 	cortinaTime       = mockable.MaxTime
-	// 	durangoTime       = mockable.MaxTime
-	// )
-
-	// // always reset latestForkTime (a package level variable)
-	// // to ensure test independence
-	// latestForkTime = ts.GenesisTime.Add(time.Second)
-	// switch fork {
-	// case durangoFork:
-	// 	durangoTime = latestForkTime
-	// 	fallthrough
-	// case cortinaFork:
-	// 	cortinaTime = latestForkTime
-	// 	fallthrough
-	// case banffFork:
-	// 	banffTime = latestForkTime
-	// 	fallthrough
-	// case apricotPhase5:
-	// 	apricotPhase5Time = latestForkTime
-	// 	fallthrough
-	// case apricotPhase3:
-	// 	apricotPhase3Time = latestForkTime
-	// default:
-	// 	require.NoError(fmt.Errorf("unhandled fork %d", fork))
-	// }
+	// always reset latestForkTime (a package level variable)
+	// to ensure test independence
+	latestForkTime = ts.GenesisTime.Add(time.Second)
 
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
+		Config: *ts.Config(fork, latestForkTime),
 	}
 	vm.DurangoTime = vm.CortinaTime // activate DFork as well
 
@@ -316,7 +277,7 @@ func defaultVM(t *testing.T, _ activeFork) (*VM, database.Database, *ts.MutableS
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -372,7 +333,7 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -420,7 +381,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, ts.CortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -473,7 +434,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, ts.CortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -519,7 +480,7 @@ func TestAddValidatorReject(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -553,7 +514,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -601,7 +562,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -648,7 +609,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -720,7 +681,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -793,7 +754,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -806,7 +767,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -857,7 +818,7 @@ func TestCreateChain(t *testing.T) {
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -967,7 +928,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, baseDB, mutableSharedMemory := defaultVM(t, latestFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1054,7 +1015,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, apricotPhase3)
+	vm, _, _ := defaultVM(t, ts.ApricotPhase3Fork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1119,7 +1080,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstDB := prefixdb.New([]byte{}, db)
 	firstVM := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
+		Config: *ts.Config(ts.DurangoFork, latestForkTime),
 	}
 
 	firstCtx, _ := ts.Context(require, memdb.New())
@@ -1191,7 +1152,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
+		Config: *ts.Config(ts.DurangoFork, latestForkTime),
 	}
 
 	secondCtx, _ := ts.Context(require, db)
@@ -1234,7 +1195,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
+		Config: *ts.Config(ts.DurangoFork, latestForkTime),
 	}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1564,7 +1525,7 @@ func TestUnverifiedParent(t *testing.T) {
 	baseDB := memdb.New()
 
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
+		Config: *ts.Config(ts.DurangoFork, latestForkTime),
 	}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1661,7 +1622,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
@@ -1718,7 +1679,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	firstDB := prefixdb.New([]byte{}, db)
 	const firstUptimePercentage = 20 // 20%
-	firstCfg := ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/)
+	firstCfg := ts.Config(ts.DurangoFork, latestForkTime)
 	firstCfg.UptimePercentage = firstUptimePercentage / 100.
 	firstVM := &VM{Config: *firstCfg}
 
@@ -1759,7 +1720,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondDB := prefixdb.New([]byte{}, db)
 
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondCfg := ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/)
+	secondCfg := ts.Config(ts.DurangoFork, latestForkTime)
 	secondCfg.UptimePercentage = secondUptimePercentage / 100.
 	secondVM := &VM{Config: *secondCfg}
 
@@ -1851,7 +1812,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	_, genesisBytes := defaultGenesis(t)
 	db := memdb.New()
 
-	cfg := ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/)
+	cfg := ts.Config(ts.DurangoFork, latestForkTime)
 	cfg.UptimePercentage = .2
 	vm := &VM{
 		Config: *cfg,
@@ -1945,7 +1906,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 
 	var (
 		chainTime          = vm.state.GetTimestamp()
@@ -2047,7 +2008,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2122,7 +2083,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 func TestBaseTx(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, ts.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))

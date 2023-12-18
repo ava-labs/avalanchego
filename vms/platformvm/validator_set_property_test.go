@@ -725,7 +725,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	require := require.New(t)
 
 	vm := &VM{
-		Config: *ts.Config(true /*postBanff*/, true /*postCortina*/, true /*postDurango*/),
+		Config: *ts.Config(ts.LatestFork, ts.ValidateStartTime.Add(-2*time.Second)),
 	}
 	vm.clock.Set(vm.CortinaTime.Add(time.Second))
 

@@ -4,6 +4,7 @@
 package testsetup
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -17,19 +18,34 @@ import (
 
 var TxFee = uint64(100) // a default Tx Fee
 
-func Config(postBanff, postCortina, postDurango bool) *config.Config {
-	forkTime := ValidateEndTime.Add(-2 * time.Second)
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = ValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = ValidateStartTime.Add(-2 * time.Second)
-	}
-	durangoTime := mockable.MaxTime
-	if postDurango {
-		durangoTime = ValidateStartTime.Add(-2 * time.Second)
+func Config(fork ActiveFork, forkTime time.Time) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
+	)
+
+	// always reset latestForkTime (a package level variable)
+	// to ensure test independence
+	switch fork {
+	case DurangoFork:
+		durangoTime = forkTime
+		fallthrough
+	case CortinaFork:
+		cortinaTime = forkTime
+		fallthrough
+	case BanffFork:
+		banffTime = forkTime
+		fallthrough
+	case ApricotPhase5Fork:
+		apricotPhase5Time = forkTime
+		fallthrough
+	case ApricotPhase3Fork:
+		apricotPhase3Time = forkTime
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
 
 	return &config.Config{
@@ -52,8 +68,8 @@ func Config(postBanff, postCortina, postDurango bool) *config.Config {
 			MintingPeriod:      MaxStakingDuration,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: forkTime,
-		ApricotPhase5Time: forkTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,

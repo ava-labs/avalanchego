@@ -1368,7 +1368,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		[]*secp256k1.PrivateKey{
 			ts.Keys[0],
 			ts.Keys[1],
-			ts.Keys[4],
+			ts.Keys[2],
 		},
 		ids.ShortEmpty,
 	)
