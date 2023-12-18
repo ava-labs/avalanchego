@@ -98,8 +98,8 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	r := require.New(t)
 
 	var (
-		fork     = ts.DurangoFork
-		forkTime = ts.ValidateStartTime.Add(-2 * time.Second)
+		fork     = ts.ApricotPhase5Fork
+		forkTime = ts.ValidateEndTime
 	)
 
 	res := &environment{
