@@ -134,13 +134,13 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				require.NoError(err)
 			})
 
-			validatorEndTime := time.Now().Add(time.Minute)
+			endTime := time.Now().Add(time.Minute)
 			ginkgo.By("add permissionless validator", func() {
 				_, err := pWallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: validatorID,
-							End:    uint64(validatorEndTime.Unix()),
+							End:    uint64(endTime.Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
 						Subnet: subnetID,
@@ -160,7 +160,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: validatorID,
-							End:    uint64(validatorEndTime.Unix()),
+							End:    uint64(endTime.Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
 						Subnet: subnetID,
