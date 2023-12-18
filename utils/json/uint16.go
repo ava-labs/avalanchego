@@ -8,7 +8,7 @@ import "strconv"
 type Uint16 uint16
 
 func (u Uint16) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + strconv.FormatUint(uint64(u), 10) + "\""), nil
+	return []byte(`"` + strconv.FormatUint(uint64(u), 10) + `"`), nil
 }
 
 func (u *Uint16) UnmarshalJSON(b []byte) error {

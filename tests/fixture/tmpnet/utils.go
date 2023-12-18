@@ -9,6 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 const (
@@ -42,7 +45,41 @@ func WaitForHealthy(ctx context.Context, node *Node) error {
 	}
 }
 
+// NodeURI associates a node ID with its API URI.
+type NodeURI struct {
+	NodeID ids.NodeID
+	URI    string
+}
+
+func GetNodeURIs(nodes []*Node) []NodeURI {
+	uris := make([]NodeURI, 0, len(nodes))
+	for _, node := range nodes {
+		// Only append URIs that are not empty. A node may have an
+		// empty URI if it is not currently running.
+		if len(node.URI) > 0 {
+			uris = append(uris, NodeURI{
+				NodeID: node.NodeID,
+				URI:    node.URI,
+			})
+		}
+	}
+	return uris
+}
+
 // Marshal to json with default prefix and indent.
 func DefaultJSONMarshal(v interface{}) ([]byte, error) {
 	return json.MarshalIndent(v, "", "  ")
+}
+
+// Helper simplifying creation of a set of private keys
+func NewPrivateKeys(keyCount int) ([]*secp256k1.PrivateKey, error) {
+	keys := make([]*secp256k1.PrivateKey, 0, keyCount)
+	for i := 0; i < keyCount; i++ {
+		key, err := secp256k1.NewPrivateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate private key: %w", err)
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
