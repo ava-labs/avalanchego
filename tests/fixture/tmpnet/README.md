@@ -78,7 +78,7 @@ network, _ := tmpnet.StartNetwork(
     ginkgo.GinkgoWriter,                           // Writer to report progress of network start
     "",                                            // Use default root dir (~/.tmpnet)
     &tmpnet.Network{
-        DefaultRuntime: tmpnet.NodeRuntimeConfig{
+        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
             ExecPath: "/path/to/avalanchego",      // Defining the avalanchego exec path is required
         },
     },
@@ -104,7 +104,7 @@ network, _ := tmpnet.StartNetwork(
     ginkgo.GinkgoWriter,
     "",
     &tmpnet.Network{
-        DefaultRuntime: tmpnet.NodeRuntimeConfig{
+        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
             ExecPath: "/path/to/avalanchego",
         },
         Nodes: []*Node{

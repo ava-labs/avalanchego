@@ -97,7 +97,7 @@ func (p *NodeProcess) Start(w io.Writer) error {
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
-		return fmt.Errorf("failed to start node process: %w", err)
+		return fmt.Errorf("failed to retrieve existing process: %w", err)
 	}
 	if proc != nil {
 		return errNodeAlreadyRunning
