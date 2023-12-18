@@ -40,64 +40,89 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 )
 
-// BindedFiles contains the generated binding file contents.
-// This is used to return the contents in a expandable way.
-type BindedFiles struct {
-	Contract     string
-	Config       string
-	Module       string
-	ConfigTest   string
-	ContractTest string
+var errNoAnonymousEvent = errors.New("event type must not be anonymous")
+
+const (
+	ContractFileName     = "contract.go"
+	ConfigFileName       = "config.go"
+	ModuleFileName       = "module.go"
+	EventFileName        = "event.go"
+	ContractTestFileName = "contract_test.go"
+	ConfigTestFileName   = "config_test.go"
+)
+
+type PrecompileBindFile struct {
+	// FileName is the name of the file to be generated.
+	FileName string
+	// Content is the content of the file to be generated.
+	Content string
+	// IsTest indicates whether the file is a test file.
+	IsTest bool
 }
 
-// PrecompileBind generates a Go binding for a precompiled contract. It returns config binding and contract binding.
-func PrecompileBind(types []string, abiData string, bytecodes []string, fsigs []map[string]string, pkg string, lang bind.Lang, libs map[string]string, aliases map[string]string, abifilename string, generateTests bool) (BindedFiles, error) {
+func NewPrecompileBindFile(fileName string, content string, isTest bool) PrecompileBindFile {
+	return PrecompileBindFile{
+		FileName: fileName,
+		Content:  content,
+		IsTest:   isTest,
+	}
+}
+
+// PrecompileBind generates a Go binding for a precompiled contract. It returns a slice of
+// PrecompileBindFile structs containing the file name and its contents.
+func PrecompileBind(types []string, abiData string, bytecodes []string, fsigs []map[string]string, pkg string, lang bind.Lang, libs map[string]string, aliases map[string]string, abifilename string, generateTests bool) ([]PrecompileBindFile, error) {
 	// create hooks
 	configHook := createPrecompileHook(abifilename, tmplSourcePrecompileConfigGo)
 	contractHook := createPrecompileHook(abifilename, tmplSourcePrecompileContractGo)
 	moduleHook := createPrecompileHook(abifilename, tmplSourcePrecompileModuleGo)
+	eventHook := createPrecompileHook(abifilename, tmplSourcePrecompileEventGo)
 	configTestHook := createPrecompileHook(abifilename, tmplSourcePrecompileConfigTestGo)
 	contractTestHook := createPrecompileHook(abifilename, tmplSourcePrecompileContractTestGo)
 
 	if err := verifyABI(abiData); err != nil {
-		return BindedFiles{}, err
+		return nil, err
 	}
 
 	abis := []string{abiData}
 
 	configBind, err := bind.BindHelper(types, abis, bytecodes, fsigs, pkg, lang, libs, aliases, configHook)
 	if err != nil {
-		return BindedFiles{}, fmt.Errorf("failed to generate config binding: %w", err)
+		return nil, fmt.Errorf("failed to generate config binding: %w", err)
 	}
 	contractBind, err := bind.BindHelper(types, abis, bytecodes, fsigs, pkg, lang, libs, aliases, contractHook)
 	if err != nil {
-		return BindedFiles{}, fmt.Errorf("failed to generate contract binding: %w", err)
+		return nil, fmt.Errorf("failed to generate contract binding: %w", err)
 	}
 	moduleBind, err := bind.BindHelper(types, abis, bytecodes, fsigs, pkg, lang, libs, aliases, moduleHook)
 	if err != nil {
-		return BindedFiles{}, fmt.Errorf("failed to generate module binding: %w", err)
+		return nil, fmt.Errorf("failed to generate module binding: %w", err)
 	}
-	bindedFiles := BindedFiles{
-		Contract: contractBind,
-		Config:   configBind,
-		Module:   moduleBind,
+	eventBind, err := bind.BindHelper(types, abis, bytecodes, fsigs, pkg, lang, libs, aliases, eventHook)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate event binding: %w", err)
 	}
+
+	var result []PrecompileBindFile
+	result = append(result, NewPrecompileBindFile(ConfigFileName, configBind, false))
+	result = append(result, NewPrecompileBindFile(ContractFileName, contractBind, false))
+	result = append(result, NewPrecompileBindFile(ModuleFileName, moduleBind, false))
+	result = append(result, NewPrecompileBindFile(EventFileName, eventBind, false))
 
 	if generateTests {
 		configTestBind, err := bind.BindHelper(types, abis, bytecodes, fsigs, pkg, lang, libs, aliases, configTestHook)
 		if err != nil {
-			return BindedFiles{}, fmt.Errorf("failed to generate config test binding: %w", err)
+			return nil, fmt.Errorf("failed to generate config test binding: %w", err)
 		}
-		bindedFiles.ConfigTest = configTestBind
+		result = append(result, NewPrecompileBindFile(ConfigTestFileName, configTestBind, true))
 
 		contractTestBind, err := bind.BindHelper(types, abis, bytecodes, fsigs, pkg, lang, libs, aliases, contractTestHook)
 		if err != nil {
-			return BindedFiles{}, fmt.Errorf("failed to generate contract test binding: %w", err)
+			return nil, fmt.Errorf("failed to generate contract test binding: %w", err)
 		}
-		bindedFiles.ContractTest = contractTestBind
+		result = append(result, NewPrecompileBindFile(ContractTestFileName, contractTestBind, true))
 	}
 
-	return bindedFiles, nil
+	return result, nil
 }
 
 // createPrecompileHook creates a bind hook for precompiled contracts.
@@ -166,6 +191,24 @@ func verifyABI(abiData string) error {
 	if len(evmABI.Methods) == 0 {
 		return errors.New("no ABI methods found")
 	}
+
+	for _, event := range evmABI.Events {
+		if event.Anonymous {
+			return fmt.Errorf("%w: %s", errNoAnonymousEvent, event.Name)
+		}
+		eventNames := make(map[string]bool)
+		for _, arg := range event.Inputs {
+			if bind.IsKeyWord(arg.Name) {
+				return fmt.Errorf("event input name %s is a keyword", arg.Name)
+			}
+			name := abi.ToCamelCase(arg.Name)
+			if eventNames[name] {
+				return fmt.Errorf("normalized event input name is duplicated: %s", name)
+			}
+			eventNames[name] = true
+		}
+	}
+
 	for _, method := range evmABI.Methods {
 		names := make(map[string]bool)
 		for _, input := range method.Inputs {

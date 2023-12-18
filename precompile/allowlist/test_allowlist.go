@@ -158,11 +158,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 		"set manager from no role before activation": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
 				return config
-			}(),
+			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := PackModifyAllowList(TestNoRoleAddr, ManagerRole)
 				require.NoError(t, err)
@@ -176,11 +176,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 		"set manager from no role after activation": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
-			}(),
+			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := PackModifyAllowList(TestNoRoleAddr, ManagerRole)
 				require.NoError(t, err)
@@ -194,11 +194,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 		"set manager from enabled role before activation": {
 			Caller:     TestEnabledAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
 				return config
-			}(),
+			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := PackModifyAllowList(TestNoRoleAddr, ManagerRole)
 				require.NoError(t, err)
@@ -212,11 +212,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 		"set manager from enabled after activation": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
-			}(),
+			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := PackModifyAllowList(TestNoRoleAddr, ManagerRole)
 				require.NoError(t, err)
@@ -236,11 +236,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 
 				return input
 			},
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
 				return config
-			}(),
+			},
 			SuppliedGas: 0,
 			ReadOnly:    false,
 			ExpectedErr: "invalid non-activated function selector",
@@ -255,11 +255,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 				return input
 			},
 			ExpectedRes: []byte{},
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
-			}(),
+			},
 			SuppliedGas: ModifyAllowListGasCost,
 			ReadOnly:    false,
 			AfterHook: func(t testing.TB, state contract.StateDB) {
@@ -306,11 +306,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 		"set no role to manager from manager after activation": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
-			}(),
+			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := PackModifyAllowList(TestNoRoleAddr, ManagerRole)
 				require.NoError(t, err)
@@ -350,11 +350,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 		"set enabled role to manager from manager after activation": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
-			}(),
+			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := PackModifyAllowList(TestEnabledAddr, ManagerRole)
 				require.NoError(t, err)
@@ -411,11 +411,11 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 		"set admin to manager from manager after activation": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
-			ChainConfig: func() precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
-			}(),
+			},
 			InputFn: func(t testing.TB) []byte {
 				input, err := PackModifyAllowList(TestAdminAddr, ManagerRole)
 				require.NoError(t, err)

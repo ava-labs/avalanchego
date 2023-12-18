@@ -292,8 +292,8 @@ var (
 				input = append(input, make([]byte, 32)...)
 				return input
 			},
-			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
@@ -315,8 +315,8 @@ var (
 				input = append(input, make([]byte, 32)...)
 				return input
 			},
-			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
@@ -339,8 +339,8 @@ var (
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
-			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
@@ -356,8 +356,8 @@ var (
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
-			ChainConfigFn: func(t testing.TB) precompileconfig.ChainConfig {
-				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},

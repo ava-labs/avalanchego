@@ -501,6 +501,113 @@ var bindTests = []struct {
 		"",
 		false,
 	},
+	{
+		`IEventer`,
+		`
+		interface IEventer {
+			event test(address indexed addressTest, uint indexed intTest, bytes bytesTest);
+			event empty();
+			event indexed(address addr, int8 indexed num);
+			event mixed(address indexed addr, int8 num);
+			event dynamic(string indexed idxStr, bytes indexed idxDat, string str, bytes dat);
+			event unnamed(uint8 indexed, uint8 indexed);
+			function eventTest() external view returns (string memory result);
+		}
+		`,
+		`[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"addressTest","type":"address"},{"indexed":true,"internalType":"uint8","name":"intTest","type":"uint8"},{"indexed":false,"internalType":"bytes","name":"bytesTest","type":"bytes"}],"name":"test","type":"event"},{"inputs":[],"name":"eventTest","outputs":[{"internalType":"string","name":"result","type":"string"}],"stateMutability":"view","type":"function"},{"type":"event","name":"empty","inputs":[]},{"type":"event","name":"indexed","inputs":[{"name":"addr","type":"address","indexed":true},{"name":"num","type":"int8","indexed":true}]},{"type":"event","name":"mixed","inputs":[{"name":"addr","type":"address","indexed":true},{"name":"num","type":"int8"}]},{"type":"event","name":"dynamic","inputs":[{"name":"idxStr","type":"string","indexed":true},{"name":"idxDat","type":"bytes","indexed":true},{"name":"str","type":"string"},{"name":"dat","type":"bytes"}]},{"type":"event","name":"unnamed","inputs":[{"name":"","type":"uint8","indexed":true},{"name":"","type":"uint8","indexed":true}]}]`,
+		`"github.com/stretchr/testify/require"
+		"github.com/ethereum/go-ethereum/common"
+		"github.com/ava-labs/subnet-evm/precompile/contract"
+		`,
+		`
+			testAddr := common.Address{1}
+			testInt := int8(5)
+			testUint := uint8(5)
+			testBytes := []byte{1, 2, 3}
+
+			testEventData := TestEventData{
+				BytesTest: testBytes,
+			}
+			topics, data, err := PackTestEvent(testAddr, testUint, testEventData)
+			require.NoError(t, err)
+			eventID := IEventerABI.Events["test"].ID
+			require.Equal(t, eventID, topics[0])
+			unpacked, err := UnpackTestEventData(data)
+			require.NoError(t, err)
+			require.Equal(t, testBytes, unpacked.BytesTest)
+			gasCost := GetTestEventGasCost(testEventData)
+			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas + contract.LogDataGas, gasCost)
+
+			topics, data, err = PackEmptyEvent()
+			require.NoError(t, err)
+			eventID = IEventerABI.Events["empty"].ID
+			require.Len(t, topics, 1)
+			require.Equal(t, eventID, topics[0])
+			require.Equal(t, 0, len(data))
+			require.Equal(t, contract.LogGas, GetEmptyEventGasCost())
+
+			topics, data, err = PackIndexedEvent(testAddr, testInt)
+			require.NoError(t, err)
+			eventID = IEventerABI.Events["indexed"].ID
+			require.Len(t, topics, 3)
+			require.Equal(t, eventID, topics[0])
+			require.Equal(t, testAddr.Hash(), topics[1])
+			require.Equal(t, 0, len(data))
+			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas, GetIndexedEventGasCost())
+
+			testMixedData := MixedEventData{
+				Num: testInt,
+			}
+			topics, data, err = PackMixedEvent(testAddr, testMixedData)
+			require.NoError(t, err)
+			eventID = IEventerABI.Events["mixed"].ID
+			require.Len(t, topics, 2)
+			require.Equal(t, eventID, topics[0])
+			require.Equal(t, testAddr.Hash(), topics[1])
+			unpackedMixedData, err := UnpackMixedEventData(data)
+			require.NoError(t, err)
+			require.Equal(t, testMixedData, unpackedMixedData)
+			require.Equal(t, contract.LogGas + contract.LogTopicGas + contract.LogDataGas, GetMixedEventGasCost(testMixedData))
+
+			testDynamicData := DynamicEventData{
+				Str:    "test",
+				Dat:    testBytes,
+			}
+			topics, data, err = PackDynamicEvent("test", testBytes, testDynamicData)
+			require.NoError(t, err)
+			eventID = IEventerABI.Events["dynamic"].ID
+			require.Len(t, topics, 3)
+			require.Equal(t, eventID, topics[0])
+			unpackedDynamicData, err := UnpackDynamicEventData(data)
+			require.NoError(t, err)
+			require.Equal(t, testDynamicData, unpackedDynamicData)
+			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas + 2 * contract.LogDataGas, GetDynamicEventGasCost(testDynamicData))
+
+			topics, data, err = PackUnnamedEvent(testUint, testUint)
+			require.NoError(t, err)
+			eventID = IEventerABI.Events["unnamed"].ID
+			require.Len(t, topics, 3)
+			require.Equal(t, eventID, topics[0])
+			require.Equal(t, 0, len(data))
+			require.Equal(t, contract.LogGas + 2 * contract.LogTopicGas, GetUnnamedEventGasCost())
+	`,
+		"",
+		false,
+	},
+	{
+		`IEventerAnonymous`,
+		`
+		interface IEventer {
+			event Anonymous(address indexed, uint indexed, bytes) anonymous;
+			function eventTest() external view returns (string memory result);
+		}
+		`,
+		`[{"anonymous":true,"inputs":[{"indexed":true,"internalType":"address","name":"","type":"address"},{"indexed":true,"internalType":"uint256","name":"","type":"uint256"},{"indexed":false,"internalType":"bytes","name":"","type":"bytes"}],"name":"Anonymous","type":"event"},{"inputs":[],"name":"eventTest","outputs":[{"internalType":"string","name":"result","type":"string"}],"stateMutability":"view","type":"function"}]`,
+		``,
+		``,
+		errNoAnonymousEvent.Error(),
+		false,
+	},
 }
 
 // Tests that packages generated by the binder can be successfully compiled and
@@ -532,31 +639,27 @@ func TestPrecompileBind(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test %d: failed to generate binding: %v", i, err)
 			}
-			if tt.expectAllowlist {
-				require.Contains(t, bindedFiles.Contract, "allowlist.CreateAllowListFunctions(", "generated contract does not contain AllowListFunctions")
-			} else {
-				require.NotContains(t, bindedFiles.Contract, "allowlist.CreateAllowListFunctions(", "generated contract contains AllowListFunctions")
-			}
+
 			precompilePath := filepath.Join(pkg, tt.name)
 			if err := os.MkdirAll(precompilePath, 0o700); err != nil {
 				t.Fatalf("failed to create package: %v", err)
 			}
-			// change address to a suitable one for testing
-			bindedFiles.Module = strings.Replace(bindedFiles.Module, `common.HexToAddress("{ASUITABLEHEXADDRESS}")`, `common.HexToAddress("0x03000000000000000000000000000000000000ff")`, 1)
-			if err = os.WriteFile(filepath.Join(precompilePath, "module.go"), []byte(bindedFiles.Module), 0o600); err != nil {
-				t.Fatalf("test %d: failed to write binding: %v", i, err)
-			}
-			if err = os.WriteFile(filepath.Join(precompilePath, "config.go"), []byte(bindedFiles.Config), 0o600); err != nil {
-				t.Fatalf("test %d: failed to write binding: %v", i, err)
-			}
-			if err = os.WriteFile(filepath.Join(precompilePath, "contract.go"), []byte(bindedFiles.Contract), 0o600); err != nil {
-				t.Fatalf("test %d: failed to write binding: %v", i, err)
-			}
-			if err = os.WriteFile(filepath.Join(precompilePath, "config_test.go"), []byte(bindedFiles.ConfigTest), 0o600); err != nil {
-				t.Fatalf("test %d: failed to write binding: %v", i, err)
-			}
-			if err = os.WriteFile(filepath.Join(precompilePath, "contract_test.go"), []byte(bindedFiles.ContractTest), 0o600); err != nil {
-				t.Fatalf("test %d: failed to write binding: %v", i, err)
+			for _, file := range bindedFiles {
+				switch file.FileName {
+				case ContractFileName:
+					// check if the allowlist functions are generated
+					if tt.expectAllowlist {
+						require.Contains(t, file.Content, "allowlist.CreateAllowListFunctions(", "generated contract does not contain AllowListFunctions")
+					} else {
+						require.NotContains(t, file.Content, "allowlist.CreateAllowListFunctions(", "generated contract contains AllowListFunctions")
+					}
+				case ModuleFileName:
+					// change address to a suitable one for testing
+					file.Content = strings.Replace(file.Content, `common.HexToAddress("{ASUITABLEHEXADDRESS}")`, `common.HexToAddress("0x03000000000000000000000000000000000000ff")`, 1)
+				}
+				if err = os.WriteFile(filepath.Join(precompilePath, file.FileName), []byte(file.Content), 0o600); err != nil {
+					t.Fatalf("test %d: failed to write binding: %v", i, err)
+				}
 			}
 			if err = os.WriteFile(filepath.Join(precompilePath, "contract.abi"), []byte(tt.abi), 0o600); err != nil {
 				t.Fatalf("test %d: failed to write binding: %v", i, err)

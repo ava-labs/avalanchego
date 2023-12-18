@@ -198,6 +198,48 @@ func Test{{.Contract.Type}}Run(t *testing.T) {
 	{{- end}}
 }
 
+{{range .Contract.Events}}
+{{$hasData := false}}
+{{range .Normalized.Inputs}}
+{{ if not .Indexed}}
+{{ $hasData = true}}
+{{end}}
+{{end}}
+{{ if $hasData}}
+// TestPackUnpack{{.Normalized.Name}}EventData tests the Pack/Unpack{{.Normalized.Name}}EventData.
+func TestPackUnpack{{.Normalized.Name}}EventData(t *testing.T) {
+	// CUSTOM CODE STARTS HERE
+	// set test inputs with proper values here
+	{{- range .Normalized.Inputs}}
+		{{if .Indexed}}var {{decapitalise .Name}}Input {{bindtype .Type $structs}} = {{bindtypenew .Type $structs}}{{end}}
+	{{- end}}
+	{{if $hasData}} dataInput := {{.Normalized.Name}}EventData{{end}}{
+		{{- range .Normalized.Inputs}}
+			{{- if not .Indexed}}
+				{{capitalise .Name}}: {{bindtypenew .Type $structs}},
+			{{- end}}
+		{{- end}}
+	}
+
+	_, data, err := Pack{{.Normalized.Name}}Event(
+		{{- range .Normalized.Inputs}}
+			{{- if .Indexed}}
+				{{decapitalise .Name}}Input,
+			{{- end}}
+		{{- end}}
+		{{- if $hasData}}
+			dataInput,
+		{{- end}}
+	)
+	require.NoError(t, err)
+
+	unpacked, err := Unpack{{.Normalized.Name}}EventData(data)
+	require.NoError(t, err)
+	require.Equal(t, dataInput, unpacked)
+}
+{{end}}
+{{end}}
+
 func Benchmark{{.Contract.Type}}(b *testing.B) {
 	{{- if .Contract.AllowList}}
 	// Benchmark tests with allowlist tests.
