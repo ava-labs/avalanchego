@@ -8,7 +8,7 @@ import "strconv"
 type Float64 float64
 
 func (f Float64) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + strconv.FormatFloat(float64(f), byte('f'), 4, 64) + "\""), nil
+	return []byte(`"` + strconv.FormatFloat(float64(f), byte('f'), 4, 64) + `"`), nil
 }
 
 func (f *Float64) UnmarshalJSON(b []byte) error {
