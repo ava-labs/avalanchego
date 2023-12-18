@@ -126,10 +126,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						// Post-Durango, the [Start] is no longer user-specified and is
-						// set to the on-chain timestamp at tx acceptance.
-						End:  uint64(alphaValidatorsEndTime.Unix()),
-						Wght: weight,
+						End:    uint64(alphaValidatorsEndTime.Unix()),
+						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
@@ -157,10 +155,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						// Post-Durango, the [Start] is no longer user-specified and is
-						// set to the on-chain timestamp at tx acceptance.
-						End:  uint64(betaValidatorEndTime.Unix()),
-						Wght: weight,
+						End:    uint64(betaValidatorEndTime.Unix()),
+						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
@@ -192,10 +188,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						// Post-Durango, the [Start] is no longer user-specified and is
-						// set to the on-chain timestamp at tx acceptance.
-						End:  uint64(gammaDelegatorEndTime.Unix()),
-						Wght: weight,
+						End:    uint64(gammaDelegatorEndTime.Unix()),
+						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
@@ -217,10 +211,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						// Post-Durango, the [Start] is no longer user-specified and is
-						// set to the on-chain timestamp at tx acceptance.
-						End:  uint64(deltaDelegatorEndTime.Unix()),
-						Wght: weight,
+						End:    uint64(deltaDelegatorEndTime.Unix()),
+						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
