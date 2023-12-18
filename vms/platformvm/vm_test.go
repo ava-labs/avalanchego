@@ -1928,14 +1928,14 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		ts.MaxValidatorStake,
+		ts.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
 		id,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[1]},
-		ts.Keys[1].Address(),
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].Address(),
 	)
 	require.NoError(err)
 
@@ -1966,21 +1966,21 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.MaxValidatorStake,
+		ts.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{key, ts.Keys[2]},
-		ts.Keys[2].Address(),
+		[]*secp256k1.PrivateKey{key, ts.Keys[1]},
+		ts.Keys[1].Address(),
 	)
 	require.NoError(err)
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{key, ts.Keys[3]},
-		ts.Keys[3].Address(),
+		[]*secp256k1.PrivateKey{key, ts.Keys[2]},
+		ts.Keys[2].Address(),
 	)
 	require.NoError(err)
 
