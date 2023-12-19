@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -164,7 +165,9 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	state, err := newState(
 		db,
 		metrics.Noop,
-		validators.NewManager(),
+		&config.Config{
+			Validators: validators.NewManager(),
+		},
 		&snow.Context{
 			Log: logging.NoLog{},
 		},

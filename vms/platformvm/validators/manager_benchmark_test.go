@@ -108,7 +108,9 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	s, err := state.New(
 		db,
 		genesisBytes,
-		vdrs,
+		&config.Config{
+			Validators: vdrs,
+		},
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
 			NodeID:    ids.GenerateTestNodeID(),

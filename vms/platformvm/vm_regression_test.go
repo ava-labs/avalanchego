@@ -644,7 +644,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	newState, err := state.New(
 		vm.db,
 		nil,
-		vm.Config.Validators,
+		&vm.Config,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
@@ -948,7 +948,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	newState, err := state.New(
 		vm.db,
 		nil,
-		vm.Config.Validators,
+		&vm.Config,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),

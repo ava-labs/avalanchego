@@ -135,7 +135,7 @@ func (vm *VM) Initialize(
 	vm.state, err = state.New(
 		vm.db,
 		genesisBytes,
-		vm.Config.Validators,
+		&vm.Config,
 		vm.ctx,
 		vm.metrics,
 		rewards,
