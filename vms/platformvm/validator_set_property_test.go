@@ -391,26 +391,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed setting preference: %w", err)
 	}
 
-	// move time ahead, promoting the validator to current
-	stakerTx := signedTx.Unsigned.(txs.ScheduledStaker)
-	currentTime := stakerTx.StartTime()
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed building block: %w", err)
-	}
-	if err := blk.Verify(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed verifying block: %w", err)
-	}
-	if err := blk.Accept(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed accepting block: %w", err)
-	}
-	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return nil, fmt.Errorf("failed setting preference: %w", err)
-	}
-
+	stakerTx := signedTx.Unsigned.(txs.Staker)
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 

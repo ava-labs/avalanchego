@@ -37,7 +37,7 @@ func (id NodeID) Bytes() []byte {
 }
 
 func (id NodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + id.String() + "\""), nil
+	return []byte(`"` + id.String() + `"`), nil
 }
 
 func (id NodeID) MarshalText() ([]byte, error) {

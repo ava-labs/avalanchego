@@ -102,11 +102,16 @@ func TestIDMarshalJSON(t *testing.T) {
 		out   []byte
 		err   error
 	}{
-		{"ID{}", ID{}, []byte("\"11111111111111111111111111111111LpoYY\""), nil},
 		{
-			"ID(\"ava labs\")",
+			"ID{}",
+			ID{},
+			[]byte(`"11111111111111111111111111111111LpoYY"`),
+			nil,
+		},
+		{
+			`ID("ava labs")`,
 			ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
+			[]byte(`"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7"`),
 			nil,
 		},
 	}
@@ -128,10 +133,15 @@ func TestIDUnmarshalJSON(t *testing.T) {
 		out   ID
 		err   error
 	}{
-		{"ID{}", []byte("null"), ID{}, nil},
 		{
-			"ID(\"ava labs\")",
-			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
+			"ID{}",
+			[]byte("null"),
+			ID{},
+			nil,
+		},
+		{
+			`ID("ava labs")`,
+			[]byte(`"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7"`),
 			ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 			nil,
 		},
