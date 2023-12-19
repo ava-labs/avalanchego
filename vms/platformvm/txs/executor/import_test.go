@@ -118,9 +118,9 @@ func TestNewImportTx(t *testing.T) {
 		},
 		{
 			description:   "attempting to import from C-chain",
-			sourceChainID: env.ctx.CChainID,
+			sourceChainID: cChainID,
 			sharedMemory: fundedSharedMemory(
-				env.ctx.CChainID,
+				cChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},

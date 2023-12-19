@@ -181,7 +181,7 @@ func TestGetTxStatus(t *testing.T) {
 	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.db))
 
 	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
-	peerSharedMemory := m.NewSharedMemory(service.vm.ctx.XChainID)
+	peerSharedMemory := m.NewSharedMemory(xChainID)
 
 	// #nosec G404
 	utxo := &avax.UTXO{
@@ -220,12 +220,7 @@ func TestGetTxStatus(t *testing.T) {
 	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
 
-	tx, err := service.vm.txBuilder.NewImportTx(
-		service.vm.ctx.XChainID,
-		ids.ShortEmpty,
-		[]*secp256k1.PrivateKey{recipientKey},
-		ids.ShortEmpty,
-	)
+	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*secp256k1.PrivateKey{recipientKey}, ids.ShortEmpty)
 	require.NoError(err)
 
 	mutableSharedMemory.SharedMemory = oldSharedMemory
