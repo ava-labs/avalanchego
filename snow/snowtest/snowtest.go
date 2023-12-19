@@ -41,7 +41,7 @@ func ConsensusContext() *snow.ConsensusContext {
 	}
 }
 
-func NewContext(tb testing.TB) *snow.Context {
+func Context(tb testing.TB) *snow.Context {
 	require := require.New(tb)
 
 	ctx := snow.DefaultContextTest()

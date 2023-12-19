@@ -31,7 +31,7 @@ import (
 )
 
 func TestSemanticVerifierBaseTx(t *testing.T) {
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
@@ -390,7 +390,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 func TestSemanticVerifierExportTx(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)
@@ -758,7 +758,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ids.GenerateTestID(), nil)
@@ -877,7 +877,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 func TestSemanticVerifierImportTx(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)

@@ -121,7 +121,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
 
-	ctx := snowtest.NewContext(tb)
+	ctx := snowtest.Context(tb)
 	ctx.ChainID = ctx.XChainID
 
 	baseDB := memdb.New()
