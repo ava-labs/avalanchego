@@ -229,10 +229,10 @@ func TestPersistStakers(t *testing.T) {
 
 				s.PutCurrentValidator(val)
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+				r.NoError(s.Commit())
 
 				s.PutCurrentDelegator(del)
 				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-
 				r.NoError(s.Commit())
 				return del
 			},
@@ -357,11 +357,12 @@ func TestPersistStakers(t *testing.T) {
 
 				s.PutPendingValidator(val)
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+				r.NoError(s.Commit())
 
 				s.PutPendingDelegator(del)
 				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-
 				r.NoError(s.Commit())
+
 				return del
 			},
 			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
@@ -510,7 +511,6 @@ func TestPersistStakers(t *testing.T) {
 
 				s.PutCurrentDelegator(del)
 				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-
 				r.NoError(s.Commit())
 
 				s.DeleteCurrentDelegator(del)
@@ -642,7 +642,6 @@ func TestPersistStakers(t *testing.T) {
 
 				s.PutPendingDelegator(del)
 				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-
 				r.NoError(s.Commit())
 
 				s.DeletePendingDelegator(del)
