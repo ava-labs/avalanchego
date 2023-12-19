@@ -63,7 +63,7 @@ func TestEthTxsTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
 	builtMsg := EthTxsGossip{
-		Txs: utils.RandomBytes(1024 * units.KiB),
+		Txs: utils.RandomBytes(maxMessageSize),
 	}
 	_, err := BuildGossipMessage(Codec, builtMsg)
 	assert.Error(err)
