@@ -2,7 +2,6 @@
 
 ## Structure
 
-
 A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store (sometimes just called "a store") using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries implement a key-value store.
 
 Like all tries, a MerkleDB instance is composed of nodes. Conceputally, a node has:
@@ -26,7 +25,7 @@ Node
 +--------------------------------------------+
 ```
 
-This conceptual picture differs slightly from the implementation of the `node` in MerkleDB but is still useful in understanding how MerkleDB works. 
+This conceptual picture differs slightly from the implementation of the `node` in MerkleDB but is still useful in understanding how MerkleDB works.
 
 ## Root IDs and Revisions
 
@@ -70,7 +69,7 @@ In the diagram above, if `view1` were committed, `view2` would be invalidated. I
 
 MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that it has a key-value pair `(k,v)`, or that `k` is not present.
 
-Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.) To put a finer point on it, the flow is:
+Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.)
 
 ```mermaid
 flowchart TD
@@ -84,9 +83,47 @@ flowchart TD
 
 `Proof(k,r)` is a proof that purports to show either that key-value pair `(k,v)` exists in the revision at `r`, or that `k` isn't in the revision.
 
+#### Verification
+
+A proof is represented as:
+
+```go
+type Proof struct {
+	// Nodes in the proof path from root --> target key
+	// (or node that would be where key is if it doesn't exist).
+	// Always contains at least the root.
+	Path []ProofNode
+
+	// This is a proof that [key] exists/doesn't exist.
+	Key Key
+
+	// Nothing if [Key] isn't in the trie.
+	// Otherwise, the value corresponding to [Key].
+	Value maybe.Maybe[[]byte]
+}
+
+type ProofNode struct {
+	Key Key
+	// Nothing if this is an intermediate node.
+	// The value in this node if its length < [HashLen].
+	// The hash of the value in this node otherwise.
+	ValueOrHash maybe.Maybe[[]byte]
+	Children    map[byte]ids.ID
+}
+```
+
+For an inclusion proof, the last node in `Path` should be the one containing `Key`.
+For an exclusion proof, the last node is either:
+* The node that would be the parent of `Key`, if such node has no child at the index `Key` would be at.
+* The node at the same child index `Key` would be at, otherwise.
+
+In other words, the last node of a proof says either, "the key is in the trie, and this node contains it," or, "the key isn't in the trie, and this node's existence precludes the existence of the key."
+
+The prover can't simply trust that such a node exists, though. It has to verify this. The prover creates an empty trie and inserts the nodes in `Path`. If the root ID of this trie matches the `r`, the verifier can trust that the last node really does exist in the trie. If the last node _didn't_ really exist, the proof creator couldn't create `Path` such that its nodes both imply the existence of the ("fake") last node and also result in the correct root ID. This follows from the one-way property of hashing.
+
 ### Range Proofs
 
-MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is similar to the merkle proofs described above, except for multiple key-value pairs. Similar to above, the flow is:
+MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is similar to the merkle proofs described above, except for multiple key-value pairs.
 
 ```mermaid
 flowchart TD
@@ -259,6 +296,13 @@ Each node must have a unique ID that identifies it. This ID is calculated by has
 * The node's children
 * The node's value digest
 * The node's key
+
+The node's value digest is:
+* Nothing, if the node has no value
+* The node's value, if it has a value < 32 bytes
+* The hash of the node's value otherwise
+
+We use the node's value digest rather than its value when hashing so that when we send proofs, each `ProofNode` doesn't need to contain the node's value, which could be very large. By using the value digest, we allow a proof verifier to calculate a node's ID while limiting the size of the data sent to the verifier.  
 
 Specifically, we encode these values in the following way:
 
