@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -183,7 +182,7 @@ func initTestProposerVM(
 		}, nil
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	ctx.ChainID = ids.ID{1}
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
@@ -979,7 +978,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}, nil
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -1274,7 +1273,7 @@ func TestInnerVMRollback(t *testing.T) {
 		}
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -1943,7 +1942,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -2153,7 +2152,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -2304,7 +2303,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
@@ -2545,7 +2544,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
 	}
 
-	snowCtx := snowtest.EmptyContext()
+	snowCtx := snow.DefaultContextTest()
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
@@ -2704,7 +2703,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		},
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = &validators.TestState{
 		T: t,

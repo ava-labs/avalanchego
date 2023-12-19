@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
 func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *testing.T) {
@@ -63,7 +62,7 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	ctx := snowtest.EmptyContext()
+	ctx := snow.DefaultContextTest()
 	initialState := []byte("genesis state")
 
 	err := proVM.Initialize(

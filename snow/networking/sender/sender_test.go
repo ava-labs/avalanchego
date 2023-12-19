@@ -614,7 +614,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		failedNodeID  = ids.GenerateTestNodeID()
 		deadline      = time.Second
 		requestID     = uint32(1337)
-		ctx           = snowtest.EmptyContext()
+		ctx           = snow.DefaultContextTest()
 		heights       = []uint64{1, 2, 3}
 		containerIDs  = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		engineType    = p2p.EngineType_ENGINE_TYPE_SNOWMAN
@@ -885,7 +885,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		destinationNodeID = ids.GenerateTestNodeID()
 		deadline          = time.Second
 		requestID         = uint32(1337)
-		ctx               = snowtest.EmptyContext()
+		ctx               = snow.DefaultContextTest()
 		summaryIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		summary           = []byte{1, 2, 3}
 		engineType        = p2p.EngineType_ENGINE_TYPE_AVALANCHE
@@ -1093,7 +1093,7 @@ func TestSender_Single_Request(t *testing.T) {
 		destinationNodeID = ids.GenerateTestNodeID()
 		deadline          = time.Second
 		requestID         = uint32(1337)
-		ctx               = snowtest.EmptyContext()
+		ctx               = snow.DefaultContextTest()
 		containerID       = ids.GenerateTestID()
 		engineType        = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
