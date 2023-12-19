@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -151,7 +152,7 @@ type mutableSharedMemory struct {
 func defaultContext(t *testing.T) *snow.Context {
 	require := require.New(t)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.EmptyContext()
 	ctx.NetworkID = constants.UnitTestID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
@@ -1306,7 +1307,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	consensusCtx := snow.DefaultConsensusContextTest()
+	consensusCtx := snowtest.EmptyConsensusContext()
 	consensusCtx.Context = ctx
 	ctx.Lock.Lock()
 

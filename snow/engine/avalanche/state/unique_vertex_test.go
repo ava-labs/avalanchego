@@ -13,10 +13,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -29,7 +29,7 @@ func newTestSerializer(t *testing.T, parse func(context.Context, []byte) (snowst
 	vm.ParseTxF = parse
 
 	baseDB := memdb.New()
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.EmptyContext()
 	s := NewSerializer(
 		SerializerConfig{
 			ChainID: ctx.ChainID,
@@ -260,7 +260,7 @@ func TestParseVertexWithIncorrectChainID(t *testing.T) {
 func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.EmptyContext()
 	statelessVertex, err := vertex.Build( // regular, non-stop vertex
 		ctx.ChainID,
 		0,

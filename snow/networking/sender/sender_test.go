@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -53,7 +54,7 @@ var defaultSubnetConfig = subnets.Config{
 func TestTimeout(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snowtest.EmptyConsensusContext()
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
@@ -112,7 +113,7 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snowtest.EmptyConsensusContext()
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -317,7 +318,7 @@ func TestTimeout(t *testing.T) {
 func TestReliableMessages(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snowtest.EmptyConsensusContext()
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.BuildTestNodeID([]byte{1}), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
@@ -377,7 +378,7 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snowtest.EmptyConsensusContext()
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -463,7 +464,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require := require.New(t)
 
 	benchlist := benchlist.NewNoBenchlist()
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snowtest.EmptyConsensusContext()
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	tm, err := timeout.NewManager(
@@ -522,7 +523,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snowtest.EmptyConsensusContext()
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -613,7 +614,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		failedNodeID  = ids.GenerateTestNodeID()
 		deadline      = time.Second
 		requestID     = uint32(1337)
-		ctx           = snow.DefaultContextTest()
+		ctx           = snowtest.EmptyContext()
 		heights       = []uint64{1, 2, 3}
 		containerIDs  = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		engineType    = p2p.EngineType_ENGINE_TYPE_SNOWMAN
@@ -884,7 +885,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		destinationNodeID = ids.GenerateTestNodeID()
 		deadline          = time.Second
 		requestID         = uint32(1337)
-		ctx               = snow.DefaultContextTest()
+		ctx               = snowtest.EmptyContext()
 		summaryIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		summary           = []byte{1, 2, 3}
 		engineType        = p2p.EngineType_ENGINE_TYPE_AVALANCHE
@@ -1092,7 +1093,7 @@ func TestSender_Single_Request(t *testing.T) {
 		destinationNodeID = ids.GenerateTestNodeID()
 		deadline          = time.Second
 		requestID         = uint32(1337)
-		ctx               = snow.DefaultContextTest()
+		ctx               = snowtest.EmptyContext()
 		containerID       = ids.GenerateTestID()
 		engineType        = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)

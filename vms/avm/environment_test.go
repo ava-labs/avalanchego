@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -238,7 +239,7 @@ func newContext(tb testing.TB) *snow.Context {
 	genesisBytes := buildGenesisTest(tb)
 	tx := getCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.EmptyContext()
 	ctx.NetworkID = constants.UnitTestID
 	ctx.ChainID = chainID
 	ctx.AVAXAssetID = tx.ID()
