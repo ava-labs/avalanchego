@@ -107,7 +107,6 @@ func TestPersistStakers(t *testing.T) {
 
 					validatorsData = txs.Validator{
 						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(startTime),
 						End:    uint64(endTime),
 						Wght:   1234,
 					}
@@ -188,7 +187,6 @@ func TestPersistStakers(t *testing.T) {
 
 					validatorsData = txs.Validator{
 						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(valStartTime),
 						End:    uint64(valEndTime),
 						Wght:   1234,
 					}
@@ -196,7 +194,6 @@ func TestPersistStakers(t *testing.T) {
 
 					delegatorData = txs.Validator{
 						NodeID: validatorsData.NodeID,
-						Start:  uint64(delStartTime),
 						End:    uint64(delEndTime),
 						Wght:   validatorsData.Wght / 2,
 					}
@@ -393,7 +390,6 @@ func TestPersistStakers(t *testing.T) {
 
 					validatorsData = txs.Validator{
 						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(startTime),
 						End:    uint64(endTime),
 						Wght:   1234,
 					}
@@ -467,7 +463,6 @@ func TestPersistStakers(t *testing.T) {
 
 					validatorsData = txs.Validator{
 						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(valStartTime),
 						End:    uint64(valEndTime),
 						Wght:   1234,
 					}
@@ -475,7 +470,6 @@ func TestPersistStakers(t *testing.T) {
 
 					delegatorData = txs.Validator{
 						NodeID: validatorsData.NodeID,
-						Start:  uint64(delStartTime),
 						End:    uint64(delEndTime),
 						Wght:   validatorsData.Wght / 2,
 					}
