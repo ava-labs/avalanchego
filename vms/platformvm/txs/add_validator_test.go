@@ -66,7 +66,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	stakes := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: ctx.AVAXAssetID},
 		Out: &stakeable.LockOut{
-			Locktime: uint64(clk.Time().Add(time.Second).Unix()),
+			Locktime: clk.Time().Add(time.Second).Unix(),
 			TransferableOut: &secp256k1fx.TransferOutput{
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -183,7 +183,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	stakes := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: assetID},
 		Out: &stakeable.LockOut{
-			Locktime: uint64(clk.Time().Add(time.Second).Unix()),
+			Locktime: clk.Time().Add(time.Second).Unix(),
 			TransferableOut: &secp256k1fx.TransferOutput{
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{

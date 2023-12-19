@@ -392,7 +392,7 @@ func (b *builder) NewExportTx(
 func getSpendableAmount(
 	utxo *avax.UTXO,
 	addrs set.Set[ids.ShortID],
-	minIssuanceTime uint64,
+	minIssuanceTime int64,
 	avaxAssetID ids.ID,
 ) (uint64, []uint32, bool) {
 	if utxo.Asset.ID != avaxAssetID {

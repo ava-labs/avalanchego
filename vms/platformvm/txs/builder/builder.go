@@ -115,9 +115,9 @@ type ProposalTxBuilder interface {
 	// keys: Keys providing the staked tokens
 	// changeAddr: Address to send change to, if there is any
 	NewAddValidatorTx(
-		stakeAmount,
+		stakeAmount uint64,
 		startTime,
-		endTime uint64,
+		endTime int64,
 		nodeID ids.NodeID,
 		rewardAddress ids.ShortID,
 		shares uint32,
@@ -133,9 +133,9 @@ type ProposalTxBuilder interface {
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
-		stakeAmount,
+		stakeAmount uint64,
 		startTime,
-		endTime uint64,
+		endTime int64,
 		nodeID ids.NodeID,
 		rewardAddress ids.ShortID,
 		keys []*secp256k1.PrivateKey,
@@ -150,9 +150,9 @@ type ProposalTxBuilder interface {
 	// keys: keys to use for adding the validator
 	// changeAddr: address to send change to, if there is any
 	NewAddSubnetValidatorTx(
-		weight,
+		weight uint64,
 		startTime,
-		endTime uint64,
+		endTime int64,
 		nodeID ids.NodeID,
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
@@ -450,9 +450,9 @@ func (b *builder) NewCreateSubnetTx(
 }
 
 func (b *builder) NewAddValidatorTx(
-	stakeAmount,
+	stakeAmount uint64,
 	startTime,
-	endTime uint64,
+	endTime int64,
 	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
 	shares uint32,
@@ -473,8 +473,8 @@ func (b *builder) NewAddValidatorTx(
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
+			Start:  uint64(startTime), // TODO
+			End:    uint64(endTime),   // TODO
 			Wght:   stakeAmount,
 		},
 		StakeOuts: stakedOuts,
@@ -493,9 +493,9 @@ func (b *builder) NewAddValidatorTx(
 }
 
 func (b *builder) NewAddDelegatorTx(
-	stakeAmount,
+	stakeAmount uint64,
 	startTime,
-	endTime uint64,
+	endTime int64,
 	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
@@ -515,8 +515,8 @@ func (b *builder) NewAddDelegatorTx(
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
+			Start:  uint64(startTime), // TODO
+			End:    uint64(endTime),   // TODO
 			Wght:   stakeAmount,
 		},
 		StakeOuts: lockedOuts,
@@ -534,9 +534,9 @@ func (b *builder) NewAddDelegatorTx(
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
-	weight,
+	weight uint64,
 	startTime,
-	endTime uint64,
+	endTime int64,
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
@@ -564,8 +564,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 		SubnetValidator: txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
-				Start:  startTime,
-				End:    endTime,
+				Start:  uint64(startTime), // TODO
+				End:    uint64(endTime),   // TODO
 				Wght:   weight,
 			},
 			Subnet: subnetID,

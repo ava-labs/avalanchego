@@ -46,7 +46,7 @@ func TestMessage(t *testing.T) {
 	testTLSCert, err := staking.LoadTLSCertFromBytes(testKeyRaw, testCertRaw)
 	require.NoError(t, err)
 
-	nowUnix := time.Now().Unix()
+	nowUnix := uint64(time.Now().Unix())
 
 	tests := []struct {
 		desc             string
@@ -128,11 +128,11 @@ func TestMessage(t *testing.T) {
 				Message: &p2p.Message_Version{
 					Version: &p2p.Version{
 						NetworkId:      uint32(1337),
-						MyTime:         uint64(nowUnix),
+						MyTime:         nowUnix,
 						IpAddr:         []byte(net.IPv6zero),
 						IpPort:         9651,
 						MyVersion:      "v1.2.3",
-						MyVersionTime:  uint64(nowUnix),
+						MyVersionTime:  nowUnix,
 						Sig:            []byte{'y', 'e', 'e', 't'},
 						TrackedSubnets: [][]byte{testID[:]},
 					},
@@ -175,7 +175,7 @@ func TestMessage(t *testing.T) {
 								X509Certificate: testTLSCert.Certificate[0],
 								IpAddr:          []byte(net.IPv6zero),
 								IpPort:          9651,
-								Timestamp:       uint64(nowUnix),
+								Timestamp:       nowUnix,
 								Signature:       compressibleContainers[0],
 							},
 						},
@@ -197,7 +197,7 @@ func TestMessage(t *testing.T) {
 								X509Certificate: testTLSCert.Certificate[0],
 								IpAddr:          []byte(net.IPv6zero),
 								IpPort:          9651,
-								Timestamp:       uint64(nowUnix),
+								Timestamp:       nowUnix,
 								Signature:       compressibleContainers[0],
 							},
 						},

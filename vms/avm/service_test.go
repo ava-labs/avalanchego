@@ -232,7 +232,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1337,
 			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  uint64(now.Add(10 * time.Hour).Unix()),
+				Locktime:  now.Add(10 * time.Hour).Unix(),
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
 			},
@@ -424,7 +424,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1337,
 			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  uint64(now.Add(10 * time.Hour).Unix()),
+				Locktime:  now.Add(10 * time.Hour).Unix(),
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
 			},

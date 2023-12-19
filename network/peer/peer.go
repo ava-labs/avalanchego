@@ -875,13 +875,13 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 			p.Log.Warn("beacon reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
-				zap.Uint64("myTime", myTime),
+				zap.Int64("myTime", myTime),
 			)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
-				zap.Uint64("myTime", myTime),
+				zap.Int64("myTime", myTime),
 			)
 		}
 		p.StartClose()
@@ -1003,7 +1003,7 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 				IP:   msg.IpAddr,
 				Port: uint16(msg.IpPort),
 			},
-			Timestamp: msg.MyVersionTime,
+			Timestamp: int64(msg.MyVersionTime),
 		},
 		Signature: msg.Sig,
 	}
@@ -1105,7 +1105,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 				IP:   claimedIPPort.IpAddr,
 				Port: uint16(claimedIPPort.IpPort),
 			},
-			Timestamp: claimedIPPort.Timestamp,
+			Timestamp: int64(claimedIPPort.Timestamp), // todo remove cast
 			Signature: claimedIPPort.Signature,
 			TxID:      txID,
 		}

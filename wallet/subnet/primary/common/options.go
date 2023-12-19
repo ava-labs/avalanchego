@@ -35,7 +35,7 @@ type Options struct {
 	baseFee *big.Int
 
 	minIssuanceTimeSet bool
-	minIssuanceTime    uint64
+	minIssuanceTime    int64
 
 	allowStakeableLocked bool
 
@@ -99,11 +99,11 @@ func (o *Options) BaseFee(defaultBaseFee *big.Int) *big.Int {
 	return defaultBaseFee
 }
 
-func (o *Options) MinIssuanceTime() uint64 {
+func (o *Options) MinIssuanceTime() int64 {
 	if o.minIssuanceTimeSet {
 		return o.minIssuanceTime
 	}
-	return uint64(time.Now().Unix())
+	return time.Now().Unix()
 }
 
 func (o *Options) AllowStakeableLocked() bool {
@@ -162,7 +162,7 @@ func WithBaseFee(baseFee *big.Int) Option {
 	}
 }
 
-func WithMinIssuanceTime(minIssuanceTime uint64) Option {
+func WithMinIssuanceTime(minIssuanceTime int64) Option {
 	return func(o *Options) {
 		o.minIssuanceTimeSet = true
 		o.minIssuanceTime = minIssuanceTime

@@ -281,8 +281,8 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 	addr := keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		vm.Config.MinValidatorStake,
-		uint64(data.startTime.Unix()),
-		uint64(data.endTime.Unix()),
+		data.startTime.Unix(),
+		data.endTime.Unix(),
 		data.nodeID,
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
@@ -358,8 +358,8 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 	addr := keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.Config.MinValidatorStake,
-		uint64(data.startTime.Unix()),
-		uint64(data.endTime.Unix()),
+		data.startTime.Unix(),
+		data.endTime.Unix(),
 		data.nodeID,
 		addr,
 		reward.PercentDenominator,

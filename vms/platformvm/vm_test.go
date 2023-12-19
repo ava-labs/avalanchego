@@ -435,8 +435,8 @@ func TestAddValidatorCommit(t *testing.T) {
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
@@ -480,8 +480,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	// create invalid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
@@ -536,8 +536,8 @@ func TestAddValidatorReject(t *testing.T) {
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
@@ -581,8 +581,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		repeatNodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
@@ -617,8 +617,8 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -665,8 +665,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
@@ -952,8 +952,8 @@ func TestCreateSubnet(t *testing.T) {
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -2054,8 +2054,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
+		validatorStartTime.Unix(),
+		validatorEndTime.Unix(),
 		nodeID,
 		id,
 		reward.PercentDenominator,
@@ -2092,8 +2092,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
+		validatorStartTime.Unix(),
+		validatorEndTime.Unix(),
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[1]},

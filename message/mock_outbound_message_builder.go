@@ -371,7 +371,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) StateSummaryFrontier(arg0, arg1, a
 }
 
 // Version mocks base method.
-func (m *MockOutboundMsgBuilder) Version(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Version(arg0 uint32, arg1 int64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 int64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Version", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
 	ret0, _ := ret[0].(OutboundMessage)

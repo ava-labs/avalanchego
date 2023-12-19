@@ -15,7 +15,7 @@ var (
 )
 
 type LockOut struct {
-	Locktime             uint64 `serialize:"true" json:"locktime"`
+	Locktime             int64 `serialize:"true" json:"locktime"`
 	avax.TransferableOut `serialize:"true" json:"output"`
 }
 
@@ -37,7 +37,7 @@ func (s *LockOut) Verify() error {
 }
 
 type LockIn struct {
-	Locktime            uint64 `serialize:"true" json:"locktime"`
+	Locktime            int64 `serialize:"true" json:"locktime"`
 	avax.TransferableIn `serialize:"true" json:"input"`
 }
 

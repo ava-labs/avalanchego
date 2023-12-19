@@ -318,7 +318,7 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
-			Locktime:  uint64(date.Add(time.Second).Unix()),
+			Locktime:  date.Add(time.Second).Unix(),
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				addr,
@@ -1122,7 +1122,7 @@ func TestVerifyPermission(t *testing.T) {
 			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
 				Threshold: 1,
-				Locktime:  uint64(now.Add(time.Second).Unix()),
+				Locktime:  now.Add(time.Second).Unix(),
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
 			ErrTimelocked,

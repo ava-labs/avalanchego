@@ -98,12 +98,12 @@ func NewTestGenesis(
 				UnlockSchedule: []genesis.LockedAmount{ // Provides stake to validators
 					{
 						Amount:   totalStake,
-						Locktime: uint64(now.Add(7 * 24 * time.Hour).Unix()), // 1 Week
+						Locktime: now.Add(7 * 24 * time.Hour).Unix(), // 1 Week
 					},
 				},
 			},
 		},
-		StartTime:                  uint64(now.Unix()),
+		StartTime:                  now.Unix(),
 		InitialStakedFunds:         []string{stakeAddress},
 		InitialStakeDuration:       365 * 24 * 60 * 60, // 1 year
 		InitialStakeDurationOffset: 90 * 60,            // 90 minutes
@@ -139,7 +139,7 @@ func NewTestGenesis(
 					},
 					{
 						Amount:   totalStake,
-						Locktime: uint64(now.Add(7 * 24 * time.Hour).Unix()), // 1 Week
+						Locktime: now.Add(7 * 24 * time.Hour).Unix(), // 1 Week
 					},
 				},
 			},

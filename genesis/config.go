@@ -28,7 +28,7 @@ var (
 
 type LockedAmount struct {
 	Amount   uint64 `json:"amount"`
-	Locktime uint64 `json:"locktime"`
+	Locktime int64  `json:"locktime"`
 }
 
 type Allocation struct {
@@ -87,7 +87,7 @@ type Config struct {
 
 	Allocations []Allocation `json:"allocations"`
 
-	StartTime                  uint64        `json:"startTime"`
+	StartTime                  int64         `json:"startTime"`
 	InitialStakeDuration       uint64        `json:"initialStakeDuration"`
 	InitialStakeDurationOffset uint64        `json:"initialStakeDurationOffset"`
 	InitialStakedFunds         []ids.ShortID `json:"initialStakedFunds"`

@@ -26,7 +26,7 @@ var (
 type OutputOwners struct {
 	verify.IsNotState `json:"-"`
 
-	Locktime  uint64        `serialize:"true" json:"locktime"`
+	Locktime  int64         `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
 

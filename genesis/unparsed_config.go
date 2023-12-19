@@ -86,7 +86,7 @@ type UnparsedConfig struct {
 
 	Allocations []UnparsedAllocation `json:"allocations"`
 
-	StartTime                  uint64           `json:"startTime"`
+	StartTime                  int64            `json:"startTime"`
 	InitialStakeDuration       uint64           `json:"initialStakeDuration"`
 	InitialStakeDurationOffset uint64           `json:"initialStakeDurationOffset"`
 	InitialStakedFunds         []string         `json:"initialStakedFunds"`

@@ -489,8 +489,8 @@ func addPendingValidator(
 ) (*txs.Tx, error) {
 	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,

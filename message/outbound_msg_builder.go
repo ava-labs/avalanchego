@@ -20,14 +20,14 @@ var _ OutboundMsgBuilder = (*outMsgBuilder)(nil)
 type OutboundMsgBuilder interface {
 	Version(
 		networkID uint32,
-		myTime uint64,
+		myTime int64,
 		ip ips.IPPort,
 		myVersion string,
 		client string,
 		major uint32,
 		minor uint32,
 		patch uint32,
-		myVersionTime uint64,
+		myVersionTime int64,
 		sig []byte,
 		trackedSubnets []ids.ID,
 		supportedACPs []uint32,
@@ -232,14 +232,14 @@ func (b *outMsgBuilder) Pong(
 
 func (b *outMsgBuilder) Version(
 	networkID uint32,
-	myTime uint64,
+	myTime int64,
 	ip ips.IPPort,
 	myVersion string,
 	client string,
 	major uint32,
 	minor uint32,
 	patch uint32,
-	myVersionTime uint64,
+	myVersionTime int64,
 	sig []byte,
 	trackedSubnets []ids.ID,
 	supportedACPs []uint32,
@@ -252,11 +252,11 @@ func (b *outMsgBuilder) Version(
 			Message: &p2p.Message_Version{
 				Version: &p2p.Version{
 					NetworkId:      networkID,
-					MyTime:         myTime,
+					MyTime:         uint64(myTime),
 					IpAddr:         ip.IP.To16(),
 					IpPort:         uint32(ip.Port),
 					MyVersion:      myVersion,
-					MyVersionTime:  myVersionTime,
+					MyVersionTime:  uint64(myVersionTime),
 					Sig:            sig,
 					TrackedSubnets: subnetIDBytes,
 					Client: &p2p.Client{
@@ -282,7 +282,7 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 			X509Certificate: p.Cert.Raw,
 			IpAddr:          p.IPPort.IP.To16(),
 			IpPort:          uint32(p.IPPort.Port),
-			Timestamp:       p.Timestamp,
+			Timestamp:       uint64(p.Timestamp),
 			Signature:       p.Signature,
 			TxId:            p.TxID[:],
 		}

@@ -500,7 +500,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 
 	// Information for them to update about us
 	ipLen := len(claimedIPPorts)
-	newestTimestamp := make(map[ids.ID]uint64, ipLen)
+	newestTimestamp := make(map[ids.ID]int64, ipLen)
 	// Information for us to update about them
 	txIDsWithUpToDateIP := make([]ids.ID, 0, ipLen)
 
@@ -607,7 +607,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			// the peer provided us, we may be able to avoid some unnecessary
 			// gossip in the case that the peer is about to update this
 			// validator's IP.
-			Timestamp: newestTimestamp[txID],
+			Timestamp: uint64(newestTimestamp[txID]),
 		}
 	}
 	return peerAcks, nil
@@ -637,7 +637,7 @@ func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error {
 		// response to. That means that I should re-gossip this node's IP to the
 		// peer.
 		myIP, previouslyTracked := n.peerIPs[nodeID]
-		if previouslyTracked && myIP.Timestamp <= ip.Timestamp {
+		if previouslyTracked && myIP.Timestamp <= int64(ip.Timestamp) { // todo remove cast
 			txIDs = append(txIDs, txID)
 		}
 	}

@@ -234,7 +234,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		}
 		if apiUTXO.Locktime > args.Time {
 			utxo.Out = &stakeable.LockOut{
-				Locktime:        uint64(apiUTXO.Locktime),
+				Locktime:        int64(apiUTXO.Locktime), // TODO fix
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
 		}
@@ -273,7 +273,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			}
 			if apiUTXO.Locktime > args.Time {
 				utxo.Out = &stakeable.LockOut{
-					Locktime:        uint64(apiUTXO.Locktime),
+					Locktime:        int64(apiUTXO.Locktime), // TODO fix
 					TransferableOut: utxo.Out,
 				}
 			}
@@ -294,7 +294,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		}
 
 		owner := &secp256k1fx.OutputOwners{
-			Locktime:  uint64(vdr.RewardOwner.Locktime),
+			Locktime:  int64(vdr.RewardOwner.Locktime), // TODO fix
 			Threshold: uint32(vdr.RewardOwner.Threshold),
 		}
 		for _, addrStr := range vdr.RewardOwner.Addresses {

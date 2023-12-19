@@ -171,7 +171,7 @@ func (h *handler) Spend(
 	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
-	now := uint64(h.clk.Time().Unix())
+	now := h.clk.Time().Unix()
 
 	ins := []*avax.TransferableInput{}
 	returnedOuts := []*avax.TransferableOutput{}
@@ -418,7 +418,7 @@ func (h *handler) Authorize(
 	kc := secp256k1fx.NewKeychain(keys...)
 
 	// Make sure that the operation is valid after a minimum time
-	now := uint64(h.clk.Time().Unix())
+	now := h.clk.Time().Unix()
 
 	// Attempt to prove ownership of the subnet
 	indices, signers, matches := kc.Match(owner, now)
@@ -484,7 +484,7 @@ func (h *handler) VerifySpendUTXOs(
 	}
 
 	// Time this transaction is being verified
-	now := uint64(h.clk.Time().Unix())
+	now := h.clk.Time().Unix()
 
 	// Track the amount of unlocked transfers
 	// assetID -> amount
@@ -492,8 +492,8 @@ func (h *handler) VerifySpendUTXOs(
 
 	// Track the amount of locked transfers and their owners
 	// assetID -> locktime -> ownerID -> amount
-	lockedProduced := make(map[ids.ID]map[uint64]map[ids.ID]uint64)
-	lockedConsumed := make(map[ids.ID]map[uint64]map[ids.ID]uint64)
+	lockedProduced := make(map[ids.ID]map[int64]map[ids.ID]uint64)
+	lockedConsumed := make(map[ids.ID]map[int64]map[ids.ID]uint64)
 
 	for index, input := range ins {
 		utxo := utxos[index] // The UTXO consumed by [input]
@@ -510,7 +510,7 @@ func (h *handler) VerifySpendUTXOs(
 		}
 
 		out := utxo.Out
-		locktime := uint64(0)
+		locktime := int64(0)
 		// Set [locktime] to this UTXO's locktime, if applicable
 		if inner, ok := out.(*stakeable.LockOut); ok {
 			out = inner.TransferableOut
@@ -563,7 +563,7 @@ func (h *handler) VerifySpendUTXOs(
 		}
 		lockedConsumedAsset, ok := lockedConsumed[realAssetID]
 		if !ok {
-			lockedConsumedAsset = make(map[uint64]map[ids.ID]uint64)
+			lockedConsumedAsset = make(map[int64]map[ids.ID]uint64)
 			lockedConsumed[realAssetID] = lockedConsumedAsset
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
@@ -583,7 +583,7 @@ func (h *handler) VerifySpendUTXOs(
 		assetID := out.AssetID()
 
 		output := out.Output()
-		locktime := uint64(0)
+		locktime := int64(0)
 		// Set [locktime] to this output's locktime, if applicable
 		if inner, ok := output.(*stakeable.LockOut); ok {
 			output = inner.TransferableOut
@@ -612,7 +612,7 @@ func (h *handler) VerifySpendUTXOs(
 		}
 		lockedProducedAsset, ok := lockedProduced[assetID]
 		if !ok {
-			lockedProducedAsset = make(map[uint64]map[ids.ID]uint64)
+			lockedProducedAsset = make(map[int64]map[ids.ID]uint64)
 			lockedProduced[assetID] = lockedProducedAsset
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)

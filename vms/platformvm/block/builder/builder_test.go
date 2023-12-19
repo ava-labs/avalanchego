@@ -111,8 +111,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	// Create a valid [AddValidatorTx]
 	tx, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
+		validatorStartTime.Unix(),
+		validatorEndTime.Unix(),
 		nodeID,
 		preFundedKeys[0].PublicKey().Address(),
 		reward.PercentDenominator,
@@ -301,8 +301,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 
 	tx1, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
+		validatorStartTime.Unix(),
+		validatorEndTime.Unix(),
 		ids.GenerateTestNodeID(),
 		preFundedKeys[0].PublicKey().Address(),
 		reward.PercentDenominator,
@@ -320,8 +320,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 
 	tx2, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
-		uint64(validator2StartTime.Unix()),
-		uint64(validator2EndTime.Unix()),
+		validator2StartTime.Unix(),
+		validator2EndTime.Unix(),
 		ids.GenerateTestNodeID(),
 		preFundedKeys[1].PublicKey().Address(),
 		reward.PercentDenominator,
@@ -339,8 +339,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 
 	tx3, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
-		uint64(validator3StartTime.Unix()),
-		uint64(validator3EndTime.Unix()),
+		validator3StartTime.Unix(),
+		validator3EndTime.Unix(),
 		ids.GenerateTestNodeID(),
 		preFundedKeys[2].PublicKey().Address(),
 		reward.PercentDenominator,
@@ -400,8 +400,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 
 	tx1, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
-		uint64(now.Unix()),
-		uint64(validatorEndTime.Unix()),
+		now.Unix(),
+		validatorEndTime.Unix(),
 		ids.GenerateTestNodeID(),
 		preFundedKeys[0].PublicKey().Address(),
 		reward.PercentDenominator,
@@ -418,8 +418,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 
 	tx2, err := env.txBuilder.NewAddValidatorTx(
 		defaultValidatorStake,
-		uint64(now.Unix()),
-		uint64(validator2EndTime.Unix()),
+		now.Unix(),
+		validator2EndTime.Unix(),
 		ids.GenerateTestNodeID(),
 		preFundedKeys[2].PublicKey().Address(),
 		reward.PercentDenominator,

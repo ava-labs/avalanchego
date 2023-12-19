@@ -19,7 +19,7 @@ var errTest = errors.New("hi mom")
 func TestLockOutVerify(t *testing.T) {
 	tests := []struct {
 		name             string
-		locktime         uint64
+		locktime         int64
 		transferableOutF func(*gomock.Controller) avax.TransferableOut
 		expectedErr      error
 	}{
@@ -77,7 +77,7 @@ func TestLockOutVerify(t *testing.T) {
 func TestLockInVerify(t *testing.T) {
 	tests := []struct {
 		name            string
-		locktime        uint64
+		locktime        int64
 		transferableInF func(*gomock.Controller) avax.TransferableIn
 		expectedErr     error
 	}{
