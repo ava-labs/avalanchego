@@ -597,8 +597,10 @@ func (db *merkleDB) getMerkleRoot() ids.ID {
 func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
+
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetProof")
 	defer span.End()
+
 	return getProof(db, key)
 }
 
@@ -610,6 +612,7 @@ func (db *merkleDB) GetRangeProof(
 ) (*RangeProof, error) {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProof")
 	defer span.End()
+
 	return getRangeProof(db, start, end, maxLength)
 }
 
@@ -625,6 +628,7 @@ func (db *merkleDB) GetRangeProofAtRoot(
 
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProofAtRoot")
 	defer span.End()
+
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
@@ -651,6 +655,7 @@ func (db *merkleDB) GetChangeProof(
 ) (*ChangeProof, error) {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetChangeProof")
 	defer span.End()
+
 	switch {
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1:
 		return nil, ErrStartAfterEnd
