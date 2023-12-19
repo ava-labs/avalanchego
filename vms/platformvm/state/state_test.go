@@ -91,7 +91,7 @@ func TestStateSyncGenesis(t *testing.T) {
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
 
-// Whenever we store a current validator, a whole bunch a data structures are updated
+// Whenever we store a staker, a whole bunch a data structures are updated
 // This test is meant to capture which updates are carried out
 func TestPersistStakers(t *testing.T) {
 	tests := map[string]struct {
