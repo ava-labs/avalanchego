@@ -5,7 +5,6 @@ package avm
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"testing"
 
@@ -20,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -72,8 +71,6 @@ var (
 
 	keys  []*secp256k1.PrivateKey
 	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
-
-	errMissing = errors.New("missing")
 )
 
 func init() {
@@ -131,7 +128,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
-	ctx := newContext(tb)
+
+	ctx := snowtest.NewContext(tb)
 
 	baseDB := memdb.New()
 	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
@@ -230,40 +228,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 	return env
-}
-
-func newContext(tb testing.TB) *snow.Context {
-	require := require.New(tb)
-
-	genesisBytes := buildGenesisTest(tb)
-	tx := getCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.ChainID = chainID
-	ctx.AVAXAssetID = tx.ID()
-	ctx.XChainID = ids.Empty.Prefix(0)
-	ctx.CChainID = ids.Empty.Prefix(1)
-	aliaser := ctx.BCLookup.(ids.Aliaser)
-
-	require.NoError(aliaser.Alias(chainID, "X"))
-	require.NoError(aliaser.Alias(chainID, chainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: ctx.SubnetID,
-				chainID:                   ctx.SubnetID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-	return ctx
 }
 
 // Returns:

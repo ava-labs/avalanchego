@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -146,41 +147,6 @@ func init() {
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
-}
-
-func defaultContext(t *testing.T) *snow.Context {
-	require := require.New(t)
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
-	aliaser := ids.NewAliaser()
-
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-	require.NoError(aliaser.Alias(xChainID, "X"))
-	require.NoError(aliaser.Alias(xChainID, xChainID.String()))
-	require.NoError(aliaser.Alias(cChainID, "C"))
-	require.NoError(aliaser.Alias(cChainID, cChainID.String()))
-
-	ctx.BCLookup = aliaser
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				xChainID:                  constants.PrimaryNetworkID,
-				cChainID:                  constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-	return ctx
 }
 
 // Returns:
@@ -375,7 +341,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 
 	vm.clock.Set(latestForkTime)
 	msgChan := make(chan common.Message, 1)
-	ctx := defaultContext(t)
+	ctx := snowtest.NewContext(t)
 
 	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
@@ -1233,7 +1199,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	firstCtx := defaultContext(t)
+	firstCtx := snowtest.NewContext(t)
 
 	baseDB := memdb.New()
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
@@ -1318,7 +1284,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	secondCtx := defaultContext(t)
+	secondCtx := snowtest.NewContext(t)
 	secondCtx.SharedMemory = firstCtx.SharedMemory
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
@@ -1372,7 +1338,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := defaultContext(t)
+	ctx := snowtest.NewContext(t)
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
@@ -1713,7 +1679,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := defaultContext(t)
+	ctx := snowtest.NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1873,7 +1839,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	firstCtx := defaultContext(t)
+	firstCtx := snowtest.NewContext(t)
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
@@ -1919,7 +1885,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	secondCtx := defaultContext(t)
+	secondCtx := snowtest.NewContext(t)
 	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
@@ -2018,7 +1984,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	ctx := defaultContext(t)
+	ctx := snowtest.NewContext(t)
 	ctx.Lock.Lock()
 
 	atomicDB := prefixdb.New([]byte{1}, db)
