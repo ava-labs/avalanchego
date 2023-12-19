@@ -65,7 +65,6 @@ var (
 		},
 	}
 
-	chainID = ids.ID{5, 4, 3, 2, 1}
 	assetID = ids.ID{1, 2, 3}
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
@@ -123,6 +122,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
 
 	ctx := snowtest.NewContext(tb)
+	ctx.ChainID = ctx.XChainID
 
 	baseDB := memdb.New()
 	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
@@ -277,7 +277,7 @@ func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 	return b
 }
 
-func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
+func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string, chainID ids.ID) *txs.Tx {
 	require := require.New(tb)
 
 	createTx := getCreateTxFromGenesisTest(tb, genesisBytes, assetName)

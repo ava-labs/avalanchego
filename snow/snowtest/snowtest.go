@@ -41,7 +41,7 @@ func ConsensusContext() *snow.ConsensusContext {
 	}
 }
 
-// Note: [ChainID] is not set in this function. It is expected to be set by the
+// Note: [ChainID] is set to ids.Empty. It is expected to be overwritten by the
 // consumer of this function to whichever chain this context exists within.
 func NewContext(tb testing.TB) *snow.Context {
 	require := require.New(tb)
