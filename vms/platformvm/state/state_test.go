@@ -68,7 +68,7 @@ func TestStateInitialization(t *testing.T) {
 
 func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
-	state, _ := newInitializedState(require)
+	state := newInitializedState(require)
 
 	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
@@ -119,7 +119,7 @@ func TestPersistCurrentStakers(t *testing.T) {
 	staker, err := NewCurrentStaker(
 		addPermValTx.ID(),
 		utx,
-		validatorsData.StartTime(),
+		time.Unix(startTime, 0),
 		validatorReward,
 	)
 	require.NoError(err)
@@ -142,8 +142,8 @@ func TestPersistCurrentStakers(t *testing.T) {
 	checkCurrentStakersData(require, rebuiltState, subnetID, staker, height)
 }
 
-func newInitializedState(require *require.Assertions) (State, database.Database) {
-	s, db := newUninitializedState(require)
+func newInitializedState(require *require.Assertions) State {
+	s, _ := newUninitializedState(require)
 
 	initialValidator := &txs.AddValidatorTx{
 		Validator: txs.Validator{
@@ -206,7 +206,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 	require.NoError(err)
 	require.NoError(s.syncGenesis(genesisBlk, genesisState))
 
-	return s, db
+	return s
 }
 
 func newUninitializedState(require *require.Assertions) (*state, database.Database) {
@@ -489,7 +489,7 @@ func TestValidatorWeightDiff(t *testing.T) {
 func TestStateAddRemoveValidator(t *testing.T) {
 	require := require.New(t)
 
-	state, _ := newInitializedState(require)
+	state := newInitializedState(require)
 
 	var (
 		numNodes  = 3
@@ -822,7 +822,7 @@ func TestParsedStateBlock(t *testing.T) {
 func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
-	state, _ := newInitializedState(require)
+	state := newInitializedState(require)
 	ctrl := gomock.NewController(t)
 
 	var (
