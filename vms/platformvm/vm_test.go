@@ -260,7 +260,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 
 	vm.clock.Set(latestForkTime)
 	msgChan := make(chan common.Message, 1)
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 
 	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
@@ -1117,7 +1117,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	firstCtx := snowtest.NewContext(t)
+	firstCtx := snowtest.Context(t)
 
 	_, genesisBytes := defaultGenesis(t, firstCtx.AVAXAssetID)
 
@@ -1204,7 +1204,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	secondCtx := snowtest.NewContext(t)
+	secondCtx := snowtest.Context(t)
 	secondCtx.SharedMemory = firstCtx.SharedMemory
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
@@ -1256,7 +1256,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
@@ -1598,7 +1598,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1759,7 +1759,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	firstCtx := snowtest.NewContext(t)
+	firstCtx := snowtest.Context(t)
 	firstCtx.Lock.Lock()
 
 	_, genesisBytes := defaultGenesis(t, firstCtx.AVAXAssetID)
@@ -1807,7 +1807,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	secondCtx := snowtest.NewContext(t)
+	secondCtx := snowtest.Context(t)
 	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
@@ -1906,7 +1906,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	ctx := snowtest.NewContext(t)
+	ctx := snowtest.Context(t)
 	ctx.Lock.Lock()
 
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
