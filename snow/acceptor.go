@@ -15,7 +15,6 @@ import (
 
 var (
 	_ Acceptor = noOpAcceptor{}
-	_ Acceptor = (*AcceptorTracker)(nil)
 	_ Acceptor = acceptorWrapper{}
 
 	_ AcceptorGroup = (*acceptorGroup)(nil)
@@ -36,33 +35,6 @@ type noOpAcceptor struct{}
 
 func (noOpAcceptor) Accept(*ConsensusContext, ids.ID, []byte) error {
 	return nil
-}
-
-// AcceptorTracker tracks the dispatched accept events by its ID and counts.
-// Useful for testing.
-type AcceptorTracker struct {
-	lock     sync.RWMutex
-	accepted map[ids.ID]int
-}
-
-func NewAcceptorTracker() *AcceptorTracker {
-	return &AcceptorTracker{
-		accepted: make(map[ids.ID]int),
-	}
-}
-
-func (a *AcceptorTracker) Accept(_ *ConsensusContext, containerID ids.ID, _ []byte) error {
-	a.lock.Lock()
-	a.accepted[containerID]++
-	a.lock.Unlock()
-	return nil
-}
-
-func (a *AcceptorTracker) IsAccepted(containerID ids.ID) (int, bool) {
-	a.lock.RLock()
-	count, ok := a.accepted[containerID]
-	a.lock.RUnlock()
-	return count, ok
 }
 
 type acceptorWrapper struct {
