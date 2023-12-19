@@ -17,9 +17,14 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 
 	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
+
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+const MaxCertificateLen = 16 * units.KiB
+
 var (
+	ErrCertificateTooLarge                   = fmt.Errorf("staking: certificate length is greater than %d", MaxCertificateLen)
 	ErrMalformedCertificate                  = errors.New("staking: malformed certificate")
 	ErrMalformedTBSCertificate               = errors.New("staking: malformed tbs certificate")
 	ErrMalformedVersion                      = errors.New("staking: malformed version")
@@ -31,10 +36,13 @@ var (
 	ErrMalformedPublicKeyAlgorithmIdentifier = errors.New("staking: malformed public key algorithm identifier")
 	ErrMalformedSubjectPublicKey             = errors.New("staking: malformed subject public key")
 	ErrMalformedOID                          = errors.New("staking: malformed oid")
+	ErrInvalidRSAPublicKey                   = errors.New("staking: invalid RSA public key")
 	ErrInvalidRSAModulus                     = errors.New("staking: invalid RSA modulus")
 	ErrInvalidRSAPublicExponent              = errors.New("staking: invalid RSA public exponent")
 	ErrRSAModulusNotPositive                 = errors.New("staking: RSA modulus is not a positive number")
-	ErrRSAPublicExponentNotPositive          = errors.New("staking: RSA public exponent is not a positive number")
+	ErrUnsupportedRSAModulusBitLen           = errors.New("staking: unsupported RSA modulus bitlen")
+	ErrRSAModulusIsEven                      = errors.New("staking: RSA modulus is an even number")
+	ErrUnsupportedRSAPublicExponent          = errors.New("staking: unsupported RSA public exponent")
 	ErrFailedUnmarshallingEllipticCurvePoint = errors.New("staking: failed to unmarshal elliptic curve point")
 	ErrUnknownPublicKeyAlgorithm             = errors.New("staking: unknown public key algorithm")
 )
@@ -139,12 +147,15 @@ func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto
 		if pub.N.Sign() <= 0 {
 			return nil, 0, ErrRSAModulusNotPositive
 		}
-		// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L874-L877
-		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
-			return nil, 0, fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidRSAPublicKey, bitLen, MaxRSAKeyBitLen)
+		bitLen := pub.N.BitLen()
+		if _, allowedRSABitLen := allowedRSABitLens[bitLen]; !allowedRSABitLen {
+			return nil, 0, fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
 		}
-		if pub.E <= 0 {
-			return nil, 0, ErrRSAPublicExponentNotPositive
+		if pub.N.Bit(0) == 0 {
+			return nil, 0, ErrRSAModulusIsEven
+		}
+		if _, allowedRSAE := allowedRSAEs[pub.E]; !allowedRSAE {
+			return nil, 0, fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
 		}
 		return pub, x509.SHA256WithRSA, nil
 	case oid.Equal(oidPublicKeyECDSA):

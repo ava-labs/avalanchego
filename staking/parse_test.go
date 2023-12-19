@@ -34,7 +34,7 @@ func TestParseCheckLargePublicKey(t *testing.T) {
 	for _, parser := range parsers {
 		t.Run(parser.name, func(t *testing.T) {
 			_, err := parser.parse(largeRSAKeyCert)
-			require.ErrorIs(t, err, ErrInvalidRSAPublicKey)
+			require.ErrorIs(t, err, ErrUnsupportedRSAModulusBitLen)
 		})
 	}
 }
