@@ -21,7 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const MaxCertificateLen = 16 * units.KiB
+const (
+	MaxCertificateLen = 16 * units.KiB
+
+	allowedRSASmallModulusLen     = 2048
+	allowedRSALargeModulusLen     = 4096
+	allowedRSAPublicExponentValue = 65537
+)
 
 var (
 	ErrCertificateTooLarge                   = fmt.Errorf("staking: certificate length is greater than %d", MaxCertificateLen)
@@ -155,14 +161,14 @@ func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto
 		if pub.N.Sign() <= 0 {
 			return nil, 0, ErrRSAModulusNotPositive
 		}
-		bitLen := pub.N.BitLen()
-		if _, allowedRSABitLen := allowedRSABitLens[bitLen]; !allowedRSABitLen {
+
+		if bitLen := pub.N.BitLen(); bitLen != allowedRSALargeModulusLen && bitLen != allowedRSASmallModulusLen {
 			return nil, 0, fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
 		}
 		if pub.N.Bit(0) == 0 {
 			return nil, 0, ErrRSAModulusIsEven
 		}
-		if _, allowedRSAE := allowedRSAEs[pub.E]; !allowedRSAE {
+		if pub.E != allowedRSAPublicExponentValue {
 			return nil, 0, fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
 		}
 		return pub, x509.SHA256WithRSA, nil

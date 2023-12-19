@@ -18,14 +18,6 @@ var (
 	ErrPublicKeyAlgoMismatch    = errors.New("staking: signature algorithm specified different public key type")
 	ErrInvalidECDSAPublicKey    = errors.New("staking: invalid ECDSA public key")
 	ErrECDSAVerificationFailure = errors.New("staking: ECDSA verification failure")
-
-	allowedRSABitLens = map[int]struct{}{
-		2048: {},
-		4096: {},
-	}
-	allowedRSAEs = map[int]struct{}{
-		65537: {},
-	}
 )
 
 // CheckSignature verifies that the signature is a valid signature over signed
@@ -73,15 +65,14 @@ func ValidateCertificate(cert *Certificate) error {
 		if pubkeyAlgo != x509.RSA {
 			return signaturePublicKeyAlgoMismatchError(pubkeyAlgo, pub)
 		}
-		bitLen := pub.N.BitLen()
-		if _, allowedRSABitLen := allowedRSABitLens[bitLen]; !allowedRSABitLen {
-			return fmt.Errorf("%w: bitLen=%d", ErrUnsupportedRSAModulusBitLen, bitLen)
+		if bitLen := pub.N.BitLen(); bitLen != allowedRSALargeModulusLen && bitLen != allowedRSASmallModulusLen {
+			return fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
 		}
 		if pub.N.Bit(0) == 0 {
 			return ErrRSAModulusIsEven
 		}
-		if _, allowedRSAE := allowedRSAEs[pub.E]; !allowedRSAE {
-			return fmt.Errorf("%w: E=%d", ErrUnsupportedRSAPublicExponent, pub.E)
+		if pub.E != allowedRSAPublicExponentValue {
+			return fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
 		}
 		return nil
 	case *ecdsa.PublicKey:
