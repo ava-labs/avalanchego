@@ -98,7 +98,7 @@ type View interface {
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
-func visitPathToKey[T Trie](t T, key Key, visitNode func(*node) error) error {
+func visitPathToKey(t Trie, key Key, visitNode func(*node) error) error {
 	maybeRoot := t.getRoot()
 	if maybeRoot.IsNothing() {
 		return nil
@@ -138,7 +138,7 @@ func visitPathToKey[T Trie](t T, key Key, visitNode func(*node) error) error {
 }
 
 // Returns a proof that [bytesPath] is in or not in trie [t].
-func getProof[T Trie](t T, key []byte) (*Proof, error) {
+func getProof(t Trie, key []byte) (*Proof, error) {
 	root := t.getRoot()
 	if root.IsNothing() {
 		return nil, ErrEmptyProof
@@ -194,8 +194,8 @@ func getProof[T Trie](t T, key []byte) (*Proof, error) {
 // GetRangeProof returns a range proof for (at least part of) the key range [start, end].
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
-func getRangeProof[T Trie](
-	t T,
+func getRangeProof(
+	t Trie,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,

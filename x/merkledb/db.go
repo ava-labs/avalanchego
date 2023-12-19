@@ -589,7 +589,7 @@ func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return db.getMerkleRoot(), nil
 }
 
-// Assumes [db.lock] is read locked.
+// Assumes [db.lock] or [db.commitLock] is read locked.
 func (db *merkleDB) getMerkleRoot() ids.ID {
 	return db.rootID
 }
@@ -1189,8 +1189,7 @@ func (db *merkleDB) initializeRoot() error {
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
-// Assumes [db.commitLock] is read locked.
-// Assumes [db.lock] isn't held.
+// Assumes [db.commitLock] or [db.lock] is read locked.
 func (db *merkleDB) getTrieAtRootForRange(
 	rootID ids.ID,
 	start maybe.Maybe[[]byte],
