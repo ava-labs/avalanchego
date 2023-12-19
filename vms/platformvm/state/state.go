@@ -2001,7 +2001,7 @@ func (s *state) processCurrentStakers() ([]stakerStatusPair, diffs, error) {
 
 			for _, delegator := range validatorDiff.deletedDelegators {
 				outputStakers = append(outputStakers, stakerStatusPair{
-					status: added,
+					status: deleted,
 					staker: delegator,
 				})
 
@@ -2030,13 +2030,13 @@ func (s *state) processPendingStakers() []stakerStatusPair {
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			defer addedDelegatorIterator.Release()
 			for addedDelegatorIterator.Next() {
 				output = append(output, stakerStatusPair{
 					status: added,
 					staker: addedDelegatorIterator.Value(),
 				})
 			}
+			addedDelegatorIterator.Release()
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				output = append(output, stakerStatusPair{
@@ -2330,6 +2330,7 @@ func (s *state) writeCurrentStakers(modifiedStakers []stakerStatusPair, codecVer
 				metadata := &delegatorMetadata{
 					txID:            staker.TxID,
 					PotentialReward: staker.PotentialReward,
+					StakerStartTime: uint64(staker.StartTime.Unix()),
 				}
 				if err := writeDelegatorMetadata(delegatorDB, metadata, codecVersion); err != nil {
 					return fmt.Errorf("failed to write current delegator to list: %w", err)
@@ -2385,9 +2386,9 @@ func (s *state) writePendingStakers(modifiedStakers []stakerStatusPair) error {
 			staker := data.staker
 
 			// Select db to write to
-			delegatorDB := s.currentSubnetDelegatorList
+			delegatorDB := s.pendingSubnetDelegatorList
 			if staker.SubnetID == constants.PrimaryNetworkID {
-				delegatorDB = s.currentDelegatorList
+				delegatorDB = s.pendingDelegatorList
 			}
 
 			switch data.status {
