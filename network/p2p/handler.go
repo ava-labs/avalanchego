@@ -20,6 +20,7 @@ var (
 	ErrNotValidator = errors.New("not a validator")
 
 	_ Handler = (*NoOpHandler)(nil)
+	_ Handler = (*TestHandler)(nil)
 	_ Handler = (*ValidatorHandler)(nil)
 )
 
@@ -150,4 +151,34 @@ func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 	}
 
 	return r.sender.SendCrossChainAppResponse(ctx, chainID, requestID, appResponse)
+}
+
+type TestHandler struct {
+	AppGossipF            func(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte)
+	AppRequestF           func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error)
+	CrossChainAppRequestF func(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error)
+}
+
+func (t TestHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+	if t.AppGossipF == nil {
+		return
+	}
+
+	t.AppGossipF(ctx, nodeID, gossipBytes)
+}
+
+func (t TestHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	if t.AppRequestF == nil {
+		return nil, nil
+	}
+
+	return t.AppRequestF(ctx, nodeID, deadline, requestBytes)
+}
+
+func (t TestHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	if t.CrossChainAppRequestF == nil {
+		return nil, nil
+	}
+
+	return t.CrossChainAppRequestF(ctx, chainID, deadline, requestBytes)
 }

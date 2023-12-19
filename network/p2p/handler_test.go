@@ -56,8 +56,8 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 
 			called := false
 			handler := NewValidatorHandler(
-				&testHandler{
-					appGossipF: func(context.Context, ids.NodeID, []byte) {
+				&TestHandler{
+					AppGossipF: func(context.Context, ids.NodeID, []byte) {
 						called = true
 					},
 				},
