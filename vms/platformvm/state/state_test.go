@@ -93,53 +93,167 @@ func TestStateSyncGenesis(t *testing.T) {
 
 // Whenever we store a current validator, a whole bunch a data structures are updated
 // This test is meant to capture which updates are carried out
-func TestPersistCurrentStakers(t *testing.T) {
-	require := require.New(t)
-	state, db := newUninitializedState(require)
+func TestPersistStakers(t *testing.T) {
+	tests := map[string]struct {
+		// create and store a staker
+		storeStaker           func(*require.Assertions, *state) *Staker
+		checkStoredStakerData func(*require.Assertions, *state, *Staker, uint64)
+		reloadState           func(*require.Assertions, *state)
+	}{
+		"current validator": {
+			storeStaker: func(r *require.Assertions, s *state) *Staker {
+				var (
+					startTime = time.Now().Unix()
+					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
 
-	var (
-		height    uint64 = 0
-		startTime        = time.Now().Unix()
-		endTime          = time.Now().Add(14 * 24 * time.Hour).Unix()
+					subnetID       = constants.PrimaryNetworkID
+					validatorsData = txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  uint64(startTime),
+						End:    uint64(endTime),
+						Wght:   1234,
+					}
+					validatorReward uint64 = 5678
+				)
 
-		subnetID       = constants.PrimaryNetworkID
-		validatorsData = txs.Validator{
-			NodeID: ids.GenerateTestNodeID(),
-			Start:  uint64(startTime),
-			End:    uint64(endTime),
-			Wght:   1234,
-		}
-		validatorReward uint64 = 5678
-	)
+				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
+				addPermValTx := &txs.Tx{Unsigned: utx}
+				r.NoError(addPermValTx.Initialize(txs.Codec))
 
-	utx := createPermissionlessValidatorTx(require, subnetID, validatorsData)
-	addPermValTx := &txs.Tx{Unsigned: utx}
-	require.NoError(addPermValTx.Initialize(txs.Codec))
+				staker, err := NewCurrentStaker(
+					addPermValTx.ID(),
+					utx,
+					time.Unix(startTime, 0),
+					validatorReward,
+				)
+				r.NoError(err)
 
-	staker, err := NewCurrentStaker(
-		addPermValTx.ID(),
-		utx,
-		time.Unix(startTime, 0),
-		validatorReward,
-	)
-	require.NoError(err)
+				s.PutCurrentValidator(staker)
+				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+				r.NoError(s.Commit())
+				return staker
+			},
+			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// Check state validator is stored in P-chain state
+				retrievedStaker, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				r.NoError(err)
+				r.Equal(staker, retrievedStaker)
 
-	state.PutCurrentValidator(staker)
-	state.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-	require.NoError(state.Commit())
+				// Check that validator is made available in the validators set
+				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				r.Len(valsMap, 1)
+				valOut, found := valsMap[staker.NodeID]
+				r.True(found)
+				r.Equal(valOut, &validators.GetValidatorOutput{
+					NodeID:    staker.NodeID,
+					PublicKey: staker.PublicKey,
+					Weight:    staker.Weight,
+				})
 
-	// Check relevant quantities are persisted or updated in memory
-	checkCurrentStakersData(require, state, subnetID, staker, height)
+				// Check that validator uptime is duly registered
+				upDuration, lastUpdated, err := s.GetUptime(staker.NodeID, staker.SubnetID)
+				r.NoError(err)
+				r.Equal(upDuration, time.Duration(0))
+				r.Equal(lastUpdated, staker.StartTime)
 
-	// check that the same quantities are available after restart
-	rebuiltState := newStateFromDB(require, db)
+				// Check that weight diff and bls diffs are duly stored
+				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.NoError(err)
+				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
+				r.NoError(err)
+				r.Equal(weightDiff, &ValidatorWeightDiff{
+					Decrease: false,
+					Amount:   staker.Weight,
+				})
 
-	// we single out two of the operations that are carried out when a node is restarted
-	// to load in memory current stakers related data
-	require.NoError(rebuiltState.loadCurrentValidators())
-	require.NoError(rebuiltState.initValidatorSets())
+				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.NoError(err)
+				r.Nil(blsDiffBytes)
+			},
+			reloadState: func(r *require.Assertions, rebuiltState *state) {
+				r.NoError(rebuiltState.loadCurrentValidators())
+				r.NoError(rebuiltState.initValidatorSets())
+			},
+		},
+		"pending validator": {
+			storeStaker: func(r *require.Assertions, s *state) *Staker {
+				var (
+					startTime = time.Now().Unix()
+					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
 
-	checkCurrentStakersData(require, rebuiltState, subnetID, staker, height)
+					subnetID       = constants.PrimaryNetworkID
+					validatorsData = txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  uint64(startTime),
+						End:    uint64(endTime),
+						Wght:   1234,
+					}
+				)
+
+				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
+				addPermValTx := &txs.Tx{Unsigned: utx}
+				r.NoError(addPermValTx.Initialize(txs.Codec))
+
+				staker, err := NewPendingStaker(
+					addPermValTx.ID(),
+					utx,
+				)
+				r.NoError(err)
+
+				s.PutPendingValidator(staker)
+				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+				r.NoError(s.Commit())
+				return staker
+			},
+			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// Check state validator is stored in P-chain state
+				retrievedStaker, err := s.GetPendingValidator(staker.SubnetID, staker.NodeID)
+				r.NoError(err)
+				r.Equal(staker, retrievedStaker)
+
+				// Check that validator is not made available in the validators set
+				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				r.Len(valsMap, 0)
+
+				// Check that validator uptime is not registered
+				_, _, err = s.GetUptime(staker.NodeID, staker.SubnetID)
+				r.ErrorIs(err, database.ErrNotFound)
+
+				// Check that weight diff and bls diffs are not stored
+				_, err = s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.ErrorIs(err, database.ErrNotFound)
+
+				_, err = s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.ErrorIs(err, database.ErrNotFound)
+			},
+			reloadState: func(r *require.Assertions, rebuiltState *state) {
+				r.NoError(rebuiltState.loadPendingValidators())
+				r.NoError(rebuiltState.initValidatorSets())
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			state, db := newUninitializedState(require)
+
+			// create and store the staker
+			staker := test.storeStaker(require, state)
+
+			// check all relevant data are stored
+			test.checkStoredStakerData(require, state, staker, 0 /*height*/)
+
+			// rebuild the state
+			rebuiltState := newStateFromDB(require, db)
+
+			// load relevant quantities
+			test.reloadState(require, rebuiltState)
+
+			// check again that all relevant data are still available in rebuilt state
+			test.checkStoredStakerData(require, rebuiltState, staker, 0 /*height*/)
+		})
+	}
 }
 
 func newInitializedState(require *require.Assertions) State {
@@ -304,44 +418,6 @@ func createPermissionlessValidatorTx(r *require.Assertions, subnetID ids.ID, val
 		},
 		DelegationShares: reward.PercentDenominator,
 	}
-}
-
-func checkCurrentStakersData(r *require.Assertions, s *state, subnetID ids.ID, staker *Staker, height uint64) {
-	// Check state validator is stored in P-chain state
-	retrievedStaker, err := s.GetCurrentValidator(subnetID, staker.NodeID)
-	r.NoError(err)
-	r.Equal(staker, retrievedStaker)
-
-	// Check that validator is made available in the validators set
-	valsMap := s.cfg.Validators.GetMap(subnetID)
-	r.Len(valsMap, 1)
-	valOut, found := valsMap[staker.NodeID]
-	r.True(found)
-	r.Equal(valOut, &validators.GetValidatorOutput{
-		NodeID:    staker.NodeID,
-		PublicKey: staker.PublicKey,
-		Weight:    staker.Weight,
-	})
-
-	// Check that validator uptime is duly registered
-	upDuration, lastUpdated, err := s.GetUptime(staker.NodeID, staker.SubnetID)
-	r.NoError(err)
-	r.Equal(upDuration, time.Duration(0))
-	r.Equal(lastUpdated, staker.StartTime)
-
-	// Check that weight diff and bls diffs are duly stored
-	weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(subnetID, height, staker.NodeID))
-	r.NoError(err)
-	weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
-	r.NoError(err)
-	r.Equal(weightDiff, &ValidatorWeightDiff{
-		Decrease: false,
-		Amount:   staker.Weight,
-	})
-
-	blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(subnetID, height, staker.NodeID))
-	r.NoError(err)
-	r.Nil(blsDiffBytes)
 }
 
 func TestValidatorWeightDiff(t *testing.T) {
