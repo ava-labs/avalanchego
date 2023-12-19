@@ -12,8 +12,8 @@ type Gossipable interface {
 
 // Marshaller creates concrete Gossipable types from bytes
 type Marshaller[T Gossipable] interface {
-	GossipMarshal(T) ([]byte, error)
-	GossipUnmarshal([]byte) (T, error)
+	MarshalGossip(T) ([]byte, error)
+	UnmarshalGossip([]byte) (T, error)
 }
 
 // Set holds a set of known Gossipable items
