@@ -19,7 +19,7 @@ type testTx struct {
 	id ids.ID
 }
 
-func (t *testTx) GetGossipID() ids.ID {
+func (t *testTx) GossipID() ids.ID {
 	return t.id
 }
 

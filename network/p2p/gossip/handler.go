@@ -147,7 +147,7 @@ func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipByte
 			h.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", gossipable.GetGossipID()),
+				zap.Stringer("id", gossipable.GossipID()),
 				zap.Error(err),
 			)
 			continue
