@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -127,11 +126,6 @@ var (
 	// Its threshold is 2
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = keys[0:3]
-
-	xChainID = ids.Empty.Prefix(0)
-	cChainID = ids.Empty.Prefix(1)
-
-	errMissing = errors.New("missing")
 )
 
 func init() {
