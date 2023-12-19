@@ -54,6 +54,10 @@ type NodeURI struct {
 func GetNodeURIs(nodes []*Node) []NodeURI {
 	uris := make([]NodeURI, 0, len(nodes))
 	for _, node := range nodes {
+		if node.IsEphemeral {
+			// Avoid returning URIs for nodes whose lifespan is indeterminate
+			continue
+		}
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it is not currently running.
 		if len(node.URI) > 0 {

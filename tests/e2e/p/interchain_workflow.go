@@ -209,7 +209,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		require.Positive(balance.Cmp(big.NewInt(0)))
 
 		ginkgo.By("stopping validator node to free up resources for a bootstrap check")
-		require.NoError(node.Stop())
+		require.NoError(node.Stop(e2e.DefaultContext()))
 
 		e2e.CheckBootstrapIsPossible(network)
 	})
