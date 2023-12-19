@@ -250,6 +250,7 @@ func GenesisVM(t *testing.T,
 	*atomic.Memory,
 	*engCommon.SenderTest) {
 	vm := &VM{}
+	vm.p2pSender = &engCommon.FakeSender{}
 	ctx, db, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	appSender := &engCommon.SenderTest{T: t}
 	appSender.CantSendAppGossip = true

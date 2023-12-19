@@ -446,14 +446,14 @@ func (n *network) Gossip(gossip []byte) error {
 	return n.appSender.SendAppGossip(context.TODO(), gossip)
 }
 
-// AppGossip is called by avalanchego -> VM when there is an incoming AppGossip from a peer
-// error returned by this function is expected to be treated as fatal by the engine
-// returns error if request could not be parsed as message.Request or when the requestHandler returns an error
-func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
+// AppGossip is called by avalanchego -> VM when there is an incoming AppGossip
+// from a peer. An error returned by this function is treated as fatal by the
+// engine.
+func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
 	var gossipMsg message.GossipMessage
 	if _, err := n.codec.Unmarshal(gossipBytes, &gossipMsg); err != nil {
-		log.Debug("could not parse app gossip", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
-		return nil
+		log.Debug("forwarding AppGossip to SDK network", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
+		return n.p2pNetwork.AppGossip(ctx, nodeID, gossipBytes)
 	}
 
 	log.Debug("processing AppGossip from node", "nodeID", nodeID, "msg", gossipMsg)
