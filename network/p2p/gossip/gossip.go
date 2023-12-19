@@ -171,7 +171,7 @@ func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	return nil
 }
 
-func (p *PullGossiper[T]) handleResponse(
+func (p *PullGossiper[_]) handleResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
@@ -196,7 +196,7 @@ func (p *PullGossiper[T]) handleResponse(
 	for _, bytes := range response.Gossip {
 		receivedBytes += len(bytes)
 
-		gossipable, err := p.marshaller.GossipUnmarshal(bytes)
+		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
 		if err != nil {
 			p.log.Debug(
 				"failed to unmarshal gossip",
@@ -206,7 +206,7 @@ func (p *PullGossiper[T]) handleResponse(
 			continue
 		}
 
-		hash := gossipable.GetID()
+		hash := gossipable.GetGossipID()
 		p.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
@@ -286,7 +286,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 			break
 		}
 
-		bytes, err := p.marshaller.GossipMarshal(gossipable)
+		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			// remove this item so we don't get stuck in a loop
 			_, _ = p.pending.PopLeft()

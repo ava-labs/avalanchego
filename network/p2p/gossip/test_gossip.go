@@ -19,17 +19,17 @@ type testTx struct {
 	id ids.ID
 }
 
-func (t *testTx) GetID() ids.ID {
+func (t *testTx) GetGossipID() ids.ID {
 	return t.id
 }
 
 type testMarshaller struct{}
 
-func (testMarshaller) GossipMarshal(tx *testTx) ([]byte, error) {
+func (testMarshaller) MarshalGossip(tx *testTx) ([]byte, error) {
 	return tx.id[:], nil
 }
 
-func (testMarshaller) GossipUnmarshal(bytes []byte) (*testTx, error) {
+func (testMarshaller) UnmarshalGossip(bytes []byte) (*testTx, error) {
 	return &testTx{
 		id: ids.ID(bytes),
 	}, nil
