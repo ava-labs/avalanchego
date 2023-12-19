@@ -342,7 +342,7 @@ func TestPushGossiper(t *testing.T) {
 				}
 
 				for _, gossipable := range gossipables {
-					bytes, err := marshaller.GossipMarshal(gossipable)
+					bytes, err := marshaller.MarshalGossip(gossipable)
 					require.NoError(err)
 
 					want.Gossip = append(want.Gossip, bytes)
@@ -453,7 +453,7 @@ func TestPushGossipE2E(t *testing.T) {
 	gotForwarded := make([]*testTx, 0, len(addedToSet))
 
 	for _, bytes := range forwardedMsg.Gossip {
-		tx, err := marshaller.GossipUnmarshal(bytes)
+		tx, err := marshaller.UnmarshalGossip(bytes)
 		require.NoError(err)
 		gotForwarded = append(gotForwarded, tx)
 	}
