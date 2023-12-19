@@ -45,6 +45,14 @@ var (
 	ErrUnsupportedRSAPublicExponent          = errors.New("staking: unsupported RSA public exponent")
 	ErrFailedUnmarshallingEllipticCurvePoint = errors.New("staking: failed to unmarshal elliptic curve point")
 	ErrUnknownPublicKeyAlgorithm             = errors.New("staking: unknown public key algorithm")
+
+	allowedRSABitLens = map[int]struct{}{
+		2048: {},
+		4096: {},
+	}
+	allowedRSAEs = map[int]struct{}{
+		65537: {},
+	}
 )
 
 // ParseCertificate parses a single certificate from the given ASN.1 DER data.
