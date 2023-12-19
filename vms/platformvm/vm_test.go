@@ -243,78 +243,6 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	return &buildGenesisArgs, genesisBytes
 }
 
-// Returns:
-// 1) The genesis state
-// 2) The byte representation of the default genesis for tests
-func BuildGenesisTest(t *testing.T) (*api.BuildGenesisArgs, []byte) {
-	return BuildGenesisTestWithArgs(t, nil)
-}
-
-// Returns:
-// 1) The genesis state
-// 2) The byte representation of the default genesis for tests
-func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.BuildGenesisArgs, []byte) {
-	require := require.New(t)
-	genesisUTXOs := make([]api.UTXO, len(keys))
-	for i, key := range keys {
-		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
-		require.NoError(err)
-
-		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
-			Address: addr,
-		}
-	}
-
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
-	for i, nodeID := range genesisNodeIDs {
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-		require.NoError(err)
-
-		genesisValidators[i] = api.GenesisPermissionlessValidator{
-			GenesisValidator: api.GenesisValidator{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
-			},
-			RewardOwner: &api.Owner{
-				Threshold: 1,
-				Addresses: []string{addr},
-			},
-			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
-				Address: addr,
-			}},
-			DelegationFee: reward.PercentDenominator,
-		}
-	}
-
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	if args != nil {
-		buildGenesisArgs = *args
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	require.NoError(err)
-
-	return &buildGenesisArgs, genesisBytes
-}
-
 func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 	var (
@@ -530,8 +458,8 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	// Verify that new validator now in pending validator set
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	// Verify that new validator now in current validator set
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 }
 
@@ -711,8 +639,8 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	// Verify that new validator is in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
+	// Verify that new validator is in current validator set
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
 	require.NoError(err)
 }
 
@@ -758,8 +686,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	// Verify that new validator NOT in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
+	// Verify that new validator NOT in validator set
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -969,9 +897,8 @@ func TestCreateChain(t *testing.T) {
 
 // test where we:
 // 1) Create a subnet
-// 2) Add a validator to the subnet's pending validator set
-// 3) Advance timestamp to validator's start time (moving the validator from pending to current)
-// 4) Advance timestamp to validator's end time (removing validator from current)
+// 2) Add a validator to the subnet's current validator set
+// 3) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, latestFork)
@@ -1040,26 +967,13 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // add the validator to pending validator set
+	require.NoError(blk.Accept(context.Background())) // add the validator to current validator set
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	txID := blk.(block.Block).Txs()[0].ID()
 	_, txStatus, err = vm.state.GetTx(txID)
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
-
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
-	require.NoError(err)
-
-	// Advance time to when new validator should start validating
-	// Create a block with an advance time tx that moves validator
-	// from pending to current validator set
-	vm.clock.Set(startTime)
-	blk, err = vm.Builder.BuildBlock(context.Background()) // should be advance time tx
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // move validator addValidatorTx from pending to current
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
