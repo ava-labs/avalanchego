@@ -142,7 +142,54 @@ flowchart TD
 
 Clients can use range proofs to efficiently download many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
 
+#### Verification
+
 Like simple proofs, range proofs can be verified without any additional context or knowledge of the contents of the key-value store.
+
+A range proof is represented as:
+
+```go
+type RangeProof struct {
+	// Invariant: At least one of [StartProof], [EndProof], [KeyValues] is non-empty.
+
+	// A proof that the smallest key in the requested range does/doesn't exist.
+	// Note that this may not be an entire proof -- nodes are omitted if
+	// they are also in [EndProof].
+	StartProof []ProofNode
+
+	// If no upper range bound was given and [KeyValues] is empty, this is empty.
+	//
+	// If no upper range bound was given and [KeyValues] is non-empty, this is
+	// a proof for the largest key in [KeyValues].
+	//
+	// Otherwise this is a proof for the upper range bound.
+	EndProof []ProofNode
+
+	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
+	// Sorted by increasing key.
+	KeyValues []KeyValue
+}
+```
+
+The prover creates an empty trie and adds to it all of the key-value pairs in `KeyValues`. 
+
+Then, it inserts:
+* The nodes in `StartProof`
+* The nodes in `EndProof`
+
+For each node in `StartProof`, the prover only populates `Children` entries whose key is before `start`.
+For each node in `EndProof`, it populates only `Children` entries whose key is after `end`, where `end` is the largest key proven by the range proof.
+
+Then, it calculates the root ID of this trie and compares it to the expected one.
+
+If the proof:
+* Omits any key-values in the range
+* Includes additional key-values that aren't really in the range
+* Provides an incorrect value for a key in the range
+
+then the actual root ID won't match the expected root ID. 
+
+Like simple proofs, range proof verification relies on the fact that the proof generator can't forge data such that it results in a trie with both incorrect data and the correct root ID.
 
 ### Change Proofs
 
@@ -164,6 +211,12 @@ flowchart TD
 * For adjacent key-value changes `(k1,v1)` and `(k2,v2)` in `kvs`, there doesn't exist a key-value change `(k3,v3)` between `r` and `r'` such that `k1 < k3 < k2`. In other words, `kvs` is a contiguous set of key-value changes.
 
 Change proofs are useful for applying changes between revisions. For example, suppose a client has a MerkleDB instance at revision `r`. The client learns that the state has been updated and that the new root is `r'`. The client can request a change proof from a server at revision `r'`, and apply the changes in the change proof to change its state from `r` to `r'`. Note that `r` and `r'` need not be "consecutive" revisions. For example, it's possible that the state goes from revision `r` to `r1` to `r2` to `r'`. The client apply changes to get directly from `r` to `r'`, without ever needing to be at revision `r1` or `r2`.
+
+#### Verification
+
+Unlike simple proofs and range proofs, change proofs require additional context to verify. Namely, the prover must have the trie at the start root `r`.
+
+The verification algorithm is similar to range proofs, except that instead of inserting the key-value changes, start proof and end proof into an empty trie, they are added to the trie at revision `r`.
 
 ## Serialization
 
