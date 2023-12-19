@@ -30,9 +30,10 @@ func (testMarshaller) MarshalGossip(tx *testTx) ([]byte, error) {
 }
 
 func (testMarshaller) UnmarshalGossip(bytes []byte) (*testTx, error) {
+	id, err := ids.ToID(bytes)
 	return &testTx{
-		id: ids.ID(bytes),
-	}, nil
+		id: id,
+	}, err
 }
 
 type testSet struct {
