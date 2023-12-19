@@ -50,26 +50,26 @@ func (t txGossipHandler) AppRequest(
 }
 
 type gossipTx struct {
-	tx     *txs.Tx
-	parser txs.Parser
+	tx *txs.Tx
 }
 
 func (g *gossipTx) GetID() ids.ID {
 	return g.tx.ID()
 }
 
-func (g *gossipTx) Marshal() ([]byte, error) {
-	return g.tx.Bytes(), nil
+type gossipTxParser struct {
+	parser txs.Parser
 }
 
-func (g *gossipTx) Unmarshal(bytes []byte) error {
-	tx, err := g.parser.ParseTx(bytes)
-	if err != nil {
-		return err
-	}
+func (g *gossipTxParser) MarshalGossip(tx *gossipTx) ([]byte, error) {
+	return tx.tx.Bytes(), nil
+}
 
-	(*g).tx = tx
-	return nil
+func (g *gossipTxParser) UnmarshalGossip(bytes []byte) (*gossipTx, error) {
+	tx, err := g.parser.ParseTx(bytes)
+	return &gossipTx{
+		tx: tx,
+	}, err
 }
 
 func newGossipMempool(
@@ -142,10 +142,8 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 
 		g.Mempool.Iterate(func(tx *txs.Tx) bool {
 			g.bloom.Add(&gossipTx{
-				tx:     tx,
-				parser: g.parser,
-			},
-			)
+				tx: tx,
+			})
 			return true
 		})
 	}
@@ -156,14 +154,11 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 	return nil
 }
 
-func (g *gossipMempool) Iterate(f func(gtx *gossipTx) bool) {
+func (g *gossipMempool) Iterate(f func(*gossipTx) bool) {
 	g.Mempool.Iterate(func(tx *txs.Tx) bool {
-		return f(
-			&gossipTx{
-				tx:     tx,
-				parser: g.parser,
-			},
-		)
+		return f(&gossipTx{
+			tx: tx,
+		})
 	})
 }
 

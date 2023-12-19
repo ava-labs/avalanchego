@@ -71,6 +71,9 @@ func New(
 		return nil, err
 	}
 
+	marshaller := &gossipTxParser{
+		parser: parser,
+	}
 	validators := p2p.NewValidators(p2pNetwork.Peers, ctx.Log, ctx.SubnetID, ctx.ValidatorState, maxValidatorSetStaleness)
 	txGossipClient := p2pNetwork.NewClient(
 		txGossipHandlerID,
@@ -82,6 +85,7 @@ func New(
 	}
 
 	txPushGossiper := gossip.NewPushGossiper[*gossipTx](
+		marshaller,
 		txGossipClient,
 		txGossipMetrics,
 		txGossipMaxGossipSize,
@@ -100,8 +104,9 @@ func New(
 	}
 
 	var txPullGossiper gossip.Gossiper
-	txPullGossiper = gossip.NewPullGossiper[gossipTx, *gossipTx](
+	txPullGossiper = gossip.NewPullGossiper[*gossipTx](
 		ctx.Log,
+		marshaller,
 		gossipMempool,
 		txGossipClient,
 		txGossipMetrics,
@@ -115,8 +120,9 @@ func New(
 		Validators: validators,
 	}
 
-	handler := gossip.NewHandler[gossipTx, *gossipTx](
+	handler := gossip.NewHandler[*gossipTx](
 		ctx.Log,
+		marshaller,
 		txPushGossiper,
 		gossipMempool,
 		txGossipMetrics,
