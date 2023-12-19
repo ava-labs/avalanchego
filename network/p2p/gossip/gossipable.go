@@ -10,7 +10,7 @@ type Gossipable interface {
 	GetGossipID() ids.ID
 }
 
-// Marshaller creates concrete Gossipable types from bytes
+// Marshaller handles parsing logic for a concrete Gossipable type
 type Marshaller[T Gossipable] interface {
 	MarshalGossip(T) ([]byte, error)
 	UnmarshalGossip([]byte) (T, error)
