@@ -384,6 +384,288 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(rebuiltState.initValidatorSets())
 			},
 		},
+		"delete current primary network validator": {
+			// add them remove the validator
+			storeStaker: func(r *require.Assertions, s *state) *Staker {
+				var (
+					startTime = time.Now().Unix()
+					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
+
+					subnetID       = constants.PrimaryNetworkID
+					validatorsData = txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  uint64(startTime),
+						End:    uint64(endTime),
+						Wght:   1234,
+					}
+					validatorReward uint64 = 5678
+				)
+
+				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
+				addPermValTx := &txs.Tx{Unsigned: utx}
+				r.NoError(addPermValTx.Initialize(txs.Codec))
+
+				staker, err := NewCurrentStaker(
+					addPermValTx.ID(),
+					utx,
+					time.Unix(startTime, 0),
+					validatorReward,
+				)
+				r.NoError(err)
+
+				s.PutCurrentValidator(staker)
+				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+				r.NoError(s.Commit())
+
+				s.DeleteCurrentValidator(staker)
+				r.NoError(s.Commit())
+				return staker
+			},
+			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// Check state validator is stored in P-chain state
+				_, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				r.ErrorIs(err, database.ErrNotFound)
+
+				// Check that validator is made available in the validators set
+				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				r.Len(valsMap, 0)
+
+				// Check that validator uptime is duly registered
+				_, _, err = s.GetUptime(staker.NodeID, staker.SubnetID)
+				r.ErrorIs(err, database.ErrNotFound)
+
+				// Check that weight diff and bls diffs are duly stored
+				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.NoError(err)
+				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
+				r.NoError(err)
+				r.Equal(weightDiff, &ValidatorWeightDiff{
+					Decrease: true,
+					Amount:   staker.Weight,
+				})
+
+				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.NoError(err)
+				r.Equal(bls.DeserializePublicKey(blsDiffBytes), staker.PublicKey)
+			},
+			reloadState: func(r *require.Assertions, rebuiltState *state) {
+				r.NoError(rebuiltState.loadCurrentValidators())
+				r.NoError(rebuiltState.initValidatorSets())
+			},
+		},
+		"delete current primary network delegator": {
+			storeStaker: func(r *require.Assertions, s *state) *Staker {
+				// insert validator and delegator, then remove the delegator
+				var (
+					valStartTime = time.Now().Truncate(time.Second).Unix()
+					delStartTime = time.Unix(valStartTime, 0).Add(time.Hour).Unix()
+					delEndTime   = time.Unix(delStartTime, 0).Add(30 * 24 * time.Hour).Unix()
+					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
+
+					subnetID       = constants.PrimaryNetworkID
+					validatorsData = txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  uint64(valStartTime),
+						End:    uint64(valEndTime),
+						Wght:   1234,
+					}
+					validatorReward uint64 = 5678
+
+					delegatorData = txs.Validator{
+						NodeID: validatorsData.NodeID,
+						Start:  uint64(delStartTime),
+						End:    uint64(delEndTime),
+						Wght:   validatorsData.Wght / 2,
+					}
+					delegatorReward uint64 = 5432
+				)
+
+				utxVal := createPermissionlessValidatorTx(r, subnetID, validatorsData)
+				addPermValTx := &txs.Tx{Unsigned: utxVal}
+				r.NoError(addPermValTx.Initialize(txs.Codec))
+
+				val, err := NewCurrentStaker(
+					addPermValTx.ID(),
+					utxVal,
+					time.Unix(valStartTime, 0),
+					validatorReward,
+				)
+				r.NoError(err)
+
+				utxDel := createPermissionlessDelegatorTx(subnetID, delegatorData)
+				addPermDelTx := &txs.Tx{Unsigned: utxDel}
+				r.NoError(addPermDelTx.Initialize(txs.Codec))
+
+				del, err := NewCurrentStaker(
+					addPermDelTx.ID(),
+					utxDel,
+					time.Unix(delStartTime, 0),
+					delegatorReward,
+				)
+				r.NoError(err)
+
+				s.PutCurrentValidator(val)
+				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+
+				s.PutCurrentDelegator(del)
+				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
+
+				r.NoError(s.Commit())
+
+				s.DeleteCurrentDelegator(del)
+				r.NoError(s.Commit())
+
+				return del
+			},
+			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// Check state validator is stored in P-chain state
+				delIt, err := s.GetCurrentDelegatorIterator(staker.SubnetID, staker.NodeID)
+				r.NoError(err)
+				r.False(delIt.Next())
+				delIt.Release()
+
+				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				r.NoError(err)
+
+				// Check that validator is made available in the validators set, with the right weight
+				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				r.Len(valsMap, 1)
+				valOut, found := valsMap[staker.NodeID]
+				r.True(found)
+				r.Equal(valOut.NodeID, staker.NodeID)
+				r.Equal(valOut.Weight, val.Weight)
+			},
+			reloadState: func(r *require.Assertions, rebuiltState *state) {
+				r.NoError(rebuiltState.loadCurrentValidators())
+				r.NoError(rebuiltState.initValidatorSets())
+			},
+		},
+		"delete pending primary network validator": {
+			storeStaker: func(r *require.Assertions, s *state) *Staker {
+				var (
+					startTime = time.Now().Unix()
+					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
+
+					subnetID       = constants.PrimaryNetworkID
+					validatorsData = txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  uint64(startTime),
+						End:    uint64(endTime),
+						Wght:   1234,
+					}
+				)
+
+				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
+				addPermValTx := &txs.Tx{Unsigned: utx}
+				r.NoError(addPermValTx.Initialize(txs.Codec))
+
+				staker, err := NewPendingStaker(
+					addPermValTx.ID(),
+					utx,
+				)
+				r.NoError(err)
+
+				s.PutPendingValidator(staker)
+				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+				r.NoError(s.Commit())
+
+				s.DeletePendingValidator(staker)
+				r.NoError(s.Commit())
+
+				return staker
+			},
+			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// Check state validator is stored in P-chain state
+				_, err := s.GetPendingValidator(staker.SubnetID, staker.NodeID)
+				r.ErrorIs(err, database.ErrNotFound)
+
+				// Check that validator is not made available in the validators set
+				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				r.Len(valsMap, 0)
+
+				// Check that validator uptime is not registered
+				_, _, err = s.GetUptime(staker.NodeID, staker.SubnetID)
+				r.ErrorIs(err, database.ErrNotFound)
+
+				// Check that weight diff and bls diffs are not stored
+				_, err = s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.ErrorIs(err, database.ErrNotFound)
+
+				_, err = s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+				r.ErrorIs(err, database.ErrNotFound)
+			},
+			reloadState: func(r *require.Assertions, rebuiltState *state) {
+				r.NoError(rebuiltState.loadPendingValidators())
+				r.NoError(rebuiltState.initValidatorSets())
+			},
+		},
+		"delete pending primary network delegator": {
+			storeStaker: func(r *require.Assertions, s *state) *Staker {
+				// insert validator and delegator the remove the validator
+				var (
+					valStartTime = time.Now().Truncate(time.Second).Unix()
+					delStartTime = time.Unix(valStartTime, 0).Add(time.Hour).Unix()
+					delEndTime   = time.Unix(delStartTime, 0).Add(30 * 24 * time.Hour).Unix()
+					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
+
+					subnetID       = constants.PrimaryNetworkID
+					validatorsData = txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  uint64(valStartTime),
+						End:    uint64(valEndTime),
+						Wght:   1234,
+					}
+
+					delegatorData = txs.Validator{
+						NodeID: validatorsData.NodeID,
+						Start:  uint64(delStartTime),
+						End:    uint64(delEndTime),
+						Wght:   validatorsData.Wght / 2,
+					}
+				)
+
+				utxVal := createPermissionlessValidatorTx(r, subnetID, validatorsData)
+				addPermValTx := &txs.Tx{Unsigned: utxVal}
+				r.NoError(addPermValTx.Initialize(txs.Codec))
+
+				val, err := NewPendingStaker(addPermValTx.ID(), utxVal)
+				r.NoError(err)
+
+				utxDel := createPermissionlessDelegatorTx(subnetID, delegatorData)
+				addPermDelTx := &txs.Tx{Unsigned: utxDel}
+				r.NoError(addPermDelTx.Initialize(txs.Codec))
+
+				del, err := NewPendingStaker(addPermDelTx.ID(), utxDel)
+				r.NoError(err)
+
+				s.PutPendingValidator(val)
+				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+
+				s.PutPendingDelegator(del)
+				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
+
+				r.NoError(s.Commit())
+
+				s.DeletePendingDelegator(del)
+				r.NoError(s.Commit())
+				return del
+			},
+			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// Check state validator is stored in P-chain state
+				delIt, err := s.GetPendingDelegatorIterator(staker.SubnetID, staker.NodeID)
+				r.NoError(err)
+				r.False(delIt.Next())
+				delIt.Release()
+
+				// Check that validator is made available in the validators set, with the right weight
+				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				r.Len(valsMap, 0)
+			},
+			reloadState: func(r *require.Assertions, rebuiltState *state) {
+				r.NoError(rebuiltState.loadPendingValidators())
+				r.NoError(rebuiltState.initValidatorSets())
+			},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
