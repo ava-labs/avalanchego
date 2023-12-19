@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package snowtest
 
 import (
@@ -5,14 +8,37 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/stretchr/testify/require"
 )
 
-var errMissing = errors.New("missing")
+var (
+	errMissing = errors.New("missing")
+
+	_ snow.Acceptor = noOpAcceptor{}
+)
+
+type noOpAcceptor struct{}
+
+func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
+	return nil
+}
+
+func EmptyConsensusContext() *snow.ConsensusContext {
+	return &snow.ConsensusContext{
+		Context:             snow.DefaultContextTest(),
+		Registerer:          prometheus.NewRegistry(),
+		AvalancheRegisterer: prometheus.NewRegistry(),
+		BlockAcceptor:       noOpAcceptor{},
+		TxAcceptor:          noOpAcceptor{},
+		VertexAcceptor:      noOpAcceptor{},
+	}
+}
 
 func NewContext(tb testing.TB) *snow.Context {
 	require := require.New(tb)
