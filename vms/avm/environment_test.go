@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -70,22 +69,16 @@ var (
 	chainID = ids.ID{5, 4, 3, 2, 1}
 	assetID = ids.ID{1, 2, 3}
 
-	keys  []*secp256k1.PrivateKey
-	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
+	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
+	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
 
 	errMissing = errors.New("missing")
 )
 
 func init() {
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-	} {
-		keyBytes, _ := cb58.Decode(key)
-		pk, _ := secp256k1.ToPrivateKey(keyBytes)
-		keys = append(keys, pk)
-		addrs = append(addrs, pk.PublicKey().Address())
+	addrs = make([]ids.ShortID, len(keys))
+	for i, key := range keys {
+		addrs[i] = key.Address()
 	}
 }
 
