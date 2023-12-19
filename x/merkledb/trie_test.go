@@ -1114,7 +1114,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Equal(db, view3.parentTrie)
 }
 
-func Test_TrieView_NewView(t *testing.T) {
+func Test_View_NewView(t *testing.T) {
 	require := require.New(t)
 
 	db, err := getBasicDB()
