@@ -100,7 +100,7 @@ func TestPersistStakers(t *testing.T) {
 		checkStoredStakerData func(*require.Assertions, *state, *Staker, uint64)
 		reloadState           func(*require.Assertions, *state)
 	}{
-		"current validator": {
+		"current primary network validator": {
 			storeStaker: func(r *require.Assertions, s *state) *Staker {
 				var (
 					startTime = time.Now().Unix()
@@ -175,7 +175,93 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(rebuiltState.initValidatorSets())
 			},
 		},
-		"pending validator": {
+		"current primary network delegator": {
+			storeStaker: func(r *require.Assertions, s *state) *Staker {
+				// insert the delegator and its validator
+				var (
+					valStartTime = time.Now().Truncate(time.Second).Unix()
+					delStartTime = time.Unix(valStartTime, 0).Add(time.Hour).Unix()
+					delEndTime   = time.Unix(delStartTime, 0).Add(30 * 24 * time.Hour).Unix()
+					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
+
+					subnetID       = constants.PrimaryNetworkID
+					validatorsData = txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  uint64(valStartTime),
+						End:    uint64(valEndTime),
+						Wght:   1234,
+					}
+					validatorReward uint64 = 5678
+
+					delegatorData = txs.Validator{
+						NodeID: validatorsData.NodeID,
+						Start:  uint64(delStartTime),
+						End:    uint64(delEndTime),
+						Wght:   validatorsData.Wght / 2,
+					}
+					delegatorReward uint64 = 5432
+				)
+
+				utxVal := createPermissionlessValidatorTx(r, subnetID, validatorsData)
+				addPermValTx := &txs.Tx{Unsigned: utxVal}
+				r.NoError(addPermValTx.Initialize(txs.Codec))
+
+				val, err := NewCurrentStaker(
+					addPermValTx.ID(),
+					utxVal,
+					time.Unix(valStartTime, 0),
+					validatorReward,
+				)
+				r.NoError(err)
+
+				utxDel := createPermissionlessDelegatorTx(subnetID, delegatorData)
+				addPermDelTx := &txs.Tx{Unsigned: utxDel}
+				r.NoError(addPermDelTx.Initialize(txs.Codec))
+
+				del, err := NewCurrentStaker(
+					addPermDelTx.ID(),
+					utxDel,
+					time.Unix(delStartTime, 0),
+					delegatorReward,
+				)
+				r.NoError(err)
+
+				s.PutCurrentValidator(val)
+				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+
+				s.PutCurrentDelegator(del)
+				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
+
+				r.NoError(s.Commit())
+				return del
+			},
+			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// Check state validator is stored in P-chain state
+				delIt, err := s.GetCurrentDelegatorIterator(staker.SubnetID, staker.NodeID)
+				r.NoError(err)
+				r.True(delIt.Next())
+				retrievedDelegator := delIt.Value()
+				r.False(delIt.Next())
+				delIt.Release()
+				r.Equal(staker, retrievedDelegator)
+
+				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				r.NoError(err)
+
+				// Check that validator is made available in the validators set, with the right weight
+				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				r.Len(valsMap, 1)
+				valOut, found := valsMap[staker.NodeID]
+				r.True(found)
+				r.Equal(valOut.NodeID, staker.NodeID)
+				r.Equal(valOut.Weight, val.Weight+retrievedDelegator.Weight)
+			},
+			reloadState: func(r *require.Assertions, rebuiltState *state) {
+				r.NoError(rebuiltState.loadCurrentValidators())
+				r.NoError(rebuiltState.initValidatorSets())
+			},
+		},
+		"pending primary network validator": {
 			storeStaker: func(r *require.Assertions, s *state) *Staker {
 				var (
 					startTime = time.Now().Unix()
@@ -417,6 +503,63 @@ func createPermissionlessValidatorTx(r *require.Assertions, subnetID ids.ID, val
 			},
 		},
 		DelegationShares: reward.PercentDenominator,
+	}
+}
+
+func createPermissionlessDelegatorTx(subnetID ids.ID, delegatorData txs.Validator) *txs.AddPermissionlessDelegatorTx {
+	return &txs.AddPermissionlessDelegatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.MainnetID,
+				BlockchainID: constants.PlatformChainID,
+				Outs:         []*avax.TransferableOutput{},
+				Ins: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID:        ids.GenerateTestID(),
+							OutputIndex: 1,
+						},
+						Asset: avax.Asset{
+							ID: ids.GenerateTestID(),
+						},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2 * units.KiloAvax,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{1},
+							},
+						},
+					},
+				},
+				Memo: types.JSONByteSlice{},
+			},
+		},
+		Validator: delegatorData,
+		Subnet:    subnetID,
+
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: ids.GenerateTestID(),
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 2 * units.KiloAvax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							ids.GenerateTestShortID(),
+						},
+					},
+				},
+			},
+		},
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				ids.GenerateTestShortID(),
+			},
+		},
 	}
 }
 
