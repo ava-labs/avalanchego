@@ -17,7 +17,7 @@ var (
 )
 
 type BanffCommitBlock struct {
-	Time               uint64 `serialize:"true" json:"time"`
+	Time               int64 `serialize:"true" json:"time"`
 	ApricotCommitBlock `serialize:"true"`
 }
 
@@ -35,7 +35,7 @@ func NewBanffCommitBlock(
 	height uint64,
 ) (*BanffCommitBlock, error) {
 	blk := &BanffCommitBlock{
-		Time: uint64(timestamp.Unix()),
+		Time: timestamp.Unix(),
 		ApricotCommitBlock: ApricotCommitBlock{
 			CommonBlock: CommonBlock{
 				PrntID: parentID,

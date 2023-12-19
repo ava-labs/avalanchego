@@ -17,7 +17,7 @@ var (
 )
 
 type BanffAbortBlock struct {
-	Time              uint64 `serialize:"true" json:"time"`
+	Time              int64 `serialize:"true" json:"time"`
 	ApricotAbortBlock `serialize:"true"`
 }
 
@@ -35,7 +35,7 @@ func NewBanffAbortBlock(
 	height uint64,
 ) (*BanffAbortBlock, error) {
 	blk := &BanffAbortBlock{
-		Time: uint64(timestamp.Unix()),
+		Time: timestamp.Unix(),
 		ApricotAbortBlock: ApricotAbortBlock{
 			CommonBlock: CommonBlock{
 				PrntID: parentID,

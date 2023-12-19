@@ -21,7 +21,7 @@ type StandardBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"`
 	// This block's height. The genesis block is at height 0.
 	Hght uint64 `serialize:"true" json:"height"`
-	Time uint64 `serialize:"true" json:"time"`
+	Time int64  `serialize:"true" json:"time"`
 	Root ids.ID `serialize:"true" json:"merkleRoot"`
 	// List of transactions contained in this block.
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
@@ -85,7 +85,7 @@ func NewStandardBlock(
 	blk := &StandardBlock{
 		PrntID:       parentID,
 		Hght:         height,
-		Time:         uint64(timestamp.Unix()),
+		Time:         timestamp.Unix(),
 		Transactions: txs,
 	}
 	return blk, initialize(blk, cm)

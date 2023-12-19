@@ -17,9 +17,9 @@ type ClientStaker struct {
 	// the txID of the transaction that added this staker.
 	TxID ids.ID
 	// the Unix time when they start staking
-	StartTime uint64
+	StartTime int64
 	// the Unix time when they are done staking
-	EndTime uint64
+	EndTime int64
 	// the validator weight when sampling validators
 	Weight uint64
 	// the amount of tokens being staked.
@@ -63,8 +63,8 @@ type ClientDelegator struct {
 func apiStakerToClientStaker(validator api.Staker) ClientStaker {
 	return ClientStaker{
 		TxID:        validator.TxID,
-		StartTime:   uint64(validator.StartTime),
-		EndTime:     uint64(validator.EndTime),
+		StartTime:   int64(validator.StartTime), // TODO
+		EndTime:     int64(validator.EndTime),   // TODO
 		Weight:      uint64(validator.Weight),
 		StakeAmount: (*uint64)(validator.StakeAmount),
 		NodeID:      validator.NodeID,

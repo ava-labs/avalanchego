@@ -18,7 +18,7 @@ var (
 )
 
 type BanffStandardBlock struct {
-	Time                 uint64 `serialize:"true" json:"time"`
+	Time                 int64 `serialize:"true" json:"time"`
 	ApricotStandardBlock `serialize:"true"`
 }
 
@@ -37,7 +37,7 @@ func NewBanffStandardBlock(
 	txs []*txs.Tx,
 ) (*BanffStandardBlock, error) {
 	blk := &BanffStandardBlock{
-		Time: uint64(timestamp.Unix()),
+		Time: timestamp.Unix(),
 		ApricotStandardBlock: ApricotStandardBlock{
 			CommonBlock: CommonBlock{
 				PrntID: parentID,

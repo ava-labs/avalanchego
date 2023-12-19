@@ -18,7 +18,7 @@ var (
 )
 
 type BanffProposalBlock struct {
-	Time uint64 `serialize:"true" json:"time"`
+	Time int64 `serialize:"true" json:"time"`
 	// Transactions is currently unused. This is populated so that introducing
 	// them in the future will not require a codec change.
 	//
@@ -72,7 +72,7 @@ func NewBanffProposalBlock(
 ) (*BanffProposalBlock, error) {
 	blk := &BanffProposalBlock{
 		Transactions: decisionTxs,
-		Time:         uint64(timestamp.Unix()),
+		Time:         timestamp.Unix(),
 		ApricotProposalBlock: ApricotProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID: parentID,
