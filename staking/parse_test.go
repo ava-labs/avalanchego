@@ -30,11 +30,11 @@ var (
 	}
 )
 
-func TestParseCheckLargePublicKey(t *testing.T) {
+func TestParseCheckLargeCert(t *testing.T) {
 	for _, parser := range parsers {
 		t.Run(parser.name, func(t *testing.T) {
 			_, err := parser.parse(largeRSAKeyCert)
-			require.ErrorIs(t, err, ErrUnsupportedRSAModulusBitLen)
+			require.ErrorIs(t, err, ErrCertificateTooLarge)
 		})
 	}
 }
