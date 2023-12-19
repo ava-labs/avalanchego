@@ -1627,6 +1627,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 }
 
 func TestNFTWorkflow(t *testing.T) {
+	addrs := addrs[:3]
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
