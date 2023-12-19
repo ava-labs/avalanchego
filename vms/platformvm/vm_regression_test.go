@@ -1482,8 +1482,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(primaryStartTime.Unix()),
-			End:    uint64(primaryEndTime.Unix()),
+			Start:  primaryStartTime.Unix(),
+			End:    primaryEndTime.Unix(),
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,
@@ -1613,8 +1613,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(primaryReStartTime.Unix()),
-			End:    uint64(primaryReEndTime.Unix()),
+			Start:  primaryReStartTime.Unix(),
+			End:    primaryReEndTime.Unix(),
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,
@@ -1812,8 +1812,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(primaryStartTime2.Unix()),
-			End:    uint64(primaryEndTime2.Unix()),
+			Start:  primaryStartTime2.Unix(),
+			End:    primaryEndTime2.Unix(),
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,
@@ -2014,8 +2014,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(primaryStartTime2.Unix()),
-			End:    uint64(primaryEndTime2.Unix()),
+			Start:  primaryStartTime2.Unix(),
+			End:    primaryEndTime2.Unix(),
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,

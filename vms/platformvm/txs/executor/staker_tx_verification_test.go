@@ -74,7 +74,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				NodeID: ids.GenerateTestNodeID(),
 				// Note: [Start] is not set here as it will be ignored
 				// Post-Durango in favor of the current chain time
-				End:  uint64(endTime.Unix()),
+				End:  endTime.Unix(),
 				Wght: unsignedTransformTx.MinValidatorStake,
 			},
 			Subnet: subnetID,
@@ -289,7 +289,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 
 				// Note the duration is 1 less than the minimum
-				tx.Validator.End = tx.Validator.Start + uint64(unsignedTransformTx.MinStakeDuration) - 1
+				tx.Validator.End = tx.Validator.Start + int64(unsignedTransformTx.MinStakeDuration) - 1
 				return &tx
 			},
 			expectedErr: ErrStakeTooShort,
@@ -322,7 +322,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 
 				// Note the duration is more than the maximum
-				tx.Validator.End = uint64(unsignedTransformTx.MaxStakeDuration) + 2
+				tx.Validator.End = int64(unsignedTransformTx.MaxStakeDuration) + 2
 				return &tx
 			},
 			expectedErr: ErrStakeTooLong,
@@ -517,8 +517,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				// Note this copies [verifiedTx]
 				tx := verifiedTx
-				tx.Validator.Start = uint64(now.Add(MaxFutureStartTime).Add(time.Second).Unix())
-				tx.Validator.End = tx.Validator.Start + uint64(unsignedTransformTx.MinStakeDuration)
+				tx.Validator.Start = now.Add(MaxFutureStartTime).Add(time.Second).Unix()
+				tx.Validator.End = tx.Validator.Start + int64(unsignedTransformTx.MinStakeDuration)
 				return &tx
 			},
 			expectedErr: ErrFutureStakeTime,

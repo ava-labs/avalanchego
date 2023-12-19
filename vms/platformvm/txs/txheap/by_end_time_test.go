@@ -24,8 +24,8 @@ func TestByEndTime(t *testing.T) {
 	utx0 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
 			NodeID: ids.BuildTestNodeID([]byte{0}),
-			Start:  uint64(baseTime.Unix()),
-			End:    uint64(baseTime.Unix()) + 1,
+			Start:  baseTime.Unix(),
+			End:    baseTime.Unix() + 1,
 		},
 		RewardsOwner: &secp256k1fx.OutputOwners{},
 	}
@@ -35,8 +35,8 @@ func TestByEndTime(t *testing.T) {
 	utx1 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
 			NodeID: ids.BuildTestNodeID([]byte{1}),
-			Start:  uint64(baseTime.Unix()),
-			End:    uint64(baseTime.Unix()) + 2,
+			Start:  baseTime.Unix(),
+			End:    baseTime.Unix() + 2,
 		},
 		RewardsOwner: &secp256k1fx.OutputOwners{},
 	}
@@ -46,8 +46,8 @@ func TestByEndTime(t *testing.T) {
 	utx2 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
 			NodeID: ids.BuildTestNodeID([]byte{1}),
-			Start:  uint64(baseTime.Unix()),
-			End:    uint64(baseTime.Unix()) + 3,
+			Start:  baseTime.Unix(),
+			End:    baseTime.Unix() + 3,
 		},
 		RewardsOwner: &secp256k1fx.OutputOwners{},
 	}

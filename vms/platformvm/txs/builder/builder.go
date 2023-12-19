@@ -473,8 +473,8 @@ func (b *builder) NewAddValidatorTx(
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(startTime), // TODO
-			End:    uint64(endTime),   // TODO
+			Start:  startTime,
+			End:    endTime,
 			Wght:   stakeAmount,
 		},
 		StakeOuts: stakedOuts,
@@ -515,8 +515,8 @@ func (b *builder) NewAddDelegatorTx(
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(startTime), // TODO
-			End:    uint64(endTime),   // TODO
+			Start:  startTime,
+			End:    endTime,
 			Wght:   stakeAmount,
 		},
 		StakeOuts: lockedOuts,
@@ -564,8 +564,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 		SubnetValidator: txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
-				Start:  uint64(startTime), // TODO
-				End:    uint64(endTime),   // TODO
+				Start:  startTime,
+				End:    endTime,
 				Wght:   weight,
 			},
 			Subnet: subnetID,

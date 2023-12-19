@@ -172,7 +172,7 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	proposalTxs := make([]*txs.Tx, 0, count)
 	for i := 0; i < count; i++ {
 		tx, err := generateAddValidatorTx(
-			uint64(now.Add(time.Duration(count-i)*time.Second).Unix()), // startTime
+			now.Add(time.Duration(count-i)*time.Second).Unix(), // startTime
 			0, // endTime
 		)
 		if err != nil {
@@ -183,7 +183,7 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	return proposalTxs, nil
 }
 
-func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
+func generateAddValidatorTx(startTime int64, endTime int64) (*txs.Tx, error) {
 	utx := &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{},
 		Validator: txs.Validator{

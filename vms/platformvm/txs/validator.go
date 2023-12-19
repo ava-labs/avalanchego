@@ -21,10 +21,10 @@ type Validator struct {
 	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 
 	// Unix time this validator starts validating
-	Start uint64 `serialize:"true" json:"start"`
+	Start int64 `serialize:"true" json:"start"`
 
 	// Unix time this validator stops validating
-	End uint64 `serialize:"true" json:"end"`
+	End int64 `serialize:"true" json:"end"`
 
 	// Weight of this validator used when sampling
 	Wght uint64 `serialize:"true" json:"weight"`

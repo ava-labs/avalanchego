@@ -94,8 +94,8 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 	initialValidator := &txs.AddValidatorTx{
 		Validator: txs.Validator{
 			NodeID: initialNodeID,
-			Start:  uint64(initialTime.Unix()),
-			End:    uint64(initialValidatorEndTime.Unix()),
+			Start:  initialTime.Unix(),
+			End:    initialValidatorEndTime.Unix(),
 			Wght:   units.Avax,
 		},
 		StakeOuts: []*avax.TransferableOutput{

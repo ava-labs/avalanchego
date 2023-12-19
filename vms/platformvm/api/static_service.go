@@ -318,8 +318,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			}}
 			validator = txs.Validator{
 				NodeID: vdr.NodeID,
-				Start:  uint64(args.Time),
-				End:    uint64(vdr.EndTime),
+				Start:  int64(args.Time),
+				End:    int64(vdr.EndTime),
 				Wght:   weight,
 			}
 			tx *txs.Tx

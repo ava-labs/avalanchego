@@ -145,8 +145,8 @@ func ExampleWallet() {
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
-				Start:  uint64(startTime.Unix()),
-				End:    uint64(startTime.Add(5 * time.Second).Unix()),
+				Start:  startTime.Unix(),
+				End:    startTime.Add(5 * time.Second).Unix(),
 				Wght:   25 * units.MegaAvax,
 			},
 			Subnet: createSubnetTxID,
@@ -169,8 +169,8 @@ func ExampleWallet() {
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
-				Start:  uint64(startTime.Unix()),
-				End:    uint64(startTime.Add(5 * time.Second).Unix()),
+				Start:  startTime.Unix(),
+				End:    startTime.Add(5 * time.Second).Unix(),
 				Wght:   25 * units.MegaAvax,
 			},
 			Subnet: createSubnetTxID,

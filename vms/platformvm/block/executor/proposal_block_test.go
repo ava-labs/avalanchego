@@ -63,7 +63,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	// create a proposal transaction to be included into proposal block
 	utx := &txs.AddValidatorTx{
 		BaseTx:    txs.BaseTx{},
-		Validator: txs.Validator{End: uint64(chainTime.Unix())},
+		Validator: txs.Validator{End: int64(chainTime.Unix())},
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -194,7 +194,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 	unsignedNextStakerTx := &txs.AddValidatorTx{
 		BaseTx:    txs.BaseTx{},
-		Validator: txs.Validator{End: uint64(nextStakerTime.Unix())},
+		Validator: txs.Validator{End: int64(nextStakerTime.Unix())},
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{

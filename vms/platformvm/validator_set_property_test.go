@@ -321,8 +321,8 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		}},
 		Validator: txs.Validator{
 			NodeID: data.nodeID,
-			Start:  uint64(data.startTime.Unix()),
-			End:    uint64(data.endTime.Unix()),
+			Start:  data.startTime.Unix(),
+			End:    data.endTime.Unix(),
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,
