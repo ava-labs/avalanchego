@@ -48,7 +48,7 @@ func (b *BanffProposalBlock) InitCtx(ctx *snow.Context) {
 }
 
 func (b *BanffProposalBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+	return time.Unix(b.Time, 0)
 }
 
 func (b *BanffProposalBlock) Txs() []*txs.Tx {

@@ -67,8 +67,8 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 
 	genesisValidators := []api.GenesisPermissionlessValidator{{
 		GenesisValidator: api.GenesisValidator{
-			StartTime: json.Uint64(genesisTime.Unix()),
-			EndTime:   json.Uint64(genesisEndTime.Unix()),
+			StartTime: json.Int64(genesisTime.Unix()),
+			EndTime:   json.Int64(genesisEndTime.Unix()),
 			NodeID:    ids.GenerateTestNodeID(),
 		},
 		RewardOwner: &api.Owner{
@@ -88,7 +88,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		UTXOs:         nil,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Uint64(genesisTime.Unix()),
+		Time:          json.Int64(genesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 		Encoding:      formatting.Hex,
 	}

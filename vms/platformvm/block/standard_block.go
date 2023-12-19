@@ -23,7 +23,7 @@ type BanffStandardBlock struct {
 }
 
 func (b *BanffStandardBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+	return time.Unix(b.Time, 0)
 }
 
 func (b *BanffStandardBlock) Visit(v Visitor) error {

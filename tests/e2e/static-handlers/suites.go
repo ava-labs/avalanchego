@@ -134,8 +134,8 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			require.NoError(err)
 			genesisValidators[i] = api.GenesisPermissionlessValidator{
 				GenesisValidator: api.GenesisValidator{
-					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
-					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
+					StartTime: json.Int64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
+					EndTime:   json.Int64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
 					NodeID:    ids.BuildTestNodeID(id[:]),
 				},
 				RewardOwner: &api.Owner{
@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			UTXOs:         genesisUTXOs,
 			Validators:    genesisValidators,
 			Chains:        nil,
-			Time:          json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
+			Time:          json.Int64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 			InitialSupply: json.Uint64(360 * units.MegaAvax),
 			Encoding:      formatting.Hex,
 		}

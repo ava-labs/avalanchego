@@ -60,7 +60,7 @@ func (b *StandardBlock) Height() uint64 {
 }
 
 func (b *StandardBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+	return time.Unix(b.Time, 0)
 }
 
 func (b *StandardBlock) MerkleRoot() ids.ID {

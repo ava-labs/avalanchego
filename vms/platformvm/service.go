@@ -835,8 +835,8 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		weight := json.Uint64(currentStaker.Weight)
 		apiStaker := platformapi.Staker{
 			TxID:        currentStaker.TxID,
-			StartTime:   json.Uint64(currentStaker.StartTime.Unix()),
-			EndTime:     json.Uint64(currentStaker.EndTime.Unix()),
+			StartTime:   json.Int64(currentStaker.StartTime.Unix()),
+			EndTime:     json.Int64(currentStaker.EndTime.Unix()),
 			Weight:      weight,
 			StakeAmount: &weight,
 			NodeID:      nodeID,
@@ -1051,8 +1051,8 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 		apiStaker := platformapi.Staker{
 			TxID:        pendingStaker.TxID,
 			NodeID:      nodeID,
-			StartTime:   json.Uint64(pendingStaker.StartTime.Unix()),
-			EndTime:     json.Uint64(pendingStaker.EndTime.Unix()),
+			StartTime:   json.Int64(pendingStaker.StartTime.Unix()),
+			EndTime:     json.Int64(pendingStaker.EndTime.Unix()),
 			Weight:      weight,
 			StakeAmount: &weight,
 		}
@@ -1193,9 +1193,9 @@ func (s *Service) AddValidator(req *http.Request, args *AddValidatorArgs, reply 
 
 	now := s.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
-	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
+	minAddStakerUnix := json.Int64(minAddStakerTime.Unix())
 	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
-	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
+	maxAddStakerUnix := json.Int64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
 		args.StartTime = minAddStakerUnix
@@ -1307,9 +1307,9 @@ func (s *Service) AddDelegator(req *http.Request, args *AddDelegatorArgs, reply 
 
 	now := s.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
-	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
+	minAddStakerUnix := json.Int64(minAddStakerTime.Unix())
 	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
-	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
+	maxAddStakerUnix := json.Int64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
 		args.StartTime = minAddStakerUnix
@@ -1418,9 +1418,9 @@ func (s *Service) AddSubnetValidator(req *http.Request, args *AddSubnetValidator
 
 	now := s.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
-	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
+	minAddStakerUnix := json.Int64(minAddStakerTime.Unix())
 	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
-	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
+	maxAddStakerUnix := json.Int64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
 		args.StartTime = minAddStakerUnix
@@ -2472,10 +2472,10 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 
 // GetMaxStakeAmountArgs is the request for calling GetMaxStakeAmount.
 type GetMaxStakeAmountArgs struct {
-	SubnetID  ids.ID      `json:"subnetID"`
-	NodeID    ids.NodeID  `json:"nodeID"`
-	StartTime json.Uint64 `json:"startTime"`
-	EndTime   json.Uint64 `json:"endTime"`
+	SubnetID  ids.ID     `json:"subnetID"`
+	NodeID    ids.NodeID `json:"nodeID"`
+	StartTime json.Int64 `json:"startTime"`
+	EndTime   json.Int64 `json:"endTime"`
 }
 
 // GetMaxStakeAmountReply is the response from calling GetMaxStakeAmount.
@@ -2775,7 +2775,7 @@ func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 
 func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Owner, error) {
 	apiOwner := &platformapi.Owner{
-		Locktime:  json.Uint64(owner.Locktime),
+		Locktime:  json.Int64(owner.Locktime),
 		Threshold: json.Uint32(owner.Threshold),
 		Addresses: make([]string, 0, len(owner.Addrs)),
 	}

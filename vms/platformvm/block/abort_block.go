@@ -22,7 +22,7 @@ type BanffAbortBlock struct {
 }
 
 func (b *BanffAbortBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+	return time.Unix(b.Time, 0)
 }
 
 func (b *BanffAbortBlock) Visit(v Visitor) error {

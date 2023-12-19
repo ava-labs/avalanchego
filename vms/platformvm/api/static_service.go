@@ -43,7 +43,7 @@ type StaticService struct{}
 
 // UTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type UTXO struct {
-	Locktime json.Uint64 `json:"locktime"`
+	Locktime json.Int64  `json:"locktime"`
 	Amount   json.Uint64 `json:"amount"`
 	Address  string      `json:"address"`
 	Message  string      `json:"message"`
@@ -83,8 +83,8 @@ func (utxo UTXO) Compare(other UTXO) int {
 // [Uptime] is the observed uptime of this staker
 type Staker struct {
 	TxID      ids.ID      `json:"txID"`
-	StartTime json.Uint64 `json:"startTime"`
-	EndTime   json.Uint64 `json:"endTime"`
+	StartTime json.Int64  `json:"startTime"`
+	EndTime   json.Int64  `json:"endTime"`
 	Weight    json.Uint64 `json:"weight"`
 	NodeID    ids.NodeID  `json:"nodeID"`
 
@@ -98,7 +98,7 @@ type GenesisValidator Staker
 
 // Owner is the repr. of a reward owner sent over APIs.
 type Owner struct {
-	Locktime  json.Uint64 `json:"locktime"`
+	Locktime  json.Int64  `json:"locktime"`
 	Threshold json.Uint32 `json:"threshold"`
 	Addresses []string    `json:"addresses"`
 }
@@ -183,7 +183,7 @@ type BuildGenesisArgs struct {
 	UTXOs         []UTXO                           `json:"utxos"`
 	Validators    []GenesisPermissionlessValidator `json:"validators"`
 	Chains        []Chain                          `json:"chains"`
-	Time          json.Uint64                      `json:"time"`
+	Time          json.Int64                       `json:"time"`
 	InitialSupply json.Uint64                      `json:"initialSupply"`
 	Message       string                           `json:"message"`
 	Encoding      formatting.Encoding              `json:"encoding"`
@@ -289,7 +289,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		if weight == 0 {
 			return errValidatorHasNoWeight
 		}
-		if uint64(vdr.EndTime) <= uint64(args.Time) {
+		if vdr.EndTime <= args.Time {
 			return errValidatorAlreadyExited
 		}
 

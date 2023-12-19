@@ -22,7 +22,7 @@ type BanffCommitBlock struct {
 }
 
 func (b *BanffCommitBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+	return time.Unix(b.Time, 0)
 }
 
 func (b *BanffCommitBlock) Visit(v Visitor) error {

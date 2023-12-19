@@ -30,7 +30,7 @@ type ClientStaker struct {
 
 // ClientOwner is the repr. of a reward owner sent over client
 type ClientOwner struct {
-	Locktime  uint64
+	Locktime  int64
 	Threshold uint32
 	Addresses []ids.ShortID
 }
@@ -78,7 +78,7 @@ func apiOwnerToClientOwner(rewardOwner *api.Owner) (*ClientOwner, error) {
 
 	addrs, err := address.ParseToIDs(rewardOwner.Addresses)
 	return &ClientOwner{
-		Locktime:  uint64(rewardOwner.Locktime),
+		Locktime:  int64(rewardOwner.Locktime),
 		Threshold: uint32(rewardOwner.Threshold),
 		Addresses: addrs,
 	}, err
