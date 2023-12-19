@@ -36,7 +36,7 @@ The root ID also serves as a unique identifier of a given state; instances with 
 
 ## Views
 
-A _view_ is a proposal to modify a MerkleDB. If a view is _committed_, its changes are written to the MerkleDB. It can be queried, and when it is, it will return the state that the MerkleDB will contain if the view is committed.
+A _view_ is a proposal to modify a MerkleDB. If a view is _committed_, its changes are written to the MerkleDB. It can be queried, and when it is, it returns the state that the MerkleDB will contain if the view is committed. A view is immutable after creation. Namely, none of its key-value pairs can be modified. 
 
 A view can be built atop the MerkleDB itself, or it can be built atop another view. Views can be chained together. For example, we might have:
 
@@ -55,6 +55,8 @@ where `view1` and `view2` are built atop MerkleDB instance `db` and `view3` is b
 `view3` has all of the key-value pairs as `view1`, except those modified in `view3`. That is, it has the state after the changes in `view1` are applied to `db`, followed by those in `view3`.
 
 A view can be committed only if its parent is the MerkleDB (and not another view). A view can only be committed once. In the above diagram, `view3` can't be committed until `view1` is committed.
+
+When a view is created, we don't apply changes to the trie's structure or calculate the new IDs of nodes because this requires expensive hashing. Instead, we lazily apply changes and calculate node IDs (including the root ID) when necessary.
 
 ### Validity
 
