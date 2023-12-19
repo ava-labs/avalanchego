@@ -87,7 +87,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		}
 
 		var bytes []byte
-		bytes, err = h.marshaller.GossipMarshal(gossipable)
+		bytes, err = h.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			return false
 		}
@@ -134,7 +134,7 @@ func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipByte
 	receivedBytes := 0
 	for _, bytes := range msg.Gossip {
 		receivedBytes += len(bytes)
-		gossipable, err := h.marshaller.GossipUnmarshal(bytes)
+		gossipable, err := h.marshaller.UnmarshalGossip(bytes)
 		if err != nil {
 			h.log.Debug("failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
@@ -147,7 +147,7 @@ func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipByte
 			h.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", gossipable.GetID()),
+				zap.Stringer("id", gossipable.GetGossipID()),
 				zap.Error(err),
 			)
 			continue
