@@ -7,10 +7,13 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 
 	"github.com/ava-labs/coreth/core"
@@ -19,10 +22,63 @@ import (
 )
 
 var (
+	_ p2p.Handler = (*txGossipHandler)(nil)
+
 	_ gossip.Gossipable        = (*GossipEthTx)(nil)
 	_ gossip.Gossipable        = (*GossipAtomicTx)(nil)
 	_ gossip.Set[*GossipEthTx] = (*GossipEthTxPool)(nil)
 )
+
+func newTxGossipHandler[T any, U gossip.GossipableAny[T]](
+	log logging.Logger,
+	mempool gossip.Set[U],
+	metrics gossip.Metrics,
+	maxMessageSize int,
+	throttlingPeriod time.Duration,
+	throttlingLimit int,
+	validators *p2p.Validators,
+) txGossipHandler {
+	// push gossip messages can be handled from any peer
+	handler := gossip.NewHandler[T, U](
+		log,
+		// Don't forward gossip to avoid double-forwarding
+		gossip.NoOpAccumulator[U]{},
+		mempool,
+		metrics,
+		maxMessageSize,
+	)
+
+	// pull gossip requests are filtered by validators and are throttled
+	// to prevent spamming
+	validatorHandler := p2p.NewValidatorHandler(
+		p2p.NewThrottlerHandler(
+			handler,
+			p2p.NewSlidingWindowThrottler(throttlingPeriod, throttlingLimit),
+			log,
+		),
+		validators,
+		log,
+	)
+
+	return txGossipHandler{
+		appGossipHandler:  handler,
+		appRequestHandler: validatorHandler,
+	}
+}
+
+type txGossipHandler struct {
+	p2p.NoOpHandler
+	appGossipHandler  p2p.Handler
+	appRequestHandler p2p.Handler
+}
+
+func (t txGossipHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+	t.appGossipHandler.AppGossip(ctx, nodeID, gossipBytes)
+}
+
+func (t txGossipHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	return t.appRequestHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
 
 type GossipAtomicTx struct {
 	Tx *Tx

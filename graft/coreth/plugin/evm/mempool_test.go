@@ -34,3 +34,22 @@ func TestMempoolAddTx(t *testing.T) {
 		require.True(m.bloom.Has(tx))
 	}
 }
+
+// Add should return an error if a tx is already known
+func TestMempoolAdd(t *testing.T) {
+	require := require.New(t)
+	m, err := NewMempool(&snow.Context{}, 5_000, nil)
+	require.NoError(err)
+
+	tx := &GossipAtomicTx{
+		Tx: &Tx{
+			UnsignedAtomicTx: &TestUnsignedTx{
+				IDV: ids.GenerateTestID(),
+			},
+		},
+	}
+
+	require.NoError(m.Add(tx))
+	err = m.Add(tx)
+	require.ErrorIs(err, errTxAlreadyKnown)
+}
