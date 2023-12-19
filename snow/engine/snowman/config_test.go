@@ -15,7 +15,7 @@ import (
 
 func DefaultConfig() Config {
 	return Config{
-		Ctx:                 snowtest.EmptyConsensusContext(),
+		Ctx:                 snowtest.ConsensusContext(),
 		VM:                  &block.TestVM{},
 		Sender:              &common.SenderTest{},
 		Validators:          validators.NewManager(),

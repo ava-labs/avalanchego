@@ -18,7 +18,7 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 	return nil
 }
 
-func EmptyConsensusContext() *snow.ConsensusContext {
+func ConsensusContext() *snow.ConsensusContext {
 	return &snow.ConsensusContext{
 		Context:             snow.DefaultContextTest(),
 		Registerer:          prometheus.NewRegistry(),
