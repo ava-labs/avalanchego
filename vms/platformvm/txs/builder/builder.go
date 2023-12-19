@@ -616,7 +616,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 }
 
 func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error) {
-	utx := &txs.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
+	utx := &txs.AdvanceTimeTx{Time: timestamp.Unix()}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err

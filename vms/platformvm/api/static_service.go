@@ -384,7 +384,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,
-		Timestamp:     uint64(args.Time),
+		Timestamp:     int64(args.Time), // TODO
 		InitialSupply: uint64(args.InitialSupply),
 		Message:       args.Message,
 	}

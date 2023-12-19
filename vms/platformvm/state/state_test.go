@@ -144,7 +144,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 		Chains: []*txs.Tx{
 			initialChainTx,
 		},
-		Timestamp:     uint64(initialTime.Unix()),
+		Timestamp:     initialTime.Unix(),
 		InitialSupply: units.Schmeckle + units.Avax,
 	}
 

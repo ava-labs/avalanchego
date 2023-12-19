@@ -10,7 +10,7 @@ import (
 
 type delegatorMetadata struct {
 	PotentialReward uint64 `v1:"true"`
-	StakerStartTime uint64 `v1:"true"`
+	StakerStartTime int64  `v1:"true"`
 
 	txID ids.ID
 }

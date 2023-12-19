@@ -339,7 +339,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		// wrong tx content (no advance time txs)
 		invalidTx := &txs.Tx{
 			Unsigned: &txs.AdvanceTimeTx{
-				Time: uint64(nextStakerTime.Unix()),
+				Time: nextStakerTime.Unix(),
 			},
 		}
 		require.NoError(invalidTx.Initialize(txs.Codec))

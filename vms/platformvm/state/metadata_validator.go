@@ -23,16 +23,16 @@ var _ validatorState = (*metadata)(nil)
 
 type preDelegateeRewardMetadata struct {
 	UpDuration      time.Duration `v0:"true"`
-	LastUpdated     uint64        `v0:"true"` // Unix time in seconds
+	LastUpdated     int64         `v0:"true"` // Unix time in seconds
 	PotentialReward uint64        `v0:"true"`
 }
 
 type validatorMetadata struct {
 	UpDuration               time.Duration `v0:"true"`
-	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
+	LastUpdated              int64         `v0:"true"` // Unix time in seconds
 	PotentialReward          uint64        `v0:"true"`
 	PotentialDelegateeReward uint64        `v0:"true"`
-	StakerStartTime          uint64        `          v1:"true"`
+	StakerStartTime          int64         `          v1:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -72,7 +72,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 			return err
 		}
 	}
-	metadata.lastUpdated = time.Unix(int64(metadata.LastUpdated), 0)
+	metadata.lastUpdated = time.Unix(metadata.LastUpdated, 0)
 	return nil
 }
 
@@ -237,7 +237,7 @@ func (m *metadata) WriteValidatorMetadata(
 	for vdrID, updatedSubnets := range m.updatedMetadata {
 		for subnetID := range updatedSubnets {
 			metadata := m.metadata[vdrID][subnetID]
-			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
+			metadata.LastUpdated = metadata.lastUpdated.Unix()
 
 			metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
 			if err != nil {
