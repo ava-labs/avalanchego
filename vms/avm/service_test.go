@@ -1310,19 +1310,19 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
-	require.Equal(`{
+	expectedReplyTxString := `{
 	"unsignedTx": {
 		"networkID": 10,
-		"blockchainID": "JwosgTNtShNg8XRDewj2SMZViRzb2KQ5vzGvSVcnWCsWwE2gL",
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [],
 		"inputs": [],
 		"memo": "0x",
 		"operations": [
 			{
-				"assetID": "KvHfrnFGRa9PewGtbBnaMXUFz4A5MxYQBU9N51kPj6yHshmqA",
+				"assetID": "PLACEHOLDER_ASSET_ID",
 				"inputIDs": [
 					{
-						"txID": "KvHfrnFGRa9PewGtbBnaMXUFz4A5MxYQBU9N51kPj6yHshmqA",
+						"txID": "PLACEHOLDER_INPUT_TX_ID",
 						"outputIndex": 4
 					}
 				],
@@ -1354,13 +1354,28 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {
 				"signatures": [
-					"0xd4123ee903947a6f305a444112c5ccb80c475211b95f2a7c7b36dce23160c078043334cebed908d516d951531b8e4e814053e50d7ab96e7cd0de48c027d9d3de00"
+					"PLACEHOLDER_SIGNATURE"
 				]
 			}
 		}
 	],
-	"id": "2kktXPQQBGkBDRNNdA652baRmvz7LfUFuko66hUPzx2kKDm1Hk"
-}`, string(replyTxBytes))
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	createAssetTxIDString := createAssetTx.ID().String()
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_ASSET_ID", createAssetTxIDString, 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_INPUT_TX_ID", createAssetTxIDString, 1)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[0].Credential.(*nftfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) {
