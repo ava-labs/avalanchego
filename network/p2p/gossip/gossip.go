@@ -169,7 +169,7 @@ func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	return nil
 }
 
-func (p *PullGossiper[T]) handleResponse(
+func (p *PullGossiper[_]) handleResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
