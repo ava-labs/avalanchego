@@ -59,7 +59,7 @@ func NewContext(tb testing.TB) *snow.Context {
 	require.NoError(aliaser.Alias(ctx.XChainID, "X"))
 	require.NoError(aliaser.Alias(ctx.XChainID, ctx.XChainID.String()))
 
-	require.NoError(aliaser.Alias(ctx.CChainID, "P"))
+	require.NoError(aliaser.Alias(ctx.CChainID, "C"))
 	require.NoError(aliaser.Alias(ctx.CChainID, ctx.CChainID.String()))
 
 	ctx.ValidatorState = &validators.TestState{
