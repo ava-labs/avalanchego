@@ -1046,7 +1046,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			}
 		}
 	],
-	"id": "4riXBNHaBMX8EuB1DKLkaCZBgK439VaADpVRFxauetzoZMFUQ"
+	"id": "PLACEHOLDER_TX_ID"
 }`
 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 4)
