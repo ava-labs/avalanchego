@@ -71,13 +71,7 @@ type viewIterator struct {
 // based on if the in memory changes or the underlying db should be read next
 func (it *viewIterator) Next() bool {
 	switch {
-	case it.view.db.closed:
-		// Short-circuit and set an error if the underlying database has been closed.
-		it.key = nil
-		it.value = nil
-		it.err = database.ErrClosed
-		return false
-	case it.view.invalidated:
+	case it.view.isInvalid():
 		it.key = nil
 		it.value = nil
 		it.err = ErrInvalid

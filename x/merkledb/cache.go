@@ -25,6 +25,7 @@ type onEvictCache[K comparable, V any] struct {
 	onEviction func(K, V) error
 }
 
+// [size] must always return a positive number.
 func newOnEvictCache[K comparable, V any](
 	maxSize int,
 	size func(K, V) int,

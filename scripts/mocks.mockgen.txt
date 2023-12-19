@@ -37,6 +37,7 @@ github.com/ava-labs/avalanchego/vms/platformvm/txs/builder=Builder=vms/platformv
 github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool=Mempool=vms/platformvm/txs/mempool/mock_mempool.go
 github.com/ava-labs/avalanchego/vms/platformvm/utxo=Verifier=vms/platformvm/utxo/mock_verifier.go
 github.com/ava-labs/avalanchego/vms/proposervm/proposer=Windower=vms/proposervm/proposer/mock_windower.go
+github.com/ava-labs/avalanchego/vms/proposervm/scheduler=Scheduler=vms/proposervm/scheduler/mock_scheduler.go
 github.com/ava-labs/avalanchego/vms/proposervm/state=State=vms/proposervm/state/mock_state.go
 github.com/ava-labs/avalanchego/vms/proposervm=PostForkBlock=vms/proposervm/mock_post_fork_block.go
 github.com/ava-labs/avalanchego/vms/registry=VMGetter=vms/registry/mock_vm_getter.go

@@ -23,7 +23,7 @@ var (
 var _ State = (*TestState)(nil)
 
 type TestState struct {
-	T *testing.T
+	T testing.TB
 
 	CantGetMinimumHeight,
 	CantGetCurrentHeight,
