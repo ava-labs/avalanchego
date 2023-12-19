@@ -99,7 +99,7 @@ func Test_GetValues_Safety(t *testing.T) {
 	require.Equal([]byte{0}, trieVals[0])
 }
 
-func TestTrieViewVisitPathToKey(t *testing.T) {
+func TestVisitPathToKey(t *testing.T) {
 	require := require.New(t)
 
 	db, err := getBasicDB()
