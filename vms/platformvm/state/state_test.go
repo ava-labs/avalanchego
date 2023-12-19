@@ -32,8 +32,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -49,16 +52,16 @@ func TestStateInitialization(t *testing.T) {
 	require := require.New(t)
 	s, db := newUninitializedState(require)
 
-	shouldInit, err := s.(*state).shouldInit()
+	shouldInit, err := s.shouldInit()
 	require.NoError(err)
 	require.True(shouldInit)
 
-	require.NoError(s.(*state).doneInit())
+	require.NoError(s.doneInit())
 	require.NoError(s.Commit())
 
 	s = newStateFromDB(require, db)
 
-	shouldInit, err = s.(*state).shouldInit()
+	shouldInit, err = s.shouldInit()
 	require.NoError(err)
 	require.False(shouldInit)
 }
@@ -86,6 +89,57 @@ func TestStateSyncGenesis(t *testing.T) {
 	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
+}
+
+// Whenever we store a current validator, a whole bunch a data structures are updated
+// This test is meant to capture which updates are carried out
+func TestPersistCurrentStakers(t *testing.T) {
+	require := require.New(t)
+	state, db := newUninitializedState(require)
+
+	var (
+		height    uint64 = 0
+		startTime        = time.Now().Unix()
+		endTime          = time.Now().Add(14 * 24 * time.Hour).Unix()
+
+		subnetID       = constants.PrimaryNetworkID
+		validatorsData = txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Start:  uint64(startTime),
+			End:    uint64(endTime),
+			Wght:   1234,
+		}
+		validatorReward uint64 = 5678
+	)
+
+	utx := createPermissionlessValidatorTx(require, subnetID, validatorsData)
+	addPermValTx := &txs.Tx{Unsigned: utx}
+	require.NoError(addPermValTx.Initialize(txs.Codec))
+
+	staker, err := NewCurrentStaker(
+		addPermValTx.ID(),
+		utx,
+		validatorsData.StartTime(),
+		validatorReward,
+	)
+	require.NoError(err)
+
+	state.PutCurrentValidator(staker)
+	state.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
+	require.NoError(state.Commit())
+
+	// Check relevant quantities are persisted or updated in memory
+	checkCurrentStakersData(require, state, subnetID, staker, height)
+
+	// check that the same quantities are available after restart
+	rebuiltState := newStateFromDB(require, db)
+
+	// we single out two of the operations that are carried out when a node is restarted
+	// to load in memory current stakers related data
+	require.NoError(rebuiltState.loadCurrentValidators())
+	require.NoError(rebuiltState.initValidatorSets())
+
+	checkCurrentStakersData(require, rebuiltState, subnetID, staker, height)
 }
 
 func newInitializedState(require *require.Assertions) (State, database.Database) {
@@ -150,17 +204,17 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 
 	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
-	require.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
+	require.NoError(s.syncGenesis(genesisBlk, genesisState))
 
 	return s, db
 }
 
-func newUninitializedState(require *require.Assertions) (State, database.Database) {
+func newUninitializedState(require *require.Assertions) (*state, database.Database) {
 	db := memdb.New()
 	return newStateFromDB(require, db), db
 }
 
-func newStateFromDB(require *require.Assertions, db database.Database) State {
+func newStateFromDB(require *require.Assertions, db database.Database) *state {
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(
 		db,
@@ -181,6 +235,113 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	require.NoError(err)
 	require.NotNil(state)
 	return state
+}
+
+func createPermissionlessValidatorTx(r *require.Assertions, subnetID ids.ID, validatorsData txs.Validator) *txs.AddPermissionlessValidatorTx {
+	sk, err := bls.NewSecretKey()
+	r.NoError(err)
+
+	return &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.MainnetID,
+				BlockchainID: constants.PlatformChainID,
+				Outs:         []*avax.TransferableOutput{},
+				Ins: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID:        ids.GenerateTestID(),
+							OutputIndex: 1,
+						},
+						Asset: avax.Asset{
+							ID: ids.GenerateTestID(),
+						},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2 * units.KiloAvax,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{1},
+							},
+						},
+					},
+				},
+				Memo: types.JSONByteSlice{},
+			},
+		},
+		Validator: validatorsData,
+		Subnet:    subnetID,
+		Signer:    signer.NewProofOfPossession(sk),
+
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: ids.GenerateTestID(),
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 2 * units.KiloAvax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							ids.GenerateTestShortID(),
+						},
+					},
+				},
+			},
+		},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				ids.GenerateTestShortID(),
+			},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				ids.GenerateTestShortID(),
+			},
+		},
+		DelegationShares: reward.PercentDenominator,
+	}
+}
+
+func checkCurrentStakersData(r *require.Assertions, s *state, subnetID ids.ID, staker *Staker, height uint64) {
+	// Check state validator is stored in P-chain state
+	retrievedStaker, err := s.GetCurrentValidator(subnetID, staker.NodeID)
+	r.NoError(err)
+	r.Equal(staker, retrievedStaker)
+
+	// Check that validator is made available in the validators set
+	valsMap := s.cfg.Validators.GetMap(subnetID)
+	r.Len(valsMap, 1)
+	valOut, found := valsMap[staker.NodeID]
+	r.True(found)
+	r.Equal(valOut, &validators.GetValidatorOutput{
+		NodeID:    staker.NodeID,
+		PublicKey: staker.PublicKey,
+		Weight:    staker.Weight,
+	})
+
+	// Check that validator uptime is duly registered
+	upDuration, lastUpdated, err := s.GetUptime(staker.NodeID, staker.SubnetID)
+	r.NoError(err)
+	r.Equal(upDuration, time.Duration(0))
+	r.Equal(lastUpdated, staker.StartTime)
+
+	// Check that weight diff and bls diffs are duly stored
+	weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(subnetID, height, staker.NodeID))
+	r.NoError(err)
+	weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
+	r.NoError(err)
+	r.Equal(weightDiff, &ValidatorWeightDiff{
+		Decrease: false,
+		Amount:   staker.Weight,
+	})
+
+	blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(subnetID, height, staker.NodeID))
+	r.NoError(err)
+	r.Nil(blsDiffBytes)
 }
 
 func TestValidatorWeightDiff(t *testing.T) {
