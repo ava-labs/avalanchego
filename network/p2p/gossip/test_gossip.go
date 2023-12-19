@@ -25,11 +25,11 @@ func (t *testTx) GetID() ids.ID {
 
 type testMarshaller struct{}
 
-func (t testMarshaller) GossipMarshal(tx *testTx) ([]byte, error) {
+func (testMarshaller) GossipMarshal(tx *testTx) ([]byte, error) {
 	return tx.id[:], nil
 }
 
-func (t testMarshaller) GossipUnmarshal(bytes []byte) (*testTx, error) {
+func (testMarshaller) GossipUnmarshal(bytes []byte) (*testTx, error) {
 	return &testTx{
 		id: ids.ID(bytes),
 	}, nil
