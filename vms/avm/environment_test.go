@@ -69,8 +69,8 @@ var (
 	chainID = ids.ID{5, 4, 3, 2, 1}
 	assetID = ids.ID{1, 2, 3}
 
-	keys  = secp256k1.TestKeys()[:3]
-	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
+	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
+	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
 
 	errMissing = errors.New("missing")
 )
