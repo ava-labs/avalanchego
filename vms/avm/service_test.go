@@ -842,7 +842,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintNFTTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildNFTxMintOp(createAssetTx, key, 2, 1))
+	mintNFTTx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key, 2, 1))
 	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
@@ -944,7 +944,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
-	mintNFTTx := buildOperationTxWithOp(env.vm.ctx.ChainID, mintOp1, mintOp2)
+	mintNFTTx := buildOperationTxWithOp(mintOp1, mintOp2)
 
 	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
@@ -1081,7 +1081,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintSecpOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildSecpMintOp(createAssetTx, key, 0))
+	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
 	require.NoError(mintSecpOpTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
@@ -1187,7 +1187,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
 	op2 := buildSecpMintOp(createAssetTx, key, 1)
-	mintSecpOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, op1, op2)
+	mintSecpOpTx := buildOperationTxWithOp(op1, op2)
 
 	require.NoError(mintSecpOpTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
@@ -1332,7 +1332,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintPropertyFxOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildPropertyFxMintOp(createAssetTx, key, 4))
+	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
@@ -1435,7 +1435,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
-	mintPropertyFxOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, op1, op2)
+	mintPropertyFxOpTx := buildOperationTxWithOp(op1, op2)
 
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
@@ -1572,7 +1572,7 @@ func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.
 
 func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *txs.Tx {
 	key := keys[0]
-	tx := buildCreateAssetTx(vm.ctx.ChainID, key)
+	tx := buildCreateAssetTx(key)
 	require.NoError(t, vm.parser.InitializeTx(tx))
 	return tx
 }
@@ -1581,7 +1581,7 @@ func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: vm.ctx.ChainID,
+			BlockchainID: chainID,
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -1617,7 +1617,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
-				BlockchainID: vm.ctx.ChainID,
+				BlockchainID: chainID,
 				Ins: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{
 						TxID:        avaxTx.ID(),
@@ -1645,7 +1645,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 	}}
 }
 
-func buildCreateAssetTx(chainID ids.ID, key *secp256k1.PrivateKey) *txs.Tx {
+func buildCreateAssetTx(key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
@@ -1784,7 +1784,7 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 	}
 }
 
-func buildOperationTxWithOp(chainID ids.ID, op ...*txs.Operation) *txs.Tx {
+func buildOperationTxWithOp(op ...*txs.Operation) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
