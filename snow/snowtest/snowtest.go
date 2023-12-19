@@ -49,7 +49,6 @@ func NewContext(tb testing.TB) *snow.Context {
 	ctx.XChainID = ids.GenerateTestID()
 	ctx.CChainID = ids.GenerateTestID()
 	ctx.AVAXAssetID = ids.GenerateTestID()
-
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
 	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
