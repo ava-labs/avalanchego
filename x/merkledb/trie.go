@@ -200,21 +200,18 @@ func getRangeProof[T Trie](
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
+	switch {
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1:
 		return nil, ErrStartAfterEnd
-	}
-
-	if maxLength <= 0 {
+	case maxLength <= 0:
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
-	}
-
-	if t.getRoot().IsNothing() {
+	case t.getRoot().IsNothing():
 		return nil, ErrEmptyProof
 	}
 
-	var result RangeProof
-
-	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
+	result := RangeProof{
+		KeyValues: make([]KeyValue, 0, initKeyValuesSize),
+	}
 	it := t.NewIteratorWithStart(start.Value())
 	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
