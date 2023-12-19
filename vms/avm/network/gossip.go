@@ -20,9 +20,10 @@ import (
 )
 
 var (
-	_ p2p.Handler           = (*txGossipHandler)(nil)
-	_ gossip.Set[*gossipTx] = (*gossipMempool)(nil)
-	_ gossip.Gossipable     = (*gossipTx)(nil)
+	_ p2p.Handler                  = (*txGossipHandler)(nil)
+	_ gossip.Set[*gossipTx]        = (*gossipMempool)(nil)
+	_ gossip.Gossipable            = (*gossipTx)(nil)
+	_ gossip.Marshaller[*gossipTx] = (*gossipTxParser)(nil)
 )
 
 // txGossipHandler is the handler called when serving gossip messages
@@ -53,7 +54,7 @@ type gossipTx struct {
 	tx *txs.Tx
 }
 
-func (g *gossipTx) GetID() ids.ID {
+func (g *gossipTx) GossipID() ids.ID {
 	return g.tx.ID()
 }
 
@@ -81,17 +82,13 @@ func newGossipMempool(
 	maxFalsePositiveProbability float64,
 ) (*gossipMempool, error) {
 	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
-	if err != nil {
-		return nil, err
-	}
-
 	return &gossipMempool{
 		Mempool:                     mempool,
 		manager:                     manager,
 		parser:                      parser,
 		maxFalsePositiveProbability: maxFalsePositiveProbability,
 		bloom:                       bloom,
-	}, nil
+	}, err
 }
 
 type gossipMempool struct {
@@ -105,7 +102,7 @@ type gossipMempool struct {
 }
 
 func (g *gossipMempool) Add(tx *gossipTx) error {
-	txID := tx.GetID()
+	txID := tx.tx.ID()
 	if g.Mempool.Has(txID) {
 		// The tx is already in the mempool
 		return fmt.Errorf("tx %s already known", txID)

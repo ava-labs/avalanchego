@@ -212,8 +212,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	// held to avoid any data races.
 	n.ctx.Lock.Lock()
 	err = n.mempool.Add(&gossipTx{
-		tx:     tx,
-		parser: n.parser,
+		tx: tx,
 	})
 	n.ctx.Lock.Unlock()
 	if err == nil {
@@ -224,8 +223,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.mempool.Add(&gossipTx{
-		tx:     tx,
-		parser: n.parser,
+		tx: tx,
 	}); err != nil {
 		return err
 	}
