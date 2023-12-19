@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	MaxCertificateLen = 16 * units.KiB
+	MaxCertificateLen = 2 * units.KiB
 
 	allowedRSASmallModulusLen     = 2048
 	allowedRSALargeModulusLen     = 4096
