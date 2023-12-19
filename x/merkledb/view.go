@@ -313,10 +313,13 @@ func (v *view) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 
 	result, err := getProof(v, key)
+	if err != nil {
+		return nil, err
+	}
 	if v.isInvalid() {
 		return nil, ErrInvalid
 	}
-	return result, err
+	return result, nil
 }
 
 // GetRangeProof returns a range proof for (at least part of) the key range [start, end].
@@ -335,10 +338,13 @@ func (v *view) GetRangeProof(
 		return nil, err
 	}
 	result, err := getRangeProof(v, start, end, maxLength)
+	if err != nil {
+		return nil, err
+	}
 	if v.isInvalid() {
 		return nil, ErrInvalid
 	}
-	return result, err
+	return result, nil
 }
 
 // CommitToDB commits changes from this view to the underlying DB.
