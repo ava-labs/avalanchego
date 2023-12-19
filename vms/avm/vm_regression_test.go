@@ -95,7 +95,7 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	spendTx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    constants.UnitTestID,
-		BlockchainID: env.vm.ctx.ChainID,
+		BlockchainID: env.vm.ctx.XChainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        createAssetTx.ID(),
