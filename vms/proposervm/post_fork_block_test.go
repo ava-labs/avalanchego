@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -39,7 +40,11 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	require.Equal(snowman.ErrNotOracle, err)
 
 	// setup
-	_, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	_, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -92,10 +97,14 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 }
 
 // ProposerBlock.Verify tests section
-func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
+func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime // pre Durango
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -192,10 +201,123 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	}
 }
 
+func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime // post Durango
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	pChainHeight := uint64(100)
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
+		return pChainHeight, nil
+	}
+
+	parentCoreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk.ID(),
+		HeightV: coreGenBlk.Height() + 1,
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return parentCoreBlk, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case parentCoreBlk.ID():
+			return parentCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, parentCoreBlk.Bytes()):
+			return parentCoreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	parentBlk, err := proVM.BuildBlock(context.Background())
+	require.NoError(err)
+
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
+
+	childCoreBlk := &snowman.TestBlock{
+		ParentV: parentCoreBlk.ID(),
+		BytesV:  []byte{2},
+		HeightV: parentCoreBlk.Height() + 1,
+	}
+	childBlk := postForkBlock{
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
+	}
+
+	require.NoError(waitForProposerWindow(proVM, parentBlk, parentBlk.(*postForkBlock).PChainHeight()))
+
+	{
+		// child block referring unknown parent does not verify
+		childSlb, err := block.Build(
+			ids.Empty, // refer unknown parent
+			proVM.Time(),
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childBlk.SignedBlock = childSlb
+
+		err = childBlk.Verify(context.Background())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	{
+		// child block referring known parent does verify
+		childSlb, err := block.Build(
+			parentBlk.ID(),
+			proVM.Time(),
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+
+		require.NoError(err)
+		childBlk.SignedBlock = childSlb
+
+		proVM.Set(childSlb.Timestamp())
+		require.NoError(childBlk.Verify(context.Background()))
+	}
+}
+
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -412,7 +534,11 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -467,10 +593,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	// set VM to be ready to build next block. We set it to generate unsigned blocks
 	// for simplicity.
-	nextTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
-	proVM.Set(nextTime)
-
 	parentBlkPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
+	require.NoError(waitForProposerWindow(proVM, parentBlk, parentBlkPChainHeight))
 
 	childCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -478,6 +602,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: parentCoreBlk.ID(),
+		HeightV: parentBlk.Height() + 1,
 		BytesV:  []byte{2},
 	}
 	childBlk := postForkBlock{
@@ -490,11 +615,14 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	{
 		// child P-Chain height must not precede parent P-Chain height
-		childSlb, err := block.BuildUnsigned(
+		childSlb, err := block.Build(
 			parentBlk.ID(),
-			nextTime,
+			proVM.Time(),
 			parentBlkPChainHeight-1,
+			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -505,11 +633,14 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	{
 		// child P-Chain height can be equal to parent P-Chain height
-		childSlb, err := block.BuildUnsigned(
+		childSlb, err := block.Build(
 			parentBlk.ID(),
-			nextTime,
+			proVM.Time(),
 			parentBlkPChainHeight,
+			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -519,11 +650,14 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	{
 		// child P-Chain height may follow parent P-Chain height
-		childSlb, err := block.BuildUnsigned(
+		childSlb, err := block.Build(
 			parentBlk.ID(),
-			nextTime,
-			parentBlkPChainHeight+1,
+			proVM.Time(),
+			parentBlkPChainHeight,
+			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -534,11 +668,14 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
 	{
 		// block P-Chain height can be equal to current P-Chain height
-		childSlb, err := block.BuildUnsigned(
+		childSlb, err := block.Build(
 			parentBlk.ID(),
-			nextTime,
+			proVM.Time(),
 			currPChainHeight,
+			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -548,11 +685,14 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	{
 		// block P-Chain height cannot be at higher than current P-Chain height
-		childSlb, err := block.BuildUnsigned(
+		childSlb, err := block.Build(
 			parentBlk.ID(),
-			nextTime,
+			proVM.Time(),
 			currPChainHeight*2,
+			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
 		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -565,7 +705,11 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -761,7 +905,11 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 
 	// Verify a block once (in this test by building it).
 	// Show that other verify call would not call coreBlk.Verify()
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -824,7 +972,11 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -887,7 +1039,11 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -934,7 +1090,11 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -966,7 +1126,11 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1080,7 +1244,11 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 5)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 5)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
