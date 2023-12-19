@@ -22,7 +22,7 @@ var (
 
 func init() {
 	Codec = codec.NewManager(maxMessageSize)
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewCustomMaxLength(maxMessageSize)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -54,7 +54,7 @@ func init() {
 	}
 
 	CrossChainCodec = codec.NewManager(maxMessageSize)
-	ccc := linearcodec.NewDefault()
+	ccc := linearcodec.NewCustomMaxLength(maxMessageSize)
 
 	errs = wrappers.Errs{}
 	errs.Add(

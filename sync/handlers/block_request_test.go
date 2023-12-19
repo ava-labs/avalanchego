@@ -167,7 +167,7 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, memdb, 96, 0, func(i int, b *core.BlockGen) {
 		var data []byte
 		switch {
-		case i < 32:
+		case i <= 32:
 			data = make([]byte, units.MiB)
 		default:
 			data = make([]byte, units.MiB/16)
