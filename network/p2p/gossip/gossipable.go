@@ -8,8 +8,12 @@ import "github.com/ava-labs/avalanchego/ids"
 // Gossipable is an item that can be gossiped across the network
 type Gossipable interface {
 	GetID() ids.ID
-	Marshal() ([]byte, error)
-	Unmarshal(bytes []byte) error
+}
+
+// Marshaller creates concrete Gossipable types from bytes
+type Marshaller[T Gossipable] interface {
+	GossipMarshal(T) ([]byte, error)
+	GossipUnmarshal([]byte) (T, error)
 }
 
 // Set holds a set of known Gossipable items
