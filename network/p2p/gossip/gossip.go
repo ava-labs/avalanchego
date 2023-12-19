@@ -206,7 +206,7 @@ func (p *PullGossiper[_]) handleResponse(
 			continue
 		}
 
-		hash := gossipable.GetGossipID()
+		hash := gossipable.GossipID()
 		p.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),

@@ -19,7 +19,7 @@ type testTx struct {
 	id ids.ID
 }
 
-func (t *testTx) GetGossipID() ids.ID {
+func (t *testTx) GossipID() ids.ID {
 	return t.id
 }
 
@@ -30,9 +30,10 @@ func (testMarshaller) MarshalGossip(tx *testTx) ([]byte, error) {
 }
 
 func (testMarshaller) UnmarshalGossip(bytes []byte) (*testTx, error) {
+	id, err := ids.ToID(bytes)
 	return &testTx{
-		id: ids.ID(bytes),
-	}, nil
+		id: id,
+	}, err
 }
 
 type testSet struct {
