@@ -124,7 +124,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	return proto.Marshal(response)
 }
 
-func (h Handler[T]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	msg := &sdk.PushGossip{}
 	if err := proto.Unmarshal(gossipBytes, msg); err != nil {
 		h.log.Debug("failed to unmarshal gossip", zap.Error(err))
