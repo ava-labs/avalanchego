@@ -174,7 +174,7 @@ func TestIssueNFT(t *testing.T) {
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.ChainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -199,7 +199,7 @@ func TestIssueNFT(t *testing.T) {
 		Unsigned: &txs.OperationTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
-				BlockchainID: env.vm.ctx.ChainID,
+				BlockchainID: env.vm.ctx.XChainID,
 			}},
 			Ops: []*txs.Operation{{
 				Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -243,12 +243,10 @@ func TestIssueProperty(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	env.vm.ctx.ChainID = env.vm.ctx.XChainID
-
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.ChainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
@@ -271,7 +269,7 @@ func TestIssueProperty(t *testing.T) {
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.ChainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -303,7 +301,7 @@ func TestIssueProperty(t *testing.T) {
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.ChainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -350,8 +348,6 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	env.vm.ctx.ChainID = env.vm.ctx.XChainID
-
 	// send second asset
 	feeAssetCreateTx := getCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
 	createTx := getCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
@@ -359,7 +355,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.ChainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{
 				// fee asset
 				{
@@ -437,13 +433,12 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
-	env.vm.ctx.ChainID = env.vm.ctx.XChainID
 
 	key := keys[0]
 	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.ChainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        env.genesisTx.ID(),
@@ -476,7 +471,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.ChainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        firstTx.ID(),
