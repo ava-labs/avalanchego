@@ -837,9 +837,12 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		staker, err := state.NewPendingStaker(
+		addValTx := tx.Unsigned.(*txs.AddValidatorTx)
+		staker, err := state.NewCurrentStaker(
 			tx.ID(),
-			tx.Unsigned.(*txs.AddValidatorTx),
+			addValTx,
+			addValTx.StartTime(),
+			0,
 		)
 		require.NoError(err)
 
