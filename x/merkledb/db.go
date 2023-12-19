@@ -613,6 +613,9 @@ func (db *merkleDB) GetRangeProof(
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProof")
 	defer span.End()
 
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
 	return getRangeProof(db, start, end, maxLength)
 }
 
