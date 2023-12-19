@@ -95,9 +95,6 @@ var (
 		SupplyCap:          720 * units.MegaAvax,
 	}
 
-	// AVAX asset ID in tests
-	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-
 	defaultTxFee = uint64(100)
 
 	// chain timestamp at genesis
@@ -146,7 +143,7 @@ type mutableSharedMemory struct {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
+func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(keys))
@@ -273,7 +270,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	_, genesisBytes := defaultGenesis(t)
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
@@ -337,7 +334,7 @@ func TestGenesis(t *testing.T) {
 	require.NoError(err)
 	require.Equal(choices.Accepted, genesisBlock.Status())
 
-	genesisState, _ := defaultGenesis(t)
+	genesisState, _ := defaultGenesis(t, vm.ctx.AVAXAssetID)
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
 		_, addrBytes, err := address.ParseBech32(utxo.Address)
@@ -989,7 +986,7 @@ func TestAtomicImport(t *testing.T) {
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: avaxAssetID},
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1105,7 +1102,6 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	require := require.New(t)
-	_, genesisBytes := defaultGenesis(t)
 	db := memdb.New()
 
 	firstDB := prefixdb.New([]byte{}, db)
@@ -1122,6 +1118,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}}
 
 	firstCtx := snowtest.NewContext(t)
+
+	_, genesisBytes := defaultGenesis(t, firstCtx.AVAXAssetID)
 
 	baseDB := memdb.New()
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
@@ -1238,8 +1236,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require := require.New(t)
 
-	_, genesisBytes := defaultGenesis(t)
-
 	baseDB := memdb.New()
 	vmDB := prefixdb.New([]byte("vm"), baseDB)
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDB)
@@ -1261,6 +1257,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
 	ctx := snowtest.NewContext(t)
+
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
@@ -1585,7 +1583,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
-	_, genesisBytes := defaultGenesis(t)
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1607,6 +1604,8 @@ func TestUnverifiedParent(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
 	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
@@ -1745,7 +1744,6 @@ func TestMaxStakeAmount(t *testing.T) {
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	latestForkTime = defaultValidateStartTime.Add(defaultMinStakingDuration)
-	_, genesisBytes := defaultGenesis(t)
 	db := memdb.New()
 
 	firstDB := prefixdb.New([]byte{}, db)
@@ -1763,6 +1761,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	firstCtx := snowtest.NewContext(t)
 	firstCtx.Lock.Lock()
+
+	_, genesisBytes := defaultGenesis(t, firstCtx.AVAXAssetID)
 
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
@@ -1892,7 +1892,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
 	latestForkTime = defaultValidateStartTime.Add(defaultMinStakingDuration)
-	_, genesisBytes := defaultGenesis(t)
+
 	db := memdb.New()
 
 	vm := &VM{Config: config.Config{
@@ -1908,6 +1908,8 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	ctx := snowtest.NewContext(t)
 	ctx.Lock.Lock()
+
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)

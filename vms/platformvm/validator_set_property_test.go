@@ -747,7 +747,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil
 	}
 
-	genesisBytes, err := buildCustomGenesis()
+	genesisBytes, err := buildCustomGenesis(ctx.AVAXAssetID)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
@@ -805,7 +805,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	return vm, testSubnet1.ID(), nil
 }
 
-func buildCustomGenesis() ([]byte, error) {
+func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()

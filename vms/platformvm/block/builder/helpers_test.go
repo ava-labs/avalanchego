@@ -122,9 +122,9 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.baseDB = versiondb.New(memdb.New())
 	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
+	m := atomic.NewMemory(atomicDB)
 
 	res.ctx = snowtest.NewContext(t)
-	m := atomic.NewMemory(atomicDB)
 	res.msm = &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(res.ctx.ChainID),
 	}
