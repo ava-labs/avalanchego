@@ -444,6 +444,5 @@ The `validityTrackingLock` goes the opposite way. A view can lock the `validityT
 
 ## TODOs
 
-- [ ] Remove special casing around the root node from the physical structure of the hashed tree.
 - [ ] Analyze performance of using database snapshots rather than in-memory history
 - [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees
