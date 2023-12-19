@@ -1389,33 +1389,8 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	require.NoError(blk.Accept(context.Background()))
 	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
 
-	// Should be pending
-	staker, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.NotNil(staker)
-
-	// Promote validator from pending to current
-	env.clk.Set(validatorStartTime)
-	now = env.clk.Time()
-
-	preferredID = env.blkManager.Preferred()
-	preferred, err = env.blkManager.GetStatelessBlock(preferredID)
-	require.NoError(err)
-
-	statelessBlk, err = block.NewBanffStandardBlock(
-		now,
-		preferredID,
-		preferred.Height()+1,
-		nil,
-	)
-	require.NoError(err)
-	blk = env.blkManager.NewBlock(statelessBlk)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
-
 	// Should be current
-	staker, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.NotNil(staker)
 
@@ -1495,8 +1470,8 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commitBlk.Accept(context.Background()))
 
-	// Should be pending
-	staker, err = env.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	// Should be current
+	staker, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.NotNil(staker)
 

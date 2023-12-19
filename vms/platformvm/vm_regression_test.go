@@ -212,7 +212,6 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			vm.ctx.Lock.Lock()
 			defer func() {
 				require.NoError(vm.Shutdown(context.Background()))
-
 				vm.ctx.Lock.Unlock()
 			}()
 
@@ -470,7 +469,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -679,7 +677,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -995,7 +992,6 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1221,7 +1217,6 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1439,9 +1434,9 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
 	subnetID := testSubnet1.TxID
 
 	// setup time
@@ -1721,7 +1716,6 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1881,9 +1875,9 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
 	subnetID := testSubnet1.TxID
 
 	// setup time
@@ -2092,9 +2086,9 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
 	subnetID := testSubnet1.TxID
 
 	// setup time

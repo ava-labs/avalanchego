@@ -134,14 +134,13 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				require.NoError(err)
 			})
 
-			validatorStartTime := time.Now().Add(time.Minute)
+			endTime := time.Now().Add(time.Minute)
 			ginkgo.By("add permissionless validator", func() {
 				_, err := pWallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: validatorID,
-							Start:  uint64(validatorStartTime.Unix()),
-							End:    uint64(validatorStartTime.Add(5 * time.Second).Unix()),
+							End:    uint64(endTime.Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
 						Subnet: subnetID,
@@ -156,14 +155,12 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				require.NoError(err)
 			})
 
-			delegatorStartTime := validatorStartTime
 			ginkgo.By("add permissionless delegator", func() {
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: validatorID,
-							Start:  uint64(delegatorStartTime.Unix()),
-							End:    uint64(delegatorStartTime.Add(5 * time.Second).Unix()),
+							End:    uint64(endTime.Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
 						Subnet: subnetID,
