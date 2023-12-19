@@ -29,22 +29,19 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	if err := s.Valid(); err != nil {
 		return nil, err
 	}
-	return []byte("\"" + s.String() + "\""), nil
+	return []byte(`"` + s.String() + `"`), nil
 }
 
 func (s *Status) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == "null" {
-		return nil
-	}
-	switch str {
-	case "\"Unknown\"":
+	switch string(b) {
+	case "null":
+	case `"Unknown"`:
 		*s = Unknown
-	case "\"Processing\"":
+	case `"Processing"`:
 		*s = Processing
-	case "\"Rejected\"":
+	case `"Rejected"`:
 		*s = Rejected
-	case "\"Accepted\"":
+	case `"Accepted"`:
 		*s = Accepted
 	default:
 		return errUnknownStatus

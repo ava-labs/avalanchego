@@ -68,11 +68,16 @@ func TestNodeIDMarshalJSON(t *testing.T) {
 		out   []byte
 		err   error
 	}{
-		{"NodeID{}", NodeID{}, []byte("\"NodeID-111111111111111111116DBWJs\""), nil},
 		{
-			"ID(\"ava labs\")",
+			"NodeID{}",
+			NodeID{},
+			[]byte(`"NodeID-111111111111111111116DBWJs"`),
+			nil,
+		},
+		{
+			`ID("ava labs")`,
 			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
 			nil,
 		},
 	}
@@ -94,40 +99,45 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 		out         NodeID
 		expectedErr error
 	}{
-		{"NodeID{}", []byte("null"), NodeID{}, nil},
 		{
-			"NodeID(\"ava labs\")",
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			"NodeID{}",
+			[]byte("null"),
+			NodeID{},
+			nil,
+		},
+		{
+			`NodeID("ava labs")`,
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
 			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 			nil,
 		},
 		{
 			"missing start quote",
-			[]byte("NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			[]byte(`NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
 			NodeID{},
 			errMissingQuotes,
 		},
 		{
 			"missing end quote",
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz`),
 			NodeID{},
 			errMissingQuotes,
 		},
 		{
 			"NodeID-",
-			[]byte("\"NodeID-\""),
+			[]byte(`"NodeID-"`),
 			NodeID{},
 			errShortNodeID,
 		},
 		{
 			"NodeID-1",
-			[]byte("\"NodeID-1\""),
+			[]byte(`"NodeID-1"`),
 			NodeID{},
 			cb58.ErrMissingChecksum,
 		},
 		{
 			"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz1",
-			[]byte("\"NodeID-1\""),
+			[]byte(`"NodeID-1"`),
 			NodeID{},
 			cb58.ErrMissingChecksum,
 		},

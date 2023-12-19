@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -153,7 +154,7 @@ func TestIndexer(t *testing.T) {
 	idxr.clock.Set(now)
 
 	// Assert state is right
-	chain1Ctx := snow.DefaultConsensusContextTest()
+	chain1Ctx := snowtest.ConsensusContext()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -258,7 +259,7 @@ func TestIndexer(t *testing.T) {
 	require.Contains(server.endpoints, "/block")
 
 	// Register a DAG chain
-	chain2Ctx := snow.DefaultConsensusContextTest()
+	chain2Ctx := snowtest.ConsensusContext()
 	chain2Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err = idxr.isIncomplete(chain2Ctx.ChainID)
 	require.NoError(err)
@@ -418,7 +419,7 @@ func TestIncompleteIndex(t *testing.T) {
 	require.False(idxr.indexingEnabled)
 
 	// Register a chain
-	chain1Ctx := snow.DefaultConsensusContextTest()
+	chain1Ctx := snowtest.ConsensusContext()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -501,7 +502,7 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	idxr := idxrIntf.(*indexer)
 
 	// Assert state is right
-	chain1Ctx := snow.DefaultConsensusContextTest()
+	chain1Ctx := snowtest.ConsensusContext()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	chain1Ctx.SubnetID = ids.GenerateTestID()
 

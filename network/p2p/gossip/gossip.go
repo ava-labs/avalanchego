@@ -33,9 +33,11 @@ var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[testTx, *testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
+	_ Gossiper = (*TestGossiper)(nil)
 
 	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
 	_ Accumulator[*testTx] = (*NoOpAccumulator[*testTx])(nil)
+	_ Accumulator[*testTx] = (*TestAccumulator[*testTx])(nil)
 
 	metricLabels = []string{typeLabel}
 )
@@ -359,3 +361,32 @@ func (NoOpAccumulator[_]) Gossip(context.Context) error {
 }
 
 func (NoOpAccumulator[T]) Add(...T) {}
+
+type TestGossiper struct {
+	GossipF func(ctx context.Context) error
+}
+
+func (t *TestGossiper) Gossip(ctx context.Context) error {
+	return t.GossipF(ctx)
+}
+
+type TestAccumulator[T Gossipable] struct {
+	GossipF func(ctx context.Context) error
+	AddF    func(...T)
+}
+
+func (t TestAccumulator[T]) Gossip(ctx context.Context) error {
+	if t.GossipF == nil {
+		return nil
+	}
+
+	return t.GossipF(ctx)
+}
+
+func (t TestAccumulator[T]) Add(gossipables ...T) {
+	if t.AddF == nil {
+		return
+	}
+
+	t.AddF(gossipables...)
+}

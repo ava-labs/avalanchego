@@ -12,13 +12,21 @@ import (
 const (
 	// Constants defining the names of shell variables whose value can
 	// configure temporary network orchestration.
-	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
-	NetworkDirEnvName      = "TMPNET_NETWORK_DIR"
-	RootDirEnvName         = "TMPNET_ROOT_DIR"
+	NetworkDirEnvName = "TMPNET_NETWORK_DIR"
+	RootDirEnvName    = "TMPNET_ROOT_DIR"
 
-	DefaultNetworkStartTimeout = 2 * time.Minute
-	DefaultNodeInitTimeout     = 10 * time.Second
-	DefaultNodeStopTimeout     = 5 * time.Second
+	DefaultNetworkTimeout = 2 * time.Minute
+
+	// Minimum required to ensure connectivity-based health checks will pass
+	DefaultNodeCount = 2
+
+	// Arbitrary number of pre-funded keys to create by default
+	DefaultPreFundedKeyCount = 50
+
+	// A short minimum stake duration enables testing of staking logic.
+	DefaultMinStakeDuration = time.Second
+
+	defaultConfigFilename = "config.json"
 )
 
 // A set of flags appropriate for testing.

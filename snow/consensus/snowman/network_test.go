@@ -7,9 +7,9 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -66,7 +66,7 @@ func (n *Network) shuffleColors() {
 }
 
 func (n *Network) AddNode(sm Consensus) error {
-	if err := sm.Initialize(snow.DefaultConsensusContextTest(), n.params, Genesis.ID(), Genesis.Height(), Genesis.Timestamp()); err != nil {
+	if err := sm.Initialize(snowtest.ConsensusContext(), n.params, Genesis.ID(), Genesis.Height(), Genesis.Timestamp()); err != nil {
 		return err
 	}
 

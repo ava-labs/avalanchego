@@ -20,10 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 const (
@@ -84,8 +82,12 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 
 // Defines the configuration required for a tempoary network
 type Network struct {
-	NetworkConfig
 	NodeRuntimeConfig
+
+	Genesis       *genesis.UnparsedConfig
+	CChainConfig  FlagsMap
+	DefaultFlags  FlagsMap
+	PreFundedKeys []*secp256k1.PrivateKey
 
 	// Nodes comprising the network
 	Nodes []*Node
@@ -95,14 +97,12 @@ type Network struct {
 }
 
 // Adds a backend-agnostic ephemeral node to the network
-func (n *Network) AddEphemeralNode(w io.Writer, flags FlagsMap) (*Node, error) {
+func (n *Network) AddEphemeralNode(ctx context.Context, w io.Writer, flags FlagsMap) (*Node, error) {
 	if flags == nil {
 		flags = FlagsMap{}
 	}
-	return n.AddNode(w, &Node{
-		NodeConfig: NodeConfig{
-			Flags: flags,
-		},
+	return n.AddNode(ctx, w, &Node{
+		Flags: flags,
 	}, true /* isEphemeral */)
 }
 
@@ -116,7 +116,7 @@ func StartNetwork(
 	nodeCount int,
 	keyCount int,
 ) (*Network, error) {
-	if _, err := fmt.Fprintf(w, "Preparing configuration for new temporary network with %s\n", network.ExecPath); err != nil {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new temporary network with %s\n", network.AvalancheGoPath); err != nil {
 		return nil, err
 	}
 
@@ -198,12 +198,12 @@ func ReadNetwork(dir string) (*Network, error) {
 }
 
 // Stop the nodes of the network configured in the provided directory.
-func StopNetwork(dir string) error {
+func StopNetwork(ctx context.Context, dir string) error {
 	network, err := ReadNetwork(dir)
 	if err != nil {
 		return err
 	}
-	return network.Stop()
+	return network.Stop(ctx)
 }
 
 // Ensure the network has the configuration it needs to start.
@@ -233,27 +233,20 @@ func (n *Network) PopulateNetworkConfig(networkID uint32, nodeCount int, keyCoun
 		}
 	}
 
-	// Assume all the initial nodes are stakers
-	initialStakers, err := stakersForNodes(networkID, n.Nodes)
-	if err != nil {
-		return err
-	}
-
 	if keyCount > 0 {
-		// Ensure there are keys for genesis generation to fund
-		keys := make([]*secp256k1.PrivateKey, 0, keyCount)
-		for i := 0; i < keyCount; i++ {
-			key, err := secp256k1.NewPrivateKey()
-			if err != nil {
-				return fmt.Errorf("failed to generate private key: %w", err)
-			}
-			keys = append(keys, key)
+		keys, err := NewPrivateKeys(keyCount)
+		if err != nil {
+			return err
 		}
 		n.PreFundedKeys = keys
 	}
 
-	if err := n.EnsureGenesis(networkID, initialStakers); err != nil {
-		return err
+	if n.Genesis == nil {
+		genesis, err := NewTestGenesis(networkID, n.Nodes, n.PreFundedKeys)
+		if err != nil {
+			return err
+		}
+		n.Genesis = genesis
 	}
 
 	if n.CChainConfig == nil {
@@ -298,8 +291,15 @@ func (n *Network) PopulateNodeConfig(node *Node, nodeParentDir string) error {
 		return err
 	}
 
+	// Ensure the node is configured with a runtime config
+	if node.RuntimeConfig == nil {
+		node.RuntimeConfig = &NodeRuntimeConfig{
+			AvalancheGoPath: n.AvalancheGoPath,
+		}
+	}
+
 	// Ensure the node's data dir is configured
-	dataDir := node.GetDataDir()
+	dataDir := node.getDataDir()
 	if len(dataDir) == 0 {
 		// NodeID will have been set by EnsureKeys
 		dataDir = filepath.Join(nodeParentDir, node.NodeID.String())
@@ -335,10 +335,10 @@ func (n *Network) Start(w io.Writer) error {
 	// Configure networking and start each node
 	for _, node := range n.Nodes {
 		// Update network configuration
-		node.SetNetworkingConfigDefaults(0, 0, bootstrapIDs, bootstrapIPs)
+		node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
 
 		// Write configuration to disk in preparation for node start
-		if err := node.WriteConfig(); err != nil {
+		if err := node.Write(); err != nil {
 			return err
 		}
 
@@ -347,7 +347,7 @@ func (n *Network) Start(w io.Writer) error {
 		// its staking port. The network will start faster with this
 		// synchronization due to the avoidance of exponential backoff
 		// if a node tries to connect to a beacon that is not ready.
-		if err := node.Start(w, n.ExecPath); err != nil {
+		if err := node.Start(w); err != nil {
 			return err
 		}
 
@@ -413,11 +413,11 @@ func (n *Network) GetURIs() []NodeURI {
 }
 
 // Stop all nodes in the network.
-func (n *Network) Stop() error {
+func (n *Network) Stop(ctx context.Context) error {
 	var errs []error
 	// Assume the nodes are loaded and the pids are current
 	for _, node := range n.Nodes {
-		if err := node.Stop(); err != nil {
+		if err := node.Stop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
@@ -483,9 +483,9 @@ func (n *Network) WriteCChainConfig() error {
 
 // Used to marshal/unmarshal persistent network defaults.
 type networkDefaults struct {
-	Flags         FlagsMap
-	ExecPath      string
-	PreFundedKeys []*secp256k1.PrivateKey
+	Flags           FlagsMap
+	AvalancheGoPath string
+	PreFundedKeys   []*secp256k1.PrivateKey
 }
 
 func (n *Network) GetDefaultsPath() string {
@@ -502,16 +502,16 @@ func (n *Network) ReadDefaults() error {
 		return fmt.Errorf("failed to unmarshal defaults: %w", err)
 	}
 	n.DefaultFlags = defaults.Flags
-	n.ExecPath = defaults.ExecPath
+	n.AvalancheGoPath = defaults.AvalancheGoPath
 	n.PreFundedKeys = defaults.PreFundedKeys
 	return nil
 }
 
 func (n *Network) WriteDefaults() error {
 	defaults := networkDefaults{
-		Flags:         n.DefaultFlags,
-		ExecPath:      n.ExecPath,
-		PreFundedKeys: n.PreFundedKeys,
+		Flags:           n.DefaultFlags,
+		AvalancheGoPath: n.AvalancheGoPath,
+		PreFundedKeys:   n.PreFundedKeys,
 	}
 	bytes, err := DefaultJSONMarshal(defaults)
 	if err != nil {
@@ -541,7 +541,7 @@ func (n *Network) WriteEnvFile() error {
 
 func (n *Network) WriteNodes() error {
 	for _, node := range n.Nodes {
-		if err := node.WriteConfig(); err != nil {
+		if err := node.Write(); err != nil {
 			return err
 		}
 	}
@@ -618,7 +618,7 @@ func (n *Network) ReadAll() error {
 	return n.ReadNodes()
 }
 
-func (n *Network) AddNode(w io.Writer, node *Node, isEphemeral bool) (*Node, error) {
+func (n *Network) AddNode(ctx context.Context, w io.Writer, node *Node, isEphemeral bool) (*Node, error) {
 	// Assume network configuration has been written to disk and is current in memory
 
 	if node == nil {
@@ -649,23 +649,17 @@ func (n *Network) AddNode(w io.Writer, node *Node, isEphemeral bool) (*Node, err
 	if err != nil {
 		return nil, err
 	}
+	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
 
-	var (
-		// Use dynamic port allocation.
-		httpPort    uint16 = 0
-		stakingPort uint16 = 0
-	)
-	node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
-
-	if err := node.WriteConfig(); err != nil {
+	if err := node.Write(); err != nil {
 		return nil, err
 	}
 
-	err = node.Start(w, n.ExecPath)
+	err = node.Start(w)
 	if err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
-		stopErr := node.Stop()
+		stopErr := node.Stop(ctx)
 		if stopErr != nil {
 			err = errors.Join(err, stopErr)
 		}
@@ -699,32 +693,4 @@ func (n *Network) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
-}
-
-// Returns staker configuration for the given set of nodes.
-func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker, error) {
-	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
-	// will be easier to perform with nodes other than the initial validators since the timing of
-	// staking can be more easily controlled.
-	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to format reward address: %w", err)
-	}
-
-	// Configure provided nodes as initial stakers
-	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
-	for i, node := range nodes {
-		pop, err := node.GetProofOfPossession()
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive proof of possession: %w", err)
-		}
-		initialStakers[i] = genesis.UnparsedStaker{
-			NodeID:        node.NodeID,
-			RewardAddress: rewardAddr,
-			DelegationFee: .01 * reward.PercentDenominator,
-			Signer:        pop,
-		}
-	}
-
-	return initialStakers, nil
 }
