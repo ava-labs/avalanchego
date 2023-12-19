@@ -330,10 +330,8 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	env.vm.ctx.ChainID = env.vm.ctx.XChainID
-
 	// send first asset
-	tx := newTx(t, env.genesisBytes, env.vm, feeAssetName, env.vm.ctx.ChainID)
+	tx := newTx(t, env.genesisBytes, env.vm, feeAssetName, env.vm.ctx.XChainID)
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
