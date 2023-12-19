@@ -942,7 +942,10 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 		}
 
 		stakeAmount := validatorTx.Weight()
-		stakeDuration := validatorTx.EndTime().Sub(validatorTx.StartTime())
+		// Note: We use [StartTime()] here because genesis transactions are
+		// guaranteed to be pre-Durango activation.
+		startTime := validatorTx.StartTime()
+		stakeDuration := validatorTx.EndTime().Sub(startTime)
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
@@ -958,7 +961,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, validatorTx.StartTime(), potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, startTime, potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1053,12 +1056,13 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return fmt.Errorf("failed to parse current stakerTx: %w", err)
 		}
-		stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.ScheduledStaker but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(tx.ID(), stakerTx, stakerTx.StartTime(), data.PotentialReward)
+		startTime := time.Unix(int64(data.StartTime), 0)
+		staker, err := NewCurrentStaker(tx.ID(), stakerTx, startTime, data.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1409,6 +1413,7 @@ func (s *state) processCurrentStakers() (
 			case added:
 				var (
 					txID            = validatorDiff.validator.TxID
+					startTime       = validatorDiff.validator.StartTime
 					potentialReward = validatorDiff.validator.PotentialReward
 					weight          = validatorDiff.validator.Weight
 					blkKey          = validatorDiff.validator.PublicKey
@@ -1420,6 +1425,7 @@ func (s *state) processCurrentStakers() (
 
 				outputStakers[txID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
+					StartTime:       uint64(startTime.Unix()),
 					PotentialReward: potentialReward,
 				}
 				outputWeights[weightKey].Amount = weight
@@ -1462,6 +1468,7 @@ func (s *state) processCurrentStakers() (
 
 				outputStakers[staker.TxID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
+					StartTime:       uint64(staker.StartTime.Unix()),
 					PotentialReward: staker.PotentialReward,
 				}
 				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
@@ -1496,8 +1503,13 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakingTxAndReward, error) 
 				if err != nil {
 					return nil, fmt.Errorf("failed loading pending validator tx, %w", err)
 				}
+				stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
+				if !ok {
+					return nil, fmt.Errorf("tx related to pending staker %s should is not txs.ScheduledStaker", txID)
+				}
 				output[txID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
+					StartTime:       uint64(stakerTx.StartTime().Unix()),
 					PotentialReward: 0,
 				}
 			case deleted:
@@ -1511,12 +1523,18 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakingTxAndReward, error) 
 			defer addedDelegatorIterator.Release()
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
-				tx, _, err := s.GetTx(staker.TxID)
+				txID := staker.TxID
+				tx, _, err := s.GetTx(txID)
 				if err != nil {
 					return nil, fmt.Errorf("failed loading pending delegator tx, %w", err)
 				}
-				output[staker.TxID] = &stakingTxAndReward{
+				stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
+				if !ok {
+					return nil, fmt.Errorf("tx related to pending staker %s should is not txs.ScheduledStaker", txID)
+				}
+				output[txID] = &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
+					StartTime:       uint64(stakerTx.StartTime().Unix()),
 					PotentialReward: 0,
 				}
 			}

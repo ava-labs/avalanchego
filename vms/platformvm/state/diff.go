@@ -22,7 +22,8 @@ import (
 const initialTxSliceSize = 8
 
 var (
-	_ Diff = (*diff)(nil)
+	_ Diff     = (*diff)(nil)
+	_ Versions = stateGetter{}
 
 	ErrMissingParentState = errors.New("missing parent state")
 )
@@ -96,6 +97,20 @@ func (d *diff) NewView() (merkledb.TrieView, error) {
 	}
 
 	return parentView.NewView(context.Background(), changes)
+}
+
+type stateGetter struct {
+	state Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (Chain, bool) {
+	return s.state, true
+}
+
+func NewDiffOn(parentState Chain) (Diff, error) {
+	return NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -475,8 +490,9 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 	}
 
 	type txIDAndReward struct {
-		txID   ids.ID
-		reward uint64
+		txID      ids.ID
+		startTime uint64
+		reward    uint64
 	}
 
 	// writeCurrentStakers
@@ -492,8 +508,9 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 				})
 			case added:
 				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
-					txID:   validatorDiff.validator.TxID,
-					reward: validatorDiff.validator.PotentialReward,
+					txID:      validatorDiff.validator.TxID,
+					startTime: uint64(validatorDiff.validator.StartTime.Unix()),
+					reward:    validatorDiff.validator.PotentialReward,
 				})
 			}
 
@@ -501,8 +518,9 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
 				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
-					txID:   staker.TxID,
-					reward: staker.PotentialReward,
+					txID:      staker.TxID,
+					startTime: uint64(validatorDiff.validator.StartTime.Unix()),
+					reward:    staker.PotentialReward,
 				})
 			}
 			addedDelegatorIterator.Release()
@@ -522,6 +540,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 
 				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
+					StartTime:       txIDAndReward.startTime,
 					PotentialReward: txIDAndReward.reward,
 				})
 				if err != nil {
@@ -546,8 +565,9 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 			switch validatorDiff.validatorStatus {
 			case added:
 				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
-					txID:   validatorDiff.validator.TxID,
-					reward: 0,
+					txID:      validatorDiff.validator.TxID,
+					startTime: uint64(validatorDiff.validator.StartTime.Unix()),
+					reward:    0,
 				})
 			case deleted:
 				changes.BatchOps = append(changes.BatchOps, database.BatchOp{
@@ -561,8 +581,9 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 			for addedDelegatorIterator.Next() {
 				staker := addedDelegatorIterator.Value()
 				toAddTxIDAndRewards = append(toAddTxIDAndRewards, txIDAndReward{
-					txID:   staker.TxID,
-					reward: 0,
+					txID:      staker.TxID,
+					startTime: uint64(staker.StartTime.Unix()),
+					reward:    0,
 				})
 			}
 
@@ -581,6 +602,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 
 				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
+					StartTime:       txIDAndReward.startTime,
 					PotentialReward: txIDAndReward.reward,
 				})
 				if err != nil {

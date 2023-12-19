@@ -199,29 +199,6 @@ func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
 	return txs.NewSigned(utx, txs.Codec, nil)
 }
 
-func TestDropExpiredStakerTxs(t *testing.T) {
-	require := require.New(t)
-
-	registerer := prometheus.NewRegistry()
-	mempool, err := New("mempool", registerer, nil)
-	require.NoError(err)
-
-	tx1, err := generateAddValidatorTx(10, 20)
-	require.NoError(err)
-	require.NoError(mempool.Add(tx1))
-
-	tx2, err := generateAddValidatorTx(8, 20)
-	require.NoError(err)
-	require.NoError(mempool.Add(tx2))
-
-	tx3, err := generateAddValidatorTx(15, 20)
-	require.NoError(err)
-	require.NoError(mempool.Add(tx3))
-
-	minStartTime := time.Unix(9, 0)
-	require.Len(mempool.DropExpiredStakerTxs(minStartTime), 1)
-}
-
 func TestPeekTxs(t *testing.T) {
 	require := require.New(t)
 
