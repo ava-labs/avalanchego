@@ -77,7 +77,7 @@ type mempool struct {
 	bytesAvailableMetric prometheus.Gauge
 	numTxs               prometheus.Gauge
 
-	lock          sync.Mutex
+	lock          sync.RWMutex
 	unissuedTxs   linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
 	consumedUTXOs set.Set[ids.ID]
 	// Key: Tx ID
@@ -122,8 +122,8 @@ func New(
 }
 
 func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	itr := m.unissuedTxs.NewIterator()
 	for itr.Next() {
@@ -189,8 +189,8 @@ func (m *mempool) Add(tx *txs.Tx) error {
 }
 
 func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	return m.unissuedTxs.Get(txID)
 }
@@ -215,8 +215,8 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 }
 
 func (m *mempool) Peek() (*txs.Tx, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	_, tx, exists := m.unissuedTxs.Oldest()
 	return tx, exists
@@ -230,16 +230,16 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 }
 
 func (m *mempool) GetDropReason(txID ids.ID) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	if !emptyBlockPermitted && m.unissuedTxs.Len() == 0 {
 		return
