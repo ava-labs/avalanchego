@@ -45,17 +45,18 @@ func Context(tb testing.TB) *snow.Context {
 	require := require.New(tb)
 
 	ctx := snow.DefaultContextTest()
+
 	ctx.NetworkID = constants.UnitTestID
+	ctx.SubnetID = constants.PrimaryNetworkID
 	ctx.XChainID = ids.GenerateTestID()
 	ctx.CChainID = ids.GenerateTestID()
 	ctx.AVAXAssetID = ids.GenerateTestID()
+
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
 	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-
 	require.NoError(aliaser.Alias(ctx.XChainID, "X"))
 	require.NoError(aliaser.Alias(ctx.XChainID, ctx.XChainID.String()))
-
 	require.NoError(aliaser.Alias(ctx.CChainID, "C"))
 	require.NoError(aliaser.Alias(ctx.CChainID, ctx.CChainID.String()))
 
