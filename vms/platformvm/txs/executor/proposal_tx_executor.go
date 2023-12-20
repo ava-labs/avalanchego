@@ -363,7 +363,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	stakerAttributes, err := e.OnCommitState.GetStakerColdAttributes(stakerToReward.TxID)
+	stakerAttributes, err := e.OnCommitState.GetStakerRewardAttributes(stakerToReward.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get attributes for staker %d: %w", stakerToReward.TxID, err)
 	}
@@ -411,7 +411,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	return err
 }
 
-func (e *ProposalTxExecutor) rewardValidatorTx(validator *state.Staker, valAttributes *state.StakerColdAttributes) error {
+func (e *ProposalTxExecutor) rewardValidatorTx(validator *state.Staker, valAttributes *state.StakerRewardAttributes) error {
 	var (
 		txID    = validator.TxID
 		stake   = valAttributes.Stake
@@ -513,7 +513,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(validator *state.Staker, valAttri
 	return nil
 }
 
-func (e *ProposalTxExecutor) rewardDelegatorTx(delegator *state.Staker, delAttributes *state.StakerColdAttributes) error {
+func (e *ProposalTxExecutor) rewardDelegatorTx(delegator *state.Staker, delAttributes *state.StakerRewardAttributes) error {
 	var (
 		txID    = delegator.TxID
 		stake   = delAttributes.Stake
@@ -544,7 +544,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(delegator *state.Staker, delAttri
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
 
-	valAttributes, err := e.OnCommitState.GetStakerColdAttributes(validator.TxID)
+	valAttributes, err := e.OnCommitState.GetStakerRewardAttributes(validator.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}

@@ -83,7 +83,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *state.StakerColdAttributes]{
+		stakerAttributesCache: &cache.LRU[ids.ID, *state.StakerRewardAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
 	}, mutableSharedMemory

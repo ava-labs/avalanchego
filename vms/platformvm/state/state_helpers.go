@@ -17,7 +17,7 @@ var (
 	errNotABlockchain     = errors.New("tx does not created a blockchain")
 )
 
-func getStakerColdAttributes(chain Chain, stakerID ids.ID) (*StakerColdAttributes, error) {
+func getStakerRewardAttributes(chain Chain, stakerID ids.ID) (*StakerRewardAttributes, error) {
 	stakerTx, _, err := chain.GetTx(stakerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get next staker %s: %w", stakerID, err)
@@ -31,7 +31,7 @@ func getStakerColdAttributes(chain Chain, stakerID ids.ID) (*StakerColdAttribute
 			}
 		}
 
-		return &StakerColdAttributes{
+		return &StakerRewardAttributes{
 			Stake:                  uStakerTx.Stake(),
 			Outputs:                uStakerTx.Outputs(),
 			Shares:                 uStakerTx.Shares(),
@@ -40,7 +40,7 @@ func getStakerColdAttributes(chain Chain, stakerID ids.ID) (*StakerColdAttribute
 			ProofOfPossession:      pop,
 		}, nil
 	case txs.DelegatorTx:
-		return &StakerColdAttributes{
+		return &StakerRewardAttributes{
 			Stake:        uStakerTx.Stake(),
 			Outputs:      uStakerTx.Outputs(),
 			RewardsOwner: uStakerTx.RewardsOwner(),

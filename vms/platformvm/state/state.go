@@ -119,7 +119,7 @@ type Chain interface {
 	AddChain(createChainTx *txs.Tx)
 	GetChainSubnet(chainID ids.ID) (ids.ID, error)
 
-	GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error)
+	GetStakerRewardAttributes(stakerID ids.ID) (*StakerRewardAttributes, error)
 
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
@@ -738,8 +738,8 @@ func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
 	return s.currentStakers.GetStakerIterator(), nil
 }
 
-func (s *state) GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error) {
-	return getStakerColdAttributes(s, stakerID)
+func (s *state) GetStakerRewardAttributes(stakerID ids.ID) (*StakerRewardAttributes, error) {
+	return getStakerRewardAttributes(s, stakerID)
 }
 
 func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {

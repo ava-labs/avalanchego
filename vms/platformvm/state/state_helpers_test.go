@@ -21,11 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestGetStakerColdAttributes(t *testing.T) {
+func TestGetStakerRewardAttributes(t *testing.T) {
 	type test struct {
 		name               string
 		chainF             func(*gomock.Controller) Chain
-		expectedAttributes *StakerColdAttributes
+		expectedAttributes *StakerRewardAttributes
 		expectedErr        error
 	}
 
@@ -125,7 +125,7 @@ func TestGetStakerColdAttributes(t *testing.T) {
 				chain.EXPECT().GetTx(stakerID).Return(validatorTx, status.Committed, nil)
 				return chain
 			},
-			expectedAttributes: &StakerColdAttributes{
+			expectedAttributes: &StakerRewardAttributes{
 				Stake:                  stakeOutputs,
 				Outputs:                outputs,
 				Shares:                 shares,
@@ -154,7 +154,7 @@ func TestGetStakerColdAttributes(t *testing.T) {
 				chain.EXPECT().GetTx(stakerID).Return(validatorTx, status.Committed, nil)
 				return chain
 			},
-			expectedAttributes: &StakerColdAttributes{
+			expectedAttributes: &StakerRewardAttributes{
 				Stake:                  stakeOutputs,
 				Outputs:                outputs,
 				Shares:                 shares,
@@ -182,7 +182,7 @@ func TestGetStakerColdAttributes(t *testing.T) {
 				chain.EXPECT().GetTx(stakerID).Return(delegatorTx, status.Committed, nil)
 				return chain
 			},
-			expectedAttributes: &StakerColdAttributes{
+			expectedAttributes: &StakerRewardAttributes{
 				Stake:        stakeOutputs,
 				Outputs:      outputs,
 				RewardsOwner: anOwner,
@@ -220,7 +220,7 @@ func TestGetStakerColdAttributes(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			chain := tt.chainF(ctrl)
-			attributes, err := getStakerColdAttributes(chain, stakerID)
+			attributes, err := getStakerRewardAttributes(chain, stakerID)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return

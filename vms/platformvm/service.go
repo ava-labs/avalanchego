@@ -84,7 +84,7 @@ var (
 type Service struct {
 	vm                    *VM
 	addrManager           avax.AddressManager
-	stakerAttributesCache *cache.LRU[ids.ID, *state.StakerColdAttributes]
+	stakerAttributesCache *cache.LRU[ids.ID, *state.StakerRewardAttributes]
 }
 
 // GetHeight returns the height of the last accepted block
@@ -715,7 +715,7 @@ type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 }
 
-func (s *Service) loadStakerTxAttributes(txID ids.ID) (*state.StakerColdAttributes, error) {
+func (s *Service) loadStakerTxAttributes(txID ids.ID) (*state.StakerRewardAttributes, error) {
 	// Lookup tx from the cache first.
 	attr, found := s.stakerAttributesCache.Get(txID)
 	if found {
@@ -723,7 +723,7 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*state.StakerColdAttribut
 	}
 
 	// Tx not available in cache; pull it from disk and populate the cache.
-	attr, err := s.vm.state.GetStakerColdAttributes(txID)
+	attr, err := s.vm.state.GetStakerRewardAttributes(txID)
 	if err != nil {
 		return nil, err
 	}

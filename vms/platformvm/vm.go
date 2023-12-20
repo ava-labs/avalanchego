@@ -420,7 +420,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	service := &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *state.StakerColdAttributes]{
+		stakerAttributesCache: &cache.LRU[ids.ID, *state.StakerRewardAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
 	}

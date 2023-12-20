@@ -131,12 +131,11 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 }
 
 // While Staker object contains a staker's hot attributes, likely to be used pretty often
-// StakerColdAttributes contains a staker's cold attributes, rarely used, mostly when rewarding it.
+// StakerRewardAttributes contains a staker's cold attributes, rarely used, mostly when rewarding it.
 // Note that both Staker and StakerAttribute content comes from the stakerTx creating the staker.
 // In state.State we do have StakerMetadata information as well, which contains data about the stakers
 // that are generated during staker's activity (mostly uptimes)
-// TODO: consider moving delegatees reward here, out of StakersMetadata.
-type StakerColdAttributes struct {
+type StakerRewardAttributes struct {
 	// common attributes
 	Stake   []*avax.TransferableOutput
 	Outputs []*avax.TransferableOutput

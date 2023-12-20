@@ -315,19 +315,19 @@ func (mr *MockChainMockRecorder) GetPendingValidator(arg0, arg1 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockChain)(nil).GetPendingValidator), arg0, arg1)
 }
 
-// GetStakerColdAttributes mocks base method.
-func (m *MockChain) GetStakerColdAttributes(arg0 ids.ID) (*StakerColdAttributes, error) {
+// GetStakerRewardAttributes mocks base method.
+func (m *MockChain) GetStakerRewardAttributes(arg0 ids.ID) (*StakerRewardAttributes, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStakerColdAttributes", arg0)
-	ret0, _ := ret[0].(*StakerColdAttributes)
+	ret := m.ctrl.Call(m, "GetStakerRewardAttributes", arg0)
+	ret0, _ := ret[0].(*StakerRewardAttributes)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetStakerColdAttributes indicates an expected call of GetStakerColdAttributes.
-func (mr *MockChainMockRecorder) GetStakerColdAttributes(arg0 interface{}) *gomock.Call {
+// GetStakerRewardAttributes indicates an expected call of GetStakerRewardAttributes.
+func (mr *MockChainMockRecorder) GetStakerRewardAttributes(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerColdAttributes", reflect.TypeOf((*MockChain)(nil).GetStakerColdAttributes), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerRewardAttributes", reflect.TypeOf((*MockChain)(nil).GetStakerRewardAttributes), arg0)
 }
 
 // GetSubnetOwner mocks base method.
@@ -807,19 +807,19 @@ func (mr *MockDiffMockRecorder) GetPendingValidator(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockDiff)(nil).GetPendingValidator), arg0, arg1)
 }
 
-// GetStakerColdAttributes mocks base method.
-func (m *MockDiff) GetStakerColdAttributes(arg0 ids.ID) (*StakerColdAttributes, error) {
+// GetStakerRewardAttributes mocks base method.
+func (m *MockDiff) GetStakerRewardAttributes(arg0 ids.ID) (*StakerRewardAttributes, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStakerColdAttributes", arg0)
-	ret0, _ := ret[0].(*StakerColdAttributes)
+	ret := m.ctrl.Call(m, "GetStakerRewardAttributes", arg0)
+	ret0, _ := ret[0].(*StakerRewardAttributes)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetStakerColdAttributes indicates an expected call of GetStakerColdAttributes.
-func (mr *MockDiffMockRecorder) GetStakerColdAttributes(arg0 interface{}) *gomock.Call {
+// GetStakerRewardAttributes indicates an expected call of GetStakerRewardAttributes.
+func (mr *MockDiffMockRecorder) GetStakerRewardAttributes(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerColdAttributes", reflect.TypeOf((*MockDiff)(nil).GetStakerColdAttributes), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerRewardAttributes", reflect.TypeOf((*MockDiff)(nil).GetStakerRewardAttributes), arg0)
 }
 
 // GetSubnetOwner mocks base method.
@@ -1453,19 +1453,19 @@ func (mr *MockStateMockRecorder) GetRewardUTXOs(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockState)(nil).GetRewardUTXOs), arg0)
 }
 
-// GetStakerColdAttributes mocks base method.
-func (m *MockState) GetStakerColdAttributes(arg0 ids.ID) (*StakerColdAttributes, error) {
+// GetStakerRewardAttributes mocks base method.
+func (m *MockState) GetStakerRewardAttributes(arg0 ids.ID) (*StakerRewardAttributes, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStakerColdAttributes", arg0)
-	ret0, _ := ret[0].(*StakerColdAttributes)
+	ret := m.ctrl.Call(m, "GetStakerRewardAttributes", arg0)
+	ret0, _ := ret[0].(*StakerRewardAttributes)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetStakerColdAttributes indicates an expected call of GetStakerColdAttributes.
-func (mr *MockStateMockRecorder) GetStakerColdAttributes(arg0 interface{}) *gomock.Call {
+// GetStakerRewardAttributes indicates an expected call of GetStakerRewardAttributes.
+func (mr *MockStateMockRecorder) GetStakerRewardAttributes(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerColdAttributes", reflect.TypeOf((*MockState)(nil).GetStakerColdAttributes), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerRewardAttributes", reflect.TypeOf((*MockState)(nil).GetStakerRewardAttributes), arg0)
 }
 
 // GetStartTime mocks base method.

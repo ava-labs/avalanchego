@@ -209,8 +209,8 @@ func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 	return d.currentStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
-func (d *diff) GetStakerColdAttributes(stakerID ids.ID) (*StakerColdAttributes, error) {
-	return getStakerColdAttributes(d, stakerID)
+func (d *diff) GetStakerRewardAttributes(stakerID ids.ID) (*StakerRewardAttributes, error) {
+	return getStakerRewardAttributes(d, stakerID)
 }
 
 func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
