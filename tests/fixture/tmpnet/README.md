@@ -1,4 +1,4 @@
-# tmpnet (temporary network fixture)
+# tmpnet - temporary network orchestration
 
 This package implements a simple orchestrator for the avalanchego
 nodes of a temporary network. Configuration is stored on disk, and
@@ -31,6 +31,8 @@ the following non-test files:
 | genesis.go        |             | Creates test genesis                           |
 | network.go        | Network     | Orchestrates and configures temporary networks |
 | node.go           | Node        | Orchestrates and configures nodes              |
+| node_config.go    | Node        | Reads and writes node configuration            |
+| node_process.go   | NodeProcess | Orchestrates node processes                    |
 | utils.go          |             | Defines shared utility functions               |
 
 ## Usage
@@ -76,7 +78,7 @@ network, _ := tmpnet.StartNetwork(
     ginkgo.GinkgoWriter,                           // Writer to report progress of network start
     "",                                            // Use default root dir (~/.tmpnet)
     &tmpnet.Network{
-        DefaultRuntime: tmpnet.NodeRuntimeConfig{
+        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
             ExecPath: "/path/to/avalanchego",      // Defining the avalanchego exec path is required
         },
     },
@@ -102,7 +104,7 @@ network, _ := tmpnet.StartNetwork(
     ginkgo.GinkgoWriter,
     "",
     &tmpnet.Network{
-        DefaultRuntime: tmpnet.NodeRuntimeConfig{
+        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
             ExecPath: "/path/to/avalanchego",
         },
         Nodes: []*Node{
@@ -147,9 +149,10 @@ HOME
             ├── NodeID-37E8UK3x2YFsHE3RdALmfWcppcZ1eTuj9 // The ID of a node is the name of its data dir
             │   ├── chainData
             │   │   └── ...
-            │   ├── config.json                          // Node flags
+            │   ├── config.json                          // Node runtime configuration
             │   ├── db
             │   │   └── ...
+            │   ├── flags.json                           // Node flags
             │   ├── logs
             │   │   └── ...
             │   ├── plugins
@@ -160,11 +163,7 @@ HOME
             │       └── config.json                      // C-Chain config for all nodes
             ├── defaults.json                            // Default flags and configuration for network
             ├── genesis.json                             // Genesis for all nodes
-            ├── network.env                              // Sets network dir env to simplify use of network
-            └── ephemeral                                // Parent directory for ephemeral nodes (e.g. created by tests)
-                └─ NodeID-FdxnAvr4jK9XXAwsYZPgWAHW2QnwSZ // Data dir for an ephemeral node
-                   └── ...
-
+            └── network.env                              // Sets network dir env var to simplify network usage
 ```
 
 ### Default flags and configuration
@@ -203,6 +202,13 @@ this file (i.e. `source network.env`) in a shell will configure ginkgo
 e2e and the `tmpnetctl` cli to target the network path specified in
 the env var.
 
+Set `TMPNET_ROOT_DIR` to specify the root directory in which to create
+the configuration directory of new networks
+(e.g. `$TMPNET_ROOT_DIR/[network-dir]`). The default root directory is
+`~/.tmpdir/networks`. Configuring the root directory is only relevant
+when creating new networks as the path of existing networks will
+already have been set.
+
 ### Node configuration
 
 The data dir for a node is set by default to
@@ -210,12 +216,19 @@ The data dir for a node is set by default to
 non-default path by explicitly setting the `--data-dir`
 flag.
 
+#### Runtime config
+
+The details required to configure a node's execution are written to
+`[network-path]/[node-id]/config.json`. This file contains the
+runtime-specific details like the path of the avalanchego binary to
+start the node with.
+
 #### Flags
 
 All flags used to configure a node are written to
-`[network-path]/[node-id]/config.json` so that a node can be
+`[network-path]/[node-id]/flags.json` so that a node can be
 configured with only a single argument:
-`--config-file=/path/to/config.json`. This simplifies node launch and
+`--config-file=/path/to/flags.json`. This simplifies node launch and
 ensures all parameters used to launch a node can be modified by
 editing the config file.
 

@@ -97,11 +97,11 @@ type Network struct {
 }
 
 // Adds a backend-agnostic ephemeral node to the network
-func (n *Network) AddEphemeralNode(w io.Writer, flags FlagsMap) (*Node, error) {
+func (n *Network) AddEphemeralNode(ctx context.Context, w io.Writer, flags FlagsMap) (*Node, error) {
 	if flags == nil {
 		flags = FlagsMap{}
 	}
-	return n.AddNode(w, &Node{
+	return n.AddNode(ctx, w, &Node{
 		Flags: flags,
 	}, true /* isEphemeral */)
 }
@@ -116,7 +116,7 @@ func StartNetwork(
 	nodeCount int,
 	keyCount int,
 ) (*Network, error) {
-	if _, err := fmt.Fprintf(w, "Preparing configuration for new temporary network with %s\n", network.ExecPath); err != nil {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new temporary network with %s\n", network.AvalancheGoPath); err != nil {
 		return nil, err
 	}
 
@@ -198,12 +198,12 @@ func ReadNetwork(dir string) (*Network, error) {
 }
 
 // Stop the nodes of the network configured in the provided directory.
-func StopNetwork(dir string) error {
+func StopNetwork(ctx context.Context, dir string) error {
 	network, err := ReadNetwork(dir)
 	if err != nil {
 		return err
 	}
-	return network.Stop()
+	return network.Stop(ctx)
 }
 
 // Ensure the network has the configuration it needs to start.
@@ -291,8 +291,15 @@ func (n *Network) PopulateNodeConfig(node *Node, nodeParentDir string) error {
 		return err
 	}
 
+	// Ensure the node is configured with a runtime config
+	if node.RuntimeConfig == nil {
+		node.RuntimeConfig = &NodeRuntimeConfig{
+			AvalancheGoPath: n.AvalancheGoPath,
+		}
+	}
+
 	// Ensure the node's data dir is configured
-	dataDir := node.GetDataDir()
+	dataDir := node.getDataDir()
 	if len(dataDir) == 0 {
 		// NodeID will have been set by EnsureKeys
 		dataDir = filepath.Join(nodeParentDir, node.NodeID.String())
@@ -331,7 +338,7 @@ func (n *Network) Start(w io.Writer) error {
 		node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
 
 		// Write configuration to disk in preparation for node start
-		if err := node.WriteConfig(); err != nil {
+		if err := node.Write(); err != nil {
 			return err
 		}
 
@@ -340,7 +347,7 @@ func (n *Network) Start(w io.Writer) error {
 		// its staking port. The network will start faster with this
 		// synchronization due to the avoidance of exponential backoff
 		// if a node tries to connect to a beacon that is not ready.
-		if err := node.Start(w, n.ExecPath); err != nil {
+		if err := node.Start(w); err != nil {
 			return err
 		}
 
@@ -406,11 +413,11 @@ func (n *Network) GetURIs() []NodeURI {
 }
 
 // Stop all nodes in the network.
-func (n *Network) Stop() error {
+func (n *Network) Stop(ctx context.Context) error {
 	var errs []error
 	// Assume the nodes are loaded and the pids are current
 	for _, node := range n.Nodes {
-		if err := node.Stop(); err != nil {
+		if err := node.Stop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
@@ -476,9 +483,9 @@ func (n *Network) WriteCChainConfig() error {
 
 // Used to marshal/unmarshal persistent network defaults.
 type networkDefaults struct {
-	Flags         FlagsMap
-	ExecPath      string
-	PreFundedKeys []*secp256k1.PrivateKey
+	Flags           FlagsMap
+	AvalancheGoPath string
+	PreFundedKeys   []*secp256k1.PrivateKey
 }
 
 func (n *Network) GetDefaultsPath() string {
@@ -495,16 +502,16 @@ func (n *Network) ReadDefaults() error {
 		return fmt.Errorf("failed to unmarshal defaults: %w", err)
 	}
 	n.DefaultFlags = defaults.Flags
-	n.ExecPath = defaults.ExecPath
+	n.AvalancheGoPath = defaults.AvalancheGoPath
 	n.PreFundedKeys = defaults.PreFundedKeys
 	return nil
 }
 
 func (n *Network) WriteDefaults() error {
 	defaults := networkDefaults{
-		Flags:         n.DefaultFlags,
-		ExecPath:      n.ExecPath,
-		PreFundedKeys: n.PreFundedKeys,
+		Flags:           n.DefaultFlags,
+		AvalancheGoPath: n.AvalancheGoPath,
+		PreFundedKeys:   n.PreFundedKeys,
 	}
 	bytes, err := DefaultJSONMarshal(defaults)
 	if err != nil {
@@ -534,7 +541,7 @@ func (n *Network) WriteEnvFile() error {
 
 func (n *Network) WriteNodes() error {
 	for _, node := range n.Nodes {
-		if err := node.WriteConfig(); err != nil {
+		if err := node.Write(); err != nil {
 			return err
 		}
 	}
@@ -611,7 +618,7 @@ func (n *Network) ReadAll() error {
 	return n.ReadNodes()
 }
 
-func (n *Network) AddNode(w io.Writer, node *Node, isEphemeral bool) (*Node, error) {
+func (n *Network) AddNode(ctx context.Context, w io.Writer, node *Node, isEphemeral bool) (*Node, error) {
 	// Assume network configuration has been written to disk and is current in memory
 
 	if node == nil {
@@ -644,15 +651,15 @@ func (n *Network) AddNode(w io.Writer, node *Node, isEphemeral bool) (*Node, err
 	}
 	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
 
-	if err := node.WriteConfig(); err != nil {
+	if err := node.Write(); err != nil {
 		return nil, err
 	}
 
-	err = node.Start(w, n.ExecPath)
+	err = node.Start(w)
 	if err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
-		stopErr := node.Stop()
+		stopErr := node.Stop(ctx)
 		if stopErr != nil {
 			err = errors.Join(err, stopErr)
 		}
