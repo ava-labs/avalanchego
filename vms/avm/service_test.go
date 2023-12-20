@@ -6,6 +6,7 @@ package avm
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -557,10 +558,66 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
-	require.Contains(jsonString, `"memo":"0x0102030405060708"`)
-	require.Contains(jsonString, `"inputs":[{"txID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","outputIndex":2,"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","input":{"amount":50000,"signatureIndices":[0]}}]`)
-	require.Contains(jsonString, `"outputs":[{"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","output":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"amount":49000,"locktime":0,"threshold":1}}]`)
+
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
+
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 49000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"outputIndex": 2,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 50000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
+		"memo": "0x0102030405060708"
+	},
+	"credentials": [
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", newTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", newTx.Unsigned.(*txs.BaseTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, newTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
@@ -585,9 +642,67 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
-	require.Contains(jsonString, `"inputs":[{"txID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","outputIndex":2,"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","input":{"amount":50000,"signatureIndices":[0]}}]`)
-	require.Contains(jsonString, `"exportedOutputs":[{"assetID":"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ","fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","output":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"amount":49000,"locktime":0,"threshold":1}}]}`)
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
+
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [
+			{
+				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"outputIndex": 2,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 50000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
+		"memo": "0x",
+		"destinationChain": "11111111111111111111111111111111LpoYY",
+		"exportedOutputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 49000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", newTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", newTx.Unsigned.(*txs.ExportTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, newTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
@@ -618,11 +733,93 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
 
-	// contains the address in the right format
-	require.Contains(jsonString, `"outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"groupID":1,"locktime":0,"threshold":1},{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"groupID":2,"locktime":0,"threshold":1}]}`)
-	require.Contains(jsonString, `"initialStates":[{"fxIndex":0,"fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"locktime":0,"threshold":1},{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"locktime":0,"threshold":1}]},{"fxIndex":1,"fxID":"qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT","outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"groupID":1,"locktime":0,"threshold":1},{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"groupID":2,"locktime":0,"threshold":1}]},{"fxIndex":2,"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy","outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"locktime":0,"threshold":1},{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"locktime":0,"threshold":1}]}]},"credentials":[],"id":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS"}`)
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
+
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [],
+		"memo": "0x",
+		"name": "Team Rocket",
+		"symbol": "TR",
+		"denomination": 0,
+		"initialStates": [
+			{
+				"fxIndex": 0,
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"outputs": [
+					{
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					{
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					}
+				]
+			},
+			{
+				"fxIndex": 1,
+				"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+				"outputs": [
+					{
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"groupID": 1,
+						"locktime": 0,
+						"threshold": 1
+					},
+					{
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"groupID": 2,
+						"locktime": 0,
+						"threshold": 1
+					}
+				]
+			},
+			{
+				"fxIndex": 2,
+				"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
+				"outputs": [
+					{
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					{
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					}
+				]
+			}
+		]
+	},
+	"credentials": [],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", createAssetTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", createAssetTx.Unsigned.(*txs.CreateAssetTx).BlockchainID.String(), 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
@@ -658,15 +855,71 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
-	// assert memo and payload are in hex
-	require.Contains(jsonString, `"memo":"0x"`)
-	require.Contains(jsonString, `"payload":"0x68656c6c6f"`)
-	// contains the address in the right format
-	require.Contains(jsonString, `"outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
-	// contains the fxID
-	require.Contains(jsonString, `"operations":[{"assetID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","inputIDs":[{"txID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","outputIndex":2}],"fxID":"qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT"`)
-	require.Contains(jsonString, `"credentials":[{"fxID":"qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT","credential":{"signatures":["0x571f18cfdb254263ab6b987f742409bd5403eafe08b4dbc297c5cd8d1c85eb8812e4541e11d3dc692cd14b5f4bccc1835ec001df6d8935ce881caf97017c2a4801"]}}]`)
+
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
+
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [],
+		"memo": "0x",
+		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 2
+					}
+				],
+				"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"groupID": 1,
+					"payload": "0x68656c6c6f",
+					"outputs": [
+						{
+							"addresses": [
+								"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+							],
+							"locktime": 0,
+							"threshold": 1
+						}
+					]
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintNFTTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[0].Credential.(*nftfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
@@ -705,14 +958,107 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
 
-	// contains the address in the right format
-	require.Contains(jsonString, `"outputs":[{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
 
-	// contains the fxID
-	require.Contains(jsonString, `"operations":[{"assetID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","inputIDs":[{"txID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","outputIndex":2}],"fxID":"qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT"`)
-	require.Contains(jsonString, `"credentials":[{"fxID":"qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT","credential":{"signatures":["0x2400cf2cf978697b3484d5340609b524eb9dfa401e5b2bd5d1bc6cee2a6b1ae41926550f00ae0651c312c35e225cb3f39b506d96c5170fb38a820dcfed11ccd801"]}},{"fxID":"qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT","credential":{"signatures":["0x2400cf2cf978697b3484d5340609b524eb9dfa401e5b2bd5d1bc6cee2a6b1ae41926550f00ae0651c312c35e225cb3f39b506d96c5170fb38a820dcfed11ccd801"]}}]`)
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [],
+		"memo": "0x",
+		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 2
+					}
+				],
+				"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"groupID": 1,
+					"payload": "0x68656c6c6f",
+					"outputs": [
+						{
+							"addresses": [
+								"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+							],
+							"locktime": 0,
+							"threshold": 1
+						}
+					]
+				}
+			},
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 3
+					}
+				],
+				"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"groupID": 2,
+					"payload": "0x68656c6c6f",
+					"outputs": [
+						{
+							"addresses": [
+								"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+							],
+							"locktime": 0,
+							"threshold": 1
+						}
+					]
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		},
+		{
+			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 4)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintNFTTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[0].Credential.(*nftfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
@@ -748,17 +1094,75 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
 
-	// ensure memo is in hex
-	require.Contains(jsonString, `"memo":"0x"`)
-	// contains the address in the right format
-	require.Contains(jsonString, `"mintOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
-	require.Contains(jsonString, `"transferOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"amount":1,"locktime":0,"threshold":1}}}]}`)
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
 
-	// contains the fxID
-	require.Contains(jsonString, `"operations":[{"assetID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","inputIDs":[{"txID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","outputIndex":0}],"fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ"`)
-	require.Contains(jsonString, `"credentials":[{"fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","credential":{"signatures":["0x6d7406d5e1bdb1d80de542e276e2d162b0497d0df1170bec72b14d40e84ecf7929cb571211d60149404413a9342fdfa0a2b5d07b48e6f3eaea1e2f9f183b480500"]}}]`)
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [],
+		"memo": "0x",
+		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 0
+					}
+				],
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"transferOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"amount": 1,
+						"locktime": 0,
+						"threshold": 1
+					}
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintSecpOpTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
@@ -797,15 +1201,115 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
 
-	// contains the address in the right format
-	require.Contains(jsonString, `"mintOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
-	require.Contains(jsonString, `"transferOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"],"amount":1,"locktime":0,"threshold":1}}}`)
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
 
-	// contains the fxID
-	require.Contains(jsonString, `"assetID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","inputIDs":[{"txID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","outputIndex":1}],"fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ"`)
-	require.Contains(jsonString, `"credentials":[{"fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","credential":{"signatures":["0xcc650f48341601c348d8634e8d207e07ea7b4ee4fbdeed3055fa1f1e4f4e27556d25056447a3bd5d949e5f1cbb0155bb20216ac3a4055356e3c82dca74323e7401"]}},{"fxID":"spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ","credential":{"signatures":["0xcc650f48341601c348d8634e8d207e07ea7b4ee4fbdeed3055fa1f1e4f4e27556d25056447a3bd5d949e5f1cbb0155bb20216ac3a4055356e3c82dca74323e7401"]}}]`)
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [],
+		"memo": "0x",
+		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 0
+					}
+				],
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"transferOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"amount": 1,
+						"locktime": 0,
+						"threshold": 1
+					}
+				}
+			},
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 1
+					}
+				],
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"transferOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"amount": 1,
+						"locktime": 0,
+						"threshold": 1
+					}
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		},
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 4)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintSecpOpTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
@@ -841,16 +1345,72 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
 
-	// ensure memo is in hex
-	require.Contains(jsonString, `"memo":"0x"`)
-	// contains the address in the right format
-	require.Contains(jsonString, `"mintOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
 
-	// contains the fxID
-	require.Contains(jsonString, `"assetID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","inputIDs":[{"txID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","outputIndex":4}],"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy"`)
-	require.Contains(jsonString, `"credentials":[{"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy","credential":{"signatures":["0xa3a00a03d3f1551ff696d6c0abdde73ae7002cd6dcce1c37d720de3b7ed80757411c9698cd9681a0fa55ca685904ca87056a3b8abc858a8ac08f45483b32a80201"]}}]`)
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [],
+		"memo": "0x",
+		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 4
+					}
+				],
+				"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"ownedOutput": {
+						"addresses": [],
+						"locktime": 0,
+						"threshold": 0
+					}
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[0].Credential.(*propertyfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) {
@@ -889,14 +1449,109 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
-	jsonString := string(reply.Tx)
 
-	// contains the address in the right format
-	require.Contains(jsonString, `"mintOutput":{"addresses":["X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"]`)
+	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
 
-	// contains the fxID
-	require.Contains(jsonString, `"operations":[{"assetID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","inputIDs":[{"txID":"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS","outputIndex":4}],"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy"`)
-	require.Contains(jsonString, `"credentials":[{"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy","credential":{"signatures":["0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601"]}},{"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy","credential":{"signatures":["0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601"]}}]`)
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [],
+		"inputs": [],
+		"memo": "0x",
+		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 4
+					}
+				],
+				"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"ownedOutput": {
+						"addresses": [],
+						"locktime": 0,
+						"threshold": 0
+					}
+				}
+			},
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 5
+					}
+				],
+				"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"ownedOutput": {
+						"addresses": [],
+						"locktime": 0,
+						"threshold": 0
+					}
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		},
+		{
+			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 4)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[0].Credential.(*propertyfx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
