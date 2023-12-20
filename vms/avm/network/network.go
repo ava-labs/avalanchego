@@ -24,11 +24,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/message"
 )
 
-const (
-	// We allow [recentTxsCacheSize] to be fairly large because we only store hashes
-	// in the cache, not entire transactions.
-	recentTxsCacheSize = 512
-)
+// We allow [recentTxsCacheSize] to be fairly large because we only store hashes
+// in the cache, not entire transactions.
+const recentTxsCacheSize = 512
 
 var (
 	_ common.AppHandler    = (*Network)(nil)
@@ -203,25 +201,20 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		)
 		return nil
 	}
-	txID := tx.ID()
 
-	// We need to grab the context lock here to avoid racy behavior with
-	// transaction verification + mempool modifications.
-	//
-	// Invariant: tx should not be referenced again without the context lock
-	// held to avoid any data races.
-	n.ctx.Lock.Lock()
 	err = n.mempool.Add(&gossipTx{
 		tx: tx,
 	})
-	n.ctx.Lock.Unlock()
 	if err == nil {
+		txID := tx.ID()
 		n.gossipTx(ctx, txID, msgBytes)
 	}
 	return nil
 }
 
 func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
+	// TODO: IssueTx has the context lock held, but the mempool verifier also
+	// grabes the context lock.
 	if err := n.mempool.Add(&gossipTx{
 		tx: tx,
 	}); err != nil {

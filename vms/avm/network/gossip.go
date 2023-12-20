@@ -103,13 +103,11 @@ type gossipMempool struct {
 
 func (g *gossipMempool) Add(tx *gossipTx) error {
 	txID := tx.tx.ID()
-	// TODO: Should be thread safe
 	if g.Mempool.Has(txID) {
 		// The tx is already in the mempool
 		return fmt.Errorf("tx %s already known", txID)
 	}
 
-	// TODO: Should be thread safe
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		//
@@ -125,7 +123,6 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 		return err
 	}
 
-	// TODO: Should be thread safe
 	if err := g.Mempool.Add(tx.tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
@@ -143,7 +140,6 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 	if reset {
 		log.Debug("resetting bloom filter", "reason", "reached max filled ratio")
 
-		// TODO: Should be thread safe
 		g.Mempool.Iterate(func(tx *txs.Tx) bool {
 			g.bloom.Add(&gossipTx{
 				tx: tx,
@@ -157,7 +153,6 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 }
 
 func (g *gossipMempool) Iterate(f func(*gossipTx) bool) {
-	// TODO: Should be thread safe
 	g.Mempool.Iterate(func(tx *txs.Tx) bool {
 		return f(&gossipTx{
 			tx: tx,
