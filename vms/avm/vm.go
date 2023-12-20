@@ -477,7 +477,7 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
  ******************************************************************************
  */
 
-// IssueTx attempts to send a transaction to consensus.
+// issueTx attempts to send a transaction to consensus.
 //
 // Invariant: The context lock is not held
 // Invariant: This function is only called after Linearize has been called.
