@@ -97,6 +97,8 @@ type VM struct {
 
 	registerer prometheus.Registerer
 
+	connectedPeers map[ids.NodeID]*version.Application
+
 	parser block.Parser
 
 	pubsub *pubsub.Server
@@ -135,10 +137,18 @@ type VM struct {
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	if vm.network == nil {
+		vm.connectedPeers[nodeID] = version
+		return nil
+	}
 	return vm.network.Connected(ctx, nodeID, version)
 }
 
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if vm.network == nil {
+		delete(vm.connectedPeers, nodeID)
+		return nil
+	}
 	return vm.network.Disconnected(ctx, nodeID)
 }
 
@@ -161,7 +171,7 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
+	_ chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -183,6 +193,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.registerer = registerer
+
+	vm.connectedPeers = make(map[ids.NodeID]*version.Application)
 
 	// Initialize metrics as soon as possible
 	var err error
@@ -243,34 +255,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-
-	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
-	if err != nil {
-		return fmt.Errorf("failed to create mempool: %w", err)
-	}
-	vm.mempool = mempool
-
-	network, err := network.New(
-		vm.ctx,
-		vm.parser,
-		vm.chainManager,
-		vm.mempool,
-		vm.appSender,
-		vm.registerer,
-		txGossipHandlerID,
-		maxValidatorSetStaleness,
-		txGossipMaxGossipSize,
-		txGossipPollSize,
-		txGossipThrottlingPeriod,
-		txGossipThrottlingLimit,
-		txGossipBloomMaxExpectedElements,
-		txGossipBloomFalsePositiveProbability,
-		txGossipBloomMaxFalsePositiveProbability,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize network: %w", err)
-	}
-	vm.network = network
 
 	vm.state = state
 
@@ -438,11 +422,16 @@ func (*VM) VerifyHeightIndex(context.Context) error {
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, _ chan<- common.Message) error {
+func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
 	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
 		return err
+	}
+
+	vm.mempool, err = mempool.New("mempool", vm.registerer, toEngine)
+	if err != nil {
+		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.chainManager = blockexecutor.NewManager(
@@ -460,6 +449,35 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, _ chan<- common.
 		&vm.clock,
 		vm.mempool,
 	)
+
+	vm.network, err = network.New(
+		vm.ctx,
+		vm.parser,
+		vm.chainManager,
+		vm.mempool,
+		vm.appSender,
+		vm.registerer,
+		txGossipHandlerID,
+		maxValidatorSetStaleness,
+		txGossipMaxGossipSize,
+		txGossipPollSize,
+		txGossipThrottlingPeriod,
+		txGossipThrottlingLimit,
+		txGossipBloomMaxExpectedElements,
+		txGossipBloomFalsePositiveProbability,
+		txGossipBloomMaxFalsePositiveProbability,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+
+	// Notify the network of our current peers
+	for nodeID, version := range vm.connectedPeers {
+		if err := vm.network.Connected(ctx, nodeID, version); err != nil {
+			return err
+		}
+	}
+	vm.connectedPeers = nil
 
 	// Note: It's important only to switch the networking stack after the full
 	// chainVM has been initialized. Traffic will immediately start being
