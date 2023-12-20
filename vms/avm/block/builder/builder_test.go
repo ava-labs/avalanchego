@@ -510,7 +510,9 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := transactions[0]
 	txID := tx.ID()
 	require.NoError(mempool.Add(tx))
-	require.True(mempool.Has(txID))
+
+	_, ok := mempool.Get(txID)
+	require.True(ok)
 
 	parser, err := block.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
