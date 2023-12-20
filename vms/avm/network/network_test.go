@@ -59,7 +59,7 @@ func TestNetworkAppGossip(t *testing.T) {
 		&secp256k1fx.Fx{},
 	})
 	require.NoError(t, err)
-	require.NoError(t, parser.InitializeTx(testTx))
+	require.NoError(t, testTx.Initialize(parser.Codec()))
 
 	type test struct {
 		name          string
@@ -105,7 +105,8 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 		},
 		{
-			// Issue returns nil because mempool has tx. We should gossip the tx.
+			// Issue returns nil because mempool has tx. We haven't gossipped
+			// the tx recently, so we should gossip it.
 			name: "issuance succeeds",
 			msgBytesFunc: func() []byte {
 				msg := message.Tx{
@@ -117,17 +118,18 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(true)
+				mempool.EXPECT().Get(gomock.Any()).Return(testTx, true)
 				return mempool
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any())
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Times(1)
 				return appSender
 			},
 		},
 		{
-			// Issue returns error because tx was dropped. We shouldn't gossip the tx.
+			// Issue returns error because tx was dropped. We shouldn't gossip
+			// the tx.
 			name: "issuance fails",
 			msgBytesFunc: func() []byte {
 				msg := message.Tx{
@@ -139,7 +141,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
 			},
@@ -201,7 +203,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "mempool has transaction",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(true)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, true)
 				return mempool
 			},
 			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
@@ -220,7 +222,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "transaction marked as dropped in mempool",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
 			},
@@ -238,7 +240,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "transaction invalid",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
@@ -258,7 +260,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "can't add transaction to mempool",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
@@ -279,7 +281,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "happy path",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
 				mempool.EXPECT().RequestBuildBlock()

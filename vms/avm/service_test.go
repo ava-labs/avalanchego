@@ -918,7 +918,7 @@ func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.
 func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *txs.Tx {
 	key := keys[0]
 	tx := buildCreateAssetTx(key)
-	require.NoError(t, vm.parser.InitializeTx(tx))
+	require.NoError(t, tx.Initialize(vm.parser.Codec()))
 	return tx
 }
 

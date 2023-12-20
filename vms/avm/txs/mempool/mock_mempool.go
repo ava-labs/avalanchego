@@ -53,11 +53,12 @@ func (mr *MockMempoolMockRecorder) Add(arg0 interface{}) *gomock.Call {
 }
 
 // Get mocks base method.
-func (m *MockMempool) Get(arg0 ids.ID) *txs.Tx {
+func (m *MockMempool) Get(arg0 ids.ID) (*txs.Tx, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0)
 	ret0, _ := ret[0].(*txs.Tx)
-	return ret0
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
@@ -78,20 +79,6 @@ func (m *MockMempool) GetDropReason(arg0 ids.ID) error {
 func (mr *MockMempoolMockRecorder) GetDropReason(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDropReason", reflect.TypeOf((*MockMempool)(nil).GetDropReason), arg0)
-}
-
-// Has mocks base method.
-func (m *MockMempool) Has(arg0 ids.ID) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Has", arg0)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// Has indicates an expected call of Has.
-func (mr *MockMempoolMockRecorder) Has(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Has", reflect.TypeOf((*MockMempool)(nil).Has), arg0)
 }
 
 // Iterate mocks base method.

@@ -103,7 +103,7 @@ type gossipMempool struct {
 
 func (g *gossipMempool) Add(tx *gossipTx) error {
 	txID := tx.tx.ID()
-	if g.Mempool.Has(txID) {
+	if _, ok :=g.Mempool.Get(txID); ok {
 		// The tx is already in the mempool
 		return fmt.Errorf("tx %s already known", txID)
 	}
