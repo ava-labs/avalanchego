@@ -134,15 +134,18 @@ impl<T: Storable> Obj<T> {
     }
 
     pub fn flush_dirty(&mut self) {
-        if !self.value.is_mem_mapped() {
-            if let Some(new_value_len) = self.dirty.take() {
-                let mut new_value = vec![0; new_value_len as usize];
-                // TODO: log error
-                self.value.write_mem_image(&mut new_value).unwrap();
-                let offset = self.value.get_offset();
-                let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
-                bx.write(offset, &new_value);
-            }
+        // faster than calling `self.dirty.take()` on a `None`
+        if self.dirty.is_none() {
+            return;
+        }
+
+        if let Some(new_value_len) = self.dirty.take() {
+            let mut new_value = vec![0; new_value_len as usize];
+            // TODO: log error
+            self.value.write_mem_image(&mut new_value).unwrap();
+            let offset = self.value.get_offset();
+            let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
+            bx.write(offset, &new_value);
         }
     }
 }
@@ -232,9 +235,6 @@ pub trait Storable {
     fn deserialize<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError>
     where
         Self: Sized;
-    fn is_mem_mapped(&self) -> bool {
-        false
-    }
 }
 
 pub fn to_dehydrated(item: &dyn Storable) -> Result<Vec<u8>, ShaleError> {
@@ -302,9 +302,6 @@ impl<T: Storable> StoredView<T> {
 
     fn write(&mut self) -> &mut T {
         &mut self.decoded
-    }
-    fn is_mem_mapped(&self) -> bool {
-        self.decoded.is_mem_mapped()
     }
 }
 
