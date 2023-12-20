@@ -375,12 +375,12 @@ func TestNetworkGossipTx(t *testing.T) {
 	// Case: Tx was recently gossiped
 	txID := ids.GenerateTestID()
 	n.recentTxs.Put(txID, struct{}{})
-	n.gossipTx(context.Background(), txID, []byte{})
+	n.gossipTxMessage(context.Background(), txID, []byte{})
 	// Didn't make a call to SendAppGossip
 
 	// Case: Tx was not recently gossiped
 	msgBytes := []byte{1, 2, 3}
 	appSender.EXPECT().SendAppGossip(gomock.Any(), msgBytes).Return(nil)
-	n.gossipTx(context.Background(), ids.GenerateTestID(), msgBytes)
+	n.gossipTxMessage(context.Background(), ids.GenerateTestID(), msgBytes)
 	// Did make a call to SendAppGossip
 }

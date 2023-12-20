@@ -21,25 +21,29 @@ import (
 
 var _ executor.Manager = (*testVerifier)(nil)
 
-func TestGossipTxMarshal(t *testing.T) {
+func TestMarshaller(t *testing.T) {
 	require := require.New(t)
 
-	parser, err := txs.NewParser([]fxs.Fx{&secp256k1fx.Fx{}})
+	parser, err := txs.NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+	})
 	require.NoError(err)
 
-	want := &gossipTx{
-		tx: &txs.Tx{
-			TxID: ids.GenerateTestID(),
-		},
+	marhsaller := gossipTxParser{
 		parser: parser,
 	}
 
-	bytes, err := want.Marshal()
+	want := &gossipTx{
+		tx: &txs.Tx{Unsigned: &txs.BaseTx{}},
+	}
+	require.NoError(want.tx.Initialize(parser.Codec()))
+
+	bytes, err := marhsaller.MarshalGossip(want)
 	require.NoError(err)
 
-	got := &gossipTx{}
-	require.NoError(got.Unmarshal(bytes))
-	require.Equal(want.GetID(), got.GetID())
+	got, err := marhsaller.UnmarshalGossip(bytes)
+	require.NoError(err)
+	require.Equal(want.GossipID(), got.GossipID())
 }
 
 func TestGossipMempoolAddTx(t *testing.T) {
@@ -73,7 +77,6 @@ func TestGossipMempoolAddTx(t *testing.T) {
 			},
 			TxID: ids.GenerateTestID(),
 		},
-		parser: parser,
 	}
 
 	require.NoError(mempool.Add(tx))

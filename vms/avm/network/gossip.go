@@ -61,7 +61,7 @@ type gossipTxParser struct {
 	parser txs.Parser
 }
 
-func (g *gossipTxParser) MarshalGossip(tx *gossipTx) ([]byte, error) {
+func (*gossipTxParser) MarshalGossip(tx *gossipTx) ([]byte, error) {
 	return tx.tx.Bytes(), nil
 }
 
