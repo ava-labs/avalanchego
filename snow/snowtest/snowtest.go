@@ -53,8 +53,8 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	ctx.NetworkID = constants.UnitTestID
 	ctx.SubnetID = constants.PrimaryNetworkID
 	ctx.ChainID = chainID
-	ctx.XChainID = ids.GenerateTestID()
-	ctx.CChainID = ids.GenerateTestID()
+	ctx.XChainID = XChainID
+	ctx.CChainID = CChainID
 	ctx.AVAXAssetID = ids.GenerateTestID()
 
 	aliaser := ctx.BCLookup.(ids.Aliaser)
