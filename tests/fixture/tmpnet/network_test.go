@@ -18,6 +18,9 @@ func TestNetworkSerialization(t *testing.T) {
 	require.NoError(network.PopulateNetworkConfig(1337, 1, 1))
 	require.NoError(network.WriteAll())
 
+	// Ensure node runtime is initialized
+	require.NoError(network.ReadNodes())
+
 	loadedNetwork, err := ReadNetwork(tmpDir)
 	require.NoError(err)
 	for _, key := range loadedNetwork.PreFundedKeys {
