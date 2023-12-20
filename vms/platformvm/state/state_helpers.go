@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrUnexpectedStakerTx = errors.New("unexpected stakerTx type ")
-	errNotABlockchain     = errors.New("tx does not created a blockchain")
+	ErrUnexpectedStakerType = errors.New("unexpected staker type ")
+	errNotABlockchain       = errors.New("tx does not created a blockchain")
 )
 
 func getStakerRewardAttributes(chain Chain, stakerID ids.ID) (*StakerRewardAttributes, error) {
@@ -46,7 +46,7 @@ func getStakerRewardAttributes(chain Chain, stakerID ids.ID) (*StakerRewardAttri
 			RewardsOwner: uStakerTx.RewardsOwner(),
 		}, nil
 	default:
-		return nil, fmt.Errorf("%w, txType %T", ErrUnexpectedStakerTx, uStakerTx)
+		return nil, fmt.Errorf("%w, txType %T", ErrUnexpectedStakerType, uStakerTx)
 	}
 }
 

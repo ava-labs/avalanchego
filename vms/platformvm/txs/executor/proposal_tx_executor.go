@@ -392,7 +392,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
 		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
 	default:
-		return state.ErrUnexpectedStakerTx
+		return state.ErrUnexpectedStakerType
 	}
 
 	// If the reward is aborted, then the current supply should be decreased.

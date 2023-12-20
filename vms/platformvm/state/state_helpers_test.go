@@ -210,7 +210,7 @@ func TestGetStakerRewardAttributes(t *testing.T) {
 				return chain
 			},
 			expectedAttributes: nil,
-			expectedErr:        ErrUnexpectedStakerTx,
+			expectedErr:        ErrUnexpectedStakerType,
 		},
 	}
 
