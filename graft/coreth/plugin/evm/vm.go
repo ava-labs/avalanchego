@@ -645,6 +645,14 @@ func (vm *VM) Initialize(
 	}
 	vm.atomicTrie = vm.atomicBackend.AtomicTrie()
 
+	// Run the atomic trie height map repair in the background on mainnet/fuji
+	// TODO: remove after DUpgrade
+	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 ||
+		vm.chainID.Cmp(params.AvalancheFujiChainID) == 0 {
+		_, lastCommitted := vm.atomicTrie.LastCommitted()
+		go vm.atomicTrie.RepairHeightMap(lastCommitted)
+	}
+
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx

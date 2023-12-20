@@ -293,7 +293,7 @@ func TestIndexerWriteAndRead(t *testing.T) {
 	assert.Len(t, blockRootMap, 3)
 
 	hash, height := atomicTrie.LastCommitted()
-	assert.EqualValues(t, lastCommittedBlockHeight, height, "expected %d was %d", 200, lastCommittedBlockHeight)
+	assert.EqualValues(t, lastCommittedBlockHeight, height)
 	assert.Equal(t, lastCommittedBlockHash, hash)
 
 	// Verify that [atomicTrie] can access each of the expected roots
