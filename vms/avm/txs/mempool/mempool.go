@@ -69,10 +69,7 @@ type mempool struct {
 	unissuedTxs    linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
 	consumedUTXOs  set.Set[ids.ID]
 	bytesAvailable int
-
-	// Key: Tx ID
-	// Value: Verification error
-	droppedTxIDs *cache.LRU[ids.ID, error]
+	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> Verification error
 
 	toEngine chan<- common.Message
 
