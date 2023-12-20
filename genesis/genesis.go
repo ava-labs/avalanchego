@@ -571,7 +571,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := xchaintxs.Tx{Unsigned: &genesisTx.CreateAssetTx}
-	if err := parser.InitializeGenesisTx(&tx); err != nil {
+	if err := tx.Initialize(genesisCodec); err != nil {
 		return ids.Empty, err
 	}
 	return tx.ID(), nil
