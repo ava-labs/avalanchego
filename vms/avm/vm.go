@@ -534,7 +534,7 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 		tx := &txs.Tx{
 			Unsigned: &genesisTx.CreateAssetTx,
 		}
-		if err := vm.parser.InitializeGenesisTx(tx); err != nil {
+		if err := tx.Initialize(genesisCodec); err != nil {
 			return err
 		}
 
