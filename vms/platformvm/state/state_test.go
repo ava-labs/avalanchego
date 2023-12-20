@@ -95,9 +95,23 @@ func TestStateSyncGenesis(t *testing.T) {
 // This test is meant to capture which updates are carried out
 func TestPersistStakers(t *testing.T) {
 	tests := map[string]struct {
-		storeStaker           func(*require.Assertions, ids.ID /*=subnetID*/, *state) *Staker
-		checkStoredStakerData func(*require.Assertions, *state, *Staker, uint64)
-		reloadState           func(*require.Assertions, *state)
+		// Insert or delete a staker to state and store it
+		storeStaker func(*require.Assertions, ids.ID /*=subnetID*/, *state) *Staker
+
+		// Check that the staker is duly stored/removed in P-chain state
+		checkStakerInState func(*require.Assertions, *state, *Staker)
+
+		// Check whether validators are duly reported in the validator set, with the right weight and key
+		checkValidatorsSet func(*require.Assertions, *state, *Staker)
+
+		// Check that node duly track stakers uptimes
+		checkValidatorUptimes func(*require.Assertions, *state, *Staker)
+
+		// Check whether weight/bls keys diffs are duly stored
+		checkDiffs func(*require.Assertions, *state, *Staker, uint64)
+
+		// reload the rebuilt state, to check whether checks still pass
+		reloadState func(*require.Assertions, *state)
 	}{
 		"add current validator": {
 			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
@@ -130,13 +144,12 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(s.Commit())
 				return staker
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// Check state validator is stored in P-chain state
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				retrievedStaker, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 				r.Equal(staker, retrievedStaker)
-
-				// Check that validator is made available in the validators set
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Len(valsMap, 1)
 				valOut, found := valsMap[staker.NodeID]
@@ -146,14 +159,14 @@ func TestPersistStakers(t *testing.T) {
 					PublicKey: staker.PublicKey,
 					Weight:    staker.Weight,
 				})
-
-				// Check that validator uptime is duly registered
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 				upDuration, lastUpdated, err := s.GetUptime(staker.NodeID, staker.SubnetID)
 				r.NoError(err)
 				r.Equal(upDuration, time.Duration(0))
 				r.Equal(lastUpdated, staker.StartTime)
-
-				// Check that weight diff and bls diffs are duly stored
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
@@ -233,7 +246,7 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(s.Commit())
 				return del
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				// Check state validator is stored in P-chain state
 				delIt, err := s.GetCurrentDelegatorIterator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
@@ -242,7 +255,8 @@ func TestPersistStakers(t *testing.T) {
 				r.False(delIt.Next())
 				delIt.Release()
 				r.Equal(staker, retrievedDelegator)
-
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 
@@ -252,7 +266,14 @@ func TestPersistStakers(t *testing.T) {
 				valOut, found := valsMap[staker.NodeID]
 				r.True(found)
 				r.Equal(valOut.NodeID, staker.NodeID)
-				r.Equal(valOut.Weight, val.Weight+retrievedDelegator.Weight)
+				r.Equal(valOut.Weight, val.Weight+staker.Weight)
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
+				// nothing to check here, it's not a validator
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// nothing to check here, it's not a validator
+				// IS THIS TRUE? Validator weight MUST HAVE CHANGED!!!
 			},
 			reloadState: func(r *require.Assertions, rebuiltState *state) {
 				r.NoError(rebuiltState.loadCurrentValidators())
@@ -288,22 +309,24 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(s.Commit())
 				return staker
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// Check state validator is stored in P-chain state
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				retrievedStaker, err := s.GetPendingValidator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 				r.Equal(staker, retrievedStaker)
-
-				// Check that validator is not made available in the validators set
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
+				// pending validators are not showed in validators set
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Len(valsMap, 0)
-
-				// Check that validator uptime is not registered
-				_, _, err = s.GetUptime(staker.NodeID, staker.SubnetID)
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
+				// pending validators uptime is not tracked
+				_, _, err := s.GetUptime(staker.NodeID, staker.SubnetID)
 				r.ErrorIs(err, database.ErrNotFound)
-
-				// Check that weight diff and bls diffs are not stored
-				_, err = s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// pending validators  weight diff and bls diffs are not stored
+				_, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.ErrorIs(err, database.ErrNotFound)
 
 				_, err = s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
@@ -362,8 +385,7 @@ func TestPersistStakers(t *testing.T) {
 
 				return del
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// Check state validator is stored in P-chain state
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				delIt, err := s.GetPendingDelegatorIterator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 				r.True(delIt.Next())
@@ -371,10 +393,16 @@ func TestPersistStakers(t *testing.T) {
 				r.False(delIt.Next())
 				delIt.Release()
 				r.Equal(staker, retrievedDelegator)
-
-				// Check that validator is made available in the validators set, with the right weight
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Len(valsMap, 0)
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
+				// nothing to do here
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// nothing to do here
 			},
 			reloadState: func(r *require.Assertions, rebuiltState *state) {
 				r.NoError(rebuiltState.loadPendingValidators())
@@ -416,20 +444,21 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(s.Commit())
 				return staker
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// Check state validator is stored in P-chain state
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				_, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 				r.ErrorIs(err, database.ErrNotFound)
-
-				// Check that validator is made available in the validators set
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
+				// deleted validators are not showed in the validators set anymore
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Len(valsMap, 0)
-
-				// Check that validator uptime is duly registered
-				_, _, err = s.GetUptime(staker.NodeID, staker.SubnetID)
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
+				// uptimes of delete validators are dropped
+				_, _, err := s.GetUptime(staker.NodeID, staker.SubnetID)
 				r.ErrorIs(err, database.ErrNotFound)
-
-				// Check that weight diff and bls diffs are duly stored
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
@@ -512,23 +541,29 @@ func TestPersistStakers(t *testing.T) {
 
 				return del
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// Check state validator is stored in P-chain state
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				delIt, err := s.GetCurrentDelegatorIterator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 				r.False(delIt.Next())
 				delIt.Release()
-
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
+				// Check that validator is made available in the validators set, with the right weight
 				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 
-				// Check that validator is made available in the validators set, with the right weight
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Len(valsMap, 1)
 				valOut, found := valsMap[staker.NodeID]
 				r.True(found)
 				r.Equal(valOut.NodeID, staker.NodeID)
 				r.Equal(valOut.Weight, val.Weight)
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
+				// nothing to do here
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				// nothing to do here
 			},
 			reloadState: func(r *require.Assertions, rebuiltState *state) {
 				r.NoError(rebuiltState.loadCurrentValidators())
@@ -568,21 +603,20 @@ func TestPersistStakers(t *testing.T) {
 
 				return staker
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// Check state validator is stored in P-chain state
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				_, err := s.GetPendingValidator(staker.SubnetID, staker.NodeID)
 				r.ErrorIs(err, database.ErrNotFound)
-
-				// Check that validator is not made available in the validators set
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Len(valsMap, 0)
-
-				// Check that validator uptime is not registered
-				_, _, err = s.GetUptime(staker.NodeID, staker.SubnetID)
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
+				_, _, err := s.GetUptime(staker.NodeID, staker.SubnetID)
 				r.ErrorIs(err, database.ErrNotFound)
-
-				// Check that weight diff and bls diffs are not stored
-				_, err = s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
+				_, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				r.ErrorIs(err, database.ErrNotFound)
 
 				_, err = s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
@@ -642,16 +676,19 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(s.Commit())
 				return del
 			},
-			checkStoredStakerData: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// Check state validator is stored in P-chain state
+			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
 				delIt, err := s.GetPendingDelegatorIterator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 				r.False(delIt.Next())
 				delIt.Release()
-
-				// Check that validator is made available in the validators set, with the right weight
+			},
+			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Len(valsMap, 0)
+			},
+			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
+			},
+			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 			},
 			reloadState: func(r *require.Assertions, rebuiltState *state) {
 				r.NoError(rebuiltState.loadPendingValidators())
@@ -672,7 +709,10 @@ func TestPersistStakers(t *testing.T) {
 				staker := test.storeStaker(require, subnetID, state)
 
 				// check all relevant data are stored
-				test.checkStoredStakerData(require, state, staker, 0 /*height*/)
+				test.checkStakerInState(require, state, staker)
+				test.checkValidatorsSet(require, state, staker)
+				test.checkValidatorUptimes(require, state, staker)
+				test.checkDiffs(require, state, staker, 0 /*height*/)
 
 				// rebuild the state
 				rebuiltState := newStateFromDB(require, db)
@@ -681,7 +721,10 @@ func TestPersistStakers(t *testing.T) {
 				test.reloadState(require, rebuiltState)
 
 				// check again that all relevant data are still available in rebuilt state
-				test.checkStoredStakerData(require, rebuiltState, staker, 0 /*height*/)
+				test.checkStakerInState(require, state, staker)
+				test.checkValidatorsSet(require, state, staker)
+				test.checkValidatorUptimes(require, state, staker)
+				test.checkDiffs(require, state, staker, 0 /*height*/)
 			})
 		}
 	}
