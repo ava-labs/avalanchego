@@ -28,7 +28,7 @@ const (
 	// Note: using trie write for the gas cost results in a conservative overestimate since the message is stored in a
 	// flat database that can be cleaned up after a period of time instead of the EVM trie.
 
-	SendWarpMessageGasCost uint64 = params.LogGas + 4*params.LogTopicGas + AddWarpMessageGasCost + contract.WriteGasCostPerSlot
+	SendWarpMessageGasCost uint64 = params.LogGas + 3*params.LogTopicGas + AddWarpMessageGasCost + contract.WriteGasCostPerSlot
 	// SendWarpMessageGasCostPerByte cost accounts for producing a signed message of a given size
 	SendWarpMessageGasCostPerByte uint64 = params.LogDataGas
 
