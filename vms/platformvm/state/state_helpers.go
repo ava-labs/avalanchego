@@ -4,12 +4,15 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
+
+var errUnexpectedStakerTx = errors.New("unexpected stakerTx type ")
 
 func getStakerColdAttributes(chain Chain, stakerID ids.ID) (*StakerColdAttributes, error) {
 	stakerTx, _, err := chain.GetTx(stakerID)
@@ -40,7 +43,7 @@ func getStakerColdAttributes(chain Chain, stakerID ids.ID) (*StakerColdAttribute
 			RewardsOwner: uStakerTx.RewardsOwner(),
 		}, nil
 	default:
-		return nil, fmt.Errorf("unexpected stakerTx type %T", uStakerTx)
+		return nil, fmt.Errorf("%w, txType %T", errUnexpectedStakerTx, uStakerTx)
 	}
 }
 
