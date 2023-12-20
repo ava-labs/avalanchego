@@ -31,7 +31,7 @@ const (
 
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
-	_ Gossiper = (*PullGossiper[testTx, *testTx])(nil)
+	_ Gossiper = (*PullGossiper[*testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
 	_ Gossiper = (*TestGossiper)(nil)
 
@@ -53,13 +53,6 @@ type Accumulator[T Gossipable] interface {
 	Gossiper
 	// Add queues gossipables to be gossiped
 	Add(gossipables ...T)
-}
-
-// GossipableAny exists to help create non-nil pointers to a concrete Gossipable
-// ref: https://stackoverflow.com/questions/69573113/how-can-i-instantiate-a-non-nil-pointer-of-type-argument-with-generic-go
-type GossipableAny[T any] interface {
-	*T
-	Gossipable
 }
 
 // ValidatorGossiper only calls [Gossip] if the given node is a validator
@@ -123,35 +116,38 @@ func (v ValidatorGossiper) Gossip(ctx context.Context) error {
 	return v.Gossiper.Gossip(ctx)
 }
 
-func NewPullGossiper[T any, U GossipableAny[T]](
+func NewPullGossiper[T Gossipable](
 	log logging.Logger,
-	set Set[U],
+	marshaller Marshaller[T],
+	set Set[T],
 	client *p2p.Client,
 	metrics Metrics,
 	pollSize int,
-) *PullGossiper[T, U] {
-	return &PullGossiper[T, U]{
-		log:      log,
-		set:      set,
-		client:   client,
-		metrics:  metrics,
-		pollSize: pollSize,
+) *PullGossiper[T] {
+	return &PullGossiper[T]{
+		log:        log,
+		marshaller: marshaller,
+		set:        set,
+		client:     client,
+		metrics:    metrics,
+		pollSize:   pollSize,
 		labels: prometheus.Labels{
 			typeLabel: pullType,
 		},
 	}
 }
 
-type PullGossiper[T any, U GossipableAny[T]] struct {
-	log      logging.Logger
-	set      Set[U]
-	client   *p2p.Client
-	metrics  Metrics
-	pollSize int
-	labels   prometheus.Labels
+type PullGossiper[T Gossipable] struct {
+	log        logging.Logger
+	marshaller Marshaller[T]
+	set        Set[T]
+	client     *p2p.Client
+	metrics    Metrics
+	pollSize   int
+	labels     prometheus.Labels
 }
 
-func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
+func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	bloom, salt, err := p.set.GetFilter()
 	if err != nil {
 		return err
@@ -175,7 +171,7 @@ func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
 	return nil
 }
 
-func (p *PullGossiper[T, U]) handleResponse(
+func (p *PullGossiper[_]) handleResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
@@ -200,8 +196,8 @@ func (p *PullGossiper[T, U]) handleResponse(
 	for _, bytes := range response.Gossip {
 		receivedBytes += len(bytes)
 
-		gossipable := U(new(T))
-		if err := gossipable.Unmarshal(bytes); err != nil {
+		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
+		if err != nil {
 			p.log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
@@ -210,7 +206,7 @@ func (p *PullGossiper[T, U]) handleResponse(
 			continue
 		}
 
-		hash := gossipable.GetID()
+		hash := gossipable.GossipID()
 		p.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
@@ -244,8 +240,9 @@ func (p *PullGossiper[T, U]) handleResponse(
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](marshaller Marshaller[T], client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
 	return &PushGossiper[T]{
+		marshaller:       marshaller,
 		client:           client,
 		metrics:          metrics,
 		targetGossipSize: targetGossipSize,
@@ -258,6 +255,7 @@ func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics, targetGo
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
+	marshaller       Marshaller[T]
 	client           *p2p.Client
 	metrics          Metrics
 	targetGossipSize int
@@ -288,7 +286,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 			break
 		}
 
-		bytes, err := gossipable.Marshal()
+		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			// remove this item so we don't get stuck in a loop
 			_, _ = p.pending.PopLeft()
