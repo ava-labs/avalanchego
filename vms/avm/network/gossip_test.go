@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ executor.Manager = (*testVerifier)(nil)
+var _ TxVerifier = (*testVerifier)(nil)
 
 func TestMarshaller(t *testing.T) {
 	require := require.New(t)
@@ -84,10 +84,9 @@ func TestGossipMempoolAddTx(t *testing.T) {
 }
 
 type testVerifier struct {
-	executor.Manager
-	fail bool
+	err error
 }
 
-func (testVerifier) VerifyTx(*txs.Tx) error {
-	return nil
+func (v testVerifier) VerifyTx(*txs.Tx) error {
+	return v.err
 }
