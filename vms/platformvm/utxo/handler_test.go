@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -40,7 +40,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 	require.NoError(t, fx.Bootstrapped())
 
 	h := &handler{
-		ctx: snow.DefaultContextTest(),
+		ctx: snowtest.EmptyContext(),
 		clk: &mockable.Clock{},
 		fx:  fx,
 	}

@@ -6,8 +6,11 @@ package snowtest
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ snow.Acceptor = noOpAcceptor{}
@@ -18,9 +21,28 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 	return nil
 }
 
+func EmptyContext() *snow.Context {
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		panic(err)
+	}
+	pk := bls.PublicFromSecretKey(sk)
+	return &snow.Context{
+		NetworkID:    0,
+		SubnetID:     ids.Empty,
+		ChainID:      ids.Empty,
+		NodeID:       ids.EmptyNodeID,
+		PublicKey:    pk,
+		Log:          logging.NoLog{},
+		BCLookup:     ids.NewAliaser(),
+		Metrics:      metrics.NewOptionalGatherer(),
+		ChainDataDir: "",
+	}
+}
+
 func ConsensusContext() *snow.ConsensusContext {
 	return &snow.ConsensusContext{
-		Context:             snow.DefaultContextTest(),
+		Context:             EmptyContext(),
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
 		BlockAcceptor:       noOpAcceptor{},

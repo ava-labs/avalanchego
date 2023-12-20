@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -35,7 +36,7 @@ var (
 func newContext(t testing.TB) *snow.Context {
 	require := require.New(t)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.EmptyContext()
 	ctx.NetworkID = constants.UnitTestID
 	ctx.ChainID = ids.GenerateTestID()
 	ctx.XChainID = ctx.ChainID

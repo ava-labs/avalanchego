@@ -152,7 +152,7 @@ type mutableSharedMemory struct {
 func defaultContext(t *testing.T) *snow.Context {
 	require := require.New(t)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.EmptyContext()
 	ctx.NetworkID = constants.UnitTestID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
