@@ -27,8 +27,9 @@ import (
 )
 
 func TestGossiperShutdown(*testing.T) {
-	gossiper := NewPullGossiper[testTx](
+	gossiper := NewPullGossiper[*testTx](
 		logging.NoLog{},
+		nil,
 		nil,
 		nil,
 		Metrics{},
@@ -122,8 +123,10 @@ func TestGossiperGossip(t *testing.T) {
 
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
-			handler := NewHandler[testTx, *testTx](
+			marshaller := testMarshaller{}
+			handler := NewHandler[*testTx](
 				logging.NoLog{},
+				marshaller,
 				NoOpAccumulator[*testTx]{},
 				responseSet,
 				metrics,
@@ -153,8 +156,9 @@ func TestGossiperGossip(t *testing.T) {
 			requestClient := requestNetwork.NewClient(0x0)
 
 			require.NoError(err)
-			gossiper := NewPullGossiper[testTx, *testTx](
+			gossiper := NewPullGossiper[*testTx](
 				logging.NoLog{},
+				marshaller,
 				requestSet,
 				requestClient,
 				metrics,
@@ -317,7 +321,13 @@ func TestPushGossiper(t *testing.T) {
 			client := network.NewClient(0)
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
-			gossiper := NewPushGossiper[*testTx](client, metrics, units.MiB)
+			marshaller := testMarshaller{}
+			gossiper := NewPushGossiper[*testTx](
+				marshaller,
+				client,
+				metrics,
+				units.MiB,
+			)
 
 			for _, gossipables := range tt.cycles {
 				gossiper.Add(gossipables...)
@@ -328,7 +338,7 @@ func TestPushGossiper(t *testing.T) {
 				}
 
 				for _, gossipable := range gossipables {
-					bytes, err := gossipable.Marshal()
+					bytes, err := marshaller.MarshalGossip(gossipable)
 					require.NoError(err)
 
 					want.Gossip = append(want.Gossip, bytes)
@@ -373,10 +383,17 @@ func TestPushGossipE2E(t *testing.T) {
 
 	metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 	require.NoError(err)
-	forwarderGossiper := NewPushGossiper[*testTx](client, metrics, units.MiB)
+	marshaller := testMarshaller{}
+	forwarderGossiper := NewPushGossiper[*testTx](
+		marshaller,
+		client,
+		metrics,
+		units.MiB,
+	)
 
-	handler := NewHandler[testTx, *testTx](
+	handler := NewHandler[*testTx](
 		log,
+		marshaller,
 		forwarderGossiper,
 		set,
 		metrics,
@@ -392,7 +409,12 @@ func TestPushGossipE2E(t *testing.T) {
 	require.NoError(err)
 	issuerClient := issuerNetwork.NewClient(handlerID)
 	require.NoError(err)
-	issuerGossiper := NewPushGossiper[*testTx](issuerClient, metrics, units.MiB)
+	issuerGossiper := NewPushGossiper[*testTx](
+		marshaller,
+		issuerClient,
+		metrics,
+		units.MiB,
+	)
 
 	want := []*testTx{
 		{id: ids.GenerateTestID()},
@@ -425,9 +447,10 @@ func TestPushGossipE2E(t *testing.T) {
 	require.Len(forwardedMsg.Gossip, len(want))
 
 	gotForwarded := make([]*testTx, 0, len(addedToSet))
+
 	for _, bytes := range forwardedMsg.Gossip {
-		tx := &testTx{}
-		require.NoError(tx.Unmarshal(bytes))
+		tx, err := marshaller.UnmarshalGossip(bytes)
+		require.NoError(err)
 		gotForwarded = append(gotForwarded, tx)
 	}
 
