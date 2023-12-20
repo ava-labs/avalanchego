@@ -63,7 +63,7 @@ func TestServiceIssueTx(t *testing.T) {
 	err := env.service.IssueTx(nil, txArgs, txReply)
 	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 
-	tx := newTx(t, env.genesisBytes, env.vm, "AVAX")
+	tx := newTx(t, env.genesisBytes, env.vm.parser, "AVAX")
 	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
 	require.NoError(err)
 	txArgs.Encoding = formatting.Hex
@@ -89,7 +89,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 	err := env.service.GetTxStatus(nil, statusArgs, statusReply)
 	require.ErrorIs(err, errNilTxID)
 
-	newTx := newAvaxBaseTxWithOutputs(t, env.genesisBytes, env.vm)
+	newTx := newAvaxBaseTxWithOutputs(t, env.genesisBytes, env.vm.TxFee, env.vm.parser)
 	txID := newTx.ID()
 
 	statusArgs = &api.JSONTxID{
@@ -99,11 +99,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 	require.NoError(env.service.GetTxStatus(nil, statusArgs, statusReply))
 	require.Equal(choices.Unknown, statusReply.Status)
 
-	env.vm.ctx.Lock.Lock()
-
 	issueAndAccept(require, env.vm, env.issuer, newTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	statusReply = &GetTxStatusReply{}
 	require.NoError(env.service.GetTxStatus(nil, statusArgs, statusReply))
@@ -539,16 +535,15 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := newAvaxBaseTxWithOutputs(t, env.genesisBytes, env.vm)
+	newTx := newAvaxBaseTxWithOutputs(t, env.genesisBytes, env.vm.TxFee, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -567,16 +562,15 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := newAvaxExportTxWithOutputs(t, env.genesisBytes, env.vm)
+	newTx := newAvaxExportTxWithOutputs(t, env.genesisBytes, env.vm.TxFee, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -600,16 +594,15 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -635,6 +628,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -642,14 +636,12 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key, 2, 1))
 	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -679,6 +671,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -686,7 +679,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
@@ -695,8 +688,6 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -725,6 +716,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -732,14 +724,12 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
 	require.NoError(mintSecpOpTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -771,6 +761,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -778,7 +769,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
@@ -787,8 +778,6 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	require.NoError(mintSecpOpTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -818,6 +807,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -825,14 +815,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -863,6 +851,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -870,7 +859,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.parser)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
@@ -879,8 +868,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
-
-	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
 	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
@@ -899,30 +886,30 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require.Contains(jsonString, `"credentials":[{"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy","credential":{"signatures":["0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601"]}},{"fxID":"rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy","credential":{"signatures":["0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601"]}}]`)
 }
 
-func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
+func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, fee uint64, parser txs.Parser) *txs.Tx {
 	avaxTx := getCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 	key := keys[0]
-	tx := buildBaseTx(avaxTx, vm, key)
-	require.NoError(t, tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	tx := buildBaseTx(avaxTx, fee, key)
+	require.NoError(t, tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	return tx
 }
 
-func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
+func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, fee uint64, parser txs.Parser) *txs.Tx {
 	avaxTx := getCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 	key := keys[0]
-	tx := buildExportTx(avaxTx, vm, key)
-	require.NoError(t, tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	tx := buildExportTx(avaxTx, fee, key)
+	require.NoError(t, tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	return tx
 }
 
-func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *txs.Tx {
+func newAvaxCreateAssetTxWithOutputs(t *testing.T, parser txs.Parser) *txs.Tx {
 	key := keys[0]
 	tx := buildCreateAssetTx(key)
-	require.NoError(t, vm.parser.InitializeTx(tx))
+	require.NoError(t, parser.InitializeTx(tx))
 	return tx
 }
 
-func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
+func buildBaseTx(avaxTx *txs.Tx, fee uint64, key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
@@ -946,7 +933,7 @@ func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: avaxTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - fee,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -957,7 +944,7 @@ func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 	}}
 }
 
-func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
+func buildExportTx(avaxTx *txs.Tx, fee uint64, key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
@@ -980,7 +967,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - fee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1501,7 +1488,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 			changeAddrStr, err := env.vm.FormatLocalAddress(testChangeAddr)
 			require.NoError(err)
-			_, fromAddrsStr := sampleAddrs(t, env.vm, addrs)
+			_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
 			require.NoError(env.service.CreateFixedCapAsset(nil, &CreateAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -1549,7 +1536,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			reply := AssetIDChangeAddr{}
 			minterAddrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 			require.NoError(err)
-			_, fromAddrsStr := sampleAddrs(t, env.vm, addrs)
+			_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 			changeAddrStr := fromAddrsStr[0]
 
 			require.NoError(env.service.CreateVariableCapAsset(nil, &CreateAssetArgs{
@@ -1574,11 +1561,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			}, &reply))
 			require.Equal(changeAddrStr, reply.ChangeAddr)
 
-			env.vm.ctx.Lock.Lock()
-
 			buildAndAccept(require, env.vm, env.issuer, reply.AssetID)
-
-			env.vm.ctx.Lock.Unlock()
 
 			createdAssetID := reply.AssetID.String()
 			// Test minting of the created variable cap asset
@@ -1598,11 +1581,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			require.NoError(env.service.Mint(nil, mintArgs, mintReply))
 			require.Equal(changeAddrStr, mintReply.ChangeAddr)
 
-			env.vm.ctx.Lock.Lock()
-
 			buildAndAccept(require, env.vm, env.issuer, mintReply.TxID)
-
-			env.vm.ctx.Lock.Unlock()
 
 			sendArgs := &SendArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -1647,7 +1626,7 @@ func TestNFTWorkflow(t *testing.T) {
 				env.vm.ctx.Lock.Unlock()
 			}()
 
-			fromAddrs, fromAddrsStr := sampleAddrs(t, env.vm, addrs)
+			fromAddrs, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
 			// Test minting of the created variable cap asset
 			addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
@@ -1677,11 +1656,7 @@ func TestNFTWorkflow(t *testing.T) {
 			require.NoError(env.service.CreateNFTAsset(nil, createArgs, createReply))
 			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
-			env.vm.ctx.Lock.Lock()
-
 			buildAndAccept(require, env.vm, env.issuer, createReply.AssetID)
-
-			env.vm.ctx.Lock.Unlock()
 
 			// Key: Address
 			// Value: AVAX balance
@@ -1732,12 +1707,8 @@ func TestNFTWorkflow(t *testing.T) {
 			require.NoError(env.service.MintNFT(nil, mintArgs, mintReply))
 			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
-			env.vm.ctx.Lock.Lock()
-
 			// Accept the transaction so that we can send the newly minted NFT
 			buildAndAccept(require, env.vm, env.issuer, mintReply.TxID)
-
-			env.vm.ctx.Lock.Unlock()
 
 			sendArgs := &SendNFTArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -1866,6 +1837,7 @@ func TestSend(t *testing.T) {
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -1877,7 +1849,7 @@ func TestSend(t *testing.T) {
 	require.NoError(err)
 	changeAddrStr, err := env.vm.FormatLocalAddress(testChangeAddr)
 	require.NoError(err)
-	_, fromAddrsStr := sampleAddrs(t, env.vm, addrs)
+	_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
 	args := &SendArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
@@ -1898,8 +1870,6 @@ func TestSend(t *testing.T) {
 	require.NoError(env.service.Send(nil, args, reply))
 	require.Equal(changeAddrStr, reply.ChangeAddr)
 
-	env.vm.ctx.Lock.Lock()
-
 	buildAndAccept(require, env.vm, env.issuer, reply.TxID)
 }
 
@@ -1919,6 +1889,7 @@ func TestSendMultiple(t *testing.T) {
 			env.vm.ctx.Lock.Unlock()
 
 			defer func() {
+				env.vm.ctx.Lock.Lock()
 				require.NoError(env.vm.Shutdown(context.Background()))
 				env.vm.ctx.Lock.Unlock()
 			}()
@@ -1930,7 +1901,7 @@ func TestSendMultiple(t *testing.T) {
 			require.NoError(err)
 			changeAddrStr, err := env.vm.FormatLocalAddress(testChangeAddr)
 			require.NoError(err)
-			_, fromAddrsStr := sampleAddrs(t, env.vm, addrs)
+			_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
 			args := &SendMultipleArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -1957,8 +1928,6 @@ func TestSendMultiple(t *testing.T) {
 			reply := &api.JSONTxIDChangeAddr{}
 			require.NoError(env.service.SendMultiple(nil, args, reply))
 			require.Equal(changeAddrStr, reply.ChangeAddr)
-
-			env.vm.ctx.Lock.Lock()
 
 			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
 		})
