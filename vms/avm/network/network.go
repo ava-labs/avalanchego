@@ -205,7 +205,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	})
 	if err == nil {
 		txID := tx.ID()
-		n.gossipTx(ctx, txID, msgBytes)
+		n.gossipTxMessage(ctx, txID, msgBytes)
 	}
 	return nil
 }
@@ -217,6 +217,20 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 		return err
 	}
 
+	return n.gossipTx(ctx, tx)
+}
+
+func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
+	if err := n.mempool.AddVerifiedTx(&gossipTx{
+		tx: tx,
+	}); err != nil {
+		return err
+	}
+
+	return n.gossipTx(ctx, tx)
+}
+
+func (n *Network) gossipTx(ctx context.Context, tx *txs.Tx) error {
 	txBytes := tx.Bytes()
 	msg := &message.Tx{
 		Tx: txBytes,
@@ -227,11 +241,11 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	}
 
 	txID := tx.ID()
-	n.gossipTx(ctx, txID, msgBytes)
+	n.gossipTxMessage(ctx, txID, msgBytes)
 	return nil
 }
 
-func (n *Network) gossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
+func (n *Network) gossipTxMessage(ctx context.Context, txID ids.ID, msgBytes []byte) {
 	n.recentTxsLock.Lock()
 	_, has := n.recentTxs.Get(txID)
 	n.recentTxs.Put(txID, struct{}{})

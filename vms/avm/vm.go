@@ -131,7 +131,6 @@ type VM struct {
 	txBackend *txexecutor.Backend
 
 	// These values are only initialized after the chain has been linearized.
-	mempool mempool.Mempool
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      *network.Network
@@ -434,13 +433,13 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		return err
 	}
 
-	vm.mempool, err = mempool.New("mempool", vm.registerer, toEngine)
+	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.chainManager = blockexecutor.NewManager(
-		vm.mempool,
+		mempool,
 		vm.metrics,
 		vm.state,
 		vm.txBackend,
@@ -452,7 +451,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		vm.txBackend,
 		vm.chainManager,
 		&vm.clock,
-		vm.mempool,
+		mempool,
 	)
 
 	vm.network, err = network.New(
@@ -462,7 +461,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 			&vm.ctx.Lock,
 			vm.chainManager,
 		),
-		vm.mempool,
+		mempool,
 		vm.appSender,
 		vm.registerer,
 		txGossipHandlerID,
