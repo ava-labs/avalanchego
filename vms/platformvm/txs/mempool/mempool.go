@@ -6,6 +6,7 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -45,9 +46,8 @@ var (
 
 type Mempool interface {
 	Add(tx *txs.Tx) error
-	Has(txID ids.ID) bool
-	Get(txID ids.ID) *txs.Tx
-	Remove(txs []*txs.Tx)
+	Get(txID ids.ID) (*txs.Tx, bool)
+	Remove(txs ...*txs.Tx)
 
 	// Peek returns the oldest tx in the mempool.
 	Peek() (tx *txs.Tx, exists bool)
@@ -64,24 +64,26 @@ type Mempool interface {
 	// possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
+
+	// Iterate iterates over the txs until f returns false
+	Iterate(f func(tx *txs.Tx) bool)
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
+	toEngine chan<- common.Message
+
 	bytesAvailableMetric prometheus.Gauge
-	bytesAvailable       int
+	numTxs               prometheus.Gauge
 
-	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
-	numTxs      prometheus.Gauge
-
+	lock          sync.Mutex
+	unissuedTxs   linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	consumedUTXOs set.Set[ids.ID]
 	// Key: Tx ID
 	// Value: Verification error
-	droppedTxIDs *cache.LRU[ids.ID, error]
-
-	consumedUTXOs set.Set[ids.ID]
-
-	toEngine chan<- common.Message
+	droppedTxIDs   *cache.LRU[ids.ID, error]
+	bytesAvailable int
 }
 
 func New(
@@ -109,19 +111,32 @@ func New(
 
 	bytesAvailableMetric.Set(maxMempoolSize)
 	return &mempool{
+		toEngine:             toEngine,
 		bytesAvailableMetric: bytesAvailableMetric,
+		numTxs:               numTxs,
+		unissuedTxs:          linkedhashmap.New[ids.ID, *txs.Tx](),
+		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
+		droppedTxIDs:         &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		bytesAvailable:       maxMempoolSize,
-
-		unissuedTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
-		numTxs:      numTxs,
-
-		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
-		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
-		toEngine:      toEngine,
 	}, nil
 }
 
+func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	itr := m.unissuedTxs.NewIterator()
+	for itr.Next() {
+		if !f(itr.Value()) {
+			return
+		}
+	}
+}
+
 func (m *mempool) Add(tx *txs.Tx) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return errCantIssueAdvanceTimeTx
@@ -132,7 +147,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
-	if m.Has(txID) {
+	if _, ok := m.get(txID); ok {
 		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
 	}
 
@@ -173,17 +188,22 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
-func (m *mempool) Has(txID ids.ID) bool {
-	return m.Get(txID) != nil
+func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	return m.get(txID)
 }
 
-func (m *mempool) Get(txID ids.ID) *txs.Tx {
-	tx, _ := m.unissuedTxs.Get(txID)
-	return tx
+func (m *mempool) get(txID ids.ID) (*txs.Tx, bool) {
+	return m.unissuedTxs.Get(txID)
 }
 
-func (m *mempool) Remove(txsToRemove []*txs.Tx) {
-	for _, tx := range txsToRemove {
+func (m *mempool) Remove(txs ...*txs.Tx) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for _, tx := range txs {
 		txID := tx.ID()
 		if !m.unissuedTxs.Delete(txID) {
 			continue
@@ -199,20 +219,32 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 }
 
 func (m *mempool) Peek() (*txs.Tx, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	_, tx, exists := m.unissuedTxs.Oldest()
 	return tx, exists
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	m.droppedTxIDs.Put(txID, reason)
 }
 
 func (m *mempool) GetDropReason(txID ids.ID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
 }
 
 func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if !emptyBlockPermitted && m.unissuedTxs.Len() == 0 {
 		return
 	}
