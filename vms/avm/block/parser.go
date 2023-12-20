@@ -4,7 +4,6 @@
 package block
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -25,9 +24,6 @@ type Parser interface {
 
 	ParseBlock(bytes []byte) (Block, error)
 	ParseGenesisBlock(bytes []byte) (Block, error)
-
-	InitializeBlock(block Block) error
-	InitializeGenesisBlock(block Block) error
 }
 
 type parser struct {
@@ -87,22 +83,4 @@ func parse(cm codec.Manager, bytes []byte) (Block, error) {
 		return nil, err
 	}
 	return blk, blk.initialize(bytes, cm)
-}
-
-func (p *parser) InitializeBlock(block Block) error {
-	return initialize(block, p.Codec())
-}
-
-func (p *parser) InitializeGenesisBlock(block Block) error {
-	return initialize(block, p.GenesisCodec())
-}
-
-func initialize(blk Block, cm codec.Manager) error {
-	// We serialize this block as a pointer so that it can be deserialized into
-	// a Block
-	bytes, err := cm.Marshal(CodecVersion, &blk)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal block: %w", err)
-	}
-	return blk.initialize(bytes, cm)
 }
