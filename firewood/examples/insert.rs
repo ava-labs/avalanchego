@@ -5,13 +5,16 @@
 // insert some random keys using the front-end API.
 
 use clap::Parser;
-use std::{collections::HashMap, error::Error, ops::RangeInclusive, sync::Arc, time::Instant};
+use std::{
+    borrow::BorrowMut as _, collections::HashMap, error::Error, ops::RangeInclusive, sync::Arc,
+    time::Instant,
+};
 
 use firewood::{
     db::{Batch, BatchOp, Db, DbConfig},
     v2::api::{Db as _, DbView, Proposal},
 };
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{distributions::Alphanumeric, Rng, SeedableRng};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -25,6 +28,8 @@ struct Args {
     inserts: usize,
     #[arg(short, long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
     read_verify_percent: u16,
+    #[arg(short, long)]
+    seed: Option<u64>,
 }
 
 fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error + Sync + Send>> {
@@ -51,19 +56,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let keys = args.batch_keys;
     let start = Instant::now();
 
+    let mut rng = if let Some(seed) = args.seed {
+        rand::rngs::StdRng::seed_from_u64(seed)
+    } else {
+        rand::rngs::StdRng::from_entropy()
+    };
+
     for _ in 0..args.inserts {
-        let keylen = rand::thread_rng().gen_range(args.keylen.clone());
-        let datalen = rand::thread_rng().gen_range(args.datalen.clone());
+        let keylen = rng.gen_range(args.keylen.clone());
+        let datalen = rng.gen_range(args.datalen.clone());
         let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
             .map(|_| {
                 (
-                    rand::thread_rng()
+                    rng.borrow_mut()
                         .sample_iter(&Alphanumeric)
-                        .take(keylen as usize)
+                        .take(keylen)
                         .collect::<Vec<u8>>(),
-                    rand::thread_rng()
+                    rng.borrow_mut()
                         .sample_iter(&Alphanumeric)
-                        .take(datalen as usize)
+                        .take(datalen)
                         .collect::<Vec<u8>>(),
                 )
             })
