@@ -2298,12 +2298,12 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 			continue
 		}
 
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
+		stakerRewardAttributes, err := s.vm.state.GetStakerRewardAttributes(staker.TxID)
 		if err != nil {
 			return err
 		}
 
-		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
+		stakedOuts = append(stakedOuts, getStakeHelper(stakerRewardAttributes.Stake, addrs, totalAmountStaked)...)
 	}
 
 	pendingStakerIterator, err := s.vm.state.GetPendingStakerIterator()
@@ -2319,12 +2319,12 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 			continue
 		}
 
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
+		stakerRewardAttributes, err := s.vm.state.GetStakerRewardAttributes(staker.TxID)
 		if err != nil {
 			return err
 		}
 
-		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
+		stakedOuts = append(stakedOuts, getStakeHelper(stakerRewardAttributes.Stake, addrs, totalAmountStaked)...)
 	}
 
 	response.Stakeds = newJSONBalanceMap(totalAmountStaked)
@@ -2751,13 +2751,7 @@ func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Own
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
-func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
-	staker, ok := tx.Unsigned.(txs.PermissionlessStaker)
-	if !ok {
-		return nil
-	}
-
-	stake := staker.Stake()
+func getStakeHelper(stake []*avax.TransferableOutput, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
 	stakedOuts := make([]avax.TransferableOutput, 0, len(stake))
 	// Go through all of the staked outputs
 	for _, output := range stake {
