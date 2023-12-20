@@ -66,7 +66,7 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		},
 	}}
-	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
