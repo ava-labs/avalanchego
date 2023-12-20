@@ -263,10 +263,17 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	)
 
 	// Add a staker to [env.state]
-	env.state.PutCurrentValidator(&state.Staker{
+	dummyTx := txs.Tx{
+		Unsigned: &txs.AddValidatorTx{},
+	}
+	dummyTx.SetBytes([]byte{0x01}, []byte{0x02})
+	staker := &state.Staker{
+		TxID:     dummyTx.ID(),
 		NextTime: nextTime,
 		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-	})
+	}
+	env.state.PutCurrentValidator(staker)
+	env.state.AddTx(&dummyTx, status.Committed)
 
 	// Advance wall clock to [nextTime] + [txexecutor.SyncBound]
 	env.backend.Clk.Set(nextTime.Add(txexecutor.SyncBound))
