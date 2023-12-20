@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/warp"
 	"github.com/stretchr/testify/require"
@@ -27,17 +28,25 @@ func TestMessageSignatureHandler(t *testing.T) {
 	snowCtx := snow.DefaultContextTest()
 	blsSecretKey, err := bls.NewSecretKey()
 	require.NoError(t, err)
-
 	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
-	backend := warp.NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, &block.TestVM{TestVM: common.TestVM{T: t}}, database, 100)
+
+	addressedPayload, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{1, 2, 3})
+	require.NoError(t, err)
+	offchainMessage, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedPayload.Bytes())
+	require.NoError(t, err)
+
+	backend, err := warp.NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, &block.TestVM{TestVM: common.TestVM{T: t}}, database, 100, [][]byte{offchainMessage.Bytes()})
+	require.NoError(t, err)
 
 	msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, []byte("test"))
 	require.NoError(t, err)
-
 	messageID := msg.ID()
 	require.NoError(t, backend.AddMessage(msg))
 	signature, err := backend.GetMessageSignature(messageID)
 	require.NoError(t, err)
+	offchainSignature, err := backend.GetMessageSignature(offchainMessage.ID())
+	require.NoError(t, err)
+
 	unknownMessageID := ids.GenerateTestID()
 
 	emptySignature := [bls.SignatureLen]byte{}
@@ -51,6 +60,21 @@ func TestMessageSignatureHandler(t *testing.T) {
 				return message.MessageSignatureRequest{
 					MessageID: messageID,
 				}, signature[:]
+			},
+			verifyStats: func(t *testing.T, stats *handlerStats) {
+				require.EqualValues(t, 1, stats.messageSignatureRequest.Count())
+				require.EqualValues(t, 1, stats.messageSignatureHit.Count())
+				require.EqualValues(t, 0, stats.messageSignatureMiss.Count())
+				require.EqualValues(t, 0, stats.blockSignatureRequest.Count())
+				require.EqualValues(t, 0, stats.blockSignatureHit.Count())
+				require.EqualValues(t, 0, stats.blockSignatureMiss.Count())
+			},
+		},
+		"offchain message": {
+			setup: func() (request message.MessageSignatureRequest, expectedResponse []byte) {
+				return message.MessageSignatureRequest{
+					MessageID: offchainMessage.ID(),
+				}, offchainSignature[:]
 			},
 			verifyStats: func(t *testing.T, stats *handlerStats) {
 				require.EqualValues(t, 1, stats.messageSignatureRequest.Count())
@@ -125,14 +149,16 @@ func TestBlockSignatureHandler(t *testing.T) {
 			return nil, errors.New("invalid blockID")
 		},
 	}
-	backend := warp.NewBackend(
+	backend, err := warp.NewBackend(
 		snowCtx.NetworkID,
 		snowCtx.ChainID,
 		warpSigner,
 		testVM,
 		database,
 		100,
+		nil,
 	)
+	require.NoError(t, err)
 
 	signature, err := backend.GetBlockSignature(blkID)
 	require.NoError(t, err)
