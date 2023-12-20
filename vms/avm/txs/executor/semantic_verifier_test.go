@@ -31,7 +31,7 @@ import (
 )
 
 func TestSemanticVerifierBaseTx(t *testing.T) {
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.XChain)
 
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
@@ -388,7 +388,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 }
 
 func TestSemanticVerifierExportTx(t *testing.T) {
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.XChain)
 
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
@@ -752,7 +752,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.XChain)
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ids.GenerateTestID(), nil)
@@ -869,7 +869,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 }
 
 func TestSemanticVerifierImportTx(t *testing.T) {
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.XChain)
 
 	m := atomic.NewMemory(prefixdb.New([]byte{0}, memdb.New()))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
