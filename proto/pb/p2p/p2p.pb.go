@@ -699,6 +699,7 @@ type Version struct {
 	// Network the peer is running on (e.g local, testnet, mainnet)
 	NetworkId uint32 `protobuf:"varint,1,opt,name=network_id,json=networkId,proto3" json:"network_id,omitempty"`
 	// Unix timestamp when this Version message was created
+	// TODO make int64
 	MyTime uint64 `protobuf:"varint,2,opt,name=my_time,json=myTime,proto3" json:"my_time,omitempty"`
 	// IP address of the peer
 	IpAddr []byte `protobuf:"bytes,3,opt,name=ip_addr,json=ipAddr,proto3" json:"ip_addr,omitempty"`
@@ -707,6 +708,7 @@ type Version struct {
 	// Avalanche client version
 	MyVersion string `protobuf:"bytes,5,opt,name=my_version,json=myVersion,proto3" json:"my_version,omitempty"`
 	// Timestamp of the IP
+	// TODO make int64
 	MyVersionTime uint64 `protobuf:"varint,6,opt,name=my_version_time,json=myVersionTime,proto3" json:"my_version_time,omitempty"`
 	// Signature of the peer IP port pair at a provided timestamp
 	Sig []byte `protobuf:"bytes,7,opt,name=sig,proto3" json:"sig,omitempty"`
@@ -913,6 +915,7 @@ type ClaimedIpPort struct {
 	// IP port of the peer
 	IpPort uint32 `protobuf:"varint,3,opt,name=ip_port,json=ipPort,proto3" json:"ip_port,omitempty"`
 	// Timestamp of the IP address + port pair
+	// TODO make int64
 	Timestamp uint64 `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	// Signature of the IP port pair at a provided timestamp
 	Signature []byte `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
@@ -1056,6 +1059,7 @@ type PeerAck struct {
 	// set
 	TxId []byte `protobuf:"bytes,1,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	// Timestamp of the signed ip of the peer
+	// TODO make int64
 	Timestamp uint64 `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
