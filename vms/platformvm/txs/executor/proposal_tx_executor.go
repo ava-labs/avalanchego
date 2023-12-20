@@ -365,7 +365,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	stakerAttributes, err := e.OnCommitState.GetStakerRewardAttributes(stakerToReward.TxID)
 	if err != nil {
-		return fmt.Errorf("failed to get attributes for staker %d: %w", stakerToReward.TxID, err)
+		return fmt.Errorf("failed to get attributes for staker %s: %w", stakerToReward.TxID, err)
 	}
 
 	switch {
@@ -392,7 +392,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
 		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
 	default:
-		return errors.New("unexpected staker type")
+		return state.ErrUnexpectedStakerTx
 	}
 
 	// If the reward is aborted, then the current supply should be decreased.

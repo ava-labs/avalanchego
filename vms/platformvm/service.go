@@ -716,13 +716,13 @@ type GetCurrentValidatorsReply struct {
 }
 
 func (s *Service) loadStakerTxAttributes(txID ids.ID) (*state.StakerRewardAttributes, error) {
-	// Lookup tx from the cache first.
+	// Lookup attributes from the cache first.
 	attr, found := s.stakerAttributesCache.Get(txID)
 	if found {
 		return attr, nil
 	}
 
-	// Tx not available in cache; pull it from disk and populate the cache.
+	// attributes not available in cache; pull them from disk and populate the cache.
 	attr, err := s.vm.state.GetStakerRewardAttributes(txID)
 	if err != nil {
 		return nil, err
@@ -2747,7 +2747,7 @@ func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Own
 	return apiOwner, nil
 }
 
-// Takes in a staker and a set of addresses
+// Takes in a slice of reward attributes and a set of addresses
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
