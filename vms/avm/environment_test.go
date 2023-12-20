@@ -276,14 +276,14 @@ func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 	return b
 }
 
-func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string, chainID ids.ID) *txs.Tx {
+func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
 	require := require.New(tb)
 
 	createTx := getCreateTxFromGenesisTest(tb, genesisBytes, assetName)
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: vm.ctx.ChainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        createTx.ID(),

@@ -64,7 +64,7 @@ func TestServiceIssueTx(t *testing.T) {
 	err := env.service.IssueTx(nil, txArgs, txReply)
 	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 
-	tx := newTx(t, env.genesisBytes, env.vm, "AVAX", env.vm.ctx.XChainID)
+	tx := newTx(t, env.genesisBytes, env.vm, "AVAX")
 	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
 	require.NoError(err)
 	txArgs.Encoding = formatting.Hex
