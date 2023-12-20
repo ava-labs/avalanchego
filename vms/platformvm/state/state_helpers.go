@@ -12,7 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var errUnexpectedStakerTx = errors.New("unexpected stakerTx type ")
+var (
+	errUnexpectedStakerTx = errors.New("unexpected stakerTx type ")
+	errNotABlockchain     = errors.New("tx does not created a blockchain")
+)
 
 func getStakerColdAttributes(chain Chain, stakerID ids.ID) (*StakerColdAttributes, error) {
 	stakerTx, _, err := chain.GetTx(stakerID)
@@ -58,7 +61,7 @@ func getChainSubnet(chain Chain, chainID ids.ID) (ids.ID, error) {
 	}
 	blockChain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 	if !ok {
-		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
+		return ids.Empty, fmt.Errorf("%w, txID %q", errNotABlockchain, chainID)
 	}
 	return blockChain.SubnetID, nil
 }

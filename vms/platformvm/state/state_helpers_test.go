@@ -229,3 +229,74 @@ func TestGetStakerColdAttributes(t *testing.T) {
 		})
 	}
 }
+
+func TestGetChainSubnet(t *testing.T) {
+	type test struct {
+		name             string
+		chainF           func(*gomock.Controller) Chain
+		expectedSubnetID ids.ID
+		expectedErr      error
+	}
+
+	var (
+		chainID  = ids.GenerateTestID()
+		subnetID = ids.GenerateTestID()
+	)
+
+	tests := []test{
+		{
+			name: "subnet from existing chain",
+			chainF: func(c *gomock.Controller) Chain {
+				chain := NewMockChain(c)
+				createChainTx := &txs.Tx{
+					Unsigned: &txs.CreateChainTx{
+						SubnetID: subnetID,
+					},
+					TxID: chainID,
+				}
+				chain.EXPECT().GetTx(chainID).Return(createChainTx, status.Committed, nil)
+				return chain
+			},
+			expectedSubnetID: subnetID,
+			expectedErr:      nil,
+		},
+		{
+			name: "missing tx",
+			chainF: func(c *gomock.Controller) Chain {
+				chain := NewMockChain(c)
+				chain.EXPECT().GetTx(chainID).Return(nil, status.Unknown, database.ErrNotFound)
+				return chain
+			},
+			expectedSubnetID: ids.Empty,
+			expectedErr:      database.ErrNotFound,
+		},
+		{
+			name: "unexpected tx type",
+			chainF: func(c *gomock.Controller) Chain {
+				chain := NewMockChain(c)
+				wrongTxType := &txs.Tx{
+					Unsigned: &txs.CreateSubnetTx{},
+				}
+				chain.EXPECT().GetTx(chainID).Return(wrongTxType, status.Committed, nil)
+				return chain
+			},
+			expectedSubnetID: ids.Empty,
+			expectedErr:      errNotABlockchain,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			chain := tt.chainF(ctrl)
+			subnetID, err := getChainSubnet(chain, chainID)
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr != nil {
+				return
+			}
+			require.Equal(tt.expectedSubnetID, subnetID)
+		})
+	}
+}
