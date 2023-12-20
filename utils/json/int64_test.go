@@ -62,4 +62,11 @@ func TestInt64(t *testing.T) {
 		require.NoError(i.UnmarshalJSON([]byte(Null)))
 		require.Equal(Int64(0), i)
 	})
+
+	t.Run("invalid", func(t *testing.T) {
+		require := require.New(t)
+
+		var i Int64
+		require.Error(i.UnmarshalJSON([]byte("wrong")))
+	})
 }
