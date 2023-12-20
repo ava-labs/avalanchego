@@ -138,6 +138,8 @@ type VM struct {
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	// If the chain isn't linearized yet, we must track the peers externally
+	// until the network is initialized.
 	if vm.network == nil {
 		vm.connectedPeers[nodeID] = version
 		return nil
@@ -146,6 +148,8 @@ func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version
 }
 
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	// If the chain isn't linearized yet, we must track the peers externally
+	// until the network is initialized.
 	if vm.network == nil {
 		delete(vm.connectedPeers, nodeID)
 		return nil
