@@ -480,3 +480,13 @@ func (vm *VM) VerifyHeightIndex(_ context.Context) error {
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return vm.state.GetBlockIDAtHeight(height)
 }
+
+// We need to grab the context lock here to avoid racy behavior with
+// transaction verification + mempool modifications.
+//
+// Invariant: tx should not be referenced again without the context lock
+// held to avoid any data races.
+func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
+	//TODO check duplicate tx error
+	return vm.Network.IssueTx(ctx, tx)
+}
