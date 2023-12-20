@@ -211,8 +211,6 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 }
 
 func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
-	// TODO: IssueTx has the context lock held, but the mempool verifier also
-	// grabes the context lock.
 	if err := n.mempool.Add(&gossipTx{
 		tx: tx,
 	}); err != nil {

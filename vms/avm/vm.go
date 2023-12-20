@@ -458,7 +458,10 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	vm.network, err = network.New(
 		vm.ctx,
 		vm.parser,
-		vm.chainManager,
+		network.NewLockedTxVerifier(
+			&vm.ctx.Lock,
+			vm.chainManager,
+		),
 		vm.mempool,
 		vm.appSender,
 		vm.registerer,
@@ -534,9 +537,6 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 // Invariant: The context lock is not held
 // Invariant: This function is only called after Linearize has been called.
 func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
 	err := vm.network.IssueTx(context.TODO(), tx)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
