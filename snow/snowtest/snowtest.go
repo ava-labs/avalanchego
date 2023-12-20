@@ -18,13 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-const (
-	XChain = 1
-	CChain = 2
-	PChain = 3
-)
-
 var (
+	XChainID = ids.GenerateTestID()
+	CChainID = ids.GenerateTestID()
+	PChainID = constants.PlatformChainID
+
 	errMissing = errors.New("missing")
 
 	_ snow.Acceptor = noOpAcceptor{}
@@ -47,25 +45,17 @@ func ConsensusContext() *snow.ConsensusContext {
 	}
 }
 
-func Context(tb testing.TB, chainID int) *snow.Context {
+func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require := require.New(tb)
 
 	ctx := snow.DefaultContextTest()
 
 	ctx.NetworkID = constants.UnitTestID
 	ctx.SubnetID = constants.PrimaryNetworkID
+	ctx.ChainID = chainID
 	ctx.XChainID = ids.GenerateTestID()
 	ctx.CChainID = ids.GenerateTestID()
 	ctx.AVAXAssetID = ids.GenerateTestID()
-
-	switch chainID {
-	case CChain:
-		ctx.ChainID = ctx.CChainID
-	case XChain:
-		ctx.ChainID = ctx.XChainID
-	case PChain:
-		ctx.ChainID = constants.PlatformChainID
-	}
 
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
