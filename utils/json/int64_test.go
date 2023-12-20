@@ -2,6 +2,7 @@ package json
 
 import (
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -67,6 +68,7 @@ func TestInt64(t *testing.T) {
 		require := require.New(t)
 
 		var i Int64
-		require.Error(i.UnmarshalJSON([]byte("wrong")))
+		err := i.UnmarshalJSON([]byte("wrong"))
+		require.ErrorIs(err, strconv.ErrSyntax)
 	})
 }
