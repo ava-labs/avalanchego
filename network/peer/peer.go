@@ -1105,7 +1105,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 				IP:   claimedIPPort.IpAddr,
 				Port: uint16(claimedIPPort.IpPort),
 			},
-			Timestamp: int64(claimedIPPort.Timestamp), // todo remove cast
+			Timestamp: int64(claimedIPPort.Timestamp),
 			Signature: claimedIPPort.Signature,
 			TxID:      txID,
 		}
