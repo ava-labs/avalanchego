@@ -5,7 +5,6 @@ package json
 
 import "strconv"
 
-// TODO test
 type Int64 int64
 
 func (i Int64) MarshalJSON() ([]byte, error) {

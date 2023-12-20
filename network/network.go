@@ -637,7 +637,7 @@ func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error {
 		// response to. That means that I should re-gossip this node's IP to the
 		// peer.
 		myIP, previouslyTracked := n.peerIPs[nodeID]
-		if previouslyTracked && myIP.Timestamp <= int64(ip.Timestamp) { // todo remove cast
+		if previouslyTracked && myIP.Timestamp <= int64(ip.Timestamp) {
 			txIDs = append(txIDs, txID)
 		}
 	}
