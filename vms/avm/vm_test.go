@@ -33,7 +33,7 @@ func TestInvalidGenesis(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.XChain)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -58,7 +58,7 @@ func TestInvalidFx(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.XChain)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -86,7 +86,7 @@ func TestFxInitializationFailure(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.XChain)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -124,7 +124,7 @@ func TestIssueTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	tx := newTx(t, env.genesisBytes, env.vm, "AVAX", env.vm.ctx.XChainID)
+	tx := newTx(t, env.genesisBytes, env.vm, "AVAX")
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -331,7 +331,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	}()
 
 	// send first asset
-	tx := newTx(t, env.genesisBytes, env.vm, feeAssetName, env.vm.ctx.XChainID)
+	tx := newTx(t, env.genesisBytes, env.vm, feeAssetName)
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
