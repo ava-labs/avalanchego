@@ -147,7 +147,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
-	if _, ok := m.get(txID); ok {
+	if _, ok := m.unissuedTxs.Get(txID); ok {
 		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
 	}
 
@@ -192,10 +192,6 @@ func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	return m.get(txID)
-}
-
-func (m *mempool) get(txID ids.ID) (*txs.Tx, bool) {
 	return m.unissuedTxs.Get(txID)
 }
 
