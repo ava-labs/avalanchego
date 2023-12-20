@@ -1267,8 +1267,8 @@ func (s *Service) AddValidator(req *http.Request, args *AddValidatorArgs, reply 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddValidatorTx(
 		uint64(args.Weight),                  // Stake amount
-		int64(args.StartTime),                // TODO                       // Start time
-		int64(args.EndTime),                  // TODO                      // End time
+		int64(args.StartTime),                // Start time
+		int64(args.EndTime),                  // End time
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
@@ -1378,8 +1378,8 @@ func (s *Service) AddDelegator(req *http.Request, args *AddDelegatorArgs, reply 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddDelegatorTx(
 		uint64(args.Weight),   // Stake amount
-		int64(args.StartTime), // TODO // Start time
-		int64(args.EndTime),   // TODO // End time
+		int64(args.StartTime), // Start time
+		int64(args.EndTime),   // End time
 		nodeID,                // Node ID
 		rewardAddress,         // Reward Address
 		privKeys.Keys,         // Private keys
@@ -1484,8 +1484,8 @@ func (s *Service) AddSubnetValidator(req *http.Request, args *AddSubnetValidator
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddSubnetValidatorTx(
 		uint64(args.Weight),   // Stake amount
-		int64(args.StartTime), // TODO // Start time
-		int64(args.EndTime),   // TODO // End time
+		int64(args.StartTime), // Start time
+		int64(args.EndTime),   // End time
 		args.NodeID,           // Node ID
 		subnetID,              // Subnet ID
 		keys.Keys,

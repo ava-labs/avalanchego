@@ -63,8 +63,8 @@ type ClientDelegator struct {
 func apiStakerToClientStaker(validator api.Staker) ClientStaker {
 	return ClientStaker{
 		TxID:        validator.TxID,
-		StartTime:   int64(validator.StartTime), // TODO
-		EndTime:     int64(validator.EndTime),   // TODO
+		StartTime:   int64(validator.StartTime),
+		EndTime:     int64(validator.EndTime),
 		Weight:      uint64(validator.Weight),
 		StakeAmount: (*uint64)(validator.StakeAmount),
 		NodeID:      validator.NodeID,
