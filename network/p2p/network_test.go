@@ -38,19 +38,19 @@ func TestMessageRouting(t *testing.T) {
 	wantMsg := []byte("message")
 
 	var appGossipCalled, appRequestCalled, crossChainAppRequestCalled bool
-	testHandler := &testHandler{
-		appGossipF: func(_ context.Context, nodeID ids.NodeID, msg []byte) {
+	testHandler := &TestHandler{
+		AppGossipF: func(_ context.Context, nodeID ids.NodeID, msg []byte) {
 			appGossipCalled = true
 			require.Equal(wantNodeID, nodeID)
 			require.Equal(wantMsg, msg)
 		},
-		appRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, msg []byte) ([]byte, error) {
+		AppRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, msg []byte) ([]byte, error) {
 			appRequestCalled = true
 			require.Equal(wantNodeID, nodeID)
 			require.Equal(wantMsg, msg)
 			return nil, nil
 		},
-		crossChainAppRequestF: func(_ context.Context, chainID ids.ID, _ time.Time, msg []byte) ([]byte, error) {
+		CrossChainAppRequestF: func(_ context.Context, chainID ids.ID, _ time.Time, msg []byte) ([]byte, error) {
 			crossChainAppRequestCalled = true
 			require.Equal(wantChainID, chainID)
 			require.Equal(wantMsg, msg)
@@ -290,15 +290,15 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
-			handler := &testHandler{
-				appGossipF: func(context.Context, ids.NodeID, []byte) {
+			handler := &TestHandler{
+				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
 				},
-				appRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
-				crossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
@@ -338,15 +338,15 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
-			handler := &testHandler{
-				appGossipF: func(context.Context, ids.NodeID, []byte) {
+			handler := &TestHandler{
+				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
 				},
-				appRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
-				crossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 					require.Fail("should not be called")
 					return nil, nil
 				},

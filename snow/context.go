@@ -115,14 +115,3 @@ func DefaultContextTest() *Context {
 		ChainDataDir: "",
 	}
 }
-
-func DefaultConsensusContextTest() *ConsensusContext {
-	return &ConsensusContext{
-		Context:             DefaultContextTest(),
-		Registerer:          prometheus.NewRegistry(),
-		AvalancheRegisterer: prometheus.NewRegistry(),
-		BlockAcceptor:       noOpAcceptor{},
-		TxAcceptor:          noOpAcceptor{},
-		VertexAcceptor:      noOpAcceptor{},
-	}
-}

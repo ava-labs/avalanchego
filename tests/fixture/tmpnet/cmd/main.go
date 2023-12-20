@@ -62,10 +62,10 @@ func main() {
 
 			network := &tmpnet.Network{
 				NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
-					ExecPath: execPath,
+					AvalancheGoPath: execPath,
 				},
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkStartTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
 			network, err := tmpnet.StartNetwork(ctx, os.Stdout, rootDir, network, int(nodeCount), int(preFundedKeyCount))
 			if err != nil {
@@ -105,7 +105,9 @@ func main() {
 			if len(networkDir) == 0 {
 				return errNetworkDirRequired
 			}
-			if err := tmpnet.StopNetwork(networkDir); err != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			if err := tmpnet.StopNetwork(ctx, networkDir); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stdout, "Stopped network configured at: %s\n", networkDir)
