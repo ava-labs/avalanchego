@@ -120,7 +120,7 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	clk := defaultClock(postBanff || postCortina || postDurango)
 
 	baseDB := versiondb.New(memdb.New())
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.PChain)
 	m := atomic.NewMemory(baseDB)
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),

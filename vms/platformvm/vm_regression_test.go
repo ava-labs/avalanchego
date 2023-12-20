@@ -357,7 +357,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		DurangoTime:            mockable.MaxTime,
 	}}
 
-	ctx := snowtest.Context(t)
+	ctx := snowtest.Context(t, snowtest.PChain)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
