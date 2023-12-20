@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -18,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/message"
@@ -38,7 +38,6 @@ type Network struct {
 
 	ctx       *snow.Context
 	parser    txs.Parser
-	manager   executor.Manager
 	mempool   *gossipMempool
 	appSender common.AppSender
 
@@ -50,7 +49,7 @@ type Network struct {
 func New(
 	ctx *snow.Context,
 	parser txs.Parser,
-	manager executor.Manager,
+	txVerifier TxVerifier,
 	mempool mempool.Mempool,
 	appSender common.AppSender,
 	registerer prometheus.Registerer,
@@ -91,7 +90,7 @@ func New(
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
-		manager,
+		txVerifier,
 		parser,
 		maxExpectedElements,
 		txGossipFalsePositiveProbability,
@@ -159,7 +158,6 @@ func New(
 		Network:   p2pNetwork,
 		ctx:       ctx,
 		parser:    parser,
-		manager:   manager,
 		mempool:   gossipMempool,
 		appSender: appSender,
 

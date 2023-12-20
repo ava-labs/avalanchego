@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
@@ -75,7 +74,7 @@ func (g *gossipTxParser) UnmarshalGossip(bytes []byte) (*gossipTx, error) {
 
 func newGossipMempool(
 	mempool mempool.Mempool,
-	manager executor.Manager,
+	txVerifier TxVerifier,
 	parser txs.Parser,
 	maxExpectedElements uint64,
 	falsePositiveProbability,
@@ -84,7 +83,7 @@ func newGossipMempool(
 	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
 	return &gossipMempool{
 		Mempool:                     mempool,
-		manager:                     manager,
+		txVerifier:                  txVerifier,
 		parser:                      parser,
 		maxFalsePositiveProbability: maxFalsePositiveProbability,
 		bloom:                       bloom,
@@ -93,7 +92,7 @@ func newGossipMempool(
 
 type gossipMempool struct {
 	mempool.Mempool
-	manager                     executor.Manager
+	txVerifier                  TxVerifier
 	parser                      txs.Parser
 	maxFalsePositiveProbability float64
 
@@ -103,7 +102,7 @@ type gossipMempool struct {
 
 func (g *gossipMempool) Add(tx *gossipTx) error {
 	txID := tx.tx.ID()
-	if _, ok :=g.Mempool.Get(txID); ok {
+	if _, ok := g.Mempool.Get(txID); ok {
 		// The tx is already in the mempool
 		return fmt.Errorf("tx %s already known", txID)
 	}
@@ -117,8 +116,7 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 	}
 
 	// Verify the tx at the currently preferred state
-	// TODO: Should be thread safe
-	if err := g.manager.VerifyTx(tx.tx); err != nil {
+	if err := g.txVerifier.VerifyTx(tx.tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}
