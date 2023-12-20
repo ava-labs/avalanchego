@@ -55,8 +55,11 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-		// issue transaction
+		env.vm.ctx.Lock.Unlock()
+
 		issueAndAccept(require, env.vm, env.issuer, tx)
+
+		env.vm.ctx.Lock.Lock()
 
 		txs = append(txs, tx)
 	}
@@ -96,8 +99,12 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
+		env.vm.ctx.Lock.Unlock()
+
 		// issue transaction
 		issueAndAccept(require, env.vm, env.issuer, tx)
+
+		env.vm.ctx.Lock.Lock()
 
 		addressTxMap[addr] = tx
 	}
@@ -145,8 +152,11 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	tx := buildTX(utxoID, txAssetID, addrs...)
 	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	// issue transaction
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
 	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
