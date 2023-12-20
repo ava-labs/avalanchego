@@ -5,6 +5,7 @@ package warp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -19,7 +20,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-var _ Backend = &backend{}
+var (
+	_                         Backend = &backend{}
+	errParsingOffChainMessage         = errors.New("failed to parse off-chain message")
+)
 
 const batchSize = ethdb.IdealBatchSize
 
@@ -48,28 +52,56 @@ type Backend interface {
 
 // backend implements Backend, keeps track of warp messages, and generates message signatures.
 type backend struct {
-	networkID             uint32
-	sourceChainID         ids.ID
-	db                    database.Database
-	warpSigner            avalancheWarp.Signer
-	blockClient           BlockClient
-	messageSignatureCache *cache.LRU[ids.ID, [bls.SignatureLen]byte]
-	blockSignatureCache   *cache.LRU[ids.ID, [bls.SignatureLen]byte]
-	messageCache          *cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]
+	networkID                 uint32
+	sourceChainID             ids.ID
+	db                        database.Database
+	warpSigner                avalancheWarp.Signer
+	blockClient               BlockClient
+	messageSignatureCache     *cache.LRU[ids.ID, [bls.SignatureLen]byte]
+	blockSignatureCache       *cache.LRU[ids.ID, [bls.SignatureLen]byte]
+	messageCache              *cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]
+	offchainAddressedCallMsgs map[ids.ID]*avalancheWarp.UnsignedMessage
 }
 
 // NewBackend creates a new Backend, and initializes the signature cache and message tracking database.
-func NewBackend(networkID uint32, sourceChainID ids.ID, warpSigner avalancheWarp.Signer, blockClient BlockClient, db database.Database, cacheSize int) Backend {
-	return &backend{
-		networkID:             networkID,
-		sourceChainID:         sourceChainID,
-		db:                    db,
-		warpSigner:            warpSigner,
-		blockClient:           blockClient,
-		messageSignatureCache: &cache.LRU[ids.ID, [bls.SignatureLen]byte]{Size: cacheSize},
-		blockSignatureCache:   &cache.LRU[ids.ID, [bls.SignatureLen]byte]{Size: cacheSize},
-		messageCache:          &cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]{Size: cacheSize},
+func NewBackend(
+	networkID uint32,
+	sourceChainID ids.ID,
+	warpSigner avalancheWarp.Signer,
+	blockClient BlockClient,
+	db database.Database,
+	cacheSize int,
+	offchainMessages [][]byte,
+) (Backend, error) {
+	b := &backend{
+		networkID:                 networkID,
+		sourceChainID:             sourceChainID,
+		db:                        db,
+		warpSigner:                warpSigner,
+		blockClient:               blockClient,
+		messageSignatureCache:     &cache.LRU[ids.ID, [bls.SignatureLen]byte]{Size: cacheSize},
+		blockSignatureCache:       &cache.LRU[ids.ID, [bls.SignatureLen]byte]{Size: cacheSize},
+		messageCache:              &cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]{Size: cacheSize},
+		offchainAddressedCallMsgs: make(map[ids.ID]*avalancheWarp.UnsignedMessage),
 	}
+	return b, b.initOffChainMessages(offchainMessages)
+}
+
+func (b *backend) initOffChainMessages(offchainMessages [][]byte) error {
+	for i, offchainMsg := range offchainMessages {
+		unsignedMsg, err := avalancheWarp.ParseUnsignedMessage(offchainMsg)
+		if err != nil {
+			return fmt.Errorf("%w at index %d: %w", errParsingOffChainMessage, i, err)
+		}
+
+		_, err = payload.ParseAddressedCall(unsignedMsg.Payload)
+		if err != nil {
+			return fmt.Errorf("%w at index %d as AddressedCall: %w", errParsingOffChainMessage, i, err)
+		}
+		b.offchainAddressedCallMsgs[unsignedMsg.ID()] = unsignedMsg
+	}
+
+	return nil
 }
 
 func (b *backend) Clear() error {
@@ -158,6 +190,9 @@ func (b *backend) GetBlockSignature(blockID ids.ID) ([bls.SignatureLen]byte, err
 
 func (b *backend) GetMessage(messageID ids.ID) (*avalancheWarp.UnsignedMessage, error) {
 	if message, ok := b.messageCache.Get(messageID); ok {
+		return message, nil
+	}
+	if message, ok := b.offchainAddressedCallMsgs[messageID]; ok {
 		return message, nil
 	}
 
