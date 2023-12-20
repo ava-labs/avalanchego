@@ -35,7 +35,7 @@ func TestIPSigner(t *testing.T) {
 	signedIP1, err := s.GetSignedIP()
 	require.NoError(err)
 	require.Equal(dynIP.IPPort(), signedIP1.IPPort)
-	require.Equal(uint64(10), signedIP1.Timestamp)
+	require.Equal(int64(10), signedIP1.Timestamp)
 
 	s.clock.Set(time.Unix(11, 0))
 
