@@ -524,7 +524,9 @@ func issueAndAccept(
 	issuer <-chan common.Message,
 	tx *txs.Tx,
 ) {
-	txID, err := vm.IssueTx(tx.Bytes())
+	vm.ctx.Lock.Unlock()
+	txID, err := vm.issueTx(tx)
+	vm.ctx.Lock.Lock()
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 

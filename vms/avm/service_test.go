@@ -649,7 +649,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
+		"outputs": null,
 		"inputs": [
 			{
 				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
@@ -741,8 +741,8 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
-		"inputs": [],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"name": "Team Rocket",
 		"symbol": "TR",
@@ -812,7 +812,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			}
 		]
 	},
-	"credentials": [],
+	"credentials": null,
 	"id": "PLACEHOLDER_TX_ID"
 }`
 
@@ -863,8 +863,8 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
-		"inputs": [],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -966,8 +966,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
-		"inputs": [],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1102,8 +1102,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
-		"inputs": [],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1209,8 +1209,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
-		"inputs": [],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1353,8 +1353,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
-		"inputs": [],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
@@ -1457,8 +1457,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [],
-		"inputs": [],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"operations": [
 			{
