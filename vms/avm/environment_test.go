@@ -289,7 +289,7 @@ func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 	tx := &txs.Tx{
 		Unsigned: &assetTx.CreateAssetTx,
 	}
-	require.NoError(parser.InitializeGenesisTx(tx))
+	require.NoError(tx.Initialize(parser.GenesisCodec()))
 	return tx
 }
 

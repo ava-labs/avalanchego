@@ -171,7 +171,7 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
@@ -226,7 +226,7 @@ func TestIssueNFT(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(env.vm.parser.InitializeTx(transferNFTTx))
+	require.NoError(transferNFTTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, transferNFTTx)
 }
 
@@ -268,7 +268,7 @@ func TestIssueProperty(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
