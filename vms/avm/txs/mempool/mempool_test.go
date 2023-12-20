@@ -4,6 +4,7 @@
 package mempool
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,55 +14,198 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	keys    = secp256k1.TestKeys()
-	chainID = ids.ID{5, 4, 3, 2, 1}
-	assetID = ids.ID{1, 2, 3}
-)
+func TestAdd(t *testing.T) {
+	tx0 := newTx(0, 32)
 
-// shows that valid tx is not added to mempool if this would exceed its maximum
-// size
-func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
-	require := require.New(t)
+	tests := []struct {
+		name       string
+		initialTxs []*txs.Tx
+		tx         *txs.Tx
+		err        error
+	}{
+		{
+			name:       "successfully add tx",
+			initialTxs: nil,
+			tx:         tx0,
+			err:        nil,
+		},
+		{
+			name:       "attempt adding duplicate tx",
+			initialTxs: []*txs.Tx{tx0},
+			tx:         tx0,
+			err:        errDuplicateTx,
+		},
+		{
+			name:       "attempt adding too large tx",
+			initialTxs: nil,
+			tx:         newTx(0, MaxTxSize+1),
+			err:        errTxTooLarge,
+		},
+		{
+			name:       "attempt adding tx when full",
+			initialTxs: newTxs(maxMempoolSize/MaxTxSize, MaxTxSize),
+			tx:         newTx(maxMempoolSize/MaxTxSize, MaxTxSize),
+			err:        errMempoolFull,
+		},
+		{
+			name:       "attempt adding conflicting tx",
+			initialTxs: []*txs.Tx{tx0},
+			tx:         newTx(0, 32),
+			err:        errConflictsWithOtherTx,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	registerer := prometheus.NewRegistry()
-	mempoolIntf, err := New("mempool", registerer, nil)
-	require.NoError(err)
+			mempool, err := New(
+				"mempool",
+				prometheus.NewRegistry(),
+				nil,
+			)
+			require.NoError(err)
 
-	mempool := mempoolIntf.(*mempool)
+			for _, tx := range test.initialTxs {
+				require.NoError(mempool.Add(tx))
+			}
 
-	testTxs := createTestTxs(2)
-	tx := testTxs[0]
-
-	// shortcut to simulated almost filled mempool
-	mempool.bytesAvailable = len(tx.Bytes()) - 1
-
-	err = mempool.Add(tx)
-	require.ErrorIs(err, errMempoolFull)
-
-	// shortcut to simulated almost filled mempool
-	mempool.bytesAvailable = len(tx.Bytes())
-
-	require.NoError(mempool.Add(tx))
+			err = mempool.Add(test.tx)
+			require.ErrorIs(err, test.err)
+		})
+	}
 }
 
-func TestTxsInMempool(t *testing.T) {
+func TestGet(t *testing.T) {
 	require := require.New(t)
 
-	registerer := prometheus.NewRegistry()
-	toEngine := make(chan common.Message, 100)
-	mempool, err := New("mempool", registerer, toEngine)
+	mempool, err := New(
+		"mempool",
+		prometheus.NewRegistry(),
+		nil,
+	)
 	require.NoError(err)
 
-	testTxs := createTestTxs(2)
+	tx := newTx(0, 32)
+	txID := tx.ID()
+
+	_, exists := mempool.Get(txID)
+	require.False(exists)
+
+	require.NoError(mempool.Add(tx))
+
+	returned, exists := mempool.Get(txID)
+	require.True(exists)
+	require.Equal(tx, returned)
+
+	mempool.Remove([]*txs.Tx{tx})
+
+	_, exists = mempool.Get(txID)
+	require.False(exists)
+}
+
+func TestPeek(t *testing.T) {
+	require := require.New(t)
+
+	mempool, err := New(
+		"mempool",
+		prometheus.NewRegistry(),
+		nil,
+	)
+	require.NoError(err)
+
+	_, exists := mempool.Peek()
+	require.False(exists)
+
+	tx0 := newTx(0, 32)
+	tx1 := newTx(1, 32)
+
+	require.NoError(mempool.Add(tx0))
+	require.NoError(mempool.Add(tx1))
+
+	tx, exists := mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, tx0)
+
+	mempool.Remove([]*txs.Tx{tx0})
+
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, tx1)
+
+	mempool.Remove([]*txs.Tx{tx0})
+
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, tx1)
+
+	mempool.Remove([]*txs.Tx{tx1})
+
+	_, exists = mempool.Peek()
+	require.False(exists)
+}
+
+func TestIterate(t *testing.T) {
+	require := require.New(t)
+
+	mempool, err := New(
+		"mempool",
+		prometheus.NewRegistry(),
+		nil,
+	)
+	require.NoError(err)
+
+	var (
+		iteratedTxs []*txs.Tx
+		maxLen      = 2
+	)
+	addTxs := func(tx *txs.Tx) bool {
+		iteratedTxs = append(iteratedTxs, tx)
+		return len(iteratedTxs) < maxLen
+	}
+	mempool.Iterate(addTxs)
+	require.Empty(iteratedTxs)
+
+	tx0 := newTx(0, 32)
+	require.NoError(mempool.Add(tx0))
+
+	mempool.Iterate(addTxs)
+	require.Equal([]*txs.Tx{tx0}, iteratedTxs)
+
+	tx1 := newTx(1, 32)
+	require.NoError(mempool.Add(tx1))
+
+	iteratedTxs = nil
+	mempool.Iterate(addTxs)
+	require.Equal([]*txs.Tx{tx0, tx1}, iteratedTxs)
+
+	tx2 := newTx(2, 32)
+	require.NoError(mempool.Add(tx2))
+
+	iteratedTxs = nil
+	mempool.Iterate(addTxs)
+	require.Equal([]*txs.Tx{tx0, tx1}, iteratedTxs)
+
+	mempool.Remove([]*txs.Tx{tx0, tx2})
+
+	iteratedTxs = nil
+	mempool.Iterate(addTxs)
+	require.Equal([]*txs.Tx{tx1}, iteratedTxs)
+}
+
+func TestRequestBuildBlock(t *testing.T) {
+	require := require.New(t)
+
+	toEngine := make(chan common.Message, 1)
+	mempool, err := New(
+		"mempool",
+		prometheus.NewRegistry(),
+		toEngine,
+	)
+	require.NoError(err)
 
 	mempool.RequestBuildBlock()
 	select {
@@ -70,139 +214,66 @@ func TestTxsInMempool(t *testing.T) {
 	default:
 	}
 
-	for _, tx := range testTxs {
-		txID := tx.ID()
-		// tx not already there
-		require.False(mempool.Has(txID))
-
-		// we can insert
-		require.NoError(mempool.Add(tx))
-
-		// we can get it
-		require.True(mempool.Has(txID))
-
-		retrieved := mempool.Get(txID)
-		require.NotNil(retrieved)
-		require.Equal(tx, retrieved)
-
-		// tx exists in mempool
-		require.True(mempool.Has(txID))
-
-		// once removed it cannot be there
-		mempool.Remove([]*txs.Tx{tx})
-
-		require.False(mempool.Has(txID))
-		require.Nil(mempool.Get(txID))
-
-		// we can reinsert it again to grow the mempool
-		require.NoError(mempool.Add(tx))
-	}
+	tx := newTx(0, 32)
+	require.NoError(mempool.Add(tx))
 
 	mempool.RequestBuildBlock()
+	mempool.RequestBuildBlock() // Must not deadlock
 	select {
 	case <-toEngine:
 	default:
 		require.FailNow("should have sent message to engine")
 	}
-
-	mempool.Remove(testTxs)
-
-	mempool.RequestBuildBlock()
 	select {
 	case <-toEngine:
-		require.FailNow("should not have sent message to engine")
+		require.FailNow("should have only sent one message to engine")
 	default:
 	}
 }
 
-func createTestTxs(count int) []*txs.Tx {
-	testTxs := make([]*txs.Tx, 0, count)
-	addr := keys[0].PublicKey().Address()
-	for i := uint32(0); i < uint32(count); i++ {
-		tx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    constants.UnitTestID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        ids.ID{'t', 'x', 'I', 'D'},
-						OutputIndex: i,
-					},
-					Asset: avax.Asset{ID: assetID},
-					In: &secp256k1fx.TransferInput{
-						Amt: 54321,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{i},
-						},
-					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: assetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 12345,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{addr},
-						},
-					},
-				}},
-			}},
-			Name:         "NormalName",
-			Symbol:       "TICK",
-			Denomination: byte(2),
-			States: []*txs.InitialState{
-				{
-					FxIndex: 0,
-					Outs: []verify.State{
-						&secp256k1fx.TransferOutput{
-							Amt: 12345,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{addr},
-							},
-						},
-					},
-				},
-			},
-		}}
-		tx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16))
-		testTxs = append(testTxs, tx)
-	}
-	return testTxs
-}
-
-func TestPeekTxs(t *testing.T) {
+func TestDropped(t *testing.T) {
 	require := require.New(t)
 
-	registerer := prometheus.NewRegistry()
-	toEngine := make(chan common.Message, 100)
-	mempool, err := New("mempool", registerer, toEngine)
+	mempool, err := New(
+		"mempool",
+		prometheus.NewRegistry(),
+		nil,
+	)
 	require.NoError(err)
 
-	testTxs := createTestTxs(2)
+	tx := newTx(0, 32)
+	txID := tx.ID()
+	testErr := errors.New("test")
 
-	tx, exists := mempool.Peek()
-	require.False(exists)
-	require.Nil(tx)
+	mempool.MarkDropped(txID, testErr)
 
-	require.NoError(mempool.Add(testTxs[0]))
-	require.NoError(mempool.Add(testTxs[1]))
+	err = mempool.GetDropReason(txID)
+	require.ErrorIs(err, testErr)
 
-	tx, exists = mempool.Peek()
-	require.True(exists)
-	require.Equal(tx, testTxs[0])
-	require.NotEqual(tx, testTxs[1])
+	require.NoError(mempool.Add(tx))
+	require.NoError(mempool.GetDropReason(txID))
 
-	mempool.Remove([]*txs.Tx{testTxs[0]})
+	mempool.MarkDropped(txID, testErr)
+	require.NoError(mempool.GetDropReason(txID))
+}
 
-	tx, exists = mempool.Peek()
-	require.True(exists)
-	require.NotEqual(tx, testTxs[0])
-	require.Equal(tx, testTxs[1])
+func newTxs(num int, size int) []*txs.Tx {
+	txs := make([]*txs.Tx, num)
+	for i := range txs {
+		txs[i] = newTx(uint32(i), size)
+	}
+	return txs
+}
 
-	mempool.Remove([]*txs.Tx{testTxs[1]})
-
-	tx, exists = mempool.Peek()
-	require.False(exists)
-	require.Nil(tx)
+func newTx(index uint32, size int) *txs.Tx {
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.ID{'t', 'x', 'I', 'D'},
+				OutputIndex: index,
+			},
+		}},
+	}}}
+	tx.SetBytes(utils.RandomBytes(size), utils.RandomBytes(size))
+	return tx
 }

@@ -5,319 +5,293 @@ package tmpnet
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"syscall"
+	"strings"
 	"time"
 
 	"github.com/spf13/cast"
 
-	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
-var errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
+// The Node type is defined in this file (node.go - orchestration) and
+// node_config.go (reading/writing configuration).
 
-// Defines configuration to execute a node.
-//
-// TODO(marun) Support persisting this configuration per-node when
-// node restart is implemented. Currently it can be supplied for node
-// start but won't survive restart.
+const (
+	defaultNodeTickerInterval = 50 * time.Millisecond
+)
+
+var (
+	errMissingTLSKeyForNodeID = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingTLSKeyContentKey)
+	errMissingCertForNodeID   = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingCertContentKey)
+	errInvalidKeypair         = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
+)
+
+// NodeRuntime defines the methods required to support running a node.
+type NodeRuntime interface {
+	readState() error
+	Start(w io.Writer) error
+	InitiateStop() error
+	WaitForStopped(ctx context.Context) error
+	IsHealthy(ctx context.Context) (bool, error)
+}
+
+// Configuration required to configure a node runtime.
 type NodeRuntimeConfig struct {
-	// Path to avalanchego binary
-	ExecPath string
+	AvalancheGoPath string
 }
 
-// Stores the configuration and process details of a node in a temporary network.
+// Node supports configuring and running a node participating in a temporary network.
 type Node struct {
-	NodeConfig
-	NodeRuntimeConfig
-	node.NodeProcessContext
+	// Set by EnsureNodeID which is also called when the node is read.
+	NodeID ids.NodeID
 
-	// Configuration is intended to be stored at the path identified in NodeConfig.Flags[config.DataDirKey]
+	// Flags that will be supplied to the node at startup
+	Flags FlagsMap
+
+	// An ephemeral node is not expected to be a persistent member of the network and
+	// should therefore not be used as for bootstrapping purposes.
+	IsEphemeral bool
+
+	// The configuration used to initialize the node runtime.
+	RuntimeConfig *NodeRuntimeConfig
+
+	// Runtime state, intended to be set by NodeRuntime
+	URI            string
+	StakingAddress string
+
+	// Initialized on demand
+	runtime NodeRuntime
 }
 
+// Initializes a new node with only the data dir set
 func NewNode(dataDir string) *Node {
 	return &Node{
-		NodeConfig: NodeConfig{
-			Flags: FlagsMap{
-				config.DataDirKey: dataDir,
-			},
+		Flags: FlagsMap{
+			config.DataDirKey: dataDir,
 		},
 	}
 }
 
-// Attempt to read configuration and process details for a node
-// from the specified directory.
+// Reads a node's configuration from the specified directory.
 func ReadNode(dataDir string) (*Node, error) {
 	node := NewNode(dataDir)
-	if _, err := os.Stat(node.GetConfigPath()); err != nil {
-		return nil, fmt.Errorf("failed to read node config file: %w", err)
-	}
-	return node, node.ReadAll()
+	return node, node.Read()
 }
 
-func (n *Node) GetDataDir() string {
+// Reads nodes from the specified network directory.
+func ReadNodes(networkDir string) ([]*Node, error) {
+	nodes := []*Node{}
+
+	// Node configuration is stored in child directories
+	entries, err := os.ReadDir(networkDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read dir: %w", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		nodeDir := filepath.Join(networkDir, entry.Name())
+		node, err := ReadNode(nodeDir)
+		if errors.Is(err, os.ErrNotExist) {
+			// If no config file exists, assume this is not the path of a node
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+
+		nodes = append(nodes, node)
+	}
+
+	return nodes, nil
+}
+
+// Retrieves the runtime for the node.
+func (n *Node) getRuntime() NodeRuntime {
+	if n.runtime == nil {
+		n.runtime = &NodeProcess{
+			node: n,
+		}
+	}
+	return n.runtime
+}
+
+// Runtime methods
+
+func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
+	return n.getRuntime().IsHealthy(ctx)
+}
+
+func (n *Node) Start(w io.Writer) error {
+	return n.getRuntime().Start(w)
+}
+
+func (n *Node) InitiateStop() error {
+	return n.getRuntime().InitiateStop()
+}
+
+func (n *Node) WaitForStopped(ctx context.Context) error {
+	return n.getRuntime().WaitForStopped(ctx)
+}
+
+func (n *Node) readState() error {
+	return n.getRuntime().readState()
+}
+
+func (n *Node) getDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
-func (n *Node) GetConfigPath() string {
-	return filepath.Join(n.GetDataDir(), "config.json")
-}
-
-func (n *Node) ReadConfig() error {
-	bytes, err := os.ReadFile(n.GetConfigPath())
-	if err != nil {
-		return fmt.Errorf("failed to read node config: %w", err)
-	}
-	flags := FlagsMap{}
-	if err := json.Unmarshal(bytes, &flags); err != nil {
-		return fmt.Errorf("failed to unmarshal node config: %w", err)
-	}
-	config := NodeConfig{Flags: flags}
-	if err := config.EnsureNodeID(); err != nil {
+// Initiates node shutdown and waits for the node to stop.
+func (n *Node) Stop(ctx context.Context) error {
+	if err := n.InitiateStop(); err != nil {
 		return err
 	}
-	n.NodeConfig = config
-	return nil
+	return n.WaitForStopped(ctx)
 }
 
-func (n *Node) WriteConfig() error {
-	if err := os.MkdirAll(n.GetDataDir(), perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create node dir: %w", err)
-	}
+// Sets networking configuration for the node.
+// Convenience method for setting networking flags.
+func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
+	var (
+		// Use dynamic port allocation.
+		httpPort    uint16 = 0
+		stakingPort uint16 = 0
+	)
+	n.Flags[config.HTTPPortKey] = httpPort
+	n.Flags[config.StakingPortKey] = stakingPort
+	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
+	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
+}
 
-	bytes, err := DefaultJSONMarshal(n.Flags)
+// Ensures staking and signing keys are generated if not already present and
+// that the node ID (derived from the staking keypair) is set.
+func (n *Node) EnsureKeys() error {
+	if err := n.EnsureBLSSigningKey(); err != nil {
+		return err
+	}
+	if err := n.EnsureStakingKeypair(); err != nil {
+		return err
+	}
+	return n.EnsureNodeID()
+}
+
+// Ensures a BLS signing key is generated if not already present.
+func (n *Node) EnsureBLSSigningKey() error {
+	// Attempt to retrieve an existing key
+	existingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
 	if err != nil {
-		return fmt.Errorf("failed to marshal node config: %w", err)
+		return err
 	}
-
-	if err := os.WriteFile(n.GetConfigPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write node config: %w", err)
-	}
-	return nil
-}
-
-func (n *Node) GetProcessContextPath() string {
-	return filepath.Join(n.GetDataDir(), config.DefaultProcessContextFilename)
-}
-
-func (n *Node) ReadProcessContext() error {
-	path := n.GetProcessContextPath()
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-		// The absence of the process context file indicates the node is not running
-		n.NodeProcessContext = node.NodeProcessContext{}
+	if len(existingKey) > 0 {
+		// Nothing to do
 		return nil
 	}
 
-	bytes, err := os.ReadFile(path)
+	// Generate a new signing key
+	newKey, err := bls.NewSecretKey()
 	if err != nil {
-		return fmt.Errorf("failed to read node process context: %w", err)
+		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
-	processContext := node.NodeProcessContext{}
-	if err := json.Unmarshal(bytes, &processContext); err != nil {
-		return fmt.Errorf("failed to unmarshal node process context: %w", err)
-	}
-	n.NodeProcessContext = processContext
+	n.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(bls.SerializeSecretKey(newKey))
 	return nil
 }
 
-func (n *Node) ReadAll() error {
-	if err := n.ReadConfig(); err != nil {
-		return err
-	}
-	return n.ReadProcessContext()
-}
+// Ensures a staking keypair is generated if not already present.
+func (n *Node) EnsureStakingKeypair() error {
+	keyKey := config.StakingTLSKeyContentKey
+	certKey := config.StakingCertContentKey
 
-func (n *Node) Start(w io.Writer, defaultExecPath string) error {
-	// Avoid attempting to start an already running node.
-	proc, err := n.GetProcess()
+	key, err := n.Flags.GetStringVal(keyKey)
 	if err != nil {
-		return fmt.Errorf("failed to start node: %w", err)
-	}
-	if proc != nil {
-		return errNodeAlreadyRunning
-	}
-
-	// Ensure a stale process context file is removed so that the
-	// creation of a new file can indicate node start.
-	if err := os.Remove(n.GetProcessContextPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("failed to remove stale process context file: %w", err)
-	}
-
-	execPath := n.ExecPath
-	if len(execPath) == 0 {
-		execPath = defaultExecPath
-	}
-
-	cmd := exec.Command(execPath, "--config-file", n.GetConfigPath())
-	if err := cmd.Start(); err != nil {
 		return err
 	}
 
-	// Determine appropriate level of node description detail
-	nodeDescription := fmt.Sprintf("node %q", n.NodeID)
-	isEphemeralNode := filepath.Base(filepath.Dir(n.GetDataDir())) == defaultEphemeralDirName
-	if isEphemeralNode {
-		nodeDescription = "ephemeral " + nodeDescription
-	}
-	nonDefaultNodeDir := filepath.Base(n.GetDataDir()) != n.NodeID.String()
-	if nonDefaultNodeDir {
-		// Only include the data dir if its base is not the default (the node ID)
-		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, n.GetDataDir())
-	}
-
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			if err.Error() != "signal: killed" {
-				_, _ = fmt.Fprintf(w, "%s finished with error: %v\n", nodeDescription, err)
-			}
-		}
-		_, _ = fmt.Fprintf(w, "%s exited\n", nodeDescription)
-	}()
-
-	// A node writes a process context file on start. If the file is not
-	// found in a reasonable amount of time, the node is unlikely to have
-	// started successfully.
-	if err := n.WaitForProcessContext(context.Background()); err != nil {
-		return fmt.Errorf("failed to start node: %w", err)
-	}
-
-	_, err = fmt.Fprintf(w, "Started %s\n", nodeDescription)
-	return err
-}
-
-// Retrieve the node process if it is running. As part of determining
-// process liveness, the node's process context will be refreshed if
-// live or cleared if not running.
-func (n *Node) GetProcess() (*os.Process, error) {
-	// Read the process context to ensure freshness. The node may have
-	// stopped or been restarted since last read.
-	if err := n.ReadProcessContext(); err != nil {
-		return nil, fmt.Errorf("failed to read process context: %w", err)
-	}
-
-	if n.PID == 0 {
-		// Process is not running
-		return nil, nil
-	}
-
-	proc, err := os.FindProcess(n.PID)
+	cert, err := n.Flags.GetStringVal(certKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find process: %w", err)
+		return err
 	}
 
-	// Sending 0 will not actually send a signal but will perform
-	// error checking.
-	err = proc.Signal(syscall.Signal(0))
-	if err == nil {
-		// Process is running
-		return proc, nil
-	}
-	if errors.Is(err, os.ErrProcessDone) {
-		// Process is not running
-		return nil, nil
-	}
-	return nil, fmt.Errorf("failed to determine process status: %w", err)
-}
-
-// Signals the node process to stop and waits for the node process to
-// stop running.
-func (n *Node) Stop() error {
-	proc, err := n.GetProcess()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve process to stop: %w", err)
-	}
-	if proc == nil {
-		// Already stopped
-		return nil
-	}
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", n.PID, err)
-	}
-
-	// Wait for the node process to stop
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
-	defer ticker.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
-	defer cancel()
-	for {
-		proc, err := n.GetProcess()
+	if len(key) == 0 && len(cert) == 0 {
+		// Generate new keypair
+		tlsCertBytes, tlsKeyBytes, err := staking.NewCertAndKeyBytes()
 		if err != nil {
-			return fmt.Errorf("failed to retrieve process: %w", err)
+			return fmt.Errorf("failed to generate staking keypair: %w", err)
 		}
-		if proc == nil {
-			return nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to see node process stop %q before timeout: %w", n.NodeID, ctx.Err())
-		case <-ticker.C:
-		}
+		n.Flags[keyKey] = base64.StdEncoding.EncodeToString(tlsKeyBytes)
+		n.Flags[certKey] = base64.StdEncoding.EncodeToString(tlsCertBytes)
+	} else if len(key) == 0 || len(cert) == 0 {
+		// Only one of key and cert was provided
+		return errInvalidKeypair
 	}
+
+	return nil
 }
 
-func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
-	// Check that the node process is running as a precondition for
-	// checking health. GetProcess will also ensure that the node's
-	// API URI is current.
-	proc, err := n.GetProcess()
+// Derives the nodes proof-of-possession. Requires the node to have a
+// BLS signing key.
+func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
+	signingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
 	if err != nil {
-		return false, fmt.Errorf("failed to determine process status: %w", err)
+		return nil, err
 	}
-	if proc == nil {
-		return false, ErrNotRunning
+	signingKeyBytes, err := base64.StdEncoding.DecodeString(signingKey)
+	if err != nil {
+		return nil, err
 	}
-
-	// Check that the node is reporting healthy
-	health, err := health.NewClient(n.URI).Health(ctx, nil)
-	if err == nil {
-		return health.Healthy, nil
+	secretKey, err := bls.SecretKeyFromBytes(signingKeyBytes)
+	if err != nil {
+		return nil, err
 	}
-
-	switch t := err.(type) {
-	case *net.OpError:
-		if t.Op == "read" {
-			// Connection refused - potentially recoverable
-			return false, nil
-		}
-	case syscall.Errno:
-		if t == syscall.ECONNREFUSED {
-			// Connection refused - potentially recoverable
-			return false, nil
-		}
-	}
-	// Assume all other errors are not recoverable
-	return false, fmt.Errorf("failed to query node health: %w", err)
+	return signer.NewProofOfPossession(secretKey), nil
 }
 
-func (n *Node) WaitForProcessContext(ctx context.Context) error {
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
-	defer ticker.Stop()
+// Derives the node ID. Requires that a tls keypair is present.
+func (n *Node) EnsureNodeID() error {
+	keyKey := config.StakingTLSKeyContentKey
+	certKey := config.StakingCertContentKey
 
-	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)
-	defer cancel()
-	for len(n.URI) == 0 {
-		err := n.ReadProcessContext()
-		if err != nil {
-			return fmt.Errorf("failed to read process context for node %q: %w", n.NodeID, err)
-		}
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.NodeID, ctx.Err())
-		case <-ticker.C:
-		}
+	key, err := n.Flags.GetStringVal(keyKey)
+	if err != nil {
+		return err
 	}
+	if len(key) == 0 {
+		return errMissingTLSKeyForNodeID
+	}
+	keyBytes, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", keyKey, err)
+	}
+
+	cert, err := n.Flags.GetStringVal(certKey)
+	if err != nil {
+		return err
+	}
+	if len(cert) == 0 {
+		return errMissingCertForNodeID
+	}
+	certBytes, err := base64.StdEncoding.DecodeString(cert)
+	if err != nil {
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", certKey, err)
+	}
+
+	tlsCert, err := staking.LoadTLSCertFromBytes(keyBytes, certBytes)
+	if err != nil {
+		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
+	}
+	stakingCert := staking.CertificateFromX509(tlsCert.Leaf)
+	n.NodeID = ids.NodeIDFromCert(stakingCert)
+
 	return nil
 }
