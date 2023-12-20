@@ -46,7 +46,7 @@ type BloomFilter struct {
 }
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
-	h := gossipable.GetID()
+	h := gossipable.GossipID()
 	salted := &hasher{
 		hash: h[:],
 		salt: b.Salt,
@@ -55,7 +55,7 @@ func (b *BloomFilter) Add(gossipable Gossipable) {
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
-	h := gossipable.GetID()
+	h := gossipable.GossipID()
 	salted := &hasher{
 		hash: h[:],
 		salt: b.Salt,
