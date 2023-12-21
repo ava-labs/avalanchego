@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var errUnknownTx = errors.New("unknown tx")
@@ -29,13 +30,12 @@ func newTestSerializer(t *testing.T, parse func(context.Context, []byte) (snowst
 	vm.ParseTxF = parse
 
 	baseDB := memdb.New()
-	ctx := snowtest.EmptyContext()
 	s := NewSerializer(
 		SerializerConfig{
-			ChainID: ctx.ChainID,
+			ChainID: ids.Empty,
 			VM:      &vm,
 			DB:      baseDB,
-			Log:     ctx.Log,
+			Log:     logging.NoLog{},
 		},
 	)
 
