@@ -119,12 +119,14 @@ func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	tx := newTx(t, env.genesisBytes, env.vm, "AVAX")
+	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, "AVAX")
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -135,7 +137,9 @@ func TestIssueNFT(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -238,7 +242,9 @@ func TestIssueProperty(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -325,13 +331,15 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	env := setup(t, &envConfig{
 		isCustomFeeAsset: true,
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
 
 	// send first asset
-	tx := newTx(t, env.genesisBytes, env.vm, feeAssetName)
+	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, feeAssetName)
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -341,7 +349,9 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	env := setup(t, &envConfig{
 		isCustomFeeAsset: true,
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -594,7 +604,11 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}))
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
@@ -739,7 +753,11 @@ func TestIssueExportTx(t *testing.T) {
 	require.NoError(err)
 	require.Empty(utxoBytes)
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	utxoBytes, _, _, err = peerSharedMemory.Indexed(
 		env.vm.ctx.ChainID,
@@ -814,7 +832,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	_, err := peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
