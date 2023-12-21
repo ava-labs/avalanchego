@@ -17,7 +17,7 @@ import (
 )
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
-	ctx := snowtest.EmptyContext()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	testSubnet1ID := ids.GenerateTestID()
 	testSubnet1ControlKeys := []*secp256k1.PrivateKey{
 		preFundedKeys[0],

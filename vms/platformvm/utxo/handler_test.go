@@ -39,8 +39,10 @@ func TestVerifySpendUTXOs(t *testing.T) {
 	require.NoError(t, fx.InitializeVM(&secp256k1fx.TestVM{}))
 	require.NoError(t, fx.Bootstrapped())
 
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
 	h := &handler{
-		ctx: snowtest.EmptyContext(),
+		ctx: ctx,
 		clk: &mockable.Clock{},
 		fx:  fx,
 	}
