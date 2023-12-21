@@ -52,7 +52,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		env.vm.state.AddUTXO(utxo)
 
 		// make transaction
-		tx := buildTX(utxoID, txAssetID, addr)
+		tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 		env.vm.ctx.Lock.Unlock()
@@ -96,7 +96,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		env.vm.state.AddUTXO(utxo)
 
 		// make transaction
-		tx := buildTX(utxoID, txAssetID, addr)
+		tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 		env.vm.ctx.Lock.Unlock()
@@ -149,7 +149,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	env.vm.state.AddUTXO(utxo)
 
 	// make transaction
-	tx := buildTX(utxoID, txAssetID, addrs...)
+	tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addrs...)
 	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 	env.vm.ctx.Lock.Unlock()
@@ -268,7 +268,7 @@ func buildUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax
 	}
 }
 
-func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
+func buildTX(chainID ids.ID, utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
