@@ -97,6 +97,21 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, caller)
 	}
 
+	if contract.IsDUpgradeActivated(accessibleState) {
+		if remainingGas, err = contract.DeductGas(remainingGas, NativeCoinMintedEventGasCost); err != nil {
+			return nil, 0, err
+		}
+		topics, data, err := PackNativeCoinMintedEvent(caller, to, amount)
+		if err != nil {
+			return nil, remainingGas, err
+		}
+		stateDB.AddLog(
+			ContractAddress,
+			topics,
+			data,
+			accessibleState.GetBlockContext().Number().Uint64(),
+		)
+	}
 	// if there is no address in the state, create one.
 	if !stateDB.Exist(to) {
 		stateDB.CreateAccount(to)

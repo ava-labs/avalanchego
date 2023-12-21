@@ -4,6 +4,7 @@
 package nativeminter
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -42,11 +43,14 @@ var (
 
 				return input
 			},
-			SuppliedGas: MintGasCost,
+			SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
-				require.Equal(t, common.Big1, state.GetBalance(allowlist.TestEnabledAddr), "expected minted funds")
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				require.Equal(t, common.Big1, stateDB.GetBalance(allowlist.TestEnabledAddr), "expected minted funds")
+
+				logsTopics, logsData := stateDB.GetLogData()
+				assertNativeCoinMintedEvent(t, logsTopics, logsData, allowlist.TestEnabledAddr, allowlist.TestEnabledAddr, common.Big1)
 			},
 		},
 		"initial mint funds": {
@@ -57,8 +61,8 @@ var (
 					allowlist.TestEnabledAddr: math.NewHexOrDecimal256(2),
 				},
 			},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
-				require.Equal(t, common.Big2, state.GetBalance(allowlist.TestEnabledAddr), "expected minted funds")
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				require.Equal(t, common.Big2, stateDB.GetBalance(allowlist.TestEnabledAddr), "expected minted funds")
 			},
 		},
 		"calling mintNativeCoin from Manager should succeed": {
@@ -70,14 +74,17 @@ var (
 
 				return input
 			},
-			SuppliedGas: MintGasCost,
+			SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
-				require.Equal(t, common.Big1, state.GetBalance(allowlist.TestEnabledAddr), "expected minted funds")
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				require.Equal(t, common.Big1, stateDB.GetBalance(allowlist.TestEnabledAddr), "expected minted funds")
+
+				logsTopics, logsData := stateDB.GetLogData()
+				assertNativeCoinMintedEvent(t, logsTopics, logsData, allowlist.TestManagerAddr, allowlist.TestEnabledAddr, common.Big1)
 			},
 		},
-		"calling mintNativeCoin from Admin should succeed": {
+		"mint funds from admin address": {
 			Caller:     allowlist.TestAdminAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -86,11 +93,14 @@ var (
 
 				return input
 			},
-			SuppliedGas: MintGasCost,
+			SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
-				require.Equal(t, common.Big1, state.GetBalance(allowlist.TestAdminAddr), "expected minted funds")
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				require.Equal(t, common.Big1, stateDB.GetBalance(allowlist.TestAdminAddr), "expected minted funds")
+
+				logsTopics, logsData := stateDB.GetLogData()
+				assertNativeCoinMintedEvent(t, logsTopics, logsData, allowlist.TestAdminAddr, allowlist.TestAdminAddr, common.Big1)
 			},
 		},
 		"mint max big funds": {
@@ -102,11 +112,14 @@ var (
 
 				return input
 			},
-			SuppliedGas: MintGasCost,
+			SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
-				require.Equal(t, math.MaxBig256, state.GetBalance(allowlist.TestAdminAddr), "expected minted funds")
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				require.Equal(t, math.MaxBig256, stateDB.GetBalance(allowlist.TestAdminAddr), "expected minted funds")
+
+				logsTopics, logsData := stateDB.GetLogData()
+				assertNativeCoinMintedEvent(t, logsTopics, logsData, allowlist.TestAdminAddr, allowlist.TestAdminAddr, math.MaxBig256)
 			},
 		},
 		"readOnly mint with noRole fails": {
@@ -157,11 +170,34 @@ var (
 
 				return input
 			},
-			SuppliedGas: MintGasCost - 1,
+			SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
-		"mint with extra padded bytes should fail before DUpgrade": {
+		"mint doesn't log pre-DUpgrade": {
+			Caller:     allowlist.TestEnabledAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				return config
+			},
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackMintNativeCoin(allowlist.TestEnabledAddr, common.Big1)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: MintGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				// Check no logs are stored in state
+				logsTopics, logsData := stateDB.GetLogData()
+				require.Len(t, logsTopics, 0)
+				require.Len(t, logsData, 0)
+			},
+		},
+		"mint with extra padded bytes should fail pre-DUpgrade": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -200,10 +236,13 @@ var (
 				return input
 			},
 			ExpectedRes: []byte{},
-			SuppliedGas: MintGasCost,
+			SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
 			ReadOnly:    false,
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				require.Equal(t, common.Big1, state.GetBalance(allowlist.TestEnabledAddr), "expected minted funds")
+
+				logsTopics, logsData := state.GetLogData()
+				assertNativeCoinMintedEvent(t, logsTopics, logsData, allowlist.TestEnabledAddr, allowlist.TestEnabledAddr, common.Big1)
 			},
 		},
 	}
@@ -215,4 +254,23 @@ func TestContractNativeMinterRun(t *testing.T) {
 
 func BenchmarkContractNativeMinter(b *testing.B) {
 	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, tests)
+}
+
+func assertNativeCoinMintedEvent(t testing.TB,
+	logsTopics [][]common.Hash,
+	logsData [][]byte,
+	expectedSender common.Address,
+	expectedRecipient common.Address,
+	expectedAmount *big.Int) {
+	require.Len(t, logsTopics, 1)
+	require.Len(t, logsData, 1)
+	topics := logsTopics[0]
+	require.Len(t, topics, 3)
+	require.Equal(t, NativeMinterABI.Events["NativeCoinMinted"].ID, topics[0])
+	require.Equal(t, expectedSender.Hash(), topics[1])
+	require.Equal(t, expectedRecipient.Hash(), topics[2])
+	require.NotEmpty(t, logsData[0])
+	amount, err := UnpackNativeCoinMintedEventData(logsData[0])
+	require.NoError(t, err)
+	require.True(t, expectedAmount.Cmp(amount) == 0, "expected", expectedAmount, "got", amount)
 }
