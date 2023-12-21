@@ -380,19 +380,21 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		parentPChainHeight,
 		proposer.TimeToSlot(parentTimestamp, blkTimestamp),
 	)
-	if err != nil {
+	switch {
+	case errors.Is(err, proposer.ErrAnyoneCanPropose):
+		return nil
+	case err != nil:
 		p.vm.ctx.Log.Error("unexpected block verification failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("blkID", blk.ID()),
 			zap.Error(err),
 		)
 		return err
-	}
-	if expectedProposerID != proposerID {
+	case expectedProposerID == proposerID:
+		return nil
+	default:
 		return errUnexpectedProposer
 	}
-
-	return nil
 }
 
 func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
@@ -410,15 +412,17 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 		parentPChainHeight,
 		currentSlot,
 	)
-	if err != nil {
+	switch {
+	case errors.Is(err, proposer.ErrAnyoneCanPropose):
+		return nil
+	case err != nil:
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
 		)
 		return err
-	}
-	if expectedProposerID == p.vm.ctx.NodeID {
+	case expectedProposerID == p.vm.ctx.NodeID:
 		return nil
 	}
 
