@@ -483,7 +483,8 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 // Invariant: This function is only called after Linearize has been called.
 func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
 	txID := tx.ID()
-	if err := vm.network.IssueTx(context.TODO(), tx); err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
+	err := vm.network.IssueTx(context.TODO(), tx)
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
