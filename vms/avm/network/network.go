@@ -36,7 +36,7 @@ var (
 type Network struct {
 	*p2p.Network
 
-	txPushGossiper gossip.Accumulator[*gossipTx]
+	txPushGossiper gossip.Accumulator[*txs.Tx]
 	txPullGossiper gossip.Gossiper
 
 	ctx       *snow.Context
@@ -71,7 +71,7 @@ func New(
 		return nil, err
 	}
 
-	marshaller := &gossipTxParser{
+	marshaller := &txParser{
 		parser: parser,
 	}
 	validators := p2p.NewValidators(p2pNetwork.Peers, ctx.Log, ctx.SubnetID, ctx.ValidatorState, maxValidatorSetStaleness)
@@ -84,7 +84,7 @@ func New(
 		return nil, err
 	}
 
-	txPushGossiper := gossip.NewPushGossiper[*gossipTx](
+	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
 		marshaller,
 		txGossipClient,
 		txGossipMetrics,
@@ -105,7 +105,7 @@ func New(
 	}
 
 	var txPullGossiper gossip.Gossiper
-	txPullGossiper = gossip.NewPullGossiper[*gossipTx](
+	txPullGossiper = gossip.NewPullGossiper[*txs.Tx](
 		ctx.Log,
 		marshaller,
 		gossipMempool,
@@ -121,7 +121,7 @@ func New(
 		Validators: validators,
 	}
 
-	handler := gossip.NewHandler[*gossipTx](
+	handler := gossip.NewHandler[*txs.Tx](
 		ctx.Log,
 		marshaller,
 		txPushGossiper,
@@ -206,12 +206,10 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	err = n.mempool.Add(&gossipTx{
-		tx: tx,
-	})
+	err = n.mempool.Add(tx)
 	if err == nil {
 		txID := tx.ID()
-		n.txPushGossiper.Add(&gossipTx{tx: tx})
+		n.txPushGossiper.Add(tx)
 		if err := n.txPushGossiper.Gossip(ctx); err != nil {
 			n.ctx.Log.Error("failed to gossip tx",
 				zap.Stringer("txID", tx.ID()),
@@ -227,9 +225,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 // preferred state. If the tx is added to the mempool, it will push gossip the
 // tx using both the legacy and p2p SDK.
 func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
-	if err := n.mempool.Add(&gossipTx{
-		tx: tx,
-	}); err != nil {
+	if err := n.mempool.Add(tx); err != nil {
 		return err
 	}
 
@@ -240,9 +236,7 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 // against the preferred state. If the tx is added to the mempool, it will push
 // gossip the tx using both the legacy and p2p SDK.
 func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
-	if err := n.mempool.AddVerifiedTx(&gossipTx{
-		tx: tx,
-	}); err != nil {
+	if err := n.mempool.AddVerifiedTx(tx); err != nil {
 		return err
 	}
 
@@ -251,7 +245,7 @@ func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
 
 // gossipTx pushes the tx to peers using both the legacy and p2p SDK.
 func (n *Network) gossipTx(ctx context.Context, tx *txs.Tx) error {
-	n.txPushGossiper.Add(&gossipTx{tx: tx})
+	n.txPushGossiper.Add(tx)
 	if err := n.txPushGossiper.Gossip(ctx); err != nil {
 		n.ctx.Log.Error("failed to gossip tx",
 			zap.Stringer("txID", tx.ID()),

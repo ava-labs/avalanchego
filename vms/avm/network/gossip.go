@@ -20,10 +20,9 @@ import (
 )
 
 var (
-	_ p2p.Handler                  = (*txGossipHandler)(nil)
-	_ gossip.Set[*gossipTx]        = (*gossipMempool)(nil)
-	_ gossip.Gossipable            = (*gossipTx)(nil)
-	_ gossip.Marshaller[*gossipTx] = (*gossipTxParser)(nil)
+	_ p2p.Handler                = (*txGossipHandler)(nil)
+	_ gossip.Set[*txs.Tx]        = (*gossipMempool)(nil)
+	_ gossip.Marshaller[*txs.Tx] = (*txParser)(nil)
 )
 
 // txGossipHandler is the handler called when serving gossip messages
@@ -50,27 +49,16 @@ func (t txGossipHandler) AppRequest(
 	return t.appRequestHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
 
-type gossipTx struct {
-	tx *txs.Tx
-}
-
-func (g *gossipTx) GossipID() ids.ID {
-	return g.tx.ID()
-}
-
-type gossipTxParser struct {
+type txParser struct {
 	parser txs.Parser
 }
 
-func (*gossipTxParser) MarshalGossip(tx *gossipTx) ([]byte, error) {
-	return tx.tx.Bytes(), nil
+func (*txParser) MarshalGossip(tx *txs.Tx) ([]byte, error) {
+	return tx.Bytes(), nil
 }
 
-func (g *gossipTxParser) UnmarshalGossip(bytes []byte) (*gossipTx, error) {
-	tx, err := g.parser.ParseTx(bytes)
-	return &gossipTx{
-		tx: tx,
-	}, err
+func (g *txParser) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
+	return g.parser.ParseTx(bytes)
 }
 
 func newGossipMempool(
@@ -108,8 +96,8 @@ type gossipMempool struct {
 // us and when handling transactions that were pulled from a peer. If this
 // returns a nil error while handling push gossip, the p2p SDK will queue the
 // transaction to push gossip as well.
-func (g *gossipMempool) Add(tx *gossipTx) error {
-	txID := tx.tx.ID()
+func (g *gossipMempool) Add(tx *txs.Tx) error {
+	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
 		// The tx is already in the mempool
 		return fmt.Errorf("attempted to issue %w: %s ", mempool.ErrDuplicateTx, txID)
@@ -124,7 +112,7 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 	}
 
 	// Verify the tx at the currently preferred state
-	if err := g.txVerifier.VerifyTx(tx.tx); err != nil {
+	if err := g.txVerifier.VerifyTx(tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}
@@ -132,9 +120,9 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 	return g.AddVerifiedTx(tx)
 }
 
-func (g *gossipMempool) AddVerifiedTx(tx *gossipTx) error {
-	if err := g.Mempool.Add(tx.tx); err != nil {
-		g.Mempool.MarkDropped(tx.tx.ID(), err)
+func (g *gossipMempool) AddVerifiedTx(tx *txs.Tx) error {
+	if err := g.Mempool.Add(tx); err != nil {
+		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
 	}
 
@@ -153,9 +141,7 @@ func (g *gossipMempool) AddVerifiedTx(tx *gossipTx) error {
 		)
 
 		g.Mempool.Iterate(func(tx *txs.Tx) bool {
-			g.bloom.Add(&gossipTx{
-				tx: tx,
-			})
+			g.bloom.Add(tx)
 			return true
 		})
 	}
@@ -164,12 +150,8 @@ func (g *gossipMempool) AddVerifiedTx(tx *gossipTx) error {
 	return nil
 }
 
-func (g *gossipMempool) Iterate(f func(*gossipTx) bool) {
-	g.Mempool.Iterate(func(tx *txs.Tx) bool {
-		return f(&gossipTx{
-			tx: tx,
-		})
-	})
+func (g *gossipMempool) Iterate(f func(*txs.Tx) bool) {
+	g.Mempool.Iterate(f)
 }
 
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {

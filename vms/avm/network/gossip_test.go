@@ -30,14 +30,12 @@ func TestMarshaller(t *testing.T) {
 	})
 	require.NoError(err)
 
-	marhsaller := gossipTxParser{
+	marhsaller := txParser{
 		parser: parser,
 	}
 
-	want := &gossipTx{
-		tx: &txs.Tx{Unsigned: &txs.BaseTx{}},
-	}
-	require.NoError(want.tx.Initialize(parser.Codec()))
+	want := &txs.Tx{Unsigned: &txs.BaseTx{}}
+	require.NoError(want.Initialize(parser.Codec()))
 
 	bytes, err := marhsaller.MarshalGossip(want)
 	require.NoError(err)
@@ -70,15 +68,13 @@ func TestGossipMempoolAddTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx := &gossipTx{
-		tx: &txs.Tx{
-			Unsigned: &txs.BaseTx{
-				BaseTx: avax.BaseTx{
-					Ins: []*avax.TransferableInput{},
-				},
+	tx := &txs.Tx{
+		Unsigned: &txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{},
 			},
-			TxID: ids.GenerateTestID(),
 		},
+		TxID: ids.GenerateTestID(),
 	}
 
 	require.NoError(mempool.Add(tx))
