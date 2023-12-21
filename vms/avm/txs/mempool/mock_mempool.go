@@ -121,15 +121,19 @@ func (mr *MockMempoolMockRecorder) Peek() *gomock.Call {
 }
 
 // Remove mocks base method.
-func (m *MockMempool) Remove(arg0 []*txs.Tx) {
+func (m *MockMempool) Remove(arg0 ...*txs.Tx) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Remove", arg0)
+	varargs := []interface{}{}
+	for _, a := range arg0 {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "Remove", varargs...)
 }
 
 // Remove indicates an expected call of Remove.
-func (mr *MockMempoolMockRecorder) Remove(arg0 interface{}) *gomock.Call {
+func (mr *MockMempoolMockRecorder) Remove(arg0 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockMempool)(nil).Remove), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockMempool)(nil).Remove), arg0...)
 }
 
 // RequestBuildBlock mocks base method.

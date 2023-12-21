@@ -5,7 +5,6 @@ package avm
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"testing"
 
@@ -20,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -66,13 +65,10 @@ var (
 		},
 	}
 
-	chainID = ids.ID{5, 4, 3, 2, 1}
 	assetID = ids.ID{1, 2, 3}
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
-
-	errMissing = errors.New("missing")
 )
 
 func init() {
@@ -124,7 +120,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
-	ctx := newContext(tb)
+
+	ctx := snowtest.Context(tb, snowtest.XChainID)
 
 	baseDB := memdb.New()
 	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
@@ -225,40 +222,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	return env
 }
 
-func newContext(tb testing.TB) *snow.Context {
-	require := require.New(tb)
-
-	genesisBytes := buildGenesisTest(tb)
-	tx := getCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.ChainID = chainID
-	ctx.AVAXAssetID = tx.ID()
-	ctx.XChainID = ids.Empty.Prefix(0)
-	ctx.CChainID = ids.Empty.Prefix(1)
-	aliaser := ctx.BCLookup.(ids.Aliaser)
-
-	require.NoError(aliaser.Alias(chainID, "X"))
-	require.NoError(aliaser.Alias(chainID, chainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: ctx.SubnetID,
-				chainID:                   ctx.SubnetID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-	return ctx
-}
-
 // Returns:
 //
 //  1. tx in genesis that creates asset
@@ -313,7 +276,7 @@ func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 	return b
 }
 
-func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
+func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser, assetName string) *txs.Tx {
 	require := require.New(tb)
 
 	createTx := getCreateTxFromGenesisTest(tb, genesisBytes, assetName)
@@ -338,14 +301,14 @@ func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx
 			}},
 		},
 	}}
-	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	require.NoError(tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 	return tx
 }
 
 // Sample from a set of addresses and return them raw and formatted as strings.
 // The size of the sample is between 1 and len(addrs)
 // If len(addrs) == 0, returns nil
-func sampleAddrs(tb testing.TB, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) {
 	require := require.New(tb)
 
 	sampledAddrs := []ids.ShortID{}
@@ -359,7 +322,7 @@ func sampleAddrs(tb testing.TB, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []s
 	require.NoError(err)
 	for _, index := range indices {
 		addr := addrs[index]
-		addrStr, err := vm.FormatLocalAddress(addr)
+		addrStr, err := addressFormatter.FormatLocalAddress(addr)
 		require.NoError(err)
 
 		sampledAddrs = append(sampledAddrs, addr)
@@ -517,30 +480,31 @@ func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
 	}
 }
 
-// issueAndAccept expects the context lock to be held
+// issueAndAccept expects the context lock not to be held
 func issueAndAccept(
 	require *require.Assertions,
 	vm *VM,
 	issuer <-chan common.Message,
 	tx *txs.Tx,
 ) {
-	txID, err := vm.IssueTx(tx.Bytes())
+	txID, err := vm.issueTx(tx)
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 
 	buildAndAccept(require, vm, issuer, txID)
 }
 
-// buildAndAccept expects the context lock to be held
+// buildAndAccept expects the context lock not to be held
 func buildAndAccept(
 	require *require.Assertions,
 	vm *VM,
 	issuer <-chan common.Message,
 	txID ids.ID,
 ) {
-	vm.ctx.Lock.Unlock()
 	require.Equal(common.PendingTxs, <-issuer)
+
 	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
 
 	blkIntf, err := vm.BuildBlock(context.Background())
 	require.NoError(err)

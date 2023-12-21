@@ -339,7 +339,7 @@ func packBlockTxs(
 		if txSize > remainingSize {
 			break
 		}
-		mempool.Remove([]*txs.Tx{tx})
+		mempool.Remove(tx)
 
 		// Invariant: [tx] has already been syntactically verified.
 
