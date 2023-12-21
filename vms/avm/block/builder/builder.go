@@ -101,7 +101,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		if !exists || len(tx.Bytes()) > remainingSize {
 			break
 		}
-		b.mempool.Remove([]*txs.Tx{tx})
+		b.mempool.Remove(tx)
 
 		// Invariant: [tx] has already been syntactically verified.
 
