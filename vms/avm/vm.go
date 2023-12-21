@@ -482,16 +482,16 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 // Invariant: The context lock is not held
 // Invariant: This function is only called after Linearize has been called.
 func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
+	txID := tx.ID()
 	err := vm.network.IssueTx(context.TODO(), tx)
-	if err != nil {
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
+			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)
+		return txID, err
 	}
-	return tx.ID(), err
+	return txID, nil
 }
 
 /*
