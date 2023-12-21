@@ -236,6 +236,14 @@ func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
 }
 
 func (n *Network) gossipTx(ctx context.Context, tx *txs.Tx) error {
+	n.txPushGossiper.Add(&gossipTx{tx: tx})
+	if err := n.txPushGossiper.Gossip(ctx); err != nil {
+		n.ctx.Log.Error("failed to gossip tx",
+			zap.Stringer("txID", tx.ID()),
+			zap.Error(err),
+		)
+	}
+
 	txBytes := tx.Bytes()
 	msg := &message.Tx{
 		Tx: txBytes,
