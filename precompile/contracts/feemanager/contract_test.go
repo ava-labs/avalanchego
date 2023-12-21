@@ -43,6 +43,16 @@ var (
 		MaxBlockGasCost:  big.NewInt(1_000_000),
 		BlockGasCostStep: big.NewInt(200_000),
 	}
+	zeroFeeConfig = commontype.FeeConfig{
+		GasLimit:                 new(big.Int),
+		MinBaseFee:               new(big.Int),
+		TargetGas:                new(big.Int),
+		BaseFeeChangeDenominator: new(big.Int),
+
+		MinBlockGasCost:  new(big.Int),
+		MaxBlockGasCost:  new(big.Int),
+		BlockGasCostStep: new(big.Int),
+	}
 	testBlockNumber = big.NewInt(7)
 	tests           = map[string]testutils.PrecompileTest{
 		"set config from no role fails": {
@@ -58,7 +68,7 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotChangeFee.Error(),
 		},
-		"set config from enabled address": {
+		"set config from enabled address succeeds and emits logs": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -67,12 +77,15 @@ var (
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
+
+				logsTopics, logsData := state.GetLogData()
+				assertFeeEvent(t, logsTopics, logsData, allowlist.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		"set config from manager succeeds": {
@@ -84,12 +97,15 @@ var (
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
+
+				logsTopics, logsData := state.GetLogData()
+				assertFeeEvent(t, logsTopics, logsData, allowlist.TestManagerAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		"set invalid config from enabled address": {
@@ -103,7 +119,7 @@ var (
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			Config: &Config{
 				InitialFeeConfig: &testFeeConfig,
@@ -123,7 +139,7 @@ var (
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
@@ -135,6 +151,9 @@ var (
 				require.Equal(t, testFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
+
+				logsTopics, logsData := state.GetLogData()
+				assertFeeEvent(t, logsTopics, logsData, allowlist.TestAdminAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		"get fee config from non-enabled address": {
@@ -320,7 +339,7 @@ var (
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
@@ -332,6 +351,9 @@ var (
 				require.Equal(t, testFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
+
+				logsTopics, logsData := state.GetLogData()
+				assertFeeEvent(t, logsTopics, logsData, allowlist.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		// from https://github.com/ava-labs/subnet-evm/issues/487
@@ -361,7 +383,7 @@ var (
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
@@ -373,6 +395,31 @@ var (
 				require.Equal(t, regressionFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
+
+				logsTopics, logsData := state.GetLogData()
+				assertFeeEvent(t, logsTopics, logsData, allowlist.TestEnabledAddr, zeroFeeConfig, regressionFeeConfig)
+			},
+		},
+		"set config should not emit event before DUpgrade": {
+			Caller:     allowlist.TestEnabledAddr,
+			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				return config
+			},
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackSetFeeConfig(testFeeConfig)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: SetFeeConfigGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, state contract.StateDB) {
+				logsTopics, logsData := state.GetLogData()
+				require.Len(t, logsTopics, 0)
+				require.Len(t, logsData, 0)
 			},
 		},
 	}
@@ -384,4 +431,27 @@ func TestFeeManager(t *testing.T) {
 
 func BenchmarkFeeManager(b *testing.B) {
 	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, tests)
+}
+
+func assertFeeEvent(
+	t testing.TB,
+	logsTopics [][]common.Hash,
+	logsData [][]byte,
+	sender common.Address,
+	expectedOldFeeConfig commontype.FeeConfig,
+	expectedNewFeeConfig commontype.FeeConfig,
+) {
+	require.Len(t, logsTopics, 1)
+	require.Len(t, logsData, 1)
+
+	topics := logsTopics[0]
+	require.Len(t, topics, 2)
+	require.Equal(t, FeeManagerABI.Events["FeeConfigChanged"].ID, topics[0])
+	require.Equal(t, sender.Hash(), topics[1])
+
+	logData := logsData[0]
+	oldFeeConfig, resFeeConfig, err := UnpackFeeConfigChangedEventData(logData)
+	require.NoError(t, err)
+	require.True(t, expectedOldFeeConfig.Equal(&oldFeeConfig), "expected %v, got %v", expectedOldFeeConfig, oldFeeConfig)
+	require.True(t, expectedNewFeeConfig.Equal(&resFeeConfig), "expected %v, got %v", expectedNewFeeConfig, resFeeConfig)
 }

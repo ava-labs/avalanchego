@@ -4,6 +4,8 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
 import { test } from "./utils"
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { Contract } from "ethers"
 
 const ADMIN_ADDRESS: string = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
 const FEE_MANAGER = "0x0200000000000000000000000000000000000003"
@@ -53,3 +55,67 @@ describe("ExampleFeeManager", function () {
     "step_lowerMinFeeByOne",
   ])
 })
+
+const C_FEES = {
+  gasLimit: 8_000_000, // gasLimit
+  targetBlockRate: 2, // targetBlockRate
+  minBaseFee: 25_000_000_000, // minBaseFee
+  targetGas: 15_000_000, // targetGas
+  baseFeeChangeDenominator: 36, // baseFeeChangeDenominator
+  minBlockGasCost: 0, // minBlockGasCost
+  maxBlockGasCost: 1_000_000, // maxBlockGasCost
+  blockGasCostStep: 100_000 // blockGasCostStep
+}
+
+const WAGMI_FEES = {
+  gasLimit: 20_000_000, // gasLimit
+  targetBlockRate: 2, // targetBlockRate
+  minBaseFee: 1_000_000_000, // minBaseFee
+  targetGas: 100_000_000, // targetGas
+  baseFeeChangeDenominator: 48, // baseFeeChangeDenominator
+  minBlockGasCost: 0, // minBlockGasCost
+  maxBlockGasCost: 10_000_000, // maxBlockGasCost
+  blockGasCostStep: 100_000 // blockGasCostStep
+}
+
+describe("IFeeManager", function () {
+  let owner: SignerWithAddress
+  let contract: Contract
+  before(async function () {
+    owner = await ethers.getSigner(ADMIN_ADDRESS);
+    contract = await ethers.getContractAt("IFeeManager", FEE_MANAGER, owner)
+    // reset to C fees
+    let tx = await contract.setFeeConfig(
+      C_FEES.gasLimit,
+      C_FEES.targetBlockRate,
+      C_FEES.minBaseFee,
+      C_FEES.targetGas,
+      C_FEES.baseFeeChangeDenominator,
+      C_FEES.minBlockGasCost,
+      C_FEES.maxBlockGasCost,
+      C_FEES.blockGasCostStep)
+    await tx.wait()
+  });
+
+  it("should emit fee config changed event", async function () {
+    await expect(contract.setFeeConfig(
+      WAGMI_FEES.gasLimit,
+       WAGMI_FEES.targetBlockRate,
+       WAGMI_FEES.minBaseFee,
+       WAGMI_FEES.targetGas,
+       WAGMI_FEES.baseFeeChangeDenominator,
+       WAGMI_FEES.minBlockGasCost,
+       WAGMI_FEES.maxBlockGasCost,
+       WAGMI_FEES.blockGasCostStep)
+      )
+      .to.emit(contract, 'FeeConfigChanged')
+      .withArgs(
+        owner.address,
+        // old config
+        [C_FEES.gasLimit, C_FEES.targetBlockRate, C_FEES.minBaseFee, C_FEES.targetGas, C_FEES.baseFeeChangeDenominator, C_FEES.minBlockGasCost, C_FEES.maxBlockGasCost, C_FEES.blockGasCostStep],
+        // new config
+        [WAGMI_FEES.gasLimit, WAGMI_FEES.targetBlockRate, WAGMI_FEES.minBaseFee, WAGMI_FEES.targetGas, WAGMI_FEES.baseFeeChangeDenominator, WAGMI_FEES.minBlockGasCost, WAGMI_FEES.maxBlockGasCost, WAGMI_FEES.blockGasCostStep]
+       );
+  })
+})
+

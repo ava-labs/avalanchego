@@ -35,9 +35,9 @@ const (
 	// [numFeeConfigField] fields in FeeConfig struct
 	feeConfigInputLen = common.HashLength * numFeeConfigField
 
-	SetFeeConfigGasCost     = contract.WriteGasCostPerSlot * (numFeeConfigField + 1) // plus one for setting last changed at
-	GetFeeConfigGasCost     = contract.ReadGasCostPerSlot * numFeeConfigField
-	GetLastChangedAtGasCost = contract.ReadGasCostPerSlot
+	SetFeeConfigGasCost     uint64 = contract.WriteGasCostPerSlot * (numFeeConfigField + 1) // plus one for setting last changed at
+	GetFeeConfigGasCost     uint64 = contract.ReadGasCostPerSlot * numFeeConfigField
+	GetLastChangedAtGasCost uint64 = contract.ReadGasCostPerSlot
 )
 
 var (
@@ -225,6 +225,28 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 	callerStatus := GetFeeManagerStatus(stateDB, caller)
 	if !callerStatus.IsEnabled() {
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotChangeFee, caller)
+	}
+
+	if contract.IsDUpgradeActivated(accessibleState) {
+		if remainingGas, err = contract.DeductGas(remainingGas, FeeConfigChangedEventGasCost); err != nil {
+			return nil, 0, err
+		}
+		oldConfig := GetStoredFeeConfig(stateDB)
+		topics, data, err := PackFeeConfigChangedEvent(
+			caller,
+			oldConfig,
+			feeConfig,
+		)
+		if err != nil {
+			return nil, remainingGas, err
+		}
+
+		stateDB.AddLog(
+			ContractAddress,
+			topics,
+			data,
+			accessibleState.GetBlockContext().Number().Uint64(),
+		)
 	}
 
 	if err := StoreFeeConfig(stateDB, feeConfig, accessibleState.GetBlockContext()); err != nil {
