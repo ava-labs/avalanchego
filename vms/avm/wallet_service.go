@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -46,7 +47,7 @@ func (w *WalletService) decided(txID ids.ID) {
 		}
 
 		err := w.vm.network.IssueVerifiedTx(context.TODO(), tx)
-		if err == nil {
+		if err == nil || errors.Is(err, mempool.ErrDuplicateTx) {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
 			)
@@ -75,7 +76,7 @@ func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 	}
 
 	if w.pendingTxs.Len() == 0 {
-		if err := w.vm.network.IssueVerifiedTx(context.TODO(), tx); err != nil {
+		if err := w.vm.network.IssueVerifiedTx(context.TODO(), tx); err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 			w.vm.ctx.Log.Warn("failed to issue tx over wallet API",
 				zap.Stringer("txID", txID),
 				zap.Error(err),

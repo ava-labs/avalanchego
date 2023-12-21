@@ -36,6 +36,8 @@ var (
 type Network struct {
 	*p2p.Network
 
+	txPullGossiper gossip.Gossiper
+
 	ctx       *snow.Context
 	parser    txs.Parser
 	mempool   *gossipMempool
@@ -139,10 +141,6 @@ func New(
 		ctx.Log,
 	)
 
-	if err := p2pNetwork.AddHandler(txGossipHandlerID, handler); err != nil {
-		return nil, err
-	}
-
 	// We allow pushing txs between all peers, but only serve gossip requests
 	// from validators
 	txGossipHandler := txGossipHandler{
@@ -155,16 +153,21 @@ func New(
 	}
 
 	return &Network{
-		Network:   p2pNetwork,
-		ctx:       ctx,
-		parser:    parser,
-		mempool:   gossipMempool,
-		appSender: appSender,
+		Network:        p2pNetwork,
+		txPullGossiper: txPullGossiper,
+		ctx:            ctx,
+		parser:         parser,
+		mempool:        gossipMempool,
+		appSender:      appSender,
 
 		recentTxs: &cache.LRU[ids.ID, struct{}]{
 			Size: recentTxsCacheSize,
 		},
 	}, nil
+}
+
+func (n *Network) Gossip(ctx context.Context, frequency time.Duration) {
+	gossip.Every(ctx, n.ctx.Log, n.txPullGossiper, frequency)
 }
 
 func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {

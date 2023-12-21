@@ -104,7 +104,7 @@ func (g *gossipMempool) Add(tx *gossipTx) error {
 	txID := tx.tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
 		// The tx is already in the mempool
-		return fmt.Errorf("tx %s already known", txID)
+		return fmt.Errorf("attempted to issue %w: %s ", mempool.ErrDuplicateTx, txID)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {

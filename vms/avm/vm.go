@@ -63,6 +63,7 @@ const (
 	maxValidatorSetStaleness                 = time.Minute
 	txGossipMaxGossipSize                    = 20 * units.KiB
 	txGossipPollSize                         = 10
+	txGossipFrequency                        = 15 * time.Second
 	txGossipThrottlingPeriod                 = 10 * time.Second
 	txGossipThrottlingLimit                  = 2
 	txGossipBloomMaxExpectedElements         = 8 * 1024
@@ -491,6 +492,8 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
 
+	go vm.network.Gossip(context.TODO(), txGossipFrequency)
+
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
 		if err != nil {
@@ -537,12 +540,14 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 // Invariant: This function is only called after Linearize has been called.
 func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
 	err := vm.network.IssueTx(context.TODO(), tx)
-	if err != nil {
-		vm.ctx.Log.Debug("failed to add tx to mempool",
-			zap.Error(err),
-		)
+	if err == nil || errors.Is(err, mempool.ErrDuplicateTx) {
+		return tx.ID(), nil
 	}
-	return tx.ID(), err
+
+	vm.ctx.Log.Debug("failed to add tx to mempool",
+		zap.Error(err),
+	)
+	return ids.Empty, err
 }
 
 /*
