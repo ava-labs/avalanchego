@@ -24,14 +24,17 @@ import (
 var (
 	_ p2p.Handler = (*txGossipHandler)(nil)
 
-	_ gossip.Gossipable        = (*GossipEthTx)(nil)
-	_ gossip.Gossipable        = (*GossipAtomicTx)(nil)
-	_ gossip.Set[*GossipEthTx] = (*GossipEthTxPool)(nil)
+	_ gossip.Gossipable                  = (*GossipEthTx)(nil)
+	_ gossip.Gossipable                  = (*GossipAtomicTx)(nil)
+	_ gossip.Marshaller[*GossipAtomicTx] = (*GossipAtomicTxMarshaller)(nil)
+	_ gossip.Marshaller[*GossipEthTx]    = (*GossipEthTxMarshaller)(nil)
+	_ gossip.Set[*GossipEthTx]           = (*GossipEthTxPool)(nil)
 )
 
-func newTxGossipHandler[T any, U gossip.GossipableAny[T]](
+func newTxGossipHandler[T gossip.Gossipable](
 	log logging.Logger,
-	mempool gossip.Set[U],
+	marshaller gossip.Marshaller[T],
+	mempool gossip.Set[T],
 	metrics gossip.Metrics,
 	maxMessageSize int,
 	throttlingPeriod time.Duration,
@@ -39,10 +42,11 @@ func newTxGossipHandler[T any, U gossip.GossipableAny[T]](
 	validators *p2p.Validators,
 ) txGossipHandler {
 	// push gossip messages can be handled from any peer
-	handler := gossip.NewHandler[T, U](
+	handler := gossip.NewHandler[T](
 		log,
+		marshaller,
 		// Don't forward gossip to avoid double-forwarding
-		gossip.NoOpAccumulator[U]{},
+		gossip.NoOpAccumulator[T]{},
 		mempool,
 		metrics,
 		maxMessageSize,
@@ -80,23 +84,25 @@ func (t txGossipHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, dead
 	return t.appRequestHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
 
+type GossipAtomicTxMarshaller struct{}
+
+func (g GossipAtomicTxMarshaller) MarshalGossip(tx *GossipAtomicTx) ([]byte, error) {
+	return tx.Tx.SignedBytes(), nil
+}
+
+func (g GossipAtomicTxMarshaller) UnmarshalGossip(bytes []byte) (*GossipAtomicTx, error) {
+	tx, err := ExtractAtomicTx(bytes, Codec)
+	return &GossipAtomicTx{
+		Tx: tx,
+	}, err
+}
+
 type GossipAtomicTx struct {
 	Tx *Tx
 }
 
-func (tx *GossipAtomicTx) GetID() ids.ID {
+func (tx *GossipAtomicTx) GossipID() ids.ID {
 	return tx.Tx.ID()
-}
-
-func (tx *GossipAtomicTx) Marshal() ([]byte, error) {
-	return tx.Tx.SignedBytes(), nil
-}
-
-func (tx *GossipAtomicTx) Unmarshal(bytes []byte) error {
-	atomicTx, err := ExtractAtomicTx(bytes, Codec)
-	tx.Tx = atomicTx
-
-	return err
 }
 
 func NewGossipEthTxPool(mempool *txpool.TxPool) (*GossipEthTxPool, error) {
@@ -175,19 +181,24 @@ func (g *GossipEthTxPool) GetFilter() ([]byte, []byte, error) {
 	return bloom, salt[:], err
 }
 
+type GossipEthTxMarshaller struct{}
+
+func (g GossipEthTxMarshaller) MarshalGossip(tx *GossipEthTx) ([]byte, error) {
+	return tx.Tx.MarshalBinary()
+}
+
+func (g GossipEthTxMarshaller) UnmarshalGossip(bytes []byte) (*GossipEthTx, error) {
+	tx := &GossipEthTx{
+		Tx: &types.Transaction{},
+	}
+
+	return tx, tx.Tx.UnmarshalBinary(bytes)
+}
+
 type GossipEthTx struct {
 	Tx *types.Transaction
 }
 
-func (tx *GossipEthTx) GetID() ids.ID {
+func (tx *GossipEthTx) GossipID() ids.ID {
 	return ids.ID(tx.Tx.Hash())
-}
-
-func (tx *GossipEthTx) Marshal() ([]byte, error) {
-	return tx.Tx.MarshalBinary()
-}
-
-func (tx *GossipEthTx) Unmarshal(bytes []byte) error {
-	tx.Tx = &types.Transaction{}
-	return tx.Tx.UnmarshalBinary(bytes)
 }

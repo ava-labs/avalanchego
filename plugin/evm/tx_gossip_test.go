@@ -135,6 +135,7 @@ func TestEthTxGossip(t *testing.T) {
 	// wait so we aren't throttled by the vm
 	time.Sleep(5 * time.Second)
 
+	marshaller := GossipEthTxMarshaller{}
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
 	onResponse = func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
@@ -144,8 +145,8 @@ func TestEthTxGossip(t *testing.T) {
 		require.NoError(proto.Unmarshal(responseBytes, response))
 		require.Len(response.Gossip, 1)
 
-		gotTx := &GossipEthTx{}
-		require.NoError(gotTx.Unmarshal(response.Gossip[0]))
+		gotTx, err := marshaller.UnmarshalGossip(response.Gossip[0])
+		require.NoError(err)
 		require.Equal(signedTx.Hash(), gotTx.Tx.Hash())
 
 		wg.Done()
@@ -270,6 +271,8 @@ func TestAtomicTxGossip(t *testing.T) {
 
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
+
+	marshaller := GossipAtomicTxMarshaller{}
 	onResponse = func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
@@ -277,9 +280,9 @@ func TestAtomicTxGossip(t *testing.T) {
 		require.NoError(proto.Unmarshal(responseBytes, response))
 		require.Len(response.Gossip, 1)
 
-		gotTx := &GossipAtomicTx{}
-		require.NoError(gotTx.Unmarshal(response.Gossip[0]))
-		require.Equal(tx.ID(), gotTx.GetID())
+		gotTx, err := marshaller.UnmarshalGossip(response.Gossip[0])
+		require.NoError(err)
+		require.Equal(tx.ID(), gotTx.GossipID())
 
 		wg.Done()
 	}
@@ -339,10 +342,11 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 	require.Equal(byte(ethTxGossipProtocol), sent[0])
 	require.NoError(proto.Unmarshal(sent[1:], got))
 
-	gossipedTx := &GossipEthTx{}
+	marshaller := GossipEthTxMarshaller{}
 	require.Len(got.Gossip, 1)
-	require.NoError(gossipedTx.Unmarshal(got.Gossip[0]))
-	require.Equal(ids.ID(signedTx.Hash()), gossipedTx.GetID())
+	gossipedTx, err := marshaller.UnmarshalGossip(got.Gossip[0])
+	require.NoError(err)
+	require.Equal(ids.ID(signedTx.Hash()), gossipedTx.GossipID())
 }
 
 // Tests that a gossiped tx is added to the mempool and forwarded
@@ -384,10 +388,11 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), pk.ToECDSA())
 	require.NoError(err)
 
+	marshaller := GossipEthTxMarshaller{}
 	gossipedTx := &GossipEthTx{
 		Tx: signedTx,
 	}
-	gossipedTxBytes, err := gossipedTx.Marshal()
+	gossipedTxBytes, err := marshaller.MarshalGossip(gossipedTx)
 	require.NoError(err)
 
 	inboundGossip := &sdk.PushGossip{
@@ -407,9 +412,9 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	require.NoError(proto.Unmarshal(outboundGossipBytes[1:], forwardedMsg))
 	require.Len(forwardedMsg.Gossip, 1)
 
-	forwardedTx := &GossipEthTx{}
-	require.NoError(forwardedTx.Unmarshal(forwardedMsg.Gossip[0]))
-	require.Equal(gossipedTx.GetID(), forwardedTx.GetID())
+	forwardedTx, err := marshaller.UnmarshalGossip(forwardedMsg.Gossip[0])
+	require.NoError(err)
+	require.Equal(gossipedTx.GossipID(), forwardedTx.GossipID())
 	require.True(vm.txPool.Has(signedTx.Hash()))
 }
 
@@ -480,8 +485,9 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	require.NoError(proto.Unmarshal(gossipedBytes[1:], outboundGossipMsg))
 	require.Len(outboundGossipMsg.Gossip, 1)
 
-	gossipedTx := &GossipAtomicTx{}
-	require.NoError(gossipedTx.Unmarshal(outboundGossipMsg.Gossip[0]))
+	marshaller := GossipAtomicTxMarshaller{}
+	gossipedTx, err := marshaller.UnmarshalGossip(outboundGossipMsg.Gossip[0])
+	require.NoError(err)
 	require.Equal(tx.ID(), gossipedTx.Tx.ID())
 }
 
@@ -545,10 +551,11 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 	require.NoError(err)
 	require.NoError(vm.mempool.AddLocalTx(tx))
 
+	marshaller := GossipAtomicTxMarshaller{}
 	gossipedTx := &GossipAtomicTx{
 		Tx: tx,
 	}
-	gossipBytes, err := gossipedTx.Marshal()
+	gossipBytes, err := marshaller.MarshalGossip(gossipedTx)
 	require.NoError(err)
 
 	inboundGossip := &sdk.PushGossip{
@@ -568,8 +575,8 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 	require.NoError(proto.Unmarshal(forwardedBytes[1:], forwardedGossipMsg))
 	require.Len(forwardedGossipMsg.Gossip, 1)
 
-	forwardedTx := &GossipAtomicTx{}
-	require.NoError(forwardedTx.Unmarshal(forwardedGossipMsg.Gossip[0]))
+	forwardedTx, err := marshaller.UnmarshalGossip(forwardedGossipMsg.Gossip[0])
+	require.NoError(err)
 	require.Equal(tx.ID(), forwardedTx.Tx.ID())
 	require.True(vm.mempool.has(tx.ID()))
 }
