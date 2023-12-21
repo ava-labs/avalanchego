@@ -488,12 +488,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require.NoError(err)
 	txID := tx.ID()
 
-	// Issue the transaction
-	require.NoError(env.network.IssueTx(context.Background(), tx))
-	_, ok := env.mempool.Get(txID)
-	require.True(ok)
-
-	// Transaction should not be marked as dropped when added to the mempool
+	// Transaction should not be marked as dropped before being added to the
+	// mempool
 	reason := env.mempool.GetDropReason(txID)
 	require.NoError(reason)
 
@@ -503,16 +499,9 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	reason = env.mempool.GetDropReason(txID)
 	require.ErrorIs(reason, errTestingDropped)
 
-	// Dropped transactions should still be in the mempool
-	_, ok = env.mempool.Get(txID)
-	require.True(ok)
-
-	// Remove the transaction from the mempool
-	env.mempool.Remove(tx)
-
-	// Issue the transaction again
+	// Issue the transaction
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	_, ok = env.mempool.Get(txID)
+	_, ok := env.mempool.Get(txID)
 	require.True(ok)
 
 	// When issued again, the mempool should not be marked as dropped
