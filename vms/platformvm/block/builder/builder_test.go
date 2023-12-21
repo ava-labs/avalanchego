@@ -53,7 +53,8 @@ func TestBuildBlockBasic(t *testing.T) {
 
 	// Issue the transaction
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
 
 	// [BuildBlock] should build a block with the transaction
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
@@ -65,7 +66,8 @@ func TestBuildBlockBasic(t *testing.T) {
 	require.Equal(txID, blk.Txs()[0].ID())
 
 	// Mempool should not contain the transaction or have marked it as dropped
-	require.False(env.mempool.Has(txID))
+	_, ok = env.mempool.Get(txID)
+	require.False(ok)
 	require.NoError(env.mempool.GetDropReason(txID))
 }
 
@@ -124,7 +126,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	// Issue the transaction
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
 
 	// Build and accept a block with the tx
 	blk, err := env.Builder.BuildBlock(context.Background())
@@ -247,7 +250,8 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 
 	// Issue the transaction
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
 
 	var (
 		now      = env.backend.Clk.Time()
@@ -312,7 +316,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
 	tx1ID := tx1.ID()
-	require.True(env.mempool.Has(tx1ID))
+	_, ok := env.mempool.Get(tx1ID)
+	require.True(ok)
 
 	// Add a validator with StartTime before current chain time
 	validator2StartTime := now.Add(-5 * time.Second)
@@ -331,7 +336,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
 	tx2ID := tx2.ID()
-	require.True(env.mempool.Has(tx2ID))
+	_, ok = env.mempool.Get(tx2ID)
+	require.True(ok)
 
 	// Add a validator with StartTime in the future past [MaxFutureStartTime]
 	validator3StartTime := now.Add(txexecutor.MaxFutureStartTime + 5*time.Second)
@@ -350,7 +356,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx3))
 	tx3ID := tx3.ID()
-	require.True(env.mempool.Has(tx3ID))
+	_, ok = env.mempool.Get(tx3ID)
+	require.True(ok)
 
 	// Only tx1 should be in a built block
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
@@ -362,9 +369,12 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.Equal(tx1ID, blk.Txs()[0].ID())
 
 	// Mempool should have none of the txs
-	require.False(env.mempool.Has(tx1ID))
-	require.False(env.mempool.Has(tx2ID))
-	require.False(env.mempool.Has(tx3ID))
+	_, ok = env.mempool.Get(tx1ID)
+	require.False(ok)
+	_, ok = env.mempool.Get(tx2ID)
+	require.False(ok)
+	_, ok = env.mempool.Get(tx3ID)
+	require.False(ok)
 
 	// Only tx2 and tx3 should be dropped
 	require.NoError(env.mempool.GetDropReason(tx1ID))
@@ -411,7 +421,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
 	tx1ID := tx1.ID()
-	require.True(env.mempool.Has(tx1ID))
+	_, ok := env.mempool.Get(tx1ID)
+	require.True(ok)
 
 	// Add a validator ending past [MaxStakeDuration]
 	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
@@ -429,7 +440,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
 	tx2ID := tx2.ID()
-	require.True(env.mempool.Has(tx2ID))
+	_, ok = env.mempool.Get(tx2ID)
+	require.True(ok)
 
 	// Only tx1 should be in a built block since [MaxStakeDuration] is satisfied.
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
@@ -441,8 +453,10 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.Equal(tx1ID, blk.Txs()[0].ID())
 
 	// Mempool should have none of the txs
-	require.False(env.mempool.Has(tx1ID))
-	require.False(env.mempool.Has(tx2ID))
+	_, ok = env.mempool.Get(tx1ID)
+	require.False(ok)
+	_, ok = env.mempool.Get(tx2ID)
+	require.False(ok)
 
 	// Only tx2 should be dropped
 	require.NoError(env.mempool.GetDropReason(tx1ID))
@@ -474,11 +488,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require.NoError(err)
 	txID := tx.ID()
 
-	// Issue the transaction
-	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
-
-	// Transaction should not be marked as dropped when added to the mempool
+	// Transaction should not be marked as dropped before being added to the
+	// mempool
 	reason := env.mempool.GetDropReason(txID)
 	require.NoError(reason)
 
@@ -488,15 +499,10 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	reason = env.mempool.GetDropReason(txID)
 	require.ErrorIs(reason, errTestingDropped)
 
-	// Dropped transactions should still be in the mempool
-	require.True(env.mempool.Has(txID))
-
-	// Remove the transaction from the mempool
-	env.mempool.Remove([]*txs.Tx{tx})
-
-	// Issue the transaction again
+	// Issue the transaction
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
 
 	// When issued again, the mempool should not be marked as dropped
 	reason = env.mempool.GetDropReason(txID)
