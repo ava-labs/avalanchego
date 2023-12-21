@@ -222,6 +222,10 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	return env
 }
 
+// Returns:
+//
+//  1. tx in genesis that creates asset
+//  2. the index of the output
 func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
 	require := require.New(tb)
 
