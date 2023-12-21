@@ -2,7 +2,10 @@
 // See the file LICENSE for licensing terms.
 
 import { ethers } from "hardhat"
-import { test } from "./utils"
+import { Roles, test } from "./utils"
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { expect } from "chai";
+import { Contract } from "ethers"
 
 // make sure this is always an admin for minter precompile
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
@@ -82,4 +85,41 @@ describe("ExampleTxAllowList", function () {
   test("should not let manager to revoke manager", "step_managerCannotRevokeManager")
 
   test("should let manager to deploy", "step_managerCanDeploy")
+})
+
+describe("IAllowList", function () {
+  let owner: SignerWithAddress
+  let contract: Contract
+  before(async function () {
+    owner = await ethers.getSigner(ADMIN_ADDRESS);
+    contract = await ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS, owner)
+  });
+
+  it("should emit event after set admin", async function () {
+    let testAddress = "0x0111000000000000000000000000000000000001"
+    await expect(contract.setAdmin(testAddress))
+      .to.emit(contract, 'RoleSet')
+      .withArgs(Roles.Admin, testAddress, owner.address, Roles.None)
+  })
+
+  it("should emit event after set manager", async function () {
+    let testAddress = "0x0222000000000000000000000000000000000002"
+    await expect(contract.setManager(testAddress))
+      .to.emit(contract, 'RoleSet')
+      .withArgs(Roles.Manager, testAddress, owner.address, Roles.None)
+  })
+
+  it("should emit event after set enabled", async function () {
+    let testAddress = "0x0333000000000000000000000000000000000003"
+    await expect(contract.setEnabled(testAddress))
+      .to.emit(contract, 'RoleSet')
+      .withArgs(Roles.Enabled, testAddress, owner.address, Roles.None)
+  })
+
+  it("should emit event after set none", async function () {
+    let testAddress = "0x0333000000000000000000000000000000000003"
+    await expect(contract.setNone(testAddress))
+      .to.emit(contract, 'RoleSet')
+      .withArgs(Roles.None, testAddress, owner.address, Roles.Enabled)
+  })
 })

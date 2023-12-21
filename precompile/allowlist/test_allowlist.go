@@ -35,12 +35,15 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 
 				return input
 			},
-			SuppliedGas: ModifyAllowListGasCost,
+			SuppliedGas: ModifyAllowListGasCost + AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				res := GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, AdminRole, res)
+				// Check logs are stored in state
+				logsTopics, logsData := state.GetLogData()
+				assertSetRoleEvent(t, logsTopics, logsData, AdminRole, TestNoRoleAddr, TestAdminAddr, NoRole)
 			},
 		},
 		"admin set enabled": {
@@ -52,12 +55,15 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 
 				return input
 			},
-			SuppliedGas: ModifyAllowListGasCost,
+			SuppliedGas: ModifyAllowListGasCost + AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				res := GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, EnabledRole, res)
+				// Check logs are stored in state
+				logsTopics, logsData := state.GetLogData()
+				assertSetRoleEvent(t, logsTopics, logsData, EnabledRole, TestNoRoleAddr, TestAdminAddr, NoRole)
 			},
 		},
 		"admin set no role": {
@@ -69,15 +75,18 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 
 				return input
 			},
-			SuppliedGas: ModifyAllowListGasCost,
+			SuppliedGas: ModifyAllowListGasCost + AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				res := GetAllowListStatus(state, contractAddress, TestEnabledAddr)
 				require.Equal(t, NoRole, res)
+				// Check logs are stored in state
+				logsTopics, logsData := state.GetLogData()
+				assertSetRoleEvent(t, logsTopics, logsData, NoRole, TestEnabledAddr, TestAdminAddr, EnabledRole)
 			},
 		},
-		"set no role from no role": {
+		"no role set no role": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -90,7 +99,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set enabled from no role": {
+		"no role set enabled": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -103,7 +112,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set admin from no role": {
+		"no role set admin": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -116,7 +125,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set no role from enabled": {
+		"enabled set no role": {
 			Caller:     TestEnabledAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -129,7 +138,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set enabled from enabled": {
+		"enabled set enabled": {
 			Caller:     TestEnabledAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -142,7 +151,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set admin from enabled": {
+		"enabled set admin": {
 			Caller:     TestEnabledAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -155,7 +164,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set manager from no role before activation": {
+		"no role set manager pre-DUpgrade": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -173,7 +182,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: "invalid non-activated function selector",
 		},
-		"set manager from no role after activation": {
+		"no role set manager": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -191,7 +200,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set manager from enabled role before activation": {
+		"enabled role set manager pre-DUpgrade": {
 			Caller:     TestEnabledAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -209,7 +218,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: "invalid non-activated function selector",
 		},
-		"set manager from enabled after activation": {
+		"enabled set manager": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -227,7 +236,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set manager from admin before activation": {
+		"admin set manager pre-DUpgarde": {
 			Caller:     TestAdminAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -245,7 +254,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: "invalid non-activated function selector",
 		},
-		"set manager from admin after activation": {
+		"admin set manager": {
 			Caller:     TestAdminAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -260,14 +269,17 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
-			SuppliedGas: ModifyAllowListGasCost,
+			SuppliedGas: ModifyAllowListGasCost + AllowListEventGasCost,
 			ReadOnly:    false,
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				res := GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, ManagerRole, res)
+				// Check logs are stored in state
+				logsTopics, logsData := state.GetLogData()
+				assertSetRoleEvent(t, logsTopics, logsData, ManagerRole, TestNoRoleAddr, TestAdminAddr, NoRole)
 			},
 		},
-		"set no role to no role from manager after activation": {
+		"manager set no role to no role": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -276,16 +288,19 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 
 				return input
 			},
-			SuppliedGas: ModifyAllowListGasCost,
+			SuppliedGas: ModifyAllowListGasCost + AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			ExpectedErr: "",
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				res := GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, NoRole, res)
+				// Check logs are stored in state
+				logsTopics, logsData := state.GetLogData()
+				assertSetRoleEvent(t, logsTopics, logsData, NoRole, TestNoRoleAddr, TestManagerAddr, NoRole)
 			},
 		},
-		"set no role to enabled from manager after activation": {
+		"manager set no role to enabled": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -294,16 +309,20 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 
 				return input
 			},
-			SuppliedGas: ModifyAllowListGasCost,
+			SuppliedGas: ModifyAllowListGasCost + AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			ExpectedErr: "",
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				res := GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, EnabledRole, res)
+
+				// Check logs are stored in state
+				logsTopics, logsData := state.GetLogData()
+				assertSetRoleEvent(t, logsTopics, logsData, EnabledRole, TestNoRoleAddr, TestManagerAddr, NoRole)
 			},
 		},
-		"set no role to manager from manager after activation": {
+		"manager set no role to manager": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -321,7 +340,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set no role to admin from manager after activation": {
+		"manager set no role to admin": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -334,7 +353,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set enabled role to admin from manager after activation": {
+		"manager set enabled to admin": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -347,7 +366,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set enabled role to manager from manager after activation": {
+		"manager set enabled role to manager": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -365,7 +384,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set enabled role to no role from manager after activation": {
+		"manager set enabled role to no role": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -374,15 +393,19 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 
 				return input
 			},
-			SuppliedGas: ModifyAllowListGasCost,
+			SuppliedGas: ModifyAllowListGasCost + AllowListEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				res := GetAllowListStatus(state, contractAddress, TestNoRoleAddr)
 				require.Equal(t, NoRole, res)
+
+				// Check logs are stored in state
+				logsTopics, logsData := state.GetLogData()
+				assertSetRoleEvent(t, logsTopics, logsData, NoRole, TestEnabledAddr, TestManagerAddr, EnabledRole)
 			},
 		},
-		"set admin to no role from manager after activation": {
+		"manager set admin to no role": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -395,7 +418,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set admin role to enabled from manager after activation": {
+		"manager set admin role to enabled": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -408,7 +431,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set admin to manager from manager after activation": {
+		"manager set admin to manager": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -426,7 +449,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set manager role to no role from manager after activation": {
+		"manager set manager to no role": {
 			Caller:     TestManagerAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -439,7 +462,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotModifyAllowList.Error(),
 		},
-		"set no role with readOnly enabled": {
+		"admin set no role with readOnly enabled": {
 			Caller:     TestAdminAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -452,7 +475,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    true,
 			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
 		},
-		"set no role insufficient gas": {
+		"admin set no role insufficient gas": {
 			Caller:     TestAdminAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -465,7 +488,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
-		"read allow list no role": {
+		"no role read allow list": {
 			Caller:     TestNoRoleAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -478,7 +501,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedRes: common.Hash(NoRole).Bytes(),
 		},
-		"read allow list admin role": {
+		"admin role read allow list": {
 			Caller:     TestAdminAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -490,7 +513,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    false,
 			ExpectedRes: common.Hash(AdminRole).Bytes(),
 		},
-		"read allow list with readOnly enabled": {
+		"admin read allow list with readOnly enabled": {
 			Caller:     TestAdminAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -502,7 +525,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			ReadOnly:    true,
 			ExpectedRes: common.Hash(NoRole).Bytes(),
 		},
-		"read allow list out of gas": {
+		"radmin read allow list out of gas": {
 			Caller:     TestAdminAddr,
 			BeforeHook: SetDefaultRoles(contractAddress),
 			InputFn: func(t testing.TB) []byte {
@@ -556,6 +579,75 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 				require.Equal(t, EnabledRole, GetAllowListStatus(state, contractAddress, TestNoRoleAddr))
 			},
 		},
+		"admin set admin pre-DUpgrade": {
+			Caller:     TestAdminAddr,
+			BeforeHook: SetDefaultRoles(contractAddress),
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				return config
+			},
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackModifyAllowList(TestNoRoleAddr, AdminRole)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: ModifyAllowListGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				// Check no logs are stored in state
+				topics, data := stateDB.GetLogData()
+				require.Len(t, topics, 0)
+				require.Len(t, data, 0)
+			},
+		},
+		"admin set enabled pre-DUpgrade": {
+			Caller:     TestAdminAddr,
+			BeforeHook: SetDefaultRoles(contractAddress),
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				return config
+			},
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackModifyAllowList(TestNoRoleAddr, EnabledRole)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: ModifyAllowListGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				// Check no logs are stored in state
+				topics, data := stateDB.GetLogData()
+				require.Len(t, topics, 0)
+				require.Len(t, data, 0)
+			},
+		},
+		"admin set no role pre-DUpgrade": {
+			Caller:     TestAdminAddr,
+			BeforeHook: SetDefaultRoles(contractAddress),
+			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
+				config := precompileconfig.NewMockChainConfig(ctrl)
+				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				return config
+			},
+			InputFn: func(t testing.TB) []byte {
+				input, err := PackModifyAllowList(TestEnabledAddr, NoRole)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: ModifyAllowListGasCost,
+			ReadOnly:    false,
+			ExpectedRes: []byte{},
+			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+				// Check no logs are stored in state
+				topics, data := stateDB.GetLogData()
+				require.Len(t, topics, 0)
+				require.Len(t, data, 0)
+			},
+		},
 	}
 }
 
@@ -604,4 +696,17 @@ func BenchPrecompileWithAllowList(b *testing.B, module modules.Module, newStateD
 			test.Bench(b, module, newStateDB(b))
 		})
 	}
+}
+
+func assertSetRoleEvent(t testing.TB, logsTopics [][]common.Hash, logsData [][]byte, role Role, addr common.Address, caller common.Address, oldRole Role) {
+	require.Len(t, logsTopics, 1)
+	require.Len(t, logsData, 1)
+	topics := logsTopics[0]
+	require.Len(t, topics, 4)
+	require.Equal(t, AllowListABI.Events["RoleSet"].ID, topics[0])
+	require.Equal(t, role.Hash(), topics[1])
+	require.Equal(t, addr.Hash(), topics[2])
+	require.Equal(t, caller.Hash(), topics[3])
+	data := logsData[0]
+	require.Equal(t, oldRole.Bytes(), data)
 }

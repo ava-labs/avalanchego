@@ -125,3 +125,10 @@ const buildTestFn = (fnNameOrObject: FnNameOrObject, overrides = {}, debug = fal
     }), Promise.resolve())
   }
 }
+
+export const Roles = {
+  None: 0,
+  Enabled: 1,
+  Admin: 2,
+  Manager: 3,
+}

@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 interface IAllowList {
+  event RoleSet(uint256 indexed role, address indexed account, address indexed sender, uint256 oldRole);
+
   // Set [addr] to have the admin role over the precompile contract.
   function setAdmin(address addr) external;
 

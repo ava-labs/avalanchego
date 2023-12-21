@@ -4,6 +4,7 @@
 package allowlist
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +20,8 @@ var (
 	AdminRole   = Role(common.BigToHash(common.Big2))
 	ManagerRole = Role(common.BigToHash(common.Big3))
 	// Roles should be incremented and not changed.
+
+	ErrInvalidRole = errors.New("invalid role")
 )
 
 // Enum constants for valid Role
@@ -77,18 +80,18 @@ func (r Role) Hash() common.Hash {
 	return common.Hash(r)
 }
 
-func (r Role) GetSetterFunctionName() string {
+func (r Role) GetSetterFunctionName() (string, error) {
 	switch r {
 	case AdminRole:
-		return "setAdmin"
+		return "setAdmin", nil
 	case ManagerRole:
-		return "setManager"
+		return "setManager", nil
 	case EnabledRole:
-		return "setEnabled"
+		return "setEnabled", nil
 	case NoRole:
-		return "setNone"
+		return "setNone", nil
 	default:
-		panic("unknown role")
+		return "", ErrInvalidRole
 	}
 }
 
@@ -105,5 +108,15 @@ func (r Role) String() string {
 		return "AdminRole"
 	default:
 		return "UnknownRole"
+	}
+}
+
+func FromBig(b *big.Int) (Role, error) {
+	role := Role(common.BigToHash(b))
+	switch role {
+	case NoRole, EnabledRole, ManagerRole, AdminRole:
+		return role, nil
+	default:
+		return Role{}, ErrInvalidRole
 	}
 }

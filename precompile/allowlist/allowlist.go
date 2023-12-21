@@ -59,7 +59,10 @@ func SetAllowListRole(stateDB contract.StateDB, precompileAddr, address common.A
 }
 
 func PackModifyAllowList(address common.Address, role Role) ([]byte, error) {
-	funcName := role.GetSetterFunctionName()
+	funcName, err := role.GetSetterFunctionName()
+	if err != nil {
+		return nil, err
+	}
 	return AllowListABI.Pack(funcName, address)
 }
 
@@ -68,9 +71,12 @@ func UnpackModifyAllowListInput(input []byte, r Role, useStrictMode bool) (commo
 		return common.Address{}, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))
 	}
 
-	funcName := r.GetSetterFunctionName()
+	funcName, err := r.GetSetterFunctionName()
+	if err != nil {
+		return common.Address{}, err
+	}
 	var modifyAddress common.Address
-	err := AllowListABI.UnpackInputIntoInterface(&modifyAddress, funcName, input, useStrictMode)
+	err = AllowListABI.UnpackInputIntoInterface(&modifyAddress, funcName, input, useStrictMode)
 	return modifyAddress, err
 }
 
@@ -103,8 +109,24 @@ func createAllowListRoleSetter(precompileAddr common.Address, role Role) contrac
 		if !callerStatus.CanModify(modifyStatus, role) {
 			return nil, remainingGas, fmt.Errorf("%w: modify address: %s, from role: %s, to role: %s", ErrCannotModifyAllowList, callerAddr, modifyStatus, role)
 		}
+		if contract.IsDUpgradeActivated(evm) {
+			if remainingGas, err = contract.DeductGas(remainingGas, AllowListEventGasCost); err != nil {
+				return nil, 0, err
+			}
+			topics, data, err := PackRoleSetEvent(role, modifyAddress, callerAddr, modifyStatus)
+			if err != nil {
+				return nil, remainingGas, err
+			}
+			stateDB.AddLog(
+				precompileAddr,
+				topics,
+				data,
+				evm.GetBlockContext().Number().Uint64(),
+			)
+		}
+
 		SetAllowListRole(stateDB, precompileAddr, modifyAddress, role)
-		// Return an empty output and the remaining gas
+
 		return []byte{}, remainingGas, nil
 	}
 }
@@ -169,22 +191,20 @@ func CreateAllowListFunctions(precompileAddr common.Address) []*contract.Statefu
 
 	for name, method := range AllowListABI.Methods {
 		var fn *contract.StatefulPrecompileFunction
-		switch name {
-		case AdminRole.GetSetterFunctionName():
-			fn = contract.NewStatefulPrecompileFunction(method.ID, createAllowListRoleSetter(precompileAddr, AdminRole))
-		case EnabledRole.GetSetterFunctionName():
-			fn = contract.NewStatefulPrecompileFunction(method.ID, createAllowListRoleSetter(precompileAddr, EnabledRole))
-		case NoRole.GetSetterFunctionName():
-			fn = contract.NewStatefulPrecompileFunction(method.ID, createAllowListRoleSetter(precompileAddr, NoRole))
-		case "readAllowList":
+		if name == "readAllowList" {
 			fn = contract.NewStatefulPrecompileFunction(method.ID, createReadAllowList(precompileAddr))
-		case ManagerRole.GetSetterFunctionName():
+		} else if adminFnName, _ := AdminRole.GetSetterFunctionName(); name == adminFnName {
+			fn = contract.NewStatefulPrecompileFunction(method.ID, createAllowListRoleSetter(precompileAddr, AdminRole))
+		} else if enabledFnName, _ := EnabledRole.GetSetterFunctionName(); name == enabledFnName {
+			fn = contract.NewStatefulPrecompileFunction(method.ID, createAllowListRoleSetter(precompileAddr, EnabledRole))
+		} else if noRoleFnName, _ := NoRole.GetSetterFunctionName(); name == noRoleFnName {
+			fn = contract.NewStatefulPrecompileFunction(method.ID, createAllowListRoleSetter(precompileAddr, NoRole))
+		} else if managerFnName, _ := ManagerRole.GetSetterFunctionName(); name == managerFnName {
 			fn = contract.NewStatefulPrecompileFunctionWithActivator(method.ID, createAllowListRoleSetter(precompileAddr, ManagerRole), contract.IsDUpgradeActivated)
-		default:
+		} else {
 			panic(fmt.Sprintf("unexpected method name: %s", name))
 		}
 		functions = append(functions, fn)
 	}
-
 	return functions
 }
