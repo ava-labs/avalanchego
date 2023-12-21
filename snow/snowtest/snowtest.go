@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	XChainID = ids.GenerateTestID()
-	CChainID = ids.GenerateTestID()
-	PChainID = constants.PlatformChainID
+	XChainID    = ids.GenerateTestID()
+	CChainID    = ids.GenerateTestID()
+	PChainID    = constants.PlatformChainID
+	AVAXAssetID = ids.GenerateTestID()
 
 	errMissing = errors.New("missing")
 
@@ -55,7 +56,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	ctx.ChainID = chainID
 	ctx.XChainID = XChainID
 	ctx.CChainID = CChainID
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx.AVAXAssetID = AVAXAssetID
 
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
