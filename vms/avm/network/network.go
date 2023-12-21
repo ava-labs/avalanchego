@@ -36,6 +36,7 @@ var (
 type Network struct {
 	*p2p.Network
 
+	txPushGossiper gossip.Accumulator[*gossipTx]
 	txPullGossiper gossip.Gossiper
 
 	ctx       *snow.Context
@@ -154,6 +155,7 @@ func New(
 
 	return &Network{
 		Network:        p2pNetwork,
+		txPushGossiper: txPushGossiper,
 		txPullGossiper: txPullGossiper,
 		ctx:            ctx,
 		parser:         parser,

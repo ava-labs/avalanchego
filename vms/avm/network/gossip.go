@@ -100,6 +100,10 @@ type gossipMempool struct {
 	bloom *gossip.BloomFilter
 }
 
+// Add is called by the p2p SDK when handling transactions that were pushed to
+// us and when handling transactions that were pulled from a peer. If this
+// returns a nil error while handling push gossip, the p2p SDK will queue the
+// transaction to push gossip as well.
 func (g *gossipMempool) Add(tx *gossipTx) error {
 	txID := tx.tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
