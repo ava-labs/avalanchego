@@ -5,6 +5,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -677,7 +678,7 @@ func TestPersistStakers(t *testing.T) {
 	subnetIDs := []ids.ID{constants.PrimaryNetworkID, ids.GenerateTestID()}
 	for _, subnetID := range subnetIDs {
 		for name, test := range tests {
-			t.Run(name, func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s - subnetID %s", name, subnetID), func(t *testing.T) {
 				require := require.New(t)
 
 				state, db := newUninitializedState(require)
