@@ -37,25 +37,25 @@ func TestAdd(t *testing.T) {
 			name:       "attempt adding duplicate tx",
 			initialTxs: []*txs.Tx{tx0},
 			tx:         tx0,
-			err:        errDuplicateTx,
+			err:        ErrDuplicateTx,
 		},
 		{
 			name:       "attempt adding too large tx",
 			initialTxs: nil,
 			tx:         newTx(0, MaxTxSize+1),
-			err:        errTxTooLarge,
+			err:        ErrTxTooLarge,
 		},
 		{
 			name:       "attempt adding tx when full",
 			initialTxs: newTxs(maxMempoolSize/MaxTxSize, MaxTxSize),
 			tx:         newTx(maxMempoolSize/MaxTxSize, MaxTxSize),
-			err:        errMempoolFull,
+			err:        ErrMempoolFull,
 		},
 		{
 			name:       "attempt adding conflicting tx",
 			initialTxs: []*txs.Tx{tx0},
 			tx:         newTx(0, 32),
-			err:        errConflictsWithOtherTx,
+			err:        ErrConflictsWithOtherTx,
 		},
 	}
 	for _, test := range tests {
