@@ -40,9 +40,9 @@ type Network interface {
 	// Invariant: The context lock is not held
 	IssueTx(context.Context, *txs.Tx) error
 
-	// IssueTx attempts to add a tx to the mempool, after verifying it against
-	// the preferred state. If the tx is added to the mempool, it will attempt
-	// to push gossip the tx to random peers in the network.
+	// IssueTx attempts to add a tx to the mempool. If the tx is added to the
+	// mempool, it will attempt to push gossip the tx to random peers in the
+	// network.
 	//
 	// If the tx is already in the mempool, mempool.ErrDuplicateTx will be
 	// returned.
