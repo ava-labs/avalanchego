@@ -200,7 +200,7 @@ func (b *Block) Verify(context.Context) error {
 	stateDiff.AddBlock(b.Block)
 
 	b.manager.blkIDToState[blkID] = blockState
-	b.manager.mempool.Remove(txs)
+	b.manager.mempool.Remove(txs...)
 	return nil
 }
 
@@ -220,7 +220,7 @@ func (b *Block) Accept(context.Context) error {
 	}
 
 	b.manager.lastAccepted = blkID
-	b.manager.mempool.Remove(txs)
+	b.manager.mempool.Remove(txs...)
 
 	blkState, ok := b.manager.blkIDToState[blkID]
 	if !ok {
