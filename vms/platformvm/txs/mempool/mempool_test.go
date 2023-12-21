@@ -60,23 +60,22 @@ func TestDecisionTxsInMempool(t *testing.T) {
 
 	for _, tx := range decisionTxs {
 		// tx not already there
-		require.False(mpool.Has(tx.ID()))
+		_, ok := mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can insert
 		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		require.True(mpool.Has(tx.ID()))
-
-		retrieved := mpool.Get(tx.ID())
-		require.NotNil(retrieved)
-		require.Equal(tx, retrieved)
+		got, ok := mpool.Get(tx.ID())
+		require.True(ok)
+		require.Equal(tx, got)
 
 		// once removed it cannot be there
-		mpool.Remove([]*txs.Tx{tx})
+		mpool.Remove(tx)
 
-		require.False(mpool.Has(tx.ID()))
-		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
+		_, ok = mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can reinsert it again to grow the mempool
 		require.NoError(mpool.Add(tx))
@@ -97,23 +96,22 @@ func TestProposalTxsInMempool(t *testing.T) {
 	require.NoError(err)
 
 	for _, tx := range proposalTxs {
-		require.False(mpool.Has(tx.ID()))
+		_, ok := mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can insert
 		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		require.True(mpool.Has(tx.ID()))
-
-		retrieved := mpool.Get(tx.ID())
-		require.NotNil(retrieved)
-		require.Equal(tx, retrieved)
+		got, ok := mpool.Get(tx.ID())
+		require.Equal(tx, got)
+		require.True(ok)
 
 		// once removed it cannot be there
-		mpool.Remove([]*txs.Tx{tx})
+		mpool.Remove(tx)
 
-		require.False(mpool.Has(tx.ID()))
-		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
+		_, ok = mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can reinsert it again to grow the mempool
 		require.NoError(mpool.Add(tx))
@@ -199,29 +197,6 @@ func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
 	return txs.NewSigned(utx, txs.Codec, nil)
 }
 
-func TestDropExpiredStakerTxs(t *testing.T) {
-	require := require.New(t)
-
-	registerer := prometheus.NewRegistry()
-	mempool, err := New("mempool", registerer, nil)
-	require.NoError(err)
-
-	tx1, err := generateAddValidatorTx(10, 20)
-	require.NoError(err)
-	require.NoError(mempool.Add(tx1))
-
-	tx2, err := generateAddValidatorTx(8, 20)
-	require.NoError(err)
-	require.NoError(mempool.Add(tx2))
-
-	tx3, err := generateAddValidatorTx(15, 20)
-	require.NoError(err)
-	require.NoError(mempool.Add(tx3))
-
-	minStartTime := time.Unix(9, 0)
-	require.Len(mempool.DropExpiredStakerTxs(minStartTime), 1)
-}
-
 func TestPeekTxs(t *testing.T) {
 	require := require.New(t)
 
@@ -247,14 +222,14 @@ func TestPeekTxs(t *testing.T) {
 	require.Equal(tx, testDecisionTxs[0])
 	require.NotEqual(tx, testProposalTxs[0])
 
-	mempool.Remove([]*txs.Tx{testDecisionTxs[0]})
+	mempool.Remove(testDecisionTxs[0])
 
 	tx, exists = mempool.Peek()
 	require.True(exists)
 	require.NotEqual(tx, testDecisionTxs[0])
 	require.Equal(tx, testProposalTxs[0])
 
-	mempool.Remove([]*txs.Tx{testProposalTxs[0]})
+	mempool.Remove(testProposalTxs[0])
 
 	tx, exists = mempool.Peek()
 	require.False(exists)

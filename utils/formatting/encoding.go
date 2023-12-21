@@ -69,7 +69,7 @@ func (enc Encoding) MarshalJSON() ([]byte, error) {
 	if !enc.valid() {
 		return nil, errInvalidEncoding
 	}
-	return []byte("\"" + enc.String() + "\""), nil
+	return []byte(`"` + enc.String() + `"`), nil
 }
 
 func (enc *Encoding) UnmarshalJSON(b []byte) error {

@@ -116,6 +116,8 @@ message Version {
   // Subnets the peer is tracking
   repeated bytes tracked_subnets = 8;
   Client client = 9;
+  repeated uint32 supported_acps = 10;
+  repeated uint32 objected_acps = 11;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility

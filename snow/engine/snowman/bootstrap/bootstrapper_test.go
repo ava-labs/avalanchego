@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -38,7 +39,7 @@ var errUnknownBlock = errors.New("unknown block")
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snowtest.ConsensusContext()
 
 	vdrs := validators.NewManager()
 
@@ -104,7 +105,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	sender.Default(true)
 	vm.Default(true)
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snowtest.ConsensusContext()
 	// create boostrapper configuration
 	peers := validators.NewManager()
 	sampleK := 2
@@ -1314,7 +1315,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 func TestBootstrapNoParseOnNew(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snowtest.ConsensusContext()
 	peers := validators.NewManager()
 
 	sender := &common.SenderTest{}

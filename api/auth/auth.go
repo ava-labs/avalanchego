@@ -41,7 +41,7 @@ const (
 var (
 	errNoToken               = errors.New("auth token not provided")
 	errAuthHeaderNotParsable = fmt.Errorf(
-		"couldn't parse auth token. Header \"%s\" should be \"%sTOKEN.GOES.HERE\"",
+		`couldn't parse auth token. Header "%s" should be "%sTOKEN.GOES.HERE"`,
 		headerKey,
 		headerValStart,
 	)

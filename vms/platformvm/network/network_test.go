@@ -95,7 +95,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(true)
+				mempool.EXPECT().Get(gomock.Any()).Return(testTx, true)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				return mempool
 			},
@@ -170,6 +170,8 @@ func TestNetworkAppGossip(t *testing.T) {
 }
 
 func TestNetworkIssueTx(t *testing.T) {
+	tx := &txs.Tx{}
+
 	type test struct {
 		name                      string
 		mempoolFunc               func(*gomock.Controller) mempool.Mempool
@@ -184,7 +186,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "mempool has transaction",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(true)
+				mempool.EXPECT().Get(gomock.Any()).Return(tx, true)
 				return mempool
 			},
 			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
@@ -203,7 +205,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "transaction marked as dropped in mempool",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
@@ -222,7 +224,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "transaction invalid",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
@@ -241,7 +243,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "can't add transaction to mempool",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
 				mempool.EXPECT().MarkDropped(gomock.Any(), errTest)
 				return mempool
@@ -261,7 +263,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "AppGossip tx but do not add to mempool if primary network is not being fully synced",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				return mempool
 			},
 			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
@@ -282,7 +284,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "happy path",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Has(gomock.Any()).Return(false)
+				mempool.EXPECT().Get(gomock.Any()).Return(tx, false)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
 				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
@@ -316,7 +318,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
 			)
-			err := n.IssueTx(context.Background(), &txs.Tx{})
+			err := n.IssueTx(context.Background(), tx)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}

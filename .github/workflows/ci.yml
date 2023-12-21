@@ -1,0 +1,183 @@
+name: Tests
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  go_version: '~1.20.12'
+  tmpnet_data_path: ~/.tmpnet/networks/1000
+
+jobs:
+  Unit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
+        shell: bash
+        if: matrix.os == 'windows-2022'
+        run: echo "TIMEOUT=240s" >> $GITHUB_ENV
+      - name: build_test
+        shell: bash
+        run: ./scripts/build_test.sh
+        env:
+          TIMEOUT: ${{ env.TIMEOUT }}
+  Fuzz:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: fuzz_test
+        shell: bash
+        run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests
+        shell: bash
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
+  e2e_existing_network:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests with existing network
+        shell: bash
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-existing-network-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
+  Upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh
+      - name: Run e2e tests
+        shell: bash
+        run: ./scripts/tests.upgrade.sh
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: upgrade-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
+  Lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: Run static analysis tests
+        shell: bash
+        run: scripts/lint.sh
+  buf-lint:
+    name: Protobuf Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: bufbuild/buf-setup-action@v1.26.1
+        with:
+          github_token: ${{ github.token }}
+      - uses: bufbuild/buf-lint-action@v1
+        with:
+          input: "proto"
+  check_generated_protobuf:
+    name: Up-to-date protobuf
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - uses: bufbuild/buf-setup-action@v1.26.1
+      - shell: bash
+        run: scripts/protobuf_codegen.sh
+      - shell: bash
+        run: .github/workflows/check-clean-branch.sh
+  check_mockgen:
+    name: Up-to-date mocks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - shell: bash
+        run: scripts/mock.gen.sh
+      - shell: bash
+        run: .github/workflows/check-clean-branch.sh
+  go_mod_tidy:
+    name: Up-to-date go.mod and go.sum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - shell: bash
+        run: go mod tidy
+      - shell: bash
+        run: .github/workflows/check-clean-branch.sh

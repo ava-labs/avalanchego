@@ -51,20 +51,20 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 	return b.state, blkID == b.state.GetLastAccepted()
 }
 
-func (b *backend) getBlkWithOnAbortState(blkID ids.ID) (*blockState, bool) {
+func (b *backend) getOnAbortState(blkID ids.ID) (state.Diff, bool) {
 	state, ok := b.blkIDToState[blkID]
 	if !ok || state.onAbortState == nil {
 		return nil, false
 	}
-	return state, true
+	return state.onAbortState, true
 }
 
-func (b *backend) getBlkWithOnCommitState(blkID ids.ID) (*blockState, bool) {
+func (b *backend) getOnCommitState(blkID ids.ID) (state.Diff, bool) {
 	state, ok := b.blkIDToState[blkID]
 	if !ok || state.onCommitState == nil {
 		return nil, false
 	}
-	return state, true
+	return state.onCommitState, true
 }
 
 func (b *backend) GetBlock(blkID ids.ID) (block.Block, error) {

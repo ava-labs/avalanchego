@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -391,26 +392,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed setting preference: %w", err)
 	}
 
-	// move time ahead, promoting the validator to current
-	stakerTx := signedTx.Unsigned.(txs.ScheduledStaker)
-	currentTime := stakerTx.StartTime()
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed building block: %w", err)
-	}
-	if err := blk.Verify(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed verifying block: %w", err)
-	}
-	if err := blk.Accept(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed accepting block: %w", err)
-	}
-	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return nil, fmt.Errorf("failed setting preference: %w", err)
-	}
-
+	stakerTx := signedTx.Unsigned.(txs.Staker)
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 
@@ -752,7 +734,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
 	msgChan := make(chan common.Message, 1)
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
@@ -765,7 +747,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil
 	}
 
-	genesisBytes, err := buildCustomGenesis()
+	genesisBytes, err := buildCustomGenesis(ctx.AVAXAssetID)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
@@ -823,7 +805,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	return vm, testSubnet1.ID(), nil
 }
 
-func buildCustomGenesis() ([]byte, error) {
+func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()

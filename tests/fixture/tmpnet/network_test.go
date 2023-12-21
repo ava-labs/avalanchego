@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package local
+package tmpnet
 
 import (
 	"testing"
@@ -14,9 +14,12 @@ func TestNetworkSerialization(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	network := &LocalNetwork{Dir: tmpDir}
-	require.NoError(network.PopulateLocalNetworkConfig(1337, 1, 1))
+	network := &Network{Dir: tmpDir}
+	require.NoError(network.PopulateNetworkConfig(1337, 1, 1))
 	require.NoError(network.WriteAll())
+
+	// Ensure node runtime is initialized
+	require.NoError(network.ReadNodes())
 
 	loadedNetwork, err := ReadNetwork(tmpDir)
 	require.NoError(err)

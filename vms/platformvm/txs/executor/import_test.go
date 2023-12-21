@@ -22,7 +22,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
@@ -118,9 +118,9 @@ func TestNewImportTx(t *testing.T) {
 		},
 		{
 			description:   "attempting to import from C-chain",
-			sourceChainID: cChainID,
+			sourceChainID: env.ctx.CChainID,
 			sharedMemory: fundedSharedMemory(
-				cChainID,
+				env.ctx.CChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
