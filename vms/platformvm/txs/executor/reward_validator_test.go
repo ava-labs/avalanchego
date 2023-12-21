@@ -556,7 +556,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
+	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
