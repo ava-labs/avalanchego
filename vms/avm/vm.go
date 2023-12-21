@@ -427,7 +427,10 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	vm.network = network.New(
 		vm.ctx,
 		vm.parser,
-		vm.chainManager,
+		network.NewLockedTxVerifier(
+			&vm.ctx.Lock,
+			vm.chainManager,
+		),
 		vm.mempool,
 		vm.appSender,
 	)
