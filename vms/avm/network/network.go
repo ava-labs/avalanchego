@@ -35,8 +35,6 @@ type Network interface {
 	// If the tx is already in the mempool, mempool.ErrDuplicateTx will be
 	// returned.
 	// If the tx is not added to the mempool, an error will be returned.
-	//
-	// Invariant: The context lock is not held
 	IssueTx(context.Context, *txs.Tx) error
 
 	// IssueVerifiedTx attempts to add a tx to the mempool. If the tx is added

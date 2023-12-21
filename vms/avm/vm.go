@@ -424,6 +424,7 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 		vm.mempool,
 	)
 
+	// Invariant: The context lock is not held when calling network.IssueTx.
 	vm.network = network.New(
 		vm.ctx,
 		vm.parser,
