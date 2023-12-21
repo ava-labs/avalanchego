@@ -819,7 +819,6 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
-	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 	now := env.clk.Time()
 
 	// Proposed advancing timestamp to 1 second after sync bound
