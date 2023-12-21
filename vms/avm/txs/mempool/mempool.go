@@ -45,7 +45,7 @@ var (
 type Mempool interface {
 	Add(tx *txs.Tx) error
 	Get(txID ids.ID) (*txs.Tx, bool)
-	Remove(txs []*txs.Tx)
+	Remove(txs ...*txs.Tx)
 
 	// Peek returns the oldest tx in the mempool.
 	Peek() (tx *txs.Tx, exists bool)
@@ -159,11 +159,11 @@ func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	return tx, ok
 }
 
-func (m *mempool) Remove(txsToRemove []*txs.Tx) {
+func (m *mempool) Remove(txs ...*txs.Tx) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for _, tx := range txsToRemove {
+	for _, tx := range txs {
 		txID := tx.ID()
 		if !m.unissuedTxs.Delete(txID) {
 			continue

@@ -101,7 +101,7 @@ func TestGet(t *testing.T) {
 	require.True(exists)
 	require.Equal(tx, returned)
 
-	mempool.Remove([]*txs.Tx{tx})
+	mempool.Remove(tx)
 
 	_, exists = mempool.Get(txID)
 	require.False(exists)
@@ -130,19 +130,19 @@ func TestPeek(t *testing.T) {
 	require.True(exists)
 	require.Equal(tx, tx0)
 
-	mempool.Remove([]*txs.Tx{tx0})
+	mempool.Remove(tx0)
 
 	tx, exists = mempool.Peek()
 	require.True(exists)
 	require.Equal(tx, tx1)
 
-	mempool.Remove([]*txs.Tx{tx0})
+	mempool.Remove(tx0)
 
 	tx, exists = mempool.Peek()
 	require.True(exists)
 	require.Equal(tx, tx1)
 
-	mempool.Remove([]*txs.Tx{tx1})
+	mempool.Remove(tx1)
 
 	_, exists = mempool.Peek()
 	require.False(exists)
@@ -189,7 +189,7 @@ func TestIterate(t *testing.T) {
 	mempool.Iterate(addTxs)
 	require.Equal([]*txs.Tx{tx0, tx1}, iteratedTxs)
 
-	mempool.Remove([]*txs.Tx{tx0, tx2})
+	mempool.Remove(tx0, tx2)
 
 	iteratedTxs = nil
 	mempool.Iterate(addTxs)
