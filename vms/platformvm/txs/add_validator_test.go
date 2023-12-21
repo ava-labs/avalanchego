@@ -22,8 +22,7 @@ import (
 func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snowtest.EmptyContext()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -146,8 +145,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snowtest.EmptyContext()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (

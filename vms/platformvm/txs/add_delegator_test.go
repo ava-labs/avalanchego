@@ -23,8 +23,7 @@ var preFundedKeys = secp256k1.TestKeys()
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snowtest.EmptyContext()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -130,8 +129,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snowtest.EmptyContext()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
