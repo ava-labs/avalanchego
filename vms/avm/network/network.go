@@ -93,6 +93,7 @@ func New(
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		ctx.Log,
 		txVerifier,
 		parser,
 		maxExpectedElements,

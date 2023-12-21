@@ -9,11 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
@@ -74,6 +75,7 @@ func (g *gossipTxParser) UnmarshalGossip(bytes []byte) (*gossipTx, error) {
 
 func newGossipMempool(
 	mempool mempool.Mempool,
+	log logging.Logger,
 	txVerifier TxVerifier,
 	parser txs.Parser,
 	maxExpectedElements uint64,
@@ -83,6 +85,7 @@ func newGossipMempool(
 	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
 	return &gossipMempool{
 		Mempool:                     mempool,
+		log:                         log,
 		txVerifier:                  txVerifier,
 		parser:                      parser,
 		maxFalsePositiveProbability: maxFalsePositiveProbability,
@@ -92,6 +95,7 @@ func newGossipMempool(
 
 type gossipMempool struct {
 	mempool.Mempool
+	log                         logging.Logger
 	txVerifier                  TxVerifier
 	parser                      txs.Parser
 	maxFalsePositiveProbability float64
@@ -144,7 +148,9 @@ func (g *gossipMempool) AddVerifiedTx(tx *gossipTx) error {
 	}
 
 	if reset {
-		log.Debug("resetting bloom filter", "reason", "reached max filled ratio")
+		g.log.Debug("resetting bloom filter",
+			zap.String("reason", "reached max filled ratio"),
+		)
 
 		g.Mempool.Iterate(func(tx *txs.Tx) bool {
 			g.bloom.Add(&gossipTx{
