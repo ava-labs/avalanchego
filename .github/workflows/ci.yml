@@ -14,10 +14,10 @@ on:
 permissions:
   contents: read
 
-# TODO: Cancel ongoing workflow runs if a new one is started
+# Cancel ongoing workflow runs if a new one is started
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   go_version: '~1.20.12'
@@ -27,6 +27,7 @@ jobs:
   Unit:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
     steps:
