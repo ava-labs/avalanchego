@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -108,8 +109,8 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 		},
 		{
-			// Issue returns nil because mempool has tx. We haven't gossipped
-			// the tx recently, so we should gossip it.
+			// The tx is added to the mempool and hasn't previously been
+			// gossipped, so we gossip it both from the legacy and p2p SDK.
 			name: "issuance succeeds",
 			msgBytesFunc: func() []byte {
 				msg := message.Tx{
@@ -134,7 +135,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Times(1)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Times(2)
 				return appSender
 			},
 		},
@@ -159,9 +160,8 @@ func TestNetworkAppGossip(t *testing.T) {
 			verifierFunc: func(*gomock.Controller) TxVerifier {
 				return nil // Unused in this test
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Unused in this test
-				return common.NewMockSender(ctrl)
+			appSenderFunc: func(*gomock.Controller) common.AppSender {
+				return nil // Unused in this test
 			},
 		},
 	}
@@ -303,7 +303,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Should gossip the tx
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 			expectedErr: nil,

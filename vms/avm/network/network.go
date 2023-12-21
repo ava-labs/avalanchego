@@ -223,6 +223,9 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	return nil
 }
 
+// IssueTx attempts to add a tx to the mempool, after verifying it against the
+// preferred state. If the tx is added to the mempool, it will push gossip the
+// tx using both the legacy and p2p SDK.
 func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.mempool.Add(&gossipTx{
 		tx: tx,
@@ -233,6 +236,9 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	return n.gossipTx(ctx, tx)
 }
 
+// IssueTx attempts to add a tx to the mempool, without first verifying it
+// against the preferred state. If the tx is added to the mempool, it will push
+// gossip the tx using both the legacy and p2p SDK.
 func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.mempool.AddVerifiedTx(&gossipTx{
 		tx: tx,
@@ -243,6 +249,7 @@ func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
 	return n.gossipTx(ctx, tx)
 }
 
+// gossipTx pushes the tx to peers using both the legacy and p2p SDK.
 func (n *Network) gossipTx(ctx context.Context, tx *txs.Tx) error {
 	n.txPushGossiper.Add(&gossipTx{tx: tx})
 	if err := n.txPushGossiper.Gossip(ctx); err != nil {
@@ -266,6 +273,8 @@ func (n *Network) gossipTx(ctx context.Context, tx *txs.Tx) error {
 	return nil
 }
 
+// gossipTxMessage pushes the tx message to peers using both the legacy format.
+// If the tx was recently gossiped, this function does nothing.
 func (n *Network) gossipTxMessage(ctx context.Context, txID ids.ID, msgBytes []byte) {
 	n.recentTxsLock.Lock()
 	_, has := n.recentTxs.Get(txID)
