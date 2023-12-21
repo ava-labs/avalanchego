@@ -31,27 +31,26 @@ type WalletService struct {
 }
 
 func (w *WalletService) decided(txID ids.ID) {
-	if _, ok := w.pendingTxs.Get(txID); !ok {
+	if !w.pendingTxs.Delete(txID) {
 		return
 	}
 
 	w.vm.ctx.Log.Info("tx decided over wallet API",
 		zap.Stringer("txID", txID),
 	)
-	w.pendingTxs.Delete(txID)
-
 	for {
 		txID, tx, ok := w.pendingTxs.Oldest()
 		if !ok {
 			return
 		}
 
-		txBytes := tx.Bytes()
-		_, err := w.vm.IssueTx(txBytes)
+		err := w.vm.mempool.Add(tx)
 		if err == nil {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
 			)
+
+			w.vm.mempool.RequestBuildBlock()
 			return
 		}
 
@@ -63,12 +62,7 @@ func (w *WalletService) decided(txID ids.ID) {
 	}
 }
 
-func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
-	tx, err := w.vm.parser.ParseTx(txBytes)
-	if err != nil {
-		return ids.ID{}, err
-	}
-
+func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 	txID := tx.ID()
 	w.vm.ctx.Log.Info("issuing tx over wallet API",
 		zap.Stringer("txID", txID),
@@ -82,10 +76,15 @@ func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
 	}
 
 	if w.pendingTxs.Len() == 0 {
-		_, err := w.vm.IssueTx(txBytes)
-		if err != nil {
+		if err := w.vm.mempool.Add(tx); err != nil {
+			w.vm.ctx.Log.Warn("failed to issue tx over wallet API",
+				zap.Stringer("txID", txID),
+				zap.Error(err),
+			)
 			return ids.ID{}, err
 		}
+
+		w.vm.mempool.RequestBuildBlock()
 
 		w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 			zap.Stringer("txID", txID),
@@ -142,10 +141,15 @@ func (w *WalletService) IssueTx(_ *http.Request, args *api.FormattedTx, reply *a
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
 
+	tx, err := w.vm.parser.ParseTx(txBytes)
+	if err != nil {
+		return err
+	}
+
 	w.vm.ctx.Lock.Lock()
 	defer w.vm.ctx.Lock.Unlock()
 
-	txID, err := w.issue(txBytes)
+	txID, err := w.issue(tx)
 	reply.TxID = txID
 	return err
 }
@@ -291,7 +295,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 	codec := w.vm.parser.Codec()
 	avax.SortTransferableOutputs(outs, codec)
 
-	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.vm.ctx.NetworkID,
 		BlockchainID: w.vm.ctx.ChainID,
 		Outs:         outs,
@@ -302,7 +306,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		return err
 	}
 
-	txID, err := w.issue(tx.Bytes())
+	txID, err := w.issue(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

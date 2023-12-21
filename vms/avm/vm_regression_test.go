@@ -26,7 +26,9 @@ func TestVerifyFxUsage(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
