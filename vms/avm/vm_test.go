@@ -34,10 +34,7 @@ func TestInvalidGenesis(t *testing.T) {
 	vm := &VM{}
 	ctx := newContext(t)
 	ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
+	defer ctx.Lock.Unlock()
 
 	err := vm.Initialize(
 		context.Background(),

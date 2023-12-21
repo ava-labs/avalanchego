@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	stdjson "encoding/json"
@@ -130,6 +131,10 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 
 	txBackend *txexecutor.Backend
+
+	context       context.Context
+	startShutdown context.CancelFunc
+	awaitShutdown sync.WaitGroup
 
 	// These values are only initialized after the chain has been linearized.
 	blockbuilder.Builder
@@ -295,6 +300,7 @@ func (vm *VM) Initialize(
 		Bootstrapped:  false,
 	}
 
+	vm.context, vm.startShutdown = context.WithCancel(context.Background())
 	return vm.state.Commit()
 }
 
@@ -336,6 +342,9 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.state == nil {
 		return nil
 	}
+
+	vm.startShutdown()
+	vm.awaitShutdown.Wait()
 
 	return utils.Err(
 		vm.state.Close(),
@@ -492,7 +501,13 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
 
-	go vm.network.Gossip(context.TODO(), txGossipFrequency)
+	vm.awaitShutdown.Add(1)
+	go func() {
+		defer vm.awaitShutdown.Done()
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.network.Gossip(vm.context, txGossipFrequency)
+	}()
 
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
