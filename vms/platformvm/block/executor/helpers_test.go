@@ -4,8 +4,6 @@
 package executor
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -27,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -75,16 +74,12 @@ var (
 	preFundedKeys             = secp256k1.TestKeys()
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
 	// Node IDs of genesis validators. Initialized in init function
 	genesisNodeIDs []ids.NodeID
-
-	errMissing = errors.New("missing")
 )
 
 func init() {
@@ -132,89 +127,95 @@ type environment struct {
 }
 
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
-	env := &environment{
+	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
 		clk:            defaultClock(),
 	}
-	env.isBootstrapped.Set(true)
+	res.isBootstrapped.Set(true)
 
-	env.baseDB = versiondb.New(memdb.New())
-	env.ctx = defaultCtx(env.baseDB)
-	env.fx = defaultFx(env.clk, env.ctx.Log, env.isBootstrapped.Get())
+	res.baseDB = versiondb.New(memdb.New())
+	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
+	m := atomic.NewMemory(atomicDB)
 
-	rewardsCalc := reward.NewCalculator(env.config.RewardConfig)
-	env.atomicUTXOs = avax.NewAtomicUTXOManager(env.ctx.SharedMemory, txs.Codec)
+	res.ctx = snowtest.Context(t, snowtest.PChainID)
+	res.ctx.AVAXAssetID = avaxAssetID
+	res.ctx.SharedMemory = m.NewSharedMemory(res.ctx.ChainID)
+
+	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
+
+	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
+	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
 	if ctrl == nil {
-		env.state = defaultState(env.config, env.ctx, env.baseDB, rewardsCalc)
-		env.uptimes = uptime.NewManager(env.state, env.clk)
-		env.utxosHandler = utxo.NewHandler(env.ctx, env.clk, env.fx)
-		env.txBuilder = p_tx_builder.New(
-			env.ctx,
-			env.config,
-			env.clk,
-			env.fx,
-			env.state,
-			env.atomicUTXOs,
-			env.utxosHandler,
+		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+		res.uptimes = uptime.NewManager(res.state, res.clk)
+		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+		res.txBuilder = p_tx_builder.New(
+			res.ctx,
+			res.config,
+			res.clk,
+			res.fx,
+			res.state,
+			res.atomicUTXOs,
+			res.utxosHandler,
 		)
 	} else {
 		genesisBlkID = ids.GenerateTestID()
-		env.mockedState = state.NewMockState(ctrl)
-		env.uptimes = uptime.NewManager(env.mockedState, env.clk)
-		env.utxosHandler = utxo.NewHandler(env.ctx, env.clk, env.fx)
-		env.txBuilder = p_tx_builder.New(
-			env.ctx,
-			env.config,
-			env.clk,
-			env.fx,
-			env.mockedState,
-			env.atomicUTXOs,
-			env.utxosHandler,
+		res.mockedState = state.NewMockState(ctrl)
+		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
+		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+		res.txBuilder = p_tx_builder.New(
+			res.ctx,
+			res.config,
+			res.clk,
+			res.fx,
+			res.mockedState,
+			res.atomicUTXOs,
+			res.utxosHandler,
 		)
 
 		// setup expectations strictly needed for environment creation
-		env.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
+		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
 	}
 
-	env.backend = &executor.Backend{
-		Config:       env.config,
-		Ctx:          env.ctx,
-		Clk:          env.clk,
-		Bootstrapped: env.isBootstrapped,
-		Fx:           env.fx,
-		FlowChecker:  env.utxosHandler,
-		Uptimes:      env.uptimes,
+	res.backend = &executor.Backend{
+		Config:       res.config,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		FlowChecker:  res.utxosHandler,
+		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
-	env.sender = &common.SenderTest{T: t}
+	res.sender = &common.SenderTest{T: t}
 
 	metrics := metrics.Noop
 
 	var err error
-	env.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
 
 	if ctrl == nil {
-		env.blkManager = NewManager(
-			env.mempool,
+		res.blkManager = NewManager(
+			res.mempool,
 			metrics,
-			env.state,
-			env.backend,
+			res.state,
+			res.backend,
 			pvalidators.TestManager,
 		)
-		addSubnet(env)
+		addSubnet(res)
 	} else {
-		env.blkManager = NewManager(
-			env.mempool,
+		res.blkManager = NewManager(
+			res.mempool,
 			metrics,
-			env.mockedState,
-			env.backend,
+			res.mockedState,
+			res.backend,
 			pvalidators.TestManager,
 		)
 		// we do not add any subnet to state, since we can mock
@@ -222,28 +223,28 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	}
 
 	t.Cleanup(func() {
-		if env.mockedState != nil {
+		if res.mockedState != nil {
 			// state is mocked, nothing to do here
 			return
 		}
 
 		require := require.New(t)
 
-		if env.isBootstrapped.Get() {
-			validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+		if res.isBootstrapped.Get() {
+			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
-			require.NoError(env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
-			require.NoError(env.state.Commit())
+			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+			require.NoError(res.state.Commit())
 		}
 
-		if env.state != nil {
-			require.NoError(env.state.Close())
+		if res.state != nil {
+			require.NoError(res.state.Close())
 		}
 
-		require.NoError(env.baseDB.Close())
+		require.NoError(res.baseDB.Close())
 	})
 
-	return env
+	return res
 }
 
 func addSubnet(env *environment) {
@@ -315,35 +316,6 @@ func defaultState(
 	}
 	genesisBlkID = state.GetLastAccepted()
 	return state
-}
-
-func defaultCtx(db database.Database) *snow.Context {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				xChainID:                  constants.PrimaryNetworkID,
-				cChainID:                  constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-
-	return ctx
 }
 
 func defaultConfig() *config.Config {

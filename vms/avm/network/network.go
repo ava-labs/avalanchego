@@ -141,7 +141,7 @@ func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 // returns nil if the tx is in the mempool
 func (n *network) issueTx(tx *txs.Tx) error {
 	txID := tx.ID()
-	if n.mempool.Has(txID) {
+	if _, ok := n.mempool.Get(txID); ok {
 		// The tx is already in the mempool
 		return nil
 	}

@@ -132,5 +132,5 @@ func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
 	privateNetworksDir := filepath.Join(sharedNetwork.Dir, PrivateNetworksDirName)
 	te.require.NoError(os.MkdirAll(privateNetworksDir, perms.ReadWriteExecute))
 
-	return StartNetwork(sharedNetwork.ExecPath, privateNetworksDir)
+	return StartNetwork(sharedNetwork.AvalancheGoPath, privateNetworksDir)
 }
