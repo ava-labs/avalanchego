@@ -211,6 +211,13 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	})
 	if err == nil {
 		txID := tx.ID()
+		n.txPushGossiper.Add(&gossipTx{tx: tx})
+		if err := n.txPushGossiper.Gossip(ctx); err != nil {
+			n.ctx.Log.Error("failed to gossip tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Error(err),
+			)
+		}
 		n.gossipTxMessage(ctx, txID, msgBytes)
 	}
 	return nil
