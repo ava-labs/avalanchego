@@ -1074,6 +1074,9 @@ func (vm *VM) initBlockBuilding() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
+	ethTxGossipMarshaller := GossipEthTxMarshaller{}
+	atomicTxGossipMarshaller := GossipAtomicTxMarshaller{}
+
 	ethTxGossipClient := vm.Network.NewClient(ethTxGossipProtocol, p2p.WithValidatorSampling(vm.validators))
 	atomicTxGossipClient := vm.Network.NewClient(atomicTxGossipProtocol, p2p.WithValidatorSampling(vm.validators))
 
@@ -1088,11 +1091,21 @@ func (vm *VM) initBlockBuilding() error {
 	}
 
 	if vm.ethTxPushGossiper == nil {
-		vm.ethTxPushGossiper = gossip.NewPushGossiper[*GossipEthTx](ethTxGossipClient, ethTxGossipMetrics, txGossipTargetMessageSize)
+		vm.ethTxPushGossiper = gossip.NewPushGossiper[*GossipEthTx](
+			ethTxGossipMarshaller,
+			ethTxGossipClient,
+			ethTxGossipMetrics,
+			txGossipTargetMessageSize,
+		)
 	}
 
 	if vm.atomicTxPushGossiper == nil {
-		vm.atomicTxPushGossiper = gossip.NewPushGossiper[*GossipAtomicTx](atomicTxGossipClient, atomicTxGossipMetrics, txGossipTargetMessageSize)
+		vm.atomicTxPushGossiper = gossip.NewPushGossiper[*GossipAtomicTx](
+			atomicTxGossipMarshaller,
+			atomicTxGossipClient,
+			atomicTxGossipMetrics,
+			txGossipTargetMessageSize,
+		)
 	}
 
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
@@ -1113,8 +1126,9 @@ func (vm *VM) initBlockBuilding() error {
 	}()
 
 	if vm.ethTxGossipHandler == nil {
-		vm.ethTxGossipHandler = newTxGossipHandler[GossipEthTx, *GossipEthTx](
+		vm.ethTxGossipHandler = newTxGossipHandler[*GossipEthTx](
 			vm.ctx.Log,
+			ethTxGossipMarshaller,
 			ethTxPool,
 			ethTxGossipMetrics,
 			txGossipTargetMessageSize,
@@ -1129,8 +1143,9 @@ func (vm *VM) initBlockBuilding() error {
 	}
 
 	if vm.atomicTxGossipHandler == nil {
-		vm.atomicTxGossipHandler = newTxGossipHandler[GossipAtomicTx, *GossipAtomicTx](
+		vm.atomicTxGossipHandler = newTxGossipHandler[*GossipAtomicTx](
 			vm.ctx.Log,
+			atomicTxGossipMarshaller,
 			vm.mempool,
 			atomicTxGossipMetrics,
 			txGossipTargetMessageSize,
@@ -1145,8 +1160,9 @@ func (vm *VM) initBlockBuilding() error {
 	}
 
 	if vm.ethTxPullGossiper == nil {
-		ethTxPullGossiper := gossip.NewPullGossiper[GossipEthTx, *GossipEthTx](
+		ethTxPullGossiper := gossip.NewPullGossiper[*GossipEthTx](
 			vm.ctx.Log,
+			ethTxGossipMarshaller,
 			ethTxPool,
 			ethTxGossipClient,
 			ethTxGossipMetrics,
@@ -1167,8 +1183,9 @@ func (vm *VM) initBlockBuilding() error {
 	}()
 
 	if vm.atomicTxPullGossiper == nil {
-		atomicTxPullGossiper := gossip.NewPullGossiper[GossipAtomicTx, *GossipAtomicTx](
+		atomicTxPullGossiper := gossip.NewPullGossiper[*GossipAtomicTx](
 			vm.ctx.Log,
+			atomicTxGossipMarshaller,
 			vm.mempool,
 			atomicTxGossipClient,
 			atomicTxGossipMetrics,
