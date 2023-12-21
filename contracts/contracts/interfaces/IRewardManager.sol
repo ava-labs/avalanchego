@@ -3,6 +3,15 @@ pragma solidity ^0.8.0;
 import "./IAllowList.sol";
 
 interface IRewardManager is IAllowList {
+  // RewardAddressChanged is the event logged whenever reward address is modified
+  event RewardAddressChanged(address indexed sender, address indexed oldRewardAddress, address indexed newRewardAddress);
+
+  // FeeRecipientsAllowed is the event logged whenever fee recipient is modified
+  event FeeRecipientsAllowed(address indexed sender);
+
+  // RewardsDisabled is the event logged whenever rewards are disabled
+  event RewardsDisabled(address indexed sender);
+
   // setRewardAddress sets the reward address to the given address
   function setRewardAddress(address addr) external;
 
