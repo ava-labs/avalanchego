@@ -90,12 +90,6 @@ func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 			)
 			return ids.Empty, err
 		}
-
-		w.vm.mempool.RequestBuildBlock()
-
-		w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
-			zap.Stringer("txID", txID),
-		)
 	} else {
 		w.vm.ctx.Log.Info("enqueueing tx over wallet API",
 			zap.Stringer("txID", txID),
