@@ -1284,8 +1284,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	consensusCtx := snowtest.ConsensusContext()
-	consensusCtx.Context = ctx
+	consensusCtx := snowtest.ConsensusContext(ctx)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)

@@ -11,7 +11,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/ava-labs/coreth v0.12.9-rc.9.0.20231219231451-224728dbacb4
+	github.com/ava-labs/coreth v0.12.9-rc.9.0.20231222191417-2e3f762373e9
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20231102202641-ae2ebdaeac34
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230209160836-829675f94811
