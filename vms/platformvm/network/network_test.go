@@ -14,8 +14,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/message"
@@ -185,7 +185,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			ctx := context.Background()
 			ctrl := gomock.NewController(t)
 
-			snowCtx := snow.DefaultContextTest()
+			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
 				logging.NoLog{},
 				ids.EmptyNodeID,
@@ -317,7 +317,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			snowCtx := snow.DefaultContextTest()
+			snowCtx := snowtest.Context(t, ids.Empty)
 			n, err := New(
 				snowCtx.Log,
 				snowCtx.NodeID,
@@ -344,7 +344,7 @@ func TestNetworkGossipTx(t *testing.T) {
 
 	appSender := common.NewMockSender(ctrl)
 
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := snowtest.Context(t, ids.Empty)
 	nIntf, err := New(
 		snowCtx.Log,
 		snowCtx.NodeID,

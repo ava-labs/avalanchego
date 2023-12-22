@@ -194,6 +194,7 @@ func newEnvironment(t *testing.T) *environment {
 		registerer,
 		network.DefaultConfig,
 	)
+	require.NoError(err)
 
 	res.Builder = New(
 		res.mempool,
