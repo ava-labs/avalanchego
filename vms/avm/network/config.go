@@ -12,8 +12,8 @@ import (
 var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
-	PullGossipPollSize:                          10,
-	PullGossipFrequency:                         15 * time.Second,
+	PullGossipPollSize:                          1,
+	PullGossipFrequency:                         1500 * time.Millisecond,
 	PullGossipThrottlingPeriod:                  10 * time.Second,
 	PullGossipThrottlingLimit:                   2,
 	ExpectedBloomFilterElements:                 8 * 1024,
