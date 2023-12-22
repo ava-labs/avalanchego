@@ -22,9 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-var errTest = errors.New("test error")
-
-var _ TxVerifier = (*testTxVerifier)(nil)
+var (
+	errTest            = errors.New("test error")
+	_       TxVerifier = (*testTxVerifier)(nil)
+)
 
 type testTxVerifier struct {
 	err error
