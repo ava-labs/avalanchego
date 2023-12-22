@@ -557,6 +557,7 @@ func TestParsedStateBlock(t *testing.T) {
 	require := require.New(t)
 
 	var blks []block.Block
+
 	{
 		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)

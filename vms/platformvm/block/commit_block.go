@@ -4,7 +4,6 @@
 package block
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -44,17 +43,7 @@ func NewBanffCommitBlock(
 			},
 		},
 	}
-
-	// We serialize this block as a pointer so that it can be deserialized into
-	// a Block
-	var blkIntf Block = blk
-	bytes, err := Codec.Marshal(Version, &blkIntf)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal block: %w", err)
-	}
-
-	blk.CommonBlock.initialize(bytes)
-	return blk, nil
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotCommitBlock struct {
@@ -86,15 +75,5 @@ func NewApricotCommitBlock(
 			Hght:   height,
 		},
 	}
-
-	// We serialize this block as a pointer so that it can be deserialized into
-	// a Block
-	var blkIntf Block = blk
-	bytes, err := Codec.Marshal(Version, &blkIntf)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal block: %w", err)
-	}
-
-	blk.CommonBlock.initialize(bytes)
-	return blk, nil
+	return blk, initialize(blk, &blk.CommonBlock)
 }
