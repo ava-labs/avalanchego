@@ -54,7 +54,11 @@ type profiler struct {
 	cpuProfileFile *os.File
 }
 
-func New(dir string) *profiler {
+func New(dir string) Profiler {
+	return newProfiler(dir)
+}
+
+func newProfiler(dir string) *profiler {
 	return &profiler{
 		dir:             dir,
 		cpuProfileName:  filepath.Join(dir, cpuProfileFile),
