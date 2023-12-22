@@ -1291,10 +1291,10 @@ func (s *Service) buildAddValidatorTx(args *AddValidatorArgs) (*txs.Tx, ids.Shor
 		changeAddr,
 	)
 	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("couldn't create tx: %w", err)
+		return nil, ids.ShortEmpty, err
 	}
 
-	return tx, changeAddr, nil
+	return tx, changeAddr, user.Close()
 }
 
 // AddDelegatorArgs are the arguments to AddDelegator
@@ -1408,8 +1408,11 @@ func (s *Service) buildAddDelegatorTx(args *AddDelegatorArgs) (*txs.Tx, ids.Shor
 		privKeys.Keys,          // Private keys
 		changeAddr,             // Change address
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
 
-	return tx, changeAddr, err
+	return tx, changeAddr, user.Close()
 }
 
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
@@ -1519,8 +1522,11 @@ func (s *Service) buildAddSubnetValidatorTx(args *AddSubnetValidatorArgs) (*txs.
 		keys.Keys,
 		changeAddr,
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
 
-	return tx, changeAddr, err
+	return tx, changeAddr, user.Close()
 }
 
 // CreateSubnetArgs are the arguments to CreateSubnet
@@ -1600,8 +1606,11 @@ func (s *Service) buildCreateSubnetTx(args *CreateSubnetArgs) (*txs.Tx, ids.Shor
 		privKeys.Keys,          // Private keys
 		changeAddr,
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
 
-	return tx, changeAddr, err
+	return tx, changeAddr, user.Close()
 }
 
 // ExportAVAXArgs are the arguments to ExportAVAX
@@ -1701,8 +1710,11 @@ func (s *Service) buildExportAVAX(args *ExportAVAXArgs) (*txs.Tx, ids.ShortID, e
 		privKeys.Keys,       // Private keys
 		changeAddr,          // Change address
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
 
-	return tx, changeAddr, err
+	return tx, changeAddr, user.Close()
 }
 
 // ImportAVAXArgs are the arguments to ImportAVAX
@@ -1791,8 +1803,11 @@ func (s *Service) buildImportAVAXTx(args *ImportAVAXArgs) (*txs.Tx, ids.ShortID,
 		privKeys.Keys,
 		changeAddr,
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
 
-	return tx, changeAddr, err
+	return tx, changeAddr, user.Close()
 }
 
 /*
@@ -1920,8 +1935,11 @@ func (s *Service) buildCreateBlockchainTx(args *CreateBlockchainArgs) (*txs.Tx, 
 		keys.Keys,
 		changeAddr, // Change address
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
 
-	return tx, changeAddr, err
+	return tx, changeAddr, user.Close()
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
