@@ -1085,7 +1085,7 @@ func initTestRemoteProposerVM(
 		}, nil
 	}
 
-	ctx := snowtest.EmptyContext()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 

@@ -63,7 +63,7 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	ctx := snowtest.EmptyContext()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	initialState := []byte("genesis state")
 
 	err := proVM.Initialize(

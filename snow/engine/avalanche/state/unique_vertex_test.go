@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -260,9 +259,9 @@ func TestParseVertexWithIncorrectChainID(t *testing.T) {
 func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snowtest.EmptyContext()
+	chainID := ids.GenerateTestID()
 	statelessVertex, err := vertex.Build( // regular, non-stop vertex
-		ctx.ChainID,
+		chainID,
 		0,
 		nil,
 		[][]byte{{1}},
@@ -290,7 +289,7 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require.ErrorIs(err, errUnknownVertex)
 
 	childStatelessVertex, err := vertex.Build( // regular, non-stop vertex
-		ctx.ChainID,
+		chainID,
 		1,
 		[]ids.ID{id},
 		[][]byte{{2}},

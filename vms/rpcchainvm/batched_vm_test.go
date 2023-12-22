@@ -86,7 +86,7 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	vm, stopper := buildClientHelper(require, testKey)
 	defer stopper.Stop(context.Background())
 
-	ctx := snowtest.EmptyContext()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	require.NoError(vm.Initialize(context.Background(), ctx, memdb.New(), nil, nil, nil, nil, nil, nil))
 
