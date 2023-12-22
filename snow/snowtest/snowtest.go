@@ -38,27 +38,23 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 	return nil
 }
 
-func EmptyContext() *snow.Context {
+func ConsensusContext() *snow.ConsensusContext {
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		panic(err)
 	}
 	pk := bls.PublicFromSecretKey(sk)
-	return &snow.Context{
-		NetworkID:    0,
-		SubnetID:     ids.Empty,
-		ChainID:      ids.Empty,
-		NodeID:       ids.EmptyNodeID,
-		PublicKey:    pk,
-		Log:          logging.NoLog{},
-		Metrics:      metrics.NewOptionalGatherer(),
-		ChainDataDir: "",
-	}
-}
-
-func ConsensusContext() *snow.ConsensusContext {
 	return &snow.ConsensusContext{
-		Context:             EmptyContext(),
+		Context: &snow.Context{
+			NetworkID:    0,
+			SubnetID:     ids.Empty,
+			ChainID:      ids.Empty,
+			NodeID:       ids.EmptyNodeID,
+			PublicKey:    pk,
+			Log:          logging.NoLog{},
+			Metrics:      metrics.NewOptionalGatherer(),
+			ChainDataDir: "",
+		},
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
 		BlockAcceptor:       noOpAcceptor{},
