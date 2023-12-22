@@ -18,12 +18,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var errTest = errors.New("test error")
+
+var _ TxVerifier = (*testTxVerifier)(nil)
+
+type testTxVerifier struct {
+	err error
+}
+
+func (t testTxVerifier) VerifyTx(*txs.Tx) error {
+	return t.err
+}
 
 func TestNetworkAppGossip(t *testing.T) {
 	testTx := &txs.Tx{
@@ -159,7 +168,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
-				executor.NewMockManager(ctrl), // Manager is unused in this test
+				testTxVerifier{},
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
@@ -175,7 +184,7 @@ func TestNetworkIssueTx(t *testing.T) {
 	type test struct {
 		name                      string
 		mempoolFunc               func(*gomock.Controller) mempool.Mempool
-		managerFunc               func(*gomock.Controller) executor.Manager
+		txVerifier                testTxVerifier
 		partialSyncPrimaryNetwork bool
 		appSenderFunc             func(*gomock.Controller) common.AppSender
 		expectedErr               error
@@ -188,10 +197,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(tx, true)
 				return mempool
-			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				// Unused in this test
-				return executor.NewMockManager(ctrl)
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Should gossip the tx
@@ -209,11 +214,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
-				return manager
-			},
+			txVerifier: testTxVerifier{err: errTest},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Shouldn't gossip the tx
 				return common.NewMockSender(ctrl)
@@ -228,11 +229,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
-				return manager
-			},
+			txVerifier: testTxVerifier{err: errTest},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Shouldn't gossip the tx
 				return common.NewMockSender(ctrl)
@@ -248,11 +245,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), errTest)
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				return manager
-			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Shouldn't gossip the tx
 				return common.NewMockSender(ctrl)
@@ -265,11 +257,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				return mempool
-			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				return manager
 			},
 			partialSyncPrimaryNetwork: true,
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
@@ -288,11 +275,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
 				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
-			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				return manager
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Should gossip the tx
@@ -313,7 +295,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
-				tt.managerFunc(ctrl),
+				tt.txVerifier,
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
@@ -334,7 +316,7 @@ func TestNetworkGossipTx(t *testing.T) {
 		&snow.Context{
 			Log: logging.NoLog{},
 		},
-		executor.NewMockManager(ctrl),
+		testTxVerifier{},
 		mempool.NewMockMempool(ctrl),
 		false,
 		appSender,
