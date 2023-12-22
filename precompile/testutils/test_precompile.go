@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/precompile/contract"
 	"github.com/ava-labs/coreth/precompile/modules"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -103,7 +103,7 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state cont
 		blockContext.EXPECT().Number().Return(big.NewInt(0)).AnyTimes()
 		blockContext.EXPECT().Timestamp().Return(uint64(time.Now().Unix())).AnyTimes()
 	}
-	snowContext := snow.DefaultContextTest()
+	snowContext := utils.TestSnowContext()
 
 	accessibleState := contract.NewMockAccessibleState(ctrl)
 	accessibleState.EXPECT().GetStateDB().Return(state).AnyTimes()
