@@ -70,9 +70,9 @@ func TestGossipMempoolAdd(t *testing.T) {
 		logging.NoLog{},
 		testVerifier{},
 		parser,
-		txGossipBloomMaxElements,
-		txGossipBloomFalsePositiveProbability,
-		txGossipBloomMaxFalsePositiveProbability,
+		DefaultConfig.ExpectedBloomFilterElements,
+		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
+		DefaultConfig.MaxBloomFilterFalsePositiveProbability,
 	)
 	require.NoError(err)
 
@@ -108,9 +108,9 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 			err: errTest, // We shouldn't be attempting to verify the tx in this flow
 		},
 		parser,
-		txGossipBloomMaxElements,
-		txGossipBloomFalsePositiveProbability,
-		txGossipBloomMaxFalsePositiveProbability,
+		DefaultConfig.ExpectedBloomFilterElements,
+		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
+		DefaultConfig.MaxBloomFilterFalsePositiveProbability,
 	)
 	require.NoError(err)
 
