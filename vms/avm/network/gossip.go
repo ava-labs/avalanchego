@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -135,10 +133,7 @@ func (g *gossipMempool) AddVerified(tx *txs.Tx) error {
 	}
 
 	if reset {
-		g.log.Debug("resetting bloom filter",
-			zap.String("reason", "reached max filled ratio"),
-		)
-
+		g.log.Debug("resetting bloom filter")
 		g.Mempool.Iterate(func(tx *txs.Tx) bool {
 			g.bloom.Add(tx)
 			return true
