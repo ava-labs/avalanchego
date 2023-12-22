@@ -157,9 +157,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		Config: vmStaticConfig,
 	}
 
-	vmDynamicConfig := Config{
-		IndexTransactions: true,
-	}
+	vmDynamicConfig := DefaultConfig
+	vmDynamicConfig.IndexTransactions = true
 	if c.vmDynamicConfig != nil {
 		vmDynamicConfig = *c.vmDynamicConfig
 	}
