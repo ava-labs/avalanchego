@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -487,6 +488,14 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 // Invariant: tx should not be referenced again without the context lock
 // held to avoid any data races.
 func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
-	//TODO check duplicate tx error
-	return vm.Network.IssueTx(ctx, tx)
+	err := vm.Network.IssueTx(ctx, tx)
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
+		vm.ctx.Log.Debug("failed to add tx to mempool",
+			zap.Stringer("txID", tx.ID()),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	return nil
 }
