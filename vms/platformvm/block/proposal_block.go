@@ -24,7 +24,7 @@ type BanffProposalBlock struct {
 	//
 	// TODO: when Transactions is used, we must correctly verify and apply their
 	//       changes.
-	Transactions         []*txs.Tx `serialize:"true" json:"-"`
+	Transactions         []*txs.Tx `serialize:"true" json:"txs"`
 	ApricotProposalBlock `serialize:"true"`
 }
 
