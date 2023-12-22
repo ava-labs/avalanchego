@@ -498,10 +498,11 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	require.IsType(&indexer{}, idxrIntf)
 	idxr := idxrIntf.(*indexer)
 
-	// Assert state is right
-	chain1Ctx := snowtest.ConsensusContext(nil)
-	chain1Ctx.ChainID = ids.GenerateTestID()
-	chain1Ctx.SubnetID = ids.GenerateTestID()
+	// Create chain1Ctx for a random subnet + chain.
+	chain1Ctx := snowtest.ConsensusContext(&snow.Context{
+		ChainID:  ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+	})
 
 	// RegisterChain should return without adding an index for this chain
 	chainVM := mocks.NewMockChainVM(ctrl)
