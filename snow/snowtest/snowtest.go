@@ -39,21 +39,9 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 }
 
 func ConsensusContext() *snow.ConsensusContext {
-	sk, err := bls.NewSecretKey()
-	if err != nil {
-		panic(err)
-	}
-	pk := bls.PublicFromSecretKey(sk)
 	return &snow.ConsensusContext{
 		Context: &snow.Context{
-			NetworkID:    0,
-			SubnetID:     ids.Empty,
-			ChainID:      ids.Empty,
-			NodeID:       ids.EmptyNodeID,
-			PublicKey:    pk,
-			Log:          logging.NoLog{},
-			Metrics:      metrics.NewOptionalGatherer(),
-			ChainDataDir: "",
+			Log: logging.NoLog{},
 		},
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
