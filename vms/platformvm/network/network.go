@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/components/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -30,8 +29,6 @@ type Network interface {
 
 	// IssueTx verifies the transaction at the currently preferred state, adds
 	// it to the mempool, and gossips it to the network.
-	//
-	// Invariant: Assumes the context lock is held.
 	IssueTx(context.Context, *txs.Tx) error
 }
 
@@ -40,7 +37,7 @@ type network struct {
 	common.AppHandler
 
 	ctx                       *snow.Context
-	manager                   executor.Manager
+	txVerifier                TxVerifier
 	mempool                   mempool.Mempool
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
@@ -52,7 +49,7 @@ type network struct {
 
 func New(
 	ctx *snow.Context,
-	manager executor.Manager,
+	txVerifier TxVerifier,
 	mempool mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
@@ -61,7 +58,7 @@ func New(
 		AppHandler: common.NewNoOpAppHandler(ctx.Log),
 
 		ctx:                       ctx,
-		manager:                   manager,
+		txVerifier:                txVerifier,
 		mempool:                   mempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		appSender:                 appSender,
@@ -109,14 +106,6 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	}
 	txID := tx.ID()
 
-	// We need to grab the context lock here to avoid racy behavior with
-	// transaction verification + mempool modifications.
-	//
-	// Invariant: tx should not be referenced again without the context lock
-	// held to avoid any data races.
-	n.ctx.Lock.Lock()
-	defer n.ctx.Lock.Unlock()
-
 	if reason := n.mempool.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		return nil
@@ -155,7 +144,7 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	// Verify the tx at the currently preferred state
-	if err := n.manager.VerifyTx(tx); err != nil {
+	if err := n.txVerifier.VerifyTx(tx); err != nil {
 		n.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("txID", txID),
 			zap.Error(err),

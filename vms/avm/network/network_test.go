@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
@@ -27,7 +30,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var errTest = errors.New("test error")
+var (
+	testConfig = Config{
+		MaxValidatorSetStaleness:                    time.Second,
+		TargetGossipSize:                            1,
+		PullGossipPollSize:                          1,
+		PullGossipFrequency:                         time.Second,
+		PullGossipThrottlingPeriod:                  time.Second,
+		PullGossipThrottlingLimit:                   1,
+		ExpectedBloomFilterElements:                 10,
+		ExpectedBloomFilterFalsePositiveProbability: .1,
+		MaxBloomFilterFalsePositiveProbability:      .5,
+		LegacyPushGossipCacheSize:                   512,
+	}
+
+	errTest = errors.New("test error")
+)
 
 func TestNetworkAppGossip(t *testing.T) {
 	testTx := &txs.Tx{
@@ -154,7 +172,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 		},
@@ -193,7 +211,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				appSenderFunc = tt.appSenderFunc
 			}
 
-			n := New(
+			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
@@ -201,7 +219,10 @@ func TestNetworkAppGossip(t *testing.T) {
 				txVerifierFunc(ctrl),
 				mempoolFunc(ctrl),
 				appSenderFunc(ctrl),
+				prometheus.NewRegistry(),
+				testConfig,
 			)
+			require.NoError(err)
 			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
 		})
 	}
@@ -286,7 +307,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 			expectedErr: nil,
@@ -326,7 +347,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				appSenderFunc = tt.appSenderFunc
 			}
 
-			n := New(
+			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
@@ -334,7 +355,10 @@ func TestNetworkIssueTx(t *testing.T) {
 				txVerifierFunc(ctrl),
 				mempoolFunc(ctrl),
 				appSenderFunc(ctrl),
+				prometheus.NewRegistry(),
+				testConfig,
 			)
+			require.NoError(err)
 			err = n.IssueTx(context.Background(), &txs.Tx{})
 			require.ErrorIs(err, tt.expectedErr)
 		})
@@ -370,7 +394,7 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 			expectedErr: nil,
@@ -403,7 +427,7 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 				appSenderFunc = tt.appSenderFunc
 			}
 
-			n := New(
+			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
@@ -411,7 +435,10 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 				executor.NewMockManager(ctrl), // Should never verify a tx
 				mempoolFunc(ctrl),
 				appSenderFunc(ctrl),
+				prometheus.NewRegistry(),
+				testConfig,
 			)
+			require.NoError(err)
 			err = n.IssueVerifiedTx(context.Background(), &txs.Tx{})
 			require.ErrorIs(err, tt.expectedErr)
 		})
@@ -429,7 +456,7 @@ func TestNetworkGossipTx(t *testing.T) {
 
 	appSender := common.NewMockSender(ctrl)
 
-	nIntf := New(
+	n, err := New(
 		&snow.Context{
 			Log: logging.NoLog{},
 		},
@@ -437,9 +464,10 @@ func TestNetworkGossipTx(t *testing.T) {
 		executor.NewMockManager(ctrl),
 		mempool.NewMockMempool(ctrl),
 		appSender,
+		prometheus.NewRegistry(),
+		testConfig,
 	)
-	require.IsType(&network{}, nIntf)
-	n := nIntf.(*network)
+	require.NoError(err)
 
 	// Case: Tx was recently gossiped
 	txID := ids.GenerateTestID()
