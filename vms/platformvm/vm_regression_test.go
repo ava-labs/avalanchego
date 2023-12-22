@@ -23,11 +23,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -45,7 +47,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -167,7 +169,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
-	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -205,13 +207,12 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t)
+			vm, _, _ := defaultVM(t, apricotPhase3)
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
 			defer func() {
 				require.NoError(vm.Shutdown(context.Background()))
-
 				vm.ctx.Lock.Unlock()
 			}()
 
@@ -340,7 +341,6 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 // panic.
 func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require := require.New(t)
-	_, genesisBytes := defaultGenesis(t)
 
 	baseDB := memdb.New()
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
@@ -352,15 +352,19 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            mockable.MaxTime,
+		DurangoTime:            mockable.MaxTime,
 	}}
 
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
 	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
@@ -379,8 +383,8 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// set time to post Banff fork
-	vm.clock.Set(banffForkTime.Add(time.Second))
-	vm.state.SetTimestamp(banffForkTime.Add(time.Second))
+	vm.clock.Set(latestForkTime.Add(time.Second))
+	vm.state.SetTimestamp(latestForkTime.Add(time.Second))
 
 	key0 := keys[0]
 	key1 := keys[1]
@@ -463,11 +467,10 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -648,7 +651,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.db,
 		nil,
 		prometheus.NewRegistry(),
-		vm.Config.Validators,
+		&vm.Config,
 		execCfg,
 		vm.ctx,
 		metrics.Noop,
@@ -672,11 +675,10 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -955,7 +957,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.db,
 		nil,
 		prometheus.NewRegistry(),
-		vm.Config.Validators,
+		&vm.Config,
 		execCfg,
 		vm.ctx,
 		metrics.Noop,
@@ -988,11 +990,10 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1116,7 +1117,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -1128,7 +1129,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1210,15 +1211,14 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1328,10 +1328,10 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1432,13 +1432,13 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
 	subnetID := testSubnet1.TxID
 
 	// setup time
@@ -1714,11 +1714,10 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1874,13 +1873,13 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
 	subnetID := testSubnet1.TxID
 
 	// setup time
@@ -2085,13 +2084,13 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t)
+	vm, _, _ := defaultVM(t, cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
+
 	subnetID := testSubnet1.TxID
 
 	// setup time

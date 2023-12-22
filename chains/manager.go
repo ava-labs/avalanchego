@@ -368,7 +368,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		// created or not. This attempts to notify the node operator that their
 		// node may not be properly validating the subnet they expect to be
 		// validating.
-		healthCheckErr := fmt.Errorf("failed to create chain on subnet: %s", chainParams.SubnetID)
+		healthCheckErr := fmt.Errorf("failed to create chain on subnet %s: %w", chainParams.SubnetID, err)
 		err := m.Health.RegisterHealthCheck(
 			chainAlias,
 			health.CheckerFunc(func(context.Context) (interface{}, error) {
@@ -771,6 +771,7 @@ func (m *manager) createAvalancheChain(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
+			DurangoTime:         version.GetDurangoTime(m.NetworkID),
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
 			DurangoTime:         version.GetDurangoTime(ctx.NetworkID),
 			MinBlkDelay:         minBlockDelay,
@@ -1117,6 +1118,7 @@ func (m *manager) createSnowmanChain(
 		vm,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
+			DurangoTime:         version.GetDurangoTime(m.NetworkID),
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
 			DurangoTime:         version.GetDurangoTime(ctx.NetworkID),
 			MinBlkDelay:         minBlockDelay,
