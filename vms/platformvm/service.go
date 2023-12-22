@@ -5,12 +5,13 @@ package platformvm
 
 import (
 	"context"
-	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"time"
+
+	stdjson "encoding/json"
 
 	"go.uber.org/zap"
 
