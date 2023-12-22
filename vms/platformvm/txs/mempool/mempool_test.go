@@ -170,7 +170,7 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	for i := 0; i < count; i++ {
 		tx, err := generateAddValidatorTx(
 			uint64(now.Add(time.Duration(count-i)*time.Second).Unix()), // startTime
-			0,                                                          // endTime
+			0, // endTime
 		)
 		if err != nil {
 			return nil, err
