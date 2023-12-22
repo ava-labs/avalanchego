@@ -183,7 +183,7 @@ func initTestProposerVM(
 		}, nil
 	}
 
-	ctx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.Context(t, ids.ID{1})
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 

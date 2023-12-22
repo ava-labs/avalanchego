@@ -453,45 +453,45 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		require.ErrorIs(err, errProposerWindowNotStarted)
 	}
 
-	// {
-	// 	// block can arrive at its creator window starts
-	// 	atWindowStart := parentTimestamp.Add(blkWinDelay)
-	// 	proVM.Clock.Set(atWindowStart)
+	{
+		// block can arrive at its creator window starts
+		atWindowStart := parentTimestamp.Add(blkWinDelay)
+		proVM.Clock.Set(atWindowStart)
 
-	// 	childSlb, err := block.Build(
-	// 		parentBlk.ID(),
-	// 		atWindowStart,
-	// 		pChainHeight,
-	// 		proVM.StakingCertLeaf,
-	// 		childCoreBlk.Bytes(),
-	// 		proVM.ctx.ChainID,
-	// 		proVM.StakingLeafSigner,
-	// 	)
-	// 	require.NoError(err)
-	// 	childBlk.SignedBlock = childSlb
+		childSlb, err := block.Build(
+			parentBlk.ID(),
+			atWindowStart,
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childBlk.SignedBlock = childSlb
 
-	// 	require.NoError(childBlk.Verify(context.Background()))
-	// }
+		require.NoError(childBlk.Verify(context.Background()))
+	}
 
-	// {
-	// 	// block can arrive after its creator window starts
-	// 	afterWindowStart := parentTimestamp.Add(blkWinDelay).Add(5 * time.Second)
-	// 	proVM.Clock.Set(afterWindowStart)
+	{
+		// block can arrive after its creator window starts
+		afterWindowStart := parentTimestamp.Add(blkWinDelay).Add(5 * time.Second)
+		proVM.Clock.Set(afterWindowStart)
 
-	// 	childSlb, err := block.Build(
-	// 		parentBlk.ID(),
-	// 		afterWindowStart,
-	// 		pChainHeight,
-	// 		proVM.StakingCertLeaf,
-	// 		childCoreBlk.Bytes(),
-	// 		proVM.ctx.ChainID,
-	// 		proVM.StakingLeafSigner,
-	// 	)
-	// 	require.NoError(err)
-	// 	childBlk.SignedBlock = childSlb
+		childSlb, err := block.Build(
+			parentBlk.ID(),
+			afterWindowStart,
+			pChainHeight,
+			proVM.StakingCertLeaf,
+			childCoreBlk.Bytes(),
+			proVM.ctx.ChainID,
+			proVM.StakingLeafSigner,
+		)
+		require.NoError(err)
+		childBlk.SignedBlock = childSlb
 
-	// 	require.NoError(childBlk.Verify(context.Background()))
-	// }
+		require.NoError(childBlk.Verify(context.Background()))
+	}
 
 	{
 		// block can arrive within submission window
