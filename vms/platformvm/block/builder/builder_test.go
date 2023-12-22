@@ -52,7 +52,9 @@ func TestBuildBlockBasic(t *testing.T) {
 	txID := tx.ID()
 
 	// Issue the transaction
+	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTx(context.Background(), tx))
+	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
 
@@ -125,7 +127,9 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	txID := tx.ID()
 
 	// Issue the transaction
+	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTx(context.Background(), tx))
+	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
 
@@ -249,7 +253,9 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	txID := tx.ID()
 
 	// Issue the transaction
+	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTx(context.Background(), tx))
+	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
 
@@ -471,6 +477,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
+		env.ctx.Lock.Lock()
 		require.NoError(shutdownEnvironment(env))
 		env.ctx.Lock.Unlock()
 	}()
@@ -500,6 +507,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require.ErrorIs(reason, errTestingDropped)
 
 	// Issue the transaction
+	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTx(context.Background(), tx))
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
