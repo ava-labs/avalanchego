@@ -79,15 +79,6 @@ func TestNetworkAppGossip(t *testing.T) {
 			msgBytesFunc: func() []byte {
 				return []byte{0x00}
 			},
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				return mempool.NewMockMempool(ctrl)
-			},
-			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 		},
 		{
 			name: "invalid tx bytes",
@@ -98,15 +89,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				msgBytes, err := message.Build(&msg)
 				require.NoError(t, err)
 				return msgBytes
-			},
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				return mempool.NewMockMempool(ctrl)
-			},
-			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 		},
 		{
@@ -124,12 +106,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(testTx, true)
 				return mempool
 			},
-			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 		},
 		{
 			name: "tx previously dropped",
@@ -146,12 +122,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
-			},
-			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 		},
 		{
@@ -175,9 +145,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				txVerifier := executor.NewMockManager(ctrl)
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
 				return txVerifier
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 		},
 		{
@@ -223,14 +190,35 @@ func TestNetworkAppGossip(t *testing.T) {
 			})
 			require.NoError(err)
 
+			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
+				return mempool.NewMockMempool(ctrl)
+			}
+			if tt.mempoolFunc != nil {
+				mempoolFunc = tt.mempoolFunc
+			}
+
+			txVerifierFunc := func(ctrl *gomock.Controller) TxVerifier {
+				return executor.NewMockManager(ctrl)
+			}
+			if tt.txVerifierFunc != nil {
+				txVerifierFunc = tt.txVerifierFunc
+			}
+
+			appSenderFunc := func(ctrl *gomock.Controller) common.AppSender {
+				return common.NewMockSender(ctrl)
+			}
+			if tt.appSenderFunc != nil {
+				appSenderFunc = tt.appSenderFunc
+			}
+
 			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
 				parser,
-				tt.txVerifierFunc(ctrl),
-				tt.mempoolFunc(ctrl),
-				tt.appSenderFunc(ctrl),
+				txVerifierFunc(ctrl),
+				mempoolFunc(ctrl),
+				appSenderFunc(ctrl),
 				prometheus.NewRegistry(),
 				testConfig,
 			)
@@ -257,12 +245,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true)
 				return mempool
 			},
-			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 			expectedErr: mempool.ErrDuplicateTx,
 		},
 		{
@@ -272,12 +254,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
-			},
-			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 			expectedErr: errTest,
 		},
@@ -295,9 +271,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
 				return txVerifier
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 			expectedErr: errTest,
 		},
 		{
@@ -314,9 +287,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				txVerifier := executor.NewMockManager(ctrl)
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
 				return txVerifier
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 			expectedErr: errTest,
 		},
@@ -356,14 +326,35 @@ func TestNetworkIssueTx(t *testing.T) {
 			})
 			require.NoError(err)
 
+			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
+				return mempool.NewMockMempool(ctrl)
+			}
+			if tt.mempoolFunc != nil {
+				mempoolFunc = tt.mempoolFunc
+			}
+
+			txVerifierFunc := func(ctrl *gomock.Controller) TxVerifier {
+				return executor.NewMockManager(ctrl)
+			}
+			if tt.txVerifierFunc != nil {
+				txVerifierFunc = tt.txVerifierFunc
+			}
+
+			appSenderFunc := func(ctrl *gomock.Controller) common.AppSender {
+				return common.NewMockSender(ctrl)
+			}
+			if tt.appSenderFunc != nil {
+				appSenderFunc = tt.appSenderFunc
+			}
+
 			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
 				parser,
-				tt.txVerifierFunc(ctrl),
-				tt.mempoolFunc(ctrl),
-				tt.appSenderFunc(ctrl),
+				txVerifierFunc(ctrl),
+				mempoolFunc(ctrl),
+				appSenderFunc(ctrl),
 				prometheus.NewRegistry(),
 				testConfig,
 			)
@@ -391,9 +382,6 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 			expectedErr: errTest,
 		},
 		{
@@ -425,14 +413,28 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			})
 			require.NoError(err)
 
+			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
+				return mempool.NewMockMempool(ctrl)
+			}
+			if tt.mempoolFunc != nil {
+				mempoolFunc = tt.mempoolFunc
+			}
+
+			appSenderFunc := func(ctrl *gomock.Controller) common.AppSender {
+				return common.NewMockSender(ctrl)
+			}
+			if tt.appSenderFunc != nil {
+				appSenderFunc = tt.appSenderFunc
+			}
+
 			n, err := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
 				parser,
 				executor.NewMockManager(ctrl), // Should never verify a tx
-				tt.mempoolFunc(ctrl),
-				tt.appSenderFunc(ctrl),
+				mempoolFunc(ctrl),
+				appSenderFunc(ctrl),
 				prometheus.NewRegistry(),
 				testConfig,
 			)
