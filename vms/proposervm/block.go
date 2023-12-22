@@ -146,9 +146,7 @@ func (p *postForkCommonComponents) Verify(
 		if p.vm.IsDurangoActivated(parentTimestamp) {
 			shouldHaveProposer, err = p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		} else {
-			var delay time.Duration
-			delay, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
-			shouldHaveProposer = delay < proposer.MaxVerifyDelay
+			shouldHaveProposer, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		}
 		if err != nil {
 			return err
@@ -200,10 +198,9 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	// After Durango, we never allow unsigned blocks.
-	shouldBuildSignedBlock := false
+	var shouldBuildSignedBlock bool
 	if p.vm.IsDurangoActivated(parentTimestamp) {
-		shouldBuildSignedBlock, err = p.shouldBuildBlockPostDurango(
+		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPostDurango(
 			ctx,
 			parentID,
 			parentTimestamp,
@@ -211,7 +208,7 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 		)
 	} else {
-		shouldBuildSignedBlock, err = p.shouldBuildUnsignedBlockPreDurango(
+		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPreDurango(
 			ctx,
 			parentID,
 			parentTimestamp,
@@ -328,7 +325,7 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
 	blk *postForkBlock,
-) (time.Duration, error) {
+) (bool, error) {
 	var (
 		blkTimestamp = blk.Timestamp()
 		childHeight  = blk.Height()
@@ -347,15 +344,15 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 			zap.Stringer("blkID", blk.ID()),
 			zap.Error(err),
 		)
-		return 0, err
+		return false, err
 	}
 
 	delay := blkTimestamp.Sub(parentTimestamp)
 	if delay < minDelay {
-		return 0, errProposerWindowNotStarted
+		return false, errProposerWindowNotStarted
 	}
 
-	return delay, nil
+	return delay < proposer.MaxVerifyDelay, nil
 }
 
 func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
@@ -378,24 +375,22 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	)
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
-		// block should be unsigned
-		return false, nil
+		return false, nil // block should be unsigned
 	case err != nil:
 		p.vm.ctx.Log.Error("unexpected block verification failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("blkID", blk.ID()),
 			zap.Error(err),
 		)
-		return true, err
+		return false, err
 	case expectedProposerID == proposerID:
-		// block should be signed
-		return true, nil
+		return true, nil // block should be signed
 	default:
-		return true, errUnexpectedProposer
+		return false, errUnexpectedProposer
 	}
 }
 
-func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
+func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
@@ -412,18 +407,16 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 	)
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
-		// build an unsigned block
-		return false, nil
+		return false, nil // build an unsigned block
 	case err != nil:
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
 		)
-		return true, err
+		return false, err
 	case expectedProposerID == p.vm.ctx.NodeID:
-		// build an signed block
-		return true, nil
+		return true, nil // build a signed block
 	}
 
 	// It's not our turn to propose a block yet. This is likely caused by having
@@ -454,17 +447,17 @@ func (p *postForkCommonComponents) shouldBuildBlockPostDurango(
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
 		)
-		return true, err
+		return false, err
 	}
 	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	// In case the inner VM only issued one pendingTxs message, we should
 	// attempt to re-handle that once it is our turn to build the block.
 	p.vm.notifyInnerBlockReady()
-	return true, errProposerWindowNotStarted
+	return false, errProposerWindowNotStarted
 }
 
-func (p *postForkCommonComponents) shouldBuildUnsignedBlockPreDurango(
+func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
@@ -473,8 +466,7 @@ func (p *postForkCommonComponents) shouldBuildUnsignedBlockPreDurango(
 ) (bool, error) {
 	delay := newTimestamp.Sub(parentTimestamp)
 	if delay >= proposer.MaxBuildDelay {
-		// time for any node to build an unsigned block
-		return false, nil
+		return false, nil // time for any node to build an unsigned block
 	}
 
 	parentHeight := p.innerBlk.Height()
@@ -486,7 +478,7 @@ func (p *postForkCommonComponents) shouldBuildUnsignedBlockPreDurango(
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
 		)
-		return true, err
+		return false, err
 	}
 
 	if delay >= minDelay {
@@ -507,5 +499,5 @@ func (p *postForkCommonComponents) shouldBuildUnsignedBlockPreDurango(
 	// In case the inner VM only issued one pendingTxs message, we should
 	// attempt to re-handle that once it is our turn to build the block.
 	p.vm.notifyInnerBlockReady()
-	return true, errProposerWindowNotStarted
+	return false, errProposerWindowNotStarted
 }

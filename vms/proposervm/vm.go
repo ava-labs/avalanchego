@@ -422,8 +422,7 @@ func (vm *VM) getPostDurangoSlotTime(
 		delay = math.Max(delay, vm.MinBlkDelay)
 		return parentTimestamp.Add(delay), err
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
-		delay = math.Max(time.Duration(0), vm.MinBlkDelay)
-		return parentTimestamp.Add(delay), err
+		return parentTimestamp.Add(vm.MinBlkDelay), err
 	default:
 		return time.Time{}, err
 	}

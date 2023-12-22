@@ -68,7 +68,8 @@ type Windower interface {
 	// able to propose from a given time on as it happens Pre-Durango).
 	// [ExpectedProposer] calculates which nodeID is scheduled to propose a
 	// block of height [blockHeight] at [slot].
-	// If no validators are currently available, [ErrAnyoneCanPropose] is returned
+	// If no validators are currently available, [ErrAnyoneCanPropose] is
+	// returned.
 	ExpectedProposer(
 		ctx context.Context,
 		blockHeight,
@@ -83,6 +84,8 @@ type Windower interface {
 	// slot to start. Delay is specified as starting from slot zero start.
 	// (which is parent timestamp). For efficiency reasons, we cap the slot
 	// search to [MaxLookAheadSlots].
+	// If no validators are currently available, [ErrAnyoneCanPropose] is
+	// returned.
 	MinDelayForProposer(
 		ctx context.Context,
 		blockHeight,
@@ -270,7 +273,7 @@ func (w *windower) expectedProposer(
 	source.Seed(w.chainSource ^ blockHeight ^ bits.Reverse64(slot))
 	indices, err := sampler.Sample(1)
 	if err != nil {
-		return ids.EmptyNodeID, fmt.Errorf("failed sampling proposers, %w", err)
+		return ids.EmptyNodeID, fmt.Errorf("failed sampling proposers: %w", err)
 	}
 	return validators[indices[0]].id, nil
 }
