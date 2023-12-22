@@ -49,14 +49,14 @@ func BenchmarkMarshalHandshake(b *testing.B) {
 	msg := p2p.Message{
 		Message: &p2p.Message_Handshake{
 			Handshake: &p2p.Handshake{
-				NetworkId:       uint32(1337),
-				MyTime:          uint64(time.Now().Unix()),
-				IpAddr:          []byte(net.IPv4(1, 2, 3, 4).To16()),
-				IpPort:          0,
-				MyVersion:       "v1.2.3",
-				MyHandshakeTime: uint64(time.Now().Unix()),
-				Sig:             []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets:  [][]byte{id[:]},
+				NetworkId:      uint32(1337),
+				MyTime:         uint64(time.Now().Unix()),
+				IpAddr:         []byte(net.IPv4(1, 2, 3, 4).To16()),
+				IpPort:         0,
+				MyVersion:      "v1.2.3",
+				IpSigningTime:  uint64(time.Now().Unix()),
+				Sig:            []byte{'y', 'e', 'e', 't'},
+				TrackedSubnets: [][]byte{id[:]},
 			},
 		},
 	}
@@ -105,14 +105,14 @@ func BenchmarkUnmarshalHandshake(b *testing.B) {
 	msg := p2p.Message{
 		Message: &p2p.Message_Handshake{
 			Handshake: &p2p.Handshake{
-				NetworkId:       uint32(1337),
-				MyTime:          uint64(time.Now().Unix()),
-				IpAddr:          []byte(net.IPv4(1, 2, 3, 4).To16()),
-				IpPort:          0,
-				MyVersion:       "v1.2.3",
-				MyHandshakeTime: uint64(time.Now().Unix()),
-				Sig:             []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets:  [][]byte{id[:]},
+				NetworkId:      uint32(1337),
+				MyTime:         uint64(time.Now().Unix()),
+				IpAddr:         []byte(net.IPv4(1, 2, 3, 4).To16()),
+				IpPort:         0,
+				MyVersion:      "v1.2.3",
+				IpSigningTime:  uint64(time.Now().Unix()),
+				Sig:            []byte{'y', 'e', 'e', 't'},
+				TrackedSubnets: [][]byte{id[:]},
 			},
 		},
 	}
