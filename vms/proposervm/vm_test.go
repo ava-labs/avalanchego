@@ -183,8 +183,7 @@ func initTestProposerVM(
 		}, nil
 	}
 
-	// TODO: Figure out why this has to be [snowtest.PChainID]
-	ctx := snowtest.Context(t, snowtest.PChainID)
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
