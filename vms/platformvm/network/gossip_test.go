@@ -122,6 +122,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	mempool.EXPECT().Get(tx.ID()).Return(nil, false)
 	mempool.EXPECT().GetDropReason(tx.ID()).Return(nil)
 	mempool.EXPECT().Add(tx).Return(nil)
+	mempool.EXPECT().RequestBuildBlock(gomock.Any())
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
