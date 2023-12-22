@@ -259,7 +259,7 @@ func TestParseVertexWithIncorrectChainID(t *testing.T) {
 func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require := require.New(t)
 
-	chainID := ids.GenerateTestID()
+	chainID := ids.Empty
 	statelessVertex, err := vertex.Build( // regular, non-stop vertex
 		chainID,
 		0,
