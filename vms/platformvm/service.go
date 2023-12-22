@@ -1408,9 +1408,6 @@ func (s *Service) buildAddDelegatorTx(args *AddDelegatorArgs) (*txs.Tx, ids.Shor
 		privKeys.Keys,          // Private keys
 		changeAddr,             // Change address
 	)
-	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("couldn't create tx: %w", err)
-	}
 
 	return tx, changeAddr, err
 }
