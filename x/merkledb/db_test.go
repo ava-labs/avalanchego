@@ -501,7 +501,7 @@ func TestDatabaseNewUntrackedView(t *testing.T) {
 	require.NoError(err)
 
 	// Create a new untracked view.
-	view, err := newTrieView(
+	view, err := newView(
 		db,
 		db,
 		ViewChanges{

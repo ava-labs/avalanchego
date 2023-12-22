@@ -122,7 +122,7 @@ func (v *view) NewView(
 		return nil, err
 	}
 
-	newView, err := newTrieView(v.db, v, changes)
+	newView, err := newView(v.db, v, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (v *view) NewView(
 }
 
 // Creates a new view with the given [parentTrie].
-func newTrieView(
+func newView(
 	db *merkleDB,
 	parentTrie View,
 	changes ViewChanges,
@@ -663,7 +663,7 @@ func (v *view) insert(
 		// TODO:
 		// [oldRootID] shouldn't need to be calculated here.
 		// Either oldRootID should already be calculated or will be calculated at the end with the other nodes
-		// Initialize the v.changes.rootID during newTrieView and then use that here instead of oldRootID
+		// Initialize the v.changes.rootID during newView and then use that here instead of oldRootID
 		newRoot.addChildWithID(oldRoot, v.tokenSize, oldRootID)
 		if err := v.recordNewNode(newRoot); err != nil {
 			return nil, err

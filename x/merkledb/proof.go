@@ -169,7 +169,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, nil, tokenSize)
+	view, err := getStandaloneView(ctx, nil, tokenSize)
 	if err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, ops, tokenSize)
+	view, err := getStandaloneView(ctx, ops, tokenSize)
 	if err != nil {
 		return err
 	}
@@ -855,8 +855,8 @@ func addPathInfo(
 	return nil
 }
 
-// getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
-func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int) (*view, error) {
+// getStandaloneView returns a new view that has nothing in it besides the changes due to [ops]
+func getStandaloneView(ctx context.Context, ops []database.BatchOp, size int) (*view, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
@@ -873,5 +873,5 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int
 		return nil, err
 	}
 
-	return newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	return newView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 }

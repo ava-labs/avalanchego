@@ -324,7 +324,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	defer valueIt.Release()
 	for valueIt.Next() {
 		if len(currentOps) >= opsSizeLimit {
-			view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
+			view, err := newView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 			if err != nil {
 				return err
 			}
@@ -347,7 +347,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	if err := valueIt.Error(); err != nil {
 		return err
 	}
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
+	view, err := newView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -373,7 +373,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 		}
 	}
 
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
+	view, err := newView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
 		return err
 	}
@@ -414,7 +414,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
+	view, err := newView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
 		return err
 	}
@@ -767,7 +767,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newTrieView(db, db, changes)
+	newView, err := newView(db, db, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -840,7 +840,7 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: []database.BatchOp{{Key: k, Value: v}}})
+	view, err := newView(db, db, ViewChanges{BatchOps: []database.BatchOp{{Key: k, Value: v}}})
 	if err != nil {
 		return err
 	}
@@ -859,7 +859,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := newTrieView(db, db,
+	view, err := newView(db, db,
 		ViewChanges{
 			BatchOps: []database.BatchOp{{
 				Key:    key,
@@ -883,7 +883,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	view, err := newView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -990,7 +990,7 @@ func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 }
 
 // CommitToDB is a no-op for db since it is already in sync with itself.
-// This exists to satisfy the TrieView interface.
+// This exists to satisfy the View interface.
 func (*merkleDB) CommitToDB(context.Context) error {
 	return nil
 }
@@ -1095,7 +1095,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	view, err := newView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}

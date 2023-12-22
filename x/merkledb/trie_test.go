@@ -20,8 +20,8 @@ import (
 
 func getNodeValue(t Trie, key string) ([]byte, error) {
 	path := ToKey([]byte(key))
-	if asTrieView, ok := t.(*view); ok {
-		if err := asTrieView.calculateNodeIDs(context.Background()); err != nil {
+	if asView, ok := t.(*view); ok {
+		if err := asView.calculateNodeIDs(context.Background()); err != nil {
 			return nil, err
 		}
 	}
@@ -48,7 +48,7 @@ func Test_GetValue_Safety(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
-	trieView, err := db.NewView(
+	view, err := db.NewView(
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
@@ -58,13 +58,13 @@ func Test_GetValue_Safety(t *testing.T) {
 	)
 	require.NoError(err)
 
-	trieVal, err := trieView.GetValue(context.Background(), []byte{0})
+	trieVal, err := view.GetValue(context.Background(), []byte{0})
 	require.NoError(err)
 	require.Equal([]byte{0}, trieVal)
 	trieVal[0] = 1
 
 	// should still be []byte{0} after edit
-	trieVal, err = trieView.GetValue(context.Background(), []byte{0})
+	trieVal, err = view.GetValue(context.Background(), []byte{0})
 	require.NoError(err)
 	require.Equal([]byte{0}, trieVal)
 }
@@ -75,7 +75,7 @@ func Test_GetValues_Safety(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
-	trieView, err := db.NewView(
+	view, err := db.NewView(
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
@@ -85,7 +85,7 @@ func Test_GetValues_Safety(t *testing.T) {
 	)
 	require.NoError(err)
 
-	trieVals, errs := trieView.GetValues(context.Background(), [][]byte{{0}})
+	trieVals, errs := view.GetValues(context.Background(), [][]byte{{0}})
 	require.Len(errs, 1)
 	require.NoError(errs[0])
 	require.Equal([]byte{0}, trieVals[0])
@@ -93,7 +93,7 @@ func Test_GetValues_Safety(t *testing.T) {
 	require.Equal([]byte{1}, trieVals[0])
 
 	// should still be []byte{0} after edit
-	trieVals, errs = trieView.GetValues(context.Background(), [][]byte{{0}})
+	trieVals, errs = view.GetValues(context.Background(), [][]byte{{0}})
 	require.Len(errs, 1)
 	require.NoError(errs[0])
 	require.Equal([]byte{0}, trieVals[0])
@@ -1171,7 +1171,7 @@ func Test_View_NewView(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 }
 
-func TestTrieViewInvalidate(t *testing.T) {
+func TestviewInvalidate(t *testing.T) {
 	require := require.New(t)
 
 	db, err := getBasicDB()
