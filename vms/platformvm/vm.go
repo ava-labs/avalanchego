@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -479,4 +480,17 @@ func (vm *VM) VerifyHeightIndex(_ context.Context) error {
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return vm.state.GetBlockIDAtHeight(height)
+}
+
+func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
+	err := vm.Network.IssueTx(ctx, tx)
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
+		vm.ctx.Log.Debug("failed to add tx to mempool",
+			zap.Stringer("txID", tx.ID()),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	return nil
 }
