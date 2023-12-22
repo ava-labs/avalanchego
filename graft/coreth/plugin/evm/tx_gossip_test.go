@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
+	agoUtils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -34,12 +34,13 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/utils"
 )
 
 func TestEthTxGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 	validatorState := &validators.TestState{}
 	snowCtx.ValidatorState = validatorState
 
@@ -102,7 +103,7 @@ func TestEthTxGossip(t *testing.T) {
 	require.NoError(err)
 	request := &sdk.PullGossipRequest{
 		Filter: emptyBloomFilterBytes,
-		Salt:   utils.RandomBytes(32),
+		Salt:   agoUtils.RandomBytes(32),
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -160,7 +161,7 @@ func TestEthTxGossip(t *testing.T) {
 func TestAtomicTxGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
 	snowCtx.XChainID = ids.GenerateTestID()
 	validatorState := &validators.TestState{
@@ -230,7 +231,7 @@ func TestAtomicTxGossip(t *testing.T) {
 	require.NoError(err)
 	request := &sdk.PullGossipRequest{
 		Filter: emptyBloomFilterBytes,
-		Salt:   utils.RandomBytes(32),
+		Salt:   agoUtils.RandomBytes(32),
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -296,7 +297,7 @@ func TestAtomicTxGossip(t *testing.T) {
 func TestEthTxPushGossipOutbound(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 	sender := &common.FakeSender{
 		SentAppGossip: make(chan []byte, 1),
 	}
@@ -353,7 +354,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 func TestEthTxPushGossipInbound(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 
 	sender := &common.FakeSender{
 		SentAppGossip: make(chan []byte, 1),
@@ -422,7 +423,7 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
 	snowCtx.XChainID = ids.GenerateTestID()
 	validatorState := &validators.TestState{
@@ -495,7 +496,7 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 func TestAtomicTxPushGossipInbound(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
 	snowCtx.XChainID = ids.GenerateTestID()
 	validatorState := &validators.TestState{
