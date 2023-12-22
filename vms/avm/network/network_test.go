@@ -251,10 +251,10 @@ func TestNetworkIssueTx(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "mempool already has transaction",
+			name: "mempool has transaction",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(&txs.Tx{}, true)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, true)
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
