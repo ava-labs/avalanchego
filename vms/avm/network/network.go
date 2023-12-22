@@ -221,9 +221,13 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	return nil
 }
 
-// IssueTx attempts to add a tx to the mempool, after verifying it against the
-// preferred state. If the tx is added to the mempool, it will push gossip the
-// tx using both the legacy and p2p SDK.
+// IssueTx attempts to add a tx to the mempool, after verifying it. If the tx is
+// added to the mempool, it will attempt to push gossip the tx to random peers
+// in the network using both the legacy and p2p SDK.
+//
+// If the tx is already in the mempool, mempool.ErrDuplicateTx will be
+// returned.
+// If the tx is not added to the mempool, an error will be returned.
 func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.mempool.Add(tx); err != nil {
 		return err
@@ -231,9 +235,13 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	return n.gossipTx(ctx, tx)
 }
 
-// IssueTx attempts to add a tx to the mempool, without first verifying it
-// against the preferred state. If the tx is added to the mempool, it will push
-// gossip the tx using both the legacy and p2p SDK.
+// IssueVerifiedTx attempts to add a tx to the mempool, without first verifyin
+// it. If the tx is added to the mempool, it will attempt to push gossip the tx
+// to random peers in the network using both the legacy and p2p SDK.
+//
+// If the tx is already in the mempool, mempool.ErrDuplicateTx will be
+// returned.
+// If the tx is not added to the mempool, an error will be returned.
 func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.mempool.AddVerified(tx); err != nil {
 		return err
