@@ -39,11 +39,6 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 }
 
 func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
-	if ctx == nil {
-		ctx = &snow.Context{
-			Log: logging.NoLog{},
-		}
-	}
 	return &snow.ConsensusContext{
 		Context:             ctx,
 		Registerer:          prometheus.NewRegistry(),
