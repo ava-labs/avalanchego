@@ -108,7 +108,7 @@ func TestBanffBlockSerialization(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			require := require.New(t)
 
-			require.NoError(initialize(test.block))
+			require.NoError(test.block.initialize(test.bytes))
 			require.Equal(test.bytes, test.block.Bytes())
 		})
 	}

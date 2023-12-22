@@ -4,7 +4,6 @@
 package block
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -34,14 +33,4 @@ type Block interface {
 type BanffBlock interface {
 	Block
 	Timestamp() time.Time
-}
-
-func initialize(blk Block) error {
-	// We serialize this block as a pointer so that it can be deserialized into
-	// a Block
-	bytes, err := Codec.Marshal(Version, &blk)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal block: %w", err)
-	}
-	return blk.initialize(bytes)
 }

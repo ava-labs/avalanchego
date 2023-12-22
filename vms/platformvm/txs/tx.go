@@ -40,8 +40,12 @@ func NewSigned(
 	c codec.Manager,
 	signers [][]*secp256k1.PrivateKey,
 ) (*Tx, error) {
-	res := &Tx{Unsigned: unsigned}
-	return res, res.Sign(c, signers)
+	tx := &Tx{Unsigned: unsigned}
+	if err := tx.Sign(c, signers); err != nil {
+		return nil, fmt.Errorf("failed to sign: %w", err)
+	}
+
+	return tx, tx.Initialize(c)
 }
 
 func (tx *Tx) Initialize(c codec.Manager) error {
