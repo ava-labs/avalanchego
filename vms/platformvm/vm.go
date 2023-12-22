@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -51,6 +53,19 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+)
+
+const (
+	maxValidatorSetStaleness          = time.Minute
+	txGossipHandlerID                 = 0
+	txGossipMaxGossipSize             = 20 * units.KiB
+	txGossipPollSize                  = 10
+	txGossipFrequency                 = 15 * time.Second
+	txGossipThrottlingPeriod          = 10 * time.Second
+	txGossipThrottlingLimit           = 2
+	txGossipBloomMaxItems             = 8 * 1024
+	txGossipBloomFalsePositiveRate    = 0.01
+	txGossipBloomMaxFalsePositiveRate = 0.05
 )
 
 var (
@@ -91,12 +106,13 @@ type VM struct {
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
+	cancel context.CancelFunc
 }
 
 // Initialize this blockchain.
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
 func (vm *VM) Initialize(
-	ctx context.Context,
+	rootCtx context.Context,
 	chainCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
@@ -106,6 +122,9 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	ctx, cancel := context.WithCancel(rootCtx)
+	vm.cancel = cancel
+
 	chainCtx.Log.Verbo("initializing platform chain")
 
 	execConfig, err := config.GetExecutionConfig(configBytes)
@@ -192,13 +211,23 @@ func (vm *VM) Initialize(
 	)
 
 	txVerifier := network.NewLockedTxVerifier(&txExecutorBackend.Ctx.Lock, vm.manager)
-	vm.Network = network.New(
+	vm.Network, err = network.New(
 		chainCtx.Log,
+		chainCtx.NodeID,
+		chainCtx.SubnetID,
+		chainCtx.ValidatorState,
 		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		registerer,
+		execConfig.Network,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+	go vm.Network.Gossip(ctx)
+
 	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
@@ -354,6 +383,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
+	vm.cancel()
 	vm.Builder.ShutdownBlockTimer()
 
 	if vm.bootstrapped.Get() {

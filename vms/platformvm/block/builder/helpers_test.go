@@ -182,12 +182,17 @@ func newEnvironment(t *testing.T) *environment {
 	)
 
 	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
-	res.network = network.New(
-		logging.NoLog{},
+	res.network, err = network.New(
+		res.backend.Ctx.Log,
+		res.backend.Ctx.NodeID,
+		res.backend.Ctx.SubnetID,
+		res.backend.Ctx.ValidatorState,
 		txVerifier,
 		res.mempool,
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
+		registerer,
+		network.DefaultConfig,
 	)
 
 	res.Builder = New(

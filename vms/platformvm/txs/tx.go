@@ -153,3 +153,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 	tx.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }
+
+func (tx *Tx) GossipID() ids.ID {
+	return tx.ID()
+}
