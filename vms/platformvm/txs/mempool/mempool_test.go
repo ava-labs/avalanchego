@@ -39,7 +39,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
 	err = mpool.Add(tx)
-	require.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
+	require.True(errors.Is(err, ErrMempoolFull), err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
@@ -171,7 +171,7 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	for i := 0; i < count; i++ {
 		tx, err := generateAddValidatorTx(
 			uint64(now.Add(time.Duration(count-i)*time.Second).Unix()), // startTime
-			0, // endTime
+			0,                                                          // endTime
 		)
 		if err != nil {
 			return nil, err
