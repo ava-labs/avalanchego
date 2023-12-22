@@ -59,7 +59,6 @@ var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
-	errBootstrapping             = errors.New("chain is currently bootstrapping")
 
 	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
 )
@@ -115,6 +114,7 @@ type VM struct {
 	txBackend *txexecutor.Backend
 
 	// These values are only initialized after the chain has been linearized.
+	mempool mempool.Mempool
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      network.Network
@@ -403,13 +403,13 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 		return err
 	}
 
-	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
+	vm.mempool, err = mempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.chainManager = blockexecutor.NewManager(
-		mempool,
+		vm.mempool,
 		vm.metrics,
 		vm.state,
 		vm.txBackend,
@@ -421,14 +421,18 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 		vm.txBackend,
 		vm.chainManager,
 		&vm.clock,
-		mempool,
+		vm.mempool,
 	)
 
+	// Invariant: The context lock is not held when calling network.IssueTx.
 	vm.network = network.New(
 		vm.ctx,
 		vm.parser,
-		vm.chainManager,
-		mempool,
+		network.NewLockedTxVerifier(
+			&vm.ctx.Lock,
+			vm.chainManager,
+		),
+		vm.mempool,
 		vm.appSender,
 	)
 
@@ -477,32 +481,21 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
  ******************************************************************************
  */
 
-// IssueTx attempts to send a transaction to consensus.
-// If onDecide is specified, the function will be called when the transaction is
-// either accepted or rejected with the appropriate status. This function will
-// go out of scope when the transaction is removed from memory.
-func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
-	if !vm.bootstrapped || vm.Builder == nil {
-		return ids.ID{}, errBootstrapping
-	}
-
-	tx, err := vm.parser.ParseTx(b)
-	if err != nil {
-		vm.ctx.Log.Debug("failed to parse tx",
-			zap.Error(err),
-		)
-		return ids.ID{}, err
-	}
-
-	err = vm.network.IssueTx(context.TODO(), tx)
-	if err != nil {
+// issueTx attempts to send a transaction to consensus.
+//
+// Invariant: The context lock is not held
+// Invariant: This function is only called after Linearize has been called.
+func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
+	txID := tx.ID()
+	err := vm.network.IssueTx(context.TODO(), tx)
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
+			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)
-		return ids.ID{}, err
+		return txID, err
 	}
-
-	return tx.ID(), nil
+	return txID, nil
 }
 
 /*
