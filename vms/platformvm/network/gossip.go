@@ -133,7 +133,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	}
 
 	g.Mempool.RequestBuildBlock(false)
-	return err
+	return nil
 }
 
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {
