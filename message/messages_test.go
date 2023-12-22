@@ -127,14 +127,14 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_Handshake{
 					Handshake: &p2p.Handshake{
-						NetworkId:      uint32(1337),
-						MyTime:         uint64(nowUnix),
-						IpAddr:         []byte(net.IPv6zero),
-						IpPort:         9651,
-						MyVersion:      "v1.2.3",
-						MyVersionTime:  uint64(nowUnix),
-						Sig:            []byte{'y', 'e', 'e', 't'},
-						TrackedSubnets: [][]byte{testID[:]},
+						NetworkId:       uint32(1337),
+						MyTime:          uint64(nowUnix),
+						IpAddr:          []byte(net.IPv6zero),
+						IpPort:          9651,
+						MyVersion:       "v1.2.3",
+						MyHandshakeTime: uint64(nowUnix),
+						Sig:             []byte{'y', 'e', 'e', 't'},
+						TrackedSubnets:  [][]byte{testID[:]},
 					},
 				},
 			},

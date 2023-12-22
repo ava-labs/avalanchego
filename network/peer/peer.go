@@ -936,10 +936,10 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	// Note that it is expected that the [versionTime] can be in the past. We
 	// are just verifying that the claimed signing time isn't too far in the
 	// future here.
-	if float64(msg.MyVersionTime)-float64(myTime) > p.MaxClockDifference.Seconds() {
+	if float64(msg.MyHandshakeTime)-float64(myTime) > p.MaxClockDifference.Seconds() {
 		p.Log.Debug("peer attempting to connect with version timestamp too far in the future",
 			zap.Stringer("nodeID", p.id),
-			zap.Uint64("versionTime", msg.MyVersionTime),
+			zap.Uint64("versionTime", msg.MyHandshakeTime),
 		)
 		p.StartClose()
 		return
@@ -1003,7 +1003,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 				IP:   msg.IpAddr,
 				Port: uint16(msg.IpPort),
 			},
-			Timestamp: msg.MyVersionTime,
+			Timestamp: msg.MyHandshakeTime,
 		},
 		Signature: msg.Sig,
 	}
