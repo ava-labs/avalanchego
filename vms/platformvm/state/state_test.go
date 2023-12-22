@@ -617,7 +617,6 @@ func TestParsedStateBlock(t *testing.T) {
 	}
 
 	{
-
 		tx := &txs.Tx{
 			Unsigned: &txs.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
