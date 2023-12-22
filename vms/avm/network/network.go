@@ -24,9 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/message"
 )
 
-// We allow [recentTxsCacheSize] to be fairly large because we only store hashes
-// in the cache, not entire transactions.
-const recentTxsCacheSize = 512
+const txGossipHandlerID = 0
 
 var (
 	_ common.AppHandler    = (*Network)(nil)
@@ -36,8 +34,9 @@ var (
 type Network struct {
 	*p2p.Network
 
-	txPushGossiper gossip.Accumulator[*txs.Tx]
-	txPullGossiper gossip.Gossiper
+	txPushGossiper        gossip.Accumulator[*txs.Tx]
+	txPullGossiper        gossip.Gossiper
+	txPullGossipFrequency time.Duration
 
 	ctx       *snow.Context
 	parser    txs.Parser
@@ -56,15 +55,7 @@ func New(
 	mempool mempool.Mempool,
 	appSender common.AppSender,
 	registerer prometheus.Registerer,
-	txGossipHandlerID uint64,
-	maxValidatorSetStaleness time.Duration,
-	txGossipMaxGossipSize int,
-	txGossipPollSize int,
-	txGossipThrottlingPeriod time.Duration,
-	txGossipThrottlingLimit int,
-	maxExpectedElements uint64,
-	txGossipFalsePositiveProbability,
-	txGossipMaxFalsePositiveProbability float64,
+	config Config,
 ) (*Network, error) {
 	p2pNetwork, err := p2p.NewNetwork(ctx.Log, appSender, registerer, "p2p")
 	if err != nil {
@@ -74,7 +65,13 @@ func New(
 	marshaller := &txParser{
 		parser: parser,
 	}
-	validators := p2p.NewValidators(p2pNetwork.Peers, ctx.Log, ctx.SubnetID, ctx.ValidatorState, maxValidatorSetStaleness)
+	validators := p2p.NewValidators(
+		p2pNetwork.Peers,
+		ctx.Log,
+		ctx.SubnetID,
+		ctx.ValidatorState,
+		config.MaxValidatorSetStaleness,
+	)
 	txGossipClient := p2pNetwork.NewClient(
 		txGossipHandlerID,
 		p2p.WithValidatorSampling(validators),
@@ -88,7 +85,7 @@ func New(
 		marshaller,
 		txGossipClient,
 		txGossipMetrics,
-		txGossipMaxGossipSize,
+		config.TargetGossipSize,
 	)
 
 	gossipMempool, err := newGossipMempool(
@@ -96,9 +93,9 @@ func New(
 		ctx.Log,
 		txVerifier,
 		parser,
-		maxExpectedElements,
-		txGossipFalsePositiveProbability,
-		txGossipMaxFalsePositiveProbability,
+		config.ExpectedBloomFilterElements,
+		config.ExpectedBloomFilterFalsePositiveProbability,
+		config.MaxBloomFilterFalsePositiveProbability,
 	)
 	if err != nil {
 		return nil, err
@@ -111,7 +108,7 @@ func New(
 		gossipMempool,
 		txGossipClient,
 		txGossipMetrics,
-		txGossipPollSize,
+		config.PullGossipPollSize,
 	)
 
 	// Gossip requests are only served if a node is a validator
@@ -127,15 +124,15 @@ func New(
 		txPushGossiper,
 		gossipMempool,
 		txGossipMetrics,
-		txGossipMaxGossipSize,
+		config.TargetGossipSize,
 	)
 
 	validatorHandler := p2p.NewValidatorHandler(
 		p2p.NewThrottlerHandler(
 			handler,
 			p2p.NewSlidingWindowThrottler(
-				txGossipThrottlingPeriod,
-				txGossipThrottlingLimit,
+				config.PullGossipThrottlingPeriod,
+				config.PullGossipThrottlingLimit,
 			),
 			ctx.Log,
 		),
@@ -155,22 +152,23 @@ func New(
 	}
 
 	return &Network{
-		Network:        p2pNetwork,
-		txPushGossiper: txPushGossiper,
-		txPullGossiper: txPullGossiper,
-		ctx:            ctx,
-		parser:         parser,
-		mempool:        gossipMempool,
-		appSender:      appSender,
+		Network:               p2pNetwork,
+		txPushGossiper:        txPushGossiper,
+		txPullGossiper:        txPullGossiper,
+		txPullGossipFrequency: config.PullGossipFrequency,
+		ctx:                   ctx,
+		parser:                parser,
+		mempool:               gossipMempool,
+		appSender:             appSender,
 
 		recentTxs: &cache.LRU[ids.ID, struct{}]{
-			Size: recentTxsCacheSize,
+			Size: config.LegacyPushGossipCacheSize,
 		},
 	}, nil
 }
 
-func (n *Network) Gossip(ctx context.Context, frequency time.Duration) {
-	gossip.Every(ctx, n.ctx.Log, n.txPullGossiper, frequency)
+func (n *Network) Gossip(ctx context.Context) {
+	gossip.Every(ctx, n.ctx.Log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
 func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {

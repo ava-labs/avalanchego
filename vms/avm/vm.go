@@ -10,9 +10,6 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
-	"time"
-
-	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -35,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -56,21 +52,7 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
-const (
-	assetToFxCacheSize = 1024
-
-	txGossipHandlerID = 0
-
-	maxValidatorSetStaleness                 = time.Minute
-	txGossipMaxGossipSize                    = 20 * units.KiB
-	txGossipPollSize                         = 10
-	txGossipFrequency                        = 15 * time.Second
-	txGossipThrottlingPeriod                 = 10 * time.Second
-	txGossipThrottlingLimit                  = 2
-	txGossipBloomMaxExpectedElements         = 8 * 1024
-	txGossipBloomFalsePositiveProbability    = 0.01
-	txGossipBloomMaxFalsePositiveProbability = 0.05
-)
+const assetToFxCacheSize = 1024
 
 var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
@@ -136,6 +118,7 @@ type VM struct {
 	startShutdown context.CancelFunc
 	awaitShutdown sync.WaitGroup
 
+	networkConfig network.Config
 	// These values are only initialized after the chain has been linearized.
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
@@ -168,12 +151,6 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
  ******************************************************************************
  */
 
-type Config struct {
-	IndexTransactions    bool `json:"index-transactions"`
-	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
-	ChecksumsEnabled     bool `json:"checksums-enabled"`
-}
-
 func (vm *VM) Initialize(
 	_ context.Context,
 	ctx *snow.Context,
@@ -188,15 +165,13 @@ func (vm *VM) Initialize(
 	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
 	vm.Atomic = network.NewAtomic(noopMessageHandler)
 
-	avmConfig := Config{}
-	if len(configBytes) > 0 {
-		if err := stdjson.Unmarshal(configBytes, &avmConfig); err != nil {
-			return err
-		}
-		ctx.Log.Info("VM config initialized",
-			zap.Reflect("config", avmConfig),
-		)
+	avmConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
 	}
+	ctx.Log.Info("VM config initialized",
+		zap.Reflect("config", avmConfig),
+	)
 
 	registerer := prometheus.NewRegistry()
 	if err := ctx.Metrics.Register(registerer); err != nil {
@@ -207,7 +182,6 @@ func (vm *VM) Initialize(
 	vm.connectedPeers = make(map[ids.NodeID]*version.Application)
 
 	// Initialize metrics as soon as possible
-	var err error
 	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
@@ -301,6 +275,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.context, vm.startShutdown = context.WithCancel(context.Background())
+	vm.networkConfig = avmConfig.Network
 	return vm.state.Commit()
 }
 
@@ -475,15 +450,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		mempool,
 		vm.appSender,
 		vm.registerer,
-		txGossipHandlerID,
-		maxValidatorSetStaleness,
-		txGossipMaxGossipSize,
-		txGossipPollSize,
-		txGossipThrottlingPeriod,
-		txGossipThrottlingLimit,
-		txGossipBloomMaxExpectedElements,
-		txGossipBloomFalsePositiveProbability,
-		txGossipBloomMaxFalsePositiveProbability,
+		vm.networkConfig,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize network: %w", err)
@@ -507,7 +474,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		defer vm.awaitShutdown.Done()
 
 		// Invariant: Gossip must never grab the context lock.
-		vm.network.Gossip(vm.context, txGossipFrequency)
+		vm.network.Gossip(vm.context)
 	}()
 
 	go func() {

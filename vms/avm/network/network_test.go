@@ -31,7 +31,6 @@ import (
 )
 
 const (
-	txGossipHandlerID                        = 0
 	maxValidatorSetStaleness                 = time.Second
 	txGossipMaxGossipSize                    = 1
 	txGossipPollSize                         = 1
@@ -42,7 +41,22 @@ const (
 	txGossipBloomMaxFalsePositiveProbability = 0.5
 )
 
-var errTest = errors.New("test error")
+var (
+	testConfig = Config{
+		MaxValidatorSetStaleness:                    time.Second,
+		TargetGossipSize:                            1,
+		PullGossipPollSize:                          1,
+		PullGossipFrequency:                         time.Second,
+		PullGossipThrottlingPeriod:                  time.Second,
+		PullGossipThrottlingLimit:                   1,
+		ExpectedBloomFilterElements:                 10,
+		ExpectedBloomFilterFalsePositiveProbability: .1,
+		MaxBloomFilterFalsePositiveProbability:      .5,
+		LegacyPushGossipCacheSize:                   512,
+	}
+
+	errTest = errors.New("test error")
+)
 
 func TestNetworkAppGossip(t *testing.T) {
 	testTx := &txs.Tx{
@@ -229,15 +243,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
 				prometheus.NewRegistry(),
-				txGossipHandlerID,
-				maxValidatorSetStaleness,
-				txGossipMaxGossipSize,
-				txGossipPollSize,
-				txGossipThrottlingPeriod,
-				txGossipThrottlingLimit,
-				txGossipBloomMaxElements,
-				txGossipBloomFalsePositiveProbability,
-				txGossipBloomMaxFalsePositiveProbability,
+				testConfig,
 			)
 			require.NoError(err)
 			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
@@ -370,15 +376,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
 				prometheus.NewRegistry(),
-				txGossipHandlerID,
-				maxValidatorSetStaleness,
-				txGossipMaxGossipSize,
-				txGossipPollSize,
-				txGossipThrottlingPeriod,
-				txGossipThrottlingLimit,
-				txGossipBloomMaxElements,
-				txGossipBloomFalsePositiveProbability,
-				txGossipBloomMaxFalsePositiveProbability,
+				testConfig,
 			)
 			require.NoError(err)
 			err = n.IssueTx(context.Background(), &txs.Tx{})
@@ -447,15 +445,7 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
 				prometheus.NewRegistry(),
-				txGossipHandlerID,
-				maxValidatorSetStaleness,
-				txGossipMaxGossipSize,
-				txGossipPollSize,
-				txGossipThrottlingPeriod,
-				txGossipThrottlingLimit,
-				txGossipBloomMaxElements,
-				txGossipBloomFalsePositiveProbability,
-				txGossipBloomMaxFalsePositiveProbability,
+				testConfig,
 			)
 			require.NoError(err)
 			err = n.IssueVerifiedTx(context.Background(), &txs.Tx{})
@@ -484,15 +474,7 @@ func TestNetworkGossipTx(t *testing.T) {
 		mempool.NewMockMempool(ctrl),
 		appSender,
 		prometheus.NewRegistry(),
-		txGossipHandlerID,
-		maxValidatorSetStaleness,
-		txGossipMaxGossipSize,
-		txGossipPollSize,
-		txGossipThrottlingPeriod,
-		txGossipThrottlingLimit,
-		txGossipBloomMaxElements,
-		txGossipBloomFalsePositiveProbability,
-		txGossipBloomMaxFalsePositiveProbability,
+		testConfig,
 	)
 	require.NoError(err)
 
