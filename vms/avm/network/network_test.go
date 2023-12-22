@@ -48,11 +48,11 @@ func TestNetworkAppGossip(t *testing.T) {
 	require.NoError(t, testTx.Initialize(parser.Codec()))
 
 	type test struct {
-		name          string
-		msgBytesFunc  func() []byte
-		mempoolFunc   func(*gomock.Controller) mempool.Mempool
-		managerFunc   func(*gomock.Controller) executor.Manager
-		appSenderFunc func(*gomock.Controller) common.AppSender
+		name           string
+		msgBytesFunc   func() []byte
+		mempoolFunc    func(*gomock.Controller) mempool.Mempool
+		txVerifierFunc func(*gomock.Controller) TxVerifier
+		appSenderFunc  func(*gomock.Controller) common.AppSender
 	}
 
 	tests := []test{
@@ -60,15 +60,6 @@ func TestNetworkAppGossip(t *testing.T) {
 			name: "invalid message bytes",
 			msgBytesFunc: func() []byte {
 				return []byte{0x00}
-			},
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				return mempool.NewMockMempool(ctrl)
-			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 		},
 		{
@@ -80,15 +71,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				msgBytes, err := message.Build(&msg)
 				require.NoError(t, err)
 				return msgBytes
-			},
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				return mempool.NewMockMempool(ctrl)
-			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 		},
 		{
@@ -106,12 +88,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(testTx, true)
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 		},
 		{
 			name: "tx previously dropped",
@@ -128,12 +104,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
-			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 		},
 		{
@@ -153,13 +123,10 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
-				return manager
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
+			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
+				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
+				return txVerifier
 			},
 		},
 		{
@@ -180,10 +147,10 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().RequestBuildBlock()
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				return manager
+			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
+				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
+				return txVerifier
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
@@ -205,14 +172,35 @@ func TestNetworkAppGossip(t *testing.T) {
 			})
 			require.NoError(err)
 
+			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
+				return mempool.NewMockMempool(ctrl)
+			}
+			if tt.mempoolFunc != nil {
+				mempoolFunc = tt.mempoolFunc
+			}
+
+			txVerifierFunc := func(ctrl *gomock.Controller) TxVerifier {
+				return executor.NewMockManager(ctrl)
+			}
+			if tt.txVerifierFunc != nil {
+				txVerifierFunc = tt.txVerifierFunc
+			}
+
+			appSenderFunc := func(ctrl *gomock.Controller) common.AppSender {
+				return common.NewMockSender(ctrl)
+			}
+			if tt.appSenderFunc != nil {
+				appSenderFunc = tt.appSenderFunc
+			}
+
 			n := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
 				parser,
-				tt.managerFunc(ctrl),
-				tt.mempoolFunc(ctrl),
-				tt.appSenderFunc(ctrl),
+				txVerifierFunc(ctrl),
+				mempoolFunc(ctrl),
+				appSenderFunc(ctrl),
 			)
 			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
 		})
@@ -221,11 +209,11 @@ func TestNetworkAppGossip(t *testing.T) {
 
 func TestNetworkIssueTx(t *testing.T) {
 	type test struct {
-		name          string
-		mempoolFunc   func(*gomock.Controller) mempool.Mempool
-		managerFunc   func(*gomock.Controller) executor.Manager
-		appSenderFunc func(*gomock.Controller) common.AppSender
-		expectedErr   error
+		name           string
+		mempoolFunc    func(*gomock.Controller) mempool.Mempool
+		txVerifierFunc func(*gomock.Controller) TxVerifier
+		appSenderFunc  func(*gomock.Controller) common.AppSender
+		expectedErr    error
 	}
 
 	tests := []test{
@@ -236,12 +224,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true)
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 			expectedErr: mempool.ErrDuplicateTx,
 		},
 		{
@@ -251,12 +233,6 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
-			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				return executor.NewMockManager(ctrl)
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
 			},
 			expectedErr: errTest,
 		},
@@ -269,13 +245,10 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
-				return manager
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
+			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
+				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
+				return txVerifier
 			},
 			expectedErr: errTest,
 		},
@@ -289,13 +262,10 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				return manager
-			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
+			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
+				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
+				return txVerifier
 			},
 			expectedErr: errTest,
 		},
@@ -309,10 +279,10 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().RequestBuildBlock()
 				return mempool
 			},
-			managerFunc: func(ctrl *gomock.Controller) executor.Manager {
-				manager := executor.NewMockManager(ctrl)
-				manager.EXPECT().VerifyTx(gomock.Any()).Return(nil)
-				return manager
+			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
+				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
+				return txVerifier
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
@@ -335,14 +305,35 @@ func TestNetworkIssueTx(t *testing.T) {
 			})
 			require.NoError(err)
 
+			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
+				return mempool.NewMockMempool(ctrl)
+			}
+			if tt.mempoolFunc != nil {
+				mempoolFunc = tt.mempoolFunc
+			}
+
+			txVerifierFunc := func(ctrl *gomock.Controller) TxVerifier {
+				return executor.NewMockManager(ctrl)
+			}
+			if tt.txVerifierFunc != nil {
+				txVerifierFunc = tt.txVerifierFunc
+			}
+
+			appSenderFunc := func(ctrl *gomock.Controller) common.AppSender {
+				return common.NewMockSender(ctrl)
+			}
+			if tt.appSenderFunc != nil {
+				appSenderFunc = tt.appSenderFunc
+			}
+
 			n := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
 				parser,
-				tt.managerFunc(ctrl),
-				tt.mempoolFunc(ctrl),
-				tt.appSenderFunc(ctrl),
+				txVerifierFunc(ctrl),
+				mempoolFunc(ctrl),
+				appSenderFunc(ctrl),
 			)
 			err = n.IssueTx(context.Background(), &txs.Tx{})
 			require.ErrorIs(err, tt.expectedErr)
@@ -367,9 +358,6 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return common.NewMockSender(ctrl)
-			},
 			expectedErr: errTest,
 		},
 		{
@@ -401,14 +389,28 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			})
 			require.NoError(err)
 
+			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
+				return mempool.NewMockMempool(ctrl)
+			}
+			if tt.mempoolFunc != nil {
+				mempoolFunc = tt.mempoolFunc
+			}
+
+			appSenderFunc := func(ctrl *gomock.Controller) common.AppSender {
+				return common.NewMockSender(ctrl)
+			}
+			if tt.appSenderFunc != nil {
+				appSenderFunc = tt.appSenderFunc
+			}
+
 			n := New(
 				&snow.Context{
 					Log: logging.NoLog{},
 				},
 				parser,
 				executor.NewMockManager(ctrl), // Should never verify a tx
-				tt.mempoolFunc(ctrl),
-				tt.appSenderFunc(ctrl),
+				mempoolFunc(ctrl),
+				appSenderFunc(ctrl),
 			)
 			err = n.IssueVerifiedTx(context.Background(), &txs.Tx{})
 			require.ErrorIs(err, tt.expectedErr)

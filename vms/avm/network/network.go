@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/message"
@@ -36,8 +35,6 @@ type Network interface {
 	// If the tx is already in the mempool, mempool.ErrDuplicateTx will be
 	// returned.
 	// If the tx is not added to the mempool, an error will be returned.
-	//
-	// Invariant: The context lock is not held
 	IssueTx(context.Context, *txs.Tx) error
 
 	// IssueVerifiedTx attempts to add a tx to the mempool. If the tx is added
@@ -54,11 +51,11 @@ type network struct {
 	// We embed a noop handler for all unhandled messages
 	common.AppHandler
 
-	ctx       *snow.Context
-	parser    txs.Parser
-	manager   executor.Manager
-	mempool   mempool.Mempool
-	appSender common.AppSender
+	ctx        *snow.Context
+	parser     txs.Parser
+	txVerifier TxVerifier
+	mempool    mempool.Mempool
+	appSender  common.AppSender
 
 	// gossip related attributes
 	recentTxsLock sync.Mutex
@@ -68,18 +65,18 @@ type network struct {
 func New(
 	ctx *snow.Context,
 	parser txs.Parser,
-	manager executor.Manager,
+	txVerifier TxVerifier,
 	mempool mempool.Mempool,
 	appSender common.AppSender,
 ) Network {
 	return &network{
 		AppHandler: common.NewNoOpAppHandler(ctx.Log),
 
-		ctx:       ctx,
-		parser:    parser,
-		manager:   manager,
-		mempool:   mempool,
-		appSender: appSender,
+		ctx:        ctx,
+		parser:     parser,
+		txVerifier: txVerifier,
+		mempool:    mempool,
+		appSender:  appSender,
 
 		recentTxs: &cache.LRU[ids.ID, struct{}]{
 			Size: recentTxsCacheSize,
@@ -154,11 +151,7 @@ func (n *network) issueTx(tx *txs.Tx) error {
 		return reason
 	}
 
-	// Verify the tx at the currently preferred state
-	n.ctx.Lock.Lock()
-	err := n.manager.VerifyTx(tx)
-	n.ctx.Lock.Unlock()
-	if err != nil {
+	if err := n.txVerifier.VerifyTx(tx); err != nil {
 		n.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
