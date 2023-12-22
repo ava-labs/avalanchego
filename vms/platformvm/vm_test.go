@@ -2260,7 +2260,6 @@ func TestBaseTx(t *testing.T) {
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTx(context.Background(), baseTx))
-	require.NoError(vm.issueTx(context.Background(), baseTx))
 	vm.ctx.Lock.Lock()
 	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
