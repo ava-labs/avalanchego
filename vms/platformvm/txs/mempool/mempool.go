@@ -6,12 +6,14 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -45,12 +47,14 @@ var (
 
 type Mempool interface {
 	Add(tx *txs.Tx) error
-	Has(txID ids.ID) bool
-	Get(txID ids.ID) *txs.Tx
-	Remove(txs []*txs.Tx)
+	Get(txID ids.ID) (*txs.Tx, bool)
+	Remove(txs ...*txs.Tx)
 
 	// Peek returns the oldest tx in the mempool.
 	Peek() (tx *txs.Tx, exists bool)
+
+	// Iterate iterates over the txs until f returns false
+	Iterate(f func(tx *txs.Tx) bool)
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built. If [emptyBlockPermitted] is true, the notification will be sent
@@ -69,19 +73,16 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
-	bytesAvailableMetric prometheus.Gauge
-	bytesAvailable       int
-
-	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
-	numTxs      prometheus.Gauge
-
-	// Key: Tx ID
-	// Value: Verification error
-	droppedTxIDs *cache.LRU[ids.ID, error]
-
-	consumedUTXOs set.Set[ids.ID]
+	lock           sync.RWMutex
+	unissuedTxs    linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	consumedUTXOs  set.Set[ids.ID]
+	bytesAvailable int
+	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> verification error
 
 	toEngine chan<- common.Message
+
+	numTxs               prometheus.Gauge
+	bytesAvailableMetric prometheus.Gauge
 }
 
 func New(
@@ -89,39 +90,36 @@ func New(
 	registerer prometheus.Registerer,
 	toEngine chan<- common.Message,
 ) (Mempool, error) {
-	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "bytes_available",
-		Help:      "Number of bytes of space currently available in the mempool",
-	})
-	if err := registerer.Register(bytesAvailableMetric); err != nil {
-		return nil, err
+	m := &mempool{
+		unissuedTxs:    linkedhashmap.New[ids.ID, *txs.Tx](),
+		consumedUTXOs:  set.NewSet[ids.ID](initialConsumedUTXOsSize),
+		bytesAvailable: maxMempoolSize,
+		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		toEngine:       toEngine,
+		numTxs: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "txs",
+			Help:      "Number of decision/staker transactions in the mempool",
+		}),
+		bytesAvailableMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "bytes_available",
+			Help:      "Number of bytes of space currently available in the mempool",
+		}),
 	}
+	m.bytesAvailableMetric.Set(maxMempoolSize)
 
-	numTxs := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "txs",
-		Help:      "Number of decision/staker transactions in the mempool",
-	})
-	if err := registerer.Register(numTxs); err != nil {
-		return nil, err
-	}
-
-	bytesAvailableMetric.Set(maxMempoolSize)
-	return &mempool{
-		bytesAvailableMetric: bytesAvailableMetric,
-		bytesAvailable:       maxMempoolSize,
-
-		unissuedTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
-		numTxs:      numTxs,
-
-		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
-		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
-		toEngine:      toEngine,
-	}, nil
+	err := utils.Err(
+		registerer.Register(m.numTxs),
+		registerer.Register(m.bytesAvailableMetric),
+	)
+	return m, err
 }
 
 func (m *mempool) Add(tx *txs.Tx) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return errCantIssueAdvanceTimeTx
@@ -132,7 +130,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
-	if m.Has(txID) {
+	if _, ok := m.unissuedTxs.Get(txID); ok {
 		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
 	}
 
@@ -173,17 +171,15 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
-func (m *mempool) Has(txID ids.ID) bool {
-	return m.Get(txID) != nil
+func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+	return m.unissuedTxs.Get(txID)
 }
 
-func (m *mempool) Get(txID ids.ID) *txs.Tx {
-	tx, _ := m.unissuedTxs.Get(txID)
-	return tx
-}
+func (m *mempool) Remove(txs ...*txs.Tx) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-func (m *mempool) Remove(txsToRemove []*txs.Tx) {
-	for _, tx := range txsToRemove {
+	for _, tx := range txs {
 		txID := tx.ID()
 		if !m.unissuedTxs.Delete(txID) {
 			continue
@@ -203,7 +199,26 @@ func (m *mempool) Peek() (*txs.Tx, bool) {
 	return tx, exists
 }
 
+func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	itr := m.unissuedTxs.NewIterator()
+	for itr.Next() {
+		if !f(itr.Value()) {
+			return
+		}
+	}
+}
+
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	if _, ok := m.unissuedTxs.Get(txID); ok {
+		return
+	}
+
 	m.droppedTxIDs.Put(txID, reason)
 }
 

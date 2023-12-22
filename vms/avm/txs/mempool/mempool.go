@@ -35,17 +35,17 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errDuplicateTx          = errors.New("duplicate tx")
-	errTxTooLarge           = errors.New("tx too large")
-	errMempoolFull          = errors.New("mempool is full")
-	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
+	ErrDuplicateTx          = errors.New("duplicate tx")
+	ErrTxTooLarge           = errors.New("tx too large")
+	ErrMempoolFull          = errors.New("mempool is full")
+	ErrConflictsWithOtherTx = errors.New("tx conflicts with other tx")
 )
 
 // Mempool contains transactions that have not yet been put into a block.
 type Mempool interface {
 	Add(tx *txs.Tx) error
 	Get(txID ids.ID) (*txs.Tx, bool)
-	Remove(txs []*txs.Tx)
+	Remove(txs ...*txs.Tx)
 
 	// Peek returns the oldest tx in the mempool.
 	Peek() (tx *txs.Tx, exists bool)
@@ -114,13 +114,13 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	defer m.lock.Unlock()
 
 	if _, ok := m.unissuedTxs.Get(txID); ok {
-		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
+		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
 	txSize := len(tx.Bytes())
 	if txSize > MaxTxSize {
 		return fmt.Errorf("%w: %s size (%d) > max size (%d)",
-			errTxTooLarge,
+			ErrTxTooLarge,
 			txID,
 			txSize,
 			MaxTxSize,
@@ -128,7 +128,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 	if txSize > m.bytesAvailable {
 		return fmt.Errorf("%w: %s size (%d) > available space (%d)",
-			errMempoolFull,
+			ErrMempoolFull,
 			txID,
 			txSize,
 			m.bytesAvailable,
@@ -137,7 +137,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
-		return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
+		return fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
 	}
 
 	m.bytesAvailable -= txSize
@@ -159,11 +159,11 @@ func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	return tx, ok
 }
 
-func (m *mempool) Remove(txsToRemove []*txs.Tx) {
+func (m *mempool) Remove(txs ...*txs.Tx) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for _, tx := range txsToRemove {
+	for _, tx := range txs {
 		txID := tx.ID()
 		if !m.unissuedTxs.Delete(txID) {
 			continue
