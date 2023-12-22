@@ -2259,7 +2259,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 		return err
 	}
 
-	if s.vm.Builder.Has(args.TxID) {
+	if _, ok := s.vm.Builder.Get(args.TxID); ok {
 		// Found the tx in the mempool. Report tx is processing.
 		response.Status = status.Processing
 		return nil

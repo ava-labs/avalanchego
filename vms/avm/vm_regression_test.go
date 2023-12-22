@@ -26,7 +26,9 @@ func TestVerifyFxUsage(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -34,7 +36,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
@@ -72,7 +74,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -95,7 +97,7 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	spendTx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
+		BlockchainID: env.vm.ctx.XChainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        createAssetTx.ID(),
