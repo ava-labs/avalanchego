@@ -87,16 +87,16 @@ func BenchmarkMarshalHandshake(b *testing.B) {
 //	$ go install -v golang.org/x/tools/cmd/benchcmp@latest
 //	$ go install -v golang.org/x/perf/cmd/benchstat@latest
 //
-//	$ go test -run=NONE -bench=BenchmarkUnmarshalVersion > /tmp/cpu.before.txt
-//	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalVersion > /tmp/cpu.after.txt
+//	$ go test -run=NONE -bench=BenchmarkUnmarshalHandshake > /tmp/cpu.before.txt
+//	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalHandshake > /tmp/cpu.after.txt
 //	$ benchcmp /tmp/cpu.before.txt /tmp/cpu.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/cpu.before.txt /tmp/cpu.after.txt
 //
-//	$ go test -run=NONE -bench=BenchmarkUnmarshalVersion -benchmem > /tmp/mem.before.txt
-//	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalVersion -benchmem > /tmp/mem.after.txt
+//	$ go test -run=NONE -bench=BenchmarkUnmarshalHandshake -benchmem > /tmp/mem.before.txt
+//	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalHandshake -benchmem > /tmp/mem.after.txt
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
-func BenchmarkUnmarshalVersion(b *testing.B) {
+func BenchmarkUnmarshalHandshake(b *testing.B) {
 	require := require.New(b)
 
 	b.StopTimer()
