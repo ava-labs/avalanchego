@@ -30,17 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const (
-	maxValidatorSetStaleness                 = time.Second
-	txGossipMaxGossipSize                    = 1
-	txGossipPollSize                         = 1
-	txGossipThrottlingPeriod                 = time.Second
-	txGossipThrottlingLimit                  = 1
-	txGossipBloomMaxElements                 = 10
-	txGossipBloomFalsePositiveProbability    = 0.1
-	txGossipBloomMaxFalsePositiveProbability = 0.5
-)
-
 var (
 	testConfig = Config{
 		MaxValidatorSetStaleness:                    time.Second,
