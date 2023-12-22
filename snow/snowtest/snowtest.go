@@ -91,14 +91,9 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		CChainID:    CChainID,
 		AVAXAssetID: AVAXAssetID,
 
-		Log: logging.NoLog{},
-		// Lock         sync.RWMutex
-		// Keystore     keystore.BlockchainKeystore
-		// SharedMemory atomic.SharedMemory
+		Log:      logging.NoLog{},
 		BCLookup: aliaser,
 		Metrics:  metrics.NewOptionalGatherer(),
-
-		// WarpSigner warp.Signer
 
 		ValidatorState: validatorState,
 		ChainDataDir:   "",
