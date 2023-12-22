@@ -18,12 +18,7 @@ var (
 )
 
 type BanffProposalBlock struct {
-	Time uint64 `serialize:"true" json:"time"`
-	// Transactions is currently unused. This is populated so that introducing
-	// them in the future will not require a codec change.
-	//
-	// TODO: when Transactions is used, we must correctly verify and apply their
-	//       changes.
+	Time                 uint64    `serialize:"true" json:"time"`
 	Transactions         []*txs.Tx `serialize:"true" json:"-"`
 	ApricotProposalBlock `serialize:"true"`
 }
