@@ -144,9 +144,6 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	// Verify the tx at the currently preferred state
-	//
-	// We need to grab the context lock here to avoid racy behavior with
-	// transaction verification + mempool modifications.
 	err := n.txVerifier.VerifyTx(tx)
 	if err != nil {
 		n.ctx.Log.Debug("tx failed verification",
