@@ -19,7 +19,7 @@ var (
 
 type BanffProposalBlock struct {
 	Time                 uint64    `serialize:"true" json:"time"`
-	Transactions         []*txs.Tx `serialize:"true" json:"-"`
+	Transactions         []*txs.Tx `serialize:"true" json:"txs"`
 	ApricotProposalBlock `serialize:"true"`
 }
 
@@ -76,7 +76,7 @@ func NewBanffProposalBlock(
 			Tx: proposalTx,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotProposalBlock struct {
@@ -119,5 +119,5 @@ func NewApricotProposalBlock(
 		},
 		Tx: tx,
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }

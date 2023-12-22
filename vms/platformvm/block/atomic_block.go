@@ -52,5 +52,5 @@ func NewApricotAtomicBlock(
 		},
 		Tx: tx,
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
