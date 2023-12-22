@@ -324,7 +324,7 @@ func InboundAppResponse(
 
 func encodeIDs(ids []ids.ID, result [][]byte) {
 	for i, id := range ids {
-		copy := id
-		result[i] = copy[:]
+		id := id
+		result[i] = id[:]
 	}
 }

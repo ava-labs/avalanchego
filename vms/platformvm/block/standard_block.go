@@ -46,7 +46,7 @@ func NewBanffStandardBlock(
 			Transactions: txs,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotStandardBlock struct {
@@ -93,5 +93,5 @@ func NewApricotStandardBlock(
 		},
 		Transactions: txs,
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
