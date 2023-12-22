@@ -110,7 +110,7 @@ message Handshake {
   // Avalanche client version
   string my_version = 5;
   // Timestamp of the IP
-  uint64 my_version_time = 6;
+  uint64 ip_signing_time = 6;
   // Signature of the peer IP port pair at a provided timestamp
   bytes sig = 7;
   // Subnets the peer is tracking
