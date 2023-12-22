@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -31,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -53,19 +51,6 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
-)
-
-const (
-	maxValidatorSetStaleness          = time.Minute
-	txGossipHandlerID                 = 0
-	txGossipMaxGossipSize             = 20 * units.KiB
-	txGossipPollSize                  = 10
-	txGossipFrequency                 = 15 * time.Second
-	txGossipThrottlingPeriod          = 10 * time.Second
-	txGossipThrottlingLimit           = 2
-	txGossipBloomMaxItems             = 8 * 1024
-	txGossipBloomFalsePositiveRate    = 0.01
-	txGossipBloomMaxFalsePositiveRate = 0.05
 )
 
 var (

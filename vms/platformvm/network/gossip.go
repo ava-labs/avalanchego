@@ -5,12 +5,16 @@ package network
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var (
@@ -56,4 +60,86 @@ func (t txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 	}
 
 	return parsed, nil
+}
+
+func newGossipMempool(
+	mempool mempool.Mempool,
+	log logging.Logger,
+	txVerifier TxVerifier,
+	maxExpectedElements uint64,
+	falsePositiveProbability float64,
+	maxFalsePositiveProbability float64,
+) (*gossipMempool, error) {
+	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
+	return &gossipMempool{
+		Mempool:                     mempool,
+		log:                         log,
+		txVerifier:                  txVerifier,
+		bloom:                       bloom,
+		maxFalsePositiveProbability: maxFalsePositiveProbability,
+	}, err
+}
+
+type gossipMempool struct {
+	mempool.Mempool
+	log                         logging.Logger
+	txVerifier                  TxVerifier
+	emptyBlockPermitted         bool
+	maxFalsePositiveProbability float64
+
+	lock  sync.RWMutex
+	bloom *gossip.BloomFilter
+}
+
+func (g *gossipMempool) Add(tx *txs.Tx) error {
+	txID := tx.ID()
+	if _, ok := g.Mempool.Get(txID); ok {
+		return fmt.Errorf("tx %s dropped: %w", tx.ID(), mempool.ErrDuplicateTx)
+	}
+
+	if reason := g.Mempool.GetDropReason(txID); reason != nil {
+		// If the tx is being dropped - just ignore it
+		//
+		// TODO: Should we allow re-verification of the transaction even if it
+		// failed previously?
+		return reason
+	}
+
+	if err := g.txVerifier.VerifyTx(tx); err != nil {
+		g.Mempool.MarkDropped(txID, err)
+		return err
+	}
+
+	if err := g.Mempool.Add(tx); err != nil {
+		g.Mempool.MarkDropped(txID, err)
+		return err
+	}
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	g.bloom.Add(tx)
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.maxFalsePositiveProbability)
+	if err != nil {
+		return err
+	}
+
+	if reset {
+		g.log.Debug("resetting bloom filter")
+		g.Mempool.Iterate(func(tx *txs.Tx) bool {
+			g.bloom.Add(tx)
+			return true
+		})
+	}
+
+	g.Mempool.RequestBuildBlock(false)
+	return err
+}
+
+func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	bloomBytes, err := g.bloom.Bloom.MarshalBinary()
+	return bloomBytes, g.bloom.Salt[:], err
 }

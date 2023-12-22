@@ -20,8 +20,8 @@ import (
 
 var errFoo = errors.New("foo")
 
-// Add should error if verification against tip errors
-func TestVerifierMempoolVerificationError(t *testing.T) {
+// Add should error if verification errors
+func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
@@ -36,7 +36,7 @@ func TestVerifierMempoolVerificationError(t *testing.T) {
 	mempool.EXPECT().GetDropReason(tx.ID()).Return(nil)
 	mempool.EXPECT().MarkDropped(tx.ID(), errFoo)
 
-	verifierMempool, err := newGossipMempool(
+	gossipMempool, err := newGossipMempool(
 		mempool,
 		logging.NoLog{},
 		txVerifier,
@@ -45,12 +45,12 @@ func TestVerifierMempoolVerificationError(t *testing.T) {
 		testConfig.MaxBloomFilterFalsePositiveProbability,
 	)
 	require.NoError(err)
-	err = verifierMempool.Add(tx)
+	err = gossipMempool.Add(tx)
 	require.ErrorIs(err, errFoo)
 }
 
 // Add should error if adding to the mempool errors
-func TestVerifierMempoolAddError(t *testing.T) {
+func TestGossipMempoolAddError(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
@@ -66,7 +66,7 @@ func TestVerifierMempoolAddError(t *testing.T) {
 	mempool.EXPECT().Add(tx).Return(errFoo)
 	mempool.EXPECT().MarkDropped(tx.ID(), errFoo).AnyTimes()
 
-	verifierMempool, err := newGossipMempool(
+	gossipMempool, err := newGossipMempool(
 		mempool,
 		logging.NoLog{},
 		txVerifier,
@@ -75,12 +75,12 @@ func TestVerifierMempoolAddError(t *testing.T) {
 		testConfig.MaxBloomFilterFalsePositiveProbability,
 	)
 	require.NoError(err)
-	err = verifierMempool.Add(tx)
+	err = gossipMempool.Add(tx)
 	require.ErrorIs(err, errFoo)
 }
 
 // Adding a duplicate to the mempool should return an error
-func TestVerifierMempoolDuplicate(t *testing.T) {
+func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
@@ -93,7 +93,7 @@ func TestVerifierMempoolDuplicate(t *testing.T) {
 
 	testMempool.EXPECT().Get(tx.ID()).Return(tx, true)
 
-	verifierMempool, err := newGossipMempool(
+	gossipMempool, err := newGossipMempool(
 		testMempool,
 		logging.NoLog{},
 		txVerifier,
@@ -103,12 +103,12 @@ func TestVerifierMempoolDuplicate(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = verifierMempool.Add(tx)
+	err = gossipMempool.Add(tx)
 	require.ErrorIs(err, mempool.ErrDuplicateTx)
 }
 
 // Adding a tx to the mempool should add it to the bloom filter
-func TestVerifierMempoolAddBloomFilter(t *testing.T) {
+func TestGossipAddBloomFilter(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
@@ -123,7 +123,7 @@ func TestVerifierMempoolAddBloomFilter(t *testing.T) {
 	mempool.EXPECT().GetDropReason(tx.ID()).Return(nil)
 	mempool.EXPECT().Add(tx).Return(nil)
 
-	verifierMempool, err := newGossipMempool(
+	gossipMempool, err := newGossipMempool(
 		mempool,
 		logging.NoLog{},
 		txVerifier,
@@ -133,9 +133,9 @@ func TestVerifierMempoolAddBloomFilter(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(verifierMempool.Add(tx))
+	require.NoError(gossipMempool.Add(tx))
 
-	bloomBytes, salt, err := verifierMempool.GetFilter()
+	bloomBytes, salt, err := gossipMempool.GetFilter()
 	require.NoError(err)
 
 	bloom := &gossip.BloomFilter{
