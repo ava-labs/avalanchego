@@ -22,6 +22,14 @@ import (
 
 var _ TxVerifier = (*testVerifier)(nil)
 
+type testVerifier struct {
+	err error
+}
+
+func (v testVerifier) VerifyTx(*txs.Tx) error {
+	return v.err
+}
+
 func TestMarshaller(t *testing.T) {
 	require := require.New(t)
 
@@ -117,12 +125,4 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 
 	require.NoError(mempool.AddVerified(tx))
 	require.True(mempool.bloom.Has(tx))
-}
-
-type testVerifier struct {
-	err error
-}
-
-func (v testVerifier) VerifyTx(*txs.Tx) error {
-	return v.err
 }
