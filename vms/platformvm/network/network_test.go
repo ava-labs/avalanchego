@@ -13,7 +13,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -166,9 +165,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			n := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-				},
+				logging.NoLog{},
 				testTxVerifier{},
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
@@ -293,9 +290,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			n := New(
-				&snow.Context{
-					Log: logging.NoLog{},
-				},
+				logging.NoLog{},
 				tt.txVerifier,
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
@@ -314,9 +309,7 @@ func TestNetworkGossipTx(t *testing.T) {
 	appSender := common.NewMockSender(ctrl)
 
 	nIntf := New(
-		&snow.Context{
-			Log: logging.NoLog{},
-		},
+		logging.NoLog{},
 		testTxVerifier{},
 		mempool.NewMockMempool(ctrl),
 		false,
