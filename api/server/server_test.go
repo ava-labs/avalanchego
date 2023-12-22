@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
 func TestRejectMiddleware(t *testing.T) {
@@ -58,7 +59,7 @@ func TestRejectMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			ctx := &snow.ConsensusContext{}
+			ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 			ctx.State.Set(snow.EngineState{
 				State: tt.state,
 			})

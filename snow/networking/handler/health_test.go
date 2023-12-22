@@ -48,7 +48,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			ctx := snowtest.ConsensusContext()
+			ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 
 			vdrs := validators.NewManager()
 

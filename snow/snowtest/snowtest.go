@@ -38,11 +38,14 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 	return nil
 }
 
-func ConsensusContext() *snow.ConsensusContext {
-	return &snow.ConsensusContext{
-		Context: &snow.Context{
+func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
+	if ctx == nil {
+		ctx = &snow.Context{
 			Log: logging.NoLog{},
-		},
+		}
+	}
+	return &snow.ConsensusContext{
+		Context:             ctx,
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
 		BlockAcceptor:       noOpAcceptor{},

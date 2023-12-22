@@ -187,7 +187,7 @@ func NewTestNetwork(
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(nil)
 	beacons := validators.NewManager()
 	networkConfig.Validators = currentValidators
 	networkConfig.Beacons = beacons

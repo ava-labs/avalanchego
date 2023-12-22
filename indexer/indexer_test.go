@@ -154,8 +154,7 @@ func TestIndexer(t *testing.T) {
 	idxr.clock.Set(now)
 
 	// Assert state is right
-	chain1Ctx := snowtest.ConsensusContext()
-	chain1Ctx.ChainID = ids.GenerateTestID()
+	chain1Ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(isIncomplete)
@@ -259,8 +258,7 @@ func TestIndexer(t *testing.T) {
 	require.Contains(server.endpoints, "/block")
 
 	// Register a DAG chain
-	chain2Ctx := snowtest.ConsensusContext()
-	chain2Ctx.ChainID = ids.GenerateTestID()
+	chain2Ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.XChainID))
 	isIncomplete, err = idxr.isIncomplete(chain2Ctx.ChainID)
 	require.NoError(err)
 	require.False(isIncomplete)
@@ -419,8 +417,7 @@ func TestIncompleteIndex(t *testing.T) {
 	require.False(idxr.indexingEnabled)
 
 	// Register a chain
-	chain1Ctx := snowtest.ConsensusContext()
-	chain1Ctx.ChainID = ids.GenerateTestID()
+	chain1Ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(isIncomplete)
@@ -502,7 +499,7 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	idxr := idxrIntf.(*indexer)
 
 	// Assert state is right
-	chain1Ctx := snowtest.ConsensusContext()
+	chain1Ctx := snowtest.ConsensusContext(nil)
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	chain1Ctx.SubnetID = ids.GenerateTestID()
 

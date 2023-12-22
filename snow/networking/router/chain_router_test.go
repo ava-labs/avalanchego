@@ -15,7 +15,6 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -49,7 +48,7 @@ const (
 func TestShutdown(t *testing.T) {
 	require := require.New(t)
 
-	chainCtx := snowtest.ConsensusContext()
+	chainCtx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(chainCtx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
@@ -184,7 +183,7 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	nodeID := ids.EmptyNodeID
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
@@ -378,7 +377,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg = sync.WaitGroup{}
 	)
 
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -727,7 +726,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 
 	h := handler.NewMockHandler(ctrl)
 
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	h.EXPECT().Context().Return(ctx).AnyTimes()
 	h.EXPECT().SetOnStopped(gomock.Any()).AnyTimes()
 	h.EXPECT().Stop(gomock.Any()).AnyTimes()
@@ -951,7 +950,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	calledF := false
 	wg := sync.WaitGroup{}
 
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewManager()
 	vID := ids.GenerateTestNodeID()
@@ -1103,11 +1102,7 @@ func TestConnectedSubnet(t *testing.T) {
 	))
 
 	// Create bootstrapper, engine and handler
-	platform := snowtest.ConsensusContext()
-	platform.ChainID = constants.PlatformChainID
-	platform.SubnetID = constants.PrimaryNetworkID
-	platform.Registerer = prometheus.NewRegistry()
-	platform.Metrics = metrics.NewOptionalGatherer()
+	platform := snowtest.ConsensusContext(snowtest.Context(t, snowtest.PChainID))
 	platform.Executing.Set(false)
 	platform.State.Set(snow.EngineState{
 		Type:  engineType,
@@ -1222,7 +1217,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	calledF := false
 	wg := sync.WaitGroup{}
 
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
 	allowedID := ids.GenerateTestNodeID()
 	allowedSet := set.Of(allowedID)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
@@ -1547,7 +1542,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 	))
 
 	// Create bootstrapper, engine and handler
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(nil)
 	vdrs := validators.NewManager()
 	require.NoError(t, vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 

@@ -28,7 +28,7 @@ func TestIndex(t *testing.T) {
 	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.PChainID))
 
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	require.NoError(err)
@@ -116,7 +116,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	codec := codec.NewDefaultManager()
 	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.PChainID))
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	require.NoError(err)
 	idx := indexIntf.(*index)
@@ -156,7 +156,7 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	codec := codec.NewDefaultManager()
 	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
-	ctx := snowtest.ConsensusContext()
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.PChainID))
 	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	require.NoError(err)
 
