@@ -812,6 +812,9 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				nodeIDsCopy    set.Set[ids.NodeID]
 			)
 			nodeIDsCopy.Union(nodeIDs)
+
+			// Instantiate new registerers to avoid duplicate metrics
+			// registration
 			ctx.Registerer = prometheus.NewRegistry()
 
 			sender, err := New(
@@ -1181,6 +1184,9 @@ func TestSender_Single_Request(t *testing.T) {
 				timeoutManager = timeout.NewMockManager(ctrl)
 				router         = router.NewMockRouter(ctrl)
 			)
+
+			// Instantiate new registerers to avoid duplicate metrics
+			// registration
 			ctx.Registerer = prometheus.NewRegistry()
 
 			sender, err := New(
