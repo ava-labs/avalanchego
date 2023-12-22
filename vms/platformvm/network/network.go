@@ -11,8 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -36,7 +36,7 @@ type network struct {
 	// We embed a noop handler for all unhandled messages
 	common.AppHandler
 
-	ctx                       *snow.Context
+	log                       logging.Logger
 	txVerifier                TxVerifier
 	mempool                   mempool.Mempool
 	partialSyncPrimaryNetwork bool
@@ -48,16 +48,16 @@ type network struct {
 }
 
 func New(
-	ctx *snow.Context,
+	log logging.Logger,
 	txVerifier TxVerifier,
 	mempool mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 ) Network {
 	return &network{
-		AppHandler: common.NewNoOpAppHandler(ctx.Log),
+		AppHandler: common.NewNoOpAppHandler(log),
 
-		ctx:                       ctx,
+		log:                       log,
 		txVerifier:                txVerifier,
 		mempool:                   mempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
@@ -67,13 +67,13 @@ func New(
 }
 
 func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
-	n.ctx.Log.Debug("called AppGossip message handler",
+	n.log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
 
 	if n.partialSyncPrimaryNetwork {
-		n.ctx.Log.Debug("dropping AppGossip message",
+		n.log.Debug("dropping AppGossip message",
 			zap.String("reason", "primary network is not being fully synced"),
 		)
 		return nil
@@ -81,7 +81,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
-		n.ctx.Log.Debug("dropping AppGossip message",
+		n.log.Debug("dropping AppGossip message",
 			zap.String("reason", "failed to parse message"),
 		)
 		return nil
@@ -89,7 +89,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 	msg, ok := msgIntf.(*message.Tx)
 	if !ok {
-		n.ctx.Log.Debug("dropping unexpected message",
+		n.log.Debug("dropping unexpected message",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
@@ -97,7 +97,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
-		n.ctx.Log.Verbo("received invalid tx",
+		n.log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),
 			zap.Binary("tx", msg.Tx),
 			zap.Error(err),
@@ -145,7 +145,7 @@ func (n *network) issueTx(tx *txs.Tx) error {
 
 	// Verify the tx at the currently preferred state
 	if err := n.txVerifier.VerifyTx(tx); err != nil {
-		n.ctx.Log.Debug("tx failed verification",
+		n.log.Debug("tx failed verification",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)
@@ -161,7 +161,7 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	if err := n.mempool.Add(tx); err != nil {
-		n.ctx.Log.Debug("tx failed to be added to the mempool",
+		n.log.Debug("tx failed to be added to the mempool",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)
@@ -186,12 +186,12 @@ func (n *network) gossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
 		return
 	}
 
-	n.ctx.Log.Debug("gossiping tx",
+	n.log.Debug("gossiping tx",
 		zap.Stringer("txID", txID),
 	)
 
 	if err := n.appSender.SendAppGossip(ctx, msgBytes); err != nil {
-		n.ctx.Log.Error("failed to gossip tx",
+		n.log.Error("failed to gossip tx",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)

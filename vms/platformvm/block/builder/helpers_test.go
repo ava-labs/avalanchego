@@ -183,7 +183,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
 	res.network = network.New(
-		res.backend.Ctx,
+		logging.NoLog{},
 		txVerifier,
 		res.mempool,
 		res.backend.Config.PartialSyncPrimaryNetwork,
