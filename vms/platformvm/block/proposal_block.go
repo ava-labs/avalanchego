@@ -19,7 +19,7 @@ var (
 
 type BanffProposalBlock struct {
 	Time                 uint64    `serialize:"true" json:"time"`
-	Transactions         []*txs.Tx `serialize:"true" json:"-"`
+	Transactions         []*txs.Tx `serialize:"true" json:"txs"`
 	ApricotProposalBlock `serialize:"true"`
 }
 

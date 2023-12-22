@@ -4,11 +4,15 @@
 package block
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -114,4 +118,109 @@ func TestBanffBlockSerialization(t *testing.T) {
 			require.Equal(test.bytes, got)
 		})
 	}
+}
+
+func TestBanffProposalBlockJSON(t *testing.T) {
+	require := require.New(t)
+
+	simpleBanffProposalBlock := &BanffProposalBlock{
+		Time: 123456,
+		ApricotProposalBlock: ApricotProposalBlock{
+			CommonBlock: CommonBlock{
+				PrntID:  ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'},
+				Hght:    1337,
+				BlockID: ids.ID{'b', 'l', 'o', 'c', 'k', 'I', 'D'},
+			},
+			Tx: &txs.Tx{
+				Unsigned: &txs.AdvanceTimeTx{
+					Time: 123457,
+				},
+			},
+		},
+	}
+
+	simpleBanffProposalBlockBytes, err := json.MarshalIndent(simpleBanffProposalBlock, "", "\t")
+	require.NoError(err)
+
+	require.Equal(`{
+	"time": 123456,
+	"txs": null,
+	"parentID": "rVcYrvnGXdoJBeYQRm5ZNaCGHeVyqcHHJu8Yd89kJcef6V5Eg",
+	"height": 1337,
+	"id": "kM6h4d2UKYEDzQXm7KNqyeBJLjhb42J24m4L4WACB5didf3pk",
+	"tx": {
+		"unsignedTx": {
+			"time": 123457
+		},
+		"credentials": null,
+		"id": "11111111111111111111111111111111LpoYY"
+	}
+}`, string(simpleBanffProposalBlockBytes))
+
+	complexBanffProposalBlock := simpleBanffProposalBlock
+	complexBanffProposalBlock.Transactions = []*txs.Tx{
+		{
+			Unsigned: &txs.BaseTx{
+				BaseTx: avax.BaseTx{
+					NetworkID:    constants.MainnetID,
+					BlockchainID: constants.PlatformChainID,
+					Outs:         []*avax.TransferableOutput{},
+					Ins:          []*avax.TransferableInput{},
+					Memo:         []byte("KilroyWasHere"),
+				},
+			},
+		},
+		{
+			Unsigned: &txs.BaseTx{
+				BaseTx: avax.BaseTx{
+					NetworkID:    constants.MainnetID,
+					BlockchainID: constants.PlatformChainID,
+					Outs:         []*avax.TransferableOutput{},
+					Ins:          []*avax.TransferableInput{},
+					Memo:         []byte("KilroyWasHere2"),
+				},
+			},
+		},
+	}
+
+	complexBanffProposalBlockBytes, err := json.MarshalIndent(complexBanffProposalBlock, "", "\t")
+	require.NoError(err)
+
+	require.Equal(`{
+	"time": 123456,
+	"txs": [
+		{
+			"unsignedTx": {
+				"networkID": 1,
+				"blockchainID": "11111111111111111111111111111111LpoYY",
+				"outputs": [],
+				"inputs": [],
+				"memo": "0x4b696c726f7957617348657265"
+			},
+			"credentials": null,
+			"id": "11111111111111111111111111111111LpoYY"
+		},
+		{
+			"unsignedTx": {
+				"networkID": 1,
+				"blockchainID": "11111111111111111111111111111111LpoYY",
+				"outputs": [],
+				"inputs": [],
+				"memo": "0x4b696c726f795761734865726532"
+			},
+			"credentials": null,
+			"id": "11111111111111111111111111111111LpoYY"
+		}
+	],
+	"parentID": "rVcYrvnGXdoJBeYQRm5ZNaCGHeVyqcHHJu8Yd89kJcef6V5Eg",
+	"height": 1337,
+	"id": "kM6h4d2UKYEDzQXm7KNqyeBJLjhb42J24m4L4WACB5didf3pk",
+	"tx": {
+		"unsignedTx": {
+			"time": 123457
+		},
+		"credentials": null,
+		"id": "11111111111111111111111111111111LpoYY"
+	}
+}`, string(complexBanffProposalBlockBytes))
 }
