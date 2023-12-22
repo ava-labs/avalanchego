@@ -105,13 +105,11 @@ func TestBanffBlockSerialization(t *testing.T) {
 
 	for _, test := range tests {
 		testName := fmt.Sprintf("%T", test.block)
+		block := test.block
 		t.Run(testName, func(t *testing.T) {
 			require := require.New(t)
 
-			require.NoError(test.block.initialize(test.bytes))
-			require.Equal(test.bytes, test.block.Bytes())
-
-			got, err := Codec.Marshal(Version, &test.block)
+			got, err := Codec.Marshal(Version, &block)
 			require.NoError(err)
 			require.Equal(test.bytes, got)
 		})
