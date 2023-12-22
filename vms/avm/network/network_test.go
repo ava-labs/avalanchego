@@ -121,7 +121,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, true)
+				mempool.EXPECT().Get(gomock.Any()).Return(testTx, true)
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
@@ -254,7 +254,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "mempool already has transaction",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, true)
+				mempool.EXPECT().Get(gomock.Any()).Return(&txs.Tx{}, true)
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
