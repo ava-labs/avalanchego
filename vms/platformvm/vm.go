@@ -190,9 +190,11 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		validatorManager,
 	)
+
+	txVerifier := network.NewLockedTxVerifier(&txExecutorBackend.Ctx.Lock, vm.manager)
 	vm.Network = network.New(
 		txExecutorBackend.Ctx,
-		vm.manager,
+		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,

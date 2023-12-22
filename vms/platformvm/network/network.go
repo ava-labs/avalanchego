@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/components/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -38,7 +37,7 @@ type network struct {
 	common.AppHandler
 
 	ctx                       *snow.Context
-	manager                   executor.Manager
+	txVerifier                TxVerifier
 	mempool                   mempool.Mempool
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
@@ -50,7 +49,7 @@ type network struct {
 
 func New(
 	ctx *snow.Context,
-	manager executor.Manager,
+	txVerifier TxVerifier,
 	mempool mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
@@ -59,7 +58,7 @@ func New(
 		AppHandler: common.NewNoOpAppHandler(ctx.Log),
 
 		ctx:                       ctx,
-		manager:                   manager,
+		txVerifier:                txVerifier,
 		mempool:                   mempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		appSender:                 appSender,
@@ -145,13 +144,7 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	// Verify the tx at the currently preferred state
-	//
-	// We need to grab the context lock here to avoid racy behavior with
-	// transaction verification + mempool modifications.
-	n.ctx.Lock.Lock()
-	err := n.manager.VerifyTx(tx)
-	n.ctx.Lock.Unlock()
-	if err != nil {
+	if err := n.txVerifier.VerifyTx(tx); err != nil {
 		n.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
