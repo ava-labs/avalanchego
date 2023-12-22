@@ -1076,11 +1076,8 @@ func TestSender_Single_Request(t *testing.T) {
 		engineType        = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
 	ctx := snowtest.Context(t, snowtest.PChainID)
-	snowCtx := &snow.ConsensusContext{
-		Context:             ctx,
-		Registerer:          prometheus.NewRegistry(),
-		AvalancheRegisterer: prometheus.NewRegistry(),
-	}
+	snowCtx := snowtest.ConsensusContext()
+	snowCtx.Context = ctx
 
 	type test struct {
 		name                    string
