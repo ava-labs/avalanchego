@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
+	agoUtils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/predicate"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ import (
 func TestGetBlockchainID(t *testing.T) {
 	callerAddr := common.HexToAddress("0x0123")
 
-	defaultSnowCtx := snow.DefaultContextTest()
+	defaultSnowCtx := utils.TestSnowContext()
 	blockchainID := defaultSnowCtx.ChainID
 
 	tests := map[string]testutils.PrecompileTest{
@@ -85,9 +85,9 @@ func TestGetBlockchainID(t *testing.T) {
 func TestSendWarpMessage(t *testing.T) {
 	callerAddr := common.HexToAddress("0x0123")
 
-	defaultSnowCtx := snow.DefaultContextTest()
+	defaultSnowCtx := utils.TestSnowContext()
 	blockchainID := defaultSnowCtx.ChainID
-	sendWarpMessagePayload := utils.RandomBytes(100)
+	sendWarpMessagePayload := agoUtils.RandomBytes(100)
 
 	sendWarpMessageInput, err := PackSendWarpMessage(sendWarpMessagePayload)
 	require.NoError(t, err)

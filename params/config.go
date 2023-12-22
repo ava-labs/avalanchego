@@ -91,7 +91,7 @@ var (
 	}
 
 	TestChainConfig = &ChainConfig{
-		AvalancheContext:    AvalancheContext{snow.DefaultContextTest()},
+		AvalancheContext:    AvalancheContext{utils.TestSnowContext()},
 		ChainID:             big.NewInt(1),
 		FeeConfig:           DefaultFeeConfig,
 		AllowFeeRecipients:  false,
@@ -113,7 +113,7 @@ var (
 	}
 
 	TestSubnetEVMConfig = &ChainConfig{
-		AvalancheContext:    AvalancheContext{snow.DefaultContextTest()},
+		AvalancheContext:    AvalancheContext{utils.TestSnowContext()},
 		ChainID:             big.NewInt(1),
 		FeeConfig:           DefaultFeeConfig,
 		AllowFeeRecipients:  false,
@@ -134,7 +134,7 @@ var (
 	}
 
 	TestPreSubnetEVMConfig = &ChainConfig{
-		AvalancheContext:         AvalancheContext{snow.DefaultContextTest()},
+		AvalancheContext:         AvalancheContext{utils.TestSnowContext()},
 		ChainID:                  big.NewInt(1),
 		FeeConfig:                DefaultFeeConfig,
 		AllowFeeRecipients:       false,

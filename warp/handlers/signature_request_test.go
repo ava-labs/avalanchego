@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -18,13 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/warp"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMessageSignatureHandler(t *testing.T) {
 	database := memdb.New()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 	blsSecretKey, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
@@ -105,7 +105,7 @@ func TestMessageSignatureHandler(t *testing.T) {
 
 func TestBlockSignatureHandler(t *testing.T) {
 	database := memdb.New()
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := utils.TestSnowContext()
 	blsSecretKey, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
