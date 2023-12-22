@@ -144,8 +144,7 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	// Verify the tx at the currently preferred state
-	err := n.txVerifier.VerifyTx(tx)
-	if err != nil {
+  if err := n.txVerifier.VerifyTx(tx); err != nil {
 		n.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("txID", txID),
 			zap.Error(err),

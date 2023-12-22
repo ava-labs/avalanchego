@@ -37,7 +37,7 @@ type continuousProfiler struct {
 
 func NewContinuous(dir string, freq time.Duration, maxNumFiles int) ContinuousProfiler {
 	return &continuousProfiler{
-		profiler:    new(dir),
+		profiler:    newProfiler(dir),
 		freq:        freq,
 		maxNumFiles: maxNumFiles,
 		closer:      make(chan struct{}),
