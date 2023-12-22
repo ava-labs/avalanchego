@@ -233,7 +233,7 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	return n.gossipTx(ctx, tx)
 }
 
-// IssueVerifiedTx attempts to add a tx to the mempool, without first verifyin
+// IssueVerifiedTx attempts to add a tx to the mempool, without first verifying
 // it. If the tx is added to the mempool, it will attempt to push gossip the tx
 // to random peers in the network using both the legacy and p2p SDK.
 //
