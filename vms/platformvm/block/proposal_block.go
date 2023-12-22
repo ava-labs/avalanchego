@@ -76,7 +76,7 @@ func NewBanffProposalBlock(
 			Tx: proposalTx,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotProposalBlock struct {
@@ -119,5 +119,5 @@ func NewApricotProposalBlock(
 		},
 		Tx: tx,
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
