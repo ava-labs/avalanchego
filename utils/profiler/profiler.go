@@ -23,6 +23,8 @@ const (
 )
 
 var (
+	_ Profiler = (*profiler)(nil)
+
 	errCPUProfilerRunning    = errors.New("cpu profiler already running")
 	errCPUProfilerNotRunning = errors.New("cpu profiler doesn't exist")
 )
@@ -52,11 +54,7 @@ type profiler struct {
 	cpuProfileFile *os.File
 }
 
-func New(dir string) Profiler {
-	return new(dir)
-}
-
-func new(dir string) *profiler {
+func New(dir string) *profiler {
 	return &profiler{
 		dir:             dir,
 		cpuProfileName:  filepath.Join(dir, cpuProfileFile),

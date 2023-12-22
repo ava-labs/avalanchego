@@ -16,7 +16,7 @@ func TestProfiler(t *testing.T) {
 
 	dir := t.TempDir()
 
-	p := New(dir)
+	var p Profiler = New(dir)
 
 	// Test Start and Stop CPU Profiler
 	require.NoError(p.StartCPUProfiler())
