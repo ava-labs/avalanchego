@@ -1735,6 +1735,9 @@ func (s *Service) ImportAVAX(req *http.Request, args *ImportAVAXArgs, response *
 
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 
 	return s.vm.issueTx(req.Context(), tx)
 }
@@ -1833,6 +1836,9 @@ func (s *Service) CreateBlockchain(req *http.Request, args *CreateBlockchainArgs
 
 	response.TxID = tx.ID()
 	response.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 
 	return s.vm.issueTx(req.Context(), tx)
 }
