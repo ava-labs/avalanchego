@@ -482,11 +482,6 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-// We need to grab the context lock here to avoid racy behavior with
-// transaction verification + mempool modifications.
-//
-// Invariant: tx should not be referenced again without the context lock
-// held to avoid any data races.
 func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
 	err := vm.Network.IssueTx(ctx, tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
