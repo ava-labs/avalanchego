@@ -56,8 +56,8 @@ const SPACE_RESERVED: u64 = 0x1000;
 
 const MAGIC_STR: &[u8; 16] = b"firewood v0.1\0\0\0";
 
-type Store = CompactSpace<Node, StoreRevMut>;
-type SharedStore = CompactSpace<Node, StoreRevShared>;
+pub type MutStore = CompactSpace<Node, StoreRevMut>;
+pub type SharedStore = CompactSpace<Node, StoreRevShared>;
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -138,11 +138,11 @@ impl SubUniverse<StoreRevShared> {
     }
 }
 
-impl SubUniverse<Arc<StoreRevMut>> {
-    fn new_from_other(&self) -> SubUniverse<Arc<StoreRevMut>> {
+impl SubUniverse<StoreRevMut> {
+    fn new_from_other(&self) -> SubUniverse<StoreRevMut> {
         SubUniverse {
-            meta: Arc::new(StoreRevMut::new_from_other(self.meta.as_ref())),
-            payload: Arc::new(StoreRevMut::new_from_other(self.payload.as_ref())),
+            meta: StoreRevMut::new_from_other(&self.meta),
+            payload: StoreRevMut::new_from_other(&self.payload),
         }
     }
 }
@@ -241,8 +241,8 @@ impl Universe<StoreRevShared> {
     }
 }
 
-impl Universe<Arc<StoreRevMut>> {
-    fn new_from_other(&self) -> Universe<Arc<StoreRevMut>> {
+impl Universe<StoreRevMut> {
+    fn new_from_other(&self) -> Universe<StoreRevMut> {
         Universe {
             merkle: self.merkle.new_from_other(),
         }
@@ -381,6 +381,15 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     }
 }
 
+impl DbRev<MutStore> {
+    pub fn into_shared(self) -> DbRev<SharedStore> {
+        DbRev {
+            header: self.header,
+            merkle: self.merkle.into(),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct DbInner {
     disk_requester: DiskBufferRequester,
@@ -462,7 +471,7 @@ impl Db {
     }
 
     /// Open a database.
-    fn new_internal<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, DbError> {
+    pub fn new_internal<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, DbError> {
         let open_options = if cfg.truncate {
             file::Options::Truncate
         } else {
@@ -655,7 +664,7 @@ impl Db {
         reset_store_headers: bool,
         payload_regn_nbit: u64,
         cfg: &DbConfig,
-    ) -> Result<(Universe<Arc<StoreRevMut>>, DbRev<Store>), DbError> {
+    ) -> Result<(Universe<StoreRevMut>, DbRev<MutStore>), DbError> {
         let mut offset = Db::PARAM_SIZE as usize;
         let db_header: DiskAddress = DiskAddress::from(offset);
         offset += DbHeader::MSIZE as usize;
@@ -682,17 +691,15 @@ impl Db {
 
         let store = Universe {
             merkle: SubUniverse::new(
-                Arc::new(merkle_meta_store),
-                Arc::new(StoreRevMut::new(cached_space.merkle.payload.clone())),
+                merkle_meta_store,
+                StoreRevMut::new(cached_space.merkle.payload.clone()),
             ),
         };
 
-        let db_header_ref = Db::get_db_header_ref(store.merkle.meta.as_ref())?;
+        let db_header_ref = Db::get_db_header_ref(&store.merkle.meta)?;
 
-        let merkle_payload_header_ref = Db::get_payload_header_ref(
-            store.merkle.meta.as_ref(),
-            Db::PARAM_SIZE + DbHeader::MSIZE,
-        )?;
+        let merkle_payload_header_ref =
+            Db::get_payload_header_ref(&store.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)?;
 
         let header_refs = (db_header_ref, merkle_payload_header_ref);
 
@@ -726,7 +733,7 @@ impl Db {
         StoredView::ptr_to_obj(meta_ref, db_header, DbHeader::MSIZE).map_err(Into::into)
     }
 
-    fn new_revision<K: CachedStore, T: Into<Arc<K>>>(
+    fn new_revision<K: CachedStore, T: Into<K>>(
         header_refs: (Obj<DbHeader>, Obj<CompactSpaceHeader>),
         merkle: (T, T),
         payload_regn_nbit: u64,

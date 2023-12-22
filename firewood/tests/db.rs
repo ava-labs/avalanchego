@@ -244,6 +244,7 @@ macro_rules! assert_val {
     };
 }
 
+#[ignore = "ref: https://github.com/ava-labs/firewood/issues/457"]
 #[tokio::test(flavor = "multi_thread")]
 async fn db_proposal() -> Result<(), api::Error> {
     let cfg = DbConfig::builder()

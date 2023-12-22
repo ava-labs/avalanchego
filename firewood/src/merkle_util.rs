@@ -6,7 +6,7 @@ use crate::shale::{
     self, cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore,
     ShaleStore, StoredView,
 };
-use std::{num::NonZeroUsize, sync::Arc};
+use std::num::NonZeroUsize;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -135,8 +135,8 @@ pub fn new_merkle(
     );
     let compact_header =
         StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
-    let mem_meta = Arc::new(dm);
-    let mem_payload = Arc::new(DynamicMem::new(compact_size, 0x1));
+    let mem_meta = dm;
+    let mem_payload = DynamicMem::new(compact_size, 0x1);
 
     let cache = shale::ObjCache::new(1);
     let space =

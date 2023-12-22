@@ -95,8 +95,8 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                     .unwrap();
 
                     let store = CompactSpace::new(
-                        PlainMem::new(TEST_MEM_SIZE, 0).into(),
-                        PlainMem::new(TEST_MEM_SIZE, 1).into(),
+                        PlainMem::new(TEST_MEM_SIZE, 0),
+                        PlainMem::new(TEST_MEM_SIZE, 1),
                         merkle_payload_header_ref,
                         ObjCache::new(1 << 20),
                         4096,

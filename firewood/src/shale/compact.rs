@@ -1,7 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::merkle::Node;
 use crate::shale::ObjCache;
+use crate::storage::{StoreRevMut, StoreRevShared};
 
 use super::disk_address::DiskAddress;
 use super::{CachedStore, Obj, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
@@ -9,7 +11,7 @@ use bytemuck::{Pod, Zeroable};
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
 use std::num::NonZeroUsize;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 #[derive(Debug)]
 pub struct CompactHeader {
@@ -216,16 +218,28 @@ impl Storable for CompactSpaceHeader {
 
 #[derive(Debug)]
 struct CompactSpaceInner<M> {
-    meta_space: Arc<M>,
-    compact_space: Arc<M>,
+    meta_space: M,
+    compact_space: M,
     header: CompactSpaceHeaderSliced,
     alloc_max_walk: u64,
     regn_nbit: u64,
 }
 
+impl CompactSpaceInner<StoreRevMut> {
+    pub fn into_shared(self) -> CompactSpaceInner<StoreRevShared> {
+        CompactSpaceInner {
+            meta_space: self.meta_space.into_shared(),
+            compact_space: self.compact_space.into_shared(),
+            header: self.header,
+            alloc_max_walk: self.alloc_max_walk,
+            regn_nbit: self.regn_nbit,
+        }
+    }
+}
+
 impl<M: CachedStore> CompactSpaceInner<M> {
     fn get_descriptor(&self, ptr: DiskAddress) -> Result<Obj<CompactDescriptor>, ShaleError> {
-        StoredView::ptr_to_obj(self.meta_space.as_ref(), ptr, CompactDescriptor::MSIZE)
+        StoredView::ptr_to_obj(&self.meta_space, ptr, CompactDescriptor::MSIZE)
     }
 
     fn get_data_ref<U: Storable + 'static>(
@@ -233,7 +247,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         ptr: DiskAddress,
         len_limit: u64,
     ) -> Result<Obj<U>, ShaleError> {
-        StoredView::ptr_to_obj(self.compact_space.as_ref(), ptr, len_limit)
+        StoredView::ptr_to_obj(&self.compact_space, ptr, len_limit)
     }
 
     fn get_header(&self, ptr: DiskAddress) -> Result<Obj<CompactHeader>, ShaleError> {
@@ -501,8 +515,8 @@ pub struct CompactSpace<T: Storable, M> {
 
 impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     pub fn new(
-        meta_space: Arc<M>,
-        compact_space: Arc<M>,
+        meta_space: M,
+        compact_space: M,
         header: Obj<CompactSpaceHeader>,
         obj_cache: super::ObjCache<T>,
         alloc_max_walk: u64,
@@ -522,6 +536,16 @@ impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     }
 }
 
+impl CompactSpace<Node, StoreRevMut> {
+    pub fn into_shared(self) -> CompactSpace<Node, StoreRevShared> {
+        let inner = self.inner.into_inner().unwrap();
+        CompactSpace {
+            inner: RwLock::new(inner.into_shared()),
+            obj_cache: self.obj_cache,
+        }
+    }
+}
+
 impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for CompactSpace<T, M> {
     fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.serialized_len() + extra;
@@ -529,7 +553,7 @@ impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for Comp
 
         let obj = {
             let inner = self.inner.read().unwrap();
-            let compact_space = inner.compact_space.as_ref();
+            let compact_space = &inner.compact_space;
             let view =
                 StoredView::item_to_obj(compact_space, addr.try_into().unwrap(), size, item)?;
 
@@ -657,8 +681,8 @@ mod tests {
         );
         let compact_header =
             StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();
-        let mem_meta = Arc::new(dm);
-        let mem_payload = Arc::new(DynamicMem::new(compact_size.get() as u64, 0x1));
+        let mem_meta = dm;
+        let mem_payload = DynamicMem::new(compact_size.get() as u64, 0x1);
 
         let cache: ObjCache<Hash> = ObjCache::new(1);
         let space =

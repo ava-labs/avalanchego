@@ -1,3 +1,4 @@
+use crate::db::{MutStore, SharedStore};
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 use crate::nibbles::Nibbles;
@@ -69,6 +70,16 @@ macro_rules! write_node {
 pub struct Merkle<S, T> {
     store: Box<S>,
     phantom: PhantomData<T>,
+}
+
+impl<T> Merkle<MutStore, T> {
+    pub fn into(self) -> Merkle<SharedStore, T> {
+        let store = self.store.into_shared();
+        Merkle {
+            store: Box::new(store),
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<S: ShaleStore<Node>, T> Merkle<S, T> {
@@ -1410,7 +1421,6 @@ mod tests {
     use super::*;
     use node::tests::{extension, leaf};
     use shale::{cached::DynamicMem, compact::CompactSpace, CachedStore};
-    use std::sync::Arc;
     use test_case::test_case;
 
     #[test_case(vec![0x12, 0x34, 0x56], &[0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
@@ -1443,8 +1453,8 @@ mod tests {
             shale::compact::CompactHeader::MSIZE,
         )
         .unwrap();
-        let mem_meta = Arc::new(dm);
-        let mem_payload = Arc::new(DynamicMem::new(0x10000, 0x1));
+        let mem_meta = dm;
+        let mem_payload = DynamicMem::new(0x10000, 0x1);
 
         let cache = shale::ObjCache::new(1);
         let space =
