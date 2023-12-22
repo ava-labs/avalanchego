@@ -132,7 +132,7 @@ func TestMessage(t *testing.T) {
 						IpAddr:         []byte(net.IPv6zero),
 						IpPort:         9651,
 						MyVersion:      "v1.2.3",
-						MyVersionTime:  uint64(nowUnix),
+						IpSigningTime:  uint64(nowUnix),
 						Sig:            []byte{'y', 'e', 'e', 't'},
 						TrackedSubnets: [][]byte{testID[:]},
 					},
