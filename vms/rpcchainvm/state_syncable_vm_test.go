@@ -471,7 +471,7 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	defer stopper.Stop(context.Background())
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
-	ctx := snowtest.Context(t, snowtest.PChainID)
+	ctx := snowtest.Context(t, snowtest.CChainID)
 
 	require.NoError(vm.Initialize(context.Background(), ctx, prefixdb.New([]byte{}, memdb.New()), nil, nil, nil, nil, nil, nil))
 
