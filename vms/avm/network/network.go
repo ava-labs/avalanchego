@@ -228,7 +228,6 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.mempool.Add(tx); err != nil {
 		return err
 	}
-
 	return n.gossipTx(ctx, tx)
 }
 
@@ -236,10 +235,9 @@ func (n *Network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 // against the preferred state. If the tx is added to the mempool, it will push
 // gossip the tx using both the legacy and p2p SDK.
 func (n *Network) IssueVerifiedTx(ctx context.Context, tx *txs.Tx) error {
-	if err := n.mempool.AddVerifiedTx(tx); err != nil {
+	if err := n.mempool.AddVerified(tx); err != nil {
 		return err
 	}
-
 	return n.gossipTx(ctx, tx)
 }
 
@@ -267,7 +265,7 @@ func (n *Network) gossipTx(ctx context.Context, tx *txs.Tx) error {
 	return nil
 }
 
-// gossipTxMessage pushes the tx message to peers using both the legacy format.
+// gossipTxMessage pushes the tx message to peers using the legacy format.
 // If the tx was recently gossiped, this function does nothing.
 func (n *Network) gossipTxMessage(ctx context.Context, txID ids.ID, msgBytes []byte) {
 	n.recentTxsLock.Lock()

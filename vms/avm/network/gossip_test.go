@@ -45,7 +45,7 @@ func TestMarshaller(t *testing.T) {
 	require.Equal(want.GossipID(), got.GossipID())
 }
 
-func TestGossipMempoolAddTx(t *testing.T) {
+func TestGossipMempoolAdd(t *testing.T) {
 	require := require.New(t)
 
 	metrics := prometheus.NewRegistry()
@@ -78,6 +78,44 @@ func TestGossipMempoolAddTx(t *testing.T) {
 	}
 
 	require.NoError(mempool.Add(tx))
+	require.True(mempool.bloom.Has(tx))
+}
+
+func TestGossipMempoolAddVerified(t *testing.T) {
+	require := require.New(t)
+
+	metrics := prometheus.NewRegistry()
+	toEngine := make(chan common.Message, 1)
+
+	baseMempool, err := mempool.New("", metrics, toEngine)
+	require.NoError(err)
+
+	parser, err := txs.NewParser(nil)
+	require.NoError(err)
+
+	mempool, err := newGossipMempool(
+		baseMempool,
+		logging.NoLog{},
+		testVerifier{
+			err: errTest, // We shouldn't be attempting to verify the tx in this flow
+		},
+		parser,
+		txGossipBloomMaxElements,
+		txGossipBloomFalsePositiveProbability,
+		txGossipBloomMaxFalsePositiveProbability,
+	)
+	require.NoError(err)
+
+	tx := &txs.Tx{
+		Unsigned: &txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{},
+			},
+		},
+		TxID: ids.GenerateTestID(),
+	}
+
+	require.NoError(mempool.AddVerified(tx))
 	require.True(mempool.bloom.Has(tx))
 }
 

@@ -116,10 +116,10 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		return err
 	}
 
-	return g.AddVerifiedTx(tx)
+	return g.AddVerified(tx)
 }
 
-func (g *gossipMempool) AddVerifiedTx(tx *txs.Tx) error {
+func (g *gossipMempool) AddVerified(tx *txs.Tx) error {
 	if err := g.Mempool.Add(tx); err != nil {
 		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
