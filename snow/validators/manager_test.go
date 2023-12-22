@@ -216,30 +216,30 @@ func TestLen(t *testing.T) {
 	m := NewManager()
 	subnetID := ids.GenerateTestID()
 
-	len := m.Count(subnetID)
-	require.Zero(len)
+	count := m.Count(subnetID)
+	require.Zero(count)
 
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID0, nil, ids.Empty, 1))
 
-	len = m.Count(subnetID)
-	require.Equal(1, len)
+	count = m.Count(subnetID)
+	require.Equal(1, count)
 
 	nodeID1 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, 1))
 
-	len = m.Count(subnetID)
-	require.Equal(2, len)
+	count = m.Count(subnetID)
+	require.Equal(2, count)
 
 	require.NoError(m.RemoveWeight(subnetID, nodeID1, 1))
 
-	len = m.Count(subnetID)
-	require.Equal(1, len)
+	count = m.Count(subnetID)
+	require.Equal(1, count)
 
 	require.NoError(m.RemoveWeight(subnetID, nodeID0, 1))
 
-	len = m.Count(subnetID)
-	require.Zero(len)
+	count = m.Count(subnetID)
+	require.Zero(count)
 }
 
 func TestGetMap(t *testing.T) {
