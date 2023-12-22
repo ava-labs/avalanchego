@@ -5,13 +5,14 @@ package platformvm
 
 import (
 	"context"
-	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/rand"
 	"testing"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/stretchr/testify/require"
 
