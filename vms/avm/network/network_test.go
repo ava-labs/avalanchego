@@ -118,10 +118,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
-				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(nil)
-				mempool.EXPECT().RequestBuildBlock()
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, true)
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
@@ -205,7 +202,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 		},
@@ -422,7 +419,7 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 			expectedErr: nil,
