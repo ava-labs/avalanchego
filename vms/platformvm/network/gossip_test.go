@@ -44,8 +44,10 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 		testConfig.MaxBloomFilterFalsePositiveProbability,
 	)
 	require.NoError(err)
+
 	err = gossipMempool.Add(tx)
 	require.ErrorIs(err, errFoo)
+	require.False(gossipMempool.bloom.Has(tx))
 }
 
 // Add should error if adding to the mempool errors
@@ -74,8 +76,10 @@ func TestGossipMempoolAddError(t *testing.T) {
 		testConfig.MaxBloomFilterFalsePositiveProbability,
 	)
 	require.NoError(err)
+
 	err = gossipMempool.Add(tx)
 	require.ErrorIs(err, errFoo)
+	require.False(gossipMempool.bloom.Has(tx))
 }
 
 // Adding a duplicate to the mempool should return an error
@@ -104,6 +108,7 @@ func TestMempoolDuplicate(t *testing.T) {
 
 	err = gossipMempool.Add(tx)
 	require.ErrorIs(err, mempool.ErrDuplicateTx)
+	require.False(gossipMempool.bloom.Has(tx))
 }
 
 // Adding a tx to the mempool should add it to the bloom filter
