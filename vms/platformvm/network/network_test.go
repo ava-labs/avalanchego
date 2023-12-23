@@ -124,7 +124,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
-				mempool.EXPECT().RequestBuildBlock(gomock.Any())
+				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
