@@ -379,10 +379,7 @@ func (m *Mempool) GetFilter() ([]byte, []byte, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	bloom, err := m.bloom.Bloom.MarshalBinary()
-	salt := m.bloom.Salt
-
-	return bloom, salt[:], err
+	return m.bloom.Marshal()
 }
 
 // NextTx returns a transaction to be issued from the mempool.

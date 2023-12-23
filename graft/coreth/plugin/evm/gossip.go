@@ -175,10 +175,7 @@ func (g *GossipEthTxPool) GetFilter() ([]byte, []byte, error) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	bloom, err := g.bloom.Bloom.MarshalBinary()
-	salt := g.bloom.Salt
-
-	return bloom, salt[:], err
+	return g.bloom.Marshal()
 }
 
 type GossipEthTxMarshaller struct{}
