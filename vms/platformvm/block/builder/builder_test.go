@@ -471,7 +471,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.ErrorIs(tx2DropReason, txexecutor.ErrStakeTooLong)
 }
 
-func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
+func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
@@ -497,24 +497,24 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 
 	// Transaction should not be marked as dropped before being added to the
 	// mempool
-	reason := env.mempool.GetDropReason(txID)
-	require.NoError(reason)
+	require.NoError(env.mempool.GetDropReason(txID))
 
 	// Mark the transaction as dropped
 	errTestingDropped := errors.New("testing dropped")
 	env.mempool.MarkDropped(txID, errTestingDropped)
-	reason = env.mempool.GetDropReason(txID)
-	require.ErrorIs(reason, errTestingDropped)
+	err = env.mempool.GetDropReason(txID)
+	require.ErrorIs(err, errTestingDropped)
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
-	require.NoError(env.network.IssueTx(context.Background(), tx))
+	err = env.network.IssueTx(context.Background(), tx)
+	require.ErrorIs(err, errTestingDropped)
 	_, ok := env.mempool.Get(txID)
-	require.True(ok)
+	require.False(ok)
 
-	// When issued again, the mempool should not be marked as dropped
-	reason = env.mempool.GetDropReason(txID)
-	require.NoError(reason)
+	// When issued again, the mempool should still be marked as dropped
+	err = env.mempool.GetDropReason(txID)
+	require.ErrorIs(err, errTestingDropped)
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {

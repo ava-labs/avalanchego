@@ -217,7 +217,6 @@ func TestGetTxStatus(t *testing.T) {
 		},
 	}))
 
-	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
 
 	tx, err := service.vm.txBuilder.NewImportTx(
@@ -227,8 +226,6 @@ func TestGetTxStatus(t *testing.T) {
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
-
-	mutableSharedMemory.SharedMemory = oldSharedMemory
 
 	service.vm.ctx.Lock.Unlock()
 
@@ -241,11 +238,6 @@ func TestGetTxStatus(t *testing.T) {
 	require.Zero(resp.Reason)
 
 	// put the chain in existing chain list
-	err = service.vm.Network.IssueTx(context.Background(), tx)
-	require.ErrorIs(err, database.ErrNotFound) // Missing shared memory UTXO
-
-	mutableSharedMemory.SharedMemory = sm
-
 	require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
 	service.vm.ctx.Lock.Lock()
 

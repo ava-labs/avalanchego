@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -88,6 +89,9 @@ type VM struct {
 
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
+
+	startShutdown context.CancelFunc
+	awaitShutdown sync.WaitGroup
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
@@ -192,13 +196,30 @@ func (vm *VM) Initialize(
 	)
 
 	txVerifier := network.NewLockedTxVerifier(&txExecutorBackend.Ctx.Lock, vm.manager)
-	vm.Network = network.New(
+	vm.Network, err = network.New(
 		chainCtx.Log,
+		chainCtx.NodeID,
+		chainCtx.SubnetID,
+		chainCtx.ValidatorState,
 		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		registerer,
+		execConfig.Network,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+
+	vmCtx, cancel := context.WithCancel(context.Background())
+	vm.startShutdown = cancel
+	vm.awaitShutdown.Add(1)
+	go func() {
+		defer vm.awaitShutdown.Done()
+		vm.Network.Gossip(vmCtx)
+	}()
+
 	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
@@ -353,6 +374,9 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.db == nil {
 		return nil
 	}
+
+	vm.startShutdown()
+	vm.awaitShutdown.Wait()
 
 	vm.Builder.ShutdownBlockTimer()
 

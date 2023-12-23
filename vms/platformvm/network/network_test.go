@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
@@ -14,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/message"
@@ -22,9 +26,23 @@ import (
 )
 
 var (
-	errTest            = errors.New("test error")
-	_       TxVerifier = (*testTxVerifier)(nil)
+	errTest = errors.New("test error")
+
+	testConfig = Config{
+		MaxValidatorSetStaleness:                    time.Second,
+		TargetGossipSize:                            1,
+		PullGossipPollSize:                          1,
+		PullGossipFrequency:                         time.Second,
+		PullGossipThrottlingPeriod:                  time.Second,
+		PullGossipThrottlingLimit:                   1,
+		ExpectedBloomFilterElements:                 10,
+		ExpectedBloomFilterFalsePositiveProbability: .1,
+		MaxBloomFilterFalsePositiveProbability:      .5,
+		LegacyPushGossipCacheSize:                   512,
+	}
 )
+
+var _ TxVerifier = (*testTxVerifier)(nil)
 
 type testTxVerifier struct {
 	err error
@@ -92,7 +110,6 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 		},
 		{
-			// Issue returns nil because mempool has tx. We should gossip the tx.
 			name: "issuance succeeds",
 			msgBytesFunc: func() []byte {
 				msg := message.Tx{
@@ -104,13 +121,17 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(testTx, true)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
+				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+				// we should gossip the tx twice because sdk and legacy gossip
+				// currently runs together
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any())
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Times(2)
 				return appSender
 			},
 		},
@@ -127,6 +148,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
 			},
@@ -162,16 +184,25 @@ func TestNetworkAppGossip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+			ctx := context.Background()
 			ctrl := gomock.NewController(t)
 
-			n := New(
+			snowCtx := snowtest.Context(t, ids.Empty)
+			n, err := New(
 				logging.NoLog{},
+				ids.EmptyNodeID,
+				ids.Empty,
+				snowCtx.ValidatorState,
 				testTxVerifier{},
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
+				prometheus.NewRegistry(),
+				DefaultConfig,
 			)
-			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
+			require.NoError(err)
+
+			require.NoError(n.AppGossip(ctx, ids.GenerateTestNodeID(), tt.msgBytesFunc()))
 		})
 	}
 }
@@ -197,22 +228,18 @@ func TestNetworkIssueTx(t *testing.T) {
 				return mempool
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Should gossip the tx
-				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
-				return appSender
+				return common.NewMockSender(ctrl)
 			},
-			expectedErr: nil,
+			expectedErr: mempool.ErrDuplicateTx,
 		},
 		{
 			name: "transaction marked as dropped in mempool",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
-				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
+				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
 			},
-			txVerifier: testTxVerifier{err: errTest},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Shouldn't gossip the tx
 				return common.NewMockSender(ctrl)
@@ -224,6 +251,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
+				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
@@ -239,8 +267,9 @@ func TestNetworkIssueTx(t *testing.T) {
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
+				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
-				mempool.EXPECT().MarkDropped(gomock.Any(), errTest)
+				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
@@ -252,15 +281,14 @@ func TestNetworkIssueTx(t *testing.T) {
 		{
 			name: "AppGossip tx but do not add to mempool if primary network is not being fully synced",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
-				return mempool
+				return mempool.NewMockMempool(ctrl)
 			},
 			partialSyncPrimaryNetwork: true,
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Should gossip the tx
+				// we should gossip the tx twice because sdk and legacy gossip
+				// currently runs together
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 			expectedErr: nil,
@@ -269,15 +297,17 @@ func TestNetworkIssueTx(t *testing.T) {
 			name: "happy path",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(tx, false)
+				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
+				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
 				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Should gossip the tx
+				// we should gossip the tx twice because sdk and legacy gossip
+				// currently runs together
 				appSender := common.NewMockSender(ctrl)
-				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).Return(nil).Times(2)
 				return appSender
 			},
 			expectedErr: nil,
@@ -289,14 +319,22 @@ func TestNetworkIssueTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			n := New(
-				logging.NoLog{},
+			snowCtx := snowtest.Context(t, ids.Empty)
+			n, err := New(
+				snowCtx.Log,
+				snowCtx.NodeID,
+				snowCtx.SubnetID,
+				snowCtx.ValidatorState,
 				tt.txVerifier,
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
+				prometheus.NewRegistry(),
+				testConfig,
 			)
-			err := n.IssueTx(context.Background(), tx)
+			require.NoError(err)
+
+			err = n.IssueTx(context.Background(), tx)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -308,25 +346,32 @@ func TestNetworkGossipTx(t *testing.T) {
 
 	appSender := common.NewMockSender(ctrl)
 
-	nIntf := New(
-		logging.NoLog{},
+	snowCtx := snowtest.Context(t, ids.Empty)
+	nIntf, err := New(
+		snowCtx.Log,
+		snowCtx.NodeID,
+		snowCtx.SubnetID,
+		snowCtx.ValidatorState,
 		testTxVerifier{},
 		mempool.NewMockMempool(ctrl),
 		false,
 		appSender,
+		prometheus.NewRegistry(),
+		testConfig,
 	)
+	require.NoError(err)
 	require.IsType(&network{}, nIntf)
 	n := nIntf.(*network)
 
 	// Case: Tx was recently gossiped
 	txID := ids.GenerateTestID()
 	n.recentTxs.Put(txID, struct{}{})
-	n.gossipTx(context.Background(), txID, []byte{})
+	n.legacyGossipTx(context.Background(), txID, []byte{})
 	// Didn't make a call to SendAppGossip
 
 	// Case: Tx was not recently gossiped
 	msgBytes := []byte{1, 2, 3}
 	appSender.EXPECT().SendAppGossip(gomock.Any(), msgBytes).Return(nil)
-	n.gossipTx(context.Background(), ids.GenerateTestID(), msgBytes)
+	n.legacyGossipTx(context.Background(), ids.GenerateTestID(), msgBytes)
 	// Did make a call to SendAppGossip
 }
