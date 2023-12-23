@@ -497,14 +497,14 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 
 	// Transaction should not be marked as dropped before being added to the
 	// mempool
-	reason := env.mempool.GetDropReason(txID)
-	require.NoError(reason)
+	err = env.mempool.GetDropReason(txID)
+	require.NoError(err)
 
 	// Mark the transaction as dropped
 	errTestingDropped := errors.New("testing dropped")
 	env.mempool.MarkDropped(txID, errTestingDropped)
-	reason = env.mempool.GetDropReason(txID)
-	require.ErrorIs(reason, errTestingDropped)
+	err = env.mempool.GetDropReason(txID)
+	require.ErrorIs(err, errTestingDropped)
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
@@ -514,7 +514,8 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	require.False(ok)
 
 	// When issued again, the mempool should still be marked as dropped
-	reason = env.mempool.GetDropReason(txID)
+	err = env.mempool.GetDropReason(txID)
+	require.ErrorIs(err, errTestingDropped)
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
