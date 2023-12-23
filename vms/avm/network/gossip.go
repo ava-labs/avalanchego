@@ -152,6 +152,5 @@ func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	bloomBytes, err := g.bloom.Bloom.MarshalBinary()
-	return bloomBytes, g.bloom.Salt[:], err
+	return g.bloom.Marshal()
 }
