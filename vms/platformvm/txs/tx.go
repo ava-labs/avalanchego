@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -18,6 +19,8 @@ import (
 )
 
 var (
+	_ gossip.Gossipable = (*Tx)(nil)
+
 	ErrNilSignedTx = errors.New("nil signed tx is not valid")
 
 	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
@@ -90,6 +93,10 @@ func (tx *Tx) Bytes() []byte {
 }
 
 func (tx *Tx) ID() ids.ID {
+	return tx.TxID
+}
+
+func (tx *Tx) GossipID() ids.ID {
 	return tx.TxID
 }
 

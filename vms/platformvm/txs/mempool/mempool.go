@@ -37,12 +37,12 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errDuplicateTx                = errors.New("duplicate tx")
-	errTxTooLarge                 = errors.New("tx too large")
-	errMempoolFull                = errors.New("mempool is full")
-	errConflictsWithOtherTx       = errors.New("tx conflicts with other tx")
-	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
-	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
+	ErrDuplicateTx                = errors.New("duplicate tx")
+	ErrTxTooLarge                 = errors.New("tx too large")
+	ErrMempoolFull                = errors.New("mempool is full")
+	ErrConflictsWithOtherTx       = errors.New("tx conflicts with other tx")
+	ErrCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
+	ErrCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
 type Mempool interface {
@@ -122,22 +122,22 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
-		return errCantIssueAdvanceTimeTx
+		return ErrCantIssueAdvanceTimeTx
 	case *txs.RewardValidatorTx:
-		return errCantIssueRewardValidatorTx
+		return ErrCantIssueRewardValidatorTx
 	default:
 	}
 
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if _, ok := m.unissuedTxs.Get(txID); ok {
-		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
+		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
 	txSize := len(tx.Bytes())
 	if txSize > MaxTxSize {
 		return fmt.Errorf("%w: %s size (%d) > max size (%d)",
-			errTxTooLarge,
+			ErrTxTooLarge,
 			txID,
 			txSize,
 			MaxTxSize,
@@ -145,7 +145,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 	if txSize > m.bytesAvailable {
 		return fmt.Errorf("%w: %s size (%d) > available space (%d)",
-			errMempoolFull,
+			ErrMempoolFull,
 			txID,
 			txSize,
 			m.bytesAvailable,
@@ -154,7 +154,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
-		return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
+		return fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
 	}
 
 	m.unissuedTxs.Put(tx.ID(), tx)

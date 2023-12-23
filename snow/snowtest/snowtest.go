@@ -12,10 +12,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -35,9 +38,9 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 	return nil
 }
 
-func ConsensusContext() *snow.ConsensusContext {
+func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 	return &snow.ConsensusContext{
-		Context:             snow.DefaultContextTest(),
+		Context:             ctx,
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
 		BlockAcceptor:       noOpAcceptor{},
@@ -49,29 +52,24 @@ func ConsensusContext() *snow.ConsensusContext {
 func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require := require.New(tb)
 
-	ctx := snow.DefaultContextTest()
+	secretKey, err := bls.NewSecretKey()
+	require.NoError(err)
+	publicKey := bls.PublicFromSecretKey(secretKey)
 
-	ctx.NetworkID = constants.UnitTestID
-	ctx.SubnetID = constants.PrimaryNetworkID
-	ctx.ChainID = chainID
-	ctx.XChainID = XChainID
-	ctx.CChainID = CChainID
-	ctx.AVAXAssetID = AVAXAssetID
-
-	aliaser := ctx.BCLookup.(ids.Aliaser)
+	aliaser := ids.NewAliaser()
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
 	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-	require.NoError(aliaser.Alias(ctx.XChainID, "X"))
-	require.NoError(aliaser.Alias(ctx.XChainID, ctx.XChainID.String()))
-	require.NoError(aliaser.Alias(ctx.CChainID, "C"))
-	require.NoError(aliaser.Alias(ctx.CChainID, ctx.CChainID.String()))
+	require.NoError(aliaser.Alias(XChainID, "X"))
+	require.NoError(aliaser.Alias(XChainID, XChainID.String()))
+	require.NoError(aliaser.Alias(CChainID, "C"))
+	require.NoError(aliaser.Alias(CChainID, CChainID.String()))
 
-	ctx.ValidatorState = &validators.TestState{
+	validatorState := &validators.TestState{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
-				ctx.XChainID:              constants.PrimaryNetworkID,
-				ctx.CChainID:              constants.PrimaryNetworkID,
+				XChainID:                  constants.PrimaryNetworkID,
+				CChainID:                  constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errMissing
@@ -80,5 +78,22 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		},
 	}
 
-	return ctx
+	return &snow.Context{
+		NetworkID: constants.UnitTestID,
+		SubnetID:  constants.PrimaryNetworkID,
+		ChainID:   chainID,
+		NodeID:    ids.EmptyNodeID,
+		PublicKey: publicKey,
+
+		XChainID:    XChainID,
+		CChainID:    CChainID,
+		AVAXAssetID: AVAXAssetID,
+
+		Log:      logging.NoLog{},
+		BCLookup: aliaser,
+		Metrics:  metrics.NewOptionalGatherer(),
+
+		ValidatorState: validatorState,
+		ChainDataDir:   "",
+	}
 }
