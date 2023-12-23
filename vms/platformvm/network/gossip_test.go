@@ -24,16 +24,17 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
+	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
-		TxID: ids.GenerateTestID(),
+		TxID: txID,
 	}
 
 	mempool := mempool.NewMockMempool(ctrl)
 	txVerifier := testTxVerifier{err: errFoo}
 
-	mempool.EXPECT().Get(tx.ID()).Return(nil, false)
-	mempool.EXPECT().GetDropReason(tx.ID()).Return(nil)
-	mempool.EXPECT().MarkDropped(tx.ID(), errFoo)
+	mempool.EXPECT().Get(txID).Return(nil, false)
+	mempool.EXPECT().GetDropReason(txID).Return(nil)
+	mempool.EXPECT().MarkDropped(txID, errFoo)
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
@@ -55,17 +56,18 @@ func TestGossipMempoolAddError(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
+	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
-		TxID: ids.GenerateTestID(),
+		TxID: txID,
 	}
 
 	txVerifier := testTxVerifier{}
 	mempool := mempool.NewMockMempool(ctrl)
 
-	mempool.EXPECT().Get(tx.ID()).Return(nil, false)
-	mempool.EXPECT().GetDropReason(tx.ID()).Return(nil)
+	mempool.EXPECT().Get(txID).Return(nil, false)
+	mempool.EXPECT().GetDropReason(txID).Return(nil)
 	mempool.EXPECT().Add(tx).Return(errFoo)
-	mempool.EXPECT().MarkDropped(tx.ID(), errFoo).AnyTimes()
+	mempool.EXPECT().MarkDropped(txID, errFoo).AnyTimes()
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
@@ -90,11 +92,12 @@ func TestMempoolDuplicate(t *testing.T) {
 	testMempool := mempool.NewMockMempool(ctrl)
 	txVerifier := testTxVerifier{}
 
+	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
-		TxID: ids.GenerateTestID(),
+		TxID: txID,
 	}
 
-	testMempool.EXPECT().Get(tx.ID()).Return(tx, true)
+	testMempool.EXPECT().Get(txID).Return(tx, true)
 
 	gossipMempool, err := newGossipMempool(
 		testMempool,
@@ -116,15 +119,16 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
+	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
-		TxID: ids.GenerateTestID(),
+		TxID: txID,
 	}
 
 	txVerifier := testTxVerifier{}
 	mempool := mempool.NewMockMempool(ctrl)
 
-	mempool.EXPECT().Get(tx.ID()).Return(nil, false)
-	mempool.EXPECT().GetDropReason(tx.ID()).Return(nil)
+	mempool.EXPECT().Get(txID).Return(nil, false)
+	mempool.EXPECT().GetDropReason(txID).Return(nil)
 	mempool.EXPECT().Add(tx).Return(nil)
 	mempool.EXPECT().RequestBuildBlock(gomock.Any())
 
