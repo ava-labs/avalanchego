@@ -65,6 +65,5 @@ func (t *testSet) Iterate(f func(gossipable *testTx) bool) {
 }
 
 func (t *testSet) GetFilter() ([]byte, []byte, error) {
-	bloom, err := t.bloom.Bloom.MarshalBinary()
-	return bloom, t.bloom.Salt[:], err
+	return t.bloom.Marshal()
 }
