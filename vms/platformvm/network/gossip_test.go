@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+
 	"github.com/stretchr/testify/require"
+
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"

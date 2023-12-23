@@ -497,8 +497,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 
 	// Transaction should not be marked as dropped before being added to the
 	// mempool
-	err = env.mempool.GetDropReason(txID)
-	require.NoError(err)
+	require.NoError(env.mempool.GetDropReason(txID))
 
 	// Mark the transaction as dropped
 	errTestingDropped := errors.New("testing dropped")

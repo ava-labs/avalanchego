@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -89,15 +90,17 @@ type VM struct {
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
 
+	startShutdown context.CancelFunc
+	awaitShutdown sync.WaitGroup
+
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
-	cancel context.CancelFunc
 }
 
 // Initialize this blockchain.
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
 func (vm *VM) Initialize(
-	rootCtx context.Context,
+	ctx context.Context,
 	chainCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
@@ -107,9 +110,6 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	ctx, cancel := context.WithCancel(rootCtx)
-	vm.cancel = cancel
-
 	chainCtx.Log.Verbo("initializing platform chain")
 
 	execConfig, err := config.GetExecutionConfig(configBytes)
@@ -211,7 +211,14 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to initialize network: %w", err)
 	}
-	go vm.Network.Gossip(ctx)
+
+	vmCtx, cancel := context.WithCancel(context.Background())
+	vm.startShutdown = cancel
+	vm.awaitShutdown.Add(1)
+	go func() {
+		defer vm.awaitShutdown.Done()
+		vm.Network.Gossip(vmCtx)
+	}()
 
 	vm.Builder = blockbuilder.New(
 		mempool,
@@ -368,7 +375,9 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.cancel()
+	vm.startShutdown()
+	vm.awaitShutdown.Wait()
+
 	vm.Builder.ShutdownBlockTimer()
 
 	if vm.bootstrapped.Get() {

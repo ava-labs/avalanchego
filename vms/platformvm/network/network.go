@@ -172,6 +172,12 @@ func New(
 }
 
 func (n *network) Gossip(ctx context.Context) {
+	// If the node is running partial sync, we should not perform any pull
+	// gossip.
+	if n.partialSyncPrimaryNetwork {
+		return
+	}
+
 	gossip.Every(ctx, n.log, n.txPullGossiper, n.txGossipFrequency)
 }
 

@@ -49,17 +49,12 @@ func (t txGossipHandler) AppRequest(
 
 type txMarshaller struct{}
 
-func (t txMarshaller) MarshalGossip(tx *txs.Tx) ([]byte, error) {
+func (txMarshaller) MarshalGossip(tx *txs.Tx) ([]byte, error) {
 	return tx.Bytes(), nil
 }
 
-func (t txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
-	parsed, err := txs.Parse(txs.Codec, bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return parsed, nil
+func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
+	return txs.Parse(txs.Codec, bytes)
 }
 
 func newGossipMempool(
@@ -84,7 +79,6 @@ type gossipMempool struct {
 	mempool.Mempool
 	log                         logging.Logger
 	txVerifier                  TxVerifier
-	emptyBlockPermitted         bool
 	maxFalsePositiveProbability float64
 
 	lock  sync.RWMutex
@@ -94,7 +88,7 @@ type gossipMempool struct {
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("tx %s dropped: %w", tx.ID(), mempool.ErrDuplicateTx)
+		return fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {

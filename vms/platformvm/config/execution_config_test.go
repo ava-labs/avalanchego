@@ -90,4 +90,52 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		}
 		require.Equal(expected, ec)
 	})
+
+	t.Run("default values applied correctly", func(t *testing.T) {
+		require := require.New(t)
+		b := []byte(`{
+			"network": {
+				"max-validator-set-staleness": 1,
+				"target-gossip-size": 2,
+				"pull-gossip-poll-size": 3,
+				"pull-gossip-frequency": 4,
+				"pull-gossip-throttling-period": 5
+			},
+			"block-cache-size": 1,
+			"tx-cache-size": 2,
+			"transformed-subnet-tx-cache-size": 3,
+			"reward-utxos-cache-size": 5,
+			"chain-cache-size": 6,
+			"chain-db-cache-size": 7,
+			"block-id-cache-size": 8,
+			"fx-owner-cache-size": 9,
+			"checksums-enabled": true
+		}`)
+		ec, err := GetExecutionConfig(b)
+		require.NoError(err)
+		expected := &ExecutionConfig{
+			Network: network.Config{
+				MaxValidatorSetStaleness:                    1,
+				TargetGossipSize:                            2,
+				PullGossipPollSize:                          3,
+				PullGossipFrequency:                         4,
+				PullGossipThrottlingPeriod:                  5,
+				PullGossipThrottlingLimit:                   DefaultExecutionConfig.Network.PullGossipThrottlingLimit,
+				ExpectedBloomFilterElements:                 DefaultExecutionConfig.Network.ExpectedBloomFilterElements,
+				ExpectedBloomFilterFalsePositiveProbability: DefaultExecutionConfig.Network.ExpectedBloomFilterFalsePositiveProbability,
+				MaxBloomFilterFalsePositiveProbability:      DefaultExecutionConfig.Network.MaxBloomFilterFalsePositiveProbability,
+				LegacyPushGossipCacheSize:                   DefaultExecutionConfig.Network.LegacyPushGossipCacheSize,
+			},
+			BlockCacheSize:               1,
+			TxCacheSize:                  2,
+			TransformedSubnetTxCacheSize: 3,
+			RewardUTXOsCacheSize:         5,
+			ChainCacheSize:               6,
+			ChainDBCacheSize:             7,
+			BlockIDCacheSize:             8,
+			FxOwnerCacheSize:             9,
+			ChecksumsEnabled:             true,
+		}
+		require.Equal(expected, ec)
+	})
 }
