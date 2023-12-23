@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -166,6 +167,9 @@ func newEnvironment(t *testing.T) *environment {
 
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
+	res.sender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
 
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
