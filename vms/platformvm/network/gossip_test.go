@@ -7,14 +7,11 @@ import (
 	"errors"
 	"testing"
 
-	bloomfilter "github.com/holiman/bloomfilter/v2"
-
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -137,15 +134,5 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(gossipMempool.Add(tx))
-
-	bloomBytes, salt, err := gossipMempool.GetFilter()
-	require.NoError(err)
-
-	bloom := &gossip.BloomFilter{
-		Bloom: &bloomfilter.Filter{},
-		Salt:  ids.ID(salt),
-	}
-
-	require.NoError(bloom.Bloom.UnmarshalBinary(bloomBytes))
-	require.True(bloom.Has(tx))
+	require.True(gossipMempool.bloom.Has(tx))
 }
