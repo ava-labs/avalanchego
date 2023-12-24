@@ -290,6 +290,8 @@ func (b *Block) Reject(context.Context) error {
 		}
 	}
 
+	b.manager.mempool.RequestBuildBlock()
+
 	b.rejected = true
 	return nil
 }

@@ -1,5 +1,58 @@
 # Release Notes
 
+## [v1.10.18](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.18)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is updated to `31` all plugins must update to be compatible.
+
+### APIs
+
+- Added `info.acps` API
+- Added `supportedACPs` and `objectedACPs` for each peer returned by `info.peers`
+- Added `txs` field to `BanffProposalBlock`'s json format
+- Renamed metrics related to message handling
+  - `version` -> `handshake`
+  - `appRequestFailed` -> `appError`
+  - `crossChainAppRequestFailed` -> `crossChainAppError`
+- Converted p2p SDK metrics to use vectors rather than independent metrics
+- Converted client name reported over the p2p network from `avalanche` to `avalanchego`
+
+
+### Configs
+
+- Added:
+  - `--acp-support`
+  - `--acp-object`
+  - `network` to the X-chain and P-chain configs including:
+    - `max-validator-set-staleness`
+    - `target-gossip-size`
+    - `pull-gossip-poll-size`
+    - `pull-gossip-frequency`
+    - `pull-gossip-throttling-period`
+    - `pull-gossip-throttling-limit`
+    - `expected-bloom-filter-elements`
+    - `expected-bloom-filter-false-positive-probability`
+    - `max-bloom-filter-false-positive-probability`
+    - `legacy-push-gossip-cache-size`
+
+### Fixes
+
+- Fixed `platformvm.SetPreference` to correctly reset the block building timer
+- Fixed early bootstrapping termination
+- Fixed duplicated transaction initialization in the X-chain and P-chain
+- Updated `golang.org/x/exp` dependency to fix downstream compilation errors
+- Updated `golang.org/x/crypto` dependency to address `CVE-2023-48795`
+- Updated minimum golang version to address `CVE-2023-39326`
+- Restricted `GOPROXY` during compilation to avoid `direct` version control fallbacks
+- Fixed `merkledb` deletion of the empty key
+- Fixed `merkledb` race condition when interacting with invalidated or closed trie views
+- Fixed `json.Marshal` for `wallet` transactions
+
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.17...v1.10.18
+
 ## [v1.10.17](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.17)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
