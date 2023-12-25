@@ -41,8 +41,8 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 	}
 
 	// sort [changes] so they can be merged with the parent trie's state
-	slices.SortFunc(changes, func(a, b KeyChange) bool {
-		return bytes.Compare(a.Key, b.Key) == -1
+	slices.SortFunc(changes, func(a, b KeyChange) int {
+		return bytes.Compare(a.Key, b.Key)
 	})
 
 	return &viewIterator{
@@ -71,13 +71,7 @@ type viewIterator struct {
 // based on if the in memory changes or the underlying db should be read next
 func (it *viewIterator) Next() bool {
 	switch {
-	case it.view.db.closed:
-		// Short-circuit and set an error if the underlying database has been closed.
-		it.key = nil
-		it.value = nil
-		it.err = database.ErrClosed
-		return false
-	case it.view.invalidated:
+	case it.view.isInvalid():
 		it.key = nil
 		it.value = nil
 		it.err = ErrInvalid

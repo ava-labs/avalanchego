@@ -220,7 +220,7 @@ func (k *PrivateKey) String() string {
 }
 
 func (k *PrivateKey) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + k.String() + "\""), nil
+	return []byte(`"` + k.String() + `"`), nil
 }
 
 func (k *PrivateKey) MarshalText() ([]byte, error) {

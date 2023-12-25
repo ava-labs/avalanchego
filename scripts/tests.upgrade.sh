@@ -3,14 +3,24 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/tests.upgrade.sh 1.7.16
-# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.7.16 # Customization of avalanchego path
+# ./scripts/tests.upgrade.sh                                                # Use default version
+# ./scripts/tests.upgrade.sh 1.10.18                                        # Specify a version
+# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.10.18 # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
 
-VERSION="${1:-}"
+# The AvalancheGo local network does not support long-lived
+# backwards-compatible networks. When a breaking change is made to the
+# local network, this flag must be updated to the last compatible
+# version with the latest code.
+#
+# v1.10.17 includes the AWM activation on the C-Chain local network
+# and the inclusion of BLS Public Keys in the network genesis.
+DEFAULT_VERSION="1.10.17"
+
+VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
   echo "Usage: ${0} [VERSION]" >>/dev/stderr
@@ -56,7 +66,7 @@ source ./scripts/constants.sh
 #################################
 echo "building upgrade.test"
 # to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.1.4
+go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
 ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
 ./tests/upgrade/upgrade.test --help
 

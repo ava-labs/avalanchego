@@ -43,8 +43,8 @@ type Manager interface {
 	// preferred state. This should *not* be used to verify transactions in a block.
 	VerifyTx(tx *txs.Tx) error
 
-	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
-	// provided blk or any of its ancestors pinned in memory.
+	// VerifyUniqueInputs returns nil iff no blocks in the inclusive
+	// ancestry of [blkID] consume an input in [inputs].
 	VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error
 }
 
