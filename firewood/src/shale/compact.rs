@@ -81,6 +81,7 @@ impl Storable for CompactFooter {
                 offset: addr,
                 size: Self::MSIZE,
             })?;
+        #[allow(clippy::unwrap_used)]
         let payload_size = u64::from_le_bytes(raw.as_deref().try_into().unwrap());
         Ok(Self { payload_size })
     }
@@ -262,6 +263,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         let desc_size = CompactDescriptor::MSIZE;
         // TODO: subtracting two disk addresses is only used here, probably can rewrite this
         // debug_assert!((desc_addr.0 - self.header.base_addr.value.into()) % desc_size == 0);
+        #[allow(clippy::unwrap_used)]
         self.header
             .meta_space_tail
             .write(|r| *r -= desc_size as usize)
@@ -270,8 +272,10 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         if desc_addr != DiskAddress(**self.header.meta_space_tail) {
             let desc_last = self.get_descriptor(*self.header.meta_space_tail.value)?;
             let mut desc = self.get_descriptor(desc_addr)?;
+            #[allow(clippy::unwrap_used)]
             desc.write(|r| *r = *desc_last).unwrap();
             let mut header = self.get_header(desc.haddr.into())?;
+            #[allow(clippy::unwrap_used)]
             header.write(|h| h.desc_addr = desc_addr).unwrap();
         }
 
@@ -280,6 +284,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
 
     fn new_desc(&mut self) -> Result<DiskAddress, ShaleError> {
         let addr = **self.header.meta_space_tail;
+        #[allow(clippy::unwrap_used)]
         self.header
             .meta_space_tail
             .write(|r| *r += CompactDescriptor::MSIZE as usize)
@@ -321,6 +326,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         offset = addr + header_payload_size;
         let mut f = offset;
 
+        #[allow(clippy::unwrap_used)]
         if offset + fsize < self.header.compact_space_tail.unwrap().get() as u64
             && (regn_size - (offset & (regn_size - 1))) >= fsize + hsize
         {
@@ -345,6 +351,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         let desc_addr = self.new_desc()?;
         {
             let mut desc = self.get_descriptor(desc_addr)?;
+            #[allow(clippy::unwrap_used)]
             desc.write(|d| {
                 d.payload_size = payload_size;
                 d.haddr = h as usize;
@@ -353,12 +360,14 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         }
         let mut h = self.get_header(DiskAddress::from(h as usize))?;
         let mut f = self.get_footer(DiskAddress::from(f as usize))?;
+        #[allow(clippy::unwrap_used)]
         h.write(|h| {
             h.payload_size = payload_size;
             h.is_freed = true;
             h.desc_addr = desc_addr;
         })
         .unwrap();
+        #[allow(clippy::unwrap_used)]
         f.write(|f| f.payload_size = payload_size).unwrap();
 
         Ok(())
@@ -394,6 +403,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
                     let mut header = self.get_header(DiskAddress::from(desc_haddr))?;
                     assert_eq!(header.payload_size as usize, desc_payload_size);
                     assert!(header.is_freed);
+                    #[allow(clippy::unwrap_used)]
                     header.write(|h| h.is_freed = false).unwrap();
                 }
                 self.del_desc(ptr)?;
@@ -404,6 +414,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
                     let mut lheader = self.get_header(DiskAddress::from(desc_haddr))?;
                     assert_eq!(lheader.payload_size as usize, desc_payload_size);
                     assert!(lheader.is_freed);
+                    #[allow(clippy::unwrap_used)]
                     lheader
                         .write(|h| {
                             h.is_freed = false;
@@ -415,6 +426,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
                     let mut lfooter =
                         self.get_footer(DiskAddress::from(desc_haddr + hsize + length as usize))?;
                     //assert!(lfooter.payload_size == desc_payload_size);
+                    #[allow(clippy::unwrap_used)]
                     lfooter.write(|f| f.payload_size = length).unwrap();
                 }
 
@@ -423,6 +435,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
                 let rdesc_addr = self.new_desc()?;
                 {
                     let mut rdesc = self.get_descriptor(rdesc_addr)?;
+                    #[allow(clippy::unwrap_used)]
                     rdesc
                         .write(|rd| {
                             rd.payload_size = rpayload_size as u64;
@@ -432,6 +445,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
                 }
                 {
                     let mut rheader = self.get_header(DiskAddress::from(offset))?;
+                    #[allow(clippy::unwrap_used)]
                     rheader
                         .write(|rh| {
                             rh.is_freed = true;
@@ -443,6 +457,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
                 {
                     let mut rfooter =
                         self.get_footer(DiskAddress::from(offset + hsize + rpayload_size))?;
+                    #[allow(clippy::unwrap_used)]
                     rfooter
                         .write(|f| f.payload_size = rpayload_size as u64)
                         .unwrap();
@@ -452,6 +467,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
             } else {
                 false
             };
+            #[allow(clippy::unwrap_used)]
             if exit {
                 self.header.alloc_addr.write(|r| *r = ptr).unwrap();
                 res = Some((desc_haddr + hsize) as u64);
@@ -472,6 +488,7 @@ impl<M: CachedStore> CompactSpaceInner<M> {
         let regn_size = 1 << self.regn_nbit;
         let total_length = CompactHeader::MSIZE + length + CompactFooter::MSIZE;
         let mut offset = *self.header.compact_space_tail;
+        #[allow(clippy::unwrap_used)]
         self.header
             .compact_space_tail
             .write(|r| {
@@ -486,13 +503,16 @@ impl<M: CachedStore> CompactSpaceInner<M> {
             .unwrap();
         let mut h = self.get_header(offset)?;
         let mut f = self.get_footer(offset + CompactHeader::MSIZE as usize + length as usize)?;
+        #[allow(clippy::unwrap_used)]
         h.write(|h| {
             h.payload_size = length;
             h.is_freed = false;
             h.desc_addr = DiskAddress::null();
         })
         .unwrap();
+        #[allow(clippy::unwrap_used)]
         f.write(|f| f.payload_size = length).unwrap();
+        #[allow(clippy::unwrap_used)]
         Ok((offset + CompactHeader::MSIZE as usize).0.unwrap().get() as u64)
     }
 
@@ -537,6 +557,7 @@ impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
 }
 
 impl CompactSpace<Node, StoreRevMut> {
+    #[allow(clippy::unwrap_used)]
     pub fn into_shared(self) -> CompactSpace<Node, StoreRevShared> {
         let inner = self.inner.into_inner().unwrap();
         CompactSpace {
@@ -549,11 +570,14 @@ impl CompactSpace<Node, StoreRevMut> {
 impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for CompactSpace<T, M> {
     fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.serialized_len() + extra;
+        #[allow(clippy::unwrap_used)]
         let addr = self.inner.write().unwrap().alloc(size)?;
 
+        #[allow(clippy::unwrap_used)]
         let obj = {
             let inner = self.inner.read().unwrap();
             let compact_space = &inner.compact_space;
+            #[allow(clippy::unwrap_used)]
             let view =
                 StoredView::item_to_obj(compact_space, addr.try_into().unwrap(), size, item)?;
 
@@ -565,20 +589,24 @@ impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for Comp
         let mut obj_ref = ObjRef::new(Some(obj), cache);
 
         // should this use a `?` instead of `unwrap`?
+        #[allow(clippy::unwrap_used)]
         obj_ref.write(|_| {}).unwrap();
 
         Ok(obj_ref)
     }
 
+    #[allow(clippy::unwrap_used)]
     fn free_item(&mut self, ptr: DiskAddress) -> Result<(), ShaleError> {
         let mut inner = self.inner.write().unwrap();
         self.obj_cache.pop(ptr);
+        #[allow(clippy::unwrap_used)]
         inner.free(ptr.unwrap().get() as u64)
     }
 
     fn get_item(&self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError> {
         let obj = self.obj_cache.get(ptr)?;
 
+        #[allow(clippy::unwrap_used)]
         let inner = self.inner.read().unwrap();
         let cache = &self.obj_cache;
 
@@ -586,6 +614,7 @@ impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for Comp
             return Ok(ObjRef::new(Some(obj), cache));
         }
 
+        #[allow(clippy::unwrap_used)]
         if ptr < DiskAddress::from(CompactSpaceHeader::MSIZE as usize) {
             return Err(ShaleError::InvalidAddressLength {
                 expected: DiskAddress::from(CompactSpaceHeader::MSIZE as usize),
@@ -602,6 +631,7 @@ impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for Comp
         Ok(ObjRef::new(Some(obj), cache))
     }
 
+    #[allow(clippy::unwrap_used)]
     fn flush_dirty(&self) -> Option<()> {
         let mut inner = self.inner.write().unwrap();
         inner.header.flush_dirty();
@@ -611,6 +641,7 @@ impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for Comp
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use sha3::Digest;
 

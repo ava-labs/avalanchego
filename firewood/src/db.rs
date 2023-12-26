@@ -513,6 +513,7 @@ impl Db {
         let (sender, inbound) = tokio::sync::mpsc::unbounded_channel();
         let disk_requester = DiskBufferRequester::new(sender);
         let buffer = cfg.buffer.clone();
+        #[allow(clippy::unwrap_used)]
         let disk_thread = block_in_place(|| {
             Some(std::thread::spawn(move || {
                 let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).unwrap();
@@ -520,6 +521,7 @@ impl Db {
             }))
         });
 
+        #[allow(clippy::unwrap_used)]
         let root_hash_cache: Arc<CachedSpace> = CachedSpace::new(
             &StoreConfig::builder()
                 .ncached_pages(cfg.root_hash_ncached_pages)
@@ -534,6 +536,7 @@ impl Db {
         .into();
 
         // setup disk buffer
+        #[allow(clippy::unwrap_used)]
         let data_cache = Universe {
             merkle: SubUniverse::<Arc<CachedSpace>>::new(
                 CachedSpace::new(
@@ -625,6 +628,7 @@ impl Db {
         // DbHeader (just a pointer to the sentinel)
         // CompactSpaceHeader for future allocations
         let (params, hdr, csh);
+        #[allow(clippy::unwrap_used)]
         let header_bytes: Vec<u8> = {
             params = DbParams {
                 magic: *MAGIC_STR,
@@ -647,6 +651,7 @@ impl Db {
             // write out the CompactSpaceHeader
             csh = CompactSpaceHeader::new(
                 NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                #[allow(clippy::unwrap_used)]
                 NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
             );
             bytemuck::bytes_of(&csh)
@@ -676,10 +681,12 @@ impl Db {
 
         if reset_store_headers {
             // initialize store headers
+            #[allow(clippy::unwrap_used)]
             merkle_meta_store.write(
                 merkle_payload_header.into(),
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
                     NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                    #[allow(clippy::unwrap_used)]
                     NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
                 ))?,
             );
@@ -710,6 +717,7 @@ impl Db {
             cfg.payload_max_walk,
             &cfg.rev,
         )?;
+        #[allow(clippy::unwrap_used)]
         rev.flush_dirty().unwrap();
 
         Ok((store, rev))
@@ -751,6 +759,7 @@ impl Db {
         let merkle_meta = merkle.0.into();
         let merkle_payload = merkle.1.into();
 
+        #[allow(clippy::unwrap_used)]
         let merkle_space = shale::compact::CompactSpace::new(
             merkle_meta,
             merkle_payload,
@@ -766,6 +775,7 @@ impl Db {
         if db_header_ref.kv_root.is_null() {
             let mut err = Ok(());
             // create the sentinel node
+            #[allow(clippy::unwrap_used)]
             db_header_ref
                 .write(|r| {
                     err = (|| {
@@ -820,6 +830,7 @@ impl Db {
                 }
             }
         })?;
+        #[allow(clippy::unwrap_used)]
         rev.flush_dirty().unwrap();
 
         let parent = ProposalBase::View(Arc::clone(&self.revisions.lock().base_revision));
@@ -848,6 +859,7 @@ impl Db {
         let mut nback = revisions.root_hashes.iter().position(|r| r == root_hash);
         let rlen = revisions.root_hashes.len();
 
+        #[allow(clippy::unwrap_used)]
         if nback.is_none() && rlen < revisions.max_revisions {
             let ashes = inner_lock
                 .disk_requester
@@ -867,7 +879,7 @@ impl Db {
                 .map(|root_hash_store| {
                     root_hash_store
                         .get_view(0, TRIE_HASH_LEN as u64)
-                        .unwrap()
+                        .expect("get view failed")
                         .as_deref()
                 })
                 .map(|data| TrieHash(data[..TRIE_HASH_LEN].try_into().unwrap()))
@@ -881,6 +893,7 @@ impl Db {
         let rlen = revisions.inner.len();
         if rlen < nback {
             // TODO: Remove unwrap
+            #[allow(clippy::unwrap_used)]
             let ashes = inner_lock.disk_requester.collect_ash(nback).ok().unwrap();
             for mut ash in ashes.into_iter().skip(rlen) {
                 for (_, a) in ash.0.iter_mut() {
@@ -909,14 +922,17 @@ impl Db {
         // Release the lock after we find the revision
         drop(inner_lock);
 
+        #[allow(clippy::unwrap_used)]
         let db_header_ref = Db::get_db_header_ref(&space.merkle.meta).unwrap();
 
+        #[allow(clippy::unwrap_used)]
         let merkle_payload_header_ref =
             Db::get_payload_header_ref(&space.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)
                 .unwrap();
 
         let header_refs = (db_header_ref, merkle_payload_header_ref);
 
+        #[allow(clippy::unwrap_used)]
         Revision {
             rev: Db::new_revision(
                 header_refs,

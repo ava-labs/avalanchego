@@ -413,6 +413,7 @@ impl<T: Iterator<Item = u8>> IntoBytes for T {}
 use super::tests::create_test_merkle;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use crate::nibbles::Nibbles;
 

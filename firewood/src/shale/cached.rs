@@ -33,6 +33,7 @@ impl CachedStore for PlainMem {
         length: u64,
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let length = length as usize;
+        #[allow(clippy::unwrap_used)]
         if offset + length > self.space.read().unwrap().len() {
             None
         } else {
@@ -56,6 +57,7 @@ impl CachedStore for PlainMem {
 
     fn write(&mut self, offset: usize, change: &[u8]) {
         let length = change.len();
+        #[allow(clippy::unwrap_used)]
         let mut vect = self.space.deref().write().unwrap();
         vect.as_mut_slice()[offset..offset + length].copy_from_slice(change);
     }
@@ -91,6 +93,7 @@ impl CachedView for PlainMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
+        #[allow(clippy::unwrap_used)]
         self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
     }
 }
@@ -119,6 +122,7 @@ impl CachedStore for DynamicMem {
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let length = length as usize;
         let size = offset + length;
+        #[allow(clippy::unwrap_used)]
         let mut space = self.space.write().unwrap();
 
         // Increase the size if the request range exceeds the current limit.
@@ -147,6 +151,7 @@ impl CachedStore for DynamicMem {
         let length = change.len();
         let size = offset + length;
 
+        #[allow(clippy::unwrap_used)]
         let mut space = self.space.write().unwrap();
 
         // Increase the size if the request range exceeds the current limit.
@@ -187,11 +192,13 @@ impl CachedView for DynamicMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
+        #[allow(clippy::unwrap_used)]
         self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -201,6 +208,7 @@ mod tests {
         let mem = view.deref_mut();
         mem.write(0, &[1, 1]);
         mem.write(0, &[1, 2]);
+        #[allow(clippy::unwrap_used)]
         let r = mem.get_view(0, 2).unwrap().as_deref();
         assert_eq!(r, [1, 2]);
 

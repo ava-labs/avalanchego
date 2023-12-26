@@ -77,6 +77,7 @@ impl From<[u8; 8]> for DiskAddress {
 /// serialization from disk
 impl From<&[u8]> for DiskAddress {
     fn from(value: &[u8]) -> Self {
+        #[allow(clippy::unwrap_used)]
         let bytes: [u8; 8] = value.try_into().unwrap();
         bytes.into()
     }
@@ -169,6 +170,7 @@ impl Storable for DiskAddress {
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         use std::io::{Cursor, Write};
+        #[allow(clippy::unwrap_used)]
         Cursor::new(to).write_all(&self.0.unwrap().get().to_le_bytes())?;
         Ok(())
     }
@@ -182,6 +184,7 @@ impl Storable for DiskAddress {
             })?;
         let addrdyn = raw.deref();
         let addrvec = addrdyn.as_deref();
+        #[allow(clippy::unwrap_used)]
         Ok(Self(NonZeroUsize::new(usize::from_le_bytes(
             addrvec.try_into().unwrap(),
         ))))

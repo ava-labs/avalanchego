@@ -23,6 +23,7 @@ pub struct TestDb {
 }
 
 impl TestDbCreator {
+    #[allow(clippy::unwrap_used)]
     pub async fn create(self) -> TestDb {
         let path = self.path.clone().unwrap_or_else(|| {
             let mut path: PathBuf = std::env::var_os("CARGO_TARGET_DIR")
@@ -66,6 +67,7 @@ impl TestDb {
 impl Drop for TestDb {
     fn drop(&mut self) {
         if !self.preserve_on_drop {
+            #[allow(clippy::unwrap_used)]
             remove_dir_all(self.creator.path.as_ref().unwrap()).unwrap();
         }
     }

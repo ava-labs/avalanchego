@@ -84,6 +84,7 @@ pub struct AshRecord(pub HashMap<SpaceId, Ash>);
 
 impl growthring::wal::Record for AshRecord {
     fn serialize(&self) -> growthring::wal::WalBytes {
+        #[allow(clippy::unwrap_used)]
         bincode::serialize(self).unwrap().into()
     }
 }
@@ -91,6 +92,7 @@ impl growthring::wal::Record for AshRecord {
 impl AshRecord {
     #[allow(clippy::boxed_local)]
     fn deserialize(raw: growthring::wal::WalBytes) -> Self {
+        #[allow(clippy::unwrap_used)]
         bincode::deserialize(raw.as_ref()).unwrap()
     }
 }
@@ -146,6 +148,7 @@ impl StoreDelta {
         widx.sort_by_key(|i| writes[*i].offset);
 
         let mut witer = widx.into_iter();
+        #[allow(clippy::unwrap_used)]
         let w0 = &writes[witer.next().unwrap()];
         let mut head = w0.offset >> PAGE_SIZE_NBIT;
         let mut tail = (w0.offset + w0.data.len() as u64 - 1) >> PAGE_SIZE_NBIT;
@@ -423,6 +426,7 @@ impl StoreRevMut {
         prev_deltas: &StoreRevMutDelta,
         pid: u64,
     ) -> &'a mut [u8] {
+        #[allow(clippy::unwrap_used)]
         let page = deltas
             .pages
             .entry(pid)
@@ -609,46 +613,51 @@ impl MemStoreR for ZeroStore {
     }
 }
 
-#[test]
-fn test_from_ash() {
-    use rand::{rngs::StdRng, Rng, SeedableRng};
-    let mut rng = StdRng::seed_from_u64(42);
-    let min = rng.gen_range(0..2 * PAGE_SIZE);
-    let max = rng.gen_range(min + PAGE_SIZE..min + 100 * PAGE_SIZE);
-    for _ in 0..20 {
-        let n = 20;
-        let mut canvas = vec![0; (max - min) as usize];
-        let mut writes: Vec<_> = Vec::new();
-        for _ in 0..n {
-            let l = rng.gen_range(min..max);
-            let r = rng.gen_range(l + 1..std::cmp::min(l + 3 * PAGE_SIZE, max));
-            let data: Box<[u8]> = (l..r).map(|_| rng.gen()).collect();
-            for (idx, byte) in (l..r).zip(data.iter()) {
-                canvas[(idx - min) as usize] = *byte;
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_from_ash() {
+        use rand::{rngs::StdRng, Rng, SeedableRng};
+        let mut rng = StdRng::seed_from_u64(42);
+        let min = rng.gen_range(0..2 * PAGE_SIZE);
+        let max = rng.gen_range(min + PAGE_SIZE..min + 100 * PAGE_SIZE);
+        for _ in 0..20 {
+            let n = 20;
+            let mut canvas = vec![0; (max - min) as usize];
+            let mut writes: Vec<_> = Vec::new();
+            for _ in 0..n {
+                let l = rng.gen_range(min..max);
+                let r = rng.gen_range(l + 1..std::cmp::min(l + 3 * PAGE_SIZE, max));
+                let data: Box<[u8]> = (l..r).map(|_| rng.gen()).collect();
+                for (idx, byte) in (l..r).zip(data.iter()) {
+                    canvas[(idx - min) as usize] = *byte;
+                }
+                println!("[0x{l:x}, 0x{r:x})");
+                writes.push(SpaceWrite { offset: l, data });
             }
-            println!("[0x{l:x}, 0x{r:x})");
-            writes.push(SpaceWrite { offset: l, data });
-        }
-        let z = Arc::new(ZeroStore::default());
-        let rev = StoreRevShared::from_ash(z, &writes);
-        println!("{rev:?}");
-        assert_eq!(
-            rev.get_view(min as usize, max - min)
-                .as_deref()
-                .unwrap()
-                .as_deref(),
-            canvas
-        );
-        for _ in 0..2 * n {
-            let l = rng.gen_range(min..max);
-            let r = rng.gen_range(l + 1..max);
+            let z = Arc::new(ZeroStore::default());
+            let rev = StoreRevShared::from_ash(z, &writes);
+            println!("{rev:?}");
             assert_eq!(
-                rev.get_view(l as usize, r - l)
+                rev.get_view(min as usize, max - min)
                     .as_deref()
                     .unwrap()
                     .as_deref(),
-                canvas[(l - min) as usize..(r - min) as usize]
+                canvas
             );
+            for _ in 0..2 * n {
+                let l = rng.gen_range(min..max);
+                let r = rng.gen_range(l + 1..max);
+                assert_eq!(
+                    rev.get_view(l as usize, r - l)
+                        .as_deref()
+                        .unwrap()
+                        .as_deref(),
+                    canvas[(l - min) as usize..(r - min) as usize]
+                );
+            }
         }
     }
 }
@@ -707,6 +716,7 @@ impl CachedSpace {
         for DeltaPage(pid, page) in &delta.0 {
             let data = self.inner.write().pin_page(self.space_id, *pid).ok()?;
             // save the original data
+            #[allow(clippy::unwrap_used)]
             pages.push(DeltaPage(*pid, Box::new(data.try_into().unwrap())));
             // apply the change
             data.copy_from_slice(page.as_ref());
@@ -892,6 +902,7 @@ impl FilePool {
 
 impl Drop for FilePool {
     fn drop(&mut self) {
+        #[allow(clippy::unwrap_used)]
         let f0 = self.get_file(0).unwrap();
         flock(f0.as_raw_fd(), FlockArg::UnlockNonblock).ok();
     }

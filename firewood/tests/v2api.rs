@@ -12,6 +12,7 @@ pub mod common;
 use common::TestDbCreator;
 
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::unwrap_used)]
 async fn smoke() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = DbConfig::builder().truncate(true).build();
     let db = TestDbCreator::builder()

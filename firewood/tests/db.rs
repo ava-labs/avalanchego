@@ -22,6 +22,7 @@ macro_rules! kv_dump {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::unwrap_used)]
 async fn test_basic_metrics() {
     let cfg = DbConfig::builder()
         .meta_ncached_pages(1024)
@@ -69,6 +70,7 @@ async fn test_basic_metrics() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::unwrap_used)]
 async fn test_revisions() {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     let cfg = DbConfig::builder()
@@ -158,6 +160,7 @@ async fn test_revisions() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::unwrap_used)]
 async fn create_db_issue_proof() {
     let cfg = DbConfig::builder()
         .meta_ncached_pages(1024)
@@ -246,6 +249,7 @@ macro_rules! assert_val {
 
 #[ignore = "ref: https://github.com/ava-labs/firewood/issues/457"]
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::unwrap_used)]
 async fn db_proposal() -> Result<(), api::Error> {
     let cfg = DbConfig::builder()
         .wal(WalConfig::builder().max_revisions(10).build())

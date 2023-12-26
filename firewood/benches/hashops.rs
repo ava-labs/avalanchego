@@ -34,6 +34,7 @@ fn file_error_panic<T, U>(path: &Path) -> impl FnOnce(T) -> U + '_ {
 }
 
 impl Profiler for FlamegraphProfiler {
+    #[allow(clippy::unwrap_used)]
     fn start_profiling(&mut self, _benchmark_id: &str, _benchmark_dir: &Path) {
         if let Self::Init(frequency) = self {
             let guard = ProfilerGuard::new(*frequency).unwrap();
@@ -41,13 +42,16 @@ impl Profiler for FlamegraphProfiler {
         }
     }
 
+    #[allow(clippy::unwrap_used)]
     fn stop_profiling(&mut self, _benchmark_id: &str, benchmark_dir: &Path) {
         std::fs::create_dir_all(benchmark_dir).unwrap();
         let filename = "firewood-flamegraph.svg";
         let flamegraph_path = benchmark_dir.join(filename);
+        #[allow(clippy::unwrap_used)]
         let flamegraph_file =
             File::create(&flamegraph_path).unwrap_or_else(file_error_panic(&flamegraph_path));
 
+        #[allow(clippy::unwrap_used)]
         if let Self::Active(profiler) = self {
             profiler
                 .report()
@@ -64,6 +68,7 @@ fn bench_trie_hash(criterion: &mut Criterion) {
     let mut store = PlainMem::new(TRIE_HASH_LEN as u64, 0u8);
     store.write(0, ZERO_HASH.deref());
 
+    #[allow(clippy::unwrap_used)]
     criterion
         .benchmark_group("TrieHash")
         .bench_function("dehydrate", |b| {
@@ -87,6 +92,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                 || {
                     let merkle_payload_header = DiskAddress::from(0);
 
+                    #[allow(clippy::unwrap_used)]
                     let merkle_payload_header_ref = StoredView::ptr_to_obj(
                         &PlainMem::new(2 * CompactHeader::MSIZE, 9),
                         merkle_payload_header,
@@ -94,6 +100,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                     )
                     .unwrap();
 
+                    #[allow(clippy::unwrap_used)]
                     let store = CompactSpace::new(
                         PlainMem::new(TEST_MEM_SIZE, 0),
                         PlainMem::new(TEST_MEM_SIZE, 1),
@@ -105,6 +112,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
                     .unwrap();
 
                     let merkle = MerkleWithEncoder::new(Box::new(store));
+                    #[allow(clippy::unwrap_used)]
                     let root = merkle.init_root().unwrap();
 
                     let keys: Vec<Vec<u8>> = repeat_with(|| {
@@ -118,6 +126,7 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
 
                     (merkle, root, keys)
                 },
+                #[allow(clippy::unwrap_used)]
                 |(mut merkle, root, keys)| {
                     keys.into_iter()
                         .for_each(|key| merkle.insert(key, vec![b'v'], root).unwrap())
@@ -131,6 +140,7 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
     const KEY_LEN: usize = 4;
     let mut rng = StdRng::seed_from_u64(1234);
 
+    #[allow(clippy::unwrap_used)]
     criterion
         .benchmark_group("Db")
         .sample_size(30)
@@ -158,11 +168,13 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
                         let cfg =
                             DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
 
+                        #[allow(clippy::unwrap_used)]
                         let db =
                             firewood::db::Db::new(db_path, &cfg.clone().truncate(true).build())
                                 .await
                                 .unwrap();
 
+                        #[allow(clippy::unwrap_used)]
                         Arc::new(db.propose(batch_ops).await.unwrap())
                             .commit()
                             .await

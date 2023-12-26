@@ -83,6 +83,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         let verify = get_keys_to_verify(&batch, args.read_verify_percent);
 
+        #[allow(clippy::unwrap_used)]
         let proposal = Arc::new(db.propose(batch).await.unwrap());
         proposal.commit().await?;
         verify_keys(&db, verify).await?;

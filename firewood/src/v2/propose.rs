@@ -134,7 +134,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         _last_key: Option<KT>,
         _limit: Option<usize>,
     ) -> Result<Option<api::RangeProof<Vec<u8>, Vec<u8>>>, api::Error> {
-        todo!()
+        todo!();
     }
 }
 

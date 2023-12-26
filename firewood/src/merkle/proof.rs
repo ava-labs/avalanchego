@@ -78,6 +78,7 @@ impl From<DbError> for ProofError {
             DbError::KeyNotFound => ProofError::InvalidEdgeKeys,
             DbError::CreateError => ProofError::NoSuchNode,
             // TODO: fix better by adding a new error to ProofError
+            #[allow(clippy::unwrap_used)]
             DbError::IO(e) => {
                 ProofError::SystemError(nix::errno::Errno::from_i32(e.raw_os_error().unwrap()))
             }
@@ -291,6 +292,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     }
                     None => {
                         // insert the leaf to the empty slot
+                        #[allow(clippy::unwrap_used)]
                         u_ref
                             .write(|u| {
                                 let uu = u.inner_mut().as_branch_mut().unwrap();
@@ -302,8 +304,10 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
                 NodeType::Extension(_) => {
                     // If the child already resolved, then use the existing node.
+                    #[allow(clippy::unwrap_used)]
                     let node = u_ref.inner().as_extension().unwrap().chd();
 
+                    #[allow(clippy::unwrap_used)]
                     if node.is_null() {
                         u_ref
                             .write(|u| {
@@ -358,6 +362,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                                 // TODO: add path
                                 NodeType::Branch(n) if n.chd()[branch_index].is_none() => {
                                     // insert the leaf to the empty slot
+                                    #[allow(clippy::unwrap_used)]
                                     u_ref
                                         .write(|u| {
                                             let uu = u.inner_mut().as_branch_mut().unwrap();
@@ -369,6 +374,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                                 // If the child already resolved, then use the existing node.
                                 NodeType::Branch(_) => {}
 
+                                #[allow(clippy::unwrap_used)]
                                 NodeType::Extension(_)
                                     if u_ref.inner().as_extension().unwrap().chd().is_null() =>
                                 {
@@ -559,6 +565,7 @@ fn generate_subproof(encoded: Vec<u8>) -> Result<SubProof, ProofError> {
 
         32 => {
             let sub_hash: &[u8] = &encoded;
+            #[allow(clippy::unwrap_used)]
             let sub_hash = sub_hash.try_into().unwrap();
 
             Ok(SubProof::Hash(sub_hash))
@@ -618,7 +625,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 };
 
                 parent = u_ref.as_ptr();
-                u_ref = merkle.get_node(left_node.unwrap())?;
+                u_ref = merkle.get_node(left_node.expect("left_node none"))?;
                 index += 1;
             }
 
@@ -674,6 +681,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
             let right_node = n.chd()[right_chunks[index] as usize];
 
             // unset all internal nodes calculated encoded value in the forkpoint
+            #[allow(clippy::unwrap_used)]
             for i in left_chunks[index] + 1..right_chunks[index] {
                 u_ref
                     .write(|u| {
@@ -718,6 +726,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 let mut p_ref = merkle
                     .get_node(parent)
                     .map_err(|_| ProofError::NoSuchNode)?;
+                #[allow(clippy::unwrap_used)]
                 p_ref
                     .write(|p| {
                         let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
@@ -775,6 +784,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 .get_node(parent)
                 .map_err(|_| ProofError::NoSuchNode)?;
 
+            #[allow(clippy::unwrap_used)]
             if fork_left.is_ne() && fork_right.is_ne() {
                 p_ref
                     .write(|p| match p.inner_mut() {
@@ -841,6 +851,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
     let mut chunks = Vec::new();
     chunks.extend(key.as_ref());
 
+    #[allow(clippy::unwrap_used)]
     let mut u_ref = merkle
         .get_node(node.unwrap())
         .map_err(|_| ProofError::NoSuchNode)?;
@@ -858,6 +869,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 child_index + 1..16
             };
 
+            #[allow(clippy::unwrap_used)]
             for i in iter {
                 u_ref
                     .write(|u| {
@@ -902,6 +914,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 (true, Ordering::Less) | (false, Ordering::Greater)
             );
 
+            #[allow(clippy::unwrap_used)]
             if should_unset_entire_branch {
                 p_ref
                     .write(|p| {

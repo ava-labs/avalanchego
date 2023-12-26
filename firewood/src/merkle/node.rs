@@ -106,6 +106,7 @@ impl NodeType {
             LEAF_NODE_SIZE => {
                 let mut items = items.into_iter();
 
+                #[allow(clippy::unwrap_used)]
                 let decoded_key: Vec<u8> = items.next().unwrap().decode()?;
 
                 let decoded_key_nibbles = Nibbles::<0>::new(&decoded_key);
@@ -114,6 +115,7 @@ impl NodeType {
                     PartialPath::from_nibbles(decoded_key_nibbles.into_iter());
 
                 let cur_key = cur_key_path.into_inner();
+                #[allow(clippy::unwrap_used)]
                 let data: Vec<u8> = items.next().unwrap().decode()?;
 
                 if term {
@@ -413,6 +415,7 @@ impl Storable for Node {
             });
         }
 
+        #[allow(clippy::unwrap_used)]
         cur.write_all(&[attrs.bits()]).unwrap();
 
         match &self.inner {
@@ -819,11 +822,13 @@ pub(super) mod tests {
     fn test_encoding(node: Node) {
         let mut bytes = vec![0; node.serialized_len() as usize];
 
+        #[allow(clippy::unwrap_used)]
         node.serialize(&mut bytes).unwrap();
 
         let mut mem = PlainMem::new(node.serialized_len(), 0x00);
         mem.write(0, &bytes);
 
+        #[allow(clippy::unwrap_used)]
         let hydrated_node = Node::deserialize(0, &mem).unwrap();
 
         assert_eq!(node, hydrated_node);

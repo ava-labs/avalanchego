@@ -28,6 +28,7 @@ fn file_error_panic<T, U>(path: &Path) -> impl FnOnce(T) -> U + '_ {
 }
 
 impl Profiler for FlamegraphProfiler {
+    #[allow(clippy::unwrap_used)]
     fn start_profiling(&mut self, _benchmark_id: &str, _benchmark_dir: &Path) {
         if let Self::Init(frequency) = self {
             let guard = ProfilerGuard::new(*frequency).unwrap();
@@ -35,13 +36,16 @@ impl Profiler for FlamegraphProfiler {
         }
     }
 
+    #[allow(clippy::unwrap_used)]
     fn stop_profiling(&mut self, _benchmark_id: &str, benchmark_dir: &Path) {
         std::fs::create_dir_all(benchmark_dir).unwrap();
         let filename = "shale-flamegraph.svg";
         let flamegraph_path = benchmark_dir.join(filename);
+        #[allow(clippy::unwrap_used)]
         let flamegraph_file =
             File::create(&flamegraph_path).unwrap_or_else(file_error_panic(&flamegraph_path));
 
+        #[allow(clippy::unwrap_used)]
         if let Self::Active(profiler) = self {
             profiler
                 .report()
@@ -63,6 +67,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
         let offset = rng.gen_range(0..BENCH_MEM_SIZE - len);
 
         cached.write(offset, rdata);
+        #[allow(clippy::unwrap_used)]
         let view = cached
             .get_view(offset, rdata.len().try_into().unwrap())
             .unwrap();
@@ -74,6 +79,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
 
 fn serialize<T: CachedStore>(m: &T) {
     let compact_header_obj: DiskAddress = DiskAddress::from(0x0);
+    #[allow(clippy::unwrap_used)]
     let _: Obj<CompactSpaceHeader> =
         StoredView::ptr_to_obj(m, compact_header_obj, CompactHeader::MSIZE).unwrap();
 }

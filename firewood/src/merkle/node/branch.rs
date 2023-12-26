@@ -114,6 +114,7 @@ impl BranchNode {
         let mut items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
 
         // we've already validated the size, that's why we can safely unwrap
+        #[allow(clippy::unwrap_used)]
         let data = items.pop().unwrap().decode()?;
         // Extract the value of the branch node and set to None if it's an empty Vec
         let value = Some(data).filter(|data| !data.is_empty());
@@ -145,8 +146,10 @@ impl BranchNode {
         for (i, c) in self.children.iter().enumerate() {
             match c {
                 Some(c) => {
+                    #[allow(clippy::unwrap_used)]
                     let mut c_ref = store.get_item(*c).unwrap();
 
+                    #[allow(clippy::unwrap_used)]
                     if c_ref.is_encoded_longer_than_hash_len::<S>(store) {
                         list[i] = Encoded::Data(
                             bincode::DefaultOptions::new()
@@ -175,6 +178,7 @@ impl BranchNode {
                     // Check if there is already a calculated encoded value for the child, which
                     // can happen when manually constructing a trie from proof.
                     if let Some(v) = &self.children_encoded[i] {
+                        #[allow(clippy::unwrap_used)]
                         if v.len() == TRIE_HASH_LEN {
                             list[i] =
                                 Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
@@ -186,11 +190,13 @@ impl BranchNode {
             };
         }
 
+        #[allow(clippy::unwrap_used)]
         if let Some(Data(val)) = &self.value {
             list[Self::MAX_CHILDREN] =
                 Encoded::Data(bincode::DefaultOptions::new().serialize(val).unwrap());
         }
 
+        #[allow(clippy::unwrap_used)]
         bincode::DefaultOptions::new()
             .serialize(list.as_slice())
             .unwrap()

@@ -142,6 +142,7 @@ impl<T: Storable> Obj<T> {
         if let Some(new_value_len) = self.dirty.take() {
             let mut new_value = vec![0; new_value_len as usize];
             // TODO: log error
+            #[allow(clippy::unwrap_used)]
             self.value.write_mem_image(&mut new_value).unwrap();
             let offset = self.value.get_offset();
             let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
@@ -176,6 +177,7 @@ impl<'a, T: Storable> ObjRef<'a, T> {
 
     #[inline]
     pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteError> {
+        #[allow(clippy::unwrap_used)]
         let inner = self.inner.as_mut().unwrap();
         inner.write(modify)?;
 
@@ -193,12 +195,14 @@ impl<'a, T: Storable> Deref for ObjRef<'a, T> {
     type Target = Obj<T>;
     fn deref(&self) -> &Obj<T> {
         // TODO: Something is seriously wrong here but I'm not quite sure about the best approach for the fix
+        #[allow(clippy::unwrap_used)]
         self.inner.as_ref().unwrap()
     }
 }
 
 impl<'a, T: Storable> Drop for ObjRef<'a, T> {
     fn drop(&mut self) {
+        #[allow(clippy::unwrap_used)]
         let mut inner = self.inner.take().unwrap();
         let ptr = inner.as_ptr();
         let mut cache = self.cache.lock();
@@ -416,11 +420,13 @@ impl<T: Storable> ObjCache<T> {
     }
 
     fn lock(&self) -> RwLockWriteGuard<ObjCacheInner<T>> {
+        #[allow(clippy::unwrap_used)]
         self.0.write().unwrap()
     }
 
     #[inline(always)]
     fn get(&self, ptr: DiskAddress) -> Result<Option<Obj<T>>, ShaleError> {
+        #[allow(clippy::unwrap_used)]
         let mut inner = self.0.write().unwrap();
 
         let obj_ref = inner.cached.pop(&ptr).map(|r| {

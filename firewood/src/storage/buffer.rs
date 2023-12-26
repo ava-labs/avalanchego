@@ -172,6 +172,7 @@ impl DiskBuffer {
                     }
 
                     // process the the request
+                    #[allow(clippy::unwrap_used)]
                     let process_result = process(
                         pending_writes.clone(),
                         notifier.clone(),
@@ -219,10 +220,12 @@ fn schedule_write(
 
     let fut = {
         let pending = pending.borrow();
+        #[allow(clippy::unwrap_used)]
         let p = pending.get(&page_key).unwrap();
         let offset = page_key.1 << PAGE_SIZE_NBIT;
         let fid = offset >> p.file_nbit;
         let fmask = (1 << p.file_nbit) - 1;
+        #[allow(clippy::unwrap_used)]
         let file = file_pools.borrow()[page_key.0 as usize]
             .as_ref()
             .unwrap()
@@ -239,6 +242,7 @@ fn schedule_write(
     let task = {
         async move {
             let (res, _) = fut.await;
+            #[allow(clippy::unwrap_used)]
             res.unwrap();
 
             let pending_len = pending.borrow().len();
@@ -296,6 +300,7 @@ async fn init_wal(
                     for (undo, redo) in ash.iter() {
                         let offset = undo.offset;
                         let file_pools = file_pools.borrow();
+                        #[allow(clippy::unwrap_used)]
                         let file_pool = file_pools[space_id as usize].as_ref().unwrap();
                         let file_nbit = file_pool.get_file_nbit();
                         let file_mask = (1 << file_nbit) - 1;
@@ -365,6 +370,7 @@ async fn run_wal_queue(
         }
 
         // first write to Wal
+        #[allow(clippy::unwrap_used)]
         let ring_ids = join_all(wal.clone().lock().await.grow(records))
             .await
             .into_iter()
@@ -386,6 +392,7 @@ async fn run_wal_queue(
                         false
                     }
                     Vacant(e) => {
+                        #[allow(clippy::unwrap_used)]
                         let file_nbit = file_pools.borrow()[page_key.0 as usize]
                             .as_ref()
                             .unwrap()
@@ -423,8 +430,10 @@ async fn run_wal_queue(
         }
 
         let task = async move {
+            #[allow(clippy::unwrap_used)]
             let _ = sem.acquire_many(npermit).await.unwrap();
 
+            #[allow(clippy::unwrap_used)]
             wal.lock()
                 .await
                 .peel(ring_ids, max.revisions)
@@ -486,6 +495,7 @@ async fn process(
 
             wal.replace(initialized_wal.clone());
 
+            #[allow(clippy::unwrap_used)]
             let writes = writes.take().unwrap();
 
             let task = run_wal_queue(
@@ -500,6 +510,8 @@ async fn process(
 
             task::spawn_local(task);
         }
+
+        #[allow(clippy::unwrap_used)]
         BufferCmd::GetPage(page_key, tx) => tx
             .send(
                 pending
@@ -509,10 +521,12 @@ async fn process(
             )
             .unwrap(),
         BufferCmd::WriteBatch(writes, wal_writes) => {
+            #[allow(clippy::unwrap_used)]
             wal_in.send((writes, wal_writes)).await.unwrap();
         }
         BufferCmd::CollectAsh(nrecords, tx) => {
             // wait to ensure writes are paused for Wal
+            #[allow(clippy::unwrap_used)]
             let ash = wal
                 .as_ref()
                 .unwrap()
@@ -524,6 +538,7 @@ async fn process(
                 .into_iter()
                 .map(AshRecord::deserialize)
                 .collect();
+            #[allow(clippy::unwrap_used)]
             tx.send(ash).unwrap();
         }
         BufferCmd::RegCachedSpace(space_id, files) => {
@@ -569,6 +584,7 @@ impl DiskBufferRequester {
             .send(BufferCmd::GetPage((space_id, page_id), resp_tx))
             .map_err(StoreError::Send)
             .ok();
+        #[allow(clippy::unwrap_used)]
         resp_rx.blocking_recv().unwrap()
     }
 
@@ -581,6 +597,7 @@ impl DiskBufferRequester {
     }
 
     pub fn shutdown(&self) {
+        #[allow(clippy::unwrap_used)]
         self.sender.send(BufferCmd::Shutdown).ok().unwrap()
     }
 
@@ -615,6 +632,7 @@ impl DiskBufferRequester {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use sha3::Digest;
     use std::path::{Path, PathBuf};

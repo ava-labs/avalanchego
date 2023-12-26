@@ -77,6 +77,7 @@ fn test_root_hash_fuzz_insertions() -> Result<(), DataStoreError> {
 }
 
 #[test]
+#[allow(clippy::unwrap_used)]
 fn test_root_hash_reversed_deletions() -> Result<(), DataStoreError> {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
@@ -148,6 +149,7 @@ fn test_root_hash_reversed_deletions() -> Result<(), DataStoreError> {
 }
 
 #[test]
+#[allow(clippy::unwrap_used)]
 fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
     use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
@@ -205,6 +207,7 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
 }
 
 #[test]
+#[allow(clippy::unwrap_used)]
 fn test_proof() -> Result<(), DataStoreError> {
     let set = generate_random_data(500);
     let mut items = Vec::from_iter(set.iter());

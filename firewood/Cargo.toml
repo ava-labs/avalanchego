@@ -51,3 +51,6 @@ pprof = { version = "0.13.0", features = ["flamegraph"] }
 [[bench]]
 name = "hashops"
 harness = false
+
+[lints.clippy]
+unwrap_used = "warn"

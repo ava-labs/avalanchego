@@ -125,14 +125,17 @@ pub fn new_merkle(
     assert!(compact_size as usize > RESERVED);
     let mut dm = DynamicMem::new(meta_size, 0);
     let compact_header = DiskAddress::null();
+    #[allow(clippy::unwrap_used)]
     dm.write(
         compact_header.into(),
         &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
             NonZeroUsize::new(RESERVED).unwrap(),
+            #[allow(clippy::unwrap_used)]
             NonZeroUsize::new(RESERVED).unwrap(),
         ))
         .unwrap(),
     );
+    #[allow(clippy::unwrap_used)]
     let compact_header =
         StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
     let mem_meta = dm;
@@ -144,6 +147,7 @@ pub fn new_merkle(
             .expect("CompactSpace init fail");
 
     let merkle = Merkle::new(Box::new(space));
+    #[allow(clippy::unwrap_used)]
     let root = merkle.init_root().unwrap();
 
     MerkleSetup { root, merkle }

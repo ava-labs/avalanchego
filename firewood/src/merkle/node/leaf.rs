@@ -52,6 +52,7 @@ impl LeafNode {
     }
 
     pub(super) fn encode(&self) -> Vec<u8> {
+        #[allow(clippy::unwrap_used)]
         bincode::DefaultOptions::new()
             .serialize(
                 [
@@ -143,6 +144,7 @@ impl Storable for LeafNode {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use test_case::test_case;
