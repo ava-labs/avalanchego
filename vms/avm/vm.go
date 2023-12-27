@@ -9,8 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-
-	stdjson "encoding/json"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -83,6 +82,8 @@ type VM struct {
 
 	registerer prometheus.Registerer
 
+	connectedPeers map[ids.NodeID]*version.Application
+
 	parser block.Parser
 
 	pubsub *pubsub.Server
@@ -113,19 +114,35 @@ type VM struct {
 
 	txBackend *txexecutor.Backend
 
+	context       context.Context
+	startShutdown context.CancelFunc
+	awaitShutdown sync.WaitGroup
+
+	networkConfig network.Config
 	// These values are only initialized after the chain has been linearized.
-	mempool mempool.Mempool
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
-	network      network.Network
+	network      *network.Network
 }
 
-func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
-	return nil
+func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	// If the chain isn't linearized yet, we must track the peers externally
+	// until the network is initialized.
+	if vm.network == nil {
+		vm.connectedPeers[nodeID] = version
+		return nil
+	}
+	return vm.network.Connected(ctx, nodeID, version)
 }
 
-func (*VM) Disconnected(context.Context, ids.NodeID) error {
-	return nil
+func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	// If the chain isn't linearized yet, we must track the peers externally
+	// until the network is initialized.
+	if vm.network == nil {
+		delete(vm.connectedPeers, nodeID)
+		return nil
+	}
+	return vm.network.Disconnected(ctx, nodeID)
 }
 
 /*
@@ -133,12 +150,6 @@ func (*VM) Disconnected(context.Context, ids.NodeID) error {
  ********************************* Common VM **********************************
  ******************************************************************************
  */
-
-type Config struct {
-	IndexTransactions    bool `json:"index-transactions"`
-	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
-	ChecksumsEnabled     bool `json:"checksums-enabled"`
-}
 
 func (vm *VM) Initialize(
 	_ context.Context,
@@ -154,15 +165,13 @@ func (vm *VM) Initialize(
 	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
 	vm.Atomic = network.NewAtomic(noopMessageHandler)
 
-	avmConfig := Config{}
-	if len(configBytes) > 0 {
-		if err := stdjson.Unmarshal(configBytes, &avmConfig); err != nil {
-			return err
-		}
-		ctx.Log.Info("VM config initialized",
-			zap.Reflect("config", avmConfig),
-		)
+	avmConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
 	}
+	ctx.Log.Info("VM config initialized",
+		zap.Reflect("config", avmConfig),
+	)
 
 	registerer := prometheus.NewRegistry()
 	if err := ctx.Metrics.Register(registerer); err != nil {
@@ -170,8 +179,9 @@ func (vm *VM) Initialize(
 	}
 	vm.registerer = registerer
 
+	vm.connectedPeers = make(map[ids.NodeID]*version.Application)
+
 	// Initialize metrics as soon as possible
-	var err error
 	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
@@ -264,6 +274,8 @@ func (vm *VM) Initialize(
 		Bootstrapped:  false,
 	}
 
+	vm.context, vm.startShutdown = context.WithCancel(context.Background())
+	vm.networkConfig = avmConfig.Network
 	return vm.state.Commit()
 }
 
@@ -305,6 +317,9 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.state == nil {
 		return nil
 	}
+
+	vm.startShutdown()
+	vm.awaitShutdown.Wait()
 
 	return utils.Err(
 		vm.state.Close(),
@@ -396,20 +411,20 @@ func (*VM) VerifyHeightIndex(context.Context) error {
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
+func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
 	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
 		return err
 	}
 
-	vm.mempool, err = mempool.New("mempool", vm.registerer, toEngine)
+	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.chainManager = blockexecutor.NewManager(
-		vm.mempool,
+		mempool,
 		vm.metrics,
 		vm.state,
 		vm.txBackend,
@@ -421,25 +436,46 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 		vm.txBackend,
 		vm.chainManager,
 		&vm.clock,
-		vm.mempool,
+		mempool,
 	)
 
 	// Invariant: The context lock is not held when calling network.IssueTx.
-	vm.network = network.New(
+	vm.network, err = network.New(
 		vm.ctx,
 		vm.parser,
 		network.NewLockedTxVerifier(
 			&vm.ctx.Lock,
 			vm.chainManager,
 		),
-		vm.mempool,
+		mempool,
 		vm.appSender,
+		vm.registerer,
+		vm.networkConfig,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+
+	// Notify the network of our current peers
+	for nodeID, version := range vm.connectedPeers {
+		if err := vm.network.Connected(ctx, nodeID, version); err != nil {
+			return err
+		}
+	}
+	vm.connectedPeers = nil
 
 	// Note: It's important only to switch the networking stack after the full
 	// chainVM has been initialized. Traffic will immediately start being
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
+
+	vm.awaitShutdown.Add(1)
+	go func() {
+		defer vm.awaitShutdown.Done()
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.network.Gossip(vm.context)
+	}()
 
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)

@@ -18,13 +18,8 @@ var (
 )
 
 type BanffProposalBlock struct {
-	Time int64 `serialize:"true" json:"time"`
-	// Transactions is currently unused. This is populated so that introducing
-	// them in the future will not require a codec change.
-	//
-	// TODO: when Transactions is used, we must correctly verify and apply their
-	//       changes.
-	Transactions         []*txs.Tx `serialize:"true" json:"-"`
+	Time                 int64     `serialize:"true" json:"time"`
+	Transactions         []*txs.Tx `serialize:"true" json:"txs"`
 	ApricotProposalBlock `serialize:"true"`
 }
 
@@ -81,7 +76,7 @@ func NewBanffProposalBlock(
 			Tx: proposalTx,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotProposalBlock struct {
@@ -124,5 +119,5 @@ func NewApricotProposalBlock(
 		},
 		Tx: tx,
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
