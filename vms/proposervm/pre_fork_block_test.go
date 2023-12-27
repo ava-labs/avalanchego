@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
@@ -51,7 +50,11 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0)
+	var (
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -139,8 +142,11 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
-	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
+	var (
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -233,8 +239,11 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
-	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
+	var (
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -242,7 +251,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require.True(coreGenBlk.Timestamp().Before(activationTime))
 
 	// create parent block ...
-	prntCoreBlk := &snowman.TestBlock{
+	parentCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
@@ -252,14 +261,14 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return prntCoreBlk, nil
+		return parentCoreBlk, nil
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
 			return coreGenBlk, nil
-		case prntCoreBlk.ID():
-			return prntCoreBlk, nil
+		case parentCoreBlk.ID():
+			return parentCoreBlk, nil
 		default:
 			return nil, database.ErrNotFound
 		}
@@ -268,15 +277,14 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
-		case bytes.Equal(b, prntCoreBlk.Bytes()):
-			return prntCoreBlk, nil
+		case bytes.Equal(b, parentCoreBlk.Bytes()):
+			return parentCoreBlk, nil
 		default:
 			return nil, database.ErrNotFound
 		}
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
-	prntProBlk, err := proVM.BuildBlock(context.Background())
+	parentBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
 	// .. create child block ...
@@ -286,28 +294,35 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{2},
-		TimestampV: prntCoreBlk.Timestamp().Add(proposer.MaxVerifyDelay),
+		TimestampV: parentCoreBlk.Timestamp(),
 	}
-	childProBlk := preForkBlock{
+	childBlk := preForkBlock{
 		Block: childCoreBlk,
 		vm:    proVM,
 	}
 
-	// child block referring unknown parent does not verify
-	childCoreBlk.ParentV = ids.Empty
-	err = childProBlk.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
+	{
+		// child block referring unknown parent does not verify
+		childCoreBlk.ParentV = ids.Empty
+		err = childBlk.Verify(context.Background())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
 
-	// child block referring known parent does verify
-	childCoreBlk.ParentV = prntProBlk.ID()
-	require.NoError(childProBlk.Verify(context.Background()))
+	{
+		// child block referring known parent does verify
+		childCoreBlk.ParentV = parentBlk.ID()
+		require.NoError(childBlk.Verify(context.Background()))
+	}
 }
 
 func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require := require.New(t)
 
-	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
+	var (
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -342,10 +357,10 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 	postForkChild := &postForkBlock{
@@ -437,8 +452,11 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	require := require.New(t)
 
-	activationTime := genesisTimestamp.Add(-1 * time.Second)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
+	var (
+		activationTime = genesisTimestamp.Add(-1 * time.Second)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	proVM.Set(activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -479,7 +497,11 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0)
+	var (
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -537,7 +559,11 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	var (
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -568,8 +594,11 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	require := require.New(t)
 
-	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
+	var (
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -659,8 +688,11 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	require := require.New(t)
 
-	activationTime := genesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
+	var (
+		activationTime = genesisTimestamp.Add(10 * time.Second)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -740,10 +772,10 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
 		0, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.StakingCertLeaf,
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.stakingLeafSigner,
+		proVM.StakingLeafSigner,
 	)
 	require.NoError(err)
 
@@ -798,7 +830,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 
 	// Should call BuildBlock since proposervm is not activated
 	innerBlk.EXPECT().Timestamp().Return(time.Time{})
-	vm.activationTime = mockable.MaxTime
+	vm.ActivationTime = mockable.MaxTime
 
 	gotChild, err = blk.buildChild(context.Background())
 	require.NoError(err)

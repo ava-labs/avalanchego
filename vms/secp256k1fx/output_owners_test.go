@@ -149,31 +149,20 @@ func TestOutputOwnerEquals(t *testing.T) {
 	}
 }
 
-func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
+func TestMarshalJSONDoesNotRequireCtx(t *testing.T) {
 	require := require.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
+		Locktime:  2,
 		Addrs: []ids.ShortID{
 			{1},
 			{0},
 		},
 	}
 
-	_, err := out.MarshalJSON()
-	require.ErrorIs(err, ErrMarshal)
-}
-
-func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {
-	require := require.New(t)
-	out := &OutputOwners{
-		Threshold: 1,
-		Locktime:  2,
-		Addrs:     []ids.ShortID{},
-	}
-
 	b, err := out.MarshalJSON()
 	require.NoError(err)
 
 	jsonData := string(b)
-	require.Equal(jsonData, "{\"addresses\":[],\"locktime\":2,\"threshold\":1}")
+	require.Equal(jsonData, `{"addresses":["6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt","111111111111111111116DBWJs"],"locktime":2,"threshold":1}`)
 }

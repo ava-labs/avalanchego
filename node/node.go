@@ -73,7 +73,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -440,6 +439,25 @@ func (n *Node) initNetworking() error {
 		)
 	}
 
+	// We allow nodes to gossip unknown ACPs in case the current ACPs constant
+	// becomes out of date.
+	var unknownACPs set.Set[uint32]
+	for acp := range n.Config.NetworkConfig.SupportedACPs {
+		if !constants.CurrentACPs.Contains(acp) {
+			unknownACPs.Add(acp)
+		}
+	}
+	for acp := range n.Config.NetworkConfig.ObjectedACPs {
+		if !constants.CurrentACPs.Contains(acp) {
+			unknownACPs.Add(acp)
+		}
+	}
+	if unknownACPs.Len() > 0 {
+		n.Log.Warn("gossipping unknown ACPs",
+			zap.Reflect("acps", unknownACPs),
+		)
+	}
+
 	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert, n.tlsKeyLogWriterCloser)
 
 	// Configure benchlist
@@ -480,28 +498,32 @@ func (n *Node) initNetworking() error {
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
-		// Set a timer that will fire after a given timeout unless we connect
-		// to a sufficient portion of nodes. If the timeout fires, the node will
-		// shutdown.
-		timer := timer.NewTimer(func() {
-			// If the timeout fires and we're already shutting down, nothing to do.
-			if !n.shuttingDown.Get() {
+		onSufficientlyConnected := make(chan struct{})
+		consensusRouter = &beaconManager{
+			Router:                  consensusRouter,
+			beacons:                 n.bootstrappers,
+			requiredConns:           int64(requiredConns),
+			onSufficientlyConnected: onSufficientlyConnected,
+		}
+
+		// Log a warning if we aren't able to connect to a sufficient portion of
+		// nodes.
+		go func() {
+			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+			defer timer.Stop()
+
+			select {
+			case <-timer.C:
+				if n.shuttingDown.Get() {
+					return
+				}
 				n.Log.Warn("failed to connect to bootstrap nodes",
 					zap.Stringer("bootstrappers", n.bootstrappers),
 					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
 				)
+			case <-onSufficientlyConnected:
 			}
-		})
-
-		go timer.Dispatch()
-		timer.SetTimeoutIn(n.Config.BootstrapBeaconConnectionTimeout)
-
-		consensusRouter = &beaconManager{
-			Router:        consensusRouter,
-			timer:         timer,
-			beacons:       n.bootstrappers,
-			requiredConns: int64(requiredConns),
-		}
+		}()
 	}
 
 	// initialize gossip tracker
@@ -1269,6 +1291,7 @@ func (n *Node) initInfoAPI() error {
 			VMManager:                     n.VMManager,
 		},
 		n.Log,
+		n.vdrs,
 		n.chainManager,
 		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,

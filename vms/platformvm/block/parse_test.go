@@ -79,6 +79,8 @@ func TestProposalBlocks(t *testing.T) {
 	height := uint64(2022)
 	proposalTx, err := testProposalTx()
 	require.NoError(err)
+	decisionTxs, err := testDecisionTxs()
+	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
@@ -109,6 +111,7 @@ func TestProposalBlocks(t *testing.T) {
 			parentID,
 			height,
 			proposalTx,
+			[]*txs.Tx{},
 		)
 		require.NoError(err)
 
@@ -130,6 +133,36 @@ func TestProposalBlocks(t *testing.T) {
 
 		// backward compatibility check
 		require.Equal(parsedApricotProposalBlk.Txs(), parsedBanffProposalBlk.Txs())
+
+		// check that banff proposal block with decisionTxs can be built and parsed
+		banffProposalBlkWithDecisionTxs, err := NewBanffProposalBlock(
+			blkTimestamp,
+			parentID,
+			height,
+			proposalTx,
+			decisionTxs,
+		)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, banffProposalBlkWithDecisionTxs.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(banffProposalBlkWithDecisionTxs.ID(), parsed.ID())
+		require.Equal(banffProposalBlkWithDecisionTxs.Bytes(), parsed.Bytes())
+		require.Equal(banffProposalBlkWithDecisionTxs.Parent(), parsed.Parent())
+		require.Equal(banffProposalBlkWithDecisionTxs.Height(), parsed.Height())
+		require.IsType(&BanffProposalBlock{}, parsed)
+		parsedBanffProposalBlkWithDecisionTxs := parsed.(*BanffProposalBlock)
+
+		l := len(decisionTxs)
+		expectedTxs := make([]*txs.Tx, l+1)
+		copy(expectedTxs, decisionTxs)
+		expectedTxs[l] = proposalTx
+		require.Equal(expectedTxs, parsedBanffProposalBlkWithDecisionTxs.Txs())
+
+		require.Equal(banffProposalBlkWithDecisionTxs.Timestamp(), parsedBanffProposalBlkWithDecisionTxs.Timestamp())
 	}
 }
 
