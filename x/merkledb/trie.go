@@ -138,6 +138,7 @@ func visitPathToKey(t Trie, key Key, visitNode func(*node) error) error {
 }
 
 // Returns a proof that [bytesPath] is in or not in trie [t].
+// Assumes [t] doesn't change while this function is running.
 func getProof(t Trie, key []byte) (*Proof, error) {
 	root := t.getRoot()
 	if root.IsNothing() {
@@ -194,6 +195,7 @@ func getProof(t Trie, key []byte) (*Proof, error) {
 // GetRangeProof returns a range proof for (at least part of) the key range [start, end].
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
+// Assumes [t] doesn't change while this function is running.
 func getRangeProof(
 	t Trie,
 	start maybe.Maybe[[]byte],
