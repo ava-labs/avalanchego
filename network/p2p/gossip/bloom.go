@@ -32,35 +32,43 @@ func NewBloomFilter(
 
 	salt, err := randomSalt()
 	return &BloomFilter{
-		Bloom: bloom,
-		Salt:  salt,
+		bloom: bloom,
+		salt:  salt,
 	}, err
 }
 
 type BloomFilter struct {
-	Bloom *bloomfilter.Filter
-	// Salt is provided to eventually unblock collisions in Bloom. It's possible
+	bloom *bloomfilter.Filter
+	// salt is provided to eventually unblock collisions in Bloom. It's possible
 	// that conflicting Gossipable items collide in the bloom filter, so a salt
 	// is generated to eventually resolve collisions.
-	Salt ids.ID
+	salt ids.ID
 }
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
 	h := gossipable.GossipID()
 	salted := &hasher{
 		hash: h[:],
-		salt: b.Salt,
+		salt: b.salt,
 	}
-	b.Bloom.Add(salted)
+	b.bloom.Add(salted)
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
 	h := gossipable.GossipID()
 	salted := &hasher{
 		hash: h[:],
-		salt: b.Salt,
+		salt: b.salt,
 	}
-	return b.Bloom.Contains(salted)
+	return b.bloom.Contains(salted)
+}
+
+func (b *BloomFilter) Marshal() ([]byte, []byte, error) {
+	bloomBytes, err := b.bloom.MarshalBinary()
+	// salt must be copied here to ensure the bytes aren't overwritten if salt
+	// is later modified.
+	salt := b.salt
+	return bloomBytes, salt[:], err
 }
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches a target false
@@ -69,11 +77,11 @@ func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	falsePositiveProbability float64,
 ) (bool, error) {
-	if bloomFilter.Bloom.FalsePosititveProbability() < falsePositiveProbability {
+	if bloomFilter.bloom.FalsePosititveProbability() < falsePositiveProbability {
 		return false, nil
 	}
 
-	newBloom, err := bloomfilter.New(bloomFilter.Bloom.M(), bloomFilter.Bloom.K())
+	newBloom, err := bloomfilter.New(bloomFilter.bloom.M(), bloomFilter.bloom.K())
 	if err != nil {
 		return false, err
 	}
@@ -82,8 +90,8 @@ func ResetBloomFilterIfNeeded(
 		return false, err
 	}
 
-	bloomFilter.Bloom = newBloom
-	bloomFilter.Salt = salt
+	bloomFilter.bloom = newBloom
+	bloomFilter.salt = salt
 	return true, nil
 }
 

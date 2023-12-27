@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"testing"
+
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -13,9 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-func DefaultConfig() Config {
+func DefaultConfig(t testing.TB) Config {
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
 	return Config{
-		Ctx:                 snowtest.ConsensusContext(),
+		Ctx:                 snowtest.ConsensusContext(ctx),
 		VM:                  &block.TestVM{},
 		Sender:              &common.SenderTest{},
 		Validators:          validators.NewManager(),
