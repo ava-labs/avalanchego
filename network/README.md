@@ -128,7 +128,7 @@ To optimize bandwidth usage, each node tracks which peers are guaranteed to know
 
 To efficiently track which peers know of which peers, the peers that each peer is aware of is represented in a [bit set](https://en.wikipedia.org/wiki/Bit_array). A peer is represented by either a `0` if it isn't known by the peer yet, or a `1` if it is known by the peer.
 
-An node follows the following steps for every cycle of `PeerList` gossip:
+A node follows the following steps for every cycle of `PeerList` gossip:
 
 1. Get a sample of peers in the network that the node is connected to
 2. For each peer:
