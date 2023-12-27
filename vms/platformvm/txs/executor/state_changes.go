@@ -59,6 +59,7 @@ func VerifyNewChainTime(
 
 // AdvanceTimeTo applies all state changes to [parentState] resulting from
 // advancing the chain time to [newChainTime].
+// Returns true iff the validator set changed.
 func AdvanceTimeTo(
 	backend *Backend,
 	parentState state.Chain,
