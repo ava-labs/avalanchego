@@ -113,7 +113,7 @@ func TestExportTxSerialization(t *testing.T) {
 	})
 	require.NoError(err)
 
-	require.NoError(parser.InitializeTx(tx))
+	require.NoError(tx.Initialize(parser.Codec()))
 	require.Equal(tx.ID().String(), "2PKJE4TrKYpgynBFCpNPpV3GHK7d9QTgrL5mpYG6abHKDvNBG3")
 
 	result := tx.Bytes()

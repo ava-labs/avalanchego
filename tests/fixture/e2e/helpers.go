@@ -118,22 +118,21 @@ func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration
 	}
 }
 
-// Add an ephemeral node that is only intended to be used by a single test. Its ID and
-// URI are not intended to be returned from the Network instance to minimize
-// accessibility from other tests.
+// Adds an ephemeral node intended to be used by a single test.
 func AddEphemeralNode(network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
 	require := require.New(ginkgo.GinkgoT())
 
-	node, err := network.AddEphemeralNode(ginkgo.GinkgoWriter, flags)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	node, err := network.AddEphemeralNode(ctx, ginkgo.GinkgoWriter, flags)
 	require.NoError(err)
 
-	// Ensure node is stopped on teardown. It's configuration is not removed to enable
-	// collection in CI to aid in troubleshooting failures.
 	ginkgo.DeferCleanup(func() {
-		tests.Outf("Shutting down ephemeral node %s\n", node.NodeID)
-		require.NoError(node.Stop())
+		tests.Outf("shutting down ephemeral node %q\n", node.NodeID)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		defer cancel()
+		require.NoError(node.Stop(ctx))
 	})
-
 	return node
 }
 
@@ -191,26 +190,13 @@ func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 
 // Verify that a new node can bootstrap into the network.
 func CheckBootstrapIsPossible(network *tmpnet.Network) {
-	require := require.New(ginkgo.GinkgoT())
-
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
 		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
 		return
 	}
 	ginkgo.By("checking if bootstrap is possible with the current network state")
 
-	// Call network.AddEphemeralNode instead of AddEphemeralNode to support
-	// checking for bootstrap implicitly on teardown via a function registered
-	// with ginkgo.DeferCleanup. It's not possible to call DeferCleanup from
-	// within a function called by DeferCleanup.
-	node, err := network.AddEphemeralNode(ginkgo.GinkgoWriter, tmpnet.FlagsMap{})
-	require.NoError(err)
-
-	defer func() {
-		tests.Outf("Shutting down ephemeral node %s\n", node.NodeID)
-		require.NoError(node.Stop())
-	}()
-
+	node := AddEphemeralNode(network, tmpnet.FlagsMap{})
 	WaitForHealthy(node)
 }
 
@@ -224,7 +210,7 @@ func StartNetwork(avalancheGoExecPath string, networkDir string) *tmpnet.Network
 		networkDir,
 		&tmpnet.Network{
 			NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
-				ExecPath: avalancheGoExecPath,
+				AvalancheGoPath: avalancheGoExecPath,
 			},
 		},
 		tmpnet.DefaultNodeCount,
@@ -233,7 +219,9 @@ func StartNetwork(avalancheGoExecPath string, networkDir string) *tmpnet.Network
 	require.NoError(err)
 	ginkgo.DeferCleanup(func() {
 		tests.Outf("Shutting down network\n")
-		require.NoError(network.Stop())
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		defer cancel()
+		require.NoError(network.Stop(ctx))
 	})
 
 	tests.Outf("{{green}}Successfully started network{{/}}\n")
