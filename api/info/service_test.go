@@ -26,15 +26,12 @@ type getVMsTest struct {
 
 func initGetVMsTest(t *testing.T) *getVMsTest {
 	ctrl := gomock.NewController(t)
-
-	service := Info{}
 	mockVMManager := vms.NewMockManager(ctrl)
-
-	service.log = logging.NoLog{}
-	service.VMManager = mockVMManager
-
 	return &getVMsTest{
-		info:          &service,
+		info: &Info{
+			log:       logging.NoLog{},
+			vmManager: mockVMManager,
+		},
 		ctrl:          ctrl,
 		mockVMManager: mockVMManager,
 	}
