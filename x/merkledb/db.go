@@ -601,6 +601,10 @@ func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetProof")
 	defer span.End()
 
+	if db.closed {
+		return nil, database.ErrClosed
+	}
+
 	return getProof(db, key)
 }
 
@@ -615,6 +619,10 @@ func (db *merkleDB) GetRangeProof(
 
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return nil, database.ErrClosed
+	}
 
 	return getRangeProof(db, start, end, maxLength)
 }
