@@ -4,9 +4,15 @@
 package tmpnet
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
+
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,12 +27,12 @@ const (
 	defaultGasLimit = uint64(100_000_000) // Gas limit is arbitrary
 
 	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
-	// defaultFundedKeyXChainAmount = 30 * units.MegaAvax
+	defaultFundedKeyXChainAmount = 30 * units.MegaAvax
 )
 
 var (
 	// Arbitrarily large amount of AVAX (10^12) to fund keys on the C-Chain for testing
-	// defaultFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
+	defaultFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
 
 	errNoKeysForGenesis           = errors.New("no keys to fund for genesis")
 	errInvalidNetworkIDForGenesis = errors.New("network ID can't be mainnet, testnet or local network ID for genesis")
@@ -107,13 +113,13 @@ func NewTestGenesis(
 
 	// Ensure pre-funded keys have arbitrary large balances on both chains to support testing
 	xChainBalances := make(XChainBalanceMap, len(keysToFund))
-	// cChainBalances := make(core.GenesisAlloc, len(keysToFund))
-	// for _, key := range keysToFund {
-	// 	xChainBalances[key.Address()] = defaultFundedKeyXChainAmount
-	// 	cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
-	// 		Balance: defaultFundedKeyCChainAmount,
-	// 	}
-	// }
+	cChainBalances := make(core.GenesisAlloc, len(keysToFund))
+	for _, key := range keysToFund {
+		xChainBalances[key.Address()] = defaultFundedKeyXChainAmount
+		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
+			Balance: defaultFundedKeyCChainAmount,
+		}
+	}
 
 	// Set X-Chain balances
 	for xChainAddress, balance := range xChainBalances {
@@ -141,19 +147,19 @@ func NewTestGenesis(
 	}
 
 	// Define C-Chain genesis
-	// cChainGenesis := &core.Genesis{
-	// 	Config: &params.ChainConfig{
-	// 		ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
-	// 	},
-	// 	Difficulty: big.NewInt(0), // Difficulty is a mandatory field
-	// 	GasLimit:   defaultGasLimit,
-	// 	Alloc:      cChainBalances,
-	// }
-	// cChainGenesisBytes, err := json.Marshal(cChainGenesis)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
-	// }
-	// config.CChainGenesis = string(cChainGenesisBytes)
+	cChainGenesis := &core.Genesis{
+		Config: &params.ChainConfig{
+			ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
+		},
+		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
+		GasLimit:   defaultGasLimit,
+		Alloc:      cChainBalances,
+	}
+	cChainGenesisBytes, err := json.Marshal(cChainGenesis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
+	}
+	config.CChainGenesis = string(cChainGenesisBytes)
 
 	return config, nil
 }
