@@ -1171,7 +1171,7 @@ func Test_View_NewView(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 }
 
-func TestviewInvalidate(t *testing.T) {
+func TestViewInvalidate(t *testing.T) {
 	require := require.New(t)
 
 	db, err := getBasicDB()
