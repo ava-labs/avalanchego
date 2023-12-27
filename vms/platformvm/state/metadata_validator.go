@@ -32,6 +32,7 @@ type validatorMetadata struct {
 	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
 	PotentialReward          uint64        `v0:"true"`
 	PotentialDelegateeReward uint64        `v0:"true"`
+	StakerStartTime          uint64        `          v1:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -130,6 +131,7 @@ type validatorState interface {
 	WriteValidatorMetadata(
 		dbPrimary database.KeyValueWriter,
 		dbSubnet database.KeyValueWriter,
+		codecVersion uint16,
 	) error
 }
 
@@ -230,13 +232,14 @@ func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 func (m *metadata) WriteValidatorMetadata(
 	dbPrimary database.KeyValueWriter,
 	dbSubnet database.KeyValueWriter,
+	codecVersion uint16,
 ) error {
 	for vdrID, updatedSubnets := range m.updatedMetadata {
 		for subnetID := range updatedSubnets {
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := metadataCodec.Marshal(v0, metadata)
+			metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
 			if err != nil {
 				return err
 			}

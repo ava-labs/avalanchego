@@ -12,3 +12,7 @@ message PullGossipRequest {
 message PullGossipResponse {
   repeated bytes gossip = 1;
 }
+
+message PushGossip {
+  repeated bytes gossip = 1;
+}

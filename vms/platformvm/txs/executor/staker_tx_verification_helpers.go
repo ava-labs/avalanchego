@@ -151,13 +151,15 @@ func overDelegated(
 	state state.Chain,
 	validator *state.Staker,
 	weightLimit uint64,
-	delegator *state.Staker,
+	delegatorWeight uint64,
+	delegatorStartTime time.Time,
+	delegatorEndTime time.Time,
 ) (bool, error) {
-	maxWeight, err := GetMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
+	maxWeight, err := GetMaxWeight(state, validator, delegatorStartTime, delegatorEndTime)
 	if err != nil {
 		return true, err
 	}
-	newMaxWeight, err := math.Add64(maxWeight, delegator.Weight)
+	newMaxWeight, err := math.Add64(maxWeight, delegatorWeight)
 	if err != nil {
 		return true, err
 	}

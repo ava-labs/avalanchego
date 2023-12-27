@@ -40,6 +40,9 @@ type Config struct {
 	PongTimeout          time.Duration
 	MaxClockDifference   time.Duration
 
+	SupportedACPs []uint32
+	ObjectedACPs  []uint32
+
 	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
 	LastSent, LastReceived int64
@@ -50,6 +53,6 @@ type Config struct {
 	// Calculates uptime of peers
 	UptimeCalculator uptime.Calculator
 
-	// Signs my IP so I can send my signed IP address in the Version message
+	// Signs my IP so I can send my signed IP address in the Handshake message
 	IPSigner *IPSigner
 }

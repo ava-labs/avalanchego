@@ -36,6 +36,7 @@ var (
 	_ Client = (*client)(nil)
 
 	errInvalidRangeProof             = errors.New("failed to verify range proof")
+	errInvalidChangeProof            = errors.New("failed to verify change proof")
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
 	errTooManyBytes                  = errors.New("response contains more than requested bytes")
 	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
@@ -149,7 +150,7 @@ func (c *client) GetChangeProof(
 				endKey,
 				endRoot,
 			); err != nil {
-				return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
+				return nil, fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 			}
 
 			return &merkledb.ChangeOrRangeProof{
