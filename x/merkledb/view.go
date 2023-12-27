@@ -102,8 +102,8 @@ type view struct {
 
 // NewView returns a new view on top of this view where the passed changes
 // have been applied.
-// Adds the new view to [t.childViews].
-// Assumes [t.commitLock] isn't held.
+// Adds the new view to [v.childViews].
+// Assumes [v.commitLock] isn't held.
 func (v *view) NewView(
 	ctx context.Context,
 	changes ViewChanges,
@@ -360,7 +360,7 @@ func (v *view) CommitToDB(ctx context.Context) error {
 
 // Commits the changes from [trieToCommit] to this view,
 // this view to its parent, and so on until committing to the db.
-// Assumes [t.db.commitLock] is held.
+// Assumes [v.db.commitLock] is held.
 func (v *view) commitToDB(ctx context.Context) error {
 	v.commitLock.Lock()
 	defer v.commitLock.Unlock()
@@ -370,7 +370,7 @@ func (v *view) commitToDB(ctx context.Context) error {
 	))
 	defer span.End()
 
-	// Call this here instead of in [t.db.commitChanges]
+	// Call this here instead of in [v.db.commitChanges]
 	// because doing so there would be a deadlock.
 	if err := v.calculateNodeIDs(ctx); err != nil {
 		return err
@@ -385,7 +385,7 @@ func (v *view) commitToDB(ctx context.Context) error {
 	return nil
 }
 
-// Assumes [t.validityTrackingLock] isn't held.
+// Assumes [v.validityTrackingLock] isn't held.
 func (v *view) isInvalid() bool {
 	v.validityTrackingLock.RLock()
 	defer v.validityTrackingLock.RUnlock()
@@ -394,7 +394,7 @@ func (v *view) isInvalid() bool {
 }
 
 // Invalidates this view and all descendants.
-// Assumes [t.validityTrackingLock] isn't held.
+// Assumes [v.validityTrackingLock] isn't held.
 func (v *view) invalidate() {
 	v.validityTrackingLock.Lock()
 	defer v.validityTrackingLock.Unlock()
@@ -534,7 +534,7 @@ func (v *view) remove(key Key) error {
 			return nil
 		}
 
-		// Note [parent] != nil since [nodeToDelete.key] != [t.root.key].
+		// Note [parent] != nil since [nodeToDelete.key] != [v.root.key].
 		// i.e. There's the root and at least one more node.
 		parent.removeChild(nodeToDelete, v.tokenSize)
 
@@ -550,7 +550,7 @@ func (v *view) remove(key Key) error {
 // have no value and a single child into one node with a compressed
 // path until a node that doesn't meet those criteria is reached.
 // [parent] is [n]'s parent. If [parent] is nil, [n] is the root
-// node and [t.root] is updated to [n].
+// node and [v.root] is updated to [n].
 // Assumes at least one of the following is true:
 // * [n] has a value.
 // * [n] has children.
@@ -649,7 +649,7 @@ func (v *view) insert(
 	}
 
 	if closestNode == nil {
-		// [t.root.key] isn't a prefix of [key].
+		// [v.root.key] isn't a prefix of [key].
 		var (
 			oldRoot            = v.root.Value()
 			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
@@ -839,7 +839,7 @@ func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 }
 
 // Retrieves a node with the given [key].
-// If the node is fetched from [t.parentTrie] and [id] isn't empty,
+// If the node is fetched from [v.parentTrie] and [id] isn't empty,
 // sets the node's ID to [id].
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.

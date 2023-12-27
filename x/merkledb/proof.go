@@ -794,9 +794,9 @@ func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byt
 // < [insertChildrenLessThan] or > [insertChildrenGreaterThan].
 // If [insertChildrenLessThan] is Nothing, no children are < [insertChildrenLessThan].
 // If [insertChildrenGreaterThan] is Nothing, no children are > [insertChildrenGreaterThan].
-// Assumes [t.lock] is held.
+// Assumes [v.lock] is held.
 func addPathInfo(
-	t *view,
+	v *view,
 	proofPath []ProofNode,
 	insertChildrenLessThan maybe.Maybe[Key],
 	insertChildrenGreaterThan maybe.Maybe[Key],
@@ -816,7 +816,7 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insert(key, maybe.Nothing[[]byte]())
+		n, err := v.insert(key, maybe.Nothing[[]byte]())
 		if err != nil {
 			return err
 		}
@@ -837,7 +837,7 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedKey = existingChild.compressedKey
 			}
-			childKey := key.Extend(ToToken(index, t.tokenSize), compressedKey)
+			childKey := key.Extend(ToToken(index, v.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.

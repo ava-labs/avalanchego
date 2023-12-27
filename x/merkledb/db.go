@@ -900,6 +900,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 
 // commitChanges commits the changes in [trieToCommit] to [db].
 // Assumes [trieToCommit]'s node IDs have been calculated.
+// Assumes [db.commitLock] is held.
 func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *view) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -1200,7 +1201,7 @@ func (db *merkleDB) initializeRoot() error {
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
-// Assumes [db.commitLock] or [db.lock] is read locked.
+// Assumes [db.commitLock] is read locked.
 func (db *merkleDB) getTrieAtRootForRange(
 	rootID ids.ID,
 	start maybe.Maybe[[]byte],
@@ -1275,6 +1276,7 @@ func (db *merkleDB) getNode(key Key, hasValue bool) (*node, error) {
 	}
 }
 
+// Assumes [db.lock] or [db.commitLock] is read locked.
 func (db *merkleDB) getRoot() maybe.Maybe[*node] {
 	return db.root
 }
