@@ -484,6 +484,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Unlock()
 	err = env.network.IssueTx(context.Background(), tx)
 	require.ErrorIs(err, errTestingDropped)
+	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.False(ok)
 
