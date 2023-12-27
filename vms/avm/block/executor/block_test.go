@@ -857,6 +857,7 @@ func TestBlockReject(t *testing.T) {
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
+				mempool.EXPECT().RequestBuildBlock()
 
 				preferredID := ids.GenerateTestID()
 				mockPreferredState := state.NewMockDiff(ctrl)
@@ -916,6 +917,7 @@ func TestBlockReject(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Add(tx1).Return(nil)
 				mempool.EXPECT().Add(tx2).Return(nil)
+				mempool.EXPECT().RequestBuildBlock()
 
 				preferredID := ids.GenerateTestID()
 				mockPreferredState := state.NewMockDiff(ctrl)
