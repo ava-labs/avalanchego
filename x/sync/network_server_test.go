@@ -93,6 +93,14 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			},
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 		},
+		"empty proof": {
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   ids.Empty[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			proofNil: true,
+		},
 	}
 
 	for name, test := range tests {
@@ -252,7 +260,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				// This root doesn't exist so server has insufficient history
 				// to serve a change proof
-				StartRootHash: ids.Empty[:],
+				StartRootHash: fakeRootID[:],
 				EndRootHash:   endRoot[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
@@ -266,6 +274,16 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				// to serve a change proof or range proof
 				StartRootHash: ids.Empty[:],
 				EndRootHash:   fakeRootID[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
+			proofNil:                 true,
+		},
+		"empt proof": {
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: fakeRootID[:],
+				EndRootHash:   ids.Empty[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
 			},
