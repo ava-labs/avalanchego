@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/thepudds/fzgen/fuzzer"
+
+	"gonum.org/v1/gonum/mathext/prng"
 )
 
 type testSource struct {
@@ -207,4 +209,22 @@ func FuzzRNG(f *testing.F) {
 		require.Equal(val, uint64(stdVal))
 		require.Len(stdSource.nums, len(source.nums))
 	})
+}
+
+func BenchmarkSeed32(b *testing.B) {
+	source := prng.NewMT19937()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		source.Seed(0)
+	}
+}
+
+func BenchmarkSeed64(b *testing.B) {
+	source := prng.NewMT19937_64()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		source.Seed(0)
+	}
 }

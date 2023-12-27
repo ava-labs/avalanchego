@@ -12,7 +12,7 @@ import (
 type sanitizedString string
 
 func (s sanitizedString) String() string {
-	return strings.ReplaceAll(string(s), "\n", "\\n")
+	return strings.ReplaceAll(string(s), "\n", `\n`)
 }
 
 // UserString constructs a field with the given key and the value stripped of
@@ -29,7 +29,7 @@ func (s sanitizedStrings) String() string {
 		if i != 0 {
 			_, _ = strs.WriteString(", ")
 		}
-		_, _ = strs.WriteString(strings.ReplaceAll(str, "\n", "\\n"))
+		_, _ = strs.WriteString(strings.ReplaceAll(str, "\n", `\n`))
 	}
 	return strs.String()
 }

@@ -12,13 +12,15 @@ import (
 )
 
 type MerkleRootGetter interface {
-	// GetMerkleRoot returns the merkle root of the Trie
+	// GetMerkleRoot returns the merkle root of the trie.
+	// Returns ids.Empty if the trie is empty.
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
 }
 
 type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
+	// Returns ErrEmptyProof if the trie is empty.
 	GetProof(ctx context.Context, keyBytes []byte) (*Proof, error)
 }
 
@@ -38,6 +40,11 @@ type ReadOnlyTrie interface {
 	// database.ErrNotFound if the key is not present
 	getValue(key Key) ([]byte, error)
 
+	// If this trie is non-empty, returns the root node.
+	// Must be copied before modification.
+	// Otherwise returns Nothing.
+	getRoot() maybe.Maybe[*node]
+
 	// get an editable copy of the node with the given key path
 	// hasValue indicates which db to look in (value or intermediate)
 	getEditableNode(key Key, hasValue bool) (*node, error)
@@ -46,6 +53,7 @@ type ReadOnlyTrie interface {
 	// keys in range [start, end].
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
+	// Returns ErrEmptyProof if the trie is empty.
 	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	database.Iteratee

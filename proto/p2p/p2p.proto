@@ -28,7 +28,7 @@ message Message {
     // Network messages:
     Ping ping = 11;
     Pong pong = 12;
-    Version version = 13;
+    Handshake handshake = 13;
     PeerList peer_list = 14;
 
     // State-sync messages:
@@ -91,17 +91,17 @@ message Pong {
   repeated SubnetUptime subnet_uptimes = 2;
 }
 
-// Version is the first outbound message sent to a peer when a connection is
+// Handshake is the first outbound message sent to a peer when a connection is
 // established to start the p2p handshake.
 //
-// Peers must respond to a Version message with a PeerList message to allow the
+// Peers must respond to a Handshake message with a PeerList message to allow the
 // peer to connect to other peers in the network.
 //
 // Peers should drop connections to peers with incompatible versions.
-message Version {
+message Handshake {
   // Network the peer is running on (e.g local, testnet, mainnet)
   uint32 network_id = 1;
-  // Unix timestamp when this Version message was created
+  // Unix timestamp when this Handshake message was created
   uint64 my_time = 2;
   // IP address of the peer
   bytes ip_addr = 3;
@@ -110,11 +110,24 @@ message Version {
   // Avalanche client version
   string my_version = 5;
   // Timestamp of the IP
-  uint64 my_version_time = 6;
+  uint64 ip_signing_time = 6;
   // Signature of the peer IP port pair at a provided timestamp
   bytes sig = 7;
   // Subnets the peer is tracking
   repeated bytes tracked_subnets = 8;
+  Client client = 9;
+  repeated uint32 supported_acps = 10;
+  repeated uint32 objected_acps = 11;
+}
+
+// Metadata about a peer's P2P client used to determine compatibility
+message Client {
+  // Client name (e.g avalanchego)
+  string name = 1;
+  // Client semantic version
+  uint32 major = 2;
+  uint32 minor = 3;
+  uint32 patch = 4;
 }
 
 // ClaimedIpPort contains metadata needed to connect to a peer
@@ -135,9 +148,9 @@ message ClaimedIpPort {
 
 // PeerList contains network-level metadata for a set of validators.
 //
-// PeerList must be sent in response to an inbound Version message from a
+// PeerList must be sent in response to an inbound Handshake message from a
 // remote peer a peer wants to connect to. Once a PeerList is received after
-// a version message, the p2p handshake is complete and the connection is
+// a Handshake message, the p2p handshake is complete and the connection is
 // established.
 
 // Peers should periodically send PeerList messages to allow peers to

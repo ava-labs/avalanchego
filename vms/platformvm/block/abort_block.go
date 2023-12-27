@@ -43,7 +43,7 @@ func NewBanffAbortBlock(
 			},
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotAbortBlock struct {
@@ -78,5 +78,5 @@ func NewApricotAbortBlock(
 			Hght:   height,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
