@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -28,7 +28,8 @@ func TestIndex(t *testing.T) {
 	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	require.NoError(err)
@@ -116,7 +117,8 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	codec := codec.NewDefaultManager()
 	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	require.NoError(err)
 	idx := indexIntf.(*index)
@@ -156,7 +158,8 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	codec := codec.NewDefaultManager()
 	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	require.NoError(err)
 

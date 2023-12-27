@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -20,7 +20,8 @@ var minimumFailingDuration = 5 * time.Minute
 func TestBenchlistAdd(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -144,7 +145,8 @@ func TestBenchlistAdd(t *testing.T) {
 func TestBenchlistMaxStake(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -257,7 +259,8 @@ func TestBenchlistMaxStake(t *testing.T) {
 func TestBenchlistRemove(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
