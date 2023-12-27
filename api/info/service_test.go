@@ -29,8 +29,10 @@ func initGetVMsTest(t *testing.T) *getVMsTest {
 	mockVMManager := vms.NewMockManager(ctrl)
 	return &getVMsTest{
 		info: &Info{
-			log:       logging.NoLog{},
-			vmManager: mockVMManager,
+			Parameters: Parameters{
+				VMManager: mockVMManager,
+			},
+			log: logging.NoLog{},
 		},
 		ctrl:          ctrl,
 		mockVMManager: mockVMManager,
