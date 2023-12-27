@@ -614,11 +614,11 @@ func (db *merkleDB) GetRangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProof")
-	defer span.End()
-
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
+
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetRangeProof")
+	defer span.End()
 
 	if db.closed {
 		return nil, database.ErrClosed
