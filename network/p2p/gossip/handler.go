@@ -71,10 +71,10 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	}
 
 	filter := &BloomFilter{
-		Bloom: &bloomfilter.Filter{},
-		Salt:  salt,
+		bloom: &bloomfilter.Filter{},
+		salt:  salt,
 	}
-	if err := filter.Bloom.UnmarshalBinary(request.Filter); err != nil {
+	if err := filter.bloom.UnmarshalBinary(request.Filter); err != nil {
 		return nil, err
 	}
 

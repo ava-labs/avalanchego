@@ -53,6 +53,6 @@ type Config struct {
 	// Calculates uptime of peers
 	UptimeCalculator uptime.Calculator
 
-	// Signs my IP so I can send my signed IP address in the Version message
+	// Signs my IP so I can send my signed IP address in the Handshake message
 	IPSigner *IPSigner
 }

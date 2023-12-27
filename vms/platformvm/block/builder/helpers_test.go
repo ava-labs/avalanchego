@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -166,6 +167,9 @@ func newEnvironment(t *testing.T) *environment {
 
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
+	res.sender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
 
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
@@ -181,13 +185,20 @@ func newEnvironment(t *testing.T) *environment {
 		pvalidators.TestManager,
 	)
 
-	res.network = network.New(
-		res.backend.Ctx,
-		res.blkManager,
+	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
+	res.network, err = network.New(
+		res.backend.Ctx.Log,
+		res.backend.Ctx.NodeID,
+		res.backend.Ctx.SubnetID,
+		res.backend.Ctx.ValidatorState,
+		txVerifier,
 		res.mempool,
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
+		registerer,
+		network.DefaultConfig,
 	)
+	require.NoError(err)
 
 	res.Builder = New(
 		res.mempool,

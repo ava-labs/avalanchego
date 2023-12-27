@@ -250,6 +250,21 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateSummaryFrontier", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetStateSummaryFrontier), arg0, arg1, arg2)
 }
 
+// Handshake mocks base method.
+func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32) (OutboundMessage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Handshake", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
+	ret0, _ := ret[0].(OutboundMessage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Handshake indicates an expected call of Handshake.
+func (mr *MockOutboundMsgBuilderMockRecorder) Handshake(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Handshake), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
+}
+
 // PeerList mocks base method.
 func (m *MockOutboundMsgBuilder) PeerList(arg0 []ips.ClaimedIPPort, arg1 bool) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
@@ -368,19 +383,4 @@ func (m *MockOutboundMsgBuilder) StateSummaryFrontier(arg0 ids.ID, arg1 uint32, 
 func (mr *MockOutboundMsgBuilderMockRecorder) StateSummaryFrontier(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateSummaryFrontier", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).StateSummaryFrontier), arg0, arg1, arg2)
-}
-
-// Version mocks base method.
-func (m *MockOutboundMsgBuilder) Version(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32) (OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Version", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
-	ret0, _ := ret[0].(OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Version indicates an expected call of Version.
-func (mr *MockOutboundMsgBuilderMockRecorder) Version(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Version), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
 }
