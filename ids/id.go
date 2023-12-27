@@ -51,7 +51,7 @@ func (id ID) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte("\"" + str + "\""), nil
+	return []byte(`"` + str + `"`), nil
 }
 
 func (id *ID) UnmarshalJSON(b []byte) error {
