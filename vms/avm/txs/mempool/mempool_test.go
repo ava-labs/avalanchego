@@ -37,25 +37,25 @@ func TestAdd(t *testing.T) {
 			name:       "attempt adding duplicate tx",
 			initialTxs: []*txs.Tx{tx0},
 			tx:         tx0,
-			err:        errDuplicateTx,
+			err:        ErrDuplicateTx,
 		},
 		{
 			name:       "attempt adding too large tx",
 			initialTxs: nil,
 			tx:         newTx(0, MaxTxSize+1),
-			err:        errTxTooLarge,
+			err:        ErrTxTooLarge,
 		},
 		{
 			name:       "attempt adding tx when full",
 			initialTxs: newTxs(maxMempoolSize/MaxTxSize, MaxTxSize),
 			tx:         newTx(maxMempoolSize/MaxTxSize, MaxTxSize),
-			err:        errMempoolFull,
+			err:        ErrMempoolFull,
 		},
 		{
 			name:       "attempt adding conflicting tx",
 			initialTxs: []*txs.Tx{tx0},
 			tx:         newTx(0, 32),
-			err:        errConflictsWithOtherTx,
+			err:        ErrConflictsWithOtherTx,
 		},
 	}
 	for _, test := range tests {
@@ -101,7 +101,7 @@ func TestGet(t *testing.T) {
 	require.True(exists)
 	require.Equal(tx, returned)
 
-	mempool.Remove([]*txs.Tx{tx})
+	mempool.Remove(tx)
 
 	_, exists = mempool.Get(txID)
 	require.False(exists)
@@ -130,19 +130,19 @@ func TestPeek(t *testing.T) {
 	require.True(exists)
 	require.Equal(tx, tx0)
 
-	mempool.Remove([]*txs.Tx{tx0})
+	mempool.Remove(tx0)
 
 	tx, exists = mempool.Peek()
 	require.True(exists)
 	require.Equal(tx, tx1)
 
-	mempool.Remove([]*txs.Tx{tx0})
+	mempool.Remove(tx0)
 
 	tx, exists = mempool.Peek()
 	require.True(exists)
 	require.Equal(tx, tx1)
 
-	mempool.Remove([]*txs.Tx{tx1})
+	mempool.Remove(tx1)
 
 	_, exists = mempool.Peek()
 	require.False(exists)
@@ -189,7 +189,7 @@ func TestIterate(t *testing.T) {
 	mempool.Iterate(addTxs)
 	require.Equal([]*txs.Tx{tx0, tx1}, iteratedTxs)
 
-	mempool.Remove([]*txs.Tx{tx0, tx2})
+	mempool.Remove(tx0, tx2)
 
 	iteratedTxs = nil
 	mempool.Iterate(addTxs)
