@@ -14,11 +14,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 )
 
@@ -86,7 +86,7 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	vm, stopper := buildClientHelper(require, testKey)
 	defer stopper.Stop(context.Background())
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 
 	require.NoError(vm.Initialize(context.Background(), ctx, memdb.New(), nil, nil, nil, nil, nil, nil))
 

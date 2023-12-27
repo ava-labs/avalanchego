@@ -2,7 +2,6 @@
 
 ## Structure
 
-
 A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store (sometimes just called "a store") using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries implement a key-value store.
 
 Like all tries, a MerkleDB instance is composed of nodes. Conceputally, a node has:
@@ -26,7 +25,7 @@ Node
 +--------------------------------------------+
 ```
 
-This conceptual picture differs slightly from the implementation of the `node` in MerkleDB but is still useful in understanding how MerkleDB works. 
+This conceptual picture differs slightly from the implementation of the `node` in MerkleDB but is still useful in understanding how MerkleDB works.
 
 ## Root IDs and Revisions
 
@@ -36,7 +35,7 @@ The root ID also serves as a unique identifier of a given state; instances with 
 
 ## Views
 
-A _view_ is a proposal to modify a MerkleDB. If a view is _committed_, its changes are written to the MerkleDB. It can be queried, and when it is, it will return the state that the MerkleDB will contain if the view is committed.
+A _view_ is a proposal to modify a MerkleDB. If a view is _committed_, its changes are written to the MerkleDB. It can be queried, and when it is, it returns the state that the MerkleDB will contain if the view is committed. A view is immutable after creation. Namely, none of its key-value pairs can be modified. 
 
 A view can be built atop the MerkleDB itself, or it can be built atop another view. Views can be chained together. For example, we might have:
 
@@ -56,6 +55,8 @@ where `view1` and `view2` are built atop MerkleDB instance `db` and `view3` is b
 
 A view can be committed only if its parent is the MerkleDB (and not another view). A view can only be committed once. In the above diagram, `view3` can't be committed until `view1` is committed.
 
+When a view is created, we don't apply changes to the trie's structure or calculate the new IDs of nodes because this requires expensive hashing. Instead, we lazily apply changes and calculate node IDs (including the root ID) when necessary.
+
 ### Validity
 
 When a view is committed, its siblings and all of their descendants are _invalidated_. An invalid view can't be read or committed. Method calls on it will return `ErrInvalid`.
@@ -68,7 +69,7 @@ In the diagram above, if `view1` were committed, `view2` would be invalidated. I
 
 MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that it has a key-value pair `(k,v)`, or that `k` is not present.
 
-Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.) To put a finer point on it, the flow is:
+Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.)
 
 ```mermaid
 flowchart TD
@@ -82,9 +83,47 @@ flowchart TD
 
 `Proof(k,r)` is a proof that purports to show either that key-value pair `(k,v)` exists in the revision at `r`, or that `k` isn't in the revision.
 
+#### Verification
+
+A proof is represented as:
+
+```go
+type Proof struct {
+	// Nodes in the proof path from root --> target key
+	// (or node that would be where key is if it doesn't exist).
+	// Always contains at least the root.
+	Path []ProofNode
+
+	// This is a proof that [key] exists/doesn't exist.
+	Key Key
+
+	// Nothing if [Key] isn't in the trie.
+	// Otherwise, the value corresponding to [Key].
+	Value maybe.Maybe[[]byte]
+}
+
+type ProofNode struct {
+	Key Key
+	// Nothing if this is an intermediate node.
+	// The value in this node if its length < [HashLen].
+	// The hash of the value in this node otherwise.
+	ValueOrHash maybe.Maybe[[]byte]
+	Children    map[byte]ids.ID
+}
+```
+
+For an inclusion proof, the last node in `Path` should be the one containing `Key`.
+For an exclusion proof, the last node is either:
+* The node that would be the parent of `Key`, if such node has no child at the index `Key` would be at.
+* The node at the same child index `Key` would be at, otherwise.
+
+In other words, the last node of a proof says either, "the key is in the trie, and this node contains it," or, "the key isn't in the trie, and this node's existence precludes the existence of the key."
+
+The prover can't simply trust that such a node exists, though. It has to verify this. The prover creates an empty trie and inserts the nodes in `Path`. If the root ID of this trie matches the `r`, the verifier can trust that the last node really does exist in the trie. If the last node _didn't_ really exist, the proof creator couldn't create `Path` such that its nodes both imply the existence of the ("fake") last node and also result in the correct root ID. This follows from the one-way property of hashing.
+
 ### Range Proofs
 
-MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is similar to the merkle proofs described above, except for multiple key-value pairs. Similar to above, the flow is:
+MerkleDB instances can also produce _range proofs_. A range proof proves that a contiguous set of key-value pairs is or isn't in the key-value store with a given root. This is similar to the merkle proofs described above, except for multiple key-value pairs.
 
 ```mermaid
 flowchart TD
@@ -103,7 +142,54 @@ flowchart TD
 
 Clients can use range proofs to efficiently download many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
 
+#### Verification
+
 Like simple proofs, range proofs can be verified without any additional context or knowledge of the contents of the key-value store.
+
+A range proof is represented as:
+
+```go
+type RangeProof struct {
+	// Invariant: At least one of [StartProof], [EndProof], [KeyValues] is non-empty.
+
+	// A proof that the smallest key in the requested range does/doesn't exist.
+	// Note that this may not be an entire proof -- nodes are omitted if
+	// they are also in [EndProof].
+	StartProof []ProofNode
+
+	// If no upper range bound was given and [KeyValues] is empty, this is empty.
+	//
+	// If no upper range bound was given and [KeyValues] is non-empty, this is
+	// a proof for the largest key in [KeyValues].
+	//
+	// Otherwise this is a proof for the upper range bound.
+	EndProof []ProofNode
+
+	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
+	// Sorted by increasing key.
+	KeyValues []KeyValue
+}
+```
+
+The prover creates an empty trie and adds to it all of the key-value pairs in `KeyValues`. 
+
+Then, it inserts:
+* The nodes in `StartProof`
+* The nodes in `EndProof`
+
+For each node in `StartProof`, the prover only populates `Children` entries whose key is before `start`.
+For each node in `EndProof`, it populates only `Children` entries whose key is after `end`, where `end` is the largest key proven by the range proof.
+
+Then, it calculates the root ID of this trie and compares it to the expected one.
+
+If the proof:
+* Omits any key-values in the range
+* Includes additional key-values that aren't really in the range
+* Provides an incorrect value for a key in the range
+
+then the actual root ID won't match the expected root ID. 
+
+Like simple proofs, range proof verification relies on the fact that the proof generator can't forge data such that it results in a trie with both incorrect data and the correct root ID.
 
 ### Change Proofs
 
@@ -125,6 +211,12 @@ flowchart TD
 * For adjacent key-value changes `(k1,v1)` and `(k2,v2)` in `kvs`, there doesn't exist a key-value change `(k3,v3)` between `r` and `r'` such that `k1 < k3 < k2`. In other words, `kvs` is a contiguous set of key-value changes.
 
 Change proofs are useful for applying changes between revisions. For example, suppose a client has a MerkleDB instance at revision `r`. The client learns that the state has been updated and that the new root is `r'`. The client can request a change proof from a server at revision `r'`, and apply the changes in the change proof to change its state from `r` to `r'`. Note that `r` and `r'` need not be "consecutive" revisions. For example, it's possible that the state goes from revision `r` to `r1` to `r2` to `r'`. The client apply changes to get directly from `r` to `r'`, without ever needing to be at revision `r1` or `r2`.
+
+#### Verification
+
+Unlike simple proofs and range proofs, change proofs require additional context to verify. Namely, the prover must have the trie at the start root `r`.
+
+The verification algorithm is similar to range proofs, except that instead of inserting the key-value changes, start proof and end proof into an empty trie, they are added to the trie at revision `r`.
 
 ## Serialization
 
@@ -258,6 +350,13 @@ Each node must have a unique ID that identifies it. This ID is calculated by has
 * The node's value digest
 * The node's key
 
+The node's value digest is:
+* Nothing, if the node has no value
+* The node's value, if it has a value < 32 bytes
+* The hash of the node's value otherwise
+
+We use the node's value digest rather than its value when hashing so that when we send proofs, each `ProofNode` doesn't need to contain the node's value, which could be very large. By using the value digest, we allow a proof verifier to calculate a node's ID while limiting the size of the data sent to the verifier.  
+
 Specifically, we encode these values in the following way:
 
 ```
@@ -345,6 +444,5 @@ The `validityTrackingLock` goes the opposite way. A view can lock the `validityT
 
 ## TODOs
 
-- [ ] Remove special casing around the root node from the physical structure of the hashed tree.
 - [ ] Analyze performance of using database snapshots rather than in-memory history
 - [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees

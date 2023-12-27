@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Handler = (*testHandler)(nil)
+var _ Handler = (*TestHandler)(nil)
 
 func TestThrottlerHandlerAppGossip(t *testing.T) {
 	tests := []struct {
@@ -38,8 +38,8 @@ func TestThrottlerHandlerAppGossip(t *testing.T) {
 
 			called := false
 			handler := NewThrottlerHandler(
-				testHandler{
-					appGossipF: func(context.Context, ids.NodeID, []byte) {
+				TestHandler{
+					AppGossipF: func(context.Context, ids.NodeID, []byte) {
 						called = true
 					},
 				},
@@ -82,34 +82,4 @@ func TestThrottlerHandlerAppRequest(t *testing.T) {
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
-}
-
-type testHandler struct {
-	appGossipF            func(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte)
-	appRequestF           func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error)
-	crossChainAppRequestF func(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error)
-}
-
-func (t testHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
-	if t.appGossipF == nil {
-		return
-	}
-
-	t.appGossipF(ctx, nodeID, gossipBytes)
-}
-
-func (t testHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if t.appRequestF == nil {
-		return nil, nil
-	}
-
-	return t.appRequestF(ctx, nodeID, deadline, requestBytes)
-}
-
-func (t testHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if t.crossChainAppRequestF == nil {
-		return nil, nil
-	}
-
-	return t.crossChainAppRequestF(ctx, chainID, deadline, requestBytes)
 }
