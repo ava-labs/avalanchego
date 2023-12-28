@@ -45,7 +45,7 @@ var (
 type Mempool interface {
 	Add(tx *txs.Tx) error
 	Get(txID ids.ID) (*txs.Tx, bool)
-	// Remove all the [txs] and any conflicts of the [txs] from the mempool.
+	// Remove [txs] and any conflicts of [txs] from the mempool.
 	Remove(txs ...*txs.Tx)
 
 	// Peek returns the oldest tx in the mempool.
