@@ -43,7 +43,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// tx should not be marked as dropped if the mempool is full
 	txID := tx.ID()
 	mpool.MarkDropped(txID, err)
-	require.NoError(mpool.GetDropReason(tx.ID()))
+	require.NoError(mpool.GetDropReason(txID))
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
