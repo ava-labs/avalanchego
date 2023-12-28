@@ -212,6 +212,10 @@ func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
+	if errors.Is(reason, ErrMempoolFull) {
+		return
+	}
+
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 

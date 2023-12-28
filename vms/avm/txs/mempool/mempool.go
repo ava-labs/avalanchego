@@ -208,6 +208,10 @@ func (m *mempool) RequestBuildBlock() {
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
+	if errors.Is(reason, ErrMempoolFull) {
+		return
+	}
+
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
