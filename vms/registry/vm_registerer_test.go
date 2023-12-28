@@ -411,7 +411,6 @@ type vmRegistererTestResources struct {
 	ctrl        *gomock.Controller
 	mockManager *vms.MockManager
 	mockServer  *server.MockServer
-	mockLogger  *logging.MockLogger
 	registerer  VMRegisterer
 }
 
@@ -420,27 +419,18 @@ func initRegistererTest(t *testing.T) *vmRegistererTestResources {
 
 	mockManager := vms.NewMockManager(ctrl)
 	mockServer := server.NewMockServer(ctrl)
-	mockLog := logging.NewMockLogger(ctrl)
 
 	registerer := NewVMRegisterer(VMRegistererConfig{
 		APIServer:    mockServer,
-		Log:          mockLog,
+		Log:          logging.NoLog{},
 		VMFactoryLog: logging.NoLog{},
 		VMManager:    mockManager,
 	})
-
-	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Trace(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Verbo(gomock.Any(), gomock.Any()).AnyTimes()
 
 	return &vmRegistererTestResources{
 		ctrl:        ctrl,
 		mockManager: mockManager,
 		mockServer:  mockServer,
-		mockLogger:  mockLog,
 		registerer:  registerer,
 	}
 }
