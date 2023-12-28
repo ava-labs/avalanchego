@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -149,6 +150,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -175,6 +177,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -210,6 +213,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -247,6 +251,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -287,6 +292,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -337,6 +343,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -392,6 +399,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -447,6 +455,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -508,6 +517,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{
@@ -569,6 +579,7 @@ func TestBlockOptions(t *testing.T) {
 				manager := &manager{
 					backend: &backend{
 						state: state,
+						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
 						Config: &config.Config{

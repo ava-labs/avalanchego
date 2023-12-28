@@ -4,11 +4,15 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -16,11 +20,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var _ block.Visitor = (*verifier)(nil)
+var (
+	_ block.Visitor = (*options)(nil)
+
+	errUnexpectedProposalTxType           = errors.New("unexpected proposal transaction type")
+	errFailedFetchingStakerTx             = errors.New("failed fetching staker transaction")
+	errUnexpectedStakerTxType             = errors.New("unexpected staker transaction type")
+	errFailedFetchingPrimaryStaker        = errors.New("failed fetching primary staker")
+	errFailedFetchingSubnetTransformation = errors.New("failed fetching subnet transformation")
+	errFailedCalculatingUptime            = errors.New("failed calculating uptime")
+)
 
 // options supports build new option blocks
 type options struct {
 	// inputs populated before calling this struct's methods:
+	log                     logging.Logger
 	primaryUptimePercentage float64
 	uptimes                 uptime.Calculator
 	state                   state.Chain
@@ -59,7 +73,21 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		)
 	}
 
-	if o.prefersCommit(b.Tx) {
+	prefersCommit, err := o.prefersCommit(b.Tx)
+	if err != nil {
+		o.log.Debug("falling back to prefer commit",
+			zap.Error(err),
+		)
+		// We fall back to commit here to err on the side of over-rewarding
+		// rather than under-rewarding.
+		//
+		// Invariant: We must not return the error here, because the error would
+		// be treated as fatal. Errors can occur here due to a malicious block
+		// proposer or even in unusual virtuous cases.
+		prefersCommit = true
+	}
+
+	if prefersCommit {
 		o.preferredBlock = commitBlock
 		o.alternateBlock = abortBlock
 	} else {
@@ -112,21 +140,20 @@ func (*options) ApricotAtomicBlock(*block.ApricotAtomicBlock) error {
 	return snowman.ErrNotOracle
 }
 
-// TODO: should prefersCommit log errors
-func (o *options) prefersCommit(tx *txs.Tx) bool {
+func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 	unsignedTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
 	if !ok {
-		return true
+		return false, fmt.Errorf("%w: %T", errUnexpectedProposalTxType, tx.Unsigned)
 	}
 
 	stakerTx, _, err := o.state.GetTx(unsignedTx.TxID)
 	if err != nil {
-		return true
+		return false, fmt.Errorf("%w: %w", errFailedFetchingStakerTx, err)
 	}
 
 	staker, ok := stakerTx.Unsigned.(txs.Staker)
 	if !ok {
-		return true
+		return false, fmt.Errorf("%w: %T", errUnexpectedStakerTxType, stakerTx.Unsigned)
 	}
 
 	nodeID := staker.NodeID()
@@ -135,14 +162,14 @@ func (o *options) prefersCommit(tx *txs.Tx) bool {
 		nodeID,
 	)
 	if err != nil {
-		return true
+		return false, fmt.Errorf("%w: %w", errFailedFetchingPrimaryStaker, err)
 	}
 
 	expectedUptimePercentage := o.primaryUptimePercentage
 	if subnetID := staker.SubnetID(); subnetID != constants.PrimaryNetworkID {
 		transformSubnet, err := executor.GetTransformSubnetTx(o.state, subnetID)
 		if err != nil {
-			return true
+			return false, fmt.Errorf("%w: %w", errFailedFetchingSubnetTransformation, err)
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
@@ -155,8 +182,8 @@ func (o *options) prefersCommit(tx *txs.Tx) bool {
 		primaryNetworkValidator.StartTime,
 	)
 	if err != nil {
-		return true
+		return false, fmt.Errorf("%w: %w", errFailedCalculatingUptime, err)
 	}
 
-	return uptime >= expectedUptimePercentage
+	return uptime >= expectedUptimePercentage, nil
 }
