@@ -26,36 +26,42 @@ func TestAdd(t *testing.T) {
 		initialTxs []*txs.Tx
 		tx         *txs.Tx
 		err        error
+		dropReason error
 	}{
 		{
 			name:       "successfully add tx",
 			initialTxs: nil,
 			tx:         tx0,
 			err:        nil,
+			dropReason: nil,
 		},
 		{
 			name:       "attempt adding duplicate tx",
 			initialTxs: []*txs.Tx{tx0},
 			tx:         tx0,
 			err:        ErrDuplicateTx,
+			dropReason: nil,
 		},
 		{
 			name:       "attempt adding too large tx",
 			initialTxs: nil,
 			tx:         newTx(0, MaxTxSize+1),
 			err:        ErrTxTooLarge,
+			dropReason: ErrTxTooLarge,
 		},
 		{
 			name:       "attempt adding tx when full",
 			initialTxs: newTxs(maxMempoolSize/MaxTxSize, MaxTxSize),
 			tx:         newTx(maxMempoolSize/MaxTxSize, MaxTxSize),
 			err:        ErrMempoolFull,
+			dropReason: nil,
 		},
 		{
 			name:       "attempt adding conflicting tx",
 			initialTxs: []*txs.Tx{tx0},
 			tx:         newTx(0, 32),
 			err:        ErrConflictsWithOtherTx,
+			dropReason: ErrConflictsWithOtherTx,
 		},
 	}
 	for _, test := range tests {
@@ -75,6 +81,15 @@ func TestAdd(t *testing.T) {
 
 			err = mempool.Add(test.tx)
 			require.ErrorIs(err, test.err)
+
+			txID := test.tx.ID()
+
+			if err != nil {
+				mempool.MarkDropped(txID, err)
+			}
+
+			err = mempool.GetDropReason(txID)
+			require.ErrorIs(err, test.dropReason)
 		})
 	}
 }

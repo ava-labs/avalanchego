@@ -219,7 +219,9 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 		return
 	}
 
-	m.droppedTxIDs.Put(txID, reason)
+	if !errors.Is(reason, ErrMempoolFull) {
+		m.droppedTxIDs.Put(txID, reason)
+	}
 }
 
 func (m *mempool) GetDropReason(txID ids.ID) error {
