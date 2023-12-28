@@ -148,7 +148,7 @@ func TestPeek(t *testing.T) {
 	require.False(exists)
 }
 
-func TestRemoveInputsOf(t *testing.T) {
+func TestRemoveConflict(t *testing.T) {
 	require := require.New(t)
 
 	mempool, err := New(
