@@ -8,9 +8,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-type Entry[K any, V comparable] struct {
-	Key   K
-	Value set.Set[V]
+type KeySetPair[K any, V comparable] struct {
+	Key K
+	Set set.Set[V]
 }
 
 // SetMap is a map to a set where all sets are non-overlapping.
@@ -27,20 +27,21 @@ func New[K, V comparable]() *SetMap[K, V] {
 	}
 }
 
-// Put the key value pair into the map. If [key] is in the map, or [val]
-// overlaps with other sets, the previous entries will be removed and returned.
-func (m *SetMap[K, V]) Put(key K, val set.Set[V]) []Entry[K, V] {
-	removed := m.DeleteValuesOf(val)
+// Put the key-set pair into the map. Removes and returns:
+// * The existing key-set pair for [key].
+// * Existing key-set pairs where the set overlaps with the [set].
+func (m *SetMap[K, V]) Put(key K, set set.Set[V]) []KeySetPair[K, V] {
+	removed := m.DeleteOverlapping(set)
 	if removedSet, ok := m.DeleteKey(key); ok {
-		removed = append(removed, Entry[K, V]{
-			Key:   key,
-			Value: removedSet,
+		removed = append(removed, KeySetPair[K, V]{
+			Key: key,
+			Set: removedSet,
 		})
 	}
 
-	m.keyToSet[key] = val
-	for v := range val {
-		m.valueToKey[v] = key
+	m.keyToSet[key] = set
+	for val := range set {
+		m.valueToKey[val] = key
 	}
 	return removed
 }
@@ -51,8 +52,8 @@ func (m *SetMap[K, V]) GetKey(val V) (K, bool) {
 	return key, ok
 }
 
-// GetValue that is mapped to the provided key.
-func (m *SetMap[K, V]) GetValue(key K) (set.Set[V], bool) {
+// GetSet that is mapped to by the provided key.
+func (m *SetMap[K, V]) GetSet(key K) (set.Set[V], bool) {
 	val, ok := m.keyToSet[key]
 	return val, ok
 }
@@ -69,17 +70,17 @@ func (m *SetMap[_, V]) HasValue(val V) bool {
 	return ok
 }
 
-// HasValuesOf returns true if [val] overlaps with any of the sets in the map.
-func (m *SetMap[_, V]) HasValuesOf(val set.Set[V]) bool {
-	if val.Len() < len(m.valueToKey) {
-		for v := range val {
-			if _, ok := m.valueToKey[v]; ok {
+// HasOverlap returns true if [set] overlaps with any of the sets in the map.
+func (m *SetMap[_, V]) HasOverlap(set set.Set[V]) bool {
+	if set.Len() < len(m.valueToKey) {
+		for val := range set {
+			if _, ok := m.valueToKey[val]; ok {
 				return true
 			}
 		}
 	} else {
-		for v := range m.valueToKey {
-			if val.Contains(v) {
+		for val := range m.valueToKey {
+			if set.Contains(val) {
 				return true
 			}
 		}
@@ -87,51 +88,51 @@ func (m *SetMap[_, V]) HasValuesOf(val set.Set[V]) bool {
 	return false
 }
 
-// DeleteKey removes [key] from the map and returns the value it mapped to.
+// DeleteKey removes [key] from the map and returns the set it mapped to.
 func (m *SetMap[K, V]) DeleteKey(key K) (set.Set[V], bool) {
-	val, ok := m.keyToSet[key]
+	set, ok := m.keyToSet[key]
 	if !ok {
 		return nil, false
 	}
 
 	delete(m.keyToSet, key)
-	for v := range val {
-		delete(m.valueToKey, v)
+	for val := range set {
+		delete(m.valueToKey, val)
 	}
-	return val, true
+	return set, true
 }
 
-// DeleteValue removes [val] from the map and returns the key that mapped to it
-// along with the set it was contained in.
+// DeleteValue removes and returns the key-set pair that contains [val].
 func (m *SetMap[K, V]) DeleteValue(val V) (K, set.Set[V], bool) {
 	key, ok := m.valueToKey[val]
 	if !ok {
 		return utils.Zero[K](), nil, false
 	}
-	v, _ := m.DeleteKey(key)
-	return key, v, true
+	set, _ := m.DeleteKey(key)
+	return key, set, true
 }
 
-// DeleteValuesOf removes all of the entries that have any overlaps with [val].
-func (m *SetMap[K, V]) DeleteValuesOf(val set.Set[V]) []Entry[K, V] {
-	var removed []Entry[K, V]
-	for v := range val {
-		if k, removedSet, ok := m.DeleteValue(v); ok {
-			removed = append(removed, Entry[K, V]{
-				Key:   k,
-				Value: removedSet,
+// DeleteOverlapping removes and returns all the key-set pairs where the set
+// overlaps with [set].
+func (m *SetMap[K, V]) DeleteOverlapping(set set.Set[V]) []KeySetPair[K, V] {
+	var removed []KeySetPair[K, V]
+	for val := range set {
+		if k, removedSet, ok := m.DeleteValue(val); ok {
+			removed = append(removed, KeySetPair[K, V]{
+				Key: k,
+				Set: removedSet,
 			})
 		}
 	}
 	return removed
 }
 
-// Len return the number of sets in this map.
+// Len return the number of sets in the map.
 func (m *SetMap[K, V]) Len() int {
 	return len(m.keyToSet)
 }
 
-// LenValues return the total number of elements across all sets in this map.
+// LenValues return the total number of values across all sets in the map.
 func (m *SetMap[K, V]) LenValues() int {
 	return len(m.valueToKey)
 }

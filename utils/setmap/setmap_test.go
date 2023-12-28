@@ -17,7 +17,7 @@ func TestSetMapPut(t *testing.T) {
 		state           *SetMap[int, int]
 		key             int
 		value           set.Set[int]
-		expectedRemoved []Entry[int, int]
+		expectedRemoved []KeySetPair[int, int]
 		expectedState   *SetMap[int, int]
 	}{
 		{
@@ -47,10 +47,10 @@ func TestSetMapPut(t *testing.T) {
 			},
 			key:   1,
 			value: set.Of(3),
-			expectedRemoved: []Entry[int, int]{
+			expectedRemoved: []KeySetPair[int, int]{
 				{
-					Key:   1,
-					Value: set.Of(2),
+					Key: 1,
+					Set: set.Of(2),
 				},
 			},
 			expectedState: &SetMap[int, int]{
@@ -74,10 +74,10 @@ func TestSetMapPut(t *testing.T) {
 			},
 			key:   3,
 			value: set.Of(2),
-			expectedRemoved: []Entry[int, int]{
+			expectedRemoved: []KeySetPair[int, int]{
 				{
-					Key:   1,
-					Value: set.Of(2),
+					Key: 1,
+					Set: set.Of(2),
 				},
 			},
 			expectedState: &SetMap[int, int]{
@@ -103,14 +103,14 @@ func TestSetMapPut(t *testing.T) {
 			},
 			key:   1,
 			value: set.Of(4),
-			expectedRemoved: []Entry[int, int]{
+			expectedRemoved: []KeySetPair[int, int]{
 				{
-					Key:   1,
-					Value: set.Of(2),
+					Key: 1,
+					Set: set.Of(2),
 				},
 				{
-					Key:   3,
-					Value: set.Of(4),
+					Key: 3,
+					Set: set.Of(4),
 				},
 			},
 			expectedState: &SetMap[int, int]{
@@ -177,7 +177,7 @@ func TestSetMapHasValueAndGetKeyAndSetOverlaps(t *testing.T) {
 	}
 }
 
-func TestSetMapHasValuesOf(t *testing.T) {
+func TestSetMapHasOverlap(t *testing.T) {
 	m := New[int, int]()
 	require.Empty(t, m.Put(1, set.Of(2)))
 	require.Empty(t, m.Put(2, set.Of(3, 4)))
@@ -210,13 +210,13 @@ func TestSetMapHasValuesOf(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			overlaps := m.HasValuesOf(test.set)
+			overlaps := m.HasOverlap(test.set)
 			require.Equal(t, test.expectedOverlaps, overlaps)
 		})
 	}
 }
 
-func TestSetMapHasKeyAndGetValue(t *testing.T) {
+func TestSetMapHasKeyAndGetSet(t *testing.T) {
 	m := New[int, int]()
 	require.Empty(t, m.Put(1, set.Of(2)))
 
@@ -252,7 +252,7 @@ func TestSetMapHasKeyAndGetValue(t *testing.T) {
 			exists := m.HasKey(test.key)
 			require.Equal(test.expectedExists, exists)
 
-			value, exists := m.GetValue(test.key)
+			value, exists := m.GetSet(test.key)
 			require.Equal(test.expectedValue, value)
 			require.Equal(test.expectedExists, exists)
 		})
@@ -353,12 +353,12 @@ func TestSetMapDeleteValue(t *testing.T) {
 	}
 }
 
-func TestSetMapDeleteValuesOf(t *testing.T) {
+func TestSetMapDeleteOverlapping(t *testing.T) {
 	tests := []struct {
 		name            string
 		state           *SetMap[int, int]
 		set             set.Set[int]
-		expectedRemoved []Entry[int, int]
+		expectedRemoved []KeySetPair[int, int]
 		expectedState   *SetMap[int, int]
 	}{
 		{
@@ -379,10 +379,10 @@ func TestSetMapDeleteValuesOf(t *testing.T) {
 				},
 			},
 			set: set.Of(2),
-			expectedRemoved: []Entry[int, int]{
+			expectedRemoved: []KeySetPair[int, int]{
 				{
-					Key:   1,
-					Value: set.Of(2),
+					Key: 1,
+					Set: set.Of(2),
 				},
 			},
 			expectedState: New[int, int](),
@@ -401,14 +401,14 @@ func TestSetMapDeleteValuesOf(t *testing.T) {
 				},
 			},
 			set: set.Of(2, 4),
-			expectedRemoved: []Entry[int, int]{
+			expectedRemoved: []KeySetPair[int, int]{
 				{
-					Key:   1,
-					Value: set.Of(2, 3),
+					Key: 1,
+					Set: set.Of(2, 3),
 				},
 				{
-					Key:   2,
-					Value: set.Of(4),
+					Key: 2,
+					Set: set.Of(4),
 				},
 			},
 			expectedState: New[int, int](),
@@ -418,7 +418,7 @@ func TestSetMapDeleteValuesOf(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			removed := test.state.DeleteValuesOf(test.set)
+			removed := test.state.DeleteOverlapping(test.set)
 			require.ElementsMatch(test.expectedRemoved, removed)
 			require.Equal(test.expectedState, test.state)
 		})
