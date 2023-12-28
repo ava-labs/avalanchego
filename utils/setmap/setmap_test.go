@@ -105,12 +105,12 @@ func TestSetMapPut(t *testing.T) {
 			value: set.Of(4),
 			expectedRemoved: []Entry[int, int]{
 				{
-					Key:   3,
-					Value: set.Of(4),
-				},
-				{
 					Key:   1,
 					Value: set.Of(2),
+				},
+				{
+					Key:   3,
+					Value: set.Of(4),
 				},
 			},
 			expectedState: &SetMap[int, int]{
@@ -128,7 +128,7 @@ func TestSetMapPut(t *testing.T) {
 			require := require.New(t)
 
 			removed := test.state.Put(test.key, test.value)
-			require.Equal(test.expectedRemoved, removed)
+			require.ElementsMatch(test.expectedRemoved, removed)
 			require.Equal(test.expectedState, test.state)
 		})
 	}
@@ -419,7 +419,7 @@ func TestSetMapDeleteValuesOf(t *testing.T) {
 			require := require.New(t)
 
 			removed := test.state.DeleteValuesOf(test.set)
-			require.Equal(test.expectedRemoved, removed)
+			require.ElementsMatch(test.expectedRemoved, removed)
 			require.Equal(test.expectedState, test.state)
 		})
 	}
