@@ -241,6 +241,31 @@ func TestPeekTxs(t *testing.T) {
 	require.Nil(tx)
 }
 
+func TestRemoveConflicts(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
+	require.NoError(err)
+
+	txs, err := createTestDecisionTxs(1)
+	require.NoError(err)
+	conflictTxs, err := createTestDecisionTxs(1)
+	require.NoError(err)
+
+	require.NoError(mempool.Add(txs[0]))
+
+	tx, exists := mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, txs[0])
+
+	mempool.Remove(conflictTxs[0])
+
+	_, exists = mempool.Peek()
+	require.False(exists)
+}
+
 func TestIterate(t *testing.T) {
 	require := require.New(t)
 
