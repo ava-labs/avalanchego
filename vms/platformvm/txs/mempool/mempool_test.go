@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -238,4 +239,36 @@ func TestPeekTxs(t *testing.T) {
 	tx, exists = mempool.Peek()
 	require.False(exists)
 	require.Nil(tx)
+}
+
+func TestIterate(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
+	require.NoError(err)
+
+	testDecisionTxs, err := createTestDecisionTxs(1)
+	require.NoError(err)
+	decisionTx := testDecisionTxs[0]
+
+	testProposalTxs, err := createTestProposalTxs(1)
+	require.NoError(err)
+	proposalTx := testProposalTxs[0]
+
+	require.NoError(mempool.Add(decisionTx))
+	require.NoError(mempool.Add(proposalTx))
+
+	expectedSet := set.NewSet[ids.ID](2)
+	expectedSet.Add(decisionTx.ID())
+	expectedSet.Add(proposalTx.ID())
+
+	set := set.NewSet[ids.ID](2)
+	mempool.Iterate(func(tx *txs.Tx) bool {
+		set.Add(tx.ID())
+		return true
+	})
+
+	require.Equal(expectedSet, set)
 }
