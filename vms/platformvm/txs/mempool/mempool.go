@@ -152,7 +152,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 
 	inputs := tx.Unsigned.InputIDs()
-	if m.consumedUTXOs.HasValuesOf(inputs) {
+	if m.consumedUTXOs.HasOverlap(inputs) {
 		return fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
 	}
 
@@ -189,7 +189,7 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 
 		// If the transaction isn't in the mempool, remove any conflicts it has.
 		inputs := tx.Unsigned.InputIDs()
-		for _, removed := range m.consumedUTXOs.DeleteValuesOf(inputs) {
+		for _, removed := range m.consumedUTXOs.DeleteOverlapping(inputs) {
 			tx, _ := m.unissuedTxs.Get(removed.Key)
 			m.unissuedTxs.Delete(removed.Key)
 			m.bytesAvailable += len(tx.Bytes())
