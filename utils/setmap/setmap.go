@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-type KeySetPair[K any, V comparable] struct {
+type Entry[K any, V comparable] struct {
 	Key K
 	Set set.Set[V]
 }
@@ -30,10 +30,10 @@ func New[K, V comparable]() *SetMap[K, V] {
 // Put the key-set pair into the map. Removes and returns:
 // * The existing key-set pair for [key].
 // * Existing key-set pairs where the set overlaps with the [set].
-func (m *SetMap[K, V]) Put(key K, set set.Set[V]) []KeySetPair[K, V] {
+func (m *SetMap[K, V]) Put(key K, set set.Set[V]) []Entry[K, V] {
 	removed := m.DeleteOverlapping(set)
 	if removedSet, ok := m.DeleteKey(key); ok {
-		removed = append(removed, KeySetPair[K, V]{
+		removed = append(removed, Entry[K, V]{
 			Key: key,
 			Set: removedSet,
 		})
@@ -102,7 +102,7 @@ func (m *SetMap[K, V]) DeleteKey(key K) (set.Set[V], bool) {
 	return set, true
 }
 
-// DeleteValue removes and returns the key-set pair that contains [val].
+// DeleteValue removes and returns the entry that contained [val].
 func (m *SetMap[K, V]) DeleteValue(val V) (K, set.Set[V], bool) {
 	key, ok := m.valueToKey[val]
 	if !ok {
@@ -112,13 +112,13 @@ func (m *SetMap[K, V]) DeleteValue(val V) (K, set.Set[V], bool) {
 	return key, set, true
 }
 
-// DeleteOverlapping removes and returns all the key-set pairs where the set
-// overlaps with [set].
-func (m *SetMap[K, V]) DeleteOverlapping(set set.Set[V]) []KeySetPair[K, V] {
-	var removed []KeySetPair[K, V]
+// DeleteOverlapping removes and returns all the entries where the set overlaps
+// with [set].
+func (m *SetMap[K, V]) DeleteOverlapping(set set.Set[V]) []Entry[K, V] {
+	var removed []Entry[K, V]
 	for val := range set {
 		if k, removedSet, ok := m.DeleteValue(val); ok {
-			removed = append(removed, KeySetPair[K, V]{
+			removed = append(removed, Entry[K, V]{
 				Key: k,
 				Set: removedSet,
 			})
