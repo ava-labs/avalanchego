@@ -60,6 +60,13 @@ type Builder interface {
 
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
+
+	VerifyTxAgainstAcceptedState(*txs.Tx) (
+		state.Diff,
+		set.Set[ids.ID],
+		bool,
+		error,
+	)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -306,6 +313,79 @@ func buildBlock(
 	)
 }
 
+func (b *builder) VerifyTxAgainstAcceptedState(tx *txs.Tx) (
+	state.Diff,
+	set.Set[ids.ID],
+	bool,
+	error,
+) {
+	acceptedID := b.blkManager.LastAccepted()
+	acceptedState, ok := b.blkManager.GetState(acceptedID)
+	if !ok {
+		return nil, nil, false, fmt.Errorf("%w: %s", state.ErrMissingParentState, acceptedID)
+	}
+
+	return VerifyTx(
+		tx,
+		acceptedID,
+		acceptedState,
+		b.txExecutorBackend,
+		set.Set[ids.ID]{},
+		b.blkManager,
+	)
+}
+
+// Verifies tx against [state] without modifying state.
+//
+// Returns:
+//   - the [state.Diff] from accepting [tx]
+//   - the [set.Set] of inputs that [tx] consumes
+//   - a bool denoting whether the [tx] should be marked as dropped
+//   - an error that
+//
+// Invariant: [tx] has already been syntactically verified.
+func VerifyTx(
+	tx *txs.Tx,
+	parentID ids.ID,
+	parentState state.Chain,
+	backend *txexecutor.Backend,
+	inputs set.Set[ids.ID],
+	manager blockexecutor.Manager,
+) (
+	state.Diff,
+	set.Set[ids.ID],
+	bool,
+	error,
+) {
+	txDiff, err := state.NewDiffOn(parentState)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	executor := &txexecutor.StandardTxExecutor{
+		Backend: backend,
+		State:   txDiff,
+		Tx:      tx,
+	}
+
+	err = tx.Unsigned.Visit(executor)
+	if err != nil {
+		return nil, nil, true, err
+	}
+
+	if inputs.Overlaps(executor.Inputs) {
+		return nil, nil, true, blockexecutor.ErrConflictingBlockTxs
+	}
+	err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
+	if err != nil {
+		return nil, nil, true, err
+	}
+
+	txDiff.AddTx(tx, status.Committed)
+
+	return txDiff, executor.Inputs, false, nil
+}
+
 func packBlockTxs(
 	parentID ids.ID,
 	parentState state.Chain,
@@ -343,42 +423,19 @@ func packBlockTxs(
 		}
 		mempool.Remove(tx)
 
-		// Invariant: [tx] has already been syntactically verified.
-
-		txDiff, err := state.NewDiffOn(stateDiff)
+		txDiff, executorInputs, dropped, err := VerifyTx(tx, parentID, stateDiff, backend, inputs, manager)
+		if dropped {
+			txID := tx.ID()
+			mempool.MarkDropped(txID, err)
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
 
-		executor := &txexecutor.StandardTxExecutor{
-			Backend: backend,
-			State:   txDiff,
-			Tx:      tx,
-		}
+		inputs.Union(executorInputs)
 
-		err = tx.Unsigned.Visit(executor)
-		if err != nil {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
-			continue
-		}
-
-		if inputs.Overlaps(executor.Inputs) {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
-			continue
-		}
-		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
-		if err != nil {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
-			continue
-		}
-		inputs.Union(executor.Inputs)
-
-		txDiff.AddTx(tx, status.Committed)
-		err = txDiff.Apply(stateDiff)
-		if err != nil {
+		if err = txDiff.Apply(stateDiff); err != nil {
 			return nil, err
 		}
 

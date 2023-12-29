@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -268,6 +269,31 @@ func (vm *VM) Initialize(
 	}()
 
 	return nil
+}
+
+func (vm *VM) PruneMempool() {
+	removedTxs := set.Set[*txs.Tx]{}
+	droppedTxs := make(map[ids.ID]error)
+
+	vm.Builder.Iterate(func(tx *txs.Tx) bool {
+		_, _, dropped, err := vm.Builder.VerifyTxAgainstAcceptedState(tx)
+		if err != nil {
+			if dropped {
+				droppedTxs[tx.ID()] = err
+			}
+
+			removedTxs.Add(tx)
+		}
+
+		// Always return true to iterate through all the txs in the mempool.
+		return true
+	})
+
+	vm.Builder.Remove(removedTxs.List()...)
+
+	for txID, dropReason := range droppedTxs {
+		vm.Builder.MarkDropped(txID, dropReason)
+	}
 }
 
 // Create all chains that exist that this node validates.
