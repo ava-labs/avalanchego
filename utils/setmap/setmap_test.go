@@ -17,7 +17,7 @@ func TestSetMapPut(t *testing.T) {
 		state           *SetMap[int, int]
 		key             int
 		value           set.Set[int]
-		expectedRemoved []KeySetPair[int, int]
+		expectedRemoved []Entry[int, int]
 		expectedState   *SetMap[int, int]
 	}{
 		{
@@ -47,7 +47,7 @@ func TestSetMapPut(t *testing.T) {
 			},
 			key:   1,
 			value: set.Of(3),
-			expectedRemoved: []KeySetPair[int, int]{
+			expectedRemoved: []Entry[int, int]{
 				{
 					Key: 1,
 					Set: set.Of(2),
@@ -74,7 +74,7 @@ func TestSetMapPut(t *testing.T) {
 			},
 			key:   3,
 			value: set.Of(2),
-			expectedRemoved: []KeySetPair[int, int]{
+			expectedRemoved: []Entry[int, int]{
 				{
 					Key: 1,
 					Set: set.Of(2),
@@ -103,7 +103,7 @@ func TestSetMapPut(t *testing.T) {
 			},
 			key:   1,
 			value: set.Of(4),
-			expectedRemoved: []KeySetPair[int, int]{
+			expectedRemoved: []Entry[int, int]{
 				{
 					Key: 1,
 					Set: set.Of(2),
@@ -358,7 +358,7 @@ func TestSetMapDeleteOverlapping(t *testing.T) {
 		name            string
 		state           *SetMap[int, int]
 		set             set.Set[int]
-		expectedRemoved []KeySetPair[int, int]
+		expectedRemoved []Entry[int, int]
 		expectedState   *SetMap[int, int]
 	}{
 		{
@@ -379,7 +379,7 @@ func TestSetMapDeleteOverlapping(t *testing.T) {
 				},
 			},
 			set: set.Of(2),
-			expectedRemoved: []KeySetPair[int, int]{
+			expectedRemoved: []Entry[int, int]{
 				{
 					Key: 1,
 					Set: set.Of(2),
@@ -401,7 +401,7 @@ func TestSetMapDeleteOverlapping(t *testing.T) {
 				},
 			},
 			set: set.Of(2, 4),
-			expectedRemoved: []KeySetPair[int, int]{
+			expectedRemoved: []Entry[int, int]{
 				{
 					Key: 1,
 					Set: set.Of(2, 3),
