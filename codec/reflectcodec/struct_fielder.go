@@ -35,7 +35,7 @@ func NewStructFielder(tagNames []string) StructFielder {
 }
 
 type structFielder struct {
-	lock sync.Mutex
+	lock sync.RWMutex
 
 	// multiple tags per field can be specified. A field is serialized/deserialized
 	// if it has at least one of the specified tags.
@@ -50,15 +50,13 @@ type structFielder struct {
 }
 
 func (s *structFielder) GetSerializedFields(t reflect.Type) ([]int, error) {
+	if serializedFields, ok := s.getCachedSerializedFields(t); ok { // use pre-computed result
+		return serializedFields, nil
+	}
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if s.serializedFieldIndices == nil {
-		s.serializedFieldIndices = make(map[reflect.Type][]int)
-	}
-	if serializedFields, ok := s.serializedFieldIndices[t]; ok { // use pre-computed result
-		return serializedFields, nil
-	}
 	numFields := t.NumField()
 	serializedFields := make([]int, 0, numFields)
 	for i := 0; i < numFields; i++ { // Go through all fields of this struct
@@ -67,9 +65,7 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]int, error) {
 		// Multiple tags per fields can be specified.
 		// Serialize/Deserialize field if it has
 		// any tag with the right value
-		var (
-			captureField bool
-		)
+		var captureField bool
 		for _, tag := range s.tags {
 			if field.Tag.Get(tag) == TagValue {
 				captureField = true
@@ -89,4 +85,12 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]int, error) {
 	}
 	s.serializedFieldIndices[t] = serializedFields // cache result
 	return serializedFields, nil
+}
+
+func (s *structFielder) getCachedSerializedFields(t reflect.Type) ([]int, bool) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	cachedFields, ok := s.serializedFieldIndices[t]
+	return cachedFields, ok
 }
