@@ -10,8 +10,6 @@ import (
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
@@ -40,9 +38,6 @@ func NewHandler[T Gossipable](
 		set:                set,
 		metrics:            metrics,
 		targetResponseSize: targetResponseSize,
-		pullLabels: prometheus.Labels{
-			typeLabel: pullType,
-		},
 	}
 }
 
@@ -54,9 +49,6 @@ type Handler[T Gossipable] struct {
 	set                Set[T]
 	metrics            Metrics
 	targetResponseSize int
-
-	pullLabels prometheus.Labels
-	pushLabels prometheus.Labels
 }
 
 func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
@@ -108,12 +100,12 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		Gossip: gossipBytes,
 	}
 
-	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(h.pullLabels)
+	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(pullLabels)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sent count metric: %w", err)
 	}
 
-	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(h.pullLabels)
+	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(pullLabels)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sent bytes metric: %w", err)
 	}
@@ -162,13 +154,13 @@ func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipByte
 		return
 	}
 
-	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(h.pushLabels)
+	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(pushLabels)
 	if err != nil {
 		h.log.Error("failed to get received count metric", zap.Error(err))
 		return
 	}
 
-	receivedBytesMetric, err := h.metrics.receivedBytes.GetMetricWith(h.pushLabels)
+	receivedBytesMetric, err := h.metrics.receivedBytes.GetMetricWith(pushLabels)
 	if err != nil {
 		h.log.Error("failed to get received bytes metric", zap.Error(err))
 		return
