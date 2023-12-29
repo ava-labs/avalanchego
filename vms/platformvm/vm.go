@@ -278,7 +278,7 @@ func (vm *VM) PruneMempool() {
 	}
 
 	for _, tx := range blockTxs {
-		vm.Builder.Add(tx)
+		_ = vm.Builder.Add(tx)
 	}
 }
 
