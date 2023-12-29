@@ -27,9 +27,8 @@ func TestIndex(t *testing.T) {
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
 
-	indexIntf, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
-	idx := indexIntf.(*index)
 
 	// Populate "containers" with random IDs/bytes
 	containers := map[ids.ID][]byte{}
@@ -80,9 +79,8 @@ func TestIndex(t *testing.T) {
 	require.NoError(db.Commit())
 	require.NoError(idx.Close())
 	db = versiondb.New(baseDB)
-	indexIntf, err = newIndex(db, logging.NoLog{}, mockable.Clock{})
+	idx, err = newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
-	idx = indexIntf.(*index)
 
 	// Get all of the containers
 	containersList, err := idx.GetContainerRange(0, pageSize)
@@ -113,9 +111,12 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	db := memdb.New()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
+<<<<<<< HEAD
 	indexIntf, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
+=======
+	idx, err := newIndex(db, logging.NoLog{},, mockable.Clock{})
+>>>>>>> dev
 	require.NoError(err)
-	idx := indexIntf.(*index)
 
 	// Insert [MaxFetchedByRange] + 1 containers
 	for i := uint64(0); i < MaxFetchedByRange+1; i++ {
