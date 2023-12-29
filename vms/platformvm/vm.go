@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sync"
 
@@ -30,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -272,27 +272,13 @@ func (vm *VM) Initialize(
 }
 
 func (vm *VM) PruneMempool() {
-	removedTxs := set.Set[*txs.Tx]{}
-	droppedTxs := make(map[ids.ID]error)
+	blockTxs, _ := vm.Builder.PackBlockTxs(math.MaxInt)
+	if blockTxs == nil {
+		return
+	}
 
-	vm.Builder.Iterate(func(tx *txs.Tx) bool {
-		_, _, dropped, err := vm.Builder.VerifyTxAgainstAcceptedState(tx)
-		if err != nil {
-			if dropped {
-				droppedTxs[tx.ID()] = err
-			}
-
-			removedTxs.Add(tx)
-		}
-
-		// Always return true to iterate through all the txs in the mempool.
-		return true
-	})
-
-	vm.Builder.Remove(removedTxs.List()...)
-
-	for txID, dropReason := range droppedTxs {
-		vm.Builder.MarkDropped(txID, dropReason)
+	for _, tx := range blockTxs {
+		vm.Builder.Add(tx)
 	}
 }
 
