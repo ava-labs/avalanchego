@@ -27,9 +27,9 @@ func New[K, V comparable]() *SetMap[K, V] {
 	}
 }
 
-// Put the key-set pair into the map. Removes and returns:
-// * The existing key-set pair for [key].
-// * Existing key-set pairs where the set overlaps with the [set].
+// Put the key to set entry into the map. Removes and returns:
+// * The existing entry for [key].
+// * Existing entries where the set overlaps with the [set].
 func (m *SetMap[K, V]) Put(key K, set set.Set[V]) []Entry[K, V] {
 	removed := m.DeleteOverlapping(set)
 	if removedSet, ok := m.DeleteKey(key); ok {
