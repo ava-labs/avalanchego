@@ -13,12 +13,12 @@ import (
 
 const CodecVersion = 0
 
-// The maximum block size is enforced by the p2p message size limit.
-// See: [constants.DefaultMaxMessageSize]
 var Codec codec.Manager
 
 func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	// The maximum block size is enforced by the p2p message size limit.
+	// See: [constants.DefaultMaxMessageSize]
 	Codec = codec.NewManager(math.MaxInt)
 
 	err := utils.Err(
