@@ -88,9 +88,9 @@ func NewIndexer(config Config) (Indexer, error) {
 		blockAcceptorGroup:   config.BlockAcceptorGroup,
 		txAcceptorGroup:      config.TxAcceptorGroup,
 		vertexAcceptorGroup:  config.VertexAcceptorGroup,
-		txIndices:            map[ids.ID]Index{},
-		vtxIndices:           map[ids.ID]Index{},
-		blockIndices:         map[ids.ID]Index{},
+		txIndices:            map[ids.ID]*index{},
+		vtxIndices:           map[ids.ID]*index{},
+		blockIndices:         map[ids.ID]*index{},
 		pathAdder:            config.APIServer,
 		shutdownF:            config.ShutdownF,
 	}
@@ -134,11 +134,11 @@ type indexer struct {
 	indexingEnabled bool
 
 	// Chain ID --> index of blocks of that chain (if applicable)
-	blockIndices map[ids.ID]Index
+	blockIndices map[ids.ID]*index
 	// Chain ID --> index of vertices of that chain (if applicable)
-	vtxIndices map[ids.ID]Index
+	vtxIndices map[ids.ID]*index
 	// Chain ID --> index of txs of that chain (if applicable)
-	txIndices map[ids.ID]Index
+	txIndices map[ids.ID]*index
 
 	// Notifies of newly accepted blocks
 	blockAcceptorGroup snow.AcceptorGroup
@@ -331,7 +331,7 @@ func (i *indexer) registerChainHelper(
 	prefixEnd byte,
 	name, endpoint string,
 	acceptorGroup snow.AcceptorGroup,
-) (Index, error) {
+) (*index, error) {
 	prefix := make([]byte, ids.IDLen+wrappers.ByteLen)
 	copy(prefix, chainID[:])
 	prefix[ids.IDLen] = prefixEnd
@@ -353,7 +353,7 @@ func (i *indexer) registerChainHelper(
 	codec := json.NewCodec()
 	apiServer.RegisterCodec(codec, "application/json")
 	apiServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := apiServer.RegisterService(&service{Index: index}, "index"); err != nil {
+	if err := apiServer.RegisterService(&service{index: index}, "index"); err != nil {
 		_ = index.Close()
 		return nil, err
 	}

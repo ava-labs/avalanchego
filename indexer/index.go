@@ -6,7 +6,6 @@ package indexer
 import (
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 
 	"go.uber.org/zap"
@@ -36,24 +35,14 @@ var (
 	errNumToFetchInvalid   = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
 	errNoContainerAtIndex  = errors.New("no container at index")
 
-	_ Index = (*index)(nil)
+	_ snow.Acceptor = (*index)(nil)
 )
 
-// Index indexes containers in their order of acceptance
-// Index is thread-safe.
-// Index assumes that Accept is called before the container is committed to the
-// database of the VM that the container exists in.
-type Index interface {
-	snow.Acceptor
-	GetContainerByIndex(index uint64) (Container, error)
-	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
-	GetLastAccepted() (Container, error)
-	GetIndex(id ids.ID) (uint64, error)
-	GetContainerByID(id ids.ID) (Container, error)
-	io.Closer
-}
-
-// indexer indexes all accepted transactions by the order in which they were accepted
+// index indexes containers in their order of acceptance
+//
+// Invariant: index is thread-safe.
+// Invariant: index assumes that Accept is called, before the container is
+// committed to the database of the VM, in the order they were accepted.
 type index struct {
 	codec codec.Manager
 	clock mockable.Clock
@@ -71,14 +60,15 @@ type index struct {
 	log              logging.Logger
 }
 
-// Returns a new, thread-safe Index.
-// Closes [baseDB] on close.
+// Create a new thread-safe index.
+//
+// Invariant: Closes [baseDB] on close.
 func newIndex(
 	baseDB database.Database,
 	log logging.Logger,
 	codec codec.Manager,
 	clock mockable.Clock,
-) (Index, error) {
+) (*index, error) {
 	vDB := versiondb.New(baseDB)
 	indexToContainer := prefixdb.New(indexToContainerPrefix, vDB)
 	containerToIndex := prefixdb.New(containerToIDPrefix, vDB)
