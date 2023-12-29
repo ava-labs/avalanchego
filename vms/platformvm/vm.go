@@ -278,7 +278,13 @@ func (vm *VM) PruneMempool() {
 	}
 
 	for _, tx := range blockTxs {
-		_ = vm.Builder.Add(tx)
+		if err := vm.Builder.Add(tx); err != nil {
+			vm.ctx.Log.Debug(
+				"failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Error(err),
+			)
+		}
 	}
 }
 
