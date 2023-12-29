@@ -23,10 +23,10 @@ var errTest = errors.New("non-nil error")
 func TestInitialStateVerifySerialization(t *testing.T) {
 	require := require.New(t)
 
-	lc := linearcodec.NewDefault()
-	require.NoError(lc.RegisterType(&secp256k1fx.TransferOutput{}))
-	c := codec.NewDefaultManager()
-	require.NoError(c.RegisterCodec(CodecVersion, lc))
+	c := linearcodec.NewDefault()
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
+	m := codec.NewDefaultManager()
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 
 	expected := []byte{
 		// Codec version:
@@ -72,7 +72,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 		},
 	}
 
-	isBytes, err := c.Marshal(CodecVersion, is)
+	isBytes, err := m.Marshal(CodecVersion, is)
 	require.NoError(err)
 	require.Equal(expected, isBytes)
 }
