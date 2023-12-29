@@ -94,11 +94,11 @@ func (v statelessVertex) Txs() [][]byte {
 
 type innerStatelessVertex struct {
 	Version   uint16   `json:"version"`
-	ChainID   ids.ID   `json:"chainID"             serializeV0:"true" serializeV1:"true"`
-	Height    uint64   `json:"height"              serializeV0:"true" serializeV1:"true"`
-	Epoch     uint32   `json:"epoch"               serializeV0:"true"`
-	ParentIDs []ids.ID `json:"parentIDs" len:"128" serializeV0:"true" serializeV1:"true"`
-	Txs       [][]byte `json:"txs"       len:"128" serializeV0:"true"`
+	ChainID   ids.ID   `json:"chainID"   serializeV0:"true" serializeV1:"true"`
+	Height    uint64   `json:"height"    serializeV0:"true" serializeV1:"true"`
+	Epoch     uint32   `json:"epoch"     serializeV0:"true"`
+	ParentIDs []ids.ID `json:"parentIDs" serializeV0:"true" serializeV1:"true"`
+	Txs       [][]byte `json:"txs"       serializeV0:"true"`
 }
 
 func (v innerStatelessVertex) Verify() error {
