@@ -111,11 +111,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	db := memdb.New()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-<<<<<<< HEAD
-	indexIntf, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
-=======
-	idx, err := newIndex(db, logging.NoLog{},, mockable.Clock{})
->>>>>>> dev
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
 
 	// Insert [MaxFetchedByRange] + 1 containers
