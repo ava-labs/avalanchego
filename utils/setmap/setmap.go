@@ -27,7 +27,7 @@ func New[K, V comparable]() *SetMap[K, V] {
 	}
 }
 
-// Put the key to set entry into the map. Removes and returns:
+// Put the new entry into the map. Removes and returns:
 // * The existing entry for [key].
 // * Existing entries where the set overlaps with the [set].
 func (m *SetMap[K, V]) Put(key K, set set.Set[V]) []Entry[K, V] {
