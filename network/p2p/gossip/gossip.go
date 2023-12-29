@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -165,7 +166,8 @@ func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	}
 
 	for i := 0; i < p.pollSize; i++ {
-		if err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse); err != nil {
+		err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse)
+		if err != nil && !errors.Is(err, p2p.ErrNoPeers) {
 			return err
 		}
 	}
