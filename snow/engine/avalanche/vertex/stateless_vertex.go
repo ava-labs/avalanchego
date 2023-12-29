@@ -73,7 +73,7 @@ func (v statelessVertex) ChainID() ids.ID {
 }
 
 func (v statelessVertex) StopVertex() bool {
-	return v.innerStatelessVertex.Version == codecVersionWithStopVtx
+	return v.innerStatelessVertex.Version == CodecVersionWithStopVtx
 }
 
 func (v statelessVertex) Height() uint64 {
@@ -102,7 +102,7 @@ type innerStatelessVertex struct {
 }
 
 func (v innerStatelessVertex) Verify() error {
-	if v.Version == codecVersionWithStopVtx {
+	if v.Version == CodecVersionWithStopVtx {
 		return v.verifyStopVertex()
 	}
 	return v.verify()
@@ -110,7 +110,7 @@ func (v innerStatelessVertex) Verify() error {
 
 func (v innerStatelessVertex) verify() error {
 	switch {
-	case v.Version != codecVersion:
+	case v.Version != CodecVersion:
 		return errBadVersion
 	case v.Epoch != 0:
 		return errBadEpoch
@@ -131,7 +131,7 @@ func (v innerStatelessVertex) verify() error {
 
 func (v innerStatelessVertex) verifyStopVertex() error {
 	switch {
-	case v.Version != codecVersionWithStopVtx:
+	case v.Version != CodecVersionWithStopVtx:
 		return errBadVersion
 	case v.Epoch != 0:
 		return errBadEpoch
