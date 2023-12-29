@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
@@ -45,6 +45,7 @@ var (
 type Mempool interface {
 	Add(tx *txs.Tx) error
 	Get(txID ids.ID) (*txs.Tx, bool)
+	// Remove [txs] and any conflicts of [txs] from the mempool.
 	Remove(txs ...*txs.Tx)
 
 	// Peek returns the oldest tx in the mempool.
@@ -67,7 +68,7 @@ type Mempool interface {
 type mempool struct {
 	lock           sync.RWMutex
 	unissuedTxs    linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
-	consumedUTXOs  set.Set[ids.ID]
+	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
 	bytesAvailable int
 	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> Verification error
 
@@ -84,6 +85,7 @@ func New(
 ) (Mempool, error) {
 	m := &mempool{
 		unissuedTxs:    linkedhashmap.New[ids.ID, *txs.Tx](),
+		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
 		bytesAvailable: maxMempoolSize,
 		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		toEngine:       toEngine,
@@ -136,7 +138,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 
 	inputs := tx.Unsigned.InputIDs()
-	if m.consumedUTXOs.Overlaps(inputs) {
+	if m.consumedUTXOs.HasOverlap(inputs) {
 		return fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
 	}
 
@@ -147,7 +149,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	m.numTxs.Inc()
 
 	// Mark these UTXOs as consumed in the mempool
-	m.consumedUTXOs.Union(inputs)
+	m.consumedUTXOs.Put(txID, inputs)
 
 	// An added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
@@ -165,18 +167,23 @@ func (m *mempool) Remove(txs ...*txs.Tx) {
 
 	for _, tx := range txs {
 		txID := tx.ID()
-		if !m.unissuedTxs.Delete(txID) {
+		// If the transaction is in the mempool, remove it.
+		if _, ok := m.consumedUTXOs.DeleteKey(txID); ok {
+			m.unissuedTxs.Delete(txID)
+			m.bytesAvailable += len(tx.Bytes())
 			continue
 		}
 
-		m.bytesAvailable += len(tx.Bytes())
-		m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-		m.numTxs.Dec()
-
+		// If the transaction isn't in the mempool, remove any conflicts it has.
 		inputs := tx.Unsigned.InputIDs()
-		m.consumedUTXOs.Difference(inputs)
+		for _, removed := range m.consumedUTXOs.DeleteOverlapping(inputs) {
+			tx, _ := m.unissuedTxs.Get(removed.Key)
+			m.unissuedTxs.Delete(removed.Key)
+			m.bytesAvailable += len(tx.Bytes())
+		}
 	}
+	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+	m.numTxs.Set(float64(m.unissuedTxs.Len()))
 }
 
 func (m *mempool) Peek() (*txs.Tx, bool) {
