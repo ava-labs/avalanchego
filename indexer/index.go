@@ -10,7 +10,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -44,7 +43,6 @@ var (
 // Invariant: index assumes that Accept is called, before the container is
 // committed to the database of the VM, in the order they were accepted.
 type index struct {
-	codec codec.Manager
 	clock mockable.Clock
 	lock  sync.RWMutex
 	// The index of the next accepted transaction
@@ -66,7 +64,6 @@ type index struct {
 func newIndex(
 	baseDB database.Database,
 	log logging.Logger,
-	codec codec.Manager,
 	clock mockable.Clock,
 ) (*index, error) {
 	vDB := versiondb.New(baseDB)
@@ -75,7 +72,6 @@ func newIndex(
 
 	i := &index{
 		clock:            clock,
-		codec:            codec,
 		baseDB:           baseDB,
 		vDB:              vDB,
 		indexToContainer: indexToContainer,
@@ -140,7 +136,7 @@ func (i *index) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container
 	)
 	// Persist index --> Container
 	nextAcceptedIndexBytes := database.PackUInt64(i.nextAcceptedIndex)
-	bytes, err := i.codec.Marshal(codecVersion, Container{
+	bytes, err := Codec.Marshal(CodecVersion, Container{
 		ID:        containerID,
 		Bytes:     containerBytes,
 		Timestamp: i.clock.Time().UnixNano(),
@@ -199,7 +195,7 @@ func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 		return Container{}, fmt.Errorf("couldn't read from database: %w", err)
 	}
 	var container Container
-	if _, err := i.codec.Unmarshal(containerBytes, &container); err != nil {
+	if _, err := Codec.Unmarshal(containerBytes, &container); err != nil {
 		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
 	}
 	return container, nil
