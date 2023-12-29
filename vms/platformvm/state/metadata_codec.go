@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	CodecVersion0Tag = "v0"
-	CodecVersion0    = 0
+	CodecVersion0Tag        = "v0"
+	CodecVersion0    uint16 = 0
 
-	CodecVersion1Tag = "v1"
-	CodecVersion1    = 1
+	CodecVersion1Tag        = "v1"
+	CodecVersion1    uint16 = 1
 )
 
 var MetadataCodec codec.Manager
