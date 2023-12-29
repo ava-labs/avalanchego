@@ -5,6 +5,6 @@ package genesis
 
 import "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 
-const Version = block.CodecVersion
+const CodecVersion = block.CodecVersion
 
 var Codec = block.Codec
