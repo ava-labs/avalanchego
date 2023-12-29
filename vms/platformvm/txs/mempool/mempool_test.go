@@ -260,9 +260,10 @@ func TestIterate(t *testing.T) {
 	require.NoError(mempool.Add(decisionTx))
 	require.NoError(mempool.Add(proposalTx))
 
-	expectedSet := set.NewSet[ids.ID](2)
-	expectedSet.Add(decisionTx.ID())
-	expectedSet.Add(proposalTx.ID())
+	expectedSet := set.Of(
+		decisionTx.ID(),
+		proposalTx.ID(),
+	)
 
 	set := set.NewSet[ids.ID](2)
 	mempool.Iterate(func(tx *txs.Tx) bool {
