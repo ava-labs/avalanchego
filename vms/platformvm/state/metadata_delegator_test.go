@@ -100,7 +100,7 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 	tests := []test{
 		{
 			name:    "v0",
-			version: v0,
+			version: CodecVersion0,
 			metadata: &delegatorMetadata{
 				PotentialReward: 123,
 				StakerStartTime: 456,
@@ -112,7 +112,7 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 		},
 		{
 			name:    "v1",
-			version: v1,
+			version: CodecVersion1,
 			metadata: &delegatorMetadata{
 				PotentialReward: 123,
 				StakerStartTime: 456,
