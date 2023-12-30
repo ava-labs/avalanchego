@@ -2310,10 +2310,8 @@ func TestPruneMempool(t *testing.T) {
 	_, ok := vm.Builder.Get(txID)
 	require.True(ok)
 
-	// Prune the mempool of invalid txs
+	// [tx] should have be ejected from the mempool.
 	vm.PruneMempool()
-
-	// [tx] should have been ejected from the mempool.
 	_, ok = vm.Builder.Get(txID)
 	require.False(ok)
 }
