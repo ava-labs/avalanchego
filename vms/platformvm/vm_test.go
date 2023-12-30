@@ -2271,3 +2271,49 @@ func TestBaseTx(t *testing.T) {
 	require.NoError(baseTxBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 }
+
+func TestPruneMempool(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, latestFork)
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		vm.ctx.Lock.Unlock()
+	}()
+
+	var (
+		startTime = vm.clock.Time()
+		endTime   = startTime.Add(vm.MinStakeDuration)
+	)
+
+	tx, err := vm.txBuilder.NewAddValidatorTx(
+		defaultMinValidatorStake,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		ids.GenerateTestNodeID(),
+		keys[1].Address(),
+		20000,
+		[]*secp256k1.PrivateKey{keys[0]},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), tx))
+	vm.ctx.Lock.Lock()
+
+	// Advance clock to [endTime], making [tx] invalid.
+	vm.clock.Set(endTime)
+
+	// [tx] should still be in the mempool
+	txID := tx.ID()
+	_, ok := vm.Builder.Get(txID)
+	require.True(ok)
+
+	// Prune the mempool of invalid txs
+	vm.PruneMempool()
+
+	// [tx] should have been ejected from the mempool.
+	_, ok = vm.Builder.Get(txID)
+	require.False(ok)
+}
