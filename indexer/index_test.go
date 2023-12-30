@@ -8,8 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,14 +22,12 @@ func TestIndex(t *testing.T) {
 	// Setup
 	pageSize := uint64(64)
 	require := require.New(t)
-	codec := codec.NewDefaultManager()
-	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
 
-	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
 
 	// Populate "containers" with random IDs/bytes
@@ -83,7 +79,7 @@ func TestIndex(t *testing.T) {
 	require.NoError(db.Commit())
 	require.NoError(idx.Close())
 	db = versiondb.New(baseDB)
-	idx, err = newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	idx, err = newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
 
 	// Get all of the containers
@@ -112,12 +108,10 @@ func TestIndex(t *testing.T) {
 func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	// Setup
 	require := require.New(t)
-	codec := codec.NewDefaultManager()
-	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
 
 	// Insert [MaxFetchedByRange] + 1 containers
@@ -152,12 +146,10 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 func TestDontIndexSameContainerTwice(t *testing.T) {
 	// Setup
 	require := require.New(t)
-	codec := codec.NewDefaultManager()
-	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
 
 	// Accept the same container twice

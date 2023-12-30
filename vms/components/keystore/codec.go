@@ -11,12 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	// CodecVersion is the current default codec version
-	CodecVersion = 0
-)
+const CodecVersion = 0
 
-// Codecs do serialization and deserialization
 var (
 	Codec       codec.Manager
 	LegacyCodec codec.Manager
