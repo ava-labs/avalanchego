@@ -57,9 +57,6 @@ import (
 )
 
 var (
-	// How often the mempool txs will be re-verified and pruned
-	mempoolPrunerFrequency = 30 * time.Minute
-
 	_ snowmanblock.ChainVM       = (*VM)(nil)
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
@@ -252,9 +249,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Incrementing [awaitShutdown] is not required since [startMempoolPruner]
-	// grabs the context lock.
-	go vm.startMempoolPruner(mempoolPrunerFrequency)
+	// Incrementing [awaitShutdown] would cause a deadlock since
+	// [startMempoolPruner] grabs the context lock.
+	go vm.startMempoolPruner(execConfig.MempoolPrunerFrequency)
 
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
