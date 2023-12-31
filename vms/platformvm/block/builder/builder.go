@@ -61,6 +61,11 @@ type Builder interface {
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
 
+	// PackBlockTxs returns an array of txs that can fit into a valid block of
+	// size [targetBlockSize]. The returned txs are all verified against the
+	// preferred state.
+	//
+	// Note: This function does not call the consensus engine.
 	PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error)
 }
 
