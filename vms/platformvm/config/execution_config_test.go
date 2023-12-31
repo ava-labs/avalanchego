@@ -63,7 +63,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			"block-id-cache-size": 8,
 			"fx-owner-cache-size": 9,
 			"checksums-enabled": true,
-			"mempool-pruner-frequency": 60000000000
+			"mempool-prune-frequency": 60000000000
 		}`)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
