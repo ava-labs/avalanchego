@@ -335,7 +335,7 @@ func packBlockTxs(
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
-	blockSize int,
+	remainingSize int,
 ) ([]*txs.Tx, error) {
 	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
@@ -350,9 +350,8 @@ func packBlockTxs(
 	stateDiff.SetTimestamp(timestamp)
 
 	var (
-		blockTxs      []*txs.Tx
-		inputs        set.Set[ids.ID]
-		remainingSize = blockSize
+		blockTxs []*txs.Tx
+		inputs   set.Set[ids.ID]
 	)
 
 	for {

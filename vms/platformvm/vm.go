@@ -271,10 +271,10 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-func (vm *VM) PruneMempool() {
-	blockTxs, _ := vm.Builder.PackBlockTxs(math.MaxInt)
-	if blockTxs == nil {
-		return
+func (vm *VM) PruneMempool() error {
+	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
+	if err != nil {
+		return err
 	}
 
 	for _, tx := range blockTxs {
@@ -286,6 +286,8 @@ func (vm *VM) PruneMempool() {
 			)
 		}
 	}
+
+	return nil
 }
 
 // Create all chains that exist that this node validates.
