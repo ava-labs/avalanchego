@@ -290,7 +290,7 @@ func (vm *VM) startMempoolPruner(frequency time.Duration) {
 		case <-vm.onShutdownCtx.Done():
 			return
 		case <-ticker.C:
-			if err := vm.PruneMempool(); err != nil {
+			if err := vm.pruneMempool(); err != nil {
 				vm.ctx.Log.Debug("pruning mempool failed",
 					zap.Error(err),
 				)
@@ -299,7 +299,7 @@ func (vm *VM) startMempoolPruner(frequency time.Duration) {
 	}
 }
 
-func (vm *VM) PruneMempool() error {
+func (vm *VM) pruneMempool() error {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
