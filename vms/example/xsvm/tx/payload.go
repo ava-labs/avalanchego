@@ -34,7 +34,7 @@ func NewPayload(
 		Amount:   amount,
 		To:       to,
 	}
-	bytes, err := Codec.Marshal(Version, p)
+	bytes, err := Codec.Marshal(CodecVersion, p)
 	p.bytes = bytes
 	return p, err
 }

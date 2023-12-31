@@ -112,7 +112,7 @@ func (s *state) SetValue(e *Element) error {
 		Traits:  e.Traits,
 	}
 
-	valueBytes, err := codecManager.Marshal(codecVersion, &dbElem)
+	valueBytes, err := Codec.Marshal(CodecVersion, &dbElem)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (s *state) RemoveValue(key []byte) error {
 
 		// The value doesn't exist, so we should optimistically delete it
 		dbElem := dbElement{Present: false}
-		valueBytes, err := codecManager.Marshal(codecVersion, &dbElem)
+		valueBytes, err := Codec.Marshal(CodecVersion, &dbElem)
 		if err != nil {
 			return err
 		}
@@ -189,7 +189,7 @@ func (s *state) loadValue(key []byte) (*dbElement, error) {
 
 	// The key was in the database
 	value := &dbElement{}
-	_, err = codecManager.Unmarshal(valueBytes, value)
+	_, err = Codec.Unmarshal(valueBytes, value)
 	return value, err
 }
 

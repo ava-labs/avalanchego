@@ -107,7 +107,7 @@ func sharedID(id1, id2 ids.ID) ids.ID {
 		id1, id2 = id2, id1
 	}
 
-	combinedBytes, err := codecManager.Marshal(codecVersion, [2]ids.ID{id1, id2})
+	combinedBytes, err := Codec.Marshal(CodecVersion, [2]ids.ID{id1, id2})
 	if err != nil {
 		panic(err)
 	}
