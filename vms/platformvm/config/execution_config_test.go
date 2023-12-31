@@ -89,7 +89,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			BlockIDCacheSize:             8,
 			FxOwnerCacheSize:             9,
 			ChecksumsEnabled:             true,
-			MempoolPrunerFrequency:       time.Minute,
+			MempoolPruneFrequency:        time.Minute,
 		}
 		require.Equal(expected, ec)
 	})
@@ -138,7 +138,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			BlockIDCacheSize:             8,
 			FxOwnerCacheSize:             9,
 			ChecksumsEnabled:             true,
-			MempoolPrunerFrequency:       30 * time.Minute,
+			MempoolPruneFrequency:        30 * time.Minute,
 		}
 		require.Equal(expected, ec)
 	})

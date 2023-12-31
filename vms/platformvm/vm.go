@@ -251,7 +251,7 @@ func (vm *VM) Initialize(
 
 	// Incrementing [awaitShutdown] would cause a deadlock since
 	// [startMempoolPruner] grabs the context lock.
-	go vm.startMempoolPruner(execConfig.MempoolPrunerFrequency)
+	go vm.startMempoolPruner(execConfig.MempoolPruneFrequency)
 
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
