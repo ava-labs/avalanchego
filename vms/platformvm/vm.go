@@ -252,6 +252,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	// Incrementing [awaitShutdown] is not required since [startMempoolPruner]
+	// grabs the context lock.
 	go vm.startMempoolPruner(mempoolPrunerFrequency)
 
 	shouldPrune, err := vm.state.ShouldPrune()
