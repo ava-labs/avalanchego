@@ -252,7 +252,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	go vm.startMempoolPruner()
+	go vm.startMempoolPruner(mempoolPrunerFrequency)
 
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
@@ -281,8 +281,8 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-func (vm *VM) startMempoolPruner() {
-	ticker := time.NewTicker(mempoolPrunerFrequency)
+func (vm *VM) startMempoolPruner(frequency time.Duration) {
+	ticker := time.NewTicker(frequency)
 	defer ticker.Stop()
 
 	for {
@@ -290,15 +290,19 @@ func (vm *VM) startMempoolPruner() {
 		case <-vm.onShutdownCtx.Done():
 			return
 		case <-ticker.C:
-			err := vm.PruneMempool()
-			vm.ctx.Log.Debug("pruning mempool failed",
-				zap.Error(err),
-			)
+			if err := vm.PruneMempool(); err != nil {
+				vm.ctx.Log.Debug("pruning mempool failed",
+					zap.Error(err),
+				)
+			}
 		}
 	}
 }
 
 func (vm *VM) PruneMempool() error {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
 	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
 	if err != nil {
 		return err
