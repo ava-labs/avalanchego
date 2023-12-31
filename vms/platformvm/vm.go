@@ -57,8 +57,8 @@ import (
 )
 
 var (
-	// How often should the mempool be re-verified and pruned
-	mempoolPrunerFrequency = 5 * time.Minute
+	// How often the mempool txs will be re-verified and pruned
+	mempoolPrunerFrequency = 6 * time.Hour
 
 	_ snowmanblock.ChainVM       = (*VM)(nil)
 	_ secp256k1fx.VM             = (*VM)(nil)
