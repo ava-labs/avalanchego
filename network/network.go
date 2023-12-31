@@ -146,7 +146,7 @@ type network struct {
 	// Cancelled on close
 	onCloseCtx context.Context
 	// Call [onCloseCtxCancel] to cancel [onCloseCtx] during close()
-	onCloseCtxCancel func()
+	onCloseCtxCancel context.CancelFunc
 
 	sendFailRateCalculator safemath.Averager
 
