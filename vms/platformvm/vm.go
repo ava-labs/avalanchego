@@ -57,6 +57,9 @@ import (
 )
 
 var (
+	// How often should the mempool be re-verified and pruned
+	mempoolPrunerFrequency = 5 * time.Minute
+
 	_ snowmanblock.ChainVM       = (*VM)(nil)
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
@@ -279,7 +282,7 @@ func (vm *VM) Initialize(
 }
 
 func (vm *VM) startMempoolPruner() {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(mempoolPrunerFrequency)
 	defer ticker.Stop()
 
 	for {
