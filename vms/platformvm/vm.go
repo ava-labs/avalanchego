@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -91,8 +92,11 @@ type VM struct {
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
 
-	startShutdown context.CancelFunc
-	awaitShutdown sync.WaitGroup
+	// Cancelled on close
+	onCloseCtx context.Context
+	// Call [onCloseCtxCancel] to cancel [onCloseCtx]
+	onCloseCtxCancel context.CancelFunc
+	awaitShutdown    sync.WaitGroup
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
@@ -213,12 +217,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize network: %w", err)
 	}
 
-	vmCtx, cancel := context.WithCancel(context.Background())
-	vm.startShutdown = cancel
+	onCloseCtx, cancel := context.WithCancel(context.Background())
+	vm.onCloseCtx = onCloseCtx
+	vm.onCloseCtxCancel = cancel
 	vm.awaitShutdown.Add(1)
 	go func() {
 		defer vm.awaitShutdown.Done()
-		vm.Network.Gossip(vmCtx)
+		vm.Network.Gossip(onCloseCtx)
 	}()
 
 	vm.Builder = blockbuilder.New(
@@ -243,6 +248,8 @@ func (vm *VM) Initialize(
 	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
 		return err
 	}
+
+	go vm.startMempoolPruner()
 
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
@@ -269,6 +276,23 @@ func (vm *VM) Initialize(
 	}()
 
 	return nil
+}
+
+func (vm *VM) startMempoolPruner() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-vm.onCloseCtx.Done():
+			return
+		case <-ticker.C:
+			err := vm.PruneMempool()
+			vm.ctx.Log.Debug("pruning mempool failed",
+				zap.Error(err),
+			)
+		}
+	}
 }
 
 func (vm *VM) PruneMempool() error {
@@ -395,7 +419,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.startShutdown()
+	vm.onCloseCtxCancel()
 	vm.awaitShutdown.Wait()
 
 	vm.Builder.ShutdownBlockTimer()
