@@ -92,11 +92,11 @@ type VM struct {
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
 
-	// Cancelled on close
-	onCloseCtx context.Context
-	// Call [onCloseCtxCancel] to cancel [onCloseCtx]
-	onCloseCtxCancel context.CancelFunc
-	awaitShutdown    sync.WaitGroup
+	// Cancelled on shutdown
+	onShutdownCtx context.Context
+	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
+	onShutdownCtxCancel context.CancelFunc
+	awaitShutdown       sync.WaitGroup
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
@@ -217,13 +217,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize network: %w", err)
 	}
 
-	onCloseCtx, cancel := context.WithCancel(context.Background())
-	vm.onCloseCtx = onCloseCtx
-	vm.onCloseCtxCancel = cancel
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	vm.awaitShutdown.Add(1)
 	go func() {
 		defer vm.awaitShutdown.Done()
-		vm.Network.Gossip(onCloseCtx)
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.Network.Gossip(vm.onShutdownCtx)
 	}()
 
 	vm.Builder = blockbuilder.New(
@@ -284,7 +284,7 @@ func (vm *VM) startMempoolPruner() {
 
 	for {
 		select {
-		case <-vm.onCloseCtx.Done():
+		case <-vm.onShutdownCtx.Done():
 			return
 		case <-ticker.C:
 			err := vm.PruneMempool()
@@ -419,7 +419,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.onCloseCtxCancel()
+	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
 	vm.Builder.ShutdownBlockTimer()
