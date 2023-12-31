@@ -2339,7 +2339,9 @@ func TestPruneMempool(t *testing.T) {
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
 
+	vm.ctx.Lock.Unlock()
 	require.NoError(vm.PruneMempool())
+	vm.ctx.Lock.Lock()
 
 	// [addValidatorTx] should be ejected from the mempool.
 	// [baseTx] should still be in the mempool.
