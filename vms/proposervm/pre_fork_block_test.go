@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
