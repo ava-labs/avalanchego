@@ -24,6 +24,7 @@ type intermediateNodeDB struct {
 	// Keys written to [baseDB] are prefixed with [intermediateNodePrefix].
 	baseDB database.Database
 
+	// The write buffer contains nodes that have been changed but have not been written to disk.
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
