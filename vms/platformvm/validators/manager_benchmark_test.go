@@ -58,7 +58,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	}()
 
 	snowCtx := snowtest.Context(b, snowtest.PChainID)
-	genesis, err := ts.BuildGenesis(snowCtx)
+	_, genesisBytes := ts.BuildGenesis(b, snowCtx)
 	require.NoError(err)
 
 	vdrs := validators.NewManager()
@@ -71,7 +71,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 
 	s, err := state.New(
 		db,
-		genesis,
+		genesisBytes,
 		prometheus.NewRegistry(),
 		&config.Config{
 			Validators: vdrs,

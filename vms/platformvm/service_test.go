@@ -395,7 +395,7 @@ func TestGetBalance(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	genesis, _ := ts.BuildGenesis(t, service.vm.ctx)
 	for idx, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -430,7 +430,7 @@ func TestGetStake(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	g, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	g, _ := ts.BuildGenesis(t, service.vm.ctx)
 	addrsStrs := []string{}
 	for i, validator := range g.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
@@ -605,16 +605,16 @@ func TestGetCurrentValidators(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	g, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	genesis, _ := ts.BuildGenesis(t, service.vm.ctx)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
 
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
-	require.Len(response.Validators, len(g.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
-	for _, vdr := range g.Validators {
+	for _, vdr := range genesis.Validators {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
 			gotVdr := response.Validators[i].(pchainapi.PermissionlessValidator)
@@ -666,7 +666,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Call getCurrentValidators
 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
-	require.Len(response.Validators, len(g.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	// Make sure the delegator is there
 	found := false
@@ -715,7 +715,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Call getValidators
 	response = GetCurrentValidatorsReply{}
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
-	require.Len(response.Validators, len(g.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	for _, vdr := range response.Validators {
 		castVdr := vdr.(pchainapi.PermissionlessValidator)

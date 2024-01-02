@@ -215,11 +215,10 @@ func defaultState(
 	require := require.New(t)
 
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	genesis, err := ts.BuildGenesis(ctx)
-	require.NoError(err)
+	_, genesisBytes := ts.BuildGenesis(t, ctx)
 	state, err := state.New(
 		db,
-		genesis,
+		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		execCfg,

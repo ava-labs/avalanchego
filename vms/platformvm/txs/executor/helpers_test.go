@@ -88,7 +88,7 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(config, ctx, baseDB, rewards)
+	baseState := defaultState(t, config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
@@ -175,20 +175,18 @@ func addSubnet(
 }
 
 func defaultState(
+	t *testing.T,
 	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesis, err := ts.BuildGenesis(ctx)
-	if err != nil {
-		panic(err)
-	}
+	_, genesisBytes := ts.BuildGenesis(t, ctx)
 
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
 		db,
-		genesis,
+		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		execCfg,
