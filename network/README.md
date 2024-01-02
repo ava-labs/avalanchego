@@ -54,26 +54,26 @@ In Avalanche, nodes connect to an initial set of bootstrapper nodes known as **b
 
 Upon connection to any peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-When attempting to establish the connection, the first message that the node attempting to connect to the peer in the network is a `Version` message describing compatibility of the candidate node with the peer. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected by the peer.
+When attempting to establish the connection, the first message that the node attempting to connect to the peer in the network is a `Handshake` message describing compatibility of the candidate node with the peer. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected by the peer.
 
 ```mermaid
 sequenceDiagram
 Note over Node,Peer: Initiate Handshake
 Note left of Node: I want to connect to you!
-Note over Node,Peer: Version message
+Note over Node,Peer: Handshake message
 Node->>Peer: AvalancheGo v1.0.0
 Note right of Peer: My version v1.9.4 is incompatible with your version v1.0.0.
 Peer-xNode: Connection dropped
 Note over Node,Peer: Handshake Failed
 ```
 
-If the `Version` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. Upon reception of a `PeerList` message, a node will attempt to connect to any peers that the node is not already connected to to allow the node to discover more peers in the network.
+If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. Upon reception of a `PeerList` message, a node will attempt to connect to any peers that the node is not already connected to to allow the node to discover more peers in the network.
 
 ```mermaid
 sequenceDiagram
 Note over Node,Peer: Initiate Handshake
 Note left of Node: I want to connect to you!
-Note over Node,Peer: Version message
+Note over Node,Peer: Handshake message
 Node->>Peer: AvalancheGo v1.9.4
 Note right of Peer: LGTM!
 Note over Node,Peer: PeerList message
@@ -90,11 +90,11 @@ Some peers aren't discovered through the `PeerList` messages exchanged through p
 
 ```mermaid
 sequenceDiagram
-Node ->> Peer-1: Version - v1.9.5
+Node ->> Peer-1: Handshake - v1.9.5
 Peer-1 ->> Node: PeerList - Peer-2
 Node ->> Peer-1: ACK - Peer-2
 Note left of Node: Node is connected to Peer-1 and now tries to connect to Peer-2.
-Node ->> Peer-2: Version - v1.9.5
+Node ->> Peer-2: Handshake - v1.9.5
 Peer-2 ->> Node: PeerList - Peer-1
 Node ->> Peer-2: ACK - Peer-1
 Note left of Node: Peer-3 was never sampled, so we haven't connected yet!
@@ -128,7 +128,7 @@ To optimize bandwidth usage, each node tracks which peers are guaranteed to know
 
 To efficiently track which peers know of which peers, the peers that each peer is aware of is represented in a [bit set](https://en.wikipedia.org/wiki/Bit_array). A peer is represented by either a `0` if it isn't known by the peer yet, or a `1` if it is known by the peer.
 
-An node follows the following steps for every cycle of `PeerList` gossip:
+A node follows the following steps for every cycle of `PeerList` gossip:
 
 1. Get a sample of peers in the network that the node is connected to
 2. For each peer:

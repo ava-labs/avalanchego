@@ -992,7 +992,7 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 	var (
 		nodeID    = ids.GenerateTestNodeID()
 		chainTime = env.state.GetTimestamp()
-		endTime   = chainTime.Add(defaultMaxStakingDuration)
+		endTime   = chainTime.Add(ts.MaxStakingDuration)
 	)
 
 	addValTx, err := env.txBuilder.NewAddValidatorTx(
@@ -1002,7 +1002,7 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 		nodeID,
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)

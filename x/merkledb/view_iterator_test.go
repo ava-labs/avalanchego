@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-func Test_TrieView_Iterator(t *testing.T) {
+func Test_View_Iterator(t *testing.T) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -55,7 +55,7 @@ func Test_TrieView_Iterator(t *testing.T) {
 	require.NoError(iterator.Error())
 }
 
-func Test_TrieView_Iterator_DBClosed(t *testing.T) {
+func Test_View_Iterator_DBClosed(t *testing.T) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -82,9 +82,9 @@ func Test_TrieView_Iterator_DBClosed(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 }
 
-// Test_TrieView_IteratorStart tests to make sure the iterator can be configured to
+// Test_View_IteratorStart tests to make sure the iterator can be configured to
 // start midway through the database.
-func Test_TrieView_IteratorStart(t *testing.T) {
+func Test_View_IteratorStart(t *testing.T) {
 	require := require.New(t)
 	db, err := getBasicDB()
 	require.NoError(err)
@@ -115,9 +115,9 @@ func Test_TrieView_IteratorStart(t *testing.T) {
 	require.NoError(iterator.Error())
 }
 
-// Test_TrieView_IteratorPrefix tests to make sure the iterator can be configured to skip
+// Test_View_IteratorPrefix tests to make sure the iterator can be configured to skip
 // keys missing the provided prefix.
-func Test_TrieView_IteratorPrefix(t *testing.T) {
+func Test_View_IteratorPrefix(t *testing.T) {
 	require := require.New(t)
 	db, err := getBasicDB()
 	require.NoError(err)
@@ -152,9 +152,9 @@ func Test_TrieView_IteratorPrefix(t *testing.T) {
 	require.NoError(iterator.Error())
 }
 
-// Test_TrieView_IteratorStartPrefix tests to make sure that the iterator can start
+// Test_View_IteratorStartPrefix tests to make sure that the iterator can start
 // midway through the database while skipping a prefix.
-func Test_TrieView_IteratorStartPrefix(t *testing.T) {
+func Test_View_IteratorStartPrefix(t *testing.T) {
 	require := require.New(t)
 	db, err := getBasicDB()
 	require.NoError(err)
@@ -196,7 +196,7 @@ func Test_TrieView_IteratorStartPrefix(t *testing.T) {
 // Test view iteration by creating a stack of views,
 // inserting random key/value pairs into them, and
 // iterating over the last view.
-func Test_TrieView_Iterator_Random(t *testing.T) {
+func Test_View_Iterator_Random(t *testing.T) {
 	require := require.New(t)
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)

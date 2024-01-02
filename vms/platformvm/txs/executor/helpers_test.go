@@ -4,8 +4,6 @@
 package executor
 
 import (
-	"context"
-	"errors"
 	"math"
 	"testing"
 	"time"
@@ -20,10 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -52,8 +50,6 @@ var (
 	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1 *txs.Tx
-
-	errMissing = errors.New("missing")
 )
 
 type mutableSharedMemory struct {
@@ -97,7 +93,12 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	clk := defaultClock(postBanff || postCortina || postDurango)
 
 	baseDB := versiondb.New(memdb.New())
-	ctx, msm := defaultCtx(baseDB)
+	ctx := snowtest.Context(t, snowtest.PChainID)
+	m := atomic.NewMemory(baseDB)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
@@ -194,7 +195,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesis, err := ts.BuildGenesis()
+	genesis, err := ts.BuildGenesis(ctx.AVAXAssetID)
 	if err != nil {
 		panic(err)
 	}
@@ -221,38 +222,6 @@ func defaultState(
 	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
-}
-
-func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = ts.NetworkID
-	ctx.XChainID = ts.XChainID
-	ctx.CChainID = ts.CChainID
-	ctx.AVAXAssetID = ts.AvaxAssetID
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				ts.XChainID:               constants.PrimaryNetworkID,
-				ts.CChainID:               constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-
-	return ctx, msm
 }
 
 func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {

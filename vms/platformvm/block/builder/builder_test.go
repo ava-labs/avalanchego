@@ -53,8 +53,11 @@ func TestBuildBlockBasic(t *testing.T) {
 	txID := tx.ID()
 
 	// Issue the transaction
+	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
+	env.ctx.Lock.Lock()
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
 
 	// [BuildBlock] should build a block with the transaction
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
@@ -66,7 +69,8 @@ func TestBuildBlockBasic(t *testing.T) {
 	require.Equal(txID, blk.Txs()[0].ID())
 
 	// Mempool should not contain the transaction or have marked it as dropped
-	require.False(env.mempool.Has(txID))
+	_, ok = env.mempool.Get(txID)
+	require.False(ok)
 	require.NoError(env.mempool.GetDropReason(txID))
 }
 
@@ -124,8 +128,11 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	txID := tx.ID()
 
 	// Issue the transaction
+	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
+	env.ctx.Lock.Lock()
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
 
 	// Build and accept a block with the tx
 	blk, err := env.Builder.BuildBlock(context.Background())
@@ -247,8 +254,11 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	txID := tx.ID()
 
 	// Issue the transaction
+	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
+	env.ctx.Lock.Lock()
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
 
 	var (
 		now      = env.backend.Clk.Time()
@@ -313,7 +323,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
 	tx1ID := tx1.ID()
-	require.True(env.mempool.Has(tx1ID))
+	_, ok := env.mempool.Get(tx1ID)
+	require.True(ok)
 
 	// Add a validator with StartTime before current chain time
 	validator2StartTime := now.Add(-5 * time.Second)
@@ -332,7 +343,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
 	tx2ID := tx2.ID()
-	require.True(env.mempool.Has(tx2ID))
+	_, ok = env.mempool.Get(tx2ID)
+	require.True(ok)
 
 	// Add a validator with StartTime in the future past [MaxFutureStartTime]
 	validator3StartTime := now.Add(txexecutor.MaxFutureStartTime + 5*time.Second)
@@ -351,7 +363,8 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx3))
 	tx3ID := tx3.ID()
-	require.True(env.mempool.Has(tx3ID))
+	_, ok = env.mempool.Get(tx3ID)
+	require.True(ok)
 
 	// Only tx1 should be in a built block
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
@@ -363,9 +376,12 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require.Equal(tx1ID, blk.Txs()[0].ID())
 
 	// Mempool should have none of the txs
-	require.False(env.mempool.Has(tx1ID))
-	require.False(env.mempool.Has(tx2ID))
-	require.False(env.mempool.Has(tx3ID))
+	_, ok = env.mempool.Get(tx1ID)
+	require.False(ok)
+	_, ok = env.mempool.Get(tx2ID)
+	require.False(ok)
+	_, ok = env.mempool.Get(tx3ID)
+	require.False(ok)
 
 	// Only tx2 and tx3 should be dropped
 	require.NoError(env.mempool.GetDropReason(tx1ID))
@@ -404,15 +420,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		uint64(now.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		preFundedKeys[0].PublicKey().Address(),
+		ts.Keys[0].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ts.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
 	tx1ID := tx1.ID()
-	require.True(env.mempool.Has(tx1ID))
+	_, ok := env.mempool.Get(tx1ID)
+	require.True(ok)
 
 	// Add a validator ending past [MaxStakeDuration]
 	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
@@ -422,15 +439,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		uint64(now.Unix()),
 		uint64(validator2EndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		preFundedKeys[2].PublicKey().Address(),
+		ts.Keys[2].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[2]},
-		preFundedKeys[2].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{ts.Keys[2]},
+		ts.Keys[2].PublicKey().Address(),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
 	tx2ID := tx2.ID()
-	require.True(env.mempool.Has(tx2ID))
+	_, ok = env.mempool.Get(tx2ID)
+	require.True(ok)
 
 	// Only tx1 should be in a built block since [MaxStakeDuration] is satisfied.
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
@@ -442,8 +460,10 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.Equal(tx1ID, blk.Txs()[0].ID())
 
 	// Mempool should have none of the txs
-	require.False(env.mempool.Has(tx1ID))
-	require.False(env.mempool.Has(tx2ID))
+	_, ok = env.mempool.Get(tx1ID)
+	require.False(ok)
+	_, ok = env.mempool.Get(tx2ID)
+	require.False(ok)
 
 	// Only tx2 should be dropped
 	require.NoError(env.mempool.GetDropReason(tx1ID))
@@ -452,12 +472,13 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.ErrorIs(tx2DropReason, txexecutor.ErrStakeTooLong)
 }
 
-func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
+func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
+		env.ctx.Lock.Lock()
 		require.NoError(shutdownEnvironment(env))
 		env.ctx.Lock.Unlock()
 	}()
@@ -475,33 +496,26 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require.NoError(err)
 	txID := tx.ID()
 
-	// Issue the transaction
-	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
-
-	// Transaction should not be marked as dropped when added to the mempool
-	reason := env.mempool.GetDropReason(txID)
-	require.NoError(reason)
+	// Transaction should not be marked as dropped before being added to the
+	// mempool
+	require.NoError(env.mempool.GetDropReason(txID))
 
 	// Mark the transaction as dropped
 	errTestingDropped := errors.New("testing dropped")
 	env.mempool.MarkDropped(txID, errTestingDropped)
-	reason = env.mempool.GetDropReason(txID)
-	require.ErrorIs(reason, errTestingDropped)
+	err = env.mempool.GetDropReason(txID)
+	require.ErrorIs(err, errTestingDropped)
 
-	// Dropped transactions should still be in the mempool
-	require.True(env.mempool.Has(txID))
+	// Issue the transaction
+	env.ctx.Lock.Unlock()
+	err = env.network.IssueTx(context.Background(), tx)
+	require.ErrorIs(err, errTestingDropped)
+	_, ok := env.mempool.Get(txID)
+	require.False(ok)
 
-	// Remove the transaction from the mempool
-	env.mempool.Remove([]*txs.Tx{tx})
-
-	// Issue the transaction again
-	require.NoError(env.network.IssueTx(context.Background(), tx))
-	require.True(env.mempool.Has(txID))
-
-	// When issued again, the mempool should not be marked as dropped
-	reason = env.mempool.GetDropReason(txID)
-	require.NoError(reason)
+	// When issued again, the mempool should still be marked as dropped
+	err = env.mempool.GetDropReason(txID)
+	require.ErrorIs(err, errTestingDropped)
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {

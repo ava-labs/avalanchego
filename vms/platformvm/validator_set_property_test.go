@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -374,7 +375,11 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 }
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
-	if err := vm.Network.IssueTx(context.Background(), signedTx); err != nil {
+	vm.ctx.Lock.Unlock()
+	err := vm.issueTx(context.Background(), signedTx)
+	vm.ctx.Lock.Lock()
+
+	if err != nil {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
 
@@ -734,7 +739,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
 	msgChan := make(chan common.Message, 1)
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
@@ -747,7 +752,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil
 	}
 
-	genesisBytes, err := buildCustomGenesis()
+	genesisBytes, err := buildCustomGenesis(ctx.AVAXAssetID)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
@@ -786,7 +791,10 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := vm.Network.IssueTx(context.Background(), testSubnet1); err != nil {
+	vm.ctx.Lock.Unlock()
+	err = vm.issueTx(context.Background(), testSubnet1)
+	vm.ctx.Lock.Lock()
+	if err != nil {
 		return nil, ids.Empty, err
 	}
 
@@ -807,7 +815,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	return vm, testSubnet1.ID(), nil
 }
 
-func buildCustomGenesis() ([]byte, error) {
+func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	genesisUTXOs := make([]api.UTXO, len(ts.Keys))
 	for i, key := range ts.Keys {
 		id := key.PublicKey().Address()
@@ -853,7 +861,7 @@ func buildCustomGenesis() ([]byte, error) {
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ts.AvaxAssetID,
+		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,

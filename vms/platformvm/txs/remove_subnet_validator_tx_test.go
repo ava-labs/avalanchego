@@ -157,7 +157,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x03,
 	}
 	var unsignedSimpleRemoveValidatorTx UnsignedTx = simpleRemoveValidatorTx
-	unsignedSimpleRemoveValidatorTxBytes, err := Codec.Marshal(Version, &unsignedSimpleRemoveValidatorTx)
+	unsignedSimpleRemoveValidatorTxBytes, err := Codec.Marshal(CodecVersion, &unsignedSimpleRemoveValidatorTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedSimpleRemoveValidatorTxBytes, unsignedSimpleRemoveValidatorTxBytes)
 
@@ -417,7 +417,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 	var unsignedComplexRemoveValidatorTx UnsignedTx = complexRemoveValidatorTx
-	unsignedComplexRemoveValidatorTxBytes, err := Codec.Marshal(Version, &unsignedComplexRemoveValidatorTx)
+	unsignedComplexRemoveValidatorTxBytes, err := Codec.Marshal(CodecVersion, &unsignedComplexRemoveValidatorTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexRemoveValidatorTxBytes, unsignedComplexRemoveValidatorTxBytes)
 

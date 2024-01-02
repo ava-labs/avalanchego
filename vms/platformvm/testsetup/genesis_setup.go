@@ -44,11 +44,6 @@ var (
 
 	NetworkID = constants.UnitTestID
 
-	// AVAX asset ID in tests
-	AvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-	XChainID    = ids.Empty.Prefix(0)
-	CChainID    = ids.Empty.Prefix(1)
-
 	MinValidatorStake = 5 * units.MilliAvax
 	MaxValidatorStake = 500 * units.MilliAvax
 
@@ -69,7 +64,7 @@ func init() {
 }
 
 // [BuildGenesis] is a good default to build genesis for platformVM unit tests
-func BuildGenesis() (*genesis.Genesis, error) {
+func BuildGenesis(avaxAssetID ids.ID) (*genesis.Genesis, error) {
 	genesisUTXOs := make([]*genesis.UTXO, len(Keys))
 	for i, key := range Keys {
 		addr := key.PublicKey().Address()
@@ -79,7 +74,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 					TxID:        ids.Empty,
 					OutputIndex: uint32(i),
 				},
-				Asset: avax.Asset{ID: AvaxAssetID},
+				Asset: avax.Asset{ID: avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: Balance,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -99,7 +94,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 
 		utxo := &avax.TransferableOutput{
-			Asset: avax.Asset{ID: AvaxAssetID},
+			Asset: avax.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: Weight,
 				OutputOwners: secp256k1fx.OutputOwners{

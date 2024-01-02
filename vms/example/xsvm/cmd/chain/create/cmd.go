@@ -55,7 +55,7 @@ func createFunc(c *cobra.Command, args []string) error {
 	// Get the P-chain wallet
 	pWallet := wallet.P()
 
-	genesisBytes, err := genesis.Codec.Marshal(genesis.Version, &genesis.Genesis{
+	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
 		Timestamp: 0,
 		Allocations: []genesis.Allocation{
 			{

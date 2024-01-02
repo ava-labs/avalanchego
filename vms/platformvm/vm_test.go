@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -35,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -101,53 +101,16 @@ var (
 	// Its controlKeys are ts.SubnetControlKeys
 	// Its threshold is 2
 	testSubnet1 *txs.Tx
-
-	errMissing = errors.New("missing")
 )
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-func defaultContext(t *testing.T) *snow.Context {
-	require := require.New(t)
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.XChainID = ts.XChainID
-	ctx.CChainID = ts.CChainID
-	ctx.AVAXAssetID = ts.AvaxAssetID
-	aliaser := ids.NewAliaser()
-
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-	require.NoError(aliaser.Alias(ts.XChainID, "X"))
-	require.NoError(aliaser.Alias(ts.XChainID, ts.XChainID.String()))
-	require.NoError(aliaser.Alias(ts.CChainID, "C"))
-	require.NoError(aliaser.Alias(ts.CChainID, ts.CChainID.String()))
-
-	ctx.BCLookup = aliaser
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				ts.XChainID:               constants.PrimaryNetworkID,
-				ts.CChainID:               constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-	return ctx
-}
-
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
+func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(ts.Keys))
@@ -186,84 +149,12 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ts.AvaxAssetID,
+		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
 		Time:          json.Uint64(ts.GenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	require.NoError(err)
-
-	return &buildGenesisArgs, genesisBytes
-}
-
-// Returns:
-// 1) The genesis state
-// 2) The byte representation of the default genesis for tests
-func BuildGenesisTest(t *testing.T) (*api.BuildGenesisArgs, []byte) {
-	return BuildGenesisTestWithArgs(t, nil)
-}
-
-// Returns:
-// 1) The genesis state
-// 2) The byte representation of the default genesis for tests
-func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.BuildGenesisArgs, []byte) {
-	require := require.New(t)
-	genesisUTXOs := make([]api.UTXO, len(ts.Keys))
-	for i, key := range ts.Keys {
-		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
-		require.NoError(err)
-
-		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(ts.Balance),
-			Address: addr,
-		}
-	}
-
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(ts.GenesisNodeIDs))
-	for i, nodeID := range ts.GenesisNodeIDs {
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-		require.NoError(err)
-
-		genesisValidators[i] = api.GenesisPermissionlessValidator{
-			GenesisValidator: api.GenesisValidator{
-				StartTime: json.Uint64(ts.ValidateStartTime.Unix()),
-				EndTime:   json.Uint64(ts.ValidateEndTime.Unix()),
-				NodeID:    nodeID,
-			},
-			RewardOwner: &api.Owner{
-				Threshold: 1,
-				Addresses: []string{addr},
-			},
-			Staked: []api.UTXO{{
-				Amount:  json.Uint64(ts.Weight),
-				Address: addr,
-			}},
-			DelegationFee: reward.PercentDenominator,
-		}
-	}
-
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ts.AvaxAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(ts.GenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	if args != nil {
-		buildGenesisArgs = *args
 	}
 
 	buildGenesisResponse := api.BuildGenesisReply{}
@@ -336,7 +227,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 
 	vm.clock.Set(latestForkTime)
 	msgChan := make(chan common.Message, 1)
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
@@ -346,7 +237,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	_, genesisBytes := defaultGenesis(t)
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
@@ -385,7 +276,9 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		ts.Keys[0].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
-	require.NoError(vm.Network.IssueTx(context.Background(), testSubnet1))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), testSubnet1))
+	vm.ctx.Lock.Lock()
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
@@ -413,7 +306,7 @@ func TestGenesis(t *testing.T) {
 	require.NoError(err)
 	require.Equal(choices.Accepted, genesisBlock.Status())
 
-	genesisState, _ := defaultGenesis(t)
+	genesisState, _ := defaultGenesis(t, vm.ctx.AVAXAssetID)
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
 		_, addrBytes, err := address.ParseBech32(utxo.Address)
@@ -482,7 +375,9 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Network.IssueTx(context.Background(), tx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), tx))
+	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -583,7 +478,9 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Network.IssueTx(context.Background(), tx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), tx))
+	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -604,6 +501,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	vm, _, _ := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
+		vm.ctx.Lock.Lock()
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
@@ -628,7 +526,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	err = vm.Network.IssueTx(context.Background(), tx)
+	vm.ctx.Lock.Unlock()
+	err = vm.issueTx(context.Background(), tx)
 	require.ErrorIs(err, txexecutor.ErrAlreadyValidator)
 }
 
@@ -663,7 +562,9 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Network.IssueTx(context.Background(), tx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), tx))
+	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -711,7 +612,9 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation
-	require.NoError(vm.Network.IssueTx(context.Background(), tx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), tx))
+	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -906,7 +809,9 @@ func TestCreateChain(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), tx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), tx))
+	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err) // should contain proposal to create chain
@@ -957,7 +862,9 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), createSubnetTx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	vm.ctx.Lock.Lock()
 
 	// should contain the CreateSubnetTx
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -998,7 +905,9 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), addValidatorTx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	vm.ctx.Lock.Lock()
 
 	blk, err = vm.Builder.BuildBlock(context.Background()) // should add validator to the new subnet
 	require.NoError(err)
@@ -1066,7 +975,7 @@ func TestAtomicImport(t *testing.T) {
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: ts.AvaxAssetID},
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1075,7 +984,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -1101,7 +1010,9 @@ func TestAtomicImport(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), tx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), tx))
+	vm.ctx.Lock.Lock()
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -1182,7 +1093,6 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	require := require.New(t)
-	_, genesisBytes := defaultGenesis(t)
 	db := memdb.New()
 
 	firstDB := prefixdb.New([]byte{}, db)
@@ -1198,7 +1108,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	firstCtx := defaultContext(t)
+	firstCtx := snowtest.Context(t, snowtest.PChainID)
+
+	_, genesisBytes := defaultGenesis(t, firstCtx.AVAXAssetID)
 
 	baseDB := memdb.New()
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
@@ -1283,7 +1195,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	secondCtx := defaultContext(t)
+	secondCtx := snowtest.Context(t, snowtest.PChainID)
 	secondCtx.SharedMemory = firstCtx.SharedMemory
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
@@ -1315,8 +1227,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require := require.New(t)
 
-	_, genesisBytes := defaultGenesis(t)
-
 	baseDB := memdb.New()
 	vmDB := prefixdb.New([]byte("vm"), baseDB)
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDB)
@@ -1337,14 +1247,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	consensusCtx := snow.DefaultConsensusContextTest()
-	consensusCtx.Context = ctx
+	consensusCtx := snowtest.ConsensusContext(ctx)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -1662,7 +1573,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
-	_, genesisBytes := defaultGenesis(t)
 
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
@@ -1678,12 +1588,14 @@ func TestUnverifiedParent(t *testing.T) {
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
 	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
@@ -1735,7 +1647,7 @@ func TestUnverifiedParent(t *testing.T) {
 	firstAdvanceTimeBlk := vm.manager.NewBlock(statelessBlk)
 	require.NoError(firstAdvanceTimeBlk.Verify(context.Background()))
 
-	// include a tx1 to make the block be accepted
+	// include a tx2 to make the block be accepted
 	tx2 := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
@@ -1753,7 +1665,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec))
+	require.NoError(tx2.Initialize(txs.Codec))
 	nextChainTime = nextChainTime.Add(time.Second)
 	vm.clock.Set(nextChainTime)
 	statelessSecondAdvanceTimeBlk, err := block.NewBanffStandardBlock(
@@ -1822,7 +1734,6 @@ func TestMaxStakeAmount(t *testing.T) {
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	latestForkTime = ts.ValidateStartTime.Add(ts.MinStakingDuration)
-	_, genesisBytes := defaultGenesis(t)
 	db := memdb.New()
 
 	firstDB := prefixdb.New([]byte{}, db)
@@ -1838,8 +1749,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	firstCtx := defaultContext(t)
+	firstCtx := snowtest.Context(t, snowtest.PChainID)
 	firstCtx.Lock.Lock()
+
+	_, genesisBytes := defaultGenesis(t, firstCtx.AVAXAssetID)
 
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
@@ -1884,7 +1797,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	secondCtx := defaultContext(t)
+	secondCtx := snowtest.Context(t, snowtest.PChainID)
 	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
@@ -1969,7 +1882,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
 	latestForkTime = ts.ValidateStartTime.Add(ts.MinStakingDuration)
-	_, genesisBytes := defaultGenesis(t)
 	db := memdb.New()
 
 	vm := &VM{Config: config.Config{
@@ -1983,8 +1895,10 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		DurangoTime:            latestForkTime,
 	}}
 
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.Lock.Lock()
+
+	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
@@ -2104,7 +2018,9 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), addValidatorTx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), addValidatorTx))
+	vm.ctx.Lock.Lock()
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -2121,7 +2037,9 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), createSubnetTx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	vm.ctx.Lock.Lock()
 
 	// trigger block creation for the subnet tx
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -2190,7 +2108,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
 
-	require.NoError(vm.Network.IssueTx(context.Background(), createSubnetTx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), createSubnetTx))
+	vm.ctx.Lock.Lock()
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -2222,7 +2142,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), transferSubnetOwnershipTx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), transferSubnetOwnershipTx))
+	vm.ctx.Lock.Lock()
 	transferSubnetOwnershipBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -2308,7 +2230,9 @@ func TestBaseTx(t *testing.T) {
 	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
-	require.NoError(vm.Network.IssueTx(context.Background(), baseTx))
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTx(context.Background(), baseTx))
+	vm.ctx.Lock.Lock()
 	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 

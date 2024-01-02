@@ -410,7 +410,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// So in this test we avoid ids.GenerateTestNodeID, in favour of ids.BuildTestNodeID
 	// so that TxID does not depend on the order we run tests.
 	staker0 := staker{
-		nodeID:        ids.BuildTestNodeID([]byte{0xf0}),
+		nodeID:        ids.BuildTestNodeID([]byte{0xff}),
 		rewardAddress: ids.ShortID{0xf0},
 		startTime:     ts.GenesisTime,
 		endTime:       time.Time{}, // actual endTime depends on specific test

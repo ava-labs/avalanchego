@@ -4,8 +4,6 @@
 package executor
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -25,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -61,8 +60,6 @@ var (
 	testSubnet1  *txs.Tx
 
 	defaultTxFee = uint64(100)
-
-	errMissing = errors.New("missing")
 )
 
 type stakerStatus uint
@@ -105,13 +102,17 @@ type environment struct {
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
+		ctx:            snowtest.Context(t, snowtest.PChainID),
 		config:         defaultConfig(),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	res.ctx = defaultCtx(res.baseDB)
+	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
+	m := atomic.NewMemory(atomicDB)
+	res.ctx.SharedMemory = m.NewSharedMemory(res.ctx.ChainID)
+
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
@@ -241,7 +242,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesis, err := ts.BuildGenesis()
+	genesis, err := ts.BuildGenesis(ctx.AVAXAssetID)
 	if err != nil {
 		panic(err)
 	}
@@ -268,35 +269,6 @@ func defaultState(
 	}
 	genesisBlkID = state.GetLastAccepted()
 	return state
-}
-
-func defaultCtx(db database.Database) *snow.Context {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = ts.NetworkID
-	ctx.XChainID = ts.XChainID
-	ctx.CChainID = ts.CChainID
-	ctx.AVAXAssetID = ts.AvaxAssetID
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				ts.XChainID:               constants.PrimaryNetworkID,
-				ts.CChainID:               constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-
-	return ctx
 }
 
 func defaultConfig() *config.Config {
