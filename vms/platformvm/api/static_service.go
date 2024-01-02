@@ -43,7 +43,7 @@ type StaticService struct{}
 
 // UTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type UTXO struct {
-	Locktime json.Int64  `json:"locktime"`
+	Locktime json.Uint64 `json:"locktime"`
 	Amount   json.Uint64 `json:"amount"`
 	Address  string      `json:"address"`
 	Message  string      `json:"message"`
@@ -183,7 +183,7 @@ type BuildGenesisArgs struct {
 	UTXOs         []UTXO                           `json:"utxos"`
 	Validators    []GenesisPermissionlessValidator `json:"validators"`
 	Chains        []Chain                          `json:"chains"`
-	Time          json.Int64                       `json:"time"`
+	Time          json.Uint64                      `json:"time"`
 	InitialSupply json.Uint64                      `json:"initialSupply"`
 	Message       string                           `json:"message"`
 	Encoding      formatting.Encoding              `json:"encoding"`
@@ -234,7 +234,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		}
 		if apiUTXO.Locktime > args.Time {
 			utxo.Out = &stakeable.LockOut{
-				Locktime:        int64(apiUTXO.Locktime),
+				Locktime:        uint64(apiUTXO.Locktime),
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
 		}
@@ -273,7 +273,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			}
 			if apiUTXO.Locktime > args.Time {
 				utxo.Out = &stakeable.LockOut{
-					Locktime:        int64(apiUTXO.Locktime),
+					Locktime:        uint64(apiUTXO.Locktime),
 					TransferableOut: utxo.Out,
 				}
 			}
@@ -289,7 +289,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		if weight == 0 {
 			return errValidatorHasNoWeight
 		}
-		if vdr.EndTime <= args.Time {
+		if vdr.EndTime <= json.Int64(args.Time) {
 			return errValidatorAlreadyExited
 		}
 

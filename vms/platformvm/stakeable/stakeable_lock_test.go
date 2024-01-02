@@ -19,7 +19,7 @@ var errTest = errors.New("hi mom")
 func TestLockOutVerify(t *testing.T) {
 	tests := []struct {
 		name             string
-		locktime         int64
+		locktime         uint64
 		transferableOutF func(*gomock.Controller) avax.TransferableOut
 		expectedErr      error
 	}{
@@ -36,14 +36,6 @@ func TestLockOutVerify(t *testing.T) {
 		{
 			name:     "zero locktime",
 			locktime: 0,
-			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
-				return nil
-			},
-			expectedErr: errInvalidLocktime,
-		},
-		{
-			name:     "negative locktime",
-			locktime: -1,
 			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
 				return nil
 			},
@@ -85,7 +77,7 @@ func TestLockOutVerify(t *testing.T) {
 func TestLockInVerify(t *testing.T) {
 	tests := []struct {
 		name            string
-		locktime        int64
+		locktime        uint64
 		transferableInF func(*gomock.Controller) avax.TransferableIn
 		expectedErr     error
 	}{
@@ -102,14 +94,6 @@ func TestLockInVerify(t *testing.T) {
 		{
 			name:     "zero locktime",
 			locktime: 0,
-			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
-				return nil
-			},
-			expectedErr: errInvalidLocktime,
-		},
-		{
-			name:     "negative locktime",
-			locktime: -1,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
 				return nil
 			},

@@ -405,7 +405,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Int64(defaultGenesisTime.Unix()),
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 		Encoding:      formatting.Hex,
 	}

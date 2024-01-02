@@ -242,7 +242,7 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, response 
 		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
 	}
 
-	currentTime := s.vm.clock.Unix()
+	now := s.vm.clock.Unix()
 
 	unlockeds := map[ids.ID]uint64{}
 	lockedStakeables := map[ids.ID]uint64{}
@@ -253,7 +253,7 @@ utxoFor:
 		assetID := utxo.AssetID()
 		switch out := utxo.Out.(type) {
 		case *secp256k1fx.TransferOutput:
-			if out.Locktime <= currentTime {
+			if out.Locktime <= now {
 				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
 					unlockeds[assetID] = math.MaxUint64
@@ -276,14 +276,14 @@ utxoFor:
 					zap.String("type", fmt.Sprintf("%T", out.TransferableOut)),
 				)
 				continue utxoFor
-			case innerOut.Locktime > currentTime:
+			case innerOut.Locktime > now:
 				newBalance, err := safemath.Add64(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
 					lockedNotStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedNotStakeables[assetID] = newBalance
 				}
-			case out.Locktime <= currentTime:
+			case out.Locktime <= uint64(now):
 				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
 					unlockeds[assetID] = math.MaxUint64

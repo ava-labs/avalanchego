@@ -57,7 +57,7 @@ func main() {
 				ID: avaxAssetID,
 			},
 			Out: &stakeable.LockOut{
-				Locktime: locktime,
+				Locktime: uint64(locktime),
 				TransferableOut: &secp256k1fx.TransferOutput{
 					Amt: amount,
 					OutputOwners: secp256k1fx.OutputOwners{

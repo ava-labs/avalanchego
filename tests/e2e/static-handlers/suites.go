@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			UTXOs:         genesisUTXOs,
 			Validators:    genesisValidators,
 			Chains:        nil,
-			Time:          json.Int64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
+			Time:          json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 			InitialSupply: json.Uint64(360 * units.MegaAvax),
 			Encoding:      formatting.Hex,
 		}

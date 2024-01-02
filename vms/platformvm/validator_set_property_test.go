@@ -862,7 +862,7 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 		UTXOs:         genesisUTXOs,
 		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,
-		Time:          json.Int64(defaultGenesisTime.Unix()),
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 

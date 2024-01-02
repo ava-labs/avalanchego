@@ -88,7 +88,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		UTXOs:         nil,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Int64(genesisTime.Unix()),
+		Time:          json.Uint64(genesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 		Encoding:      formatting.Hex,
 	}
