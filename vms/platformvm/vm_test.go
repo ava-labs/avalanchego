@@ -2315,8 +2315,8 @@ func TestPruneMempool(t *testing.T) {
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		defaultMinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		ids.GenerateTestNodeID(),
 		keys[2].Address(),
 		20000,
