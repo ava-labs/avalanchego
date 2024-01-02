@@ -47,8 +47,8 @@ type PredicateContext struct {
 // will not maintain backwards compatibility of this interface and your code should not
 // rely on this. Designed for use only by precompiles that ship with coreth.
 type Predicater interface {
-	PredicateGas(storageSlots []byte) (uint64, error)
-	VerifyPredicate(predicateContext *PredicateContext, predicates [][]byte) []byte
+	PredicateGas(predicateBytes []byte) (uint64, error)
+	VerifyPredicate(predicateContext *PredicateContext, predicateBytes []byte) error
 }
 
 // SharedMemoryWriter defines an interface to allow a precompile's Accepter to write operations
