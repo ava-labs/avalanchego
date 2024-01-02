@@ -10,18 +10,18 @@ import (
 )
 
 const (
+	CodecVersion = 0
+
 	maxPackerSize  = 1 * units.GiB // max size, in bytes, of something being marshalled by Marshal()
 	maxSliceLength = linearcodec.DefaultMaxSliceLength
-
-	codecVersion = 0
 )
 
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
 	lc := linearcodec.NewCustomMaxLength(maxSliceLength)
-	c = codec.NewManager(maxPackerSize)
-	if err := c.RegisterCodec(codecVersion, lc); err != nil {
+	Codec = codec.NewManager(maxPackerSize)
+	if err := Codec.RegisterCodec(CodecVersion, lc); err != nil {
 		panic(err)
 	}
 }

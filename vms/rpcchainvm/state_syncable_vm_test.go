@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -67,8 +66,8 @@ var (
 )
 
 type StateSyncEnabledMock struct {
-	*mocks.MockChainVM
-	*mocks.MockStateSyncableVM
+	*block.MockChainVM
+	*block.MockStateSyncableVM
 }
 
 func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
@@ -77,8 +76,8 @@ func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) block.Chain
 	// create mock
 	ctrl := gomock.NewController(t)
 	ssVM := StateSyncEnabledMock{
-		MockChainVM:         mocks.NewMockChainVM(ctrl),
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockChainVM:         block.NewMockChainVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	if loadExpectations {
@@ -99,8 +98,8 @@ func getOngoingSyncStateSummaryTestPlugin(t *testing.T, loadExpectations bool) b
 	// create mock
 	ctrl := gomock.NewController(t)
 	ssVM := StateSyncEnabledMock{
-		MockChainVM:         mocks.NewMockChainVM(ctrl),
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockChainVM:         block.NewMockChainVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	if loadExpectations {
@@ -120,8 +119,8 @@ func getLastStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.Ch
 	// create mock
 	ctrl := gomock.NewController(t)
 	ssVM := StateSyncEnabledMock{
-		MockChainVM:         mocks.NewMockChainVM(ctrl),
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockChainVM:         block.NewMockChainVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	if loadExpectations {
@@ -141,8 +140,8 @@ func parseStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.Chai
 	// create mock
 	ctrl := gomock.NewController(t)
 	ssVM := StateSyncEnabledMock{
-		MockChainVM:         mocks.NewMockChainVM(ctrl),
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockChainVM:         block.NewMockChainVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	if loadExpectations {
@@ -163,8 +162,8 @@ func getStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.ChainV
 	// create mock
 	ctrl := gomock.NewController(t)
 	ssVM := StateSyncEnabledMock{
-		MockChainVM:         mocks.NewMockChainVM(ctrl),
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockChainVM:         block.NewMockChainVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	if loadExpectations {
@@ -184,8 +183,8 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) block.Cha
 	// create mock
 	ctrl := gomock.NewController(t)
 	ssVM := StateSyncEnabledMock{
-		MockChainVM:         mocks.NewMockChainVM(ctrl),
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockChainVM:         block.NewMockChainVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	if loadExpectations {
@@ -230,8 +229,8 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 	// create mock
 	ctrl := gomock.NewController(t)
 	ssVM := StateSyncEnabledMock{
-		MockChainVM:         mocks.NewMockChainVM(ctrl),
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockChainVM:         block.NewMockChainVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	if loadExpectations {

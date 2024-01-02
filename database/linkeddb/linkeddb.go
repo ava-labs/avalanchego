@@ -316,7 +316,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 		return node{}, err
 	}
 	n := node{}
-	_, err = c.Unmarshal(nodeBytes, &n)
+	_, err = Codec.Unmarshal(nodeBytes, &n)
 	if err == nil {
 		ldb.nodeCache.Put(keyStr, &n)
 	}
@@ -325,7 +325,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 
 func (ldb *linkedDB) putNode(key []byte, n node) error {
 	ldb.updatedNodes[string(key)] = &n
-	nodeBytes, err := c.Marshal(codecVersion, n)
+	nodeBytes, err := Codec.Marshal(CodecVersion, n)
 	if err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ func Build(
 		InnerSummary: coreSummary,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &summary)
+	bytes, err := Codec.Marshal(CodecVersion, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal proposer summary due to: %w", err)
 	}
