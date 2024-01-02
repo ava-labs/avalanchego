@@ -37,6 +37,24 @@ func NewBloomFilter(
 	}, err
 }
 
+// ParseBloomFilter returns a new instance of a bloom filter with the provided
+// binary representation.
+func ParseBloomFilter(
+	filterBytes []byte,
+	saltBytes []byte,
+) (*BloomFilter, error) {
+	salt, err := ids.ToID(saltBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := &BloomFilter{
+		bloom: &bloomfilter.Filter{},
+		salt:  salt,
+	}
+	return filter, filter.bloom.UnmarshalBinary(filterBytes)
+}
+
 type BloomFilter struct {
 	bloom *bloomfilter.Filter
 	// salt is provided to eventually unblock collisions in Bloom. It's possible

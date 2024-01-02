@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	bloomfilter "github.com/holiman/bloomfilter/v2"
-
 	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
@@ -57,16 +55,8 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, err
 	}
 
-	salt, err := ids.ToID(request.Salt)
+	filter, err := ParseBloomFilter(request.Filter, request.Salt)
 	if err != nil {
-		return nil, err
-	}
-
-	filter := &BloomFilter{
-		bloom: &bloomfilter.Filter{},
-		salt:  salt,
-	}
-	if err := filter.bloom.UnmarshalBinary(request.Filter); err != nil {
 		return nil, err
 	}
 
