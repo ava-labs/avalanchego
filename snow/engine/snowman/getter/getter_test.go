@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -29,7 +28,7 @@ var errUnknownBlock = errors.New("unknown block")
 
 type StateSyncEnabledMock struct {
 	*block.TestVM
-	*mocks.MockStateSyncableVM
+	*block.MockStateSyncableVM
 }
 
 func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.SenderTest) {
@@ -37,7 +36,7 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.
 
 	vm := StateSyncEnabledMock{
 		TestVM:              &block.TestVM{},
-		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
 	sender := &common.SenderTest{

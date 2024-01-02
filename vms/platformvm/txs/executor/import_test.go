@@ -67,7 +67,7 @@ func TestNewImportTx(t *testing.T) {
 					},
 				},
 			}
-			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 			require.NoError(t, err)
 
 			inputID := utxo.InputID()

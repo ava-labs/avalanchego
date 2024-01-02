@@ -7,29 +7,30 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
+	CodecVersion            uint16 = 0
+	CodecVersionWithStopVtx uint16 = 1
+
 	// maxSize is the maximum allowed vertex size. It is necessary to deter DoS
 	maxSize = units.MiB
-
-	codecVersion            uint16 = 0
-	codecVersionWithStopVtx uint16 = 1
 )
 
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
-	lc := linearcodec.New([]string{reflectcodec.DefaultTagName + "V0"}, maxSize)
-	lc2 := linearcodec.New([]string{reflectcodec.DefaultTagName + "V1"}, maxSize)
+	lc0 := linearcodec.New([]string{reflectcodec.DefaultTagName + "V0"}, maxSize)
+	lc1 := linearcodec.New([]string{reflectcodec.DefaultTagName + "V1"}, maxSize)
 
-	c = codec.NewManager(maxSize)
-	// for backward compatibility, still register the initial codec version
-	if err := c.RegisterCodec(codecVersion, lc); err != nil {
-		panic(err)
-	}
-	if err := c.RegisterCodec(codecVersionWithStopVtx, lc2); err != nil {
+	Codec = codec.NewManager(maxSize)
+	err := utils.Err(
+		Codec.RegisterCodec(CodecVersion, lc0),
+		Codec.RegisterCodec(CodecVersionWithStopVtx, lc1),
+	)
+	if err != nil {
 		panic(err)
 	}
 }
