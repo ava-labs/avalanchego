@@ -1099,6 +1099,18 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			return
 		}
 
+		// Timestamp should be expressible as an int64
+		if claimedIPPort.Timestamp > uint64(math.MaxInt64) {
+			p.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.PeerListOp),
+				zap.String("field", "timestamp"),
+				zap.Uint64("timestamp", claimedIPPort.Timestamp),
+			)
+			p.StartClose()
+			return
+		}
+
 		discoveredIPs[i] = &ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
