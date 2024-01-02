@@ -107,7 +107,6 @@ impl PartialPath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ops::Deref;
     use test_case::test_case;
 
     #[test_case(&[1, 2, 3, 4], true)]
@@ -123,7 +122,7 @@ mod tests {
 
         let (decoded, decoded_term) = PartialPath::decode(&encoded);
 
-        assert_eq!(&decoded.deref(), &steps);
+        assert_eq!(&&*decoded, &steps);
         assert_eq!(decoded_term, term);
     }
 }

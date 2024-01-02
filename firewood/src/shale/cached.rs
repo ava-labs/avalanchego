@@ -59,6 +59,7 @@ impl CachedStore for PlainMem {
         let length = change.len();
         #[allow(clippy::unwrap_used)]
         let mut vect = self.space.deref().write().unwrap();
+        #[allow(clippy::indexing_slicing)]
         vect.as_mut_slice()[offset..offset + length].copy_from_slice(change);
     }
 
@@ -94,6 +95,7 @@ impl CachedView for PlainMemView {
 
     fn as_deref(&self) -> Self::DerefReturn {
         #[allow(clippy::unwrap_used)]
+        #[allow(clippy::indexing_slicing)]
         self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
     }
 }
@@ -158,6 +160,7 @@ impl CachedStore for DynamicMem {
         if size > space.len() {
             space.resize(size, 0);
         }
+        #[allow(clippy::indexing_slicing)]
         space[offset..offset + length].copy_from_slice(change)
     }
 
@@ -193,19 +196,21 @@ impl CachedView for DynamicMemView {
 
     fn as_deref(&self) -> Self::DerefReturn {
         #[allow(clippy::unwrap_used)]
+        #[allow(clippy::indexing_slicing)]
         self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_plain_mem() {
         let mut view = PlainMemShared(PlainMem::new(2, 0));
-        let mem = view.deref_mut();
+        let mem = &mut *view;
         mem.write(0, &[1, 1]);
         mem.write(0, &[1, 2]);
         #[allow(clippy::unwrap_used)]
@@ -226,7 +231,7 @@ mod tests {
     #[should_panic(expected = "index 3 out of range for slice of length 2")]
     fn test_plain_mem_panic() {
         let mut view = PlainMemShared(PlainMem::new(2, 0));
-        let mem = view.deref_mut();
+        let mem = &mut *view;
 
         // out of range
         mem.write(1, &[7, 8]);
@@ -235,7 +240,7 @@ mod tests {
     #[test]
     fn test_dynamic_mem() {
         let mut view = DynamicMemShared(DynamicMem::new(2, 0));
-        let mem = view.deref_mut();
+        let mem = &mut *view;
         mem.write(0, &[1, 2]);
         mem.write(0, &[3, 4]);
         assert_eq!(mem.get_view(0, 2).unwrap().as_deref(), [3, 4]);

@@ -12,7 +12,6 @@ use std::{
     fmt::{Debug, Error as FmtError, Formatter},
     io::{Cursor, Read, Write},
     mem::size_of,
-    ops::Deref,
 };
 
 pub type DataLen = u32;
@@ -74,11 +73,11 @@ impl BranchNode {
         }
     }
 
-    pub fn value(&self) -> &Option<Data> {
+    pub const fn value(&self) -> &Option<Data> {
         &self.value
     }
 
-    pub fn chd(&self) -> &[Option<DiskAddress>; Self::MAX_CHILDREN] {
+    pub const fn chd(&self) -> &[Option<DiskAddress>; Self::MAX_CHILDREN] {
         &self.children
     }
 
@@ -86,7 +85,7 @@ impl BranchNode {
         &mut self.children
     }
 
-    pub fn chd_encode(&self) -> &[Option<Vec<u8>>; Self::MAX_CHILDREN] {
+    pub const fn chd_encode(&self) -> &[Option<Vec<u8>>; Self::MAX_CHILDREN] {
         &self.children_encoded
     }
 
@@ -125,7 +124,8 @@ impl BranchNode {
         // we popped the last element, so their should only be NBRANCH items left
         for (i, chd) in items.into_iter().enumerate() {
             let data = chd.decode()?;
-            chd_encoded[i] = Some(data).filter(|data| !data.is_empty());
+            #[allow(clippy::indexing_slicing)]
+            (chd_encoded[i] = Some(data).filter(|data| !data.is_empty()));
         }
 
         // TODO: add path
@@ -151,11 +151,12 @@ impl BranchNode {
 
                     #[allow(clippy::unwrap_used)]
                     if c_ref.is_encoded_longer_than_hash_len::<S>(store) {
-                        list[i] = Encoded::Data(
+                        #[allow(clippy::indexing_slicing)]
+                        (list[i] = Encoded::Data(
                             bincode::DefaultOptions::new()
                                 .serialize(&&(*c_ref.get_root_hash::<S>(store))[..])
                                 .unwrap(),
-                        );
+                        ));
 
                         // See struct docs for ordering requirements
                         if c_ref.is_dirty() {
@@ -164,7 +165,8 @@ impl BranchNode {
                         }
                     } else {
                         let child_encoded = &c_ref.get_encoded::<S>(store);
-                        list[i] = Encoded::Raw(child_encoded.to_vec());
+                        #[allow(clippy::indexing_slicing)]
+                        (list[i] = Encoded::Raw(child_encoded.to_vec()));
                     }
                 }
 
@@ -177,13 +179,17 @@ impl BranchNode {
                 None => {
                     // Check if there is already a calculated encoded value for the child, which
                     // can happen when manually constructing a trie from proof.
+                    #[allow(clippy::indexing_slicing)]
                     if let Some(v) = &self.children_encoded[i] {
-                        #[allow(clippy::unwrap_used)]
                         if v.len() == TRIE_HASH_LEN {
-                            list[i] =
-                                Encoded::Data(bincode::DefaultOptions::new().serialize(v).unwrap());
+                            #[allow(clippy::indexing_slicing)]
+                            #[allow(clippy::unwrap_used)]
+                            (list[i] = Encoded::Data(
+                                bincode::DefaultOptions::new().serialize(v).unwrap(),
+                            ));
                         } else {
-                            list[i] = Encoded::Raw(v.clone());
+                            #[allow(clippy::indexing_slicing)]
+                            (list[i] = Encoded::Raw(v.clone()));
                         }
                     }
                 }
@@ -225,7 +231,7 @@ impl Storable for BranchNode {
         let (value_len, value) = self
             .value
             .as_ref()
-            .map(|val| (val.len() as DataLen, val.deref()))
+            .map(|val| (val.len() as DataLen, &**val))
             .unwrap_or((DataLen::MAX, &[]));
 
         cursor.write_all(&value_len.to_le_bytes())?;

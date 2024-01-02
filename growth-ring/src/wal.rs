@@ -296,7 +296,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
             .ok_or(WalError::Other("EOF".to_string()))?;
         let slice = cast_slice::<_, Header>(&bytes);
         slice
-            .get(0)
+            .first()
             .copied()
             .ok_or(WalError::Other("short read".to_string()))
     }
@@ -1006,7 +1006,7 @@ impl WalLoader {
                 };
                 v.off += msize as u64;
                 let header: &[WalRingBlob] = cast_slice(&header_raw);
-                let header = *header.get(0)?;
+                let header = *header.first()?;
 
                 let payload;
                 match header.rtype.try_into() {
@@ -1115,7 +1115,7 @@ impl WalLoader {
                     };
                     let ringid_start = (fid << file_nbit) + v.off;
                     v.off += msize as u64;
-                    let header: WalRingBlob = *cast_slice(&header_raw).get(0)?;
+                    let header: WalRingBlob = *cast_slice(&header_raw).first()?;
                     let rsize = header.rsize;
                     match header.rtype.try_into() {
                         Ok(WalRingType::Full) => {

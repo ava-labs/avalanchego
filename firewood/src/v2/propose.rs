@@ -102,7 +102,7 @@ impl<T> Proposal<T> {
 #[async_trait]
 impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
     async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
-        todo!()
+        todo!();
     }
 
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, api::Error> {
@@ -125,7 +125,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         &self,
         _key: K,
     ) -> Result<Option<Proof<Vec<u8>>>, api::Error> {
-        todo!()
+        todo!();
     }
 
     async fn range_proof<KT: KeyType, VT>(

@@ -226,6 +226,7 @@ fn schedule_write(
         let fid = offset >> p.file_nbit;
         let fmask = (1 << p.file_nbit) - 1;
         #[allow(clippy::unwrap_used)]
+        #[allow(clippy::indexing_slicing)]
         let file = file_pools.borrow()[page_key.0 as usize]
             .as_ref()
             .unwrap()
@@ -301,6 +302,7 @@ async fn init_wal(
                         let offset = undo.offset;
                         let file_pools = file_pools.borrow();
                         #[allow(clippy::unwrap_used)]
+                        #[allow(clippy::indexing_slicing)]
                         let file_pool = file_pools[space_id as usize].as_ref().unwrap();
                         let file_nbit = file_pool.get_file_nbit();
                         let file_mask = (1 << file_nbit) - 1;
@@ -393,6 +395,7 @@ async fn run_wal_queue(
                     }
                     Vacant(e) => {
                         #[allow(clippy::unwrap_used)]
+                        #[allow(clippy::indexing_slicing)]
                         let file_nbit = file_pools.borrow()[page_key.0 as usize]
                             .as_ref()
                             .unwrap()
@@ -573,7 +576,7 @@ pub struct DiskBufferRequester {
 
 impl DiskBufferRequester {
     /// Create a new requester.
-    pub fn new(sender: mpsc::UnboundedSender<BufferCmd>) -> Self {
+    pub const fn new(sender: mpsc::UnboundedSender<BufferCmd>) -> Self {
         Self { sender }
     }
 
@@ -633,6 +636,7 @@ impl DiskBufferRequester {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use sha3::Digest;
     use std::path::{Path, PathBuf};

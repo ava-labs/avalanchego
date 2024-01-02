@@ -124,7 +124,7 @@ struct SubUniverse<T> {
 }
 
 impl<T> SubUniverse<T> {
-    fn new(meta: T, payload: T) -> Self {
+    const fn new(meta: T, payload: T) -> Self {
         Self { meta, payload }
     }
 }
@@ -196,7 +196,7 @@ struct DbHeader {
 impl DbHeader {
     pub const MSIZE: u64 = std::mem::size_of::<Self>() as u64;
 
-    pub fn new_empty() -> Self {
+    pub const fn new_empty() -> Self {
         Self {
             kv_root: DiskAddress::null(),
         }
@@ -503,6 +503,7 @@ impl Db {
         let mut header_bytes = [0; size_of::<DbParams>()];
         nix::sys::uio::pread(fd0, &mut header_bytes, 0).map_err(DbError::System)?;
         drop(file0);
+        #[allow(clippy::indexing_slicing)]
         let params: DbParams = cast_slice(&header_bytes)[0];
 
         let wal = WalConfig::builder()
@@ -867,12 +868,14 @@ impl Db {
                 .ok()
                 .unwrap();
 
-            nback = ashes
+            #[allow(clippy::indexing_slicing)]
+            (nback = ashes
                 .iter()
                 .skip(rlen)
                 .map(|ash| {
                     StoreRevShared::from_ash(
                         Arc::new(ZeroStore::default()),
+                        #[allow(clippy::indexing_slicing)]
                         &ash.0[&ROOT_HASH_SPACE].redo,
                     )
                 })
@@ -883,7 +886,7 @@ impl Db {
                         .as_deref()
                 })
                 .map(|data| TrieHash(data[..TRIE_HASH_LEN].try_into().unwrap()))
-                .position(|trie_hash| &trie_hash == root_hash);
+                .position(|trie_hash| &trie_hash == root_hash));
         }
 
         let Some(nback) = nback else {
@@ -902,11 +905,15 @@ impl Db {
 
                 let u = match revisions.inner.back() {
                     Some(u) => u.to_mem_store_r().rewind(
+                        #[allow(clippy::indexing_slicing)]
                         &ash.0[&MERKLE_META_SPACE].undo,
+                        #[allow(clippy::indexing_slicing)]
                         &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
                     ),
                     None => inner_lock.cached_space.to_mem_store_r().rewind(
+                        #[allow(clippy::indexing_slicing)]
                         &ash.0[&MERKLE_META_SPACE].undo,
+                        #[allow(clippy::indexing_slicing)]
                         &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
                     ),
                 };
@@ -917,6 +924,7 @@ impl Db {
         let space = if nback == 0 {
             &revisions.base
         } else {
+            #[allow(clippy::indexing_slicing)]
             &revisions.inner[nback - 1]
         };
         // Release the lock after we find the revision

@@ -85,7 +85,7 @@ impl ExtNode {
             .unwrap()
     }
 
-    pub fn chd(&self) -> DiskAddress {
+    pub const fn chd(&self) -> DiskAddress {
         self.child
     }
 
@@ -159,6 +159,7 @@ impl Storable for ExtNode {
         let mut cursor = Cursor::new(path_and_disk_address);
         let mut buf = [0u8; DiskAddress::MSIZE as usize];
 
+        #[allow(clippy::indexing_slicing)]
         let path_len = {
             let buf = &mut buf[..Self::PATH_LEN_SIZE as usize];
             cursor.read_exact(buf)?;

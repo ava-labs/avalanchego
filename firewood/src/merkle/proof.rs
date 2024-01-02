@@ -157,6 +157,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         }
 
         // Ensure the received batch is monotonic increasing and contains no deletions
+        #[allow(clippy::indexing_slicing)]
+        #[allow(clippy::indexing_slicing)]
         if !keys.windows(2).all(|w| w[0].as_ref() < w[1].as_ref()) {
             return Err(ProofError::NonMonotonicIncreaseRange);
         }
@@ -168,6 +170,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         // to be the whole leaf-set in the trie.
         if self.0.is_empty() {
             for (index, k) in keys.iter().enumerate() {
+                #[allow(clippy::indexing_slicing)]
                 merkle_setup.insert(k, vals[index].as_ref().to_vec())?;
             }
 
@@ -197,11 +200,13 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             let data =
                 self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, false)?;
 
+            #[allow(clippy::indexing_slicing)]
             return if first_key.as_ref() != keys[0].as_ref() {
                 // correct proof but invalid key
                 Err(ProofError::InvalidEdgeKeys)
             } else {
                 match data {
+                    #[allow(clippy::indexing_slicing)]
                     Some(val) if val == vals[0].as_ref() => Ok(true),
                     None => Ok(false),
                     _ => Err(ProofError::InvalidData),
@@ -285,6 +290,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
             // Link the child to the parent based on the node type.
             match &u_ref.inner() {
+                #[allow(clippy::indexing_slicing)]
                 NodeType::Branch(n) => match n.chd()[branch_index] {
                     // If the child already resolved, then use the existing node.
                     Some(node) => {
@@ -296,7 +302,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                         u_ref
                             .write(|u| {
                                 let uu = u.inner_mut().as_branch_mut().unwrap();
-                                uu.chd_mut()[branch_index] = Some(chd_ptr);
+                                #[allow(clippy::indexing_slicing)]
+                                (uu.chd_mut()[branch_index] = Some(chd_ptr));
                             })
                             .unwrap();
                     }
@@ -328,7 +335,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
             // If the new parent is a branch node, record the index to correctly link the next child to it.
             if u_ref.inner().as_branch().is_some() {
-                branch_index = chunks[key_index] as usize;
+                #[allow(clippy::indexing_slicing)]
+                (branch_index = chunks[key_index] as usize);
             }
 
             key_index += size;
@@ -346,7 +354,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 Some(p) => {
                     // Return when reaching the end of the key.
                     if key_index == chunks.len() {
-                        cur_key = &chunks[key_index..];
+                        #[allow(clippy::indexing_slicing)]
+                        (cur_key = &chunks[key_index..]);
                         let mut data = None;
 
                         // Decode the last subproof to get the value.
@@ -360,13 +369,15 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                             // Link the child to the parent based on the node type.
                             match &u_ref.inner() {
                                 // TODO: add path
+                                #[allow(clippy::indexing_slicing)]
                                 NodeType::Branch(n) if n.chd()[branch_index].is_none() => {
                                     // insert the leaf to the empty slot
                                     #[allow(clippy::unwrap_used)]
                                     u_ref
                                         .write(|u| {
                                             let uu = u.inner_mut().as_branch_mut().unwrap();
-                                            uu.chd_mut()[branch_index] = Some(chd_ptr);
+                                            #[allow(clippy::indexing_slicing)]
+                                            (uu.chd_mut()[branch_index] = Some(chd_ptr));
                                         })
                                         .unwrap();
                                 }
@@ -435,7 +446,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     };
 
                     cur_hash = hash;
-                    cur_key = &chunks[key_index..];
+                    #[allow(clippy::indexing_slicing)]
+                    (cur_key = &chunks[key_index..]);
                 }
             }
         }
@@ -489,7 +501,9 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             NodeType::Branch(_) if key.is_empty() => Err(ProofError::NoSuchNode),
             NodeType::Branch(n) => {
                 // Check if the subproof with the given key exist.
+                #[allow(clippy::indexing_slicing)]
                 let index = key[0] as usize;
+                #[allow(clippy::indexing_slicing)]
                 let Some(data) = &n.chd_encode()[index] else {
                     return Ok((addr, None, 1));
                 };
@@ -547,6 +561,7 @@ fn locate_subproof(
             };
 
             // consume items returning the item at index
+            #[allow(clippy::indexing_slicing)]
             let data = n.chd_encode()[index]
                 .as_ref()
                 .ok_or(ProofError::InvalidData)?
@@ -615,7 +630,11 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
             NodeType::Branch(n) => {
                 // If either the node pointed by left proof or right proof is nil,
                 // stop here and the forkpoint is the fullnode.
+                #[allow(clippy::indexing_slicing)]
+                #[allow(clippy::indexing_slicing)]
                 let left_node = n.chd()[left_chunks[index] as usize];
+                #[allow(clippy::indexing_slicing)]
+                #[allow(clippy::indexing_slicing)]
                 let right_node = n.chd()[right_chunks[index] as usize];
 
                 match (left_node.as_ref(), right_node.as_ref()) {
@@ -635,14 +654,18 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 let cur_key = n.path.clone().into_inner();
 
                 fork_left = if left_chunks.len() - index < cur_key.len() {
+                    #[allow(clippy::indexing_slicing)]
                     left_chunks[index..].cmp(&cur_key)
                 } else {
+                    #[allow(clippy::indexing_slicing)]
                     left_chunks[index..index + cur_key.len()].cmp(&cur_key)
                 };
 
                 fork_right = if right_chunks.len() - index < cur_key.len() {
+                    #[allow(clippy::indexing_slicing)]
                     right_chunks[index..].cmp(&cur_key)
                 } else {
+                    #[allow(clippy::indexing_slicing)]
                     right_chunks[index..index + cur_key.len()].cmp(&cur_key)
                 };
 
@@ -659,14 +682,18 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 let cur_key = n.path();
 
                 fork_left = if left_chunks.len() - index < cur_key.len() {
+                    #[allow(clippy::indexing_slicing)]
                     left_chunks[index..].cmp(cur_key)
                 } else {
+                    #[allow(clippy::indexing_slicing)]
                     left_chunks[index..index + cur_key.len()].cmp(cur_key)
                 };
 
                 fork_right = if right_chunks.len() - index < cur_key.len() {
+                    #[allow(clippy::indexing_slicing)]
                     right_chunks[index..].cmp(cur_key)
                 } else {
+                    #[allow(clippy::indexing_slicing)]
                     right_chunks[index..index + cur_key.len()].cmp(cur_key)
                 };
 
@@ -677,24 +704,34 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
 
     match &u_ref.inner() {
         NodeType::Branch(n) => {
+            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing)]
             let left_node = n.chd()[left_chunks[index] as usize];
+            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing)]
             let right_node = n.chd()[right_chunks[index] as usize];
 
             // unset all internal nodes calculated encoded value in the forkpoint
             #[allow(clippy::unwrap_used)]
+            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing)]
             for i in left_chunks[index] + 1..right_chunks[index] {
                 u_ref
                     .write(|u| {
                         let uu = u.inner_mut().as_branch_mut().unwrap();
-                        uu.chd_mut()[i as usize] = None;
-                        uu.chd_encoded_mut()[i as usize] = None;
+                        #[allow(clippy::indexing_slicing)]
+                        (uu.chd_mut()[i as usize] = None);
+                        #[allow(clippy::indexing_slicing)]
+                        (uu.chd_encoded_mut()[i as usize] = None);
                     })
                     .unwrap();
             }
 
             let p = u_ref.as_ptr();
             drop(u_ref);
+            #[allow(clippy::indexing_slicing)]
             unset_node_ref(merkle, p, left_node, &left_chunks[index..], 1, false)?;
+            #[allow(clippy::indexing_slicing)]
             unset_node_ref(merkle, p, right_node, &right_chunks[index..], 1, true)?;
             Ok(false)
         }
@@ -730,8 +767,10 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 p_ref
                     .write(|p| {
                         let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                        pp.chd_mut()[left_chunks[index - 1] as usize] = None;
-                        pp.chd_encoded_mut()[left_chunks[index - 1] as usize] = None;
+                        #[allow(clippy::indexing_slicing)]
+                        (pp.chd_mut()[left_chunks[index - 1] as usize] = None);
+                        #[allow(clippy::indexing_slicing)]
+                        (pp.chd_encoded_mut()[left_chunks[index - 1] as usize] = None);
                     })
                     .unwrap();
 
@@ -747,6 +786,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                     merkle,
                     p,
                     Some(node),
+                    #[allow(clippy::indexing_slicing)]
                     &left_chunks[index..],
                     cur_key.len(),
                     false,
@@ -760,6 +800,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                     merkle,
                     p,
                     Some(node),
+                    #[allow(clippy::indexing_slicing)]
                     &right_chunks[index..],
                     cur_key.len(),
                     true,
@@ -793,8 +834,10 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                             *n.chd_encoded_mut() = None;
                         }
                         NodeType::Branch(n) => {
-                            n.chd_mut()[left_chunks[index - 1] as usize] = None;
-                            n.chd_encoded_mut()[left_chunks[index - 1] as usize] = None;
+                            #[allow(clippy::indexing_slicing)]
+                            (n.chd_mut()[left_chunks[index - 1] as usize] = None);
+                            #[allow(clippy::indexing_slicing)]
+                            (n.chd_encoded_mut()[left_chunks[index - 1] as usize] = None);
                         }
                         _ => {}
                     })
@@ -803,16 +846,20 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 p_ref
                     .write(|p| {
                         let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                        pp.chd_mut()[left_chunks[index - 1] as usize] = None;
-                        pp.chd_encoded_mut()[left_chunks[index - 1] as usize] = None;
+                        #[allow(clippy::indexing_slicing)]
+                        (pp.chd_mut()[left_chunks[index - 1] as usize] = None);
+                        #[allow(clippy::indexing_slicing)]
+                        (pp.chd_encoded_mut()[left_chunks[index - 1] as usize] = None);
                     })
                     .unwrap();
             } else if fork_left.is_ne() {
                 p_ref
                     .write(|p| {
                         let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                        pp.chd_mut()[right_chunks[index - 1] as usize] = None;
-                        pp.chd_encoded_mut()[right_chunks[index - 1] as usize] = None;
+                        #[allow(clippy::indexing_slicing)]
+                        (pp.chd_mut()[right_chunks[index - 1] as usize] = None);
+                        #[allow(clippy::indexing_slicing)]
+                        (pp.chd_encoded_mut()[right_chunks[index - 1] as usize] = None);
                     })
                     .unwrap();
             }
@@ -859,8 +906,10 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
 
     match &u_ref.inner() {
         NodeType::Branch(n) => {
+            #[allow(clippy::indexing_slicing)]
             let child_index = chunks[index] as usize;
 
+            #[allow(clippy::indexing_slicing)]
             let node = n.chd()[child_index];
 
             let iter = if remove_left {
@@ -874,8 +923,10 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 u_ref
                     .write(|u| {
                         let uu = u.inner_mut().as_branch_mut().unwrap();
-                        uu.chd_mut()[i] = None;
-                        uu.chd_encoded_mut()[i] = None;
+                        #[allow(clippy::indexing_slicing)]
+                        (uu.chd_mut()[i] = None);
+                        #[allow(clippy::indexing_slicing)]
+                        (uu.chd_encoded_mut()[i] = None);
                     })
                     .unwrap();
             }
@@ -885,6 +936,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
             unset_node_ref(merkle, p, node, key, index + 1, remove_left)
         }
 
+        #[allow(clippy::indexing_slicing)]
         NodeType::Extension(n) if chunks[index..].starts_with(&n.path) => {
             let node = Some(n.chd());
             unset_node_ref(merkle, p, node, key, index + n.path.len(), remove_left)
@@ -909,12 +961,14 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
             // branch. The parent must be a fullnode. Otherwise the
             // key is not part of the range and should remain in the
             // cached hash.
+            #[allow(clippy::indexing_slicing)]
             let should_unset_entire_branch = matches!(
                 (remove_left, cur_key.cmp(&chunks[index..])),
                 (true, Ordering::Less) | (false, Ordering::Greater)
             );
 
             #[allow(clippy::unwrap_used)]
+            #[allow(clippy::indexing_slicing)]
             if should_unset_entire_branch {
                 p_ref
                     .write(|p| {
@@ -936,7 +990,9 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
 
             // Similar to branch node, we need to compare the path to see if the node
             // needs to be unset.
+            #[allow(clippy::indexing_slicing)]
             if !(chunks[index..]).starts_with(cur_key) {
+                #[allow(clippy::indexing_slicing)]
                 match (cur_key.cmp(&chunks[index..]), remove_left) {
                     (Ordering::Greater, false) | (Ordering::Less, true) => {
                         p_ref
@@ -958,6 +1014,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                             *n.chd_encoded_mut() = None;
                         }
                         NodeType::Branch(n) => {
+                            #[allow(clippy::indexing_slicing)]
                             let index = chunks[index - 1] as usize;
 
                             n.chd_mut()[index] = None;
@@ -981,6 +1038,7 @@ impl<T> ContainsOtherExt for &[T]
 where
     [T]: PartialEq<[T]>,
 {
+    #[allow(clippy::indexing_slicing)]
     fn contains_other(&self, other: Self) -> bool {
         self.len() >= other.len() && &self[..other.len()] == other
     }

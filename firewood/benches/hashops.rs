@@ -18,7 +18,7 @@ use firewood::{
 };
 use pprof::ProfilerGuard;
 use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
-use std::{fs::File, iter::repeat_with, ops::Deref, os::raw::c_int, path::Path, sync::Arc};
+use std::{fs::File, iter::repeat_with, os::raw::c_int, path::Path, sync::Arc};
 
 const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
 
@@ -66,7 +66,7 @@ impl Profiler for FlamegraphProfiler {
 fn bench_trie_hash(criterion: &mut Criterion) {
     let mut to = [1u8; TRIE_HASH_LEN];
     let mut store = PlainMem::new(TRIE_HASH_LEN as u64, 0u8);
-    store.write(0, ZERO_HASH.deref());
+    store.write(0, &*ZERO_HASH);
 
     #[allow(clippy::unwrap_used)]
     criterion

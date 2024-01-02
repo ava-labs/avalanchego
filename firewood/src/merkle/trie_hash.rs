@@ -29,6 +29,7 @@ impl Storable for TrieHash {
                 size: U64_TRIE_HASH_LEN,
             })?;
         #[allow(clippy::unwrap_used)]
+        #[allow(clippy::indexing_slicing)]
         Ok(Self(raw.as_deref()[..TRIE_HASH_LEN].try_into().unwrap()))
     }
 
@@ -48,6 +49,7 @@ impl Debug for TrieHash {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

@@ -62,6 +62,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
 
     b.iter(|| {
         let len = rng.gen_range(0..26);
+        #[allow(clippy::indexing_slicing)]
         let rdata = black_box(&"abcdefghijklmnopqrstuvwxyz".as_bytes()[..len]);
 
         let offset = rng.gen_range(0..BENCH_MEM_SIZE - len);

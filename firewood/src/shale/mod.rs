@@ -105,7 +105,7 @@ pub struct Obj<T: Storable> {
 
 impl<T: Storable> Obj<T> {
     #[inline(always)]
-    pub fn as_ptr(&self) -> DiskAddress {
+    pub const fn as_ptr(&self) -> DiskAddress {
         DiskAddress(NonZeroUsize::new(self.value.get_offset()))
     }
 
@@ -129,7 +129,7 @@ impl<T: Storable> Obj<T> {
     }
 
     #[inline(always)]
-    pub fn from_typed_view(value: StoredView<T>) -> Self {
+    pub const fn from_typed_view(value: StoredView<T>) -> Self {
         Obj { value, dirty: None }
     }
 
@@ -171,7 +171,7 @@ pub struct ObjRef<'a, T: Storable> {
 }
 
 impl<'a, T: Storable> ObjRef<'a, T> {
-    fn new(inner: Option<Obj<T>>, cache: &'a ObjCache<T>) -> Self {
+    const fn new(inner: Option<Obj<T>>, cache: &'a ObjCache<T>) -> Self {
         Self { inner, cache }
     }
 
@@ -279,7 +279,7 @@ impl<T: Storable> Deref for StoredView<T> {
 }
 
 impl<T: Storable> StoredView<T> {
-    fn get_offset(&self) -> usize {
+    const fn get_offset(&self) -> usize {
         self.offset
     }
 

@@ -43,11 +43,11 @@ impl LeafNode {
         }
     }
 
-    pub fn path(&self) -> &PartialPath {
+    pub const fn path(&self) -> &PartialPath {
         &self.path
     }
 
-    pub fn data(&self) -> &Data {
+    pub const fn data(&self) -> &Data {
         &self.data
     }
 

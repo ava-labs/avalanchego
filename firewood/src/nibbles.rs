@@ -46,9 +46,14 @@ impl<'a, const LEADING_ZEROES: usize> Index<usize> for Nibbles<'a, LEADING_ZEROE
     fn index(&self, index: usize) -> &Self::Output {
         match index {
             _ if index < LEADING_ZEROES => &NIBBLES[0],
-            _ if (index - LEADING_ZEROES) % 2 == 0 => {
+            _ if (index - LEADING_ZEROES) % 2 == 0 =>
+            {
+                #[allow(clippy::indexing_slicing)]
+                #[allow(clippy::indexing_slicing)]
                 &NIBBLES[(self.0[(index - LEADING_ZEROES) / 2] >> 4) as usize]
             }
+            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing)]
             _ => &NIBBLES[(self.0[(index - LEADING_ZEROES) / 2] & 0xf) as usize],
         }
     }
@@ -70,16 +75,16 @@ impl<'a, const LEADING_ZEROES: usize> IntoIterator for Nibbles<'a, LEADING_ZEROE
 
 impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         LEADING_ZEROES + 2 * self.0.len()
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         LEADING_ZEROES == 0 && self.0.is_empty()
     }
 
-    pub fn new(inner: &'a [u8]) -> Self {
+    pub const fn new(inner: &'a [u8]) -> Self {
         Nibbles(inner)
     }
 }
@@ -102,6 +107,7 @@ impl<'a, const LEADING_ZEROES: usize> Iterator for NibblesIterator<'a, LEADING_Z
         if self.is_empty() {
             return None;
         }
+        #[allow(clippy::indexing_slicing)]
         let result = Some(self.data[self.head]);
         self.head += 1;
         result
@@ -120,7 +126,7 @@ impl<'a, const LEADING_ZEROES: usize> Iterator for NibblesIterator<'a, LEADING_Z
 
 impl<'a, const LEADING_ZEROES: usize> NibblesIterator<'a, LEADING_ZEROES> {
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.head == self.tail
     }
 }
@@ -131,6 +137,7 @@ impl<'a, const LEADING_ZEROES: usize> DoubleEndedIterator for NibblesIterator<'a
             return None;
         }
         self.tail -= 1;
+        #[allow(clippy::indexing_slicing)]
         Some(self.data[self.tail])
     }
 
@@ -141,6 +148,7 @@ impl<'a, const LEADING_ZEROES: usize> DoubleEndedIterator for NibblesIterator<'a
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod test {
     use super::Nibbles;
     static TEST_BYTES: [u8; 4] = [0xdeu8, 0xad, 0xbe, 0xef];

@@ -259,7 +259,7 @@ impl Proposal {
 }
 
 impl Proposal {
-    pub fn get_revision(&self) -> &DbRev<MutStore> {
+    pub const fn get_revision(&self) -> &DbRev<MutStore> {
         &self.rev
     }
 }
@@ -299,6 +299,6 @@ impl api::DbView for Proposal {
     where
         K: api::KeyType,
     {
-        todo!()
+        todo!();
     }
 }

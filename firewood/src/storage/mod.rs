@@ -102,7 +102,7 @@ pub struct DeltaPage(u64, Page);
 
 impl DeltaPage {
     #[inline(always)]
-    fn offset(&self) -> u64 {
+    const fn offset(&self) -> u64 {
         self.0 << PAGE_SIZE_NBIT
     }
 
@@ -136,6 +136,7 @@ impl Deref for StoreDelta {
 impl StoreDelta {
     pub fn new(src: &dyn MemStoreR, writes: &[SpaceWrite]) -> Self {
         let mut deltas = Vec::new();
+        #[allow(clippy::indexing_slicing)]
         let mut widx: Vec<_> = (0..writes.len())
             .filter(|i| writes[*i].data.len() > 0)
             .collect();
@@ -145,10 +146,12 @@ impl StoreDelta {
         }
 
         // sort by the starting point
+        #[allow(clippy::indexing_slicing)]
         widx.sort_by_key(|i| writes[*i].offset);
 
         let mut witer = widx.into_iter();
         #[allow(clippy::unwrap_used)]
+        #[allow(clippy::indexing_slicing)]
         let w0 = &writes[witer.next().unwrap()];
         let mut head = w0.offset >> PAGE_SIZE_NBIT;
         let mut tail = (w0.offset + w0.data.len() as u64 - 1) >> PAGE_SIZE_NBIT;
@@ -166,6 +169,7 @@ impl StoreDelta {
         }
 
         for i in witer {
+            #[allow(clippy::indexing_slicing)]
             let w = &writes[i];
             let ep = (w.offset + w.data.len() as u64 - 1) >> PAGE_SIZE_NBIT;
             let wp = w.offset >> PAGE_SIZE_NBIT;
@@ -185,23 +189,31 @@ impl StoreDelta {
             let mut r = deltas.len();
             while r - l > 1 {
                 let mid = (l + r) >> 1;
-                (*if w.offset < deltas[mid].offset() {
+                #[allow(clippy::indexing_slicing)]
+                ((*if w.offset < deltas[mid].offset() {
                     &mut r
                 } else {
                     &mut l
-                }) = mid;
+                }) = mid);
             }
+            #[allow(clippy::indexing_slicing)]
             let off = (w.offset - deltas[l].offset()) as usize;
             let len = std::cmp::min(psize - off, w.data.len());
+            #[allow(clippy::indexing_slicing)]
             deltas[l].data_mut()[off..off + len].copy_from_slice(&w.data[..len]);
+            #[allow(clippy::indexing_slicing)]
             let mut data = &w.data[len..];
             while data.len() >= psize {
                 l += 1;
+                #[allow(clippy::indexing_slicing)]
                 deltas[l].data_mut().copy_from_slice(&data[..psize]);
-                data = &data[psize..];
+                #[allow(clippy::indexing_slicing)]
+                (data = &data[psize..]);
             }
             if !data.is_empty() {
                 l += 1;
+                #[allow(clippy::indexing_slicing)]
+                #[allow(clippy::indexing_slicing)]
                 deltas[l].data_mut()[..data.len()].copy_from_slice(data);
             }
         }
@@ -239,42 +251,63 @@ impl MemStoreR for StoreRev {
         // otherwise, some dirty pages are covered by the range
         while r - l > 1 {
             let mid = (l + r) >> 1;
-            (*if start < delta[mid].offset() {
+            #[allow(clippy::indexing_slicing)]
+            ((*if start < delta[mid].offset() {
                 &mut r
             } else {
                 &mut l
-            }) = mid;
+            }) = mid);
         }
+        #[allow(clippy::indexing_slicing)]
         if start >= delta[l].offset() + PAGE_SIZE {
             l += 1
         }
+        #[allow(clippy::indexing_slicing)]
         if l >= delta.len() || end < delta[l].offset() {
             return base_space.get_slice(start, end - start);
         }
         let mut data = Vec::new();
+        #[allow(clippy::indexing_slicing)]
         let p_off = std::cmp::min(end - delta[l].offset(), PAGE_SIZE);
+        #[allow(clippy::indexing_slicing)]
         if start < delta[l].offset() {
+            #[allow(clippy::indexing_slicing)]
             data.extend(base_space.get_slice(start, delta[l].offset() - start)?);
+            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing)]
             data.extend(&delta[l].data()[..p_off as usize]);
         } else {
+            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing)]
             data.extend(&delta[l].data()[(start - delta[l].offset()) as usize..p_off as usize]);
         };
-        start = delta[l].offset() + p_off;
+        #[allow(clippy::indexing_slicing)]
+        (start = delta[l].offset() + p_off);
         while start < end {
             l += 1;
+            #[allow(clippy::indexing_slicing)]
             if l >= delta.len() || end < delta[l].offset() {
                 data.extend(base_space.get_slice(start, end - start)?);
                 break;
             }
+            #[allow(clippy::indexing_slicing)]
             if delta[l].offset() > start {
+                #[allow(clippy::indexing_slicing)]
                 data.extend(base_space.get_slice(start, delta[l].offset() - start)?);
             }
+            #[allow(clippy::indexing_slicing)]
             if end < delta[l].offset() + PAGE_SIZE {
+                #[allow(clippy::indexing_slicing)]
+                #[allow(clippy::indexing_slicing)]
+                #[allow(clippy::indexing_slicing)]
                 data.extend(&delta[l].data()[..(end - delta[l].offset()) as usize]);
                 break;
             }
+            #[allow(clippy::indexing_slicing)]
             data.extend(delta[l].data());
-            start = delta[l].offset() + PAGE_SIZE;
+            #[allow(clippy::indexing_slicing)]
+            (start = delta[l].offset() + PAGE_SIZE);
         }
         assert!(data.len() == length as usize);
         Some(data)
@@ -304,7 +337,7 @@ impl StoreRevShared {
         *self.0.base_space.write() = base_space
     }
 
-    pub fn inner(&self) -> &Arc<StoreRev> {
+    pub const fn inner(&self) -> &Arc<StoreRev> {
         &self.0
     }
 }
@@ -480,16 +513,20 @@ impl CachedStore for StoreRevMut {
             let prev_deltas = &self.prev_deltas.read().pages;
             if s_pid == e_pid {
                 match deltas.get(&s_pid) {
+                    #[allow(clippy::indexing_slicing)]
                     Some(p) => p[s_off..e_off + 1].to_vec(),
                     None => match prev_deltas.get(&s_pid) {
+                        #[allow(clippy::indexing_slicing)]
                         Some(p) => p[s_off..e_off + 1].to_vec(),
                         None => self.base_space.get_slice(offset as u64, length)?,
                     },
                 }
             } else {
                 let mut data = match deltas.get(&s_pid) {
+                    #[allow(clippy::indexing_slicing)]
                     Some(p) => p[s_off..].to_vec(),
                     None => match prev_deltas.get(&s_pid) {
+                        #[allow(clippy::indexing_slicing)]
                         Some(p) => p[s_off..].to_vec(),
                         None => self
                             .base_space
@@ -508,8 +545,10 @@ impl CachedStore for StoreRevMut {
                     };
                 }
                 match deltas.get(&e_pid) {
+                    #[allow(clippy::indexing_slicing)]
                     Some(p) => data.extend(&p[..e_off + 1]),
                     None => match prev_deltas.get(&e_pid) {
+                        #[allow(clippy::indexing_slicing)]
                         Some(p) => data.extend(&p[..e_off + 1]),
                         None => data.extend(
                             self.base_space
@@ -539,9 +578,9 @@ impl CachedStore for StoreRevMut {
 
         if s_pid == e_pid {
             let mut deltas = self.deltas.write();
-            let slice =
-                &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), s_pid as u64)
-                    [s_off..e_off + 1];
+            #[allow(clippy::indexing_slicing)]
+            let slice = &mut self.get_page_mut(&mut deltas, &self.prev_deltas.read(), s_pid as u64)
+                [s_off..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change)
         } else {
@@ -549,29 +588,31 @@ impl CachedStore for StoreRevMut {
 
             {
                 let mut deltas = self.deltas.write();
-                let slice = &mut self.get_page_mut(
-                    deltas.deref_mut(),
-                    &self.prev_deltas.read(),
-                    s_pid as u64,
-                )[s_off..];
+                #[allow(clippy::indexing_slicing)]
+                let slice =
+                    &mut self.get_page_mut(&mut deltas, &self.prev_deltas.read(), s_pid as u64)
+                        [s_off..];
                 undo.extend(&*slice);
+                #[allow(clippy::indexing_slicing)]
                 slice.copy_from_slice(&change[..len]);
             }
 
-            change = &change[len..];
+            #[allow(clippy::indexing_slicing)]
+            (change = &change[len..]);
 
             let mut deltas = self.deltas.write();
             for p in s_pid + 1..e_pid {
-                let slice =
-                    self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), p as u64);
+                let slice = self.get_page_mut(&mut deltas, &self.prev_deltas.read(), p as u64);
                 undo.extend(&*slice);
+                #[allow(clippy::indexing_slicing)]
                 slice.copy_from_slice(&change[..PAGE_SIZE as usize]);
-                change = &change[PAGE_SIZE as usize..];
+                #[allow(clippy::indexing_slicing)]
+                (change = &change[PAGE_SIZE as usize..]);
             }
 
-            let slice =
-                &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), e_pid as u64)
-                    [..e_off + 1];
+            #[allow(clippy::indexing_slicing)]
+            let slice = &mut self.get_page_mut(&mut deltas, &self.prev_deltas.read(), e_pid as u64)
+                [..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change);
         }
@@ -615,6 +656,7 @@ impl MemStoreR for ZeroStore {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[allow(clippy::indexing_slicing)]
 mod test {
     use super::*;
     #[test]
@@ -752,7 +794,7 @@ impl CachedSpaceInner {
 
                         nix::sys::uio::pread(
                             file.as_fd(),
-                            page.deref_mut(),
+                            &mut *page,
                             (poff & (file_size - 1)) as nix::libc::off_t,
                         )
                         .map_err(StoreError::System)?;
@@ -836,14 +878,17 @@ impl MemStoreR for CachedSpace {
         let e_pid = end >> PAGE_SIZE_NBIT;
         let e_off = (end & PAGE_MASK) as usize;
         if s_pid == e_pid {
+            #[allow(clippy::indexing_slicing)]
             return PageRef::new(s_pid, self).map(|e| e[s_off..e_off + 1].to_vec());
         }
         let mut data: Vec<u8> = Vec::new();
         {
+            #[allow(clippy::indexing_slicing)]
             data.extend(&PageRef::new(s_pid, self)?[s_off..]);
             for p in s_pid + 1..e_pid {
                 data.extend(&PageRef::new(p, self)?[..]);
             }
+            #[allow(clippy::indexing_slicing)]
             data.extend(&PageRef::new(e_pid, self)?[..e_off + 1]);
         }
         Some(data)
@@ -895,7 +940,7 @@ impl FilePool {
         Ok(file)
     }
 
-    fn get_file_nbit(&self) -> u64 {
+    const fn get_file_nbit(&self) -> u64 {
         self.file_nbit
     }
 }

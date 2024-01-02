@@ -414,6 +414,7 @@ use super::tests::create_test_merkle;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use crate::nibbles::Nibbles;
 
@@ -449,6 +450,7 @@ mod tests {
         };
 
         // we iterate twice because we should get a None then start over
+        #[allow(clippy::indexing_slicing)]
         for k in start.map(|r| r[0]).unwrap_or_default()..=u8::MAX {
             let next = stream.next().await.map(|kv| {
                 let (k, v) = kv.unwrap();
