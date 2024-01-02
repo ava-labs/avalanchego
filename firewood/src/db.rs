@@ -889,9 +889,7 @@ impl Db {
                 .position(|trie_hash| &trie_hash == root_hash));
         }
 
-        let Some(nback) = nback else {
-            return None;
-        };
+        let nback = nback?;
 
         let rlen = revisions.inner.len();
         if rlen < nback {
