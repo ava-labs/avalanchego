@@ -16,8 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -4066,12 +4064,6 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 	if _, _, err := vm2.onExtraStateChange(ethBlk2, state); err == nil || !strings.Contains(err.Error(), "exceeds atomic gas limit") {
 		t.Fatalf("Expected block to fail verification due to exceeded atomic gas limit, but found error: %v", err)
 	}
-}
-
-func TestGetAtomicRepositoryRepairHeights(t *testing.T) {
-	mainnetHeights := getAtomicRepositoryRepairHeights(bonusBlockMainnetHeights, canonicalBlockMainnetHeights)
-	assert.Len(t, mainnetHeights, 76)
-	assert.True(t, slices.IsSorted(mainnetHeights))
 }
 
 func TestSkipChainConfigCheckCompatible(t *testing.T) {

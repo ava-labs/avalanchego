@@ -5,11 +5,8 @@ package evm
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -33,7 +30,9 @@ var (
 	atomicHeightTxDBPrefix     = []byte("atomicHeightTxDB")
 	atomicRepoMetadataDBPrefix = []byte("atomicRepoMetadataDB")
 	maxIndexedHeightKey        = []byte("maxIndexedAtomicTxHeight")
-	bonusBlocksRepairedKey     = []byte("bonusBlocksRepaired")
+
+	// Historically used to track the completion of a migration
+	// bonusBlocksRepairedKey     = []byte("bonusBlocksRepaired")
 )
 
 // AtomicTxRepository defines an entity that manages storage and indexing of
@@ -70,7 +69,6 @@ type atomicTxRepository struct {
 
 func NewAtomicTxRepository(
 	db *versiondb.Database, codec codec.Manager, lastAcceptedHeight uint64,
-	bonusBlocks map[uint64]ids.ID, canonicalBlocks []uint64,
 	getAtomicTxFromBlockByHeight func(height uint64) (*Tx, error),
 ) (*atomicTxRepository, error) {
 	repo := &atomicTxRepository{
@@ -83,13 +81,6 @@ func NewAtomicTxRepository(
 	if err := repo.initializeHeightIndex(lastAcceptedHeight); err != nil {
 		return nil, err
 	}
-
-	// TODO: remove post banff as all network participants will have applied the repair script.
-	repairHeights := getAtomicRepositoryRepairHeights(bonusBlocks, canonicalBlocks)
-	if err := repo.RepairForBonusBlocks(repairHeights, getAtomicTxFromBlockByHeight); err != nil {
-		return nil, fmt.Errorf("failed to repair atomic repository: %w", err)
-	}
-
 	return repo, nil
 }
 
@@ -374,86 +365,4 @@ func (a *atomicTxRepository) IterateByHeight(height uint64) database.Iterator {
 
 func (a *atomicTxRepository) Codec() codec.Manager {
 	return a.codec
-}
-
-func (a *atomicTxRepository) isBonusBlocksRepaired() (bool, error) {
-	return a.atomicRepoMetadataDB.Has(bonusBlocksRepairedKey)
-}
-
-func (a *atomicTxRepository) markBonusBlocksRepaired(repairedEntries uint64) error {
-	val := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(val, repairedEntries)
-	return a.atomicRepoMetadataDB.Put(bonusBlocksRepairedKey, val)
-}
-
-// RepairForBonusBlocks ensures that atomic txs that were processed on more than one block
-// (canonical block + a number of bonus blocks) are indexed to the first height they were
-// processed on (canonical block). [sortedHeights] should include all canonical block and
-// bonus block heights in ascending order, and will only be passed as non-empty on mainnet.
-func (a *atomicTxRepository) RepairForBonusBlocks(
-	sortedHeights []uint64, getAtomicTxFromBlockByHeight func(height uint64) (*Tx, error),
-) error {
-	done, err := a.isBonusBlocksRepaired()
-	if err != nil {
-		return err
-	}
-	if done {
-		return nil
-	}
-	repairedEntries := uint64(0)
-	seenTxs := make(map[ids.ID][]uint64)
-	for _, height := range sortedHeights {
-		// get atomic tx from block
-		tx, err := getAtomicTxFromBlockByHeight(height)
-		if err != nil {
-			return err
-		}
-		if tx == nil {
-			continue
-		}
-
-		// get the tx by txID and update it, the first time we encounter
-		// a given [txID], overwrite the previous [txID] => [height]
-		// mapping. This provides a canonical mapping across nodes.
-		heights, seen := seenTxs[tx.ID()]
-		_, foundHeight, err := a.GetByTxID(tx.ID())
-		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return err
-		}
-		if !seen {
-			if err := a.Write(height, []*Tx{tx}); err != nil {
-				return err
-			}
-		} else {
-			if err := a.WriteBonus(height, []*Tx{tx}); err != nil {
-				return err
-			}
-		}
-		if foundHeight != height && !seen {
-			repairedEntries++
-		}
-		seenTxs[tx.ID()] = append(heights, height)
-	}
-	if err := a.markBonusBlocksRepaired(repairedEntries); err != nil {
-		return err
-	}
-	log.Info("atomic tx repository RepairForBonusBlocks complete", "repairedEntries", repairedEntries)
-	return a.db.Commit()
-}
-
-// getAtomicRepositoryRepairHeights returns a slice containing heights from bonus blocks and
-// canonical blocks sorted by height.
-func getAtomicRepositoryRepairHeights(bonusBlocks map[uint64]ids.ID, canonicalBlocks []uint64) []uint64 {
-	repairHeights := make([]uint64, 0, len(bonusBlocks)+len(canonicalBlocks))
-	for height := range bonusBlocks {
-		repairHeights = append(repairHeights, height)
-	}
-	for _, height := range canonicalBlocks {
-		// avoid appending duplicates
-		if _, exists := bonusBlocks[height]; !exists {
-			repairHeights = append(repairHeights, height)
-		}
-	}
-	slices.Sort(repairHeights)
-	return repairHeights
 }
