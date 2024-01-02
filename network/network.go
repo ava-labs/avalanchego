@@ -20,8 +20,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -431,22 +429,11 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		Signature: peerIP.Signature,
 	}
 	prevIP, ok := n.peerIPs[nodeID]
-	if !ok {
+	if !ok || prevIP.Timestamp < newIP.Timestamp {
 		// If the IP wasn't previously tracked, then we never could have
-		// gossiped it. This means we don't need to reset the validator's
-		// tracked set.
+		// gossiped it. If the previous IP was stale, we should gossip the newer
+		// IP.
 		n.peerIPs[nodeID] = newIP
-	} else if prevIP.Timestamp < newIP.Timestamp {
-		// The previous IP was stale, so we should gossip the newer IP.
-		n.peerIPs[nodeID] = newIP
-
-		if !prevIP.IPPort.Equal(newIP.IPPort) {
-			// This IP is actually different, so we should gossip it.
-			n.peerConfig.Log.Debug("resetting gossip due to ip change",
-				zap.Stringer("nodeID", nodeID),
-			)
-			_ = n.gossipTracker.ResetValidator(nodeID)
-		}
 	}
 
 	if tracked, ok := n.trackedIPs[nodeID]; ok {
@@ -497,12 +484,6 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 		return err
 	}
 
-	// Information for them to update about us
-	ipLen := len(claimedIPPorts)
-	newestTimestamp := make(map[ids.ID]uint64, ipLen)
-	// Information for us to update about them
-	txIDsWithUpToDateIP := make([]ids.ID, 0, ipLen)
-
 	// Atomically modify peer data
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
@@ -523,26 +504,9 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 		// Evaluate if the gossiped IP is useful to us or to the peer that
 		// shared it with us.
 		switch {
-		case previouslyTracked && prevIP.Timestamp > ip.Timestamp:
-			// Our previous IP was more up to date. We should tell the peer
-			// not to gossip their IP to us. We should still gossip our IP to
-			// them.
-			newestTimestamp[ip.TxID] = prevIP.Timestamp
-
-			n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
-		case previouslyTracked && prevIP.Timestamp == ip.Timestamp:
-			// Our previous IP was equally fresh. We should tell the peer
-			// not to gossip this IP to us. We should not gossip our IP to them.
-			newestTimestamp[ip.TxID] = prevIP.Timestamp
-			txIDsWithUpToDateIP = append(txIDsWithUpToDateIP, ip.TxID)
-
+		case previouslyTracked && prevIP.Timestamp >= ip.Timestamp:
 			n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		case verifiedIP && shouldUpdateOurIP:
-			// This IP is more up to date. We should tell the peer not to gossip
-			// this IP to us. We should not gossip our IP to them.
-			newestTimestamp[ip.TxID] = ip.Timestamp
-			txIDsWithUpToDateIP = append(txIDsWithUpToDateIP, ip.TxID)
-
 			// In the future, we should gossip this IP rather than the old IP.
 			n.peerIPs[nodeID] = ip
 
@@ -553,12 +517,6 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 				continue
 			}
 
-			// We should gossip this new IP to all our peers.
-			n.peerConfig.Log.Debug("resetting gossip due to ip change",
-				zap.Stringer("nodeID", nodeID),
-			)
-			_ = n.gossipTracker.ResetValidator(nodeID)
-
 			// We should update any existing outbound connection attempts.
 			if isTracked {
 				// Stop tracking the old IP and start tracking the new one.
@@ -568,12 +526,6 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			}
 		case verifiedIP && shouldDial:
 			// Invariant: [isTracked] is false here.
-
-			// This is the first we've heard of this IP and we want to connect
-			// to it. We should tell the peer not to gossip this IP to us again.
-			newestTimestamp[ip.TxID] = ip.Timestamp
-			// We should not gossip this IP back to them.
-			txIDsWithUpToDateIP = append(txIDsWithUpToDateIP, ip.TxID)
 
 			// We don't need to reset gossip about this validator because
 			// we've never gossiped it before.
@@ -586,17 +538,6 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			// This IP isn't desired
 			n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
-	}
-
-	_, ok := n.gossipTracker.AddKnown(
-		peerID,
-		txIDsWithUpToDateIP,
-		maps.Keys(newestTimestamp),
-	)
-	if !ok {
-		n.peerConfig.Log.Error("failed to update known peers",
-			zap.Stringer("nodeID", peerID),
-		)
 	}
 
 	return nil
