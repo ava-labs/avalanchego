@@ -90,8 +90,8 @@ func (sn *ShortNodeID) UnmarshalText(text []byte) error {
 	return sn.UnmarshalJSON(text)
 }
 
-func (sn ShortNodeID) Less(other ShortNodeID) bool {
-	return bytes.Compare(sn[:], other[:]) == -1
+func (sn ShortNodeID) Compare(other ShortNodeID) int {
+	return bytes.Compare(sn[:], other[:])
 }
 
 func ShortNodeIDFromCert(cert *staking.Certificate) ShortNodeID {

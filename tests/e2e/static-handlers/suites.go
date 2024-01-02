@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -114,20 +113,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		})
 
 	ginkgo.It("can make calls to platformvm static api", func() {
-		keys := []*secp256k1.PrivateKey{}
-		for _, key := range []string{
-			"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-			"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-			"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-			"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-			"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-		} {
-			privKeyBytes, err := cb58.Decode(key)
-			require.NoError(err)
-			pk, err := secp256k1.ToPrivateKey(privKeyBytes)
-			require.NoError(err)
-			keys = append(keys, pk)
-		}
+		keys := secp256k1.TestKeys()
 
 		genesisUTXOs := make([]api.UTXO, len(keys))
 		hrp := constants.NetworkIDToHRP[constants.UnitTestID]

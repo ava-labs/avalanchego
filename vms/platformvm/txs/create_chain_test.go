@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -17,7 +17,7 @@ import (
 )
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	testSubnet1ID := ids.GenerateTestID()
 	testSubnet1ControlKeys := []*secp256k1.PrivateKey{
 		preFundedKeys[0],

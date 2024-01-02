@@ -5,8 +5,10 @@ package platformvm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -88,6 +90,12 @@ type VM struct {
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
 
+	// Cancelled on shutdown
+	onShutdownCtx context.Context
+	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
+	onShutdownCtxCancel context.CancelFunc
+	awaitShutdown       sync.WaitGroup
+
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
 }
@@ -139,7 +147,7 @@ func (vm *VM) Initialize(
 		vm.db,
 		genesisBytes,
 		registerer,
-		vm.Config.Validators,
+		&vm.Config,
 		execConfig,
 		vm.ctx,
 		vm.metrics,
@@ -189,13 +197,33 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		validatorManager,
 	)
-	vm.Network = network.New(
-		txExecutorBackend.Ctx,
-		vm.manager,
+
+	txVerifier := network.NewLockedTxVerifier(&txExecutorBackend.Ctx.Lock, vm.manager)
+	vm.Network, err = network.New(
+		chainCtx.Log,
+		chainCtx.NodeID,
+		chainCtx.SubnetID,
+		chainCtx.ValidatorState,
+		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		registerer,
+		execConfig.Network,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
+	vm.awaitShutdown.Add(1)
+	go func() {
+		defer vm.awaitShutdown.Done()
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.Network.Gossip(vm.onShutdownCtx)
+	}()
+
 	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
@@ -330,7 +358,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	// Start the block builder
-	vm.Builder.ResetBlockTimer()
+	vm.Builder.StartBlockTimer()
 	return nil
 }
 
@@ -351,7 +379,10 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.Builder.Shutdown()
+	vm.onShutdownCtxCancel()
+	vm.awaitShutdown.Wait()
+
+	vm.Builder.ShutdownBlockTimer()
 
 	if vm.bootstrapped.Get() {
 		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
@@ -479,4 +510,17 @@ func (vm *VM) VerifyHeightIndex(_ context.Context) error {
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return vm.state.GetBlockIDAtHeight(height)
+}
+
+func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
+	err := vm.Network.IssueTx(ctx, tx)
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
+		vm.ctx.Log.Debug("failed to add tx to mempool",
+			zap.Stringer("txID", tx.ID()),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	return nil
 }

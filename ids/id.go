@@ -51,7 +51,7 @@ func (id ID) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte("\"" + str + "\""), nil
+	return []byte(`"` + str + `"`), nil
 }
 
 func (id *ID) UnmarshalJSON(b []byte) error {
@@ -145,6 +145,6 @@ func (id ID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-func (id ID) Less(other ID) bool {
-	return bytes.Compare(id[:], other[:]) < 0
+func (id ID) Compare(other ID) int {
+	return bytes.Compare(id[:], other[:])
 }

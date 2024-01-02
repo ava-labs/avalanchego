@@ -66,7 +66,7 @@ across multiple test runs. This can increase the speed of iteration by
 removing the requirement to start a new network for every invocation
 of the test under development.
 
-To create an temporary network for use across test runs:
+To create a temporary network for use across test runs:
 
 ```bash
 # From the root of the avalanchego repo

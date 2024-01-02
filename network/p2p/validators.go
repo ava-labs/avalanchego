@@ -86,6 +86,8 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 
 	v.refresh(ctx)
 
+	// TODO: Account for peer connectivity during the sampling of validators
+	// rather than filtering sampled validators.
 	validatorIDs := v.validatorIDs.Sample(limit)
 	sampled := validatorIDs[:0]
 

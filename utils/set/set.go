@@ -9,6 +9,7 @@ import (
 	stdjson "encoding/json"
 
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -161,7 +162,7 @@ func (s Set[_]) MarshalJSON() ([]byte, error) {
 		i++
 	}
 	// Sort for determinism
-	utils.SortBytes(eltBytes)
+	slices.SortFunc(eltBytes, bytes.Compare)
 
 	// Build the JSON
 	var (

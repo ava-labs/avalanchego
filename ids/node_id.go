@@ -79,8 +79,8 @@ func (n *NodeID) UnmarshalText(text []byte) error {
 	return n.UnmarshalJSON(text)
 }
 
-func (n NodeID) Less(other NodeID) bool {
-	return n.buf < other.buf
+func (n NodeID) Compare(other NodeID) int {
+	return strings.Compare(n.buf, other.buf)
 }
 
 func ToNodeID(src []byte) (NodeID, error) {

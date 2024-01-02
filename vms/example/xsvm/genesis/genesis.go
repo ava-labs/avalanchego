@@ -26,7 +26,7 @@ func Parse(bytes []byte) (*Genesis, error) {
 }
 
 func Block(genesis *Genesis) (*block.Stateless, error) {
-	bytes, err := Codec.Marshal(Version, genesis)
+	bytes, err := Codec.Marshal(CodecVersion, genesis)
 	if err != nil {
 		return nil, err
 	}
