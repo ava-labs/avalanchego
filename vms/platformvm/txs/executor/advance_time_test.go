@@ -909,7 +909,7 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(chainTime.Add(time.Second))
 	require.NoError(err)
 
-	bytes, err := txs.Codec.Marshal(txs.Version, tx)
+	bytes, err := txs.Codec.Marshal(txs.CodecVersion, tx)
 	require.NoError(err)
 
 	var unmarshaledTx txs.Tx

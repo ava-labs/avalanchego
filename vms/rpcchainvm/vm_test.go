@@ -19,7 +19,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
@@ -172,7 +171,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			require := require.New(t)
 
 			ctrl := gomock.NewController(t)
-			vm := mocks.NewMockChainVM(ctrl)
+			vm := block.NewMockChainVM(ctrl)
 
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)

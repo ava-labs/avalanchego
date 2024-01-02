@@ -39,7 +39,7 @@ type BanffBlock interface {
 func initialize(blk Block, commonBlk *CommonBlock) error {
 	// We serialize this block as a pointer so that it can be deserialized into
 	// a Block
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(CodecVersion, &blk)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal block: %w", err)
 	}

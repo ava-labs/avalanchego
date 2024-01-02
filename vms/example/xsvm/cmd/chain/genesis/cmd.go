@@ -34,7 +34,7 @@ func genesisFunc(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	genesisBytes, err := genesis.Codec.Marshal(genesis.Version, config.Genesis)
+	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, config.Genesis)
 	if err != nil {
 		return err
 	}

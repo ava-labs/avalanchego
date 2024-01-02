@@ -62,7 +62,7 @@ func Block(
 		return err
 	}
 
-	blkBytes, err := xsblock.Codec.Marshal(xsblock.Version, blk)
+	blkBytes, err := xsblock.Codec.Marshal(xsblock.CodecVersion, blk)
 	if err != nil {
 		return err
 	}
