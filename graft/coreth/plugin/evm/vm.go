@@ -611,14 +611,12 @@ func (vm *VM) Initialize(
 	}
 	// initialize bonus blocks on mainnet
 	var (
-		bonusBlockHeights     map[uint64]ids.ID
-		bonusBlockRepair      map[uint64]*types.Block
-		canonicalBlockHeights []uint64
+		bonusBlockHeights map[uint64]ids.ID
+		bonusBlockRepair  map[uint64]*types.Block
 	)
 	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
 		bonusBlockHeights = bonusBlockMainnetHeights
 		bonusBlockRepair = mainnetBonusBlocksParsed
-		canonicalBlockHeights = canonicalBlockMainnetHeights
 	}
 	defer func() {
 		// Free memory after VM is initialized
@@ -629,7 +627,6 @@ func (vm *VM) Initialize(
 	// initialize atomic repository
 	vm.atomicTxRepository, err = NewAtomicTxRepository(
 		vm.db, vm.codec, lastAcceptedHeight,
-		bonusBlockHeights, canonicalBlockHeights,
 		vm.getAtomicTxFromPreApricot5BlockByHeight,
 	)
 	if err != nil {

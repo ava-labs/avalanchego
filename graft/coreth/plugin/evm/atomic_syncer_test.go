@@ -51,7 +51,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 	)
 
 	clientDB := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(clientDB, message.Codec, 0, nil, nil, nil)
+	repo, err := NewAtomicTxRepository(clientDB, message.Codec, 0, nil)
 	if err != nil {
 		t.Fatal("could not initialize atomix tx repository", err)
 	}

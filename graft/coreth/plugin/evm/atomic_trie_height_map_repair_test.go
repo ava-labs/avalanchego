@@ -45,7 +45,7 @@ func (test testAtomicTrieRepairHeightMap) run(t *testing.T) {
 	require := require.New(t)
 
 	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, testTxCodec(), 0, nil, nil, nil)
+	repo, err := NewAtomicTxRepository(db, testTxCodec(), 0, nil)
 	require.NoError(err)
 	atomicBackend, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, 0, common.Hash{}, testCommitInterval)
 	require.NoError(err)

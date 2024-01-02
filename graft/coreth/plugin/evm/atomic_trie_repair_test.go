@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 type atomicTrieRepairTest struct {
@@ -56,14 +58,14 @@ func (test atomicTrieRepairTest) test(t *testing.T) {
 
 	// create an unrepaired atomic trie for setup
 	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, Codec, 0, nil, nil, nil)
+	repo, err := NewAtomicTxRepository(db, Codec, 0, nil)
 	require.NoError(err)
 	atomicBackend, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, 0, common.Hash{}, commitInterval)
 	require.NoError(err)
 	a := atomicBackend.AtomicTrie().(*atomicTrie)
 
 	// make a commit at a height larger than all bonus blocks
-	maxBonusBlockHeight := canonicalBlockMainnetHeights[len(canonicalBlockMainnetHeights)-1]
+	maxBonusBlockHeight := slices.Max(maps.Keys(mainnetBonusBlocksParsed))
 	commitHeight := nearestCommitHeight(maxBonusBlockHeight, commitInterval) + commitInterval
 	err = a.commit(commitHeight, types.EmptyRootHash)
 	require.NoError(err)
