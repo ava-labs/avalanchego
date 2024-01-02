@@ -357,7 +357,7 @@ func TestFxVerifyTransferTimelockedPastMaxInt64(t *testing.T) {
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
-			Locktime:  uint64(date.Add(24 * time.Hour).Unix()),
+			Locktime:  uint64(math.MaxInt64 + 1),
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				addr,
