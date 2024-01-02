@@ -59,7 +59,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		// potential reward and uptime was stored but potential delegatee reward
 		// was not
 		tmp := preDelegateeRewardMetadata{}
-		if _, err := metadataCodec.Unmarshal(bytes, &tmp); err != nil {
+		if _, err := MetadataCodec.Unmarshal(bytes, &tmp); err != nil {
 			return err
 		}
 
@@ -68,7 +68,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		metadata.PotentialReward = tmp.PotentialReward
 	default:
 		// everything was stored
-		if _, err := metadataCodec.Unmarshal(bytes, metadata); err != nil {
+		if _, err := MetadataCodec.Unmarshal(bytes, metadata); err != nil {
 			return err
 		}
 	}
@@ -239,7 +239,7 @@ func (m *metadata) WriteValidatorMetadata(
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := metadataCodec.Marshal(codecVersion, metadata)
+			metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
 			if err != nil {
 				return err
 			}

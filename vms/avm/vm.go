@@ -114,9 +114,11 @@ type VM struct {
 
 	txBackend *txexecutor.Backend
 
-	context       context.Context
-	startShutdown context.CancelFunc
-	awaitShutdown sync.WaitGroup
+	// Cancelled on shutdown
+	onShutdownCtx context.Context
+	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
+	onShutdownCtxCancel context.CancelFunc
+	awaitShutdown       sync.WaitGroup
 
 	networkConfig network.Config
 	// These values are only initialized after the chain has been linearized.
@@ -274,7 +276,7 @@ func (vm *VM) Initialize(
 		Bootstrapped:  false,
 	}
 
-	vm.context, vm.startShutdown = context.WithCancel(context.Background())
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	vm.networkConfig = avmConfig.Network
 	return vm.state.Commit()
 }
@@ -318,7 +320,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.startShutdown()
+	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
 	return utils.Err(
@@ -474,7 +476,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		defer vm.awaitShutdown.Done()
 
 		// Invariant: Gossip must never grab the context lock.
-		vm.network.Gossip(vm.context)
+		vm.network.Gossip(vm.onShutdownCtx)
 	}()
 
 	go func() {
