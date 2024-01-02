@@ -2263,10 +2263,10 @@ func TestPruneMempool(t *testing.T) {
 		secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				keys[1].Address(),
+				ts.Keys[1].Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{keys[0]},
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
 		changeAddr,
 	)
 	require.NoError(err)
@@ -2287,13 +2287,13 @@ func TestPruneMempool(t *testing.T) {
 	)
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		defaultMinValidatorStake,
+		ts.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ids.GenerateTestNodeID(),
-		keys[2].Address(),
+		ts.Keys[2].Address(),
 		20000,
-		[]*secp256k1.PrivateKey{keys[1]},
+		[]*secp256k1.PrivateKey{ts.Keys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
