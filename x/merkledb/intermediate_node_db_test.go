@@ -33,7 +33,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 
 	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
-	db := newIntermediateNodeDB(
+	db, err := newIntermediateNodeDB(
 		baseDB,
 		&sync.Pool{
 			New: func() interface{} { return make([]byte, 0) },
@@ -44,6 +44,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 		evictionBatchSize,
 		4,
 	)
+	require.NoError(err)
 
 	// Put a key-node pair
 	node1Key := ToKey([]byte{0x01})
@@ -147,7 +148,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 	) {
 		require := require.New(t)
 		for _, tokenSize := range validTokenSizes {
-			db := newIntermediateNodeDB(
+			db, err := newIntermediateNodeDB(
 				baseDB,
 				&sync.Pool{
 					New: func() interface{} { return make([]byte, 0) },
@@ -158,6 +159,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				evictionBatchSize,
 				tokenSize,
 			)
+			require.NoError(err)
 
 			p := ToKey(key)
 			uBitLength := tokenLength * uint(tokenSize)
@@ -190,7 +192,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	bufferSize := 200
 	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
-	db := newIntermediateNodeDB(
+	db, err := newIntermediateNodeDB(
 		baseDB,
 		&sync.Pool{
 			New: func() interface{} { return make([]byte, 0) },
@@ -201,6 +203,8 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		evictionBatchSize,
 		4,
 	)
+
+	require.NoError(err)
 
 	db.bufferPool.Put([]byte{0xFF, 0xFF, 0xFF})
 	constructedKey := db.constructDBKey(ToKey([]byte{}))
@@ -227,7 +231,7 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 	bufferSize := 200
 	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
-	db := newIntermediateNodeDB(
+	db, err := newIntermediateNodeDB(
 		baseDB,
 		&sync.Pool{
 			New: func() interface{} { return make([]byte, 0) },
@@ -238,6 +242,8 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 		evictionBatchSize,
 		4,
 	)
+
+	require.NoError(err)
 
 	for _, b := range [][]byte{{1}, {2}, {3}} {
 		require.NoError(db.Put(ToKey(b), newNode(ToKey(b))))
@@ -263,7 +269,7 @@ func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
 	bufferSize := 200
 	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
-	db := newIntermediateNodeDB(
+	db, err := newIntermediateNodeDB(
 		baseDB,
 		&sync.Pool{
 			New: func() interface{} { return make([]byte, 0) },
@@ -274,6 +280,8 @@ func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
 		evictionBatchSize,
 		4,
 	)
+
+	require.NoError(err)
 
 	emptyKey := ToKey([]byte{})
 	require.NoError(db.Put(emptyKey, newNode(emptyKey)))

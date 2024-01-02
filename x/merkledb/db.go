@@ -259,11 +259,23 @@ func newDatabase(
 			return make([]byte, 0, defaultBufferLength)
 		},
 	}
+	iNodeDB, err := newIntermediateNodeDB(
+		db,
+		bufferPool,
+		metrics,
+		int(config.IntermediateNodeCacheSize),
+		int(config.IntermediateWriteBufferSize),
+		int(config.IntermediateWriteBatchSize),
+		BranchFactorToTokenSize[config.BranchFactor])
+	if err != nil {
+		return nil, err
+	}
+
 	trieDB := &merkleDB{
 		metrics:              metrics,
 		baseDB:               db,
+		intermediateNodeDB:   iNodeDB,
 		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
-		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.IntermediateWriteBufferSize), int(config.IntermediateWriteBatchSize), BranchFactorToTokenSize[config.BranchFactor]),
 		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
