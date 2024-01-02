@@ -8,9 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	ids "github.com/ava-labs/avalanchego/ids"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockStateSyncableVM is a mock of StateSyncableVM interface.
