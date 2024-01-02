@@ -28,7 +28,7 @@ var (
 
 type LockedAmount struct {
 	Amount   uint64 `json:"amount"`
-	Locktime int64  `json:"locktime"`
+	Locktime uint64 `json:"locktime"`
 }
 
 type Allocation struct {
