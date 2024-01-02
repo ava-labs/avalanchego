@@ -486,17 +486,10 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 
 func (db *merkleDB) prefetchPath(keyBytes []byte) error {
 	return visitPathToKey(db, ToKey(keyBytes), func(n *node) error {
-		if !n.hasValue() {
-			// if this value is already in the cache, skip writing
-			// to avoid grabbing the cache write lock
-			if _, ok := db.intermediateNodeDB.nodeCache.Get(n.key); !ok {
-				db.intermediateNodeDB.nodeCache.Put(n.key, n)
-			}
-			return nil
-		}
-		// if this value is already in the cache, skip writing
-		if _, ok := db.valueNodeDB.nodeCache.Get(n.key); !ok {
+		if n.hasValue() {
 			db.valueNodeDB.nodeCache.Put(n.key, n)
+		} else {
+			db.intermediateNodeDB.nodeCache.Put(n.key, n)
 		}
 		return nil
 	})

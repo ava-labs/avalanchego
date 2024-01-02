@@ -24,14 +24,15 @@ type intermediateNodeDB struct {
 	// Keys written to [baseDB] are prefixed with [intermediateNodePrefix].
 	baseDB database.Database
 
-	// If a value is nil, the corresponding key isn't in the trie.
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
 	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
 	writeBuffer onEvictCache[Key, *node]
 
+	// If a value is nil, the corresponding key isn't in the trie.
 	nodeCache cache.Cacher[Key, *node]
+
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
@@ -104,7 +105,6 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n *node) err
 	if n == nil {
 		return b.Delete(dbKey)
 	}
-	db.nodeCache.Put(key, n)
 	return b.Put(dbKey, n.bytes())
 }
 
@@ -115,15 +115,6 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 			return nil, database.ErrNotFound
 		}
 		return cachedValue, nil
-	}
-	db.metrics.IntermediateNodeCacheMiss()
-
-	if bufferedValue, inBuffer := db.writeBuffer.Get(key); inBuffer {
-		db.metrics.IntermediateNodeCacheHit()
-		if bufferedValue == nil {
-			return nil, database.ErrNotFound
-		}
-		return bufferedValue, nil
 	}
 	db.metrics.IntermediateNodeCacheMiss()
 
@@ -152,7 +143,7 @@ func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
 }
 
 func (db *intermediateNodeDB) Put(key Key, n *node) error {
-	db.nodeCache.Evict(key)
+	db.nodeCache.Put(key, n)
 	return db.writeBuffer.Put(key, n)
 }
 
@@ -162,7 +153,7 @@ func (db *intermediateNodeDB) Flush() error {
 }
 
 func (db *intermediateNodeDB) Delete(key Key) error {
-	db.nodeCache.Evict(key)
+	db.nodeCache.Put(key, nil)
 	return db.writeBuffer.Put(key, nil)
 }
 
