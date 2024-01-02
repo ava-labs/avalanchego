@@ -19,7 +19,7 @@ type Parser interface {
 // Parse parses the provided vertex bytes into a stateless vertex
 func Parse(bytes []byte) (StatelessVertex, error) {
 	vtx := innerStatelessVertex{}
-	version, err := c.Unmarshal(bytes, &vtx)
+	version, err := Codec.Unmarshal(bytes, &vtx)
 	if err != nil {
 		return nil, err
 	}

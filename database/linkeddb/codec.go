@@ -10,20 +10,15 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 )
 
-const (
-	codecVersion = 0
-)
+const CodecVersion = 0
 
-// c does serialization and deserialization
-var (
-	c codec.Manager
-)
+var Codec codec.Manager
 
 func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	c = codec.NewManager(math.MaxInt32)
+	Codec = codec.NewManager(math.MaxInt32)
 
-	if err := c.RegisterCodec(codecVersion, lc); err != nil {
+	if err := Codec.RegisterCodec(CodecVersion, lc); err != nil {
 		panic(err)
 	}
 }

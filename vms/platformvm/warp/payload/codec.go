@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	codecVersion = 0
+	CodecVersion = 0
 
 	MaxMessageSize = 24 * units.KiB
 
@@ -20,17 +20,16 @@ const (
 	MaxSliceLen = 24 * 1024
 )
 
-// Codec does serialization and deserialization for Warp messages.
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
-	c = codec.NewManager(MaxMessageSize)
+	Codec = codec.NewManager(MaxMessageSize)
 	lc := linearcodec.NewCustomMaxLength(MaxSliceLen)
 
 	err := utils.Err(
 		lc.RegisterType(&Hash{}),
 		lc.RegisterType(&AddressedCall{}),
-		c.RegisterCodec(codecVersion, lc),
+		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
 		panic(err)

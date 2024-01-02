@@ -399,7 +399,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(ts.ValidateEndTime.Unix())+1,
 			nodeID,
 			testSubnet1.ID(),
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -427,7 +427,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(ts.ValidateEndTime.Unix()),
 			nodeID,
 			testSubnet1.ID(),
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -469,7 +469,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -512,7 +512,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -538,7 +538,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -564,7 +564,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix()),   // same end time as for primary network
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -591,7 +591,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(newTimestamp.Add(ts.MinStakingDuration).Unix()), // end time
 			nodeID,           // node ID
 			testSubnet1.ID(), // subnet ID
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -619,7 +619,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		uint64(ts.ValidateEndTime.Unix()),   // end time
 		nodeID,                              // node ID
 		testSubnet1.ID(),                    // subnet ID
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -647,7 +647,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(ts.ValidateEndTime.Unix()), // end time
 			nodeID,                            // node ID
 			testSubnet1.ID(),                  // subnet ID
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -677,7 +677,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(startTime.Add(ts.MinStakingDuration).Unix())+1, // end time
 			nodeID,           // node ID
 			testSubnet1.ID(), // subnet ID
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1], ts.SubnetControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -710,7 +710,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(startTime.Add(ts.MinStakingDuration).Unix()), // end time
 			nodeID,           // node ID
 			testSubnet1.ID(), // subnet ID
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -743,7 +743,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(startTime.Add(ts.MinStakingDuration).Unix()), // end time
 			nodeID,           // node ID
 			testSubnet1.ID(), // subnet ID
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], ts.Keys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.Keys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -775,7 +775,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			uint64(startTime.Add(ts.MinStakingDuration).Unix())+1, // end time
 			nodeID,           // node ID
 			testSubnet1.ID(), // subnet ID
-			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -809,7 +809,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, ts.ApricotPhase5Fork)
+	env := newEnvironment(t, ts.BanffFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -978,6 +978,51 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrFlowCheckFailed)
 	}
+}
+
+func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, ts.DurangoFork)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		chainTime = env.state.GetTimestamp()
+		endTime   = chainTime.Add(ts.MaxStakingDuration)
+	)
+
+	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		0,
+		uint64(endTime.Unix()),
+		nodeID,
+		ids.ShortEmpty,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	require.NoError(addValTx.Unsigned.Visit(&StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addValTx,
+	}))
+
+	// Check that a current validator is added
+	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	require.Equal(addValTx.ID(), val.TxID)
+	require.Equal(chainTime, val.StartTime)
+	require.Equal(endTime, val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

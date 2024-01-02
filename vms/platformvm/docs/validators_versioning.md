@@ -18,7 +18,7 @@ GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.No
 
 Validator data are collected in a struct named `validators.GetValidatorOutput` which holds for each active validator, its `NodeID`, its `Weight` and its `BLS Public Key` if it was registered.
 
-Note that a validator `Weight` is not just its stake; its the aggregate value of the validator's own stake and all of its delegators' stake. A validator's `Weight` gauges how relevant its preference should be in consensus or Warp operations.
+Note that a validator `Weight` is not just its stake; it's the aggregate value of the validator's own stake and all of its delegators' stake. A validator's `Weight` gauges how relevant its preference should be in consensus or Warp operations.
 
 We will see in the next section how the P-chain keeps track of this information over time as the validator set changes.
 
@@ -35,7 +35,7 @@ These diffs are key to rebuilding the validator set at a given past height. In t
 
 The validators diffs track changes in a validator's `Weight` and `BLS Public key`. Along with the `NodeID` this is the data exposed by the `GetValidatorSet` method.
 
-Note that `Weight` and `BLS Public key` behave differently throughout the validator lifetime:
+Note that `Weight` and `BLS Public key` behave differently throughout the validator's lifetime:
 
 1. `BLS Public key` cannot change through a validator's lifetime. It can only change when a validator is added/re-added and removed.
 2. `Weight` can change throughout a validator's lifetime by the creation and removal of its delegators as well as by validator's own creation and removal.

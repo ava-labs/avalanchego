@@ -42,8 +42,7 @@ import (
 var (
 	lastAcceptedID = ids.GenerateTestID()
 
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = ts.Keys[0:3]
+	testSubnet1 *txs.Tx
 )
 
 type environment struct {
@@ -76,8 +75,6 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 }
 
 func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
-	r := require.New(t)
-
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
@@ -86,7 +83,7 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
 	clk := ts.Clock(forkTime)
 
 	baseDB := versiondb.New(memdb.New())
-	ctx, msm := ts.Context(r, baseDB)
+	ctx, msm := ts.Context(t, baseDB)
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
@@ -152,9 +149,9 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.Keys[0].PublicKey().Address(),
-			ts.Keys[1].PublicKey().Address(),
-			ts.Keys[2].PublicKey().Address(),
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+			ts.SubnetControlKeys[1].PublicKey().Address(),
+			ts.SubnetControlKeys[2].PublicKey().Address(),
 		},
 		[]*secp256k1.PrivateKey{ts.Keys[4]},
 		ts.Keys[4].PublicKey().Address(),
@@ -183,7 +180,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesis, err := ts.BuildGenesis()
+	genesis, err := ts.BuildGenesis(ctx)
 	if err != nil {
 		panic(err)
 	}

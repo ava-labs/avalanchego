@@ -95,8 +95,6 @@ type environment struct {
 }
 
 func newEnvironment(t *testing.T, fork ts.ActiveFork, ctrl *gomock.Controller) *environment {
-	r := require.New(t)
-
 	forkTime := ts.ValidateStartTime
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
@@ -106,7 +104,7 @@ func newEnvironment(t *testing.T, fork ts.ActiveFork, ctrl *gomock.Controller) *
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	res.ctx, _ = ts.Context(r, res.baseDB)
+	res.ctx, _ = ts.Context(t, res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
@@ -198,9 +196,9 @@ func addSubnet(t *testing.T, env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.Keys[0].PublicKey().Address(),
-			ts.Keys[1].PublicKey().Address(),
-			ts.Keys[2].PublicKey().Address(),
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+			ts.SubnetControlKeys[1].PublicKey().Address(),
+			ts.SubnetControlKeys[2].PublicKey().Address(),
 		},
 		[]*secp256k1.PrivateKey{ts.Keys[4]},
 		ts.Keys[0].PublicKey().Address(),
@@ -233,7 +231,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesis, err := ts.BuildGenesis()
+	genesis, err := ts.BuildGenesis(ctx)
 	if err != nil {
 		panic(err)
 	}
