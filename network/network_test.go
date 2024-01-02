@@ -405,7 +405,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
-	_, err := network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
+	err := network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
 		Cert: staking.CertificateFromX509(tlsCert.Leaf),
 		IPPort: ips.IPPort{
 			IP:   net.IPv4(123, 132, 123, 123),
@@ -581,16 +581,13 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	wg.Add(len(networks))
 	for i, net := range networks {
 		if i != 0 {
-			peerAcks, err := net.Track(config.MyNodeID, []*ips.ClaimedIPPort{{
+			err := net.Track(config.MyNodeID, []*ips.ClaimedIPPort{{
 				Cert:      staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
 				IPPort:    ip.IPPort,
 				Timestamp: ip.Timestamp,
 				Signature: ip.Signature,
 			}})
 			require.NoError(err)
-			// peerAcks is empty because we aren't actually connected to
-			// MyNodeID yet
-			require.Empty(peerAcks)
 		}
 
 		go func(net Network) {

@@ -23,7 +23,6 @@ const (
 	PongOp
 	HandshakeOp
 	PeerListOp
-	PeerListAckOp
 	// State sync:
 	GetStateSummaryFrontierOp
 	GetStateSummaryFrontierFailedOp
@@ -73,7 +72,6 @@ var (
 		PongOp,
 		HandshakeOp,
 		PeerListOp,
-		PeerListAckOp,
 	}
 
 	// List of all consensus request message types
@@ -213,8 +211,6 @@ func (op Op) String() string {
 		return "handshake"
 	case PeerListOp:
 		return "peerlist"
-	case PeerListAckOp:
-		return "peerlist_ack"
 	// State sync
 	case GetStateSummaryFrontierOp:
 		return "get_state_summary_frontier"
@@ -307,8 +303,6 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.Handshake, nil
 	case *p2p.Message_PeerList:
 		return msg.PeerList, nil
-	case *p2p.Message_PeerListAck:
-		return msg.PeerListAck, nil
 	// State sync:
 	case *p2p.Message_GetStateSummaryFrontier:
 		return msg.GetStateSummaryFrontier, nil
@@ -366,8 +360,6 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return HandshakeOp, nil
 	case *p2p.Message_PeerList:
 		return PeerListOp, nil
-	case *p2p.Message_PeerListAck:
-		return PeerListAckOp, nil
 	case *p2p.Message_GetStateSummaryFrontier:
 		return GetStateSummaryFrontierOp, nil
 	case *p2p.Message_StateSummaryFrontier_:

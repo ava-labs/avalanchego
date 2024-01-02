@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -479,7 +478,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return isValidator || n.WantsConnection(nodeID)
 }
 
-func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
+func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) error {
 	// Perform all signature verification and hashing before grabbing the peer
 	// lock.
 	// Note: Avoiding signature verification when the IP isn't needed is a
@@ -495,7 +494,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			zap.Stringer("nodeID", peerID),
 			zap.Error(err),
 		)
-		return nil, err
+		return err
 	}
 
 	// Information for them to update about us
@@ -589,64 +588,17 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 		}
 	}
 
-	txIDsToAck := maps.Keys(newestTimestamp)
-	txIDsToAck, ok := n.gossipTracker.AddKnown(peerID, txIDsWithUpToDateIP, txIDsToAck)
+	_, ok := n.gossipTracker.AddKnown(
+		peerID,
+		txIDsWithUpToDateIP,
+		maps.Keys(newestTimestamp),
+	)
 	if !ok {
 		n.peerConfig.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", peerID),
 		)
-		return nil, nil
 	}
 
-	peerAcks := make([]*p2p.PeerAck, len(txIDsToAck))
-	for i, txID := range txIDsToAck {
-		txID := txID
-		peerAcks[i] = &p2p.PeerAck{
-			TxId: txID[:],
-			// By responding with the highest timestamp, not just the timestamp
-			// the peer provided us, we may be able to avoid some unnecessary
-			// gossip in the case that the peer is about to update this
-			// validator's IP.
-			Timestamp: newestTimestamp[txID],
-		}
-	}
-	return peerAcks, nil
-}
-
-func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error {
-	txIDs := make([]ids.ID, 0, len(ips))
-
-	n.peersLock.RLock()
-	defer n.peersLock.RUnlock()
-
-	for _, ip := range ips {
-		txID, err := ids.ToID(ip.TxId)
-		if err != nil {
-			return err
-		}
-
-		// If [txID]'s corresponding nodeID isn't known, then they must no
-		// longer be a validator. Therefore we wouldn't gossip their IP anyways.
-		nodeID, ok := n.gossipTracker.GetNodeID(txID)
-		if !ok {
-			continue
-		}
-
-		// If the peer returns a lower timestamp than I currently have, then I
-		// have updated the IP since I sent the PeerList message this is in
-		// response to. That means that I should re-gossip this node's IP to the
-		// peer.
-		myIP, previouslyTracked := n.peerIPs[nodeID]
-		if previouslyTracked && myIP.Timestamp <= ip.Timestamp {
-			txIDs = append(txIDs, txID)
-		}
-	}
-
-	if _, ok := n.gossipTracker.AddKnown(peerID, txIDs, nil); !ok {
-		n.peerConfig.Log.Error("failed to update known peers",
-			zap.Stringer("nodeID", peerID),
-		)
-	}
 	return nil
 }
 

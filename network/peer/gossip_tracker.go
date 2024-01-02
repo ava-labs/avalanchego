@@ -58,10 +58,6 @@ type GossipTracker interface {
 	// 	bool: False if a validator with the same node ID or txID as [validator]
 	// 	is present. True otherwise.
 	AddValidator(validator ValidatorID) bool
-	// GetNodeID maps a txID into a nodeIDs
-	// 	nodeID: The nodeID that was registered by [txID]
-	// 	bool: False if [validator] was not present. True otherwise.
-	GetNodeID(txID ids.ID) (ids.NodeID, bool)
 	// RemoveValidator removes a validator that can be gossiped about
 	// 	bool: False if [validator] was already not present. True otherwise.
 	RemoveValidator(validatorID ids.NodeID) bool
@@ -185,14 +181,6 @@ func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
 	g.metrics.validatorsSize.Set(float64(len(g.validatorIDs)))
 
 	return true
-}
-
-func (g *gossipTracker) GetNodeID(txID ids.ID) (ids.NodeID, bool) {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	nodeID, ok := g.txIDsToNodeIDs[txID]
-	return nodeID, ok
 }
 
 func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {

@@ -704,10 +704,6 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handlePeerList(m)
 		msg.OnFinishedHandling()
 		return
-	case *p2p.PeerListAck:
-		p.handlePeerListAck(m)
-		msg.OnFinishedHandling()
-		return
 	}
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug(
@@ -1111,48 +1107,11 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		}
 	}
 
-	trackedPeers, err := p.Network.Track(p.id, discoveredIPs)
-	if err != nil {
+	if err := p.Network.Track(p.id, discoveredIPs); err != nil {
 		p.Log.Debug("message with invalid field",
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PeerListOp),
 			zap.String("field", "claimedIP"),
-			zap.Error(err),
-		)
-		p.StartClose()
-		return
-	}
-	if len(trackedPeers) == 0 {
-		p.Log.Debug("skipping peerlist ack as there were no tracked peers",
-			zap.Stringer("nodeID", p.id),
-		)
-		return
-	}
-
-	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(trackedPeers)
-	if err != nil {
-		p.Log.Error("failed to create message",
-			zap.Stringer("messageOp", message.PeerListAckOp),
-			zap.Stringer("nodeID", p.id),
-			zap.Error(err),
-		)
-		return
-	}
-
-	if !p.Send(p.onClosingCtx, peerListAckMsg) {
-		p.Log.Debug("failed to send peer list ack",
-			zap.Stringer("nodeID", p.id),
-		)
-	}
-}
-
-func (p *peer) handlePeerListAck(msg *p2p.PeerListAck) {
-	err := p.Network.MarkTracked(p.id, msg.PeerAcks)
-	if err != nil {
-		p.Log.Debug("message with invalid field",
-			zap.Stringer("nodeID", p.id),
-			zap.Stringer("messageOp", message.PeerListAckOp),
-			zap.String("field", "txID"),
 			zap.Error(err),
 		)
 		p.StartClose()

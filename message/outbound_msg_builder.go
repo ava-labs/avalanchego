@@ -39,10 +39,6 @@ type OutboundMsgBuilder interface {
 		bypassThrottling bool,
 	) (OutboundMessage, error)
 
-	PeerListAck(
-		peerAcks []*p2p.PeerAck,
-	) (OutboundMessage, error)
-
 	Ping(
 		primaryUptime uint32,
 		subnetUptimes []*p2p.SubnetUptime,
@@ -297,20 +293,6 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 		},
 		b.compressionType,
 		bypassThrottling,
-	)
-}
-
-func (b *outMsgBuilder) PeerListAck(peerAcks []*p2p.PeerAck) (OutboundMessage, error) {
-	return b.builder.createOutbound(
-		&p2p.Message{
-			Message: &p2p.Message_PeerListAck{
-				PeerListAck: &p2p.PeerListAck{
-					PeerAcks: peerAcks,
-				},
-			},
-		},
-		compression.TypeNone,
-		false,
 	)
 }
 

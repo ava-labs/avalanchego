@@ -56,8 +56,7 @@ message Message {
     AppRequest app_request = 30;
     AppResponse app_response = 31;
     AppGossip app_gossip = 32;
-
-    PeerListAck peer_list_ack = 33;
+    // 33 is reserved until after durango activates.
     AppError app_error = 34;
   }
 }
@@ -155,27 +154,8 @@ message ClaimedIpPort {
 
 // Peers should periodically send PeerList messages to allow peers to
 // discover each other.
-//
-// PeerListAck should be sent in response to a PeerList.
 message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
-}
-
-// PeerAck acknowledges that a gossiped peer in a PeerList message will be
-// tracked by the remote peer.
-message PeerAck {
-  // P-Chain transaction that added the acknowledged peer to the validator
-  // set
-  bytes tx_id = 1;
-  // Timestamp of the signed ip of the peer
-  uint64 timestamp = 2;
-}
-
-// PeerListAck is sent in response to PeerList to acknowledge the subset of
-// peers that the peer will attempt to connect to.
-message PeerListAck {
-  reserved 1; // deprecated; used to be tx_ids
-  repeated PeerAck peer_acks = 2;
 }
 
 // GetStateSummaryFrontier requests a peer's most recently accepted state
