@@ -30,8 +30,6 @@ type ClaimedIPPort struct {
 	// actually claimed by the peer in question, and not by a malicious peer
 	// trying to get us to dial bogus IPPorts.
 	Signature []byte
-	// The txID that added this peer into the validator set
-	TxID ids.ID
 }
 
 func (i *ClaimedIPPort) NodeID() ids.NodeID {

@@ -280,7 +280,7 @@ func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bo
 			IpPort:          uint32(p.IPPort.Port),
 			Timestamp:       p.Timestamp,
 			Signature:       p.Signature,
-			TxId:            p.TxID[:],
+			TxId:            ids.Empty[:],
 		}
 	}
 	return b.builder.createOutbound(

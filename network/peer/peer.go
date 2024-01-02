@@ -1094,18 +1094,6 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			return
 		}
 
-		txID, err := ids.ToID(claimedIPPort.TxId)
-		if err != nil {
-			p.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.PeerListOp),
-				zap.String("field", "txID"),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-
 		discoveredIPs[i] = &ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
@@ -1114,7 +1102,6 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			},
 			Timestamp: claimedIPPort.Timestamp,
 			Signature: claimedIPPort.Signature,
-			TxID:      txID,
 		}
 	}
 
