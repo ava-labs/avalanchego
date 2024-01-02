@@ -230,7 +230,7 @@ func defaultState(
 	require := require.New(t)
 
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	genesis, err := ts.BuildGenesis(ctx.AVAXAssetID)
+	genesis, err := ts.BuildGenesis(ctx)
 	require.NoError(err)
 	state, err := state.New(
 		db,

@@ -57,7 +57,8 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(db.Close())
 	}()
 
-	genesis, err := ts.BuildGenesis(snowtest.AVAXAssetID)
+	snowCtx := snowtest.Context(b, snowtest.PChainID)
+	genesis, err := ts.BuildGenesis(snowCtx)
 	require.NoError(err)
 
 	vdrs := validators.NewManager()

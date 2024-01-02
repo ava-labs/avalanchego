@@ -195,7 +195,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesis, err := ts.BuildGenesis(ctx.AVAXAssetID)
+	genesis, err := ts.BuildGenesis(ctx)
 	if err != nil {
 		panic(err)
 	}
