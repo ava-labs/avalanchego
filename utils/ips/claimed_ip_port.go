@@ -6,16 +6,14 @@ package ips
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Can't import these from wrappers package due to circular import.
 const (
-	intLen  = 4
-	longLen = 8
-	ipLen   = 18
-	idLen   = 32
 	// Certificate length, signature length, IP, timestamp, tx ID
-	baseIPCertDescLen = 2*intLen + ipLen + longLen + idLen
+	baseIPCertDescLen = 2*wrappers.IntLen + IPPortLen + wrappers.LongLen + ids.IDLen
+	preimageLen       = ids.IDLen + IPPortLen + wrappers.LongLen
 )
 
 // A self contained proof that a peer is claiming ownership of an IPPort at a
@@ -36,8 +34,24 @@ type ClaimedIPPort struct {
 	TxID ids.ID
 }
 
+func (i *ClaimedIPPort) NodeID() ids.NodeID {
+	// TODO: Don't recalculate
+	return ids.NodeIDFromCert(i.Cert)
+}
+
+func (i *ClaimedIPPort) GossipID() ids.ID {
+	// TODO: Don't recalculate
+	packer := wrappers.Packer{
+		Bytes: make([]byte, preimageLen),
+	}
+	nodeID := i.NodeID()
+	packer.PackFixedBytes(nodeID[:])
+	PackIP(&packer, i.IPPort)
+	packer.PackLong(i.Timestamp)
+	return hashing.ComputeHash256Array(packer.Bytes)
+}
+
 // Returns the length of the byte representation of this ClaimedIPPort.
 func (i *ClaimedIPPort) BytesLen() int {
-	// See wrappers.PackPeerTrackInfo.
 	return baseIPCertDescLen + len(i.Cert.Raw) + len(i.Signature)
 }
