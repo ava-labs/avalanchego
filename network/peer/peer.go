@@ -984,6 +984,21 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
+	knownPeers := emptyBloomFilter
+	if msg.KnownPeers != nil {
+		var err error
+		knownPeers, err = gossip.ParseBloomFilter(msg.KnownPeers.Filter, msg.KnownPeers.Salt)
+		if err != nil {
+			p.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.HandshakeOp),
+				zap.String("field", "KnownPeers"),
+			)
+			p.StartClose()
+			return
+		}
+	}
+
 	// "net.IP" type in Golang is 16-byte
 	if ipLen := len(msg.IpAddr); ipLen != net.IPv6len {
 		p.Log.Debug("message with invalid field",
@@ -1017,7 +1032,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.gotHandshake.Set(true)
 
-	peerIPs := p.Network.Peers(emptyBloomFilter)
+	peerIPs := p.Network.Peers(knownPeers)
 
 	// We bypass throttling here to ensure that the peerlist message is
 	// acknowledged timely.

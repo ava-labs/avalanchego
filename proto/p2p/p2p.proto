@@ -117,6 +117,7 @@ message Handshake {
   Client client = 9;
   repeated uint32 supported_acps = 10;
   repeated uint32 objected_acps = 11;
+  BloomFilter known_peers = 12;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility
@@ -127,6 +128,12 @@ message Client {
   uint32 major = 2;
   uint32 minor = 3;
   uint32 patch = 4;
+}
+
+// BloomFilter with a random salt to prevent consistent hash collisions
+message BloomFilter {
+  bytes filter = 1;
+  bytes salt = 2;
 }
 
 // ClaimedIpPort contains metadata needed to connect to a peer
