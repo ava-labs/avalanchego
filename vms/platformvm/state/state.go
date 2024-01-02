@@ -451,7 +451,7 @@ func blockSize(_ ids.ID, blk block.Block) int {
 
 func New(
 	db database.Database,
-	g *genesis.Genesis,
+	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
 	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
@@ -472,7 +472,7 @@ func New(
 		return nil, err
 	}
 
-	if err := s.sync(g); err != nil {
+	if err := s.sync(genesisBytes); err != nil {
 		// Drop any errors on close to return the first error
 		_ = s.Close()
 
@@ -1783,7 +1783,7 @@ func (s *state) Close() error {
 	)
 }
 
-func (s *state) sync(g *genesis.Genesis) error {
+func (s *state) sync(genesis []byte) error {
 	shouldInit, err := s.shouldInit()
 	if err != nil {
 		return fmt.Errorf(
@@ -1795,7 +1795,7 @@ func (s *state) sync(g *genesis.Genesis) error {
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
 	if shouldInit {
-		if err := s.init(g); err != nil {
+		if err := s.init(genesis); err != nil {
 			return fmt.Errorf(
 				"failed to initialize the database: %w",
 				err,
@@ -1812,17 +1812,21 @@ func (s *state) sync(g *genesis.Genesis) error {
 	return nil
 }
 
-func (s *state) init(g *genesis.Genesis) error {
+func (s *state) init(genesisBytes []byte) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
-	genesisID := hashing.ComputeHash256Array(g.GenesisBytes)
+	genesisID := hashing.ComputeHash256Array(genesisBytes)
 	genesisBlock, err := block.NewApricotCommitBlock(genesisID, 0 /*height*/)
 	if err != nil {
 		return err
 	}
 
-	if err := s.syncGenesis(genesisBlock, g); err != nil {
+	genesis, err := genesis.Parse(genesisBytes)
+	if err != nil {
+		return err
+	}
+	if err := s.syncGenesis(genesisBlock, genesis); err != nil {
 		return err
 	}
 
