@@ -283,7 +283,7 @@ utxoFor:
 				} else {
 					lockedNotStakeables[assetID] = newBalance
 				}
-			case out.Locktime <= uint64(now):
+			case out.Locktime <= now:
 				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
 					unlockeds[assetID] = math.MaxUint64
