@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
-	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,48 +17,27 @@ type PredicateTest struct {
 
 	PredicateContext *precompileconfig.PredicateContext
 
-	StorageSlots [][]byte
-	Gas          uint64
-	GasErr       error
-	PredicateRes []byte
+	PredicateBytes []byte
+	Gas            uint64
+	GasErr         error
+	ExpectedErr    error
 }
 
 func (test PredicateTest) Run(t testing.TB) {
 	t.Helper()
 	require := require.New(t)
+	predicate := test.Config.(precompileconfig.Predicater)
 
-	var (
-		gas          uint64
-		gasErr       error
-		predicateRes []byte
-		predicate    = test.Config.(precompileconfig.Predicater)
-	)
-
-	for _, predicateBytes := range test.StorageSlots {
-		predicateGas, predicateGasErr := predicate.PredicateGas(predicateBytes)
-		if predicateGasErr != nil {
-			gasErr = predicateGasErr
-			break
-		}
-		updatedGas, overflow := cmath.SafeAdd(gas, predicateGas)
-		if overflow {
-			panic("predicate gas should not overflow")
-		}
-		gas = updatedGas
-	}
-
+	predicateGas, predicateGasErr := predicate.PredicateGas(test.PredicateBytes)
+	require.ErrorIs(predicateGasErr, test.GasErr)
 	if test.GasErr != nil {
-		// If PredicateGas returns an error, the predicate fails verification and we will
-		// never call VerifyPredicate.
-		require.ErrorIs(gasErr, test.GasErr)
 		return
-	} else {
-		require.NoError(gasErr)
 	}
-	require.Equal(test.Gas, gas)
 
-	predicateRes = predicate.VerifyPredicate(test.PredicateContext, test.StorageSlots)
-	require.Equal(test.PredicateRes, predicateRes)
+	require.Equal(test.Gas, predicateGas)
+
+	predicateRes := predicate.VerifyPredicate(test.PredicateContext, test.PredicateBytes)
+	require.ErrorIs(predicateRes, test.ExpectedErr)
 }
 
 func RunPredicateTests(t *testing.T, predicateTests map[string]PredicateTest) {

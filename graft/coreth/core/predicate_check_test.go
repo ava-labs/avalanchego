@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
@@ -31,8 +32,6 @@ func TestCheckPredicate(t *testing.T) {
 	addr2 := common.HexToAddress("0xbb")
 	addr3 := common.HexToAddress("0xcc")
 	addr4 := common.HexToAddress("0xdd")
-	predicateResultBytes1 := []byte{1, 2, 3}
-	predicateResultBytes2 := []byte{3, 2, 1}
 	predicateContext := &precompileconfig.PredicateContext{
 		ProposerVMBlockCtx: &block.Context{
 			PChainHeight: 10,
@@ -142,7 +141,7 @@ func TestCheckPredicate(t *testing.T) {
 				predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
 				arg := common.Hash{1}
 				predicater.EXPECT().PredicateGas(arg[:]).Return(uint64(0), nil).Times(2)
-				predicater.EXPECT().VerifyPredicate(gomock.Any(), [][]byte{arg[:]}).Return(predicateResultBytes1)
+				predicater.EXPECT().VerifyPredicate(gomock.Any(), arg[:]).Return(nil)
 				return map[common.Address]precompileconfig.Predicater{
 					addr1: predicater,
 				}
@@ -156,7 +155,7 @@ func TestCheckPredicate(t *testing.T) {
 				},
 			}),
 			expectedRes: map[common.Address][]byte{
-				addr1: predicateResultBytes1,
+				addr1: {}, // valid bytes
 			},
 			expectedErr: nil,
 		},
@@ -188,7 +187,7 @@ func TestCheckPredicate(t *testing.T) {
 				predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
 				arg := common.Hash{1}
 				predicater.EXPECT().PredicateGas(arg[:]).Return(uint64(0), nil).Times(2)
-				predicater.EXPECT().VerifyPredicate(gomock.Any(), [][]byte{arg[:]}).Return(predicateResultBytes1)
+				predicater.EXPECT().VerifyPredicate(gomock.Any(), arg[:]).Return(nil)
 				return map[common.Address]precompileconfig.Predicater{
 					addr1: predicater,
 					addr2: predicater,
@@ -203,7 +202,7 @@ func TestCheckPredicate(t *testing.T) {
 				},
 			}),
 			expectedRes: map[common.Address][]byte{
-				addr1: predicateResultBytes1,
+				addr1: {}, // valid bytes
 			},
 			expectedErr: nil,
 		},
@@ -215,11 +214,11 @@ func TestCheckPredicate(t *testing.T) {
 				predicate1 := precompileconfig.NewMockPredicater(ctrl)
 				arg1 := common.Hash{1}
 				predicate1.EXPECT().PredicateGas(arg1[:]).Return(uint64(0), nil).Times(2)
-				predicate1.EXPECT().VerifyPredicate(gomock.Any(), [][]byte{arg1[:]}).Return(predicateResultBytes1)
+				predicate1.EXPECT().VerifyPredicate(gomock.Any(), arg1[:]).Return(nil)
 				predicate2 := precompileconfig.NewMockPredicater(ctrl)
 				arg2 := common.Hash{2}
 				predicate2.EXPECT().PredicateGas(arg2[:]).Return(uint64(0), nil).Times(2)
-				predicate2.EXPECT().VerifyPredicate(gomock.Any(), [][]byte{arg2[:]}).Return(predicateResultBytes2)
+				predicate2.EXPECT().VerifyPredicate(gomock.Any(), arg2[:]).Return(testErr)
 				return map[common.Address]precompileconfig.Predicater{
 					addr1: predicate1,
 					addr2: predicate2,
@@ -240,8 +239,8 @@ func TestCheckPredicate(t *testing.T) {
 				},
 			}),
 			expectedRes: map[common.Address][]byte{
-				addr1: predicateResultBytes1,
-				addr2: predicateResultBytes2,
+				addr1: {},  // valid bytes
+				addr2: {1}, // invalid bytes
 			},
 			expectedErr: nil,
 		},
@@ -319,6 +318,144 @@ func TestCheckPredicate(t *testing.T) {
 			intrinsicGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), true, rules)
 			require.NoError(err)
 			require.Equal(tx.Gas(), intrinsicGas) // Require test specifies exact amount of gas consumed
+		})
+	}
+}
+
+func TestCheckPredicatesOutput(t *testing.T) {
+	testErr := errors.New("test error")
+	addr1 := common.HexToAddress("0xaa")
+	addr2 := common.HexToAddress("0xbb")
+	validHash := common.Hash{1}
+	invalidHash := common.Hash{2}
+	predicateContext := &precompileconfig.PredicateContext{
+		ProposerVMBlockCtx: &block.Context{
+			PChainHeight: 10,
+		},
+	}
+	type testTuple struct {
+		address          common.Address
+		isValidPredicate bool
+	}
+	type resultTest struct {
+		name        string
+		expectedRes map[common.Address][]byte
+		testTuple   []testTuple
+	}
+	tests := []resultTest{
+		{name: "no predicates", expectedRes: map[common.Address][]byte{}},
+		{
+			name: "one address one predicate",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: true},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits().Bytes()},
+		},
+		{
+			name: "one address one invalid predicate",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: false},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits(0).Bytes()},
+		},
+		{
+			name: "one address two invalid predicates",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: false},
+				{address: addr1, isValidPredicate: false},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits(0, 1).Bytes()},
+		},
+		{
+			name: "one address two mixed predicates",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: true},
+				{address: addr1, isValidPredicate: false},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits(1).Bytes()},
+		},
+		{
+			name: "one address mixed predicates",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: true},
+				{address: addr1, isValidPredicate: false},
+				{address: addr1, isValidPredicate: false},
+				{address: addr1, isValidPredicate: true},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits(1, 2).Bytes()},
+		},
+		{
+			name: "two addresses mixed predicates",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: true},
+				{address: addr2, isValidPredicate: false},
+				{address: addr1, isValidPredicate: false},
+				{address: addr1, isValidPredicate: false},
+				{address: addr2, isValidPredicate: true},
+				{address: addr2, isValidPredicate: true},
+				{address: addr2, isValidPredicate: false},
+				{address: addr2, isValidPredicate: true},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits(1, 2).Bytes(), addr2: set.NewBits(0, 3).Bytes()},
+		},
+		{
+			name: "two addresses all valid predicates",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: true},
+				{address: addr2, isValidPredicate: true},
+				{address: addr1, isValidPredicate: true},
+				{address: addr1, isValidPredicate: true},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits().Bytes(), addr2: set.NewBits().Bytes()},
+		},
+		{
+			name: "two addresses all invalid predicates",
+			testTuple: []testTuple{
+				{address: addr1, isValidPredicate: false},
+				{address: addr2, isValidPredicate: false},
+				{address: addr1, isValidPredicate: false},
+				{address: addr1, isValidPredicate: false},
+			},
+			expectedRes: map[common.Address][]byte{addr1: set.NewBits(0, 1, 2).Bytes(), addr2: set.NewBits(0).Bytes()},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			// Create the rules from TestChainConfig and update the predicates based on the test params
+			rules := params.TestChainConfig.AvalancheRules(common.Big0, 0)
+			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
+			predicater.EXPECT().PredicateGas(gomock.Any()).Return(uint64(0), nil).Times(len(test.testTuple))
+
+			var txAccessList types.AccessList
+			for _, tuple := range test.testTuple {
+				var predicateHash common.Hash
+				if tuple.isValidPredicate {
+					predicateHash = validHash
+					predicater.EXPECT().VerifyPredicate(gomock.Any(), validHash[:]).Return(nil)
+				} else {
+					predicateHash = invalidHash
+					predicater.EXPECT().VerifyPredicate(gomock.Any(), invalidHash[:]).Return(testErr)
+				}
+				txAccessList = append(txAccessList, types.AccessTuple{
+					Address: tuple.address,
+					StorageKeys: []common.Hash{
+						predicateHash,
+					},
+				})
+			}
+
+			rules.Predicaters[addr1] = predicater
+			rules.Predicaters[addr2] = predicater
+
+			// Specify only the access list, since this test should not depend on any other values
+			tx := types.NewTx(&types.DynamicFeeTx{
+				AccessList: txAccessList,
+				Gas:        53000,
+			})
+			predicateRes, err := CheckPredicates(rules, predicateContext, tx)
+			require.NoError(err)
+			require.Equal(test.expectedRes, predicateRes)
 		})
 	}
 }

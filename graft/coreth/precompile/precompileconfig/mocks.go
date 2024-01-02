@@ -146,17 +146,17 @@ func (mr *MockPredicaterMockRecorder) PredicateGas(storageSlots interface{}) *go
 }
 
 // VerifyPredicate mocks base method.
-func (m *MockPredicater) VerifyPredicate(predicateContext *PredicateContext, predicates [][]byte) []byte {
+func (m *MockPredicater) VerifyPredicate(arg0 *PredicateContext, arg1 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyPredicate", predicateContext, predicates)
-	ret0, _ := ret[0].([]byte)
+	ret := m.ctrl.Call(m, "VerifyPredicate", arg0, arg1)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // VerifyPredicate indicates an expected call of VerifyPredicate.
-func (mr *MockPredicaterMockRecorder) VerifyPredicate(predicateContext, predicates interface{}) *gomock.Call {
+func (mr *MockPredicaterMockRecorder) VerifyPredicate(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyPredicate", reflect.TypeOf((*MockPredicater)(nil).VerifyPredicate), predicateContext, predicates)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyPredicate", reflect.TypeOf((*MockPredicater)(nil).VerifyPredicate), arg0, arg1)
 }
 
 // MockSharedMemoryWriter is a mock of SharedMemoryWriter interface.
