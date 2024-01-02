@@ -14,13 +14,6 @@ then
   go install -v go.uber.org/mock/mockgen@v0.2.0
 fi
 
-if ! command -v go-license &> /dev/null
-then
-  echo "go-license not found, installing..."
-  # https://github.com/palantir/go-license
-  go install -v github.com/palantir/go-license@v1.25.0
-fi
-
 source ./scripts/constants.sh
 
 # tuples of (source interface import path, comma-separated interface names, output file path)
@@ -32,9 +25,6 @@ do
   echo "Generating ${output_path}..."
   mockgen -package=${package_name} -destination=${output_path} ${src_import_path} ${interface_name}
   
-  go-license \
-  --config=./header.yml \
-  "${output_path}"
 done < "$input"
 
 echo "SUCCESS"

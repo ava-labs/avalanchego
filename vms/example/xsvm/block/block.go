@@ -26,7 +26,7 @@ func (b *Stateless) Time() time.Time {
 }
 
 func (b *Stateless) ID() (ids.ID, error) {
-	bytes, err := Codec.Marshal(Version, b)
+	bytes, err := Codec.Marshal(CodecVersion, b)
 	return hashing.ComputeHash256Array(bytes), err
 }
 
