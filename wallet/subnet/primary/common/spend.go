@@ -16,7 +16,7 @@ func MatchOwners(
 	addrs set.Set[ids.ShortID],
 	minIssuanceTime int64,
 ) ([]uint32, bool) {
-	if owners.Locktime > minIssuanceTime {
+	if owners.Locktime > uint64(minIssuanceTime) {
 		return nil, false
 	}
 

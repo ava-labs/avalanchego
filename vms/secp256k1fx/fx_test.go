@@ -4,6 +4,7 @@
 package secp256k1fx
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -318,7 +319,45 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
-			Locktime:  date.Add(time.Second).Unix(),
+			Locktime:  uint64(date.Add(time.Second).Unix()),
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+	}
+	in := &TransferInput{
+		Amt: 1,
+		Input: Input{
+			SigIndices: []uint32{0},
+		},
+	}
+	cred := &Credential{
+		Sigs: [][secp256k1.SignatureLen]byte{
+			sigBytes,
+		},
+	}
+
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrTimelocked)
+}
+
+func TestFxVerifyTransferTimelockedPastMaxInt64(t *testing.T) {
+	require := require.New(t)
+	vm := TestVM{
+		Codec: linearcodec.NewDefault(),
+		Log:   logging.NoLog{},
+	}
+
+	date := time.Unix(math.MaxInt64, 0)
+	vm.Clk.Set(date)
+	fx := Fx{}
+	require.NoError(fx.Initialize(&vm))
+	tx := &TestTx{UnsignedBytes: txBytes}
+	out := &TransferOutput{
+		Amt: 1,
+		OutputOwners: OutputOwners{
+			Locktime:  uint64(date.Add(24 * time.Hour).Unix()),
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				addr,
@@ -1122,7 +1161,7 @@ func TestVerifyPermission(t *testing.T) {
 			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
 				Threshold: 1,
-				Locktime:  now.Add(time.Second).Unix(),
+				Locktime:  uint64(now.Add(time.Second).Unix()),
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
 			ErrTimelocked,

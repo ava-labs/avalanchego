@@ -557,7 +557,7 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 		GroupID: 1,
 		Payload: []byte{2},
 		OutputOwners: secp256k1fx.OutputOwners{
-			Locktime:  vm.Clk.Unix() + 1,
+			Locktime:  uint64(vm.Clk.Unix() + 1),
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				addr,

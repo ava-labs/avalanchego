@@ -242,12 +242,12 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, response 
 		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
 	}
 
-	now := s.vm.clock.Unix()
-
-	unlockeds := map[ids.ID]uint64{}
-	lockedStakeables := map[ids.ID]uint64{}
-	lockedNotStakeables := map[ids.ID]uint64{}
-
+	var (
+		now                 = uint64(s.vm.clock.Unix())
+		unlockeds           = map[ids.ID]uint64{}
+		lockedStakeables    = map[ids.ID]uint64{}
+		lockedNotStakeables = map[ids.ID]uint64{}
+	)
 utxoFor:
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
@@ -2828,7 +2828,7 @@ func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 
 func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Owner, error) {
 	apiOwner := &platformapi.Owner{
-		Locktime:  json.Int64(owner.Locktime),
+		Locktime:  json.Uint64(owner.Locktime),
 		Threshold: json.Uint32(owner.Threshold),
 		Addresses: make([]string, 0, len(owner.Addrs)),
 	}

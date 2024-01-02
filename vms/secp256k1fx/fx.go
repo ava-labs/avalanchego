@@ -180,7 +180,7 @@ func (fx *Fx) VerifySpend(utx UnsignedTx, in *TransferInput, cred *Credential, u
 func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out *OutputOwners) error {
 	numSigs := len(in.SigIndices)
 	switch {
-	case out.Locktime > fx.VM.Clock().Unix():
+	case out.Locktime > uint64(fx.VM.Clock().Unix()):
 		return ErrTimelocked
 	case out.Threshold < uint32(numSigs):
 		return ErrTooManySigners

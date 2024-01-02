@@ -98,7 +98,7 @@ type GenesisValidator Staker
 
 // Owner is the repr. of a reward owner sent over APIs.
 type Owner struct {
-	Locktime  json.Int64  `json:"locktime"`
+	Locktime  json.Uint64 `json:"locktime"`
 	Threshold json.Uint32 `json:"threshold"`
 	Addresses []string    `json:"addresses"`
 }
@@ -294,7 +294,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		}
 
 		owner := &secp256k1fx.OutputOwners{
-			Locktime:  int64(vdr.RewardOwner.Locktime),
+			Locktime:  uint64(vdr.RewardOwner.Locktime),
 			Threshold: uint32(vdr.RewardOwner.Threshold),
 		}
 		for _, addrStr := range vdr.RewardOwner.Addresses {
