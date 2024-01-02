@@ -5,6 +5,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -61,7 +62,8 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			"chain-db-cache-size": 7,
 			"block-id-cache-size": 8,
 			"fx-owner-cache-size": 9,
-			"checksums-enabled": true
+			"checksums-enabled": true,
+			"mempool-prune-frequency": 60000000000
 		}`)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
@@ -87,6 +89,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			BlockIDCacheSize:             8,
 			FxOwnerCacheSize:             9,
 			ChecksumsEnabled:             true,
+			MempoolPruneFrequency:        time.Minute,
 		}
 		require.Equal(expected, ec)
 	})
@@ -135,6 +138,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			BlockIDCacheSize:             8,
 			FxOwnerCacheSize:             9,
 			ChecksumsEnabled:             true,
+			MempoolPruneFrequency:        30 * time.Minute,
 		}
 		require.Equal(expected, ec)
 	})
