@@ -169,7 +169,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID, tokenSize
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, nil, tokenSize)
+	view, err := getStandaloneView(ctx, nil, tokenSize)
 	if err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getStandaloneTrieView(ctx, ops, tokenSize)
+	view, err := getStandaloneView(ctx, ops, tokenSize)
 	if err != nil {
 		return err
 	}
@@ -794,9 +794,9 @@ func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byt
 // < [insertChildrenLessThan] or > [insertChildrenGreaterThan].
 // If [insertChildrenLessThan] is Nothing, no children are < [insertChildrenLessThan].
 // If [insertChildrenGreaterThan] is Nothing, no children are > [insertChildrenGreaterThan].
-// Assumes [t.lock] is held.
+// Assumes [v.lock] is held.
 func addPathInfo(
-	t *trieView,
+	v *view,
 	proofPath []ProofNode,
 	insertChildrenLessThan maybe.Maybe[Key],
 	insertChildrenGreaterThan maybe.Maybe[Key],
@@ -816,7 +816,7 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insert(key, maybe.Nothing[[]byte]())
+		n, err := v.insert(key, maybe.Nothing[[]byte]())
 		if err != nil {
 			return err
 		}
@@ -837,7 +837,7 @@ func addPathInfo(
 			if existingChild, ok := n.children[index]; ok {
 				compressedKey = existingChild.compressedKey
 			}
-			childKey := key.Extend(ToToken(index, t.tokenSize), compressedKey)
+			childKey := key.Extend(ToToken(index, v.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
 				// We didn't set the other values on the child entry, but it doesn't matter.
@@ -855,8 +855,8 @@ func addPathInfo(
 	return nil
 }
 
-// getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
-func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int) (*trieView, error) {
+// getStandaloneView returns a new view that has nothing in it besides the changes due to [ops]
+func getStandaloneView(ctx context.Context, ops []database.BatchOp, size int) (*view, error) {
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
@@ -873,5 +873,5 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp, size int
 		return nil, err
 	}
 
-	return newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	return newView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 }

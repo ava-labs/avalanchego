@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -40,6 +41,12 @@ var (
 	_ Accumulator[*testTx] = (*TestAccumulator[*testTx])(nil)
 
 	metricLabels = []string{typeLabel}
+	pushLabels   = prometheus.Labels{
+		typeLabel: pushType,
+	}
+	pullLabels = prometheus.Labels{
+		typeLabel: pullType,
+	}
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -131,9 +138,6 @@ func NewPullGossiper[T Gossipable](
 		client:     client,
 		metrics:    metrics,
 		pollSize:   pollSize,
-		labels: prometheus.Labels{
-			typeLabel: pullType,
-		},
 	}
 }
 
@@ -144,7 +148,6 @@ type PullGossiper[T Gossipable] struct {
 	client     *p2p.Client
 	metrics    Metrics
 	pollSize   int
-	labels     prometheus.Labels
 }
 
 func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
@@ -163,7 +166,8 @@ func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	}
 
 	for i := 0; i < p.pollSize; i++ {
-		if err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse); err != nil {
+		err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse)
+		if err != nil && !errors.Is(err, p2p.ErrNoPeers) {
 			return err
 		}
 	}
@@ -223,13 +227,13 @@ func (p *PullGossiper[_]) handleResponse(
 		}
 	}
 
-	receivedCountMetric, err := p.metrics.receivedCount.GetMetricWith(p.labels)
+	receivedCountMetric, err := p.metrics.receivedCount.GetMetricWith(pullLabels)
 	if err != nil {
 		p.log.Error("failed to get received count metric", zap.Error(err))
 		return
 	}
 
-	receivedBytesMetric, err := p.metrics.receivedBytes.GetMetricWith(p.labels)
+	receivedBytesMetric, err := p.metrics.receivedBytes.GetMetricWith(pullLabels)
 	if err != nil {
 		p.log.Error("failed to get received bytes metric", zap.Error(err))
 		return
@@ -246,10 +250,7 @@ func NewPushGossiper[T Gossipable](marshaller Marshaller[T], client *p2p.Client,
 		client:           client,
 		metrics:          metrics,
 		targetGossipSize: targetGossipSize,
-		labels: prometheus.Labels{
-			typeLabel: pushType,
-		},
-		pending: buffer.NewUnboundedDeque[T](0),
+		pending:          buffer.NewUnboundedDeque[T](0),
 	}
 }
 
@@ -259,8 +260,6 @@ type PushGossiper[T Gossipable] struct {
 	client           *p2p.Client
 	metrics          Metrics
 	targetGossipSize int
-
-	labels prometheus.Labels
 
 	lock    sync.Mutex
 	pending buffer.Deque[T]
@@ -303,12 +302,12 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return err
 	}
 
-	sentCountMetric, err := p.metrics.sentCount.GetMetricWith(p.labels)
+	sentCountMetric, err := p.metrics.sentCount.GetMetricWith(pushLabels)
 	if err != nil {
 		return fmt.Errorf("failed to get sent count metric: %w", err)
 	}
 
-	sentBytesMetric, err := p.metrics.sentBytes.GetMetricWith(p.labels)
+	sentBytesMetric, err := p.metrics.sentBytes.GetMetricWith(pushLabels)
 	if err != nil {
 		return fmt.Errorf("failed to get sent bytes metric: %w", err)
 	}
