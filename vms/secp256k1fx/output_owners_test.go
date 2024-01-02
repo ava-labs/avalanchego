@@ -23,6 +23,15 @@ func TestOutputOwnersVerify(t *testing.T) {
 			expectedErr: ErrNilOutput,
 		},
 		{
+			name: "negative locktime",
+			out: &OutputOwners{
+				Locktime:  -1,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
+			expectedErr: ErrNegativeLocktime,
+		},
+		{
 			name: "threshold > num addrs",
 			out: &OutputOwners{
 				Threshold: 1,

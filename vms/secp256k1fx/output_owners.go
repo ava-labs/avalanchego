@@ -18,6 +18,7 @@ import (
 
 var (
 	ErrNilOutput            = errors.New("nil output")
+	ErrNegativeLocktime     = errors.New("output has negative locktime")
 	ErrOutputUnspendable    = errors.New("output is unspendable")
 	ErrOutputUnoptimized    = errors.New("output representation should be optimized")
 	ErrAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
@@ -114,6 +115,8 @@ func (out *OutputOwners) Verify() error {
 	switch {
 	case out == nil:
 		return ErrNilOutput
+	case out.Locktime < 0:
+		return ErrNegativeLocktime
 	case out.Threshold > uint32(len(out.Addrs)):
 		return ErrOutputUnspendable
 	case out.Threshold == 0 && len(out.Addrs) > 0:

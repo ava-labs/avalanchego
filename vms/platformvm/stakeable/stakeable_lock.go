@@ -27,7 +27,7 @@ func (s *LockOut) Addresses() [][]byte {
 }
 
 func (s *LockOut) Verify() error {
-	if s.Locktime == 0 {
+	if s.Locktime <= 0 {
 		return errInvalidLocktime
 	}
 	if _, nested := s.TransferableOut.(*LockOut); nested {
@@ -42,7 +42,7 @@ type LockIn struct {
 }
 
 func (s *LockIn) Verify() error {
-	if s.Locktime == 0 {
+	if s.Locktime <= 0 {
 		return errInvalidLocktime
 	}
 	if _, nested := s.TransferableIn.(*LockIn); nested {
