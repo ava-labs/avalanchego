@@ -35,7 +35,7 @@ type OutboundMsgBuilder interface {
 	) (OutboundMessage, error)
 
 	PeerList(
-		peers []ips.ClaimedIPPort,
+		peers []*ips.ClaimedIPPort,
 		bypassThrottling bool,
 	) (OutboundMessage, error)
 
@@ -271,7 +271,7 @@ func (b *outMsgBuilder) Handshake(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	claimIPPorts := make([]*p2p.ClaimedIpPort, len(peers))
 	for i, p := range peers {
 		claimIPPorts[i] = &p2p.ClaimedIpPort{

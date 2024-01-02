@@ -42,12 +42,18 @@ func (v *ValidatorTracker) Connected(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
 	}
 }
 
-func (v *ValidatorTracker) Disconnected(nodeID ids.NodeID) {
+func (v *ValidatorTracker) Disconnected(nodeID ids.NodeID) *ips.ClaimedIPPort {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
+	ip, ok := v.connected[nodeID]
+	if !ok {
+		return nil
+	}
+
 	delete(v.connected, nodeID)
 	v.removeConnectedValidator(nodeID)
+	return ip
 }
 
 func (v *ValidatorTracker) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {

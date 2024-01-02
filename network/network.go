@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -32,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -148,8 +148,8 @@ type network struct {
 	sendFailRateCalculator safemath.Averager
 
 	// Tracks which peers know about which peers
-	gossipTracker peer.GossipTracker
-	peersLock     sync.RWMutex
+	validatorTracker *ValidatorTracker
+	peersLock        sync.RWMutex
 	// peerIPs contains the most up to date set of signed IPs for nodes we are
 	// currently connected or attempting to connect to.
 	// Note: The txID provided inside of a claimed IP is not verified and should
@@ -276,6 +276,10 @@ func NewNetwork(
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
+
+	validatorTracker := NewValidatorTracker()
+	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, validatorTracker)
+
 	n := &network{
 		config:               config,
 		peerConfig:           peerConfig,
@@ -297,12 +301,12 @@ func NewNetwork(
 			time.Now(),
 		)),
 
-		peerIPs:         make(map[ids.NodeID]*ips.ClaimedIPPort),
-		trackedIPs:      make(map[ids.NodeID]*trackedIP),
-		gossipTracker:   config.GossipTracker,
-		connectingPeers: peer.NewSet(),
-		connectedPeers:  peer.NewSet(),
-		router:          router,
+		peerIPs:          make(map[ids.NodeID]*ips.ClaimedIPPort),
+		trackedIPs:       make(map[ids.NodeID]*trackedIP),
+		validatorTracker: validatorTracker,
+		connectingPeers:  peer.NewSet(),
+		connectedPeers:   peer.NewSet(),
+		router:           router,
 	}
 	n.peerConfig.Network = n
 	return n, nil
@@ -444,6 +448,8 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
+	n.validatorTracker.Connected(nodeID, newIP)
+
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
@@ -549,12 +555,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 // call. Note that this is from the perspective of a single peer object, because
 // a peer with the same ID can reconnect to this network instance.
 func (n *network) Disconnected(nodeID ids.NodeID) {
-	if !n.gossipTracker.StopTrackingPeer(nodeID) {
-		n.peerConfig.Log.Error(
-			"stopped non-existent peer tracker",
-			zap.Stringer("nodeID", nodeID),
-		)
-	}
+	n.validatorTracker.Disconnected(nodeID)
 
 	n.peersLock.RLock()
 	_, connecting := n.connectingPeers.GetByID(nodeID)
@@ -569,57 +570,11 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 	}
 }
 
-func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
-	// Only select validators that we haven't already sent to this peer
-	unknownValidators, ok := n.gossipTracker.GetUnknown(peerID)
-	if !ok {
-		n.peerConfig.Log.Debug(
-			"unable to find peer to gossip to",
-			zap.Stringer("nodeID", peerID),
-		)
-		return nil, nil
-	}
-
-	// We select a random sample of validators to gossip to avoid starving out a
-	// validator from being gossiped for an extended period of time.
-	s := sampler.NewUniform()
-	s.Initialize(uint64(len(unknownValidators)))
-
-	// Calculate the unknown information we need to send to this peer.
-	validatorIPs := make([]ips.ClaimedIPPort, 0, int(n.config.PeerListNumValidatorIPs))
-	for i := 0; i < len(unknownValidators) && len(validatorIPs) < int(n.config.PeerListNumValidatorIPs); i++ {
-		drawn, err := s.Next()
-		if err != nil {
-			return nil, err
-		}
-
-		validator := unknownValidators[drawn]
-		n.peersLock.RLock()
-		_, isConnected := n.connectedPeers.GetByID(validator.NodeID)
-		peerIP := n.peerIPs[validator.NodeID]
-		n.peersLock.RUnlock()
-		if !isConnected {
-			n.peerConfig.Log.Verbo(
-				"unable to find validator in connected peers",
-				zap.Stringer("nodeID", validator.NodeID),
-			)
-			continue
-		}
-
-		// Note: peerIP isn't used directly here because the TxID may be
-		//       incorrect.
-		validatorIPs = append(validatorIPs,
-			ips.ClaimedIPPort{
-				Cert:      peerIP.Cert,
-				IPPort:    peerIP.IPPort,
-				Timestamp: peerIP.Timestamp,
-				Signature: peerIP.Signature,
-				TxID:      validator.TxID,
-			},
-		)
-	}
-
-	return validatorIPs, nil
+func (n *network) Peers(knownPeers *gossip.BloomFilter) []*ips.ClaimedIPPort {
+	return n.validatorTracker.GetValidatorIPs(
+		knownPeers,
+		int(n.config.PeerListNumValidatorIPs),
+	)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -1162,13 +1117,6 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	n.peerConfig.Log.Verbo("starting handshake",
 		zap.Stringer("nodeID", nodeID),
 	)
-
-	if !n.gossipTracker.StartTrackingPeer(nodeID) {
-		n.peerConfig.Log.Error(
-			"started duplicate peer tracker",
-			zap.Stringer("nodeID", nodeID),
-		)
-	}
 
 	// peer.Start requires there is only ever one peer instance running with the
 	// same [peerConfig.InboundMsgThrottler]. This is guaranteed by the above

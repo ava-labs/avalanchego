@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -32,8 +33,18 @@ import (
 var (
 	errClosed = errors.New("closed")
 
+	emptyBloomFilter *gossip.BloomFilter
+
 	_ Peer = (*peer)(nil)
 )
+
+func init() {
+	var err error
+	emptyBloomFilter, err = gossip.NewBloomFilter(2, .5)
+	if err != nil {
+		panic(err)
+	}
+}
 
 // Peer encapsulates all of the functionality required to send and receive
 // messages with a remote peer.
@@ -614,15 +625,7 @@ func (p *peer) sendNetworkMessages() {
 	for {
 		select {
 		case <-p.peerListChan:
-			peerIPs, err := p.Config.Network.Peers(p.id)
-			if err != nil {
-				p.Log.Error("failed to get peers to gossip",
-					zap.Stringer("nodeID", p.id),
-					zap.Error(err),
-				)
-				return
-			}
-
+			peerIPs := p.Config.Network.Peers(emptyBloomFilter)
 			if len(peerIPs) == 0 {
 				p.Log.Verbo(
 					"skipping peer gossip as there are no unknown peers",
@@ -1014,14 +1017,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.gotHandshake.Set(true)
 
-	peerIPs, err := p.Network.Peers(p.id)
-	if err != nil {
-		p.Log.Error("failed to get peers to gossip for handshake",
-			zap.Stringer("nodeID", p.id),
-			zap.Error(err),
-		)
-		return
-	}
+	peerIPs := p.Network.Peers(emptyBloomFilter)
 
 	// We bypass throttling here to ensure that the peerlist message is
 	// acknowledged timely.

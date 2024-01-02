@@ -186,9 +186,8 @@ func NewTestNetwork(
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
-	beacons := validators.NewManager()
 	networkConfig.Validators = currentValidators
-	networkConfig.Beacons = beacons
+	networkConfig.Beacons = validators.NewManager()
 	// This never actually does anything because we never initialize the P-chain
 	networkConfig.UptimeCalculator = uptime.NoOpCalculator
 
@@ -226,11 +225,6 @@ func NewTestNetwork(
 	)
 
 	networkConfig.MyIPPort = ips.NewDynamicIPPort(net.IPv4zero, 0)
-
-	networkConfig.GossipTracker, err = peer.NewGossipTracker(metrics, "")
-	if err != nil {
-		return nil, err
-	}
 
 	return NewNetwork(
 		&networkConfig,

@@ -215,27 +215,16 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
-		g, err := peer.NewGossipTracker(registry, "foobar")
-		require.NoError(err)
-
-		log := logging.NoLog{}
-		gossipTrackerCallback := peer.GossipTrackerCallback{
-			Log:           log,
-			GossipTracker: g,
-		}
-
 		beacons := validators.NewManager()
 		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		vdrs := validators.NewManager()
-		vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
 			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
 		config := config
 
-		config.GossipTracker = g
 		config.Beacons = beacons
 		config.Validators = vdrs
 
@@ -244,7 +233,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			config,
 			msgCreator,
 			registry,
-			log,
+			logging.NoLog{},
 			listeners[i],
 			dialer,
 			&testHandler{
@@ -437,27 +426,16 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
-		g, err := peer.NewGossipTracker(registry, "foobar")
-		require.NoError(err)
-
-		log := logging.NoLog{}
-		gossipTrackerCallback := peer.GossipTrackerCallback{
-			Log:           log,
-			GossipTracker: g,
-		}
-
 		beacons := validators.NewManager()
 		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		vdrs := validators.NewManager()
-		vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
 			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
 		config := config
 
-		config.GossipTracker = g
 		config.Beacons = beacons
 		config.Validators = vdrs
 		config.AllowPrivateIPs = false
@@ -466,7 +444,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			config,
 			msgCreator,
 			registry,
-			log,
+			logging.NoLog{},
 			listeners[i],
 			dialer,
 			&testHandler{
@@ -532,23 +510,11 @@ func TestDialDeletesNonValidators(t *testing.T) {
 		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
-		g, err := peer.NewGossipTracker(registry, "foobar")
-		require.NoError(err)
-
-		log := logging.NoLog{}
-		gossipTrackerCallback := peer.GossipTrackerCallback{
-			Log:           log,
-			GossipTracker: g,
-		}
-
 		beacons := validators.NewManager()
 		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
-		vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
-
 		config := config
 
-		config.GossipTracker = g
 		config.Beacons = beacons
 		config.Validators = vdrs
 		config.AllowPrivateIPs = false
@@ -557,7 +523,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			config,
 			msgCreator,
 			registry,
-			log,
+			logging.NoLog{},
 			listeners[i],
 			dialer,
 			&testHandler{
@@ -691,25 +657,14 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
-		g, err := peer.NewGossipTracker(registry, "foobar")
-		require.NoError(err)
-
-		log := logging.NoLog{}
-		gossipTrackerCallback := peer.GossipTrackerCallback{
-			Log:           log,
-			GossipTracker: g,
-		}
-
 		beacons := validators.NewManager()
 		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		vdrs := validators.NewManager()
-		vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
 		require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		config := config
 
-		config.GossipTracker = g
 		config.Beacons = beacons
 		config.Validators = vdrs
 		config.RequireValidatorToConnect = true
@@ -718,7 +673,7 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 			config,
 			msgCreator,
 			registry,
-			log,
+			logging.NoLog{},
 			listeners[i],
 			dialer,
 			&testHandler{

@@ -5,6 +5,7 @@ package peer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -21,8 +22,6 @@ type Network interface {
 	// Track allows the peer to notify the network of a potential new peer to
 	// connect to, given the [ips] of the peers it sent us during the peer
 	// handshake.
-	//
-	// Returns which IPs should not be gossipped to this node again.
 	Track(peerID ids.NodeID, ips []*ips.ClaimedIPPort) error
 
 	// Disconnected is called when the peer finishes shutting down. It is not
@@ -31,6 +30,6 @@ type Network interface {
 	// for a given [Peer] object.
 	Disconnected(peerID ids.NodeID)
 
-	// Peers returns peers that [peerID] might not know about.
-	Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error)
+	// Peers returns peers that are not known.
+	Peers(knownPeers *gossip.BloomFilter) []*ips.ClaimedIPPort
 }

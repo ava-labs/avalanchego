@@ -5,6 +5,7 @@ package peer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -24,6 +25,6 @@ func (testNetwork) Track(ids.NodeID, []*ips.ClaimedIPPort) error {
 
 func (testNetwork) Disconnected(ids.NodeID) {}
 
-func (testNetwork) Peers(ids.NodeID) ([]ips.ClaimedIPPort, error) {
-	return nil, nil
+func (testNetwork) Peers(*gossip.BloomFilter) []*ips.ClaimedIPPort {
+	return nil
 }
