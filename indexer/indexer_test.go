@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -68,7 +68,6 @@ func TestNewIndexer(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&indexer{}, idxrIntf)
 	idxr := idxrIntf.(*indexer)
-	require.NotNil(idxr.codec)
 	require.NotNil(idxr.log)
 	require.NotNil(idxr.db)
 	require.False(idxr.closed)
@@ -164,7 +163,7 @@ func TestIndexer(t *testing.T) {
 	require.False(previouslyIndexed)
 
 	// Register this chain, creating a new index
-	chainVM := mocks.NewMockChainVM(ctrl)
+	chainVM := block.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -427,7 +426,7 @@ func TestIncompleteIndex(t *testing.T) {
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	chainVM := mocks.NewMockChainVM(ctrl)
+	chainVM := block.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -508,7 +507,7 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	})
 
 	// RegisterChain should return without adding an index for this chain
-	chainVM := mocks.NewMockChainVM(ctrl)
+	chainVM := block.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	require.Empty(idxr.blockIndices)
 }

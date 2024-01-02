@@ -649,7 +649,7 @@ func TestParsedStateBlock(t *testing.T) {
 			Status: choices.Accepted,
 		}
 
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.Version, &stBlk)
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
 		require.NoError(err)
 
 		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
