@@ -15,8 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Version is the current default codec version
-const Version = 0
+const CodecVersion = 0
 
 var (
 	Codec codec.Manager
@@ -48,8 +47,8 @@ func init() {
 		errs.Add(RegisterDUnsignedTxsTypes(c))
 	}
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
-		GenesisCodec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(CodecVersion, c),
+		GenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

@@ -10,15 +10,15 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 )
 
-const version = 0
+const CodecVersion = 0
 
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	c = codec.NewManager(math.MaxInt32)
+	Codec = codec.NewManager(math.MaxInt32)
 
-	err := c.RegisterCodec(version, lc)
+	err := Codec.RegisterCodec(CodecVersion, lc)
 	if err != nil {
 		panic(err)
 	}

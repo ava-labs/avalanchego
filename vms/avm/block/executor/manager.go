@@ -155,7 +155,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	stateDiff, err := state.NewDiff(m.preferred, m)
+	stateDiff, err := state.NewDiff(m.lastAccepted, m)
 	if err != nil {
 		return err
 	}
@@ -174,12 +174,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		State: stateDiff,
 		Tx:    tx,
 	}
-	err = tx.Unsigned.Visit(executor)
-	if err != nil {
-		return err
-	}
-
-	return m.VerifyUniqueInputs(m.preferred, executor.Inputs)
+	return tx.Unsigned.Visit(executor)
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {

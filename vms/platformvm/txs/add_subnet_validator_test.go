@@ -201,7 +201,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
-	txBytes, err := Codec.Marshal(Version, stx)
+	txBytes, err := Codec.Marshal(CodecVersion, stx)
 	require.NoError(err)
 
 	parsedTx, err := Parse(Codec, txBytes)

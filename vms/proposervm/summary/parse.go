@@ -14,11 +14,11 @@ func Parse(bytes []byte) (StateSummary, error) {
 		id:    hashing.ComputeHash256Array(bytes),
 		bytes: bytes,
 	}
-	version, err := c.Unmarshal(bytes, &summary)
+	version, err := Codec.Unmarshal(bytes, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal summary due to: %w", err)
 	}
-	if version != codecVersion {
+	if version != CodecVersion {
 		return nil, errWrongCodecVersion
 	}
 	return &summary, nil

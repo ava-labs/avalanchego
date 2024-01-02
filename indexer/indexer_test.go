@@ -68,7 +68,6 @@ func TestNewIndexer(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&indexer{}, idxrIntf)
 	idxr := idxrIntf.(*indexer)
-	require.NotNil(idxr.codec)
 	require.NotNil(idxr.log)
 	require.NotNil(idxr.db)
 	require.False(idxr.closed)
