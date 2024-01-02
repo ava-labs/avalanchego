@@ -80,7 +80,7 @@ func (c *chain) NewBlock(blk *xsblock.Stateless) (Block, error) {
 		return blk, nil
 	}
 
-	blkBytes, err := xsblock.Codec.Marshal(xsblock.Version, blk)
+	blkBytes, err := xsblock.Codec.Marshal(xsblock.CodecVersion, blk)
 	if err != nil {
 		return nil, err
 	}

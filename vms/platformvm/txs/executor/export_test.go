@@ -33,13 +33,13 @@ func TestNewExportTx(t *testing.T) {
 	tests := []test{
 		{
 			description:        "P->X export",
-			destinationChainID: xChainID,
+			destinationChainID: env.ctx.XChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          defaultValidateStartTime,
 		},
 		{
 			description:        "P->C export",
-			destinationChainID: cChainID,
+			destinationChainID: env.ctx.CChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          env.config.ApricotPhase5Time,
 		},

@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -56,8 +55,8 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
 
-	innerVM := mocks.NewMockChainVM(ctrl)
-	innerBlockBuilderVM := mocks.NewMockBuildBlockWithContextChainVM(ctrl)
+	innerVM := block.NewMockChainVM(ctrl)
+	innerBlockBuilderVM := block.NewMockBuildBlockWithContextChainVM(ctrl)
 	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &block.Context{
 		PChainHeight: pChainHeight - 1,
 	}).Return(builtBlk, nil).AnyTimes()
@@ -410,7 +409,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 		},
-		ChainVM: mocks.NewMockChainVM(ctrl),
+		ChainVM: block.NewMockChainVM(ctrl),
 		ctx: &snow.Context{
 			NodeID:         thisNodeID,
 			ValidatorState: vdrState,
