@@ -90,8 +90,11 @@ type VM struct {
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
 
-	startShutdown context.CancelFunc
-	awaitShutdown sync.WaitGroup
+	// Cancelled on shutdown
+	onShutdownCtx context.Context
+	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
+	onShutdownCtxCancel context.CancelFunc
+	awaitShutdown       sync.WaitGroup
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
@@ -212,12 +215,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize network: %w", err)
 	}
 
-	vmCtx, cancel := context.WithCancel(context.Background())
-	vm.startShutdown = cancel
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	vm.awaitShutdown.Add(1)
 	go func() {
 		defer vm.awaitShutdown.Done()
-		vm.Network.Gossip(vmCtx)
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.Network.Gossip(vm.onShutdownCtx)
 	}()
 
 	vm.Builder = blockbuilder.New(
@@ -375,7 +379,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.startShutdown()
+	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
 	vm.Builder.ShutdownBlockTimer()
