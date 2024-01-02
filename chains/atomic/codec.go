@@ -8,15 +8,15 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 )
 
-const codecVersion = 0
+const CodecVersion = 0
 
-// codecManager is used to marshal and unmarshal dbElements and chain IDs.
-var codecManager codec.Manager
+// Codec is used to marshal and unmarshal dbElements and chain IDs.
+var Codec codec.Manager
 
 func init() {
-	linearCodec := linearcodec.NewDefault()
-	codecManager = codec.NewDefaultManager()
-	if err := codecManager.RegisterCodec(codecVersion, linearCodec); err != nil {
+	lc := linearcodec.NewDefault()
+	Codec = codec.NewDefaultManager()
+	if err := Codec.RegisterCodec(CodecVersion, lc); err != nil {
 		panic(err)
 	}
 }

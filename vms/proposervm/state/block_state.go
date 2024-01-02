@@ -100,11 +100,11 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	}
 
 	blkWrapper := blockWrapper{}
-	parsedVersion, err := c.Unmarshal(blkWrapperBytes, &blkWrapper)
+	parsedVersion, err := Codec.Unmarshal(blkWrapperBytes, &blkWrapper)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}
-	if parsedVersion != version {
+	if parsedVersion != CodecVersion {
 		return nil, choices.Unknown, errBlockWrongVersion
 	}
 
@@ -126,7 +126,7 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 		block:  blk,
 	}
 
-	bytes, err := c.Marshal(version, &blkWrapper)
+	bytes, err := Codec.Marshal(CodecVersion, &blkWrapper)
 	if err != nil {
 		return err
 	}

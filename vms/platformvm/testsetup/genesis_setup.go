@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -24,6 +25,10 @@ var (
 	// each key controls an address that has [Balance] AVAX at genesis
 	Keys = secp256k1.TestKeys()
 
+	// many UTs add a subnet right after genesis. They should use
+	// SubnetControlKeys to control the subnet
+	SubnetControlKeys = Keys[0:3]
+
 	// Node IDs of genesis validators. Initialized in init function
 	GenesisNodeIDs []ids.NodeID
 
@@ -37,13 +42,6 @@ var (
 
 	// time that genesis validators stop validating
 	ValidateEndTime = ValidateStartTime.Add(20 * MinStakingDuration)
-
-	NetworkID = constants.UnitTestID
-
-	// AVAX asset ID in tests
-	AvaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-	XChainID    = ids.Empty.Prefix(0)
-	CChainID    = ids.Empty.Prefix(1)
 
 	MinValidatorStake = 5 * units.MilliAvax
 	MaxValidatorStake = 500 * units.MilliAvax
@@ -65,7 +63,7 @@ func init() {
 }
 
 // [BuildGenesis] is a good default to build genesis for platformVM unit tests
-func BuildGenesis() (*genesis.Genesis, error) {
+func BuildGenesis(ctx *snow.Context) (*genesis.Genesis, error) {
 	genesisUTXOs := make([]*genesis.UTXO, len(Keys))
 	for i, key := range Keys {
 		addr := key.PublicKey().Address()
@@ -75,7 +73,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 					TxID:        ids.Empty,
 					OutputIndex: uint32(i),
 				},
-				Asset: avax.Asset{ID: AvaxAssetID},
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: Balance,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -95,7 +93,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 
 		utxo := &avax.TransferableOutput{
-			Asset: avax.Asset{ID: AvaxAssetID},
+			Asset: avax.Asset{ID: ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: Weight,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -114,7 +112,7 @@ func BuildGenesis() (*genesis.Genesis, error) {
 
 		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    NetworkID,
+				NetworkID:    ctx.NetworkID,
 				BlockchainID: constants.PlatformChainID,
 			}},
 			Validator: txs.Validator{

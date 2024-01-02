@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 
@@ -95,8 +94,6 @@ type environment struct {
 }
 
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
-	r := require.New(t)
-
 	var (
 		fork     = ts.ApricotPhase5Fork
 		forkTime = ts.ValidateEndTime
@@ -110,7 +107,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	res.ctx, _ = ts.Context(r, res.baseDB)
+	res.ctx, _ = ts.Context(t, res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
@@ -200,9 +197,9 @@ func addSubnet(env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.Keys[0].PublicKey().Address(),
-			ts.Keys[1].PublicKey().Address(),
-			ts.Keys[2].PublicKey().Address(),
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+			ts.SubnetControlKeys[1].PublicKey().Address(),
+			ts.SubnetControlKeys[2].PublicKey().Address(),
 		},
 		[]*secp256k1.PrivateKey{ts.Keys[4]},
 		ts.Keys[0].PublicKey().Address(),
@@ -240,7 +237,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesis, err := ts.BuildGenesis()
+	genesis, err := ts.BuildGenesis(ctx)
 	if err != nil {
 		panic(err)
 	}

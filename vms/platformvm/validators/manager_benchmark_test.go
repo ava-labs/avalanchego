@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -56,7 +57,8 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(db.Close())
 	}()
 
-	genesis, err := ts.BuildGenesis()
+	snowCtx := snowtest.Context(b, snowtest.PChainID)
+	genesis, err := ts.BuildGenesis(snowCtx)
 	require.NoError(err)
 
 	vdrs := validators.NewManager()

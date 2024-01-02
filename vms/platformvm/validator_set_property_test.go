@@ -15,7 +15,6 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
-	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/maps"
 
@@ -371,7 +370,11 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 }
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
-	if err := vm.Network.IssueTx(context.Background(), signedTx); err != nil {
+	vm.ctx.Lock.Unlock()
+	err := vm.issueTx(context.Background(), signedTx)
+	vm.ctx.Lock.Lock()
+
+	if err != nil {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
 
@@ -389,26 +392,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed setting preference: %w", err)
 	}
 
-	// move time ahead, promoting the validator to current
-	stakerTx := signedTx.Unsigned.(txs.ScheduledStaker)
-	currentTime := stakerTx.StartTime()
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed building block: %w", err)
-	}
-	if err := blk.Verify(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed verifying block: %w", err)
-	}
-	if err := blk.Accept(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed accepting block: %w", err)
-	}
-	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return nil, fmt.Errorf("failed setting preference: %w", err)
-	}
-
+	stakerTx := signedTx.Unsigned.(txs.Staker)
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 
@@ -722,8 +706,6 @@ func TestTimestampListGenerator(t *testing.T) {
 // add a single validator at the end of times,
 // to make sure it won't pollute our tests
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
-	require := require.New(t)
-
 	forkTime := ts.GenesisTime
 	vm := &VM{
 		Config: *ts.Config(ts.LatestFork, forkTime),
@@ -734,7 +716,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	chainDB := prefixdb.New([]byte{0}, baseDB)
 
 	msgChan := make(chan common.Message, 1)
-	ctx, _ := ts.Context(require, baseDB)
+	ctx, _ := ts.Context(t, baseDB)
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -744,7 +726,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil
 	}
 
-	genesisBytes, err := buildCustomGenesis()
+	genesisBytes, err := buildCustomGenesis(ctx.AVAXAssetID)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
@@ -774,14 +756,19 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// chain time ahead
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
-		[]ids.ShortID{ts.Keys[0].PublicKey().Address()},
+		[]ids.ShortID{
+			ts.SubnetControlKeys[0].PublicKey().Address(),
+		},
 		[]*secp256k1.PrivateKey{ts.Keys[len(ts.Keys)-1]}, // pays tx fee
 		ts.Keys[0].PublicKey().Address(),                 // change addr
 	)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := vm.Network.IssueTx(context.Background(), testSubnet1); err != nil {
+	vm.ctx.Lock.Unlock()
+	err = vm.issueTx(context.Background(), testSubnet1)
+	vm.ctx.Lock.Lock()
+	if err != nil {
 		return nil, ids.Empty, err
 	}
 
@@ -802,7 +789,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	return vm, testSubnet1.ID(), nil
 }
 
-func buildCustomGenesis() ([]byte, error) {
+func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	genesisUTXOs := make([]api.UTXO, len(ts.Keys))
 	for i, key := range ts.Keys {
 		id := key.PublicKey().Address()
@@ -848,7 +835,7 @@ func buildCustomGenesis() ([]byte, error) {
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ts.AvaxAssetID,
+		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,

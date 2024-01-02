@@ -19,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 func TestNewImportTx(t *testing.T) {
@@ -69,7 +67,7 @@ func TestNewImportTx(t *testing.T) {
 					},
 				},
 			}
-			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 			require.NoError(t, err)
 
 			inputID := utxo.InputID()
@@ -120,9 +118,9 @@ func TestNewImportTx(t *testing.T) {
 		},
 		{
 			description:   "attempting to import from C-chain",
-			sourceChainID: ts.CChainID,
+			sourceChainID: env.ctx.CChainID,
 			sharedMemory: fundedSharedMemory(
-				ts.CChainID,
+				env.ctx.CChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
