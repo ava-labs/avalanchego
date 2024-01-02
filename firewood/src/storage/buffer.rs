@@ -20,6 +20,7 @@ use growthring::{
     walerror::WalError,
     WalFileImpl, WalStoreImpl,
 };
+use tokio::task::block_in_place;
 use tokio::{
     sync::{
         mpsc,
@@ -588,7 +589,7 @@ impl DiskBufferRequester {
             .map_err(StoreError::Send)
             .ok();
         #[allow(clippy::unwrap_used)]
-        resp_rx.blocking_recv().unwrap()
+        block_in_place(move || resp_rx.blocking_recv().unwrap())
     }
 
     /// Sends a batch of writes to the buffer.
@@ -622,7 +623,7 @@ impl DiskBufferRequester {
             .send(BufferCmd::CollectAsh(nrecords, resp_tx))
             .map_err(StoreError::Send)
             .ok();
-        resp_rx.blocking_recv().map_err(StoreError::Receive)
+        block_in_place(|| resp_rx.blocking_recv().map_err(StoreError::Receive))
     }
 
     /// Register a cached space to the buffer.
