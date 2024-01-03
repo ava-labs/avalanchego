@@ -200,20 +200,20 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	// Node stop will be initiated if the node is not started without error.
 	node, err := network.AddEphemeralNode(ctx, ginkgo.GinkgoWriter, tmpnet.FlagsMap{})
+	// AddEphemeralNode will initiate node stop if an error is encountered during start,
+	// so no further cleanup effort is required if an error is seen here.
 	require.NoError(err)
 
-	err = tmpnet.WaitForHealthy(ctx, node)
+	// Ensure the node is always stopped at the end of the check
+	defer func() {
+		ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
+		defer cancel()
+		require.NoError(node.Stop(ctx))
+	}()
 
-	// Ensure the node is stopped regardless of whether bootstrap succeeded. Use a new
-	// context in case the previous one timed out waiting for the node to become healthy.
-	ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-	require.NoError(node.Stop(ctx))
-
-	// Check that the node became healthy within timout
-	require.NoError(err)
+	// Check that the node becomes healthy within timeout
+	require.NoError(tmpnet.WaitForHealthy(ctx, node))
 }
 
 // Start a temporary network with the provided avalanchego binary.
