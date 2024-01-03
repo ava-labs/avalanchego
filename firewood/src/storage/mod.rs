@@ -150,8 +150,7 @@ impl StoreDelta {
         widx.sort_by_key(|i| writes[*i].offset);
 
         let mut witer = widx.into_iter();
-        #[allow(clippy::unwrap_used)]
-        #[allow(clippy::indexing_slicing)]
+        #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
         let w0 = &writes[witer.next().unwrap()];
         let mut head = w0.offset >> PAGE_SIZE_NBIT;
         let mut tail = (w0.offset + w0.data.len() as u64 - 1) >> PAGE_SIZE_NBIT;
@@ -213,7 +212,6 @@ impl StoreDelta {
             if !data.is_empty() {
                 l += 1;
                 #[allow(clippy::indexing_slicing)]
-                #[allow(clippy::indexing_slicing)]
                 deltas[l].data_mut()[..data.len()].copy_from_slice(data);
             }
         }
@@ -274,11 +272,8 @@ impl MemStoreR for StoreRev {
             #[allow(clippy::indexing_slicing)]
             data.extend(base_space.get_slice(start, delta[l].offset() - start)?);
             #[allow(clippy::indexing_slicing)]
-            #[allow(clippy::indexing_slicing)]
             data.extend(&delta[l].data()[..p_off as usize]);
         } else {
-            #[allow(clippy::indexing_slicing)]
-            #[allow(clippy::indexing_slicing)]
             #[allow(clippy::indexing_slicing)]
             data.extend(&delta[l].data()[(start - delta[l].offset()) as usize..p_off as usize]);
         };
@@ -298,8 +293,6 @@ impl MemStoreR for StoreRev {
             }
             #[allow(clippy::indexing_slicing)]
             if end < delta[l].offset() + PAGE_SIZE {
-                #[allow(clippy::indexing_slicing)]
-                #[allow(clippy::indexing_slicing)]
                 #[allow(clippy::indexing_slicing)]
                 data.extend(&delta[l].data()[..(end - delta[l].offset()) as usize]);
                 break;
@@ -655,8 +648,7 @@ impl MemStoreR for ZeroStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::indexing_slicing)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod test {
     use super::*;
     #[test]

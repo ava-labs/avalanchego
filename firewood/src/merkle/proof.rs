@@ -158,7 +158,6 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
         // Ensure the received batch is monotonic increasing and contains no deletions
         #[allow(clippy::indexing_slicing)]
-        #[allow(clippy::indexing_slicing)]
         if !keys.windows(2).all(|w| w[0].as_ref() < w[1].as_ref()) {
             return Err(ProofError::NonMonotonicIncreaseRange);
         }
@@ -631,9 +630,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 // If either the node pointed by left proof or right proof is nil,
                 // stop here and the forkpoint is the fullnode.
                 #[allow(clippy::indexing_slicing)]
-                #[allow(clippy::indexing_slicing)]
                 let left_node = n.chd()[left_chunks[index] as usize];
-                #[allow(clippy::indexing_slicing)]
                 #[allow(clippy::indexing_slicing)]
                 let right_node = n.chd()[right_chunks[index] as usize];
 
@@ -705,16 +702,12 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
     match &u_ref.inner() {
         NodeType::Branch(n) => {
             #[allow(clippy::indexing_slicing)]
-            #[allow(clippy::indexing_slicing)]
             let left_node = n.chd()[left_chunks[index] as usize];
-            #[allow(clippy::indexing_slicing)]
             #[allow(clippy::indexing_slicing)]
             let right_node = n.chd()[right_chunks[index] as usize];
 
             // unset all internal nodes calculated encoded value in the forkpoint
-            #[allow(clippy::unwrap_used)]
-            #[allow(clippy::indexing_slicing)]
-            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
             for i in left_chunks[index] + 1..right_chunks[index] {
                 u_ref
                     .write(|u| {
@@ -967,8 +960,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 (true, Ordering::Less) | (false, Ordering::Greater)
             );
 
-            #[allow(clippy::unwrap_used)]
-            #[allow(clippy::indexing_slicing)]
+            #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
             if should_unset_entire_branch {
                 p_ref
                     .write(|p| {

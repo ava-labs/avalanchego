@@ -1464,13 +1464,11 @@ pub const fn to_nibble_array(x: u8) -> [u8; 2] {
 pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
     debug_assert_eq!(nibbles.len() & 1, 0);
     #[allow(clippy::indexing_slicing)]
-    #[allow(clippy::indexing_slicing)]
     nibbles.chunks_exact(2).map(|p| (p[0] << 4) | p[1])
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::indexing_slicing)]
+#[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use crate::merkle::node::PlainCodec;
 

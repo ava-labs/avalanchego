@@ -94,8 +94,7 @@ impl CachedView for PlainMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
-        #[allow(clippy::unwrap_used)]
-        #[allow(clippy::indexing_slicing)]
+        #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
         self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
     }
 }
@@ -195,15 +194,13 @@ impl CachedView for DynamicMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
-        #[allow(clippy::unwrap_used)]
-        #[allow(clippy::indexing_slicing)]
+        #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
         self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::indexing_slicing)]
+#[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use super::*;
 

@@ -226,8 +226,7 @@ fn schedule_write(
         let offset = page_key.1 << PAGE_SIZE_NBIT;
         let fid = offset >> p.file_nbit;
         let fmask = (1 << p.file_nbit) - 1;
-        #[allow(clippy::unwrap_used)]
-        #[allow(clippy::indexing_slicing)]
+        #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
         let file = file_pools.borrow()[page_key.0 as usize]
             .as_ref()
             .unwrap()
@@ -302,8 +301,7 @@ async fn init_wal(
                     for (undo, redo) in ash.iter() {
                         let offset = undo.offset;
                         let file_pools = file_pools.borrow();
-                        #[allow(clippy::unwrap_used)]
-                        #[allow(clippy::indexing_slicing)]
+                        #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
                         let file_pool = file_pools[space_id as usize].as_ref().unwrap();
                         let file_nbit = file_pool.get_file_nbit();
                         let file_mask = (1 << file_nbit) - 1;
@@ -395,8 +393,7 @@ async fn run_wal_queue(
                         false
                     }
                     Vacant(e) => {
-                        #[allow(clippy::unwrap_used)]
-                        #[allow(clippy::indexing_slicing)]
+                        #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
                         let file_nbit = file_pools.borrow()[page_key.0 as usize]
                             .as_ref()
                             .unwrap()
@@ -636,8 +633,7 @@ impl DiskBufferRequester {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::indexing_slicing)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use sha3::Digest;
     use std::path::{Path, PathBuf};

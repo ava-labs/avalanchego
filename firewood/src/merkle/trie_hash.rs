@@ -28,8 +28,7 @@ impl Storable for TrieHash {
                 offset: addr,
                 size: U64_TRIE_HASH_LEN,
             })?;
-        #[allow(clippy::unwrap_used)]
-        #[allow(clippy::indexing_slicing)]
+        #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
         Ok(Self(raw.as_deref()[..TRIE_HASH_LEN].try_into().unwrap()))
     }
 

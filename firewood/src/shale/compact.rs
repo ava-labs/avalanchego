@@ -650,8 +650,7 @@ impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for Comp
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::indexing_slicing)]
+#[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use sha3::Digest;
 

@@ -49,10 +49,8 @@ impl<'a, const LEADING_ZEROES: usize> Index<usize> for Nibbles<'a, LEADING_ZEROE
             _ if (index - LEADING_ZEROES) % 2 == 0 =>
             {
                 #[allow(clippy::indexing_slicing)]
-                #[allow(clippy::indexing_slicing)]
                 &NIBBLES[(self.0[(index - LEADING_ZEROES) / 2] >> 4) as usize]
             }
-            #[allow(clippy::indexing_slicing)]
             #[allow(clippy::indexing_slicing)]
             _ => &NIBBLES[(self.0[(index - LEADING_ZEROES) / 2] & 0xf) as usize],
         }

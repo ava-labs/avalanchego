@@ -182,8 +182,7 @@ impl BranchNode {
                     #[allow(clippy::indexing_slicing)]
                     if let Some(v) = &self.children_encoded[i] {
                         if v.len() == TRIE_HASH_LEN {
-                            #[allow(clippy::indexing_slicing)]
-                            #[allow(clippy::unwrap_used)]
+                            #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
                             (list[i] = Encoded::Data(
                                 bincode::DefaultOptions::new().serialize(v).unwrap(),
                             ));

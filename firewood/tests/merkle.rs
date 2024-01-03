@@ -207,8 +207,7 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
 }
 
 #[test]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::indexing_slicing)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 fn test_proof() -> Result<(), DataStoreError> {
     let set = generate_random_data(500);
     let mut items = Vec::from_iter(set.iter());
