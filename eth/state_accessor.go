@@ -212,7 +212,7 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 	}
 	// Lookup the statedb of parent block from the live database,
 	// otherwise regenerate it on the flight.
-	statedb, release, err := eth.StateAtBlock(ctx, parent, reexec, nil, true, false)
+	statedb, release, err := eth.StateAtNextBlock(ctx, parent, block, reexec, nil, true, false)
 	if err != nil {
 		return nil, vm.BlockContext{}, nil, nil, err
 	}
@@ -240,4 +240,26 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 		statedb.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
 	}
 	return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("transaction index %d out of range for block %#x", txIndex, block.Hash())
+}
+
+// StateAtNextBlock is a helper function that returns the state at the next block.
+// It wraps StateAtBlock and handles the case where Upgrades are applied to the
+// next block.
+// This is different than using StateAtBlock with [nextBlock] because it will
+// apply the upgrades to the [parent] state before returning it.
+func (eth *Ethereum) StateAtNextBlock(ctx context.Context, parent *types.Block, nextBlock *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	// Get state for [parent]
+	statedb, release, err := eth.StateAtBlock(ctx, parent, reexec, nil, true, false)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Apply upgrades here for the [nextBlock]
+	err = core.ApplyUpgrades(eth.blockchain.Config(), &parent.Header().Time, nextBlock, statedb)
+	if err != nil {
+		release()
+		return nil, nil, err
+	}
+
+	return statedb, release, nil
 }

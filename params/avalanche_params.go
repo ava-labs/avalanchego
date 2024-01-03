@@ -36,11 +36,6 @@ const (
 
 	// The base cost to charge per atomic transaction. Added in Apricot Phase 5.
 	AtomicTxBaseCost uint64 = 10_000
-
-	// Warp Parameters
-	WarpDefaultQuorumNumerator uint64 = 67
-	WarpQuorumNumeratorMinimum uint64 = 33
-	WarpQuorumDenominator      uint64 = 100
 )
 
 // Constants for message sizes
@@ -48,13 +43,11 @@ const (
 	MaxCodeHashesPerRequest = 5
 )
 
-var (
-	// The atomic gas limit specifies the maximum amount of gas that can be consumed by the atomic
-	// transactions included in a block and is enforced as of ApricotPhase5. Prior to ApricotPhase5,
-	// a block included a single atomic transaction. As of ApricotPhase5, each block can include a set
-	// of atomic transactions where the cumulative atomic gas consumed is capped by the atomic gas limit,
-	// similar to the block gas limit.
-	//
-	// This value must always remain <= MaxUint64.
-	AtomicGasLimit *big.Int = big.NewInt(100_000)
-)
+// The atomic gas limit specifies the maximum amount of gas that can be consumed by the atomic
+// transactions included in a block and is enforced as of ApricotPhase5. Prior to ApricotPhase5,
+// a block included a single atomic transaction. As of ApricotPhase5, each block can include a set
+// of atomic transactions where the cumulative atomic gas consumed is capped by the atomic gas limit,
+// similar to the block gas limit.
+//
+// This value must always remain <= MaxUint64.
+var AtomicGasLimit *big.Int = big.NewInt(100_000)

@@ -1186,6 +1186,8 @@ func (pool *TxPool) HasLocal(hash common.Hash) bool {
 	return pool.all.GetLocal(hash) != nil
 }
 
+// RemoveTx removes a single transaction from the queue, moving all subsequent
+// transactions back to the future queue.
 func (pool *TxPool) RemoveTx(hash common.Hash) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()

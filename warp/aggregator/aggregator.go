@@ -7,13 +7,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/coreth/params"
-
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/coreth/precompile/contracts/warp"
 )
 
 type AggregateSignatureResult struct {
@@ -130,7 +129,7 @@ func (a *Aggregator) AggregateSignatures(ctx context.Context, unsignedMessage *a
 		)
 
 		// If the signature weight meets the requested threshold, cancel signature fetching
-		if err := avalancheWarp.VerifyWeight(signaturesWeight, a.totalWeight, quorumNum, params.WarpQuorumDenominator); err == nil {
+		if err := avalancheWarp.VerifyWeight(signaturesWeight, a.totalWeight, quorumNum, warp.WarpQuorumDenominator); err == nil {
 			log.Debug("Verify weight passed, exiting aggregation early",
 				"quorumNum", quorumNum,
 				"totalWeight", a.totalWeight,

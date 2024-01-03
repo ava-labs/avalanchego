@@ -22,7 +22,6 @@ type ActivationFunc func(AccessibleState) bool
 // StatefulPrecompileFunction defines a function implemented by a stateful precompile
 type StatefulPrecompileFunction struct {
 	// selector is the 4 byte function selector for this function
-	// This should be calculated from the function signature using CalculateFunctionSelector
 	selector []byte
 	// execute is performed when this function is selected
 	execute RunStatefulPrecompileFunc

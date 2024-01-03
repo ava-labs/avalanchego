@@ -49,8 +49,8 @@ var (
 	_ contract.BlockContext    = &BlockContext{}
 )
 
-// IsProhibited returns true if [addr] is the blackhole address or is
-// with a range reserved for precompiled contracts.
+// IsProhibited returns true if [addr] is in the prohibited list of addresses which should
+// not be allowed as an EOA or newly created contract address.
 func IsProhibited(addr common.Address) bool {
 	if addr == constants.BlackholeAddr {
 		return true
@@ -231,7 +231,7 @@ func (evm *EVM) Cancelled() bool {
 
 // GetSnowContext returns the evm's snow.Context.
 func (evm *EVM) GetSnowContext() *snow.Context {
-	return evm.chainConfig.AvalancheContext.SnowCtx
+	return evm.chainConfig.SnowCtx
 }
 
 // GetStateDB returns the evm's StateDB
