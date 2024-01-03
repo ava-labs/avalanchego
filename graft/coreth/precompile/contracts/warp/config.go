@@ -10,13 +10,18 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/predicate"
 	warpValidators "github.com/ava-labs/coreth/warp/validators"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
+)
+
+const (
+	WarpDefaultQuorumNumerator uint64 = 67
+	WarpQuorumNumeratorMinimum uint64 = 33
+	WarpQuorumDenominator      uint64 = 100
 )
 
 var (
@@ -85,12 +90,12 @@ func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 		}
 	}
 
-	if c.QuorumNumerator > params.WarpQuorumDenominator {
-		return fmt.Errorf("cannot specify quorum numerator (%d) > quorum denominator (%d)", c.QuorumNumerator, params.WarpQuorumDenominator)
+	if c.QuorumNumerator > WarpQuorumDenominator {
+		return fmt.Errorf("cannot specify quorum numerator (%d) > quorum denominator (%d)", c.QuorumNumerator, WarpQuorumDenominator)
 	}
 	// If a non-default quorum numerator is specified and it is less than the minimum, return an error
-	if c.QuorumNumerator != 0 && c.QuorumNumerator < params.WarpQuorumNumeratorMinimum {
-		return fmt.Errorf("cannot specify quorum numerator (%d) < min quorum numerator (%d)", c.QuorumNumerator, params.WarpQuorumNumeratorMinimum)
+	if c.QuorumNumerator != 0 && c.QuorumNumerator < WarpQuorumNumeratorMinimum {
+		return fmt.Errorf("cannot specify quorum numerator (%d) < min quorum numerator (%d)", c.QuorumNumerator, WarpQuorumNumeratorMinimum)
 	}
 	return nil
 }
@@ -187,12 +192,12 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 		return fmt.Errorf("%w: %w", errCannotParseWarpMsg, err)
 	}
 
-	quorumNumerator := params.WarpDefaultQuorumNumerator
+	quorumNumerator := WarpDefaultQuorumNumerator
 	if c.QuorumNumerator != 0 {
 		quorumNumerator = c.QuorumNumerator
 	}
 
-	log.Debug("verifying warp message", "warpMsg", warpMsg, "quorumNum", quorumNumerator, "quorumDenom", params.WarpQuorumDenominator)
+	log.Debug("verifying warp message", "warpMsg", warpMsg, "quorumNum", quorumNumerator, "quorumDenom", WarpQuorumDenominator)
 	err = warpMsg.Signature.Verify(
 		context.Background(),
 		&warpMsg.UnsignedMessage,
@@ -200,7 +205,7 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 		warpValidators.NewState(predicateContext.SnowCtx), // Wrap validators.State on the chain snow context to special case the Primary Network
 		predicateContext.ProposerVMBlockCtx.PChainHeight,
 		quorumNumerator,
-		params.WarpQuorumDenominator,
+		WarpQuorumDenominator,
 	)
 
 	if err != nil {

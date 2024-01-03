@@ -91,7 +91,7 @@ type StateDB interface {
 	Snapshot() int
 
 	AddLog(addr common.Address, topics []common.Hash, data []byte, blockNumber uint64)
-	GetLogData() [][]byte
+	GetLogData() (topics [][]common.Hash, data [][]byte)
 	GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool)
 	SetPredicateStorageSlots(address common.Address, predicates [][]byte)
 

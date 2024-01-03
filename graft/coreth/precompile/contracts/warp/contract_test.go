@@ -148,10 +148,16 @@ func TestSendWarpMessage(t *testing.T) {
 				return bytes
 			}(),
 			AfterHook: func(t testing.TB, state contract.StateDB) {
-				logsData := state.GetLogData()
+				logsTopics, logsData := state.GetLogData()
+				require.Len(t, logsTopics, 1)
+				topics := logsTopics[0]
+				require.Len(t, topics, 3)
+				require.Equal(t, topics[0], WarpABI.Events["SendWarpMessage"].ID)
+				require.Equal(t, topics[1], callerAddr.Hash())
+				require.Equal(t, topics[2], common.Hash(unsignedWarpMessage.ID()))
+
 				require.Len(t, logsData, 1)
 				logData := logsData[0]
-
 				unsignedWarpMsg, err := UnpackSendWarpEventDataToMessage(logData)
 				require.NoError(t, err)
 				addressedPayload, err := payload.ParseAddressedCall(unsignedWarpMsg.Payload)

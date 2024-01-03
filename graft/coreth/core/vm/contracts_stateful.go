@@ -14,6 +14,8 @@ type wrappedPrecompiledContract struct {
 	p PrecompiledContract
 }
 
+// newWrappedPrecompiledContract returns a wrapped version of [PrecompiledContract] to be executed according to the StatefulPrecompiledContract
+// interface.
 func newWrappedPrecompiledContract(p PrecompiledContract) contract.StatefulPrecompiledContract {
 	return &wrappedPrecompiledContract{p: p}
 }

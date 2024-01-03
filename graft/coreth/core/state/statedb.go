@@ -260,16 +260,18 @@ func (s *StateDB) Logs() []*types.Log {
 	return logs
 }
 
-// GetLogData returns the underlying data from each log included in the StateDB
+// GetLogData returns the underlying topics and data from each log included in the StateDB
 // Test helper function.
-func (s *StateDB) GetLogData() [][]byte {
+func (s *StateDB) GetLogData() ([][]common.Hash, [][]byte) {
 	var logData [][]byte
+	var topics [][]common.Hash
 	for _, lgs := range s.logs {
 		for _, log := range lgs {
+			topics = append(topics, log.Topics)
 			logData = append(logData, common.CopyBytes(log.Data))
 		}
 	}
-	return logData
+	return topics, logData
 }
 
 // AddPreimage records a SHA3 preimage seen by the VM.

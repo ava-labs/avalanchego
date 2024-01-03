@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/precompile/testutils"
 	"github.com/ava-labs/coreth/predicate"
@@ -457,17 +456,17 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 	tests := make(map[string]testutils.PredicateTest)
 	for _, numSigners := range []int{
 		1,
-		int(params.WarpDefaultQuorumNumerator) - 1,
-		int(params.WarpDefaultQuorumNumerator),
-		int(params.WarpDefaultQuorumNumerator) + 1,
-		int(params.WarpQuorumDenominator) - 1,
-		int(params.WarpQuorumDenominator),
-		int(params.WarpQuorumDenominator) + 1,
+		int(WarpDefaultQuorumNumerator) - 1,
+		int(WarpDefaultQuorumNumerator),
+		int(WarpDefaultQuorumNumerator) + 1,
+		int(WarpQuorumDenominator) - 1,
+		int(WarpQuorumDenominator),
+		int(WarpQuorumDenominator) + 1,
 	} {
 		predicateBytes := createPredicate(numSigners)
 		// The predicate is valid iff the number of signers is >= the required numerator and does not exceed the denominator.
 		var expectedErr error
-		if numSigners >= int(params.WarpDefaultQuorumNumerator) && numSigners <= int(params.WarpQuorumDenominator) {
+		if numSigners >= int(WarpDefaultQuorumNumerator) && numSigners <= int(WarpQuorumDenominator) {
 			expectedErr = nil
 		} else {
 			expectedErr = errFailedVerification
@@ -510,7 +509,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 		{true, true},
 	} {
 		var (
-			numSigners            = int(params.WarpQuorumDenominator)
+			numSigners            = int(WarpQuorumDenominator)
 			invalidPredicateBytes = createPredicate(1)
 			validPredicateBytes   = createPredicate(numSigners)
 		)
@@ -562,13 +561,13 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 	tests := make(map[string]testutils.PredicateTest)
 	nonDefaultQuorumNumerator := 50
 	// Ensure this test fails if the DefaultQuroumNumerator is changed to an unexpected value during development
-	require.NotEqual(t, nonDefaultQuorumNumerator, int(params.WarpDefaultQuorumNumerator))
+	require.NotEqual(t, nonDefaultQuorumNumerator, int(WarpDefaultQuorumNumerator))
 	// Add cases with default quorum
 	for _, numSigners := range []int{nonDefaultQuorumNumerator, nonDefaultQuorumNumerator + 1, 99, 100, 101} {
 		predicateBytes := createPredicate(numSigners)
 		// The predicate is valid iff the number of signers is >= the required numerator and does not exceed the denominator.
 		var expectedErr error
-		if numSigners >= nonDefaultQuorumNumerator && numSigners <= int(params.WarpQuorumDenominator) {
+		if numSigners >= nonDefaultQuorumNumerator && numSigners <= int(WarpQuorumDenominator) {
 			expectedErr = nil
 		} else {
 			expectedErr = errFailedVerification
