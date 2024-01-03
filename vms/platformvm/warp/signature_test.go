@@ -39,8 +39,8 @@ type testValidator struct {
 	vdr    *Validator
 }
 
-func (v *testValidator) Less(o *testValidator) bool {
-	return v.vdr.Less(o.vdr)
+func (v *testValidator) Compare(o *testValidator) int {
+	return v.vdr.Compare(o.vdr)
 }
 
 func newTestValidator() *testValidator {
@@ -56,7 +56,7 @@ func newTestValidator() *testValidator {
 		sk:     sk,
 		vdr: &Validator{
 			PublicKey:      pk,
-			PublicKeyBytes: pk.Serialize(),
+			PublicKeyBytes: bls.SerializePublicKey(pk),
 			Weight:         3,
 			NodeIDs:        []ids.NodeID{nodeID},
 		},

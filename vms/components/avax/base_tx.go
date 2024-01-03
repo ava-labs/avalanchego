@@ -35,7 +35,7 @@ type BaseTx struct {
 func (t *BaseTx) InputUTXOs() []*UTXOID {
 	utxos := make([]*UTXOID, len(t.Ins))
 	for i, in := range t.Ins {
-		utxos[i] = &in.UTXOID //nolint:gosec
+		utxos[i] = &in.UTXOID
 	}
 	return utxos
 }

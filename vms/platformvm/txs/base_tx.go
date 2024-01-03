@@ -16,6 +16,8 @@ import (
 )
 
 var (
+	_ UnsignedTx = (*BaseTx)(nil)
+
 	ErrNilTx = errors.New("tx is nil")
 
 	errOutputsNotSorted      = errors.New("outputs not sorted")
@@ -95,4 +97,8 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	default:
 		return nil
 	}
+}
+
+func (tx *BaseTx) Visit(visitor Visitor) error {
+	return visitor.BaseTx(tx)
 }

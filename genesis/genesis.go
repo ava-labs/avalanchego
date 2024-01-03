@@ -418,8 +418,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		delegationFee := json.Uint32(staker.DelegationFee)
 
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			api.PermissionlessValidator{
-				Staker: api.Staker{
+			api.GenesisPermissionlessValidator{
+				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					NodeID:    staker.NodeID,
@@ -430,6 +430,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				},
 				Staked:             utxos,
 				ExactDelegationFee: &delegationFee,
+				Signer:             staker.Signer,
 			},
 		)
 	}
@@ -570,7 +571,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := xchaintxs.Tx{Unsigned: &genesisTx.CreateAssetTx}
-	if err := parser.InitializeGenesisTx(&tx); err != nil {
+	if err := tx.Initialize(genesisCodec); err != nil {
 		return ids.Empty, err
 	}
 	return tx.ID(), nil

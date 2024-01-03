@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/version"
@@ -49,7 +49,7 @@ type TestVM struct {
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
 
-	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
+	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
 	SetStateF                   func(ctx context.Context, state snow.State) error
 	ShutdownF                   func(context.Context) error
 	CreateHandlersF             func(context.Context) (map[string]http.Handler, error)
@@ -60,11 +60,11 @@ type TestVM struct {
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error
 	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -89,7 +89,7 @@ func (vm *TestVM) Default(cant bool) {
 func (vm *TestVM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	db manager.Manager,
+	db database.Database,
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
@@ -185,9 +185,9 @@ func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error {
 	if vm.AppRequestFailedF != nil {
-		return vm.AppRequestFailedF(ctx, nodeID, requestID)
+		return vm.AppRequestFailedF(ctx, nodeID, requestID, appErr)
 	}
 	if !vm.CantAppRequestFailed {
 		return nil
@@ -237,9 +237,9 @@ func (vm *TestVM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requ
 	return errCrossChainAppRequest
 }
 
-func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error {
 	if vm.CrossChainAppRequestFailedF != nil {
-		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID)
+		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID, appErr)
 	}
 	if !vm.CantCrossChainAppRequestFailed {
 		return nil

@@ -81,11 +81,7 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
-		return fmt.Errorf(
-			"failed to apply accept state for block %s: %w",
-			blkID,
-			err,
-		)
+		return err
 	}
 
 	defer a.state.Abort()
@@ -176,21 +172,41 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 		return err
 	}
 
+	parentState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w %s", errMissingBlockState, parentID)
+	}
+	if parentState.onDecisionState != nil {
+		if err := parentState.onDecisionState.Apply(a.state); err != nil {
+			return err
+		}
+	}
+
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
-
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
+		return err
+	}
+
+	defer a.state.Abort()
+	batch, err := a.state.CommitBatch()
+	if err != nil {
 		return fmt.Errorf(
-			"failed to apply accept state for block %s: %w",
+			"failed to commit VM's database for block %s: %w",
 			blkID,
 			err,
 		)
 	}
 
-	if err := a.state.Commit(); err != nil {
-		return err
+	// Note that this method writes [batch] to the database.
+	if err := a.ctx.SharedMemory.Apply(parentState.atomicRequests, batch); err != nil {
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
+	}
+
+	if onAcceptFunc := parentState.onAcceptFunc; onAcceptFunc != nil {
+		onAcceptFunc()
 	}
 
 	a.ctx.Log.Trace(
@@ -250,11 +266,7 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
-		return fmt.Errorf(
-			"failed to apply accept state for block %s: %w",
-			blkID,
-			err,
-		)
+		return err
 	}
 
 	defer a.state.Abort()

@@ -6,12 +6,12 @@ package payload
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
-	codecVersion = 0
+	CodecVersion = 0
 
 	MaxMessageSize = 24 * units.KiB
 
@@ -20,20 +20,18 @@ const (
 	MaxSliceLen = 24 * 1024
 )
 
-// Codec does serialization and deserialization for Warp messages.
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
-	c = codec.NewManager(MaxMessageSize)
+	Codec = codec.NewManager(MaxMessageSize)
 	lc := linearcodec.NewCustomMaxLength(MaxSliceLen)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		lc.RegisterType(&Hash{}),
 		lc.RegisterType(&AddressedCall{}),
-		c.RegisterCodec(codecVersion, lc),
+		Codec.RegisterCodec(CodecVersion, lc),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 }

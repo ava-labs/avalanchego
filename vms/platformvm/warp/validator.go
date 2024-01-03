@@ -39,8 +39,8 @@ type Validator struct {
 	NodeIDs        []ids.NodeID
 }
 
-func (v *Validator) Less(o *Validator) bool {
-	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes) < 0
+func (v *Validator) Compare(o *Validator) int {
+	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes)
 }
 
 // GetCanonicalValidatorSet returns the validator set of [subnetID] at
@@ -72,7 +72,7 @@ func GetCanonicalValidatorSet(
 			continue
 		}
 
-		pkBytes := vdr.PublicKey.Serialize()
+		pkBytes := bls.SerializePublicKey(vdr.PublicKey)
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
 			uniqueVdr = &Validator{

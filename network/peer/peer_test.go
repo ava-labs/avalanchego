@@ -102,7 +102,7 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 		VersionCompatibility: version.GetCompatibility(constants.LocalID),
 		MySubnets:            trackedSubnets,
 		UptimeCalculator:     uptime.NoOpCalculator,
-		Beacons:              validators.NewSet(),
+		Beacons:              validators.NewManager(),
 		NetworkID:            constants.LocalID,
 		PingFrequency:        constants.DefaultPingFrequency,
 		PongTimeout:          constants.DefaultPingPongTimeout,

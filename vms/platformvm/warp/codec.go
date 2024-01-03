@@ -8,24 +8,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-const codecVersion = 0
+const CodecVersion = 0
 
-// Codec does serialization and deserialization for Warp messages.
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
-	c = codec.NewManager(math.MaxInt)
+	Codec = codec.NewManager(math.MaxInt)
 	lc := linearcodec.NewCustomMaxLength(math.MaxInt32)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		lc.RegisterType(&BitSetSignature{}),
-		c.RegisterCodec(codecVersion, lc),
+		Codec.RegisterCodec(CodecVersion, lc),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 }

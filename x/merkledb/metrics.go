@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -198,8 +198,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 			Help:      "cumulative amount of misses on the view value cache",
 		}),
 	}
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		reg.Register(m.ioKeyWrite),
 		reg.Register(m.ioKeyRead),
 		reg.Register(m.hashCount),
@@ -212,7 +211,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 		reg.Register(m.viewValueCacheHit),
 		reg.Register(m.viewValueCacheMiss),
 	)
-	return &m, errs.Err
+	return &m, err
 }
 
 func (m *metrics) DatabaseNodeRead() {

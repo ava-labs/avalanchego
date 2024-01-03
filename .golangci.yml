@@ -65,12 +65,14 @@ linters:
     - nakedret
     - noctx
     - nolintlint
+    - perfsprint
     - prealloc
+    - predeclared
     - revive
     - staticcheck
     - stylecheck
-    - typecheck
     - tagalign
+    - typecheck
     - unconvert
     - unparam
     - unused

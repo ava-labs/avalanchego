@@ -8,29 +8,25 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-const codecVersion = 0
+const CodecVersion = 0
 
-// The maximum block size is enforced by the p2p message size limit.
-// See: [constants.DefaultMaxMessageSize]
-//
-// Invariant: This codec must never be used to unmarshal a slice unless it is a
-// `[]byte`. Otherwise a malicious payload could cause an OOM.
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
-	linearCodec := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	c = codec.NewManager(math.MaxInt)
+	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	// The maximum block size is enforced by the p2p message size limit.
+	// See: [constants.DefaultMaxMessageSize]
+	Codec = codec.NewManager(math.MaxInt)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		linearCodec.RegisterType(&statelessBlock{}),
-		linearCodec.RegisterType(&option{}),
-		c.RegisterCodec(codecVersion, linearCodec),
+	err := utils.Err(
+		lc.RegisterType(&statelessBlock{}),
+		lc.RegisterType(&option{}),
+		Codec.RegisterCodec(CodecVersion, lc),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 }

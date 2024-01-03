@@ -8,15 +8,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	// CodecVersion is the current default codec version
-	CodecVersion = 0
-)
+const CodecVersion = 0
 
-// Codecs do serialization and deserialization
 var (
 	Codec       codec.Manager
 	LegacyCodec codec.Manager
@@ -28,12 +24,11 @@ func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
 	LegacyCodec = codec.NewManager(math.MaxInt32)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		Codec.RegisterCodec(CodecVersion, c),
 		LegacyCodec.RegisterCodec(CodecVersion, lc),
 	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err != nil {
+		panic(err)
 	}
 }

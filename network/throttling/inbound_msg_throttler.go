@@ -56,7 +56,7 @@ func NewInboundMsgThrottler(
 	log logging.Logger,
 	namespace string,
 	registerer prometheus.Registerer,
-	vdrs validators.Set,
+	vdrs validators.Manager,
 	throttlerConfig InboundMsgThrottlerConfig,
 	resourceTracker tracker.ResourceTracker,
 	cpuTargeter tracker.Targeter,

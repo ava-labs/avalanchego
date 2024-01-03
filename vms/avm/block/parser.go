@@ -4,13 +4,12 @@
 package block
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
@@ -25,9 +24,6 @@ type Parser interface {
 
 	ParseBlock(bytes []byte) (Block, error)
 	ParseGenesisBlock(bytes []byte) (Block, error)
-
-	InitializeBlock(block Block) error
-	InitializeGenesisBlock(block Block) error
 }
 
 type parser struct {
@@ -42,14 +38,13 @@ func NewParser(fxs []fxs.Fx) (Parser, error) {
 	c := p.CodecRegistry()
 	gc := p.GenesisCodecRegistry()
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err = utils.Err(
 		c.RegisterType(&StandardBlock{}),
 		gc.RegisterType(&StandardBlock{}),
 	)
 	return &parser{
 		Parser: p,
-	}, errs.Err
+	}, err
 }
 
 func NewCustomParser(
@@ -65,14 +60,13 @@ func NewCustomParser(
 	c := p.CodecRegistry()
 	gc := p.GenesisCodecRegistry()
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err = utils.Err(
 		c.RegisterType(&StandardBlock{}),
 		gc.RegisterType(&StandardBlock{}),
 	)
 	return &parser{
 		Parser: p,
-	}, errs.Err
+	}, err
 }
 
 func (p *parser) ParseBlock(bytes []byte) (Block, error) {
@@ -89,22 +83,4 @@ func parse(cm codec.Manager, bytes []byte) (Block, error) {
 		return nil, err
 	}
 	return blk, blk.initialize(bytes, cm)
-}
-
-func (p *parser) InitializeBlock(block Block) error {
-	return initialize(block, p.Codec())
-}
-
-func (p *parser) InitializeGenesisBlock(block Block) error {
-	return initialize(block, p.GenesisCodec())
-}
-
-func initialize(blk Block, cm codec.Manager) error {
-	// We serialize this block as a pointer so that it can be deserialized into
-	// a Block
-	bytes, err := cm.Marshal(CodecVersion, &blk)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal block: %w", err)
-	}
-	return blk.initialize(bytes, cm)
 }

@@ -12,8 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/e2e"
-	"github.com/ava-labs/avalanchego/utils/cb58"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -114,21 +113,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		})
 
 	ginkgo.It("can make calls to platformvm static api", func() {
-		keys := []*secp256k1.PrivateKey{}
-		factory := secp256k1.Factory{}
-		for _, key := range []string{
-			"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-			"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-			"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-			"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-			"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-		} {
-			privKeyBytes, err := cb58.Decode(key)
-			require.NoError(err)
-			pk, err := factory.ToPrivateKey(privKeyBytes)
-			require.NoError(err)
-			keys = append(keys, pk)
-		}
+		keys := secp256k1.TestKeys()
 
 		genesisUTXOs := make([]api.UTXO, len(keys))
 		hrp := constants.NetworkIDToHRP[constants.UnitTestID]
@@ -142,16 +127,16 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			}
 		}
 
-		genesisValidators := make([]api.PermissionlessValidator, len(keys))
+		genesisValidators := make([]api.GenesisPermissionlessValidator, len(keys))
 		for i, key := range keys {
 			id := key.PublicKey().Address()
 			addr, err := address.FormatBech32(hrp, id.Bytes())
 			require.NoError(err)
-			genesisValidators[i] = api.PermissionlessValidator{
-				Staker: api.Staker{
+			genesisValidators[i] = api.GenesisPermissionlessValidator{
+				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
-					NodeID:    ids.NodeID(id),
+					NodeID:    ids.BuildTestNodeID(id[:]),
 				},
 				RewardOwner: &api.Owner{
 					Threshold: 1,

@@ -8,12 +8,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-// Version is the current default codec version
-const Version = txs.Version
+const CodecVersion = txs.CodecVersion
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
@@ -36,11 +36,12 @@ func init() {
 			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
 			RegisterBanffBlockTypes(c),
+			txs.RegisterDUnsignedTxsTypes(c),
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
-		GenesisCodec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(CodecVersion, c),
+		GenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -52,24 +53,20 @@ func init() {
 // subpackage-level codecs were introduced, each handling serialization of
 // specific types.
 func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		targetCodec.RegisterType(&ApricotProposalBlock{}),
 		targetCodec.RegisterType(&ApricotAbortBlock{}),
 		targetCodec.RegisterType(&ApricotCommitBlock{}),
 		targetCodec.RegisterType(&ApricotStandardBlock{}),
 		targetCodec.RegisterType(&ApricotAtomicBlock{}),
 	)
-	return errs.Err
 }
 
 func RegisterBanffBlockTypes(targetCodec codec.Registry) error {
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		targetCodec.RegisterType(&BanffProposalBlock{}),
 		targetCodec.RegisterType(&BanffAbortBlock{}),
 		targetCodec.RegisterType(&BanffCommitBlock{}),
 		targetCodec.RegisterType(&BanffStandardBlock{}),
 	)
-	return errs.Err
 }

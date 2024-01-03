@@ -16,11 +16,11 @@ import (
 	"github.com/leanovate/gopter/prop"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -42,8 +42,7 @@ var (
 func TestGeneralStakerContainersProperties(t *testing.T) {
 	storeCreators := map[string]func() (Stakers, error){
 		"base state": func() (Stakers, error) {
-			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-			baseDB := versiondb.New(baseDBManager.Current().Database)
+			baseDB := versiondb.New(memdb.New())
 			return buildChainState(baseDB, nil)
 		},
 		"diff": func() (Stakers, error) {
@@ -66,7 +65,8 @@ func TestGeneralStakerContainersProperties(t *testing.T) {
 func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
 
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
+	dummyStartTime := time.Now()
 
 	properties.Property("add, delete and query current validators", prop.ForAll(
 		func(nonInitTx *txs.Tx) string {
@@ -81,7 +81,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			}
 
 			stakerTx := signedTx.Unsigned.(txs.StakerTx)
-			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, dummyStartTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -151,7 +151,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			}
 
 			stakerTx := signedTx.Unsigned.(txs.StakerTx)
-			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+			startTime := signedTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -225,7 +226,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx))
+			staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.ScheduledStaker))
 			if err != nil {
 				return err.Error()
 			}
@@ -297,7 +298,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -309,7 +310,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -447,7 +448,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 				stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
-				del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, uint64(1000))
+				startTime := signedDelTx.Unsigned.(txs.ScheduledStaker).StartTime()
+				del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, startTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -538,7 +540,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -550,7 +552,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -677,12 +679,11 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 // TestStateStakersProperties verifies properties specific to State, but not to Diff
 func TestStateStakersProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 
 	properties.Property("cannot update unknown validator", prop.ForAll(
 		func(nonInitValTx *txs.Tx) string {
-			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-			baseDB := versiondb.New(baseDBManager.Current().Database)
+			baseDB := versiondb.New(memdb.New())
 			baseState, err := buildChainState(baseDB, nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -694,7 +695,8 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -711,8 +713,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 	properties.Property("cannot update deleted validator", prop.ForAll(
 		func(nonInitValTx *txs.Tx) string {
-			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-			baseDB := versiondb.New(baseDBManager.Current().Database)
+			baseDB := versiondb.New(memdb.New())
 			baseState, err := buildChainState(baseDB, nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -724,7 +725,8 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -743,8 +745,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 	properties.Property("cannot update delegator from unknown subnetID/nodeID", prop.ForAll(
 		func(nonInitValTx *txs.Tx) string {
-			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-			baseDB := versiondb.New(baseDBManager.Current().Database)
+			baseDB := versiondb.New(memdb.New())
 			baseState, err := buildChainState(baseDB, nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -756,7 +757,8 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -777,8 +779,7 @@ func TestStateStakersProperties(t *testing.T) {
 	)
 	properties.Property("cannot update unknown delegator from known subnetID/nodeID", prop.ForAll(
 		func(nonInitValTx, nonInitDelTx *txs.Tx) string {
-			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-			baseDB := versiondb.New(baseDBManager.Current().Database)
+			baseDB := versiondb.New(memdb.New())
 			baseState, err := buildChainState(baseDB, nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -790,7 +791,8 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -801,7 +803,8 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			stakerTx = signedDelTx.Unsigned.(txs.StakerTx)
-			del, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime = signedDelTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			del, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -824,7 +827,7 @@ func TestStateStakersProperties(t *testing.T) {
 // TestDiffStakersProperties verifies properties specific to Diff, but not to State
 func TestDiffStakersProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 
 	properties.Property("updating unknown validator should not err", prop.ForAll(
 		func(nonInitValTx *txs.Tx) string {
@@ -839,7 +842,8 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -867,7 +871,8 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -897,7 +902,8 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
-			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, uint64(1000))
+			startTime := signedDelTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -925,7 +931,8 @@ func TestDiffStakersProperties(t *testing.T) {
 			}
 
 			stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
-			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, uint64(1000))
+			startTime := signedDelTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -949,7 +956,7 @@ func TestDiffStakersProperties(t *testing.T) {
 // upon different stakers operations
 func TestValidatorSetOperations(t *testing.T) {
 	properties := gopter.NewProperties(nil)
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 
 	trackedSubnet := ids.GenerateTestID()
 	properties.Property("validator is added upon staker insertion", prop.ForAll(
@@ -965,7 +972,8 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -986,16 +994,12 @@ func TestValidatorSetOperations(t *testing.T) {
 				nodeID   = val.NodeID
 			)
 
-			set, found := baseState.(*state).cfg.Validators.Get(subnetID)
+			valMap := baseState.(*state).cfg.Validators.GetMap(subnetID)
+			data, found := valMap[nodeID]
 			if !found {
-				return errMissingValidatorSet.Error()
-			}
-
-			if !set.Contains(nodeID) {
 				return errMissingValidatotFromValidatorSet.Error()
 			}
-
-			if set.GetWeight(nodeID) != val.Weight {
+			if data.Weight != val.Weight {
 				return "inserted staker's weight does not match with validator's weight in validator set"
 			}
 
@@ -1017,7 +1021,8 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1046,16 +1051,12 @@ func TestValidatorSetOperations(t *testing.T) {
 				nodeID   = val.NodeID
 			)
 
-			set, found := baseState.(*state).cfg.Validators.Get(subnetID)
+			valMap := baseState.(*state).cfg.Validators.GetMap(subnetID)
+			data, found := valMap[nodeID]
 			if !found {
-				return errMissingValidatorSet.Error()
-			}
-
-			if !set.Contains(nodeID) {
 				return errMissingValidatotFromValidatorSet.Error()
 			}
-
-			if set.GetWeight(nodeID) != updatedStaker.Weight {
+			if data.Weight != val.Weight {
 				return "inserted staker's weight does not match with validator's weight in validator set"
 			}
 
@@ -1077,7 +1078,8 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx := signedMainValTx.Unsigned.(txs.StakerTx)
-			mainVal, err := NewCurrentStaker(signedMainValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedMainValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			mainVal, err := NewCurrentStaker(signedMainValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1088,7 +1090,8 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			stakerTx = signedCompanionValTx.Unsigned.(txs.StakerTx)
-			companionVal, err := NewCurrentStaker(signedCompanionValTx.ID(), stakerTx, uint64(1000))
+			startTime = signedCompanionValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			companionVal, err := NewCurrentStaker(signedCompanionValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1111,16 +1114,13 @@ func TestValidatorSetOperations(t *testing.T) {
 				nodeID   = mainVal.NodeID
 			)
 
-			set, found := baseState.(*state).cfg.Validators.Get(subnetID)
+			valMap := baseState.(*state).cfg.Validators.GetMap(subnetID)
+			data, found := valMap[nodeID]
 			if !found {
-				return errMissingValidatorSet.Error()
-			}
-
-			if set.Contains(nodeID) {
 				return errUnexpectedValidatotInValidatorSet.Error()
 			}
 
-			if set.GetWeight(nodeID) != 0 {
+			if data.Weight != 0 {
 				return "deleted validators's weight is not zero"
 			}
 
@@ -1137,7 +1137,7 @@ func TestValidatorSetOperations(t *testing.T) {
 // upon different stakers operations
 func TestValidatorUptimesOperations(t *testing.T) {
 	properties := gopter.NewProperties(nil)
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 
 	// // to reproduce a given scenario do something like this:
 	// parameters := gopter.DefaultTestParametersWithSeed(1688585045068172845)
@@ -1156,7 +1156,8 @@ func TestValidatorUptimesOperations(t *testing.T) {
 			}
 
 			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
-			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			startTime := signedValTx.Unsigned.(txs.ScheduledStaker).StartTime()
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, startTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1184,7 +1185,7 @@ func TestValidatorUptimesOperations(t *testing.T) {
 			}
 
 			// Check start time
-			startTime, err := baseState.GetStartTime(nodeID, subnetID)
+			startTime, err = baseState.GetStartTime(nodeID, subnetID)
 			if err != nil {
 				return fmt.Sprintf("could not get validator start time, err %v", err)
 			}
@@ -1260,8 +1261,7 @@ func TestValidatorUptimesOperations(t *testing.T) {
 }
 
 func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, State, error) {
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
+	baseDB := versiondb.New(memdb.New())
 	baseState, err := buildChainState(baseDB, trackedSubnets)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unexpected error while creating chain base state, err %w", err)

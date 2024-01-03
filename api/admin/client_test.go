@@ -63,8 +63,8 @@ func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, re
 	case *LoadVMsReply:
 		response := mc.response.(*LoadVMsReply)
 		*p = *response
-	case *GetLoggerLevelReply:
-		response := mc.response.(*GetLoggerLevelReply)
+	case *LoggerLevelReply:
+		response := mc.response.(*LoggerLevelReply)
 		*p = *response
 	case *interface{}:
 		response := mc.response.(*interface{})
@@ -212,54 +212,72 @@ func TestReloadInstalledVMs(t *testing.T) {
 
 func TestSetLoggerLevel(t *testing.T) {
 	type test struct {
-		name         string
-		logLevel     string
-		displayLevel string
-		serviceErr   error
-		clientErr    error
+		name            string
+		logLevel        string
+		displayLevel    string
+		serviceResponse map[string]LogAndDisplayLevels
+		serviceErr      error
+		clientErr       error
 	}
 	tests := []test{
 		{
 			name:         "Happy path",
 			logLevel:     "INFO",
 			displayLevel: "INFO",
-			serviceErr:   nil,
-			clientErr:    nil,
+			serviceResponse: map[string]LogAndDisplayLevels{
+				"Happy path": {LogLevel: logging.Info, DisplayLevel: logging.Info},
+			},
+			serviceErr: nil,
+			clientErr:  nil,
 		},
 		{
-			name:         "Service errors",
-			logLevel:     "INFO",
-			displayLevel: "INFO",
-			serviceErr:   errTest,
-			clientErr:    errTest,
+			name:            "Service errors",
+			logLevel:        "INFO",
+			displayLevel:    "INFO",
+			serviceResponse: nil,
+			serviceErr:      errTest,
+			clientErr:       errTest,
 		},
 		{
-			name:         "Invalid log level",
-			logLevel:     "invalid",
-			displayLevel: "INFO",
-			serviceErr:   nil,
-			clientErr:    logging.ErrUnknownLevel,
+			name:            "Invalid log level",
+			logLevel:        "invalid",
+			displayLevel:    "INFO",
+			serviceResponse: nil,
+			serviceErr:      nil,
+			clientErr:       logging.ErrUnknownLevel,
 		},
 		{
-			name:         "Invalid display level",
-			logLevel:     "INFO",
-			displayLevel: "invalid",
-			serviceErr:   nil,
-			clientErr:    logging.ErrUnknownLevel,
+			name:            "Invalid display level",
+			logLevel:        "INFO",
+			displayLevel:    "invalid",
+			serviceResponse: nil,
+			serviceErr:      nil,
+			clientErr:       logging.ErrUnknownLevel,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			c := client{
-				requester: NewMockClient(&api.EmptyReply{}, tt.serviceErr),
+				requester: NewMockClient(
+					&LoggerLevelReply{
+						LoggerLevels: tt.serviceResponse,
+					},
+					tt.serviceErr,
+				),
 			}
-			err := c.SetLoggerLevel(
+			res, err := c.SetLoggerLevel(
 				context.Background(),
 				"",
 				tt.logLevel,
 				tt.displayLevel,
 			)
-			require.ErrorIs(t, err, tt.clientErr)
+			require.ErrorIs(err, tt.clientErr)
+			if tt.clientErr != nil {
+				return
+			}
+			require.Equal(tt.serviceResponse, res)
 		})
 	}
 }
@@ -296,7 +314,7 @@ func TestGetLoggerLevel(t *testing.T) {
 
 			c := client{
 				requester: NewMockClient(
-					&GetLoggerLevelReply{
+					&LoggerLevelReply{
 						LoggerLevels: tt.serviceResponse,
 					},
 					tt.serviceErr,

@@ -13,6 +13,7 @@ import (
 	"github.com/leanovate/gopter/prop"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -26,7 +27,7 @@ var (
 func TestGeneratedStakersValidity(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 	maxDelegatorWeight := uint64(2023)
@@ -51,7 +52,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return errWrongNodeID.Error()
 			}
 
-			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, uint64(100))
+			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, addValTx.StartTime(), uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -96,7 +97,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return errWrongNodeID.Error()
 			}
 
-			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, uint64(100))
+			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, addDelTx.StartTime(), uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -155,7 +156,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return "subnet not duly set"
 			}
 
-			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, uint64(100))
+			currentVal, err := NewCurrentStaker(signedTx.ID(), addValTx, addValTx.StartTime(), uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -204,7 +205,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return "subnet not duly set"
 			}
 
-			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, uint64(100))
+			currentDel, err := NewCurrentStaker(signedTx.ID(), addDelTx, addDelTx.StartTime(), uint64(100))
 			if err != nil {
 				return err.Error()
 			}

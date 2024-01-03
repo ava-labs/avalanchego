@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs/socket"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -133,12 +134,10 @@ func newEventIPCSocket(
 		url:    url,
 		socket: socket.NewSocket(url, ctx.log),
 		unregisterFn: func() error {
-			errs := wrappers.Errs{}
-			errs.Add(
+			return utils.Err(
 				snowmanAcceptorGroup.DeregisterAcceptor(chainID, ipcName),
 				avalancheAcceptorGroup.DeregisterAcceptor(chainID, ipcName),
 			)
-			return errs.Err
 		},
 	}
 
@@ -175,9 +174,10 @@ func (eis *eventSocket) Accept(_ *snow.ConsensusContext, _ ids.ID, container []b
 // stop unregisters the event handler and closes the eventSocket
 func (eis *eventSocket) stop() error {
 	eis.log.Info("closing Chain IPC")
-	errs := wrappers.Errs{}
-	errs.Add(eis.unregisterFn(), eis.socket.Close())
-	return errs.Err
+	return utils.Err(
+		eis.unregisterFn(),
+		eis.socket.Close(),
+	)
 }
 
 // URL returns the URL of the socket

@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -37,9 +38,11 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/pebble"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
@@ -70,8 +73,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -89,12 +90,166 @@ import (
 )
 
 var (
-	genesisHashKey  = []byte("genesisID")
-	indexerDBPrefix = []byte{0x00}
+	genesisHashKey     = []byte("genesisID")
+	ungracefulShutdown = []byte("ungracefulShutdown")
+
+	indexerDBPrefix  = []byte{0x00}
+	keystoreDBPrefix = []byte("keystore")
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
 )
+
+// New returns an instance of Node
+func New(
+	config *Config,
+	logFactory logging.Factory,
+	logger logging.Logger,
+) (*Node, error) {
+	tlsCert := config.StakingTLSCert.Leaf
+	stakingCert := staking.CertificateFromX509(tlsCert)
+	if err := staking.ValidateCertificate(stakingCert); err != nil {
+		return nil, fmt.Errorf("invalid staking certificate: %w", err)
+	}
+
+	n := &Node{
+		Log:        logger,
+		LogFactory: logFactory,
+		ID:         ids.NodeIDFromCert(stakingCert),
+		Config:     config,
+	}
+
+	n.DoneShuttingDown.Add(1)
+
+	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	logger.Info("initializing node",
+		zap.Stringer("version", version.CurrentApp),
+		zap.Stringer("nodeID", n.ID),
+		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
+		zap.Reflect("nodePOP", pop),
+		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
+		zap.Reflect("config", n.Config),
+	)
+
+	var err error
+	n.VMFactoryLog, err = logFactory.Make("vm-factory")
+	if err != nil {
+		return nil, fmt.Errorf("problem creating vm logger: %w", err)
+	}
+
+	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+
+	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
+		return nil, fmt.Errorf("problem initializing node beacons: %w", err)
+	}
+
+	// Set up tracer
+	n.tracer, err = trace.New(n.Config.TraceConfig)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize tracer: %w", err)
+	}
+
+	if n.Config.TraceConfig.Enabled {
+		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
+	}
+
+	n.initMetrics()
+
+	if err := n.initAPIServer(); err != nil { // Start the API Server
+		return nil, fmt.Errorf("couldn't initialize API server: %w", err)
+	}
+
+	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
+		return nil, fmt.Errorf("couldn't initialize metrics API: %w", err)
+	}
+
+	if err := n.initDatabase(); err != nil { // Set up the node's database
+		return nil, fmt.Errorf("problem initializing database: %w", err)
+	}
+
+	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
+		return nil, fmt.Errorf("couldn't initialize keystore API: %w", err)
+	}
+
+	n.initSharedMemory() // Initialize shared memory
+
+	// message.Creator is shared between networking, chainManager and the engine.
+	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
+	// and the engine (initChains) but after the metrics (initMetricsAPI)
+	// message.Creator currently record metrics under network namespace
+	n.networkNamespace = "network"
+	n.msgCreator, err = message.NewCreator(
+		n.Log,
+		n.MetricsRegisterer,
+		n.networkNamespace,
+		n.Config.NetworkConfig.CompressionType,
+		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("problem initializing message creator: %w", err)
+	}
+
+	n.vdrs = validators.NewManager()
+	if !n.Config.SybilProtectionEnabled {
+		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
+	}
+	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
+		return nil, fmt.Errorf("problem initializing resource manager: %w", err)
+	}
+	n.initCPUTargeter(&config.CPUTargeterConfig)
+	n.initDiskTargeter(&config.DiskTargeterConfig)
+	if err := n.initNetworking(); err != nil { // Set up networking layer.
+		return nil, fmt.Errorf("problem initializing networking: %w", err)
+	}
+
+	n.initEventDispatchers()
+
+	// Start the Health API
+	// Has to be initialized before chain manager
+	// [n.Net] must already be set
+	if err := n.initHealthAPI(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize health API: %w", err)
+	}
+	if err := n.addDefaultVMAliases(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize API aliases: %w", err)
+	}
+	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
+		return nil, fmt.Errorf("couldn't initialize chain manager: %w", err)
+	}
+	if err := n.initVMs(); err != nil { // Initialize the VM registry.
+		return nil, fmt.Errorf("couldn't initialize VM registry: %w", err)
+	}
+	if err := n.initAdminAPI(); err != nil { // Start the Admin API
+		return nil, fmt.Errorf("couldn't initialize admin API: %w", err)
+	}
+	if err := n.initInfoAPI(); err != nil { // Start the Info API
+		return nil, fmt.Errorf("couldn't initialize info API: %w", err)
+	}
+	if err := n.initIPCs(); err != nil { // Start the IPCs
+		return nil, fmt.Errorf("couldn't initialize IPCs: %w", err)
+	}
+	if err := n.initIPCAPI(); err != nil { // Start the IPC API
+		return nil, fmt.Errorf("couldn't initialize the IPC API: %w", err)
+	}
+	if err := n.initChainAliases(n.Config.GenesisBytes); err != nil {
+		return nil, fmt.Errorf("couldn't initialize chain aliases: %w", err)
+	}
+	if err := n.initAPIAliases(n.Config.GenesisBytes); err != nil {
+		return nil, fmt.Errorf("couldn't initialize API aliases: %w", err)
+	}
+	if err := n.initIndexer(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize indexer: %w", err)
+	}
+
+	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
+	n.initProfiler()
+
+	// Start the Platform chain
+	if err := n.initChains(n.Config.GenesisBytes); err != nil {
+		return nil, fmt.Errorf("couldn't initialize chains: %w", err)
+	}
+	return n, nil
+}
 
 // Node is an instance of an Avalanche node.
 type Node struct {
@@ -107,8 +262,7 @@ type Node struct {
 	ID ids.NodeID
 
 	// Storage for this node
-	DBManager manager.Manager
-	DB        database.Database
+	DB database.Database
 
 	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
@@ -127,6 +281,9 @@ type Node struct {
 
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
+
+	// Manages network timeouts
+	timeoutManager timeout.Manager
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -157,7 +314,7 @@ type Node struct {
 	tlsKeyLogWriterCloser io.WriteCloser
 
 	// this node's initial connections to the network
-	bootstrappers validators.Set
+	bootstrappers validators.Manager
 
 	// current validators of the network
 	vdrs validators.Manager
@@ -219,8 +376,8 @@ type Node struct {
  */
 
 // Initialize the networking layer.
-// Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
+// Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
+func (n *Node) initNetworking() error {
 	currentIPPort := n.Config.IPPort.IPPort()
 
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
@@ -240,7 +397,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(currentIPPort.Port), 10))
 
 	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
@@ -282,12 +439,30 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
+	// We allow nodes to gossip unknown ACPs in case the current ACPs constant
+	// becomes out of date.
+	var unknownACPs set.Set[uint32]
+	for acp := range n.Config.NetworkConfig.SupportedACPs {
+		if !constants.CurrentACPs.Contains(acp) {
+			unknownACPs.Add(acp)
+		}
+	}
+	for acp := range n.Config.NetworkConfig.ObjectedACPs {
+		if !constants.CurrentACPs.Contains(acp) {
+			unknownACPs.Add(acp)
+		}
+	}
+	if unknownACPs.Len() > 0 {
+		n.Log.Warn("gossipping unknown ACPs",
+			zap.Reflect("acps", unknownACPs),
+		)
+	}
+
 	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert, n.tlsKeyLogWriterCloser)
 
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
-	n.Config.BenchlistConfig.SybilProtectionEnabled = n.Config.SybilProtectionEnabled
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
@@ -298,9 +473,10 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		// a validator. Because each validator needs a txID associated with it,
 		// we hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
-		copy(dummyTxID[:], n.ID[:])
+		copy(dummyTxID[:], n.ID.Bytes())
 
-		err := primaryNetVdrs.Add(
+		err := n.vdrs.AddStaker(
+			constants.PrimaryNetworkID,
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
@@ -311,38 +487,43 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		}
 
 		consensusRouter = &insecureValidatorManager{
+			log:    n.Log,
 			Router: consensusRouter,
-			vdrs:   primaryNetVdrs,
+			vdrs:   n.vdrs,
 			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
-	numBootstrappers := n.bootstrappers.Len()
+	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
-		// Set a timer that will fire after a given timeout unless we connect
-		// to a sufficient portion of nodes. If the timeout fires, the node will
-		// shutdown.
-		timer := timer.NewTimer(func() {
-			// If the timeout fires and we're already shutting down, nothing to do.
-			if !n.shuttingDown.Get() {
+		onSufficientlyConnected := make(chan struct{})
+		consensusRouter = &beaconManager{
+			Router:                  consensusRouter,
+			beacons:                 n.bootstrappers,
+			requiredConns:           int64(requiredConns),
+			onSufficientlyConnected: onSufficientlyConnected,
+		}
+
+		// Log a warning if we aren't able to connect to a sufficient portion of
+		// nodes.
+		go func() {
+			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+			defer timer.Stop()
+
+			select {
+			case <-timer.C:
+				if n.shuttingDown.Get() {
+					return
+				}
 				n.Log.Warn("failed to connect to bootstrap nodes",
 					zap.Stringer("bootstrappers", n.bootstrappers),
 					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
 				)
+			case <-onSufficientlyConnected:
 			}
-		})
-
-		go timer.Dispatch()
-		timer.SetTimeoutIn(n.Config.BootstrapBeaconConnectionTimeout)
-
-		consensusRouter = &beaconManager{
-			Router:        consensusRouter,
-			timer:         timer,
-			beacons:       n.bootstrappers,
-			requiredConns: int64(requiredConns),
-		}
+		}()
 	}
 
 	// initialize gossip tracker
@@ -352,7 +533,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	}
 
 	// keep gossip tracker synchronized with the validator set
-	primaryNetVdrs.RegisterCallbackListener(&peer.GossipTrackerCallback{
+	n.vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &peer.GossipTrackerCallback{
 		Log:           n.Log,
 		GossipTracker: gossipTracker,
 	})
@@ -494,40 +675,45 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	// start the db manager
-	var (
-		dbManager manager.Manager
-		err       error
-	)
+	// start the db
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+		// Prior to v1.10.15, the only on-disk database was leveldb, and its
+		// files went to [dbPath]/[networkID]/v1.4.5.
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
+		var err error
+		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create leveldb at %s: %w", dbPath, err)
+		}
 	case memdb.Name:
-		dbManager = manager.NewMemDB(version.CurrentDatabase)
+		n.DB = memdb.New()
+	case pebble.Name:
+		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, pebble.Name)
+		var err error
+		n.DB, err = pebble.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, "db_internal", n.MetricsRegisterer)
+		if err != nil {
+			return fmt.Errorf("couldn't create pebbledb at %s: %w", dbPath, err)
+		}
 	default:
-		err = fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s}",
+		return fmt.Errorf(
+			"db-type was %q but should have been one of {%s, %s, %s}",
 			n.Config.DatabaseConfig.Name,
 			leveldb.Name,
 			memdb.Name,
+			pebble.Name,
 		)
 	}
+
+	if n.Config.ReadOnly && n.Config.DatabaseConfig.Name != memdb.Name {
+		n.DB = versiondb.New(n.DB)
+	}
+
+	var err error
+	n.DB, err = meterdb.New("db", n.MetricsRegisterer, n.DB)
 	if err != nil {
 		return err
 	}
-
-	meterDBManager, err := dbManager.NewMeterDBManager("db", n.MetricsRegisterer)
-	if err != nil {
-		return err
-	}
-
-	n.DBManager = meterDBManager
-
-	currentDB := dbManager.Current()
-	n.Log.Info("initializing database",
-		zap.Stringer("dbVersion", currentDB.Version),
-	)
-	n.DB = currentDB.Database
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -552,17 +738,38 @@ func (n *Node) initDatabase() error {
 	if genesisHash != expectedGenesisHash {
 		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
+
+	n.Log.Info("initializing database",
+		zap.Stringer("genesisHash", genesisHash),
+	)
+
+	ok, err := n.DB.Has(ungracefulShutdown)
+	if err != nil {
+		return fmt.Errorf("failed to read ungraceful shutdown key: %w", err)
+	}
+
+	if ok {
+		n.Log.Warn("detected previous ungraceful shutdown")
+	}
+
+	if err := n.DB.Put(ungracefulShutdown, nil); err != nil {
+		return fmt.Errorf(
+			"failed to write ungraceful shutdown key at: %w",
+			err,
+		)
+	}
+
 	return nil
 }
 
 // Set the node IDs of the peers this node should first connect to
 func (n *Node) initBootstrappers() error {
-	n.bootstrappers = validators.NewSet()
+	n.bootstrappers = validators.NewManager()
 	for _, bootstrapper := range n.Config.Bootstrappers {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
-		if err := n.bootstrappers.Add(bootstrapper.ID, nil, ids.Empty, 1); err != nil {
+		if err := n.bootstrappers.AddStaker(constants.PrimaryNetworkID, bootstrapper.ID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}
@@ -656,7 +863,7 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
-	listenAddress := net.JoinHostPort(n.Config.HTTPHost, fmt.Sprintf("%d", n.Config.HTTPPort))
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
@@ -768,8 +975,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
-	// Manages network timeouts
-	timeoutManager, err := timeout.NewManager(
+	n.timeoutManager, err = timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		"requests",
@@ -778,13 +984,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+	go n.Log.RecoverAndPanic(n.timeoutManager.Dispatch)
 
 	// Routes incoming messages from peers to the appropriate chain
 	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
-		timeoutManager,
+		n.timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Config.SybilProtectionEnabled,
@@ -808,7 +1014,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
 		TxAcceptorGroup:                         n.TxAcceptorGroup,
 		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
-		DBManager:                               n.DBManager,
+		DB:                                      n.DB,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
@@ -823,22 +1029,20 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		XChainID:                                xChainID,
 		CChainID:                                cChainID,
 		CriticalChains:                          criticalChains,
-		TimeoutManager:                          timeoutManager,
+		TimeoutManager:                          n.timeoutManager,
 		Health:                                  n.health,
-		RetryBootstrap:                          n.Config.RetryBootstrap,
-		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                        n.Shutdown,
 		MeterVMEnabled:                          n.Config.MeterVMEnabled,
 		Metrics:                                 n.MetricsGatherer,
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
-		AcceptedFrontierGossipFrequency:         n.Config.AcceptedFrontierGossipFrequency,
+		FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
 		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
-		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		TracingEnabled:                          n.Config.TraceConfig.Enabled,
@@ -862,8 +1066,6 @@ func (n *Node) initVMs() error {
 	// allows the node's validator sets to be determined by network connections.
 	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
-		primaryVdrs := validators.NewSet()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	}
 
 	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
@@ -874,8 +1076,7 @@ func (n *Node) initVMs() error {
 	})
 
 	// Register the VMs that Avalanche supports
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                        n.chainManager,
@@ -905,7 +1106,7 @@ func (n *Node) initVMs() error {
 				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
 				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
 				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
-				DTime:                         version.GetDTime(n.Config.NetworkID),
+				DurangoTime:                   version.GetDurangoTime(n.Config.NetworkID),
 				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
@@ -920,8 +1121,8 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
-	if errs.Errored() {
-		return errs.Err
+	if err != nil {
+		return err
 	}
 
 	// initialize vm runtime manager
@@ -961,8 +1162,7 @@ func (n *Node) initSharedMemory() {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
-	n.keystore = keystore.New(n.Log, keystoreDB)
+	n.keystore = keystore.New(n.Log, prefixdb.New(keystoreDBPrefix, n.DB))
 	handler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
@@ -1073,7 +1273,6 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
 			Version:                       version.CurrentApp,
@@ -1092,11 +1291,11 @@ func (n *Node) initInfoAPI() error {
 			VMManager:                     n.VMManager,
 		},
 		n.Log,
+		n.vdrs,
 		n.chainManager,
 		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,
 		n.Net,
-		primaryValidators,
 		n.benchlistManager,
 	)
 	if err != nil {
@@ -1268,14 +1467,6 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	return nil
 }
 
-// Initializes [n.vdrs] and returns the Primary Network validator set.
-func (n *Node) initVdrs() validators.Set {
-	n.vdrs = validators.NewManager()
-	vdrSet := validators.NewSet()
-	_ = n.vdrs.Add(constants.PrimaryNetworkID, vdrSet)
-	return vdrSet
-}
-
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 	resourceManager, err := resource.NewManager(
@@ -1300,11 +1491,11 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initCPUTargeter(
 	config *tracker.TargeterConfig,
-	vdrs validators.Set,
 ) {
 	n.cpuTargeter = tracker.NewTargeter(
+		n.Log,
 		config,
-		vdrs,
+		n.vdrs,
 		n.resourceTracker.CPUTracker(),
 	)
 }
@@ -1313,158 +1504,13 @@ func (n *Node) initCPUTargeter(
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initDiskTargeter(
 	config *tracker.TargeterConfig,
-	vdrs validators.Set,
 ) {
 	n.diskTargeter = tracker.NewTargeter(
+		n.Log,
 		config,
-		vdrs,
+		n.vdrs,
 		n.resourceTracker.DiskTracker(),
 	)
-}
-
-// Initialize this node
-func (n *Node) Initialize(
-	config *Config,
-	logger logging.Logger,
-	logFactory logging.Factory,
-) error {
-	tlsCert := config.StakingTLSCert.Leaf
-	stakingCert := staking.CertificateFromX509(tlsCert)
-	if err := staking.ValidateCertificate(stakingCert); err != nil {
-		return fmt.Errorf("invalid staking certificate: %w", err)
-	}
-
-	n.Log = logger
-	n.Config = config
-	n.ID = ids.NodeIDFromCert(stakingCert)
-	n.LogFactory = logFactory
-	n.DoneShuttingDown.Add(1)
-
-	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
-	n.Log.Info("initializing node",
-		zap.Stringer("version", version.CurrentApp),
-		zap.Stringer("nodeID", n.ID),
-		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
-		zap.Reflect("nodePOP", pop),
-		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
-		zap.Reflect("config", n.Config),
-	)
-
-	var err error
-	n.VMFactoryLog, err = logFactory.Make("vm-factory")
-	if err != nil {
-		return fmt.Errorf("problem creating vm logger: %w", err)
-	}
-
-	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
-
-	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
-		return fmt.Errorf("problem initializing node beacons: %w", err)
-	}
-
-	// Set up tracer
-	n.tracer, err = trace.New(n.Config.TraceConfig)
-	if err != nil {
-		return fmt.Errorf("couldn't initialize tracer: %w", err)
-	}
-
-	if n.Config.TraceConfig.Enabled {
-		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
-	}
-
-	n.initMetrics()
-
-	if err := n.initAPIServer(); err != nil { // Start the API Server
-		return fmt.Errorf("couldn't initialize API server: %w", err)
-	}
-
-	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
-		return fmt.Errorf("couldn't initialize metrics API: %w", err)
-	}
-
-	if err := n.initDatabase(); err != nil { // Set up the node's database
-		return fmt.Errorf("problem initializing database: %w", err)
-	}
-
-	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
-		return fmt.Errorf("couldn't initialize keystore API: %w", err)
-	}
-
-	n.initSharedMemory() // Initialize shared memory
-
-	// message.Creator is shared between networking, chainManager and the engine.
-	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
-	// and the engine (initChains) but after the metrics (initMetricsAPI)
-	// message.Creator currently record metrics under network namespace
-	n.networkNamespace = "network"
-	n.msgCreator, err = message.NewCreator(
-		n.Log,
-		n.MetricsRegisterer,
-		n.networkNamespace,
-		n.Config.NetworkConfig.CompressionType,
-		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
-	)
-	if err != nil {
-		return fmt.Errorf("problem initializing message creator: %w", err)
-	}
-
-	primaryNetVdrs := n.initVdrs()
-	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
-		return fmt.Errorf("problem initializing resource manager: %w", err)
-	}
-	n.initCPUTargeter(&config.CPUTargeterConfig, primaryNetVdrs)
-	n.initDiskTargeter(&config.DiskTargeterConfig, primaryNetVdrs)
-	if err := n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
-		return fmt.Errorf("problem initializing networking: %w", err)
-	}
-
-	n.initEventDispatchers()
-
-	// Start the Health API
-	// Has to be initialized before chain manager
-	// [n.Net] must already be set
-	if err := n.initHealthAPI(); err != nil {
-		return fmt.Errorf("couldn't initialize health API: %w", err)
-	}
-	if err := n.addDefaultVMAliases(); err != nil {
-		return fmt.Errorf("couldn't initialize API aliases: %w", err)
-	}
-	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
-		return fmt.Errorf("couldn't initialize chain manager: %w", err)
-	}
-	if err := n.initVMs(); err != nil { // Initialize the VM registry.
-		return fmt.Errorf("couldn't initialize VM registry: %w", err)
-	}
-	if err := n.initAdminAPI(); err != nil { // Start the Admin API
-		return fmt.Errorf("couldn't initialize admin API: %w", err)
-	}
-	if err := n.initInfoAPI(); err != nil { // Start the Info API
-		return fmt.Errorf("couldn't initialize info API: %w", err)
-	}
-	if err := n.initIPCs(); err != nil { // Start the IPCs
-		return fmt.Errorf("couldn't initialize IPCs: %w", err)
-	}
-	if err := n.initIPCAPI(); err != nil { // Start the IPC API
-		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
-	}
-	if err := n.initChainAliases(n.Config.GenesisBytes); err != nil {
-		return fmt.Errorf("couldn't initialize chain aliases: %w", err)
-	}
-	if err := n.initAPIAliases(n.Config.GenesisBytes); err != nil {
-		return fmt.Errorf("couldn't initialize API aliases: %w", err)
-	}
-	if err := n.initIndexer(); err != nil {
-		return fmt.Errorf("couldn't initialize indexer: %w", err)
-	}
-
-	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
-	n.initProfiler()
-
-	// Start the Platform chain
-	if err := n.initChains(n.Config.GenesisBytes); err != nil {
-		return fmt.Errorf("couldn't initialize chains: %w", err)
-	}
-	return nil
 }
 
 // Shutdown this node
@@ -1510,6 +1556,7 @@ func (n *Node) shutdown() {
 			)
 		}
 	}
+	n.timeoutManager.Stop()
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
 	}
@@ -1534,8 +1581,15 @@ func (n *Node) shutdown() {
 	n.Log.Info("cleaning up plugin runtimes")
 	n.runtimeManager.Stop(context.TODO())
 
-	if n.DBManager != nil {
-		if err := n.DBManager.Close(); err != nil {
+	if n.DB != nil {
+		if err := n.DB.Delete(ungracefulShutdown); err != nil {
+			n.Log.Error(
+				"failed to delete ungraceful shutdown key",
+				zap.Error(err),
+			)
+		}
+
+		if err := n.DB.Close(); err != nil {
 			n.Log.Warn("error during DB shutdown",
 				zap.Error(err),
 			)

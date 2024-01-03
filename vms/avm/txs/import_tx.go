@@ -31,7 +31,7 @@ func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, in := range t.ImportedIns {
 		in.Symbol = true
-		utxos = append(utxos, &in.UTXOID) //nolint:gosec
+		utxos = append(utxos, &in.UTXOID)
 	}
 	return utxos
 }

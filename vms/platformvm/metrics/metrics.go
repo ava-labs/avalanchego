@@ -110,9 +110,9 @@ func New(
 
 	errs := wrappers.Errs{Err: err}
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
+	errs.Add(err)
 	m.APIInterceptor = apiRequestMetrics
 	errs.Add(
-		err,
 		registerer.Register(m.timeUntilUnstake),
 		registerer.Register(m.timeUntilSubnetUnstake),
 		registerer.Register(m.localStake),

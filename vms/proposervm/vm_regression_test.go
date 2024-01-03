@@ -11,11 +11,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
 func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *testing.T) {
@@ -36,7 +38,7 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 		return customError
 	}
 
-	innerVM.InitializeF = func(context.Context, *snow.Context, manager.Manager,
+	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
 	) error {
@@ -45,27 +47,29 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 
 	proVM := New(
 		innerVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
+		Config{
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 	)
+
 	defer func() {
 		// avoids leaking goroutines
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	ctx := snow.DefaultContextTest()
-	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	initialState := []byte("genesis state")
 
 	err := proVM.Initialize(
 		context.Background(),
 		ctx,
-		dummyDBManager,
+		prefixdb.New([]byte{}, memdb.New()),
 		initialState,
 		nil,
 		nil,

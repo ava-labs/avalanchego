@@ -18,8 +18,6 @@ const (
 	hrp        = "fuji"
 )
 
-var factory secp256k1.Factory
-
 // TestLedger will be skipped if a ledger is not connected.
 func TestLedger(t *testing.T) {
 	require := require.New(t)
@@ -66,7 +64,7 @@ func TestLedger(t *testing.T) {
 	for i, addrIndex := range indices {
 		sig := sigs[i]
 
-		pk, err := factory.RecoverHashPublicKey(rawHash, sig)
+		pk, err := secp256k1.RecoverPublicKeyFromHash(rawHash, sig)
 		require.NoError(err)
 		require.Equal(addresses[addrIndex], pk.Address())
 	}

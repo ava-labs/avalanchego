@@ -7,6 +7,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -25,12 +27,20 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = (*getter)(nil)
 
-func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer, error) {
+func New(
+	storage vertex.Storage,
+	sender common.Sender,
+	log logging.Logger,
+	maxTimeGetAncestors time.Duration,
+	maxContainersGetAncestors int,
+	reg prometheus.Registerer,
+) (common.AllGetsServer, error) {
 	gh := &getter{
-		storage: storage,
-		sender:  commonCfg.Sender,
-		cfg:     commonCfg,
-		log:     commonCfg.Ctx.Log,
+		storage:                   storage,
+		sender:                    sender,
+		log:                       log,
+		maxTimeGetAncestors:       maxTimeGetAncestors,
+		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
 
 	var err error
@@ -38,17 +48,18 @@ func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer,
 		"bs",
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
-		commonCfg.Ctx.AvalancheRegisterer,
+		reg,
 	)
 	return gh, err
 }
 
 type getter struct {
-	storage vertex.Storage
-	sender  common.Sender
-	cfg     common.Config
+	storage                   vertex.Storage
+	sender                    common.Sender
+	log                       logging.Logger
+	maxTimeGetAncestors       time.Duration
+	maxContainersGetAncestors int
 
-	log              logging.Logger
 	getAncestorsVtxs metric.Averager
 }
 
@@ -62,7 +73,7 @@ func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[uint64]) error {
 	gh.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
@@ -72,6 +83,8 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
+// TODO: Remove support for GetAcceptedFrontier messages after v1.11.x is
+// activated.
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
 	acceptedFrontier := gh.storage.Edge(ctx)
 	// Since all the DAGs are linearized, we only need to return the stop
@@ -82,9 +95,10 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, vtxID := range containerIDs {
+// TODO: Remove support for GetAccepted messages after v1.11.x is activated.
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	acceptedVtxIDs := make([]ids.ID, 0, containerIDs.Len())
+	for vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
@@ -106,13 +120,13 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
-	queue := make([]avalanche.Vertex, 1, gh.cfg.AncestorsMaxContainersSent) // for BFS
+	queue := make([]avalanche.Vertex, 1, gh.maxContainersGetAncestors) // for BFS
 	queue[0] = vertex
-	ancestorsBytesLen := 0                                                 // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, gh.cfg.AncestorsMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := set.Of(vertex.ID())                                         // IDs of vertices that have been in queue before
+	ancestorsBytesLen := 0                                            // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, gh.maxContainersGetAncestors) // vertex and its ancestors in BFS order
+	visited := set.Of(vertex.ID())                                    // IDs of vertices that have been in queue before
 
-	for len(ancestorsBytes) < gh.cfg.AncestorsMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {
+	for len(ancestorsBytes) < gh.maxContainersGetAncestors && len(queue) > 0 && time.Since(startTime) < gh.maxTimeGetAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()

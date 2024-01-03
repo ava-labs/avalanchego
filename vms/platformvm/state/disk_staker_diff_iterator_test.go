@@ -58,8 +58,8 @@ func TestDiffIteration(t *testing.T) {
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 
-	nodeID0 := ids.NodeID{0x00}
-	nodeID1 := ids.NodeID{0x01}
+	nodeID0 := ids.BuildTestNodeID([]byte{0x00})
+	nodeID1 := ids.BuildTestNodeID([]byte{0x01})
 
 	subnetID0Height0NodeID0 := marshalDiffKey(subnetID0, 0, nodeID0)
 	subnetID0Height1NodeID0 := marshalDiffKey(subnetID0, 1, nodeID0)

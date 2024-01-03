@@ -126,6 +126,9 @@ type Config struct {
 	PingFrequency      time.Duration     `json:"pingFrequency"`
 	AllowPrivateIPs    bool              `json:"allowPrivateIPs"`
 
+	SupportedACPs set.Set[uint32] `json:"supportedACPs"`
+	ObjectedACPs  set.Set[uint32] `json:"objectedACPs"`
+
 	// The compression type to use when compressing outbound messages.
 	// Assumes all peers support this compression type.
 	CompressionType compression.Type `json:"compressionType"`
@@ -134,8 +137,8 @@ type Config struct {
 	TLSKey crypto.Signer `json:"-"`
 
 	// TrackedSubnets of the node.
-	TrackedSubnets set.Set[ids.ID] `json:"-"`
-	Beacons        validators.Set  `json:"-"`
+	TrackedSubnets set.Set[ids.ID]    `json:"-"`
+	Beacons        validators.Manager `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`

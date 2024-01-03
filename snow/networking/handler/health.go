@@ -12,9 +12,6 @@ import (
 var ErrNotConnectedEnoughStake = errors.New("not connected to enough stake")
 
 func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
-	h.ctx.Lock.Lock()
-	defer h.ctx.Lock.Unlock()
-
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
 	if !ok {

@@ -5,8 +5,8 @@ package warp
 
 import (
 	"context"
-	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -166,7 +166,7 @@ func TestFilterValidators(t *testing.T) {
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
-		PublicKeyBytes: pk0.Serialize(),
+		PublicKeyBytes: bls.SerializePublicKey(pk0),
 		Weight:         1,
 	}
 
@@ -175,7 +175,7 @@ func TestFilterValidators(t *testing.T) {
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
-		PublicKeyBytes: pk1.Serialize(),
+		PublicKeyBytes: bls.SerializePublicKey(pk1),
 		Weight:         2,
 	}
 
@@ -336,7 +336,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 			},
 		}
 
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
 				require.NoError(b, err)

@@ -73,7 +73,7 @@ func (*noopListener) Addr() net.Addr {
 func NewTestNetwork(
 	log logging.Logger,
 	networkID uint32,
-	currentValidators validators.Set,
+	currentValidators validators.Manager,
 	trackedSubnets set.Set[ids.ID],
 	router router.ExternalHandler,
 ) (Network, error) {
@@ -186,10 +186,8 @@ func NewTestNetwork(
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
-	validatorManager := validators.NewManager()
-	beacons := validators.NewSet()
-	networkConfig.Validators = validatorManager
-	networkConfig.Validators.Add(constants.PrimaryNetworkID, currentValidators)
+	beacons := validators.NewManager()
+	networkConfig.Validators = currentValidators
 	networkConfig.Beacons = beacons
 	// This never actually does anything because we never initialize the P-chain
 	networkConfig.UptimeCalculator = uptime.NoOpCalculator
@@ -207,6 +205,7 @@ func NewTestNetwork(
 		return nil, err
 	}
 	networkConfig.CPUTargeter = tracker.NewTargeter(
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           float64(runtime.NumCPU()),
 			MaxNonVdrUsage:     .8 * float64(runtime.NumCPU()),
@@ -216,6 +215,7 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.CPUTracker(),
 	)
 	networkConfig.DiskTargeter = tracker.NewTargeter(
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           1000 * units.GiB,
 			MaxNonVdrUsage:     1000 * units.GiB,

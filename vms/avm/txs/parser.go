@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 )
 
@@ -31,9 +31,6 @@ type Parser interface {
 
 	ParseTx(bytes []byte) (*Tx, error)
 	ParseGenesisTx(bytes []byte) (*Tx, error)
-
-	InitializeTx(tx *Tx) error
-	InitializeGenesisTx(tx *Tx) error
 }
 
 type parser struct {
@@ -64,8 +61,7 @@ func NewCustomParser(
 	gcm := codec.NewManager(math.MaxInt32)
 	cm := codec.NewDefaultManager()
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
 		c.RegisterType(&OperationTx{}),
@@ -80,8 +76,8 @@ func NewCustomParser(
 		gc.RegisterType(&ExportTx{}),
 		gcm.RegisterCodec(CodecVersion, gc),
 	)
-	if errs.Errored() {
-		return nil, errs.Err
+	if err != nil {
+		return nil, err
 	}
 
 	vm := &fxVM{
@@ -131,14 +127,6 @@ func (p *parser) ParseGenesisTx(bytes []byte) (*Tx, error) {
 	return parse(p.gcm, bytes)
 }
 
-func (p *parser) InitializeTx(tx *Tx) error {
-	return initializeTx(p.cm, tx)
-}
-
-func (p *parser) InitializeGenesisTx(tx *Tx) error {
-	return initializeTx(p.gcm, tx)
-}
-
 func parse(cm codec.Manager, signedBytes []byte) (*Tx, error) {
 	tx := &Tx{}
 	parsedVersion, err := cm.Unmarshal(signedBytes, tx)
@@ -157,20 +145,4 @@ func parse(cm codec.Manager, signedBytes []byte) (*Tx, error) {
 	unsignedBytes := signedBytes[:unsignedBytesLen]
 	tx.SetBytes(unsignedBytes, signedBytes)
 	return tx, nil
-}
-
-func initializeTx(cm codec.Manager, tx *Tx) error {
-	signedBytes, err := cm.Marshal(CodecVersion, tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-
-	unsignedBytesLen, err := cm.Size(CodecVersion, &tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
-	}
-
-	unsignedBytes := signedBytes[:unsignedBytesLen]
-	tx.SetBytes(unsignedBytes, signedBytes)
-	return nil
 }

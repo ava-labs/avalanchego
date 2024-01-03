@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -27,23 +28,19 @@ func TestMaskedIterator(t *testing.T) {
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
-			Weight:   0, // just to simplify debugging
 			NextTime: time.Unix(0, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
-			Weight:   10, // just to simplify debugging
-			NextTime: time.Unix(10, 0),
+			NextTime: time.Unix(1, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
-			Weight:   20, // just to simplify debugging
-			NextTime: time.Unix(20, 0),
+			NextTime: time.Unix(2, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
-			Weight:   30, // just to simplify debugging
-			NextTime: time.Unix(30, 0),
+			NextTime: time.Unix(3, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
@@ -103,7 +100,8 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+				startTime := signedTx.Unsigned.(txs.ScheduledStaker).StartTime()
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -144,7 +142,8 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+				startTime := signedTx.Unsigned.(txs.ScheduledStaker).StartTime()
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -184,7 +183,8 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+				startTime := signedTx.Unsigned.(txs.ScheduledStaker).StartTime()
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -244,7 +244,7 @@ func indexPermutationGenerator(sliceLen int) gopter.Gen {
 
 func maskedIteratorTestGenerator() []gopter.Gen {
 	parentStakersCount := 10
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 
 	return []gopter.Gen{
 		gen.SliceOfN(parentStakersCount, addValidatorTxGenerator(ctx, nil, math.MaxUint64)),

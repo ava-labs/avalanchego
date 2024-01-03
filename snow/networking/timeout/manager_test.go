@@ -33,12 +33,13 @@ func TestManagerFire(t *testing.T) {
 	)
 	require.NoError(t, err)
 	go manager.Dispatch()
+	defer manager.Stop()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	manager.RegisterRequest(
-		ids.NodeID{},
+		ids.EmptyNodeID,
 		ids.ID{},
 		true,
 		ids.RequestID{},

@@ -84,7 +84,7 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := NewAdaptiveTimeoutManager(&test.config, "", prometheus.NewRegistry()) //nolint:gosec
+		_, err := NewAdaptiveTimeoutManager(&test.config, "", prometheus.NewRegistry())
 		require.ErrorIs(t, err, test.expectedErr)
 	}
 }

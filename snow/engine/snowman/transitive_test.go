@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
@@ -32,25 +34,34 @@ var (
 	Genesis           = ids.GenerateTestID()
 )
 
-func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	require := require.New(t)
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
+	require.NoError(engCfg.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp))
+
+	vals.RegisterCallbackListener(engCfg.Ctx.SubnetID, engCfg.ConnectedValidators)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-	commonCfg.Sender = sender
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
-	snowGetHandler, err := getter.New(vm, commonCfg)
+	snowGetHandler, err := getter.New(
+		vm,
+		sender,
+		engCfg.Ctx.Log,
+		time.Second,
+		2000,
+		engCfg.Ctx.Registerer,
+	)
 	require.NoError(err)
 	engCfg.AllGetsServer = snowGetHandler
 
@@ -86,10 +97,9 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	return vdr, vals, sender, vm, te, gBlk
 }
 
-func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	commonCfg := common.DefaultConfigTest()
-	engCfg := DefaultConfigs()
-	return setup(t, commonCfg, engCfg)
+func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+	engCfg := DefaultConfig(t)
+	return setup(t, engCfg)
 }
 
 func TestEngineShutdown(t *testing.T) {
@@ -318,7 +328,7 @@ func TestEngineQuery(t *testing.T) {
 func TestEngineMultipleQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		AlphaPreference:       2,
@@ -331,16 +341,16 @@ func TestEngineMultipleQuery(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -406,7 +416,13 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.issue(context.Background(), blk0, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk0,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	blk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -516,10 +532,22 @@ func TestEngineBlockedIssue(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.issue(context.Background(), blk1, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk1,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	blk0.StatusV = choices.Processing
-	require.NoError(te.issue(context.Background(), blk0, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk0,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	require.Equal(blk1.ID(), te.Consensus.Preference())
 }
@@ -552,7 +580,13 @@ func TestEngineAbandonResponse(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 	require.NoError(te.QueryFailed(context.Background(), vdr, 1))
 
 	require.Empty(te.blocked)
@@ -713,7 +747,7 @@ func TestEngineRepoll(t *testing.T) {
 func TestVoteCanceling(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		AlphaPreference:       2,
@@ -726,16 +760,16 @@ func TestVoteCanceling(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -791,7 +825,13 @@ func TestVoteCanceling(t *testing.T) {
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(context.Background(), blk, true))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		true,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	require.Equal(1, te.polls.Len())
 
@@ -811,7 +851,7 @@ func TestVoteCanceling(t *testing.T) {
 func TestEngineNoQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -852,13 +892,19 @@ func TestEngineNoQuery(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -955,7 +1001,13 @@ func TestEngineAbandonChit(t *testing.T) {
 		reqID = requestID
 	}
 
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -1010,7 +1062,13 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		reqID = requestID
 	}
 
-	require.NoError(te.issue(context.Background(), blk, true))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		true,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -1093,7 +1151,13 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		return blockingBlk, nil
 	}
 
-	require.NoError(te.issue(context.Background(), parentBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		parentBlk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	sender.CantSendChits = false
 
@@ -1104,7 +1168,13 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantSendPullQuery = false
 
 	missingBlk.StatusV = choices.Processing
-	require.NoError(te.issue(context.Background(), missingBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		missingBlk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	require.Empty(te.blocked)
 }
@@ -1157,7 +1227,13 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.issue(context.Background(), blockingBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blockingBlk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	queryRequestID := new(uint32)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
@@ -1168,7 +1244,13 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(context.Background(), issuedBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		issuedBlk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	sender.SendPushQueryF = nil
 	sender.CantSendPushQuery = false
@@ -1179,7 +1261,13 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.CantSendPullQuery = false
 
 	missingBlk.StatusV = choices.Processing
-	require.NoError(te.issue(context.Background(), missingBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		missingBlk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 }
 
 func TestEngineRetryFetch(t *testing.T) {
@@ -1275,9 +1363,21 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	require.NoError(te.issue(context.Background(), validBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		validBlk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 	sender.SendPushQueryF = nil
-	require.NoError(te.issue(context.Background(), invalidBlk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		invalidBlk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 	require.NoError(te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlkID))
 
 	require.Equal(choices.Accepted, validBlk.Status())
@@ -1286,7 +1386,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	require := require.New(t)
 
-	_, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	nodeID, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return gBlk.ID(), nil
@@ -1296,15 +1396,15 @@ func TestEngineGossip(t *testing.T) {
 		return gBlk, nil
 	}
 
-	called := new(bool)
-	sender.SendGossipF = func(_ context.Context, blkBytes []byte) {
-		*called = true
-		require.Equal(gBlk.Bytes(), blkBytes)
+	var calledSendPullQuery bool
+	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
+		calledSendPullQuery = true
+		require.Equal(set.Of(nodeID), nodeIDs)
 	}
 
 	require.NoError(te.Gossip(context.Background()))
 
-	require.True(*called)
+	require.True(calledSendPullQuery)
 }
 
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
@@ -1313,7 +1413,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	vdr, vdrs, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	secondVdr := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(secondVdr, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(te.Ctx.SubnetID, secondVdr, nil, ids.Empty, 1))
 
 	sender.Default(true)
 
@@ -1496,14 +1596,14 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 func TestEngineAggressivePolling(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 	engCfg.Params.ConcurrentRepolls = 2
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1584,7 +1684,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 func TestEngineDoubleChit(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     2,
 		AlphaPreference:       2,
@@ -1597,14 +1697,14 @@ func TestEngineDoubleChit(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 
-	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
-	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1660,7 +1760,13 @@ func TestEngineDoubleChit(t *testing.T) {
 		require.Equal(blk.ID(), blkID)
 		require.Equal(uint64(1), requestedHeight)
 	}
-	require.NoError(te.issue(context.Background(), blk, false))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		false,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
@@ -1688,17 +1794,17 @@ func TestEngineDoubleChit(t *testing.T) {
 func TestEngineBuildBlockLimit(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 	engCfg.Params.K = 1
 	engCfg.Params.AlphaPreference = 1
 	engCfg.Params.AlphaConfidence = 1
 	engCfg.Params.OptimalProcessing = 1
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -2710,7 +2816,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -2723,11 +2829,11 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	vals := validators.NewSet()
+	vals := validators.NewManager()
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -2779,7 +2885,13 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.issue(context.Background(), blk, true))
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		true,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {

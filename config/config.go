@@ -59,13 +59,29 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 	ipResolutionTimeout  = 30 * time.Second
+
+	ipcDeprecationMsg                    = "IPC API is deprecated"
+	keystoreDeprecationMsg               = "keystore API is deprecated"
+	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{}
+	deprecatedKeys = map[string]string{
+		IpcAPIEnabledKey:      ipcDeprecationMsg,
+		IpcsChainIDsKey:       ipcDeprecationMsg,
+		IpcsPathKey:           ipcDeprecationMsg,
+		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
+		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipOnAcceptValidatorSizeKey:            acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
+		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
+	}
 
+	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
 	errAuthPasswordTooWeak                    = errors.New("API auth password is not strong enough")
@@ -331,6 +347,25 @@ func getNetworkConfig(
 		allowPrivateIPs = v.GetBool(NetworkAllowPrivateIPsKey)
 	}
 
+	var supportedACPs set.Set[uint32]
+	for _, acp := range v.GetIntSlice(ACPSupportKey) {
+		if acp < 0 || acp > math.MaxInt32 {
+			return network.Config{}, fmt.Errorf("invalid ACP: %d", acp)
+		}
+		supportedACPs.Add(uint32(acp))
+	}
+
+	var objectedACPs set.Set[uint32]
+	for _, acp := range v.GetIntSlice(ACPObjectKey) {
+		if acp < 0 || acp > math.MaxInt32 {
+			return network.Config{}, fmt.Errorf("invalid ACP: %d", acp)
+		}
+		objectedACPs.Add(uint32(acp))
+	}
+	if supportedACPs.Overlaps(objectedACPs) {
+		return network.Config{}, errConflictingACPOpinion
+	}
+
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
 			MaxInboundConnsPerSec: maxInboundConnsPerSec,
@@ -409,6 +444,9 @@ func getNetworkConfig(
 		AllowPrivateIPs:              allowPrivateIPs,
 		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),
 		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
+
+		SupportedACPs: supportedACPs,
+		ObjectedACPs:  objectedACPs,
 
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),
@@ -513,8 +551,6 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 
 func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
 	config := node.BootstrapConfig{
-		RetryBootstrap:                          v.GetBool(RetryBootstrapKey),
-		RetryBootstrapWarnFrequency:             v.GetInt(RetryBootstrapWarnFrequencyKey),
 		BootstrapBeaconConnectionTimeout:        v.GetDuration(BootstrapBeaconConnectionTimeoutKey),
 		BootstrapMaxTimeGetAncestors:            v.GetDuration(BootstrapMaxTimeGetAncestorsKey),
 		BootstrapAncestorsMaxContainersSent:     int(v.GetUint(BootstrapAncestorsMaxContainersSentKey)),
@@ -920,7 +956,8 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 	}
 
 	return node.DatabaseConfig{
-		Name: v.GetString(DBTypeKey),
+		Name:     v.GetString(DBTypeKey),
+		ReadOnly: v.GetBool(DBReadOnlyKey),
 		Path: filepath.Join(
 			GetExpandedArg(v, DBPathKey),
 			constants.NetworkName(networkID),
@@ -1313,9 +1350,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Gossiping
-	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(ConsensusAcceptedFrontierGossipFrequencyKey)
-	if nodeConfig.AcceptedFrontierGossipFrequency < 0 {
-		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusAcceptedFrontierGossipFrequencyKey)
+	nodeConfig.FrontierPollFrequency = v.GetDuration(ConsensusFrontierPollFrequencyKey)
+	if nodeConfig.FrontierPollFrequency < 0 {
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusFrontierPollFrequencyKey)
 	}
 
 	// App handling

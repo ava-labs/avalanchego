@@ -3,10 +3,6 @@
 
 package wrappers
 
-import "strings"
-
-var _ error = (*aggregate)(nil)
-
 type Errs struct{ Err error }
 
 func (errs *Errs) Errored() bool {
@@ -22,29 +18,4 @@ func (errs *Errs) Add(errors ...error) {
 			}
 		}
 	}
-}
-
-// NewAggregate returns an aggregate error from a list of errors
-func NewAggregate(errs []error) error {
-	err := &aggregate{errs}
-	if len(err.Errors()) == 0 {
-		return nil
-	}
-	return err
-}
-
-type aggregate struct{ errs []error }
-
-// Error returns the slice of errors with comma separated messsages wrapped in brackets
-// [ error string 0 ], [ error string 1 ] ...
-func (a *aggregate) Error() string {
-	errString := make([]string, len(a.errs))
-	for i, err := range a.errs {
-		errString[i] = "[" + err.Error() + "]"
-	}
-	return strings.Join(errString, ",")
-}
-
-func (a *aggregate) Errors() []error {
-	return a.errs
 }

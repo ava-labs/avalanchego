@@ -60,12 +60,12 @@ func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staki
 
 func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, error) {
 	if err := conn.Handshake(); err != nil {
-		return ids.NodeID{}, nil, nil, err
+		return ids.EmptyNodeID, nil, nil, err
 	}
 
 	state := conn.ConnectionState()
 	if len(state.PeerCertificates) == 0 {
-		return ids.NodeID{}, nil, nil, errNoCert
+		return ids.EmptyNodeID, nil, nil, errNoCert
 	}
 
 	tlsCert := state.PeerCertificates[0]
@@ -75,7 +75,7 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeI
 	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
 	if err != nil {
 		invalidCerts.Inc()
-		return ids.NodeID{}, nil, nil, err
+		return ids.EmptyNodeID, nil, nil, err
 	}
 
 	// We validate the certificate here to attempt to make the validity of the
@@ -84,7 +84,7 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeI
 	// healthy.
 	if err := staking.ValidateCertificate(peerCert); err != nil {
 		invalidCerts.Inc()
-		return ids.NodeID{}, nil, nil, err
+		return ids.EmptyNodeID, nil, nil, err
 	}
 
 	nodeID := ids.NodeIDFromCert(peerCert)
