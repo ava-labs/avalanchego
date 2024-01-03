@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
@@ -56,7 +56,7 @@ func TestRegisterCreateHandlersAndShutdownFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(logging.NoLog{}).Times(1).Return(vm, nil)
@@ -73,7 +73,7 @@ func TestRegisterCreateHandlersFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(logging.NoLog{}).Times(1).Return(vm, nil)
@@ -90,7 +90,7 @@ func TestRegisterAddRouteFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -118,7 +118,7 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -147,7 +147,7 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -184,7 +184,7 @@ func TestRegisterHappyCase(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -248,7 +248,7 @@ func TestRegisterWithReadLockCreateHandlersAndShutdownFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(logging.NoLog{}).Times(1).Return(vm, nil)
@@ -265,7 +265,7 @@ func TestRegisterWithReadLockCreateHandlersFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(logging.NoLog{}).Times(1).Return(vm, nil)
@@ -282,7 +282,7 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -310,7 +310,7 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -339,7 +339,7 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -376,7 +376,7 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	resources := initRegistererTest(t)
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := mocks.NewMockChainVM(resources.ctrl)
+	vm := block.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]http.Handler{
 		"foo": nil,
@@ -411,7 +411,6 @@ type vmRegistererTestResources struct {
 	ctrl        *gomock.Controller
 	mockManager *vms.MockManager
 	mockServer  *server.MockServer
-	mockLogger  *logging.MockLogger
 	registerer  VMRegisterer
 }
 
@@ -420,27 +419,18 @@ func initRegistererTest(t *testing.T) *vmRegistererTestResources {
 
 	mockManager := vms.NewMockManager(ctrl)
 	mockServer := server.NewMockServer(ctrl)
-	mockLog := logging.NewMockLogger(ctrl)
 
 	registerer := NewVMRegisterer(VMRegistererConfig{
 		APIServer:    mockServer,
-		Log:          mockLog,
+		Log:          logging.NoLog{},
 		VMFactoryLog: logging.NoLog{},
 		VMManager:    mockManager,
 	})
-
-	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Trace(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLog.EXPECT().Verbo(gomock.Any(), gomock.Any()).AnyTimes()
 
 	return &vmRegistererTestResources{
 		ctrl:        ctrl,
 		mockManager: mockManager,
 		mockServer:  mockServer,
-		mockLogger:  mockLog,
 		registerer:  registerer,
 	}
 }

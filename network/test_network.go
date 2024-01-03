@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
@@ -187,7 +186,6 @@ func NewTestNetwork(
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
-	ctx := snowtest.ConsensusContext()
 	beacons := validators.NewManager()
 	networkConfig.Validators = currentValidators
 	networkConfig.Beacons = beacons
@@ -207,7 +205,7 @@ func NewTestNetwork(
 		return nil, err
 	}
 	networkConfig.CPUTargeter = tracker.NewTargeter(
-		ctx.Log,
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           float64(runtime.NumCPU()),
 			MaxNonVdrUsage:     .8 * float64(runtime.NumCPU()),
@@ -217,7 +215,7 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.CPUTracker(),
 	)
 	networkConfig.DiskTargeter = tracker.NewTargeter(
-		ctx.Log,
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           1000 * units.GiB,
 			MaxNonVdrUsage:     1000 * units.GiB,

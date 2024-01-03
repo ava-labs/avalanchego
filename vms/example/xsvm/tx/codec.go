@@ -11,8 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// Version is the current default codec version
-const Version = 0
+const CodecVersion = 0
 
 var Codec codec.Manager
 
@@ -24,7 +23,7 @@ func init() {
 		c.RegisterType(&Transfer{}),
 		c.RegisterType(&Export{}),
 		c.RegisterType(&Import{}),
-		Codec.RegisterCodec(Version, c),
+		Codec.RegisterCodec(CodecVersion, c),
 	)
 	if err != nil {
 		panic(err)

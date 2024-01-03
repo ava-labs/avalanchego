@@ -181,7 +181,7 @@ func TestGetTxStatus(t *testing.T) {
 	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.db))
 
 	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
-	peerSharedMemory := m.NewSharedMemory(xChainID)
+	peerSharedMemory := m.NewSharedMemory(service.vm.ctx.XChainID)
 
 	// #nosec G404
 	utxo := &avax.UTXO{
@@ -189,7 +189,7 @@ func TestGetTxStatus(t *testing.T) {
 			TxID:        ids.GenerateTestID(),
 			OutputIndex: rand.Uint32(),
 		},
-		Asset: avax.Asset{ID: avaxAssetID},
+		Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1234567,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -199,7 +199,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -217,13 +217,15 @@ func TestGetTxStatus(t *testing.T) {
 		},
 	}))
 
-	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
 
-	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*secp256k1.PrivateKey{recipientKey}, ids.ShortEmpty)
+	tx, err := service.vm.txBuilder.NewImportTx(
+		service.vm.ctx.XChainID,
+		ids.ShortEmpty,
+		[]*secp256k1.PrivateKey{recipientKey},
+		ids.ShortEmpty,
+	)
 	require.NoError(err)
-
-	mutableSharedMemory.SharedMemory = oldSharedMemory
 
 	service.vm.ctx.Lock.Unlock()
 
@@ -235,15 +237,9 @@ func TestGetTxStatus(t *testing.T) {
 	require.Equal(status.Unknown, resp.Status)
 	require.Zero(resp.Reason)
 
-	service.vm.ctx.Lock.Lock()
-
 	// put the chain in existing chain list
-	err = service.vm.Network.IssueTx(context.Background(), tx)
-	require.ErrorIs(err, database.ErrNotFound) // Missing shared memory UTXO
-
-	mutableSharedMemory.SharedMemory = sm
-
 	require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
+	service.vm.ctx.Lock.Lock()
 
 	block, err := service.vm.BuildBlock(context.Background())
 	require.NoError(err)
@@ -337,9 +333,8 @@ func TestGetTx(t *testing.T) {
 				err = service.GetTx(nil, arg, &response)
 				require.ErrorIs(err, database.ErrNotFound) // We haven't issued the tx yet
 
-				service.vm.ctx.Lock.Lock()
-
 				require.NoError(service.vm.Network.IssueTx(context.Background(), tx))
+				service.vm.ctx.Lock.Lock()
 
 				blk, err := service.vm.BuildBlock(context.Background())
 				require.NoError(err)
@@ -399,7 +394,7 @@ func TestGetBalance(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis(t)
+	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	for idx, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -433,7 +428,7 @@ func TestGetStake(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis(t)
+	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	addrsStrs := []string{}
 	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
@@ -608,7 +603,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	genesis, _ := defaultGenesis(t)
+	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}

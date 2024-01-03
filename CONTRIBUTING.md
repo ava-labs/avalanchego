@@ -25,7 +25,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 ## Features
 
-- If you want to start a discussion about the development of a new feature or the modfiication of an existing one, start a thread under GitHub [discussions](https://github.com/ava-labs/avalanchego/discussions/categories/ideas).
+- If you want to start a discussion about the development of a new feature or the modification of an existing one, start a thread under GitHub [discussions](https://github.com/ava-labs/avalanchego/discussions/categories/ideas).
 - Post a thread about your idea and why it should be added to AvalancheGo.
 - Don't start working on a pull request until you've received positive feedback from the maintainers.
 
