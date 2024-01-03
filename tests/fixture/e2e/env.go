@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
@@ -83,6 +84,23 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 	// network will also need subnets to be created the first time it
 	// is used.
 	require.NoError(network.CreateSubnets(DefaultContext(), ginkgo.GinkgoWriter))
+
+	// Wait for chains to have bootstrapped on all nodes
+	Eventually(func() bool {
+		for _, subnet := range network.Subnets {
+			for _, node := range network.Nodes {
+				infoClient := info.NewClient(node.URI)
+				for _, chain := range subnet.Chains {
+					isBootstrapped, err := infoClient.IsBootstrapped(DefaultContext(), chain.ChainID.String())
+					// Ignore errors since a chain id that is not yet known will result in a recoverable error.
+					if err != nil || !isBootstrapped {
+						return false
+					}
+				}
+			}
+		}
+		return true
+	}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
 
 	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")

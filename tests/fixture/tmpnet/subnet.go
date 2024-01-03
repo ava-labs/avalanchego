@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -93,22 +92,36 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (primary.Wallet, err
 
 // Issues the subnet creation transaction and retains the result. The URI of a node is
 // required to issue the transaction.
-func (s *Subnet) Create(ctx context.Context, pWallet p.Wallet) error {
-	owner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			s.OwningKey.Address(),
-		},
+func (s *Subnet) Create(ctx context.Context, uri string) error {
+	wallet, err := s.GetWallet(ctx, uri)
+	if err != nil {
+		return err
 	}
+	pWallet := wallet.P()
 
 	subnetTx, err := pWallet.IssueCreateSubnetTx(
-		owner,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				s.OwningKey.Address(),
+			},
+		},
 		common.WithContext(ctx),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create subnet %s: %w", s.Name, err)
 	}
 	s.SubnetID = subnetTx.ID()
+
+	return nil
+}
+
+func (s *Subnet) CreateChains(ctx context.Context, uri string) error {
+	wallet, err := s.GetWallet(ctx, uri)
+	if err != nil {
+		return err
+	}
+	pWallet := wallet.P()
 
 	for _, chain := range s.Chains {
 		vmID, err := GetVMID(chain.VMName)
@@ -127,7 +140,6 @@ func (s *Subnet) Create(ctx context.Context, pWallet p.Wallet) error {
 		if err != nil {
 			return fmt.Errorf("failed to create chain: %w", err)
 		}
-
 		chain.ChainID = createChainTx.ID()
 	}
 	return nil
@@ -177,6 +189,7 @@ func (s *Subnet) AddValidators(ctx context.Context, nodes []*Node) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -186,13 +199,21 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 		return fmt.Errorf("failed to create subnet dir: %w", err)
 	}
 	path := filepath.Join(subnetDir, s.Name+".json")
-	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
+
+	// Since subnets are expected to be serialized for the first time
+	// without their chains having been created (i.e. chains will have
+	// empty IDs), use the absence of chain IDs as a prompt for a
+	// subnet name uniquness check.
+	if len(s.Chains) > 0 && s.Chains[0].ChainID == ids.Empty {
+		_, err := os.Stat(path)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		if err == nil {
+			return fmt.Errorf("a subnet with name %s already exists", s.Name)
+		}
 	}
-	if err == nil {
-		return fmt.Errorf("a subnet with alias %s already exists", s.Name)
-	}
+
 	bytes, err := DefaultJSONMarshal(s)
 	if err != nil {
 		return fmt.Errorf("failed to marshal subnet %s: %w", s.Name, err)
@@ -257,7 +278,7 @@ func waitForActiveValidators(
 	}
 }
 
-// Reads subnets from [network dir]/subnets/[subnet alias].json
+// Reads subnets from [network dir]/subnets/[subnet name].json
 func readSubnets(subnetDir string) ([]*Subnet, error) {
 	if _, err := os.Stat(subnetDir); os.IsNotExist(err) {
 		return nil, nil

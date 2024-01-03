@@ -530,18 +530,12 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 			n.PreFundedKeys = n.PreFundedKeys[:len(n.PreFundedKeys)-1]
 		}
 
-		wallet, err := subnet.GetWallet(ctx, n.Nodes[0].URI)
-		if err != nil {
-			return err
-		}
-		pWallet := wallet.P()
-
-		// Create the subnet and its chains on the network
-		if err := subnet.Create(ctx, pWallet); err != nil {
+		// Create the subnet on the network
+		if err := subnet.Create(ctx, n.Nodes[0].URI); err != nil {
 			return err
 		}
 
-		// Persist the subnet and chain configuration
+		// Persist the subnet configuration
 		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
 			return err
 		}
@@ -573,17 +567,27 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	// Add each node as a validator
+	// Add each node as a subnet validator
 	for _, subnet := range createdSubnets {
 		if err := subnet.AddValidators(ctx, n.Nodes); err != nil {
 			return err
 		}
 	}
 
-	// Wait for nodes to become validators of the network
+	// Wait for nodes to become subnet validators
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
 	for _, subnet := range createdSubnets {
 		if err := waitForActiveValidators(ctx, w, pChainClient, subnet, n.Nodes); err != nil {
+			return err
+		}
+
+		// It should now be safe to create chains for the subnet
+		if err := subnet.CreateChains(ctx, n.Nodes[0].URI); err != nil {
+			return err
+		}
+
+		// Persist the chain configuration
+		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
 			return err
 		}
 	}
