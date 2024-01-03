@@ -54,9 +54,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/fx"
 	"github.com/ava-labs/avalanchego/vms/metervm"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -258,6 +262,7 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]handler.Handler
+	fxs    map[ids.ID]fx.Factory
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
@@ -266,12 +271,17 @@ type manager struct {
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
 	return &manager{
-		Aliaser:                ids.NewAliaser(),
-		ManagerConfig:          *config,
-		stakingSigner:          config.StakingTLSCert.PrivateKey.(crypto.Signer),
-		stakingCert:            staking.CertificateFromX509(config.StakingTLSCert.Leaf),
-		subnets:                make(map[ids.ID]subnets.Subnet),
-		chains:                 make(map[ids.ID]handler.Handler),
+		Aliaser:       ids.NewAliaser(),
+		ManagerConfig: *config,
+		stakingSigner: config.StakingTLSCert.PrivateKey.(crypto.Signer),
+		stakingCert:   staking.CertificateFromX509(config.StakingTLSCert.Leaf),
+		subnets:       make(map[ids.ID]subnets.Subnet),
+		chains:        make(map[ids.ID]handler.Handler),
+		fxs: map[ids.ID]fx.Factory{
+			secp256k1fx.ID: &secp256k1fx.Factory{},
+			nftfx.ID:       &nftfx.Factory{},
+			propertyfx.ID:  &propertyfx.Factory{},
+		},
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
@@ -512,21 +522,14 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 
 	fxs := make([]*common.Fx, len(chainParams.FxIDs))
 	for i, fxID := range chainParams.FxIDs {
-		// Get a factory for the fx we want to use on our chain
-		fxFactory, err := m.VMManager.GetFactory(fxID)
-		if err != nil {
-			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
+		fxFactory, ok := m.fxs[fxID]
+		if !ok {
+			return nil, fmt.Errorf("fx %s not found", fxID)
 		}
 
-		fx, err := fxFactory.New(chainLog)
-		if err != nil {
-			return nil, fmt.Errorf("error while creating fx: %w", err)
-		}
-
-		// Create the fx
 		fxs[i] = &common.Fx{
 			ID: fxID,
-			Fx: fx,
+			Fx: fxFactory.New(),
 		}
 	}
 
