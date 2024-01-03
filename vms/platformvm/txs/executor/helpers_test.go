@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -41,8 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 var (
@@ -164,12 +163,12 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.SubnetControlKeys[0].PublicKey().Address(),
-			ts.SubnetControlKeys[1].PublicKey().Address(),
-			ts.SubnetControlKeys[2].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -196,7 +195,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
@@ -225,15 +224,15 @@ func defaultState(
 func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 	banffTime := mockable.MaxTime
 	if postBanff {
-		banffTime = ts.ValidateEndTime.Add(-2 * time.Second)
+		banffTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
 	}
 	cortinaTime := mockable.MaxTime
 	if postCortina {
-		cortinaTime = ts.ValidateStartTime.Add(-2 * time.Second)
+		cortinaTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
 	}
 	durangoTime := mockable.MaxTime
 	if postDurango {
-		durangoTime = ts.ValidateStartTime.Add(-2 * time.Second)
+		durangoTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
 	}
 
 	return &config.Config{
@@ -246,16 +245,16 @@ func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       ts.MinStakingDuration,
-		MaxStakeDuration:       ts.MaxStakingDuration,
+		MinStakeDuration:       genesistest.MinStakingDuration,
+		MaxStakeDuration:       genesistest.MaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: ts.ValidateEndTime,
-		ApricotPhase5Time: ts.ValidateEndTime,
+		ApricotPhase3Time: genesistest.ValidateEndTime,
+		ApricotPhase5Time: genesistest.ValidateEndTime,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,
@@ -263,10 +262,10 @@ func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 }
 
 func defaultClock(postFork bool) *mockable.Clock {
-	now := ts.GenesisTime
+	now := genesistest.GenesisTime
 	if postFork {
 		// 1 second after Banff fork
-		now = ts.ValidateEndTime.Add(-2 * time.Second)
+		now = genesistest.ValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}
 	clk.Set(now)

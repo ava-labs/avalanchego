@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package testsetup
+package genesistest
 
 import (
 	"testing"
@@ -64,11 +64,11 @@ func init() {
 	}
 }
 
-// [BuildGenesis] is a good default to build genesis for platformVM unit tests
+// [Genesis] is a good default to build genesis for platformVM unit tests
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func BuildGenesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byte) {
+func Genesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(Keys))

@@ -20,12 +20,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -46,7 +46,7 @@ func TestBuildBlockBasic(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -119,10 +119,10 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
-		ts.Keys[0].PublicKey().Address(),
+		genesistest.Keys[0].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -247,7 +247,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -315,10 +315,10 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		ts.Keys[0].PublicKey().Address(),
+		genesistest.Keys[0].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -335,10 +335,10 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		uint64(validator2StartTime.Unix()),
 		uint64(validator2EndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		ts.Keys[1].PublicKey().Address(),
+		genesistest.Keys[1].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[1]},
-		ts.Keys[1].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[1]},
+		genesistest.Keys[1].PublicKey().Address(),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -355,10 +355,10 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		uint64(validator3StartTime.Unix()),
 		uint64(validator3EndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		ts.Keys[2].PublicKey().Address(),
+		genesistest.Keys[2].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[2]},
-		ts.Keys[2].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[2]},
+		genesistest.Keys[2].PublicKey().Address(),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx3))
@@ -420,10 +420,10 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		uint64(now.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		ts.Keys[0].PublicKey().Address(),
+		genesistest.Keys[0].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -439,10 +439,10 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		uint64(now.Unix()),
 		uint64(validator2EndTime.Unix()),
 		ids.GenerateTestNodeID(),
-		ts.Keys[2].PublicKey().Address(),
+		genesistest.Keys[2].PublicKey().Address(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[2]},
-		ts.Keys[2].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[2]},
+		genesistest.Keys[2].PublicKey().Address(),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -490,7 +490,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
