@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -247,6 +249,10 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	// Incrementing [awaitShutdown] would cause a deadlock since
+	// [periodicallyPruneMempool] grabs the context lock.
+	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
+
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
 		return fmt.Errorf(
@@ -270,6 +276,46 @@ func (vm *VM) Initialize(
 
 		vm.pruned.Set(true)
 	}()
+
+	return nil
+}
+
+func (vm *VM) periodicallyPruneMempool(frequency time.Duration) {
+	ticker := time.NewTicker(frequency)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-vm.onShutdownCtx.Done():
+			return
+		case <-ticker.C:
+			if err := vm.pruneMempool(); err != nil {
+				vm.ctx.Log.Debug("pruning mempool failed",
+					zap.Error(err),
+				)
+			}
+		}
+	}
+}
+
+func (vm *VM) pruneMempool() error {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range blockTxs {
+		if err := vm.Builder.Add(tx); err != nil {
+			vm.ctx.Log.Debug(
+				"failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Error(err),
+			)
+		}
+	}
 
 	return nil
 }
