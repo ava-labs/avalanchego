@@ -16,12 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -39,7 +39,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{ts.Keys[0], ts.Keys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -74,7 +74,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -116,7 +116,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -150,7 +150,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -167,7 +167,7 @@ func TestCreateChainTxValid(t *testing.T) {
 }
 
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
-	ap3Time := ts.GenesisTime.Add(time.Hour)
+	ap3Time := genesistest.GenesisTime.Add(time.Hour)
 	tests := []struct {
 		name          string
 		time          time.Time
@@ -176,20 +176,20 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:          "pre-fork - correctly priced",
-			time:          ts.GenesisTime,
+			time:          genesistest.GenesisTime,
 			fee:           0,
 			expectedError: nil,
 		},
 		{
 			name:          "post-fork - incorrectly priced",
 			time:          ap3Time,
-			fee:           100*ts.TxFee - 1*units.NanoAvax,
+			fee:           100*configtest.TxFee - 1*units.NanoAvax,
 			expectedError: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name:          "post-fork - correctly priced",
 			time:          ap3Time,
-			fee:           100 * ts.TxFee,
+			fee:           100 * configtest.TxFee,
 			expectedError: nil,
 		},
 	}
@@ -203,10 +203,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, ts.Keys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, genesistest.Keys, 0, test.fee, ids.ShortEmpty)
 			require.NoError(err)
 
-			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), ts.Keys)
+			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), genesistest.Keys)
 			require.NoError(err)
 
 			signers = append(signers, subnetSigners)

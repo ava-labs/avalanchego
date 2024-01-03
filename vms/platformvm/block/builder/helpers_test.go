@@ -28,7 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -40,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
@@ -60,7 +61,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *ts.MutableSharedMemory
+	msm            *configtest.MutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	atomicUTXOs    avax.AtomicUTXOManager
@@ -74,19 +75,19 @@ func newEnvironment(t *testing.T) *environment {
 	r := require.New(t)
 
 	var (
-		fork     = ts.DurangoFork
-		forkTime = ts.ValidateStartTime.Add(-2 * time.Second)
+		fork     = configtest.DurangoFork
+		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
 	)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(fork, forkTime),
+		config:         configtest.Config(fork, forkTime),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	res.ctx, res.msm = ts.Context(t, res.baseDB)
+	res.ctx, res.msm = configtest.Context(t, res.baseDB)
 
 	res.ctx.Lock.Lock()
 	defer res.ctx.Lock.Unlock()
@@ -179,12 +180,12 @@ func addSubnet(t *testing.T, env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.SubnetControlKeys[0].PublicKey().Address(),
-			ts.SubnetControlKeys[1].PublicKey().Address(),
-			ts.SubnetControlKeys[2].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[4]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
+		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -214,7 +215,7 @@ func defaultState(
 	require := require.New(t)
 
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 	state, err := state.New(
 		db,
 		genesisBytes,
@@ -236,7 +237,7 @@ func defaultState(
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
 	clk := &mockable.Clock{}
-	clk.Set(ts.GenesisTime)
+	clk.Set(genesistest.GenesisTime)
 	return clk
 }
 

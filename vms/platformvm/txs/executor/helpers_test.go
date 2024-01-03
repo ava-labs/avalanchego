@@ -27,7 +27,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -36,8 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 var (
@@ -52,7 +52,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *ts.MutableSharedMemory
+	msm            *configtest.MutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	states         map[ids.ID]state.Chain
@@ -80,29 +80,29 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	isBootstrapped.Set(true)
 
 	var (
-		fork     ts.ActiveFork
+		fork     configtest.ActiveFork
 		forkTime time.Time
 	)
 	switch {
 	case postDurango:
-		fork = ts.DurangoFork
-		forkTime = ts.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
+		fork = configtest.DurangoFork
+		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
 	case postCortina:
-		fork = ts.CortinaFork
-		forkTime = ts.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
+		fork = configtest.CortinaFork
+		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
 	case postBanff:
-		fork = ts.BanffFork
-		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+		fork = configtest.BanffFork
+		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
 	default:
-		fork = ts.ApricotPhase5Fork
-		forkTime = ts.GenesisTime
+		fork = configtest.ApricotPhase5Fork
+		forkTime = genesistest.GenesisTime
 	}
 
-	config := ts.Config(fork, forkTime)
+	config := configtest.Config(fork, forkTime)
 	clk := defaultClock(forkTime)
 
 	baseDB := versiondb.New(memdb.New())
-	ctx, msm := ts.Context(t, baseDB)
+	ctx, msm := configtest.Context(t, baseDB)
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
@@ -168,12 +168,12 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.SubnetControlKeys[0].PublicKey().Address(),
-			ts.SubnetControlKeys[1].PublicKey().Address(),
-			ts.SubnetControlKeys[2].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[4]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
+		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -200,7 +200,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(

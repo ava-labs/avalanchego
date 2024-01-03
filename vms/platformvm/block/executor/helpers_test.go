@@ -28,7 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -39,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -95,19 +96,19 @@ type environment struct {
 
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	var (
-		fork     = ts.ApricotPhase5Fork
-		forkTime = ts.ValidateEndTime
+		fork     = configtest.ApricotPhase5Fork
+		forkTime = genesistest.ValidateEndTime
 	)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         ts.Config(fork, forkTime),
+		config:         configtest.Config(fork, forkTime),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	res.ctx, _ = ts.Context(t, res.baseDB)
+	res.ctx, _ = configtest.Context(t, res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
@@ -197,12 +198,12 @@ func addSubnet(env *environment) {
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.SubnetControlKeys[0].PublicKey().Address(),
-			ts.SubnetControlKeys[1].PublicKey().Address(),
-			ts.SubnetControlKeys[2].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[4]},
-		ts.Keys[0].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
+		genesistest.Keys[0].PublicKey().Address(),
 	)
 	if err != nil {
 		panic(err)
@@ -238,7 +239,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 
 	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
 	state, err := state.New(
@@ -266,7 +267,7 @@ func defaultState(
 
 func defaultClock() *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(ts.GenesisTime)
+	clk.Set(genesistest.GenesisTime)
 	return clk
 }
 
