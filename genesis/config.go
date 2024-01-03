@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var (
@@ -52,15 +53,18 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	return ua, err
 }
 
-func (a Allocation) Less(other Allocation) bool {
-	return a.InitialAmount < other.InitialAmount ||
-		(a.InitialAmount == other.InitialAmount && a.AVAXAddr.Less(other.AVAXAddr))
+func (a Allocation) Compare(other Allocation) int {
+	if amountCmp := utils.Compare(a.InitialAmount, other.InitialAmount); amountCmp != 0 {
+		return amountCmp
+	}
+	return a.AVAXAddr.Compare(other.AVAXAddr)
 }
 
 type Staker struct {
-	NodeID        ids.NodeID  `json:"nodeID"`
-	RewardAddress ids.ShortID `json:"rewardAddress"`
-	DelegationFee uint32      `json:"delegationFee"`
+	NodeID        ids.NodeID                `json:"nodeID"`
+	RewardAddress ids.ShortID               `json:"rewardAddress"`
+	DelegationFee uint32                    `json:"delegationFee"`
+	Signer        *signer.ProofOfPossession `json:"signer,omitempty"`
 }
 
 func (s Staker) Unparse(networkID uint32) (UnparsedStaker, error) {
@@ -73,6 +77,7 @@ func (s Staker) Unparse(networkID uint32) (UnparsedStaker, error) {
 		NodeID:        s.NodeID,
 		RewardAddress: avaxAddr,
 		DelegationFee: s.DelegationFee,
+		Signer:        s.Signer,
 	}, err
 }
 

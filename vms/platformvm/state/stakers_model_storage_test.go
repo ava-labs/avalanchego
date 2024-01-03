@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -32,7 +33,7 @@ var (
 	_ commands.Command = (*applyAndCommitBottomDiffCommand)(nil)
 	_ commands.Command = (*rebuildStateCommand)(nil)
 
-	commandsCtx = buildStateCtx()
+	commandsCtx = snowtest.Context(&testing.T{}, snowtest.PChainID)
 )
 
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
@@ -145,7 +146,8 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 	}
 
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
+	startTime := sTx.Unsigned.(txs.ScheduledStaker).StartTime()
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, startTime, uint64(1000))
 	if err != nil {
 		return sys // state checks later on should spot missing validator
 	}
@@ -159,7 +161,9 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 func (cmd *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	sTx := cmd.sTx
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
+	startTime := sTx.Unsigned.(txs.ScheduledStaker).StartTime()
+
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, startTime, uint64(1000))
 	if err != nil {
 		return cmdState // state checks later on should spot missing validator
 	}
@@ -192,13 +196,13 @@ func (cmd *putCurrentValidatorCommand) PostCondition(cmdState commands.State, re
 
 func (cmd *putCurrentValidatorCommand) String() string {
 	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("\nputCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+	return fmt.Sprintf("\nputCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, unixEndTime: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
 		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
-		stakerTx.StartTime().Unix(),
-		stakerTx.EndTime().Sub(stakerTx.StartTime()),
+		stakerTx.(txs.ScheduledStaker).StartTime().Unix(),
+		stakerTx.EndTime().Unix(),
 	)
 }
 
@@ -417,7 +421,8 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	startTime := signedTx.Unsigned.(txs.ScheduledStaker).StartTime()
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), startTime, uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -475,7 +480,8 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegatorTx
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	startTime := signedTx.Unsigned.(txs.ScheduledStaker).StartTime()
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), startTime, uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -507,13 +513,13 @@ func (cmd *putCurrentDelegatorCommand) PostCondition(cmdState commands.State, re
 
 func (cmd *putCurrentDelegatorCommand) String() string {
 	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("\nputCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+	return fmt.Sprintf("\nputCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, unixEndTime: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
 		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
-		stakerTx.StartTime().Unix(),
-		stakerTx.EndTime().Sub(stakerTx.StartTime()))
+		stakerTx.(txs.ScheduledStaker).StartTime().Unix(),
+		stakerTx.EndTime().Unix())
 }
 
 var genPutCurrentDelegatorCommand = addPermissionlessDelegatorTxGenerator(commandsCtx, nil, nil, 1000).Map(

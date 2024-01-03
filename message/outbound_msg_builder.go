@@ -18,14 +18,20 @@ var _ OutboundMsgBuilder = (*outMsgBuilder)(nil)
 // with a reference count of 1. Once the reference count hits 0, the message
 // bytes should no longer be accessed.
 type OutboundMsgBuilder interface {
-	Version(
+	Handshake(
 		networkID uint32,
 		myTime uint64,
 		ip ips.IPPort,
 		myVersion string,
-		myVersionTime uint64,
+		client string,
+		major uint32,
+		minor uint32,
+		patch uint32,
+		ipSigningTime uint64,
 		sig []byte,
 		trackedSubnets []ids.ID,
+		supportedACPs []uint32,
+		objectedACPs []uint32,
 	) (OutboundMessage, error)
 
 	PeerList(
@@ -224,29 +230,43 @@ func (b *outMsgBuilder) Pong(
 	)
 }
 
-func (b *outMsgBuilder) Version(
+func (b *outMsgBuilder) Handshake(
 	networkID uint32,
 	myTime uint64,
 	ip ips.IPPort,
 	myVersion string,
-	myVersionTime uint64,
+	client string,
+	major uint32,
+	minor uint32,
+	patch uint32,
+	ipSigningTime uint64,
 	sig []byte,
 	trackedSubnets []ids.ID,
+	supportedACPs []uint32,
+	objectedACPs []uint32,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
-			Message: &p2p.Message_Version{
-				Version: &p2p.Version{
+			Message: &p2p.Message_Handshake{
+				Handshake: &p2p.Handshake{
 					NetworkId:      networkID,
 					MyTime:         myTime,
 					IpAddr:         ip.IP.To16(),
 					IpPort:         uint32(ip.Port),
 					MyVersion:      myVersion,
-					MyVersionTime:  myVersionTime,
+					IpSigningTime:  ipSigningTime,
 					Sig:            sig,
 					TrackedSubnets: subnetIDBytes,
+					Client: &p2p.Client{
+						Name:  client,
+						Major: major,
+						Minor: minor,
+						Patch: patch,
+					},
+					SupportedAcps: supportedACPs,
+					ObjectedAcps:  objectedACPs,
 				},
 			},
 		},

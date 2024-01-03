@@ -68,19 +68,15 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 				require.GreaterOrEqual(pBalance, minBalance)
 			})
-			// create validator data
-			validatorStartTimeDiff := 30 * time.Second
-			vdrStartTime := time.Now().Add(validatorStartTimeDiff)
 
 			// Use a random node ID to ensure that repeated test runs
-			// will succeed against a persistent network.
+			// will succeed against a network that persists across runs.
 			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
 			require.NoError(err)
 
 			vdr := &txs.Validator{
 				NodeID: validatorID,
-				Start:  uint64(vdrStartTime.Unix()),
-				End:    uint64(vdrStartTime.Add(72 * time.Hour).Unix()),
+				End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
 				Wght:   minValStake,
 			}
 			rewardOwner := &secp256k1fx.OutputOwners{

@@ -5,7 +5,6 @@ package builder
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -68,16 +69,21 @@ var (
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
 	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 
-	errMissing = errors.New("missing")
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
 )
+
+func init() {
+	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	for i := range preFundedKeys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+	}
+}
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -87,6 +93,7 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
+	network    network.Network
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
@@ -115,7 +122,14 @@ func newEnvironment(t *testing.T) *environment {
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	res.ctx, res.msm = defaultCtx(res.baseDB)
+	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
+	m := atomic.NewMemory(atomicDB)
+
+	res.ctx = snowtest.Context(t, snowtest.PChainID)
+	res.msm = &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(res.ctx.ChainID),
+	}
+	res.ctx.SharedMemory = res.msm
 
 	res.ctx.Lock.Lock()
 	defer res.ctx.Lock.Unlock()
@@ -153,11 +167,14 @@ func newEnvironment(t *testing.T) *environment {
 
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
+	res.sender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
 
 	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -168,16 +185,30 @@ func newEnvironment(t *testing.T) *environment {
 		pvalidators.TestManager,
 	)
 
+	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
+	res.network, err = network.New(
+		res.backend.Ctx.Log,
+		res.backend.Ctx.NodeID,
+		res.backend.Ctx.SubnetID,
+		res.backend.Ctx.ValidatorState,
+		txVerifier,
+		res.mempool,
+		res.backend.Config.PartialSyncPrimaryNetwork,
+		res.sender,
+		registerer,
+		network.DefaultConfig,
+	)
+	require.NoError(err)
+
 	res.Builder = New(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
-		nil, // toEngine,
-		res.sender,
 	)
+	res.Builder.StartBlockTimer()
 
-	res.Builder.SetPreference(genesisID)
+	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
 
 	return res
@@ -243,38 +274,6 @@ func defaultState(
 	state.SetHeight(0)
 	require.NoError(state.Commit())
 	return state
-}
-
-func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				xChainID:                  constants.PrimaryNetworkID,
-				cChainID:                  constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-
-	return ctx, msm
 }
 
 func defaultConfig() *config.Config {
@@ -357,9 +356,8 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
@@ -402,7 +400,7 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 }
 
 func shutdownEnvironment(env *environment) error {
-	env.Builder.Shutdown()
+	env.Builder.ShutdownBlockTimer()
 
 	if env.isBootstrapped.Get() {
 		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)

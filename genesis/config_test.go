@@ -11,56 +11,43 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestAllocationLess(t *testing.T) {
+func TestAllocationCompare(t *testing.T) {
 	type test struct {
 		name     string
 		alloc1   Allocation
 		alloc2   Allocation
-		expected bool
+		expected int
 	}
 	tests := []test{
 		{
 			name:     "equal",
 			alloc1:   Allocation{},
 			alloc2:   Allocation{},
-			expected: false,
+			expected: 0,
 		},
 		{
-			name:   "first initial amount smaller",
+			name:   "initial amount smaller",
 			alloc1: Allocation{},
 			alloc2: Allocation{
 				InitialAmount: 1,
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
-			name: "first initial amount larger",
-			alloc1: Allocation{
-				InitialAmount: 1,
-			},
-			alloc2:   Allocation{},
-			expected: false,
-		},
-		{
-			name:   "first bytes smaller",
+			name:   "bytes smaller",
 			alloc1: Allocation{},
 			alloc2: Allocation{
 				AVAXAddr: ids.ShortID{1},
 			},
-			expected: true,
-		},
-		{
-			name: "first bytes larger",
-			alloc1: Allocation{
-				AVAXAddr: ids.ShortID{1},
-			},
-			alloc2:   Allocation{},
-			expected: false,
+			expected: -1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.alloc1.Less(tt.alloc2))
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.alloc1.Compare(tt.alloc2))
+			require.Equal(-tt.expected, tt.alloc2.Compare(tt.alloc1))
 		})
 	}
 }

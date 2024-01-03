@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
@@ -42,14 +42,14 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		privateNetwork := e2e.Env.NewPrivateNetwork()
 
 		ginkgo.By("allocating a pre-funded key")
-		key := privateNetwork.GetConfig().FundedKeys[0]
+		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := evm.GetEthAddress(key)
 
 		ginkgo.By("initializing a coreth client")
-		node := privateNetwork.GetNodes()[0]
-		nodeURI := testnet.NodeURI{
-			NodeID: node.GetID(),
-			URI:    node.GetProcessContext().URI,
+		node := privateNetwork.Nodes[0]
+		nodeURI := tmpnet.NodeURI{
+			NodeID: node.NodeID,
+			URI:    node.URI,
 		}
 		ethClient := e2e.NewEthClient(nodeURI)
 

@@ -9,6 +9,7 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -57,7 +59,8 @@ func TestGeneralStakerContainersProperties(t *testing.T) {
 func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
 
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
+	dummyStartTime := time.Now()
 
 	properties.Property("add, delete and query current validators", prop.ForAll(
 		func(nonInitTx *txs.Tx) string {
@@ -72,7 +75,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			}
 
 			stakerTx := signedTx.Unsigned.(txs.StakerTx)
-			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, dummyStartTime, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -140,7 +143,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx))
+			staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.ScheduledStaker))
 			if err != nil {
 				return err.Error()
 			}
@@ -212,7 +215,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -224,7 +227,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -358,7 +361,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -370,7 +373,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), dummyStartTime, uint64(1000))
 				if err != nil {
 					return err.Error()
 				}

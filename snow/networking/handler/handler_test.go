@@ -22,10 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
@@ -39,7 +41,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	called := make(chan struct{})
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 
 	vdrs := validators.NewManager()
 	vdr0 := ids.GenerateTestNodeID()
@@ -67,9 +70,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler := handlerIntf.(*handler)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -78,11 +78,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(context.Context, ids.NodeID, uint32) error {
 		require.FailNow("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
-	bootstrapper.GetAcceptedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+	bootstrapper.GetAcceptedF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -137,7 +137,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 	require := require.New(t)
 
 	closed := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
@@ -169,9 +170,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 	})
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -231,7 +229,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	require := require.New(t)
 
 	closed := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -259,9 +258,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler.clock.Set(time.Now())
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -311,7 +307,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 func TestHandlerDispatchInternal(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
@@ -337,9 +334,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -383,7 +377,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 func TestHandlerSubnetConnector(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -414,9 +409,6 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
-		BootstrapableTest: common.BootstrapableTest{
-			T: t,
-		},
 		EngineTest: common.EngineTest{
 			T: t,
 		},
@@ -561,7 +553,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			require := require.New(t)
 
 			messageReceived := make(chan struct{})
-			ctx := snow.DefaultConsensusContextTest()
+			snowCtx := snowtest.Context(t, snowtest.CChainID)
+			ctx := snowtest.ConsensusContext(snowCtx)
 			vdrs := validators.NewManager()
 			require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -586,9 +579,6 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			require.NoError(err)
 
 			bootstrapper := &common.BootstrapperTest{
-				BootstrapableTest: common.BootstrapableTest{
-					T: t,
-				},
 				EngineTest: common.EngineTest{
 					T: t,
 				},
@@ -637,7 +627,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 func TestHandlerStartError(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,

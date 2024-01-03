@@ -4,8 +4,6 @@
 package executor
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -25,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -63,8 +62,6 @@ const (
 )
 
 var (
-	_ mempool.BlockTimer = (*environment)(nil)
-
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -75,14 +72,20 @@ var (
 	preFundedKeys             = secp256k1.TestKeys()
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
-	errMissing = errors.New("missing")
+	// Node IDs of genesis validators. Initialized in init function
+	genesisNodeIDs []ids.NodeID
 )
+
+func init() {
+	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	for i := range preFundedKeys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+	}
+}
 
 type stakerStatus uint
 
@@ -121,10 +124,6 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func (*environment) ResetBlockTimer() {
-	// dummy call, do nothing for now
-}
-
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
@@ -134,7 +133,13 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	res.ctx = defaultCtx(res.baseDB)
+	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
+	m := atomic.NewMemory(atomicDB)
+
+	res.ctx = snowtest.Context(t, snowtest.PChainID)
+	res.ctx.AVAXAssetID = avaxAssetID
+	res.ctx.SharedMemory = m.NewSharedMemory(res.ctx.ChainID)
+
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
@@ -189,7 +194,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer, res)
+	res.mempool, err = mempool.New("mempool", registerer, nil)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
@@ -289,35 +294,6 @@ func defaultState(
 	return state
 }
 
-func defaultCtx(db database.Database) *snow.Context {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
-
-	atomicDB := prefixdb.New([]byte{1}, db)
-	m := atomic.NewMemory(atomicDB)
-
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				xChainID:                  constants.PrimaryNetworkID,
-				cChainID:                  constants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-
-	return ctx
-}
-
 func defaultConfig() *config.Config {
 	return &config.Config{
 		Chains:                 chains.TestManager,
@@ -399,9 +375,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
+	for i, nodeID := range genesisNodeIDs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)

@@ -66,24 +66,33 @@ type Staker struct {
 //  3. If the priorities are also the same, the one with the lesser txID is
 //     lesser.
 func (s *Staker) Less(than *Staker) bool {
+	return s.Compare(than) == -1
+}
+
+func (s *Staker) Compare(than *Staker) int {
 	if s.NextTime.Before(than.NextTime) {
-		return true
+		return -1
 	}
 	if than.NextTime.Before(s.NextTime) {
-		return false
+		return 1
 	}
 
 	if s.Priority < than.Priority {
-		return true
+		return -1
 	}
 	if than.Priority < s.Priority {
-		return false
+		return 1
 	}
 
-	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
+	return bytes.Compare(s.TxID[:], than.TxID[:])
 }
 
-func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*Staker, error) {
+func NewCurrentStaker(
+	txID ids.ID,
+	staker txs.Staker,
+	startTime time.Time,
+	potentialReward uint64,
+) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err
@@ -95,7 +104,7 @@ func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*
 		PublicKey:       publicKey,
 		SubnetID:        staker.SubnetID(),
 		Weight:          staker.Weight(),
-		StartTime:       staker.StartTime(),
+		StartTime:       startTime,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        endTime,
@@ -103,7 +112,7 @@ func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*
 	}, nil
 }
 
-func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
+func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err

@@ -5,6 +5,7 @@ package state
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,9 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -28,10 +29,6 @@ import (
 
 var (
 	_ Versions = (*versionsHolder)(nil)
-
-	xChainID    = ids.Empty.Prefix(0)
-	cChainID    = ids.Empty.Prefix(1)
-	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
 
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -51,16 +48,6 @@ func (h *versionsHolder) GetState(blkID ids.ID) (Chain, bool) {
 	return h.baseState, blkID == h.baseState.GetLastAccepted()
 }
 
-func buildStateCtx() *snow.Context {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
-
-	return ctx
-}
-
 func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, error) {
 	cfg := defaultConfig()
 	cfg.TrackedSubnets.Add(trackedSubnets...)
@@ -70,7 +57,7 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		return nil, err
 	}
 
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 
 	genesisBytes, err := buildGenesisTest(ctx)
 	if err != nil {
@@ -87,7 +74,6 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		ctx,
 		metrics.Noop,
 		rewardsCalc,
-		&utils.Atomic[bool]{},
 	)
 }
 
@@ -114,6 +100,7 @@ func defaultConfig() *config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         defaultValidateEndTime,
 		CortinaTime:       defaultValidateEndTime,
+		DurangoTime:       defaultValidateEndTime,
 	}
 }
 

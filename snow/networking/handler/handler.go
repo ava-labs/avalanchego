@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
@@ -270,8 +271,8 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg Message) {
 	switch msg.Op() {
-	case message.AppRequestOp, message.AppRequestFailedOp, message.AppResponseOp, message.AppGossipOp,
-		message.CrossChainAppRequestOp, message.CrossChainAppRequestFailedOp, message.CrossChainAppResponseOp:
+	case message.AppRequestOp, message.AppErrorOp, message.AppResponseOp, message.AppGossipOp,
+		message.CrossChainAppRequestOp, message.CrossChainAppErrorOp, message.CrossChainAppResponseOp:
 		h.asyncMessageQueue.Push(ctx, msg)
 	default:
 		h.syncMessageQueue.Push(ctx, msg)
@@ -454,7 +455,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		h.ctx.Log.Verbo("forwarding sync message to consensus",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
-			zap.Any("message", body),
+			zap.Stringer("message", body),
 		)
 	} else {
 		h.ctx.Log.Debug("forwarding sync message to consensus",
@@ -487,7 +488,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
-				zap.Any("message", body),
+				zap.Stringer("message", body),
 			)
 		}
 	}()
@@ -556,23 +557,11 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2p.GetAcceptedStateSummary:
-		// TODO: Enforce that the numbers are sorted to make this verification
-		//       more efficient.
-		if !utils.IsUnique(msg.Heights) {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
-				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "Heights"),
-			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
-		}
-
 		return engine.GetAcceptedStateSummary(
 			ctx,
 			nodeID,
 			msg.RequestId,
-			msg.Heights,
+			set.Of(msg.Heights...),
 		)
 
 	case *p2p.AcceptedStateSummary:
@@ -804,7 +793,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		h.ctx.Log.Verbo("forwarding async message to consensus",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
-			zap.Any("message", body),
+			zap.Stringer("message", body),
 		)
 	} else {
 		h.ctx.Log.Debug("forwarding async message to consensus",
@@ -853,8 +842,18 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	case *p2p.AppResponse:
 		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
-	case *message.AppRequestFailed:
-		return engine.AppRequestFailed(ctx, nodeID, m.RequestID)
+	case *p2p.AppError:
+		err := &common.AppError{
+			Code:    m.ErrorCode,
+			Message: m.ErrorMessage,
+		}
+
+		return engine.AppRequestFailed(
+			ctx,
+			nodeID,
+			m.RequestId,
+			err,
+		)
 
 	case *p2p.AppGossip:
 		return engine.AppGossip(ctx, nodeID, m.AppBytes)
@@ -877,10 +876,16 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 
 	case *message.CrossChainAppRequestFailed:
+		err := &common.AppError{
+			Code:    m.ErrorCode,
+			Message: m.ErrorMessage,
+		}
+
 		return engine.CrossChainAppRequestFailed(
 			ctx,
 			m.SourceChainID,
 			m.RequestID,
+			err,
 		)
 
 	default:
@@ -904,7 +909,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	if h.ctx.Log.Enabled(logging.Verbo) {
 		h.ctx.Log.Verbo("forwarding chan message to consensus",
 			zap.Stringer("messageOp", op),
-			zap.Any("message", body),
+			zap.Stringer("message", body),
 		)
 	} else {
 		h.ctx.Log.Debug("forwarding chan message to consensus",
@@ -933,7 +938,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 				zap.Duration("processingTime", processingTime),
 				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("messageOp", op),
-				zap.Any("message", body),
+				zap.Stringer("message", body),
 			)
 		}
 	}()

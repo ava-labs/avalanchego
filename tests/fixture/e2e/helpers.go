@@ -22,9 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
-	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -45,11 +43,6 @@ const (
 	// development.
 	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
 
-	// Validator start time must be a minimum of SyncBound from the
-	// current time for validator addition to succeed, and adding 20
-	// seconds provides a buffer in case of any delay in processing.
-	DefaultValidatorStartTimeDiff = executor.SyncBound + 20*time.Second
-
 	DefaultGasLimit = uint64(21000) // Standard gas limit
 
 	// An empty string prompts the use of the default path which ensures a
@@ -62,7 +55,7 @@ const (
 )
 
 // Create a new wallet for the provided keychain against the specified node URI.
-func NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.Wallet {
+func NewWallet(keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {
 	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
 		URI:          nodeURI.URI,
@@ -81,7 +74,7 @@ func NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.
 }
 
 // Create a new eth client targeting the specified node URI.
-func NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
+func NewEthClient(nodeURI tmpnet.NodeURI) ethclient.Client {
 	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
@@ -125,28 +118,30 @@ func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration
 	}
 }
 
-// Add an ephemeral node that is only intended to be used by a single test. Its ID and
-// URI are not intended to be returned from the Network instance to minimize
-// accessibility from other tests.
-func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.Node {
+// Adds an ephemeral node intended to be used by a single test.
+func AddEphemeralNode(network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
 	require := require.New(ginkgo.GinkgoT())
 
-	node, err := network.AddEphemeralNode(ginkgo.GinkgoWriter, flags)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	node, err := network.AddEphemeralNode(ctx, ginkgo.GinkgoWriter, flags)
 	require.NoError(err)
 
-	// Ensure node is stopped on teardown. It's configuration is not removed to enable
-	// collection in CI to aid in troubleshooting failures.
 	ginkgo.DeferCleanup(func() {
-		tests.Outf("Shutting down ephemeral node %s\n", node.GetID())
-		require.NoError(node.Stop())
+		tests.Outf("shutting down ephemeral node %q\n", node.NodeID)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		defer cancel()
+		require.NoError(node.Stop(ctx))
 	})
-
 	return node
 }
 
 // Wait for the given node to report healthy.
-func WaitForHealthy(node testnet.Node) {
-	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(DefaultContext(), node))
+func WaitForHealthy(node *tmpnet.Node) {
+	// Need to use explicit context (vs DefaultContext()) to support use with DeferCleanup
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	require.NoError(ginkgo.GinkgoT(), tmpnet.WaitForHealthy(ctx, node))
 }
 
 // Sends an eth transaction, waits for the transaction receipt to be issued
@@ -194,36 +189,39 @@ func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 }
 
 // Verify that a new node can bootstrap into the network.
-func CheckBootstrapIsPossible(network testnet.Network) {
+func CheckBootstrapIsPossible(network *tmpnet.Network) {
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
 		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
 		return
 	}
 	ginkgo.By("checking if bootstrap is possible with the current network state")
-	node := AddEphemeralNode(network, testnet.FlagsMap{})
+
+	node := AddEphemeralNode(network, tmpnet.FlagsMap{})
 	WaitForHealthy(node)
 }
 
-// Start a local test-managed network with the provided avalanchego binary.
-func StartLocalNetwork(avalancheGoExecPath string, networkDir string) *local.LocalNetwork {
+// Start a temporary network with the provided avalanchego binary.
+func StartNetwork(avalancheGoExecPath string, networkDir string) *tmpnet.Network {
 	require := require.New(ginkgo.GinkgoT())
 
-	network, err := local.StartNetwork(
+	network, err := tmpnet.StartNetwork(
 		DefaultContext(),
 		ginkgo.GinkgoWriter,
 		networkDir,
-		&local.LocalNetwork{
-			LocalConfig: local.LocalConfig{
-				ExecPath: avalancheGoExecPath,
+		&tmpnet.Network{
+			NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
+				AvalancheGoPath: avalancheGoExecPath,
 			},
 		},
-		testnet.DefaultNodeCount,
-		testnet.DefaultFundedKeyCount,
+		tmpnet.DefaultNodeCount,
+		tmpnet.DefaultPreFundedKeyCount,
 	)
 	require.NoError(err)
 	ginkgo.DeferCleanup(func() {
 		tests.Outf("Shutting down network\n")
-		require.NoError(network.Stop())
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		defer cancel()
+		require.NoError(network.Stop(ctx))
 	})
 
 	tests.Outf("{{green}}Successfully started network{{/}}\n")
