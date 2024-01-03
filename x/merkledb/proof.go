@@ -21,8 +21,7 @@ import (
 )
 
 const (
-	verificationIntermediateWriteBatchSize = 0
-	verificationCacheSize                  = math.MaxInt
+	verificationCacheSize = math.MaxUint16
 )
 
 var (
@@ -861,11 +860,12 @@ func getStandaloneView(ctx context.Context, ops []database.BatchOp, size int) (*
 		ctx,
 		memdb.New(),
 		Config{
-			IntermediateWriteBatchSize: verificationIntermediateWriteBatchSize,
-			Tracer:                     trace.Noop,
-			ValueNodeCacheSize:         verificationCacheSize,
-			IntermediateNodeCacheSize:  verificationCacheSize,
-			BranchFactor:               tokenSizeToBranchFactor[size],
+			BranchFactor:                tokenSizeToBranchFactor[size],
+			Tracer:                      trace.Noop,
+			ValueNodeCacheSize:          verificationCacheSize,
+			IntermediateNodeCacheSize:   verificationCacheSize,
+			IntermediateWriteBufferSize: verificationCacheSize,
+			IntermediateWriteBatchSize:  verificationCacheSize,
 		},
 		&mockMetrics{},
 	)
