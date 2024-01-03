@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -308,7 +309,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.GenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesistest.MinStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 	addPendingValidatorTx, err := addPendingValidator(
@@ -375,13 +376,13 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.BuildTestNodeID([]byte{0xf1}),
 		rewardAddress: ids.ShortID{0xf1},
 		startTime:     genesistest.GenesisTime.Add(1 * time.Minute),
-		endTime:       genesistest.GenesisTime.Add(10 * genesistest.MinStakingDuration).Add(1 * time.Minute),
+		endTime:       genesistest.GenesisTime.Add(10 * configtest.MinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf2}),
 		rewardAddress: ids.ShortID{0xf2},
 		startTime:     staker1.startTime.Add(1 * time.Minute),
-		endTime:       staker1.startTime.Add(1 * time.Minute).Add(genesistest.MinStakingDuration),
+		endTime:       staker1.startTime.Add(1 * time.Minute).Add(configtest.MinStakingDuration),
 	}
 	staker3 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf3}),
@@ -405,7 +406,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.BuildTestNodeID([]byte{0xf5}),
 		rewardAddress: ids.ShortID{0xf5},
 		startTime:     staker2.endTime,
-		endTime:       staker2.endTime.Add(genesistest.MinStakingDuration),
+		endTime:       staker2.endTime.Add(configtest.MinStakingDuration),
 	}
 
 	tests := []test{
@@ -618,7 +619,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := genesistest.GenesisNodeIDs[0]
 	subnetVdr1StartTime := genesistest.ValidateStartTime
-	subnetVdr1EndTime := genesistest.ValidateStartTime.Add(genesistest.MinStakingDuration)
+	subnetVdr1EndTime := genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
@@ -649,8 +650,8 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	subnetVdr2NodeID := genesistest.GenesisNodeIDs[1]
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
-		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                     // Start time
-		uint64(subnetVdr1EndTime.Add(time.Second).Add(genesistest.MinStakingDuration).Unix()), // end time
+		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                    // Start time
+		uint64(subnetVdr1EndTime.Add(time.Second).Add(configtest.MinStakingDuration).Unix()), // end time
 		subnetVdr2NodeID, // Node ID
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
@@ -719,7 +720,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			// Add a subnet validator to the staker set
 			subnetValidatorNodeID := genesistest.GenesisNodeIDs[0]
 			subnetVdr1StartTime := genesistest.GenesisTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := genesistest.GenesisTime.Add(10 * genesistest.MinStakingDuration).Add(1 * time.Minute)
+			subnetVdr1EndTime := genesistest.GenesisTime.Add(10 * configtest.MinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
@@ -777,7 +778,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.GenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesistest.MaxStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
 	_, err := addPendingValidator(

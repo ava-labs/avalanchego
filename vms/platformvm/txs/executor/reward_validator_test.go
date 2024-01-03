@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -236,7 +237,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * genesistest.MinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -360,7 +361,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * genesistest.MinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -579,7 +580,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * genesistest.MinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -744,7 +745,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := uint64(genesistest.ValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * genesistest.MinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.ValidateStartTime.Add(2 * configtest.MinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(

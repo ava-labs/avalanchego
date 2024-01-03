@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
@@ -52,7 +53,7 @@ func TestNewExportTx(t *testing.T) {
 			require := require.New(t)
 
 			tx, err := env.txBuilder.NewExportTx(
-				genesistest.Balance-defaultTxFee, // Amount of tokens to export
+				configtest.Balance-defaultTxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,
 				tt.sourceKeys,

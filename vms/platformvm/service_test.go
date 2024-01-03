@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -286,7 +287,7 @@ func TestGetTx(t *testing.T) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(genesistest.MinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(configtest.MinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
@@ -405,11 +406,11 @@ func TestGetBalance(t *testing.T) {
 		reply := GetBalanceResponse{}
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
-		balance := genesistest.Balance
+		balance := configtest.Balance
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = genesistest.Balance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
+			balance = configtest.Balance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
 		}
 		require.Equal(json.Uint64(balance), reply.Balance)
 		require.Equal(json.Uint64(balance), reply.Unlocked)
@@ -443,7 +444,7 @@ func TestGetStake(t *testing.T) {
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
-		require.Equal(genesistest.Weight, uint64(response.Staked))
+		require.Equal(configtest.Weight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
@@ -455,7 +456,7 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(genesistest.Weight, out.Amount())
+		require.Equal(configtest.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Len(out.Addrs, 1)
 		require.Equal(genesistest.Keys[i].PublicKey().Address(), out.Addrs[0])
@@ -471,7 +472,7 @@ func TestGetStake(t *testing.T) {
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.Equal(len(g.Validators)*int(genesistest.Weight), int(response.Staked))
+	require.Equal(len(g.Validators)*int(configtest.Weight), int(response.Staked))
 	require.Len(response.Outputs, len(g.Validators))
 
 	for _, outputStr := range response.Outputs {
@@ -483,13 +484,13 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(genesistest.Weight, out.Amount())
+		require.Equal(configtest.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
 	}
 
-	oldStake := genesistest.Weight
+	oldStake := configtest.Weight
 
 	service.vm.ctx.Lock.Lock()
 
@@ -497,7 +498,7 @@ func TestGetStake(t *testing.T) {
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesistest.GenesisNodeIDs[0]
 	delegatorStartTime := genesistest.ValidateStartTime
-	delegatorEndTime := delegatorStartTime.Add(genesistest.MinStakingDuration)
+	delegatorEndTime := delegatorStartTime.Add(configtest.MinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
@@ -551,7 +552,7 @@ func TestGetStake(t *testing.T) {
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
-	pendingStakerEndTime := uint64(genesistest.GenesisTime.Add(genesistest.MinStakingDuration).Unix())
+	pendingStakerEndTime := uint64(genesistest.GenesisTime.Add(configtest.MinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
 		stakeAmount,
 		uint64(genesistest.GenesisTime.Unix()),
@@ -632,7 +633,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := genesistest.GenesisNodeIDs[1]
 	delegatorStartTime := genesistest.ValidateStartTime
-	delegatorEndTime := genesistest.ValidateStartTime.Add(genesistest.MinStakingDuration)
+	delegatorEndTime := genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -38,19 +39,10 @@ var (
 	GenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// time that genesis validators start validating
-	ValidateStartTime  = GenesisTime
-	MinStakingDuration = 24 * time.Hour
-	MaxStakingDuration = 365 * 24 * time.Hour
+	ValidateStartTime = GenesisTime
 
 	// time that genesis validators stop validating
-	ValidateEndTime = ValidateStartTime.Add(20 * MinStakingDuration)
-
-	MinValidatorStake = 5 * units.MilliAvax
-	MaxValidatorStake = 500 * units.MilliAvax
-
-	// amount all genesis validators have in defaultVM
-	Balance = 100 * MinValidatorStake
-	Weight  = MinValidatorStake
+	ValidateEndTime = ValidateStartTime.Add(20 * configtest.MinStakingDuration)
 )
 
 func init() {
@@ -77,7 +69,7 @@ func Genesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byte) {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(Balance),
+			Amount:  json.Uint64(configtest.Balance),
 			Address: addr,
 		}
 	}
@@ -97,7 +89,7 @@ func Genesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byte) {
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(Weight),
+				Amount:  json.Uint64(configtest.Weight),
 				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,

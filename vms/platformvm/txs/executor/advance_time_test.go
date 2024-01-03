@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -35,7 +36,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.ValidateStartTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesistest.MinStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	addPendingValidatorTx, err := addPendingValidator(
 		env,
@@ -123,7 +124,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.GenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesistest.MinStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*secp256k1.PrivateKey{genesistest.Keys[0]})
 	require.NoError(err)
@@ -215,12 +216,12 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	staker1 := staker{
 		nodeID:    ids.GenerateTestNodeID(),
 		startTime: genesistest.ValidateStartTime.Add(1 * time.Minute),
-		endTime:   genesistest.ValidateStartTime.Add(10 * genesistest.MinStakingDuration).Add(1 * time.Minute),
+		endTime:   genesistest.ValidateStartTime.Add(10 * configtest.MinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:    ids.GenerateTestNodeID(),
 		startTime: staker1.startTime.Add(1 * time.Minute),
-		endTime:   staker1.startTime.Add(1 * time.Minute).Add(genesistest.MinStakingDuration),
+		endTime:   staker1.startTime.Add(1 * time.Minute).Add(configtest.MinStakingDuration),
 	}
 	staker3 := staker{
 		nodeID:    ids.GenerateTestNodeID(),
@@ -240,7 +241,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	staker5 := staker{
 		nodeID:    ids.GenerateTestNodeID(),
 		startTime: staker2.endTime,
-		endTime:   staker2.endTime.Add(genesistest.MinStakingDuration),
+		endTime:   staker2.endTime.Add(configtest.MinStakingDuration),
 	}
 
 	tests := []test{
@@ -471,7 +472,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := genesistest.GenesisNodeIDs[0]
 	subnetVdr1StartTime := genesistest.ValidateStartTime
-	subnetVdr1EndTime := genesistest.ValidateStartTime.Add(genesistest.MinStakingDuration)
+	subnetVdr1EndTime := genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
@@ -503,8 +504,8 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetVdr2NodeID := genesistest.GenesisNodeIDs[1]
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
-		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                     // Start time
-		uint64(subnetVdr1EndTime.Add(time.Second).Add(genesistest.MinStakingDuration).Unix()), // end time
+		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                    // Start time
+		uint64(subnetVdr1EndTime.Add(time.Second).Add(configtest.MinStakingDuration).Unix()), // end time
 		subnetVdr2NodeID, // Node ID
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]}, // Keys
@@ -578,7 +579,7 @@ func TestTrackedSubnet(t *testing.T) {
 			subnetValidatorNodeID := genesistest.GenesisNodeIDs[0]
 
 			subnetVdr1StartTime := genesistest.ValidateStartTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := genesistest.ValidateStartTime.Add(10 * genesistest.MinStakingDuration).Add(1 * time.Minute)
+			subnetVdr1EndTime := genesistest.ValidateStartTime.Add(10 * configtest.MinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
@@ -642,7 +643,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.ValidateStartTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesistest.MaxStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	_, err := addPendingValidator(
 		env,
@@ -749,7 +750,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.ValidateStartTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(genesistest.MinStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(configtest.MinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*secp256k1.PrivateKey{genesistest.Keys[0]})
 	require.NoError(err)
@@ -782,7 +783,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
-	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(genesistest.MinStakingDuration)
+	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(configtest.MinStakingDuration)
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
 		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),

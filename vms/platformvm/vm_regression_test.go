@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -180,23 +181,23 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
-	validatorStake := genesistest.MaxValidatorStake / 5
+	validatorStake := configtest.MaxValidatorStake / 5
 
 	delegator1StartTime := validatorStartTime
-	delegator1EndTime := delegator1StartTime.Add(3 * genesistest.MinStakingDuration)
-	delegator1Stake := genesistest.MinValidatorStake
+	delegator1EndTime := delegator1StartTime.Add(3 * configtest.MinStakingDuration)
+	delegator1Stake := configtest.MinValidatorStake
 
-	delegator2StartTime := validatorStartTime.Add(1 * genesistest.MinStakingDuration)
-	delegator2EndTime := delegator1StartTime.Add(6 * genesistest.MinStakingDuration)
-	delegator2Stake := genesistest.MinValidatorStake
+	delegator2StartTime := validatorStartTime.Add(1 * configtest.MinStakingDuration)
+	delegator2EndTime := delegator1StartTime.Add(6 * configtest.MinStakingDuration)
+	delegator2Stake := configtest.MinValidatorStake
 
-	delegator3StartTime := validatorStartTime.Add(2 * genesistest.MinStakingDuration)
-	delegator3EndTime := delegator1StartTime.Add(4 * genesistest.MinStakingDuration)
-	delegator3Stake := genesistest.MaxValidatorStake - validatorStake - 2*genesistest.MinValidatorStake
+	delegator3StartTime := validatorStartTime.Add(2 * configtest.MinStakingDuration)
+	delegator3EndTime := delegator1StartTime.Add(4 * configtest.MinStakingDuration)
+	delegator3Stake := configtest.MaxValidatorStake - validatorStake - 2*configtest.MinValidatorStake
 
-	delegator4StartTime := validatorStartTime.Add(5 * genesistest.MinStakingDuration)
-	delegator4EndTime := delegator1StartTime.Add(7 * genesistest.MinStakingDuration)
-	delegator4Stake := genesistest.MaxValidatorStake - validatorStake - genesistest.MinValidatorStake
+	delegator4StartTime := validatorStartTime.Add(5 * configtest.MinStakingDuration)
+	delegator4EndTime := delegator1StartTime.Add(7 * configtest.MinStakingDuration)
+	delegator4Stake := configtest.MaxValidatorStake - validatorStake - configtest.MinValidatorStake
 
 	tests := []struct {
 		name    string
@@ -368,8 +369,8 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       genesistest.MinStakingDuration,
-		MaxStakeDuration:       genesistest.MaxStakingDuration,
+		MinStakeDuration:       configtest.MinStakingDuration,
+		MaxStakeDuration:       configtest.MaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              latestForkTime,
 		CortinaTime:            mockable.MaxTime,
@@ -495,7 +496,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	nodeID := ids.GenerateTestNodeID()
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
-	newValidatorEndTime := newValidatorStartTime.Add(genesistest.MinStakingDuration)
+	newValidatorEndTime := newValidatorStartTime.Add(configtest.MinStakingDuration)
 
 	// Create the tx to add a new validator
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
@@ -704,7 +705,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
-	newValidatorEndTime0 := newValidatorStartTime0.Add(genesistest.MaxStakingDuration)
+	newValidatorEndTime0 := newValidatorStartTime0.Add(configtest.MaxStakingDuration)
 
 	nodeID0 := ids.GenerateTestNodeID()
 
@@ -876,7 +877,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.Equal(choices.Processing, importBlkStatus)
 
 	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
-	newValidatorEndTime1 := newValidatorStartTime1.Add(genesistest.MaxStakingDuration)
+	newValidatorEndTime1 := newValidatorStartTime1.Add(configtest.MaxStakingDuration)
 
 	nodeID1 := ids.GenerateTestNodeID()
 
@@ -1021,11 +1022,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
-		genesistest.GenesisNodeIDs[0]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[1]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[2]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[3]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[4]: genesistest.Weight,
+		genesistest.GenesisNodeIDs[0]: configtest.Weight,
+		genesistest.GenesisNodeIDs[1]: configtest.Weight,
+		genesistest.GenesisNodeIDs[2]: configtest.Weight,
+		genesistest.GenesisNodeIDs[3]: configtest.Weight,
+		genesistest.GenesisNodeIDs[4]: configtest.Weight,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1034,7 +1035,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
-	newValidatorEndTime0 := newValidatorStartTime0.Add(genesistest.MaxStakingDuration)
+	newValidatorEndTime0 := newValidatorStartTime0.Add(configtest.MaxStakingDuration)
 
 	extraNodeID := ids.GenerateTestNodeID()
 
@@ -1119,11 +1120,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
-		genesistest.GenesisNodeIDs[0]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[1]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[2]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[3]: genesistest.Weight,
-		genesistest.GenesisNodeIDs[4]: genesistest.Weight,
+		genesistest.GenesisNodeIDs[0]: configtest.Weight,
+		genesistest.GenesisNodeIDs[1]: configtest.Weight,
+		genesistest.GenesisNodeIDs[2]: configtest.Weight,
+		genesistest.GenesisNodeIDs[3]: configtest.Weight,
+		genesistest.GenesisNodeIDs[4]: configtest.Weight,
 		extraNodeID:                   vm.MinValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
@@ -1138,15 +1139,15 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
-	validatorStake := genesistest.MaxValidatorStake / 5
+	validatorStake := configtest.MaxValidatorStake / 5
 
 	delegator1StartTime := validatorStartTime
-	delegator1EndTime := delegator1StartTime.Add(3 * genesistest.MinStakingDuration)
-	delegator1Stake := genesistest.MaxValidatorStake - validatorStake
+	delegator1EndTime := delegator1StartTime.Add(3 * configtest.MinStakingDuration)
+	delegator1Stake := configtest.MaxValidatorStake - validatorStake
 
 	delegator2StartTime := delegator1EndTime
-	delegator2EndTime := delegator2StartTime.Add(3 * genesistest.MinStakingDuration)
-	delegator2Stake := genesistest.MaxValidatorStake - validatorStake
+	delegator2EndTime := delegator2StartTime.Add(3 * configtest.MinStakingDuration)
+	delegator2Stake := configtest.MaxValidatorStake - validatorStake
 
 	vm, _, _ := defaultVM(t, cortinaFork)
 
@@ -1255,7 +1256,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	changeAddr := genesistest.Keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		genesistest.MaxValidatorStake,
+		configtest.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
@@ -1297,7 +1298,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		genesistest.MaxValidatorStake,
+		configtest.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
@@ -1381,7 +1382,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	changeAddr := genesistest.Keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		genesistest.MaxValidatorStake,
+		configtest.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
@@ -1423,7 +1424,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		genesistest.MaxValidatorStake,
+		configtest.MaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
@@ -1491,10 +1492,10 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	var (
 		primaryStartTime   = currentTime.Add(executor.SyncBound)
 		subnetStartTime    = primaryStartTime.Add(executor.SyncBound)
-		subnetEndTime      = subnetStartTime.Add(genesistest.MinStakingDuration)
+		subnetEndTime      = subnetStartTime.Add(configtest.MinStakingDuration)
 		primaryEndTime     = subnetEndTime.Add(time.Second)
 		primaryReStartTime = primaryEndTime.Add(executor.SyncBound)
-		primaryReEndTime   = primaryReStartTime.Add(genesistest.MinStakingDuration)
+		primaryReEndTime   = primaryReStartTime.Add(configtest.MinStakingDuration)
 	)
 
 	// insert primary network validator
@@ -1776,9 +1777,9 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// A primary network validator stake twice
 	var (
 		primaryStartTime1 = currentTime.Add(executor.SyncBound)
-		primaryEndTime1   = primaryStartTime1.Add(genesistest.MinStakingDuration)
+		primaryEndTime1   = primaryStartTime1.Add(configtest.MinStakingDuration)
 		primaryStartTime2 = primaryEndTime1.Add(executor.SyncBound)
-		primaryEndTime2   = primaryStartTime2.Add(genesistest.MinStakingDuration)
+		primaryEndTime2   = primaryStartTime2.Add(configtest.MinStakingDuration)
 	)
 
 	// Add a primary network validator with no BLS key
@@ -1942,10 +1943,10 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	var (
 		primaryStartTime1 = currentTime.Add(executor.SyncBound)
 		subnetStartTime   = primaryStartTime1.Add(executor.SyncBound)
-		subnetEndTime     = subnetStartTime.Add(genesistest.MinStakingDuration)
+		subnetEndTime     = subnetStartTime.Add(configtest.MinStakingDuration)
 		primaryEndTime1   = subnetEndTime.Add(time.Second)
 		primaryStartTime2 = primaryEndTime1.Add(executor.SyncBound)
-		primaryEndTime2   = primaryStartTime2.Add(genesistest.MinStakingDuration)
+		primaryEndTime2   = primaryStartTime2.Add(configtest.MinStakingDuration)
 	)
 
 	// Add a primary network validator with no BLS key
@@ -2159,7 +2160,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	var (
 		primaryStartTime1 = currentTime.Add(executor.SyncBound)
 		subnetStartTime   = primaryStartTime1.Add(executor.SyncBound)
-		subnetEndTime     = subnetStartTime.Add(genesistest.MinStakingDuration)
+		subnetEndTime     = subnetStartTime.Add(configtest.MinStakingDuration)
 		primaryEndTime1   = subnetEndTime.Add(time.Second)
 	)
 
