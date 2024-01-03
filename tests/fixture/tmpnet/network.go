@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// The Network type is defined in this file (network.go - orchestration) and
-// network.go (reading/writing configuration).
+// The Network type is defined in this file (orchestration) and
+// network_config.go (reading/writing configuration).
 
 const (
 	// Constants defining the names of shell variables whose value can
@@ -245,10 +245,7 @@ func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error 
 	if err := node.Start(w); err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
-		stopErr := node.Stop(ctx)
-		if stopErr != nil {
-			err = errors.Join(err, stopErr)
-		}
+		err = errors.Join(err, node.Stop(ctx))
 		return err
 	}
 

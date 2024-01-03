@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-// The Network type is defined in this file (network_config.go - reading/writing configuration) and
-// network.go (network.go - orchestration).
+// The Network type is defined in this file (reading/writing configuration) and network.go
+// (orchestration).
 
 var errMissingNetworkDir = errors.New("failed to write network: missing network directory")
 
