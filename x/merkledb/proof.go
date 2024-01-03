@@ -20,9 +20,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const (
-	verificationCacheSize = math.MaxUint16
-)
+const verificationCacheSize = math.MaxUint16
 
 var (
 	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
