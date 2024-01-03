@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package testsetup
+package genesistest
 
 import (
 	"testing"
@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -38,18 +39,10 @@ var (
 	GenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// time that genesis validators start validating
-	ValidateStartTime  = GenesisTime
-	MinStakingDuration = 24 * time.Hour
-	MaxStakingDuration = 365 * 24 * time.Hour
+	ValidateStartTime = GenesisTime
 
 	// time that genesis validators stop validating
-	ValidateEndTime = ValidateStartTime.Add(20 * MinStakingDuration)
-
-	MinValidatorStake = 5 * units.MilliAvax
-	MaxValidatorStake = 500 * units.MilliAvax
-
-	GenesisUTXOBalance     = 100 * MinValidatorStake // amount in each genesis utxos
-	GenesisValidatorWeight = MinValidatorStake       // weight of each genesis validator
+	ValidateEndTime = ValidateStartTime.Add(20 * configtest.MinStakingDuration)
 )
 
 func init() {
@@ -63,11 +56,11 @@ func init() {
 	}
 }
 
-// [BuildGenesis] is a good default to build genesis for platformVM unit tests
+// [Genesis] is a good default to build genesis for platformVM unit tests
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func BuildGenesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byte) {
+func Genesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(Keys))
@@ -76,7 +69,7 @@ func BuildGenesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byt
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(GenesisUTXOBalance),
+			Amount:  json.Uint64(configtest.Balance),
 			Address: addr,
 		}
 	}
@@ -96,7 +89,7 @@ func BuildGenesis(t testing.TB, ctx *snow.Context) (*api.BuildGenesisArgs, []byt
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(GenesisValidatorWeight),
+				Amount:  json.Uint64(configtest.Weight),
 				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,

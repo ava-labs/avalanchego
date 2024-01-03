@@ -15,15 +15,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(t, ts.ApricotPhase5Fork)
+	env := newEnvironment(t, configtest.ApricotPhase5Fork)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()

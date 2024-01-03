@@ -1,13 +1,18 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package testsetup
+package configtest
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -16,15 +21,53 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
-var (
-	TxFee = uint64(100) // a default Tx Fee
+// Shared Unit test setup utilities for a platform vm packages
 
-	// Many tests add a subnet as soon as they build test env/VM
-	// We single out the fee required to create the subnet to ease up
-	// balance checks. CreateSubnetTxFee will be subtracted from the
-	// initial balance of the key used to create the subnet
-	CreateSubnetTxFee = 100 * TxFee
+type ActiveFork uint8
+
+const (
+	ApricotPhase3Fork ActiveFork = iota
+	ApricotPhase5Fork
+	BanffFork
+	CortinaFork
+	DurangoFork
+
+	LatestFork ActiveFork = DurangoFork
 )
+
+var (
+	MinStakingDuration = 24 * time.Hour
+	MaxStakingDuration = 365 * 24 * time.Hour
+
+	MinValidatorStake = 5 * units.MilliAvax
+	MaxValidatorStake = 500 * units.MilliAvax
+
+	Balance = 100 * MinValidatorStake
+	Weight  = MinValidatorStake
+
+	TxFee = uint64(100) // a default Tx Fee
+)
+
+func Clock(forkTime time.Time) *mockable.Clock {
+	clk := &mockable.Clock{}
+	clk.Set(forkTime)
+	return clk
+}
+
+type MutableSharedMemory struct {
+	atomic.SharedMemory
+}
+
+func Context(tb testing.TB, baseDB database.Database) (*snow.Context, *MutableSharedMemory) {
+	ctx := snowtest.Context(tb, snowtest.PChainID)
+	m := atomic.NewMemory(baseDB)
+	msm := &MutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
+
+	return ctx, msm
+}
 
 func Config(fork ActiveFork, forkTime time.Time) *config.Config {
 	var (

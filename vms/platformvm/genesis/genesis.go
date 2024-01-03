@@ -22,8 +22,6 @@ type Genesis struct {
 	Timestamp     uint64    `serialize:"true"`
 	InitialSupply uint64    `serialize:"true"`
 	Message       string    `serialize:"true"`
-
-	GenesisBytes []byte `serialize:"false"`
 }
 
 func Parse(genesisBytes []byte) (*Genesis, error) {
@@ -41,7 +39,5 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 			return nil, err
 		}
 	}
-
-	gen.GenesisBytes = genesisBytes
 	return gen, nil
 }

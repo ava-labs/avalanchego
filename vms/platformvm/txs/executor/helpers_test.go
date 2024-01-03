@@ -26,7 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -35,8 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 )
 
 var (
@@ -51,7 +51,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *ts.MutableSharedMemory
+	msm            *configtest.MutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	states         map[ids.ID]state.Chain
@@ -74,16 +74,16 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, fork ts.ActiveFork) *environment {
+func newEnvironment(t *testing.T, fork configtest.ActiveFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	forkTime := ts.ValidateStartTime
-	config := ts.Config(fork, forkTime)
-	clk := ts.Clock(forkTime)
+	forkTime := genesistest.ValidateStartTime
+	config := configtest.Config(fork, forkTime)
+	clk := configtest.Clock(forkTime)
 
 	baseDB := versiondb.New(memdb.New())
-	ctx, msm := ts.Context(t, baseDB)
+	ctx, msm := configtest.Context(t, baseDB)
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
@@ -149,12 +149,12 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			ts.SubnetControlKeys[0].PublicKey().Address(),
-			ts.SubnetControlKeys[1].PublicKey().Address(),
-			ts.SubnetControlKeys[2].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[4]},
-		ts.Keys[4].PublicKey().Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
+		genesistest.Keys[4].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -181,7 +181,7 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(

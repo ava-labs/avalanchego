@@ -46,6 +46,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -57,7 +59,6 @@ import (
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -67,12 +68,12 @@ import (
 // Its threshold is 2
 var testSubnet1 *txs.Tx
 
-func defaultVM(t *testing.T, fork ts.ActiveFork) (*VM, database.Database, *ts.MutableSharedMemory) {
+func defaultVM(t *testing.T, fork configtest.ActiveFork) (*VM, database.Database, *configtest.MutableSharedMemory) {
 	require := require.New(t)
 
-	forkTime := ts.GenesisTime.Add(time.Second)
+	forkTime := genesistest.GenesisTime.Add(time.Second)
 	vm := &VM{
-		Config: *ts.Config(fork, forkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
 	baseDB := memdb.New()
@@ -80,11 +81,11 @@ func defaultVM(t *testing.T, fork ts.ActiveFork) (*VM, database.Database, *ts.Mu
 
 	vm.clock.Set(forkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
-	ctx, msm := ts.Context(t, baseDB)
+	ctx, msm := configtest.Context(t, baseDB)
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
@@ -115,12 +116,12 @@ func defaultVM(t *testing.T, fork ts.ActiveFork) (*VM, database.Database, *ts.Mu
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs needed to add validator to this subnet
 		[]ids.ShortID{
-			ts.SubnetControlKeys[0].PublicKey().Address(),
-			ts.SubnetControlKeys[1].PublicKey().Address(),
-			ts.SubnetControlKeys[2].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[4]}, // pays tx fee
-		ts.Keys[4].PublicKey().Address(),    // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]}, // pays tx fee
+		genesistest.Keys[4].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
@@ -138,7 +139,7 @@ func defaultVM(t *testing.T, fork ts.ActiveFork) (*VM, database.Database, *ts.Mu
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -153,7 +154,7 @@ func TestGenesis(t *testing.T) {
 	require.NoError(err)
 	require.Equal(choices.Accepted, genesisBlock.Status())
 
-	genesisState, _ := ts.BuildGenesis(t, vm.ctx)
+	genesisState, _ := genesistest.Genesis(t, vm.ctx)
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
 		_, addrBytes, err := address.ParseBech32(utxo.Address)
@@ -169,7 +170,7 @@ func TestGenesis(t *testing.T) {
 
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
-			id := ts.Keys[4].PublicKey().Address()
+			id := genesistest.Keys[4].PublicKey().Address()
 			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
@@ -181,7 +182,7 @@ func TestGenesis(t *testing.T) {
 	// Ensure current validator set of primary network is correct
 	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
-	for _, nodeID := range ts.GenesisNodeIDs {
+	for _, nodeID := range genesistest.GenesisNodeIDs {
 		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
 		require.True(ok)
 	}
@@ -194,7 +195,7 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -203,7 +204,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	var (
 		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime       = startTime.Add(ts.MinStakingDuration)
+		endTime       = startTime.Add(configtest.MinStakingDuration)
 		nodeID        = ids.GenerateTestNodeID()
 		rewardAddress = ids.GenerateTestShortID()
 	)
@@ -216,7 +217,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -244,7 +245,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.CortinaFork)
+	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -252,8 +253,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}()
 
 	nodeID := ids.GenerateTestNodeID()
-	startTime := ts.GenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
-	endTime := startTime.Add(ts.MinStakingDuration)
+	startTime := genesistest.GenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
+	endTime := startTime.Add(configtest.MinStakingDuration)
 
 	// create invalid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -263,7 +264,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		nodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -297,7 +298,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.CortinaFork)
+	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -306,7 +307,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	var (
 		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime       = startTime.Add(ts.MinStakingDuration)
+		endTime       = startTime.Add(configtest.MinStakingDuration)
 		nodeID        = ids.GenerateTestNodeID()
 		rewardAddress = ids.GenerateTestShortID()
 	)
@@ -319,7 +320,7 @@ func TestAddValidatorReject(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -345,7 +346,7 @@ func TestAddValidatorReject(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		vm.ctx.Lock.Lock()
@@ -354,10 +355,10 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}()
 
 	// Use nodeID that is already in the genesis
-	repeatNodeID := ts.GenesisNodeIDs[0]
+	repeatNodeID := genesistest.GenesisNodeIDs[0]
 
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(ts.MinStakingDuration)
+	endTime := startTime.Add(configtest.MinStakingDuration)
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -367,7 +368,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		repeatNodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -381,7 +382,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -390,20 +391,20 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	var (
 		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime   = startTime.Add(ts.MinStakingDuration)
-		nodeID    = ts.GenesisNodeIDs[0]
+		endTime   = startTime.Add(configtest.MinStakingDuration)
+		nodeID    = genesistest.GenesisNodeIDs[0]
 	)
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that test.Keys[0]
 	// validates primary network ([test.ValidateStartTime, test.ValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.GenesisValidatorWeight,
+		configtest.Weight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
 		testSubnet1.ID(),
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -431,7 +432,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -440,20 +441,20 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 	var (
 		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime   = startTime.Add(ts.MinStakingDuration)
-		nodeID    = ts.GenesisNodeIDs[0]
+		endTime   = startTime.Add(configtest.MinStakingDuration)
+		nodeID    = genesistest.GenesisNodeIDs[0]
 	)
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that test.Keys[0]
 	// validates primary network ([test.ValidateStartTime, test.ValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.GenesisValidatorWeight,
+		configtest.Weight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
 		testSubnet1.ID(),
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[1], ts.SubnetControlKeys[2]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[1], genesistest.SubnetControlKeys[2]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -480,7 +481,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -488,7 +489,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	}()
 
 	// Fast forward clock to time for genesis validators to leave
-	vm.clock.Set(ts.ValidateEndTime)
+	vm.clock.Set(genesistest.ValidateEndTime)
 
 	// Advance time and create proposal to reward a genesis validator
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -527,7 +528,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.state.GetTimestamp()
-	require.Equal(ts.ValidateEndTime.Unix(), timestamp.Unix())
+	require.Equal(genesistest.ValidateEndTime.Unix(), timestamp.Unix())
 
 	// Verify that rewarded validator has been removed.
 	// Note that test genesis has multiple validators
@@ -552,7 +553,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -560,7 +561,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	}()
 
 	// Fast forward clock to time for genesis validators to leave
-	vm.clock.Set(ts.ValidateEndTime)
+	vm.clock.Set(genesistest.ValidateEndTime)
 
 	// Advance time and create proposal to reward a genesis validator
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -600,7 +601,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.state.GetTimestamp()
-	require.Equal(ts.ValidateEndTime.Unix(), timestamp.Unix())
+	require.Equal(genesistest.ValidateEndTime.Unix(), timestamp.Unix())
 
 	// Verify that rewarded validator has been removed.
 	// Note that test genesis has multiple validators
@@ -625,7 +626,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -638,7 +639,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -651,7 +652,7 @@ func TestCreateChain(t *testing.T) {
 		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
 		nil,
 		"name",
-		[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
+		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -690,22 +691,22 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ts.GenesisNodeIDs[0]
+	nodeID := genesistest.GenesisNodeIDs[0]
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
 		[]ids.ShortID{ // control test.Keys
-			ts.SubnetControlKeys[0].PublicKey().Address(),
-			ts.SubnetControlKeys[1].PublicKey().Address(),
+			genesistest.SubnetControlKeys[0].PublicKey().Address(),
+			genesistest.SubnetControlKeys[1].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[0]}, // payer
-		ts.Keys[0].PublicKey().Address(),    // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]}, // payer
+		genesistest.Keys[0].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
 
@@ -739,15 +740,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(ts.MinStakingDuration)
+	endTime := startTime.Add(configtest.MinStakingDuration)
 	// [startTime, endTime] is subset of time test.Keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.GenesisValidatorWeight,
+		configtest.Weight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -791,7 +792,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, baseDB, mutableSharedMemory := defaultVM(t, ts.LatestFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -803,7 +804,7 @@ func TestAtomicImport(t *testing.T) {
 		OutputIndex: 1,
 	}
 	amount := uint64(50000)
-	recipientKey := ts.Keys[1]
+	recipientKey := genesistest.Keys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
@@ -813,7 +814,7 @@ func TestAtomicImport(t *testing.T) {
 	_, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.ErrorIs(err, txbuilder.ErrNoFunds)
@@ -880,7 +881,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.ApricotPhase3Fork)
+	vm, _, _ := defaultVM(t, configtest.ApricotPhase3Fork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -945,15 +946,15 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstDB := prefixdb.New([]byte{}, db)
 
 	var (
-		fork     = ts.LatestFork
-		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
 	)
 	firstVM := &VM{
-		Config: *ts.Config(fork, forkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
-	firstCtx, _ := ts.Context(t, memdb.New())
-	_, genesisBytes := ts.BuildGenesis(t, firstCtx)
+	firstCtx, _ := configtest.Context(t, memdb.New())
+	_, genesisBytes := genesistest.Genesis(t, firstCtx)
 
 	initialClkTime := forkTime
 	firstVM.clock.Set(initialClkTime)
@@ -1022,10 +1023,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
-		Config: *ts.Config(fork, forkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
-	secondCtx, _ := ts.Context(t, db)
+	secondCtx, _ := configtest.Context(t, db)
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -1063,18 +1064,18 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	var (
-		fork     = ts.LatestFork
-		forkTime = ts.ValidateEndTime.Add(-2 * time.Second)
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
 	)
 
 	vm := &VM{
-		Config: *ts.Config(fork, forkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
 	initialClkTime := forkTime
 	vm.clock.Set(initialClkTime)
-	ctx, _ := ts.Context(t, baseDB)
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	ctx, _ := configtest.Context(t, baseDB)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 
 	consensusCtx := snowtest.ConsensusContext(ctx)
 	ctx.Lock.Lock()
@@ -1397,24 +1398,24 @@ func TestUnverifiedParent(t *testing.T) {
 	baseDB := memdb.New()
 
 	var (
-		fork     = ts.LatestFork
-		forkTime = ts.ValidateStartTime
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateStartTime
 	)
 
 	vm := &VM{
-		Config: *ts.Config(fork, forkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
 	initialClkTime := forkTime
 	vm.clock.Set(initialClkTime)
-	ctx, _ := ts.Context(t, baseDB)
+	ctx, _ := configtest.Context(t, baseDB)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 
 	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
@@ -1501,14 +1502,14 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ts.GenesisNodeIDs[0]
+	nodeID := genesistest.GenesisNodeIDs[0]
 
 	tests := []struct {
 		description string
@@ -1517,23 +1518,23 @@ func TestMaxStakeAmount(t *testing.T) {
 	}{
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   ts.ValidateStartTime,
-			endTime:     ts.ValidateEndTime,
+			startTime:   genesistest.ValidateStartTime,
+			endTime:     genesistest.ValidateEndTime,
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   ts.ValidateStartTime.Add(time.Minute),
-			endTime:     ts.ValidateEndTime,
+			startTime:   genesistest.ValidateStartTime.Add(time.Minute),
+			endTime:     genesistest.ValidateEndTime,
 		},
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   ts.ValidateStartTime,
-			endTime:     ts.ValidateEndTime.Add(-time.Minute),
+			startTime:   genesistest.ValidateStartTime,
+			endTime:     genesistest.ValidateEndTime.Add(-time.Minute),
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   ts.ValidateStartTime.Add(time.Minute),
-			endTime:     ts.ValidateEndTime.Add(-time.Minute),
+			startTime:   genesistest.ValidateStartTime.Add(time.Minute),
+			endTime:     genesistest.ValidateEndTime.Add(-time.Minute),
 		},
 	}
 
@@ -1545,7 +1546,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
 			require.NoError(err)
-			require.Equal(ts.GenesisValidatorWeight, amount)
+			require.Equal(configtest.Weight, amount)
 		})
 	}
 }
@@ -1557,9 +1558,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	const firstUptimePercentage = 20 // 20%
 
 	var (
-		fork     = ts.LatestFork
-		forkTime = ts.ValidateStartTime
-		firstCfg = ts.Config(fork, forkTime)
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateStartTime
+		firstCfg = configtest.Config(fork, forkTime)
 
 		firstDB = prefixdb.New([]byte{}, db)
 	)
@@ -1567,10 +1568,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCfg.UptimePercentage = firstUptimePercentage / 100.
 	firstVM := &VM{Config: *firstCfg}
 
-	firstCtx, _ := ts.Context(t, db)
+	firstCtx, _ := configtest.Context(t, db)
 	firstCtx.Lock.Lock()
 
-	_, genesisBytes := ts.BuildGenesis(t, firstCtx)
+	_, genesisBytes := genesistest.Genesis(t, firstCtx)
 
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
@@ -1592,8 +1593,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
-	durationForReward := ts.ValidateEndTime.Sub(ts.ValidateStartTime) * firstUptimePercentage / 100
-	vmStopTime := ts.ValidateStartTime.Add(durationForReward)
+	durationForReward := genesistest.ValidateEndTime.Sub(genesistest.ValidateStartTime) * firstUptimePercentage / 100
+	vmStopTime := genesistest.ValidateStartTime.Add(durationForReward)
 	firstVM.clock.Set(vmStopTime)
 
 	// Shutdown VM to stop all genesis validator uptime.
@@ -1606,11 +1607,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Reset vm config for the second VM
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondCfg := ts.Config(fork, forkTime)
+	secondCfg := configtest.Config(fork, forkTime)
 	secondCfg.UptimePercentage = secondUptimePercentage / 100.
 	secondVM := &VM{Config: *secondCfg}
 
-	secondCtx, _ := ts.Context(t, db)
+	secondCtx, _ := configtest.Context(t, db)
 	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
@@ -1641,7 +1642,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
 
 	// after restart and change of uptime required for reward, push validators to their end of life
-	secondVM.clock.Set(ts.ValidateEndTime)
+	secondVM.clock.Set(genesistest.ValidateEndTime)
 
 	// evaluate a genesis validator for reward
 	blk, err := secondVM.Builder.BuildBlock(context.Background())
@@ -1697,20 +1698,20 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	db := memdb.New()
 
 	var (
-		fork     = ts.LatestFork
-		forkTime = ts.ValidateStartTime
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateStartTime
 	)
 
-	cfg := ts.Config(fork, forkTime)
+	cfg := configtest.Config(fork, forkTime)
 	cfg.UptimePercentage = .2
 	vm := &VM{
 		Config: *cfg,
 	}
 
-	ctx, _ := ts.Context(t, db)
+	ctx, _ := configtest.Context(t, db)
 	ctx.Lock.Lock()
 
-	_, genesisBytes := ts.BuildGenesis(t, ctx)
+	_, genesisBytes := genesistest.Genesis(t, ctx)
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
@@ -1742,7 +1743,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
-	vm.clock.Set(ts.ValidateEndTime)
+	vm.clock.Set(genesistest.ValidateEndTime)
 
 	// evaluate a genesis validator for reward
 	blk, err := vm.Builder.BuildBlock(context.Background())
@@ -1796,7 +1797,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1814,14 +1815,14 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		ts.MinValidatorStake,
+		configtest.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
 		id,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].Address(),
 	)
 	require.NoError(err)
 
@@ -1839,8 +1840,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1,
 		[]ids.ShortID{id},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].Address(),
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].Address(),
 	)
 	require.NoError(err)
 
@@ -1856,21 +1857,21 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		ts.MinValidatorStake,
+		configtest.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{key, ts.Keys[1]},
-		ts.Keys[1].Address(),
+		[]*secp256k1.PrivateKey{key, genesistest.Keys[1]},
+		genesistest.Keys[1].Address(),
 	)
 	require.NoError(err)
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		createSubnetTx.ID(),
-		[]*secp256k1.PrivateKey{key, ts.Keys[2]},
-		ts.Keys[2].Address(),
+		[]*secp256k1.PrivateKey{key, genesistest.Keys[2]},
+		genesistest.Keys[2].Address(),
 	)
 	require.NoError(err)
 
@@ -1898,7 +1899,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1908,9 +1909,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	// Create a subnet
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1,
-		[]ids.ShortID{ts.SubnetControlKeys[0].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].Address(),
+		[]ids.ShortID{genesistest.SubnetControlKeys[0].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].Address(),
 	)
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
@@ -1935,7 +1936,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ts.Keys[0].PublicKey().Address(),
+			genesistest.Keys[0].PublicKey().Address(),
 		},
 	}
 	require.Equal(expectedOwner, subnetOwner)
@@ -1943,8 +1944,8 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	transferSubnetOwnershipTx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		1,
-		[]ids.ShortID{ts.Keys[1].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]ids.ShortID{genesistest.Keys[1].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
@@ -1969,7 +1970,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			ts.Keys[1].PublicKey().Address(),
+			genesistest.Keys[1].PublicKey().Address(),
 		},
 	}
 	require.Equal(expectedOwner, subnetOwner)
@@ -1977,7 +1978,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 func TestBaseTx(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1992,10 +1993,10 @@ func TestBaseTx(t *testing.T) {
 		secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ts.Keys[1].Address(),
+				genesistest.Keys[1].Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		changeAddr,
 	)
 	require.NoError(err)
@@ -2007,7 +2008,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 		require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
 		castOut := utxo.Out.(*secp256k1fx.TransferOutput)
-		if castOut.AddressesSet().Equals(set.Of(ts.Keys[0].Address())) {
+		if castOut.AddressesSet().Equals(set.Of(genesistest.Keys[0].Address())) {
 			key0InputAmt += castOut.Amt
 		}
 		totalInputAmt += castOut.Amt
@@ -2021,10 +2022,10 @@ func TestBaseTx(t *testing.T) {
 	for _, output := range baseTx.Unsigned.Outputs() {
 		require.IsType(&secp256k1fx.TransferOutput{}, output.Out)
 		castOut := output.Out.(*secp256k1fx.TransferOutput)
-		if castOut.AddressesSet().Equals(set.Of(ts.Keys[0].Address())) {
+		if castOut.AddressesSet().Equals(set.Of(genesistest.Keys[0].Address())) {
 			key0OutputAmt += castOut.Amt
 		}
-		if castOut.AddressesSet().Equals(set.Of(ts.Keys[1].Address())) {
+		if castOut.AddressesSet().Equals(set.Of(genesistest.Keys[1].Address())) {
 			key1OutputAmt += castOut.Amt
 		}
 		if castOut.AddressesSet().Equals(set.Of(changeAddr)) {
@@ -2054,7 +2055,7 @@ func TestBaseTx(t *testing.T) {
 
 func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, ts.LatestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2070,10 +2071,10 @@ func TestPruneMempool(t *testing.T) {
 		secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ts.Keys[1].Address(),
+				genesistest.Keys[1].Address(),
 			},
 		},
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		changeAddr,
 	)
 	require.NoError(err)
@@ -2094,13 +2095,13 @@ func TestPruneMempool(t *testing.T) {
 	)
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		ts.MinValidatorStake,
+		configtest.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ids.GenerateTestNodeID(),
-		ts.Keys[2].Address(),
+		genesistest.Keys[2].Address(),
 		20000,
-		[]*secp256k1.PrivateKey{ts.Keys[1]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)

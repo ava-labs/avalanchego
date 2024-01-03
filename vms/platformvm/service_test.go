@@ -37,6 +37,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -45,7 +47,6 @@ import (
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	ts "github.com/ava-labs/avalanchego/vms/platformvm/testsetup"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -73,8 +74,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *ts.MutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, ts.LatestFork)
+func defaultService(t *testing.T) (*Service, *configtest.MutableSharedMemory) {
+	vm, _, mutableSharedMemory := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -102,7 +103,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
 	require.NoError(err)
 
-	require.NoError(user.PutKeys(pk, ts.Keys[0]))
+	require.NoError(user.PutKeys(pk, genesistest.Keys[0]))
 }
 
 func TestAddValidator(t *testing.T) {
@@ -275,8 +276,8 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					[]ids.ID{},
 					"chain name",
-					[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
-					ts.Keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
+					genesistest.Keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -286,12 +287,12 @@ func TestGetTx(t *testing.T) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(ts.MinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(configtest.MinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
-					[]*secp256k1.PrivateKey{ts.Keys[0]},
-					ts.Keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+					genesistest.Keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -302,8 +303,8 @@ func TestGetTx(t *testing.T) {
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
-					[]*secp256k1.PrivateKey{ts.Keys[0]},
-					ts.Keys[0].PublicKey().Address(), // change addr
+					[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+					genesistest.Keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -395,7 +396,7 @@ func TestGetBalance(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := ts.BuildGenesis(t, service.vm.ctx)
+	genesis, _ := genesistest.Genesis(t, service.vm.ctx)
 	for idx, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -405,12 +406,11 @@ func TestGetBalance(t *testing.T) {
 		reply := GetBalanceResponse{}
 
 		require.NoError(service.GetBalance(nil, &request, &reply))
-
-		balance := ts.GenesisUTXOBalance
+		balance := configtest.Balance
 		if idx == 4 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = ts.GenesisUTXOBalance - ts.CreateSubnetTxFee
+			balance = configtest.Balance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
 		}
 		require.Equal(json.Uint64(balance), reply.Balance)
 		require.Equal(json.Uint64(balance), reply.Unlocked)
@@ -430,7 +430,7 @@ func TestGetStake(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	g, _ := ts.BuildGenesis(t, service.vm.ctx)
+	g, _ := genesistest.Genesis(t, service.vm.ctx)
 	addrsStrs := []string{}
 	for i, validator := range g.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
@@ -444,7 +444,7 @@ func TestGetStake(t *testing.T) {
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
-		require.Equal(ts.GenesisValidatorWeight, uint64(response.Staked))
+		require.Equal(configtest.Weight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
@@ -456,10 +456,10 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(ts.GenesisValidatorWeight, out.Amount())
+		require.Equal(configtest.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Len(out.Addrs, 1)
-		require.Equal(ts.Keys[i].PublicKey().Address(), out.Addrs[0])
+		require.Equal(genesistest.Keys[i].PublicKey().Address(), out.Addrs[0])
 		require.Zero(out.Locktime)
 	}
 
@@ -472,7 +472,7 @@ func TestGetStake(t *testing.T) {
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.Equal(len(g.Validators)*int(ts.GenesisValidatorWeight), int(response.Staked))
+	require.Equal(len(g.Validators)*int(configtest.Weight), int(response.Staked))
 	require.Len(response.Outputs, len(g.Validators))
 
 	for _, outputStr := range response.Outputs {
@@ -484,29 +484,29 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(ts.GenesisValidatorWeight, out.Amount())
+		require.Equal(configtest.Weight, out.Amount())
 		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
 	}
 
-	oldStake := ts.GenesisValidatorWeight
+	oldStake := configtest.Weight
 
 	service.vm.ctx.Lock.Lock()
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := ts.GenesisNodeIDs[0]
-	delegatorStartTime := ts.ValidateStartTime
-	delegatorEndTime := delegatorStartTime.Add(ts.MinStakingDuration)
+	delegatorNodeID := genesistest.GenesisNodeIDs[0]
+	delegatorStartTime := genesistest.ValidateStartTime
+	delegatorEndTime := delegatorStartTime.Add(configtest.MinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
 		uint64(delegatorEndTime.Unix()),
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
 
@@ -526,7 +526,7 @@ func TestGetStake(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.addrManager.FormatLocalAddress(ts.Keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(genesistest.Keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	require.NoError(service.GetStake(nil, &args, &response))
 	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
@@ -552,16 +552,16 @@ func TestGetStake(t *testing.T) {
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
-	pendingStakerEndTime := uint64(ts.GenesisTime.Add(ts.MinStakingDuration).Unix())
+	pendingStakerEndTime := uint64(genesistest.GenesisTime.Add(configtest.MinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
 		stakeAmount,
-		uint64(ts.GenesisTime.Unix()),
+		uint64(genesistest.GenesisTime.Unix()),
 		pendingStakerEndTime,
 		pendingStakerNodeID,
 		ids.GenerateTestShortID(),
 		0,
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
 
@@ -605,7 +605,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	genesis, _ := ts.BuildGenesis(t, service.vm.ctx)
+	genesis, _ := genesistest.Genesis(t, service.vm.ctx)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
@@ -631,9 +631,9 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := ts.GenesisNodeIDs[1]
-	delegatorStartTime := ts.ValidateStartTime
-	delegatorEndTime := ts.ValidateStartTime.Add(ts.MinStakingDuration)
+	validatorNodeID := genesistest.GenesisNodeIDs[1]
+	delegatorStartTime := genesistest.ValidateStartTime
+	delegatorEndTime := genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 
@@ -643,8 +643,8 @@ func TestGetCurrentValidators(t *testing.T) {
 		uint64(delegatorEndTime.Unix()),
 		validatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*secp256k1.PrivateKey{ts.Keys[0]},
-		ts.Keys[0].PublicKey().Address(), // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		genesistest.Keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
 
@@ -777,7 +777,7 @@ func TestGetBlock(t *testing.T) {
 				service.vm.ctx.Lock.Unlock()
 			}()
 
-			service.vm.Config.CreateAssetTxFee = 100 * ts.TxFee
+			service.vm.Config.CreateAssetTxFee = 100 * configtest.TxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
@@ -786,8 +786,8 @@ func TestGetBlock(t *testing.T) {
 				constants.AVMID,
 				[]ids.ID{},
 				"chain name",
-				[]*secp256k1.PrivateKey{ts.SubnetControlKeys[0], ts.SubnetControlKeys[1]},
-				ts.Keys[0].PublicKey().Address(), // change addr
+				[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
+				genesistest.Keys[0].PublicKey().Address(), // change addr
 			)
 			require.NoError(err)
 
