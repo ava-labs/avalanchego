@@ -5,6 +5,7 @@ package state
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -51,7 +53,7 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		return nil, err
 	}
 
-	ctx := buildStateCtx()
+	ctx := snowtest.Context(&testing.T{}, snowtest.PChainID)
 
 	genesisBytes, err := buildGenesisTest(ctx)
 	if err != nil {
@@ -63,22 +65,12 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		baseDB,
 		genesisBytes,
 		prometheus.NewRegistry(),
-		cfg.Validators,
+		cfg,
 		execConfig,
 		ctx,
 		metrics.Noop,
 		rewardsCalc,
 	)
-}
-
-func buildStateCtx() *snow.Context {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
-
-	return ctx
 }
 
 func defaultConfig() *config.Config {
