@@ -23,9 +23,9 @@ struct Args {
     #[arg(short, long, default_value = "32", value_parser = string_to_range)]
     datalen: RangeInclusive<usize>,
     #[arg(short, long, default_value_t = 1)]
-    batch_keys: usize,
+    batch_size: usize,
     #[arg(short, long, default_value_t = 100)]
-    inserts: usize,
+    number_of_batches: usize,
     #[arg(short, long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
     read_verify_percent: u16,
     #[arg(short, long)]
@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await
         .expect("db initiation should succeed");
 
-    let keys = args.batch_keys;
+    let keys = args.batch_size;
     let start = Instant::now();
 
     let mut rng = if let Some(seed) = args.seed {
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         rand::rngs::StdRng::from_entropy()
     };
 
-    for _ in 0..args.inserts {
+    for _ in 0..args.number_of_batches {
         let keylen = rng.gen_range(args.keylen.clone());
         let datalen = rng.gen_range(args.datalen.clone());
         let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let duration = start.elapsed();
     println!(
         "Generated and inserted {} batches of size {keys} in {duration:?}",
-        args.inserts
+        args.number_of_batches
     );
 
     Ok(())
