@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -11,18 +11,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const codecVersion = 0
+const CodecVersion = 0
 
-// Codec does serialization and deserialization for Warp messages.
-var c codec.Manager
+var Codec codec.Manager
 
 func init() {
-	c = codec.NewManager(math.MaxInt)
+	Codec = codec.NewManager(math.MaxInt)
 	lc := linearcodec.NewCustomMaxLength(math.MaxInt32)
 
 	err := utils.Err(
 		lc.RegisterType(&BitSetSignature{}),
-		c.RegisterCodec(codecVersion, lc),
+		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
 		panic(err)

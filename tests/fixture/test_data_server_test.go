@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fixture
@@ -14,7 +14,7 @@ import (
 
 // Check that funded test keys can be served from an http server to
 // ensure at-most-once allocation when tests are executed in parallel.
-func TestAllocateFundedKeys(t *testing.T) {
+func TestAllocatePreFundedKeys(t *testing.T) {
 	require := require.New(t)
 
 	keys := make([]*secp256k1.PrivateKey, 5)
@@ -25,7 +25,7 @@ func TestAllocateFundedKeys(t *testing.T) {
 	}
 
 	uri, err := ServeTestData(TestData{
-		FundedKeys: keys,
+		PreFundedKeys: keys,
 	})
 	require.NoError(err)
 
@@ -63,7 +63,7 @@ func TestAllocateFundedKeys(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keys, err := AllocateFundedKeys(uri, tc.count)
+			keys, err := AllocatePreFundedKeys(uri, tc.count)
 			require.ErrorIs(err, tc.expectedError)
 
 			addresses := make([]ids.ShortID, len(keys))

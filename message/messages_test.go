@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -122,17 +122,17 @@ func TestMessage(t *testing.T) {
 			bytesSaved:       false,
 		},
 		{
-			desc: "version message with no compression",
-			op:   VersionOp,
+			desc: "Handshake message with no compression",
+			op:   HandshakeOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_Version{
-					Version: &p2p.Version{
+				Message: &p2p.Message_Handshake{
+					Handshake: &p2p.Handshake{
 						NetworkId:      uint32(1337),
 						MyTime:         uint64(nowUnix),
 						IpAddr:         []byte(net.IPv6zero),
 						IpPort:         9651,
 						MyVersion:      "v1.2.3",
-						MyVersionTime:  uint64(nowUnix),
+						IpSigningTime:  uint64(nowUnix),
 						Sig:            []byte{'y', 'e', 'e', 't'},
 						TrackedSubnets: [][]byte{testID[:]},
 					},

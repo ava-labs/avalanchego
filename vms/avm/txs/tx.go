@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -18,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+var _ gossip.Gossipable = (*Tx)(nil)
 
 type UnsignedTx interface {
 	snow.ContextInitializable
@@ -72,6 +75,11 @@ func (t *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
 
 // ID returns the unique ID of this tx
 func (t *Tx) ID() ids.ID {
+	return t.TxID
+}
+
+// GossipID returns the unique ID that this tx should use for mempool gossip
+func (t *Tx) GossipID() ids.ID {
 	return t.TxID
 }
 

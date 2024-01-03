@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -25,6 +25,7 @@ type onEvictCache[K comparable, V any] struct {
 	onEviction func(K, V) error
 }
 
+// [size] must always return a positive number.
 func newOnEvictCache[K comparable, V any](
 	maxSize int,
 	size func(K, V) int,

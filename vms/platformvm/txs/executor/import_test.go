@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -22,7 +22,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
@@ -67,7 +67,7 @@ func TestNewImportTx(t *testing.T) {
 					},
 				},
 			}
-			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 			require.NoError(t, err)
 
 			inputID := utxo.InputID()
@@ -118,9 +118,9 @@ func TestNewImportTx(t *testing.T) {
 		},
 		{
 			description:   "attempting to import from C-chain",
-			sourceChainID: cChainID,
+			sourceChainID: env.ctx.CChainID,
 			sharedMemory: fundedSharedMemory(
-				cChainID,
+				env.ctx.CChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},

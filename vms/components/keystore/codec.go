@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
@@ -11,12 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	// CodecVersion is the current default codec version
-	CodecVersion = 0
-)
+const CodecVersion = 0
 
-// Codecs do serialization and deserialization
 var (
 	Codec       codec.Manager
 	LegacyCodec codec.Manager

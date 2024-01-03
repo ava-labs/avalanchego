@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -15,8 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Version is the current default codec version
-const Version = 0
+const CodecVersion = 0
 
 var (
 	Codec codec.Manager
@@ -48,8 +47,8 @@ func init() {
 		errs.Add(RegisterDUnsignedTxsTypes(c))
 	}
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
-		GenesisCodec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(CodecVersion, c),
+		GenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bag
@@ -201,8 +201,8 @@ func TestBagString(t *testing.T) {
 
 	bag.AddCount(elt0, 1337)
 
-	expected := "Bag[int]: (Size = 1337)\n" +
-		"    123: 1337"
+	expected := `Bag[int]: (Size = 1337)
+    123: 1337`
 
 	require.Equal(t, expected, bag.String())
 }

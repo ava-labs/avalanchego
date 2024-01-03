@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -32,12 +33,9 @@ func TestInvalidGenesis(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
+	defer ctx.Lock.Unlock()
 
 	err := vm.Initialize(
 		context.Background(),
@@ -57,7 +55,7 @@ func TestInvalidFx(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -85,7 +83,7 @@ func TestFxInitializationFailure(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -118,12 +116,14 @@ func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	tx := newTx(t, env.genesisBytes, env.vm, "AVAX")
+	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, "AVAX")
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -134,7 +134,9 @@ func TestIssueNFT(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -142,7 +144,7 @@ func TestIssueNFT(t *testing.T) {
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
@@ -167,13 +169,13 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -198,7 +200,7 @@ func TestIssueNFT(t *testing.T) {
 		Unsigned: &txs.OperationTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
-				BlockchainID: chainID,
+				BlockchainID: env.vm.ctx.XChainID,
 			}},
 			Ops: []*txs.Operation{{
 				Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -222,7 +224,7 @@ func TestIssueNFT(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(env.vm.parser.InitializeTx(transferNFTTx))
+	require.NoError(transferNFTTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, transferNFTTx)
 }
 
@@ -237,7 +239,9 @@ func TestIssueProperty(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -245,7 +249,7 @@ func TestIssueProperty(t *testing.T) {
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
@@ -262,13 +266,13 @@ func TestIssueProperty(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -300,7 +304,7 @@ func TestIssueProperty(t *testing.T) {
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -324,13 +328,15 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	env := setup(t, &envConfig{
 		isCustomFeeAsset: true,
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
 
 	// send first asset
-	tx := newTx(t, env.genesisBytes, env.vm, feeAssetName)
+	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, feeAssetName)
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -340,7 +346,9 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	env := setup(t, &envConfig{
 		isCustomFeeAsset: true,
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -352,7 +360,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{
 				// fee asset
 				{
@@ -435,7 +443,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        env.genesisTx.ID(),
@@ -468,7 +476,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        firstTx.ID(),
@@ -538,7 +546,7 @@ func TestIssueImportTx(t *testing.T) {
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
 				Out: &secp256k1fx.TransferOutput{
@@ -593,7 +601,11 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}))
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
@@ -633,7 +645,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
 				Out: &secp256k1fx.TransferOutput{
@@ -698,7 +710,7 @@ func TestIssueExportTx(t *testing.T) {
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -738,7 +750,11 @@ func TestIssueExportTx(t *testing.T) {
 	require.NoError(err)
 	require.Empty(utxoBytes)
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	utxoBytes, _, _, err = peerSharedMemory.Indexed(
 		env.vm.ctx.ChainID,
@@ -770,7 +786,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -813,7 +829,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	_, err := peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)

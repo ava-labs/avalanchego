@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -37,7 +37,7 @@ func (id NodeID) Bytes() []byte {
 }
 
 func (id NodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + id.String() + "\""), nil
+	return []byte(`"` + id.String() + `"`), nil
 }
 
 func (id NodeID) MarshalText() ([]byte, error) {

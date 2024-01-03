@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tx
@@ -11,8 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// Version is the current default codec version
-const Version = 0
+const CodecVersion = 0
 
 var Codec codec.Manager
 
@@ -24,7 +23,7 @@ func init() {
 		c.RegisterType(&Transfer{}),
 		c.RegisterType(&Export{}),
 		c.RegisterType(&Import{}),
-		Codec.RegisterCodec(Version, c),
+		Codec.RegisterCodec(CodecVersion, c),
 	)
 	if err != nil {
 		panic(err)

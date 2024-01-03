@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -91,6 +91,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// Network ID
 	fs.String(NetworkNameKey, constants.MainnetName, "Network ID this node will connect to")
+
+	// ACP flagging
+	fs.IntSlice(ACPSupportKey, nil, "ACPs to support adoption")
+	fs.IntSlice(ACPObjectKey, nil, "ACPs to object adoption")
 
 	// AVAX fees
 	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")

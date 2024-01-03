@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -396,8 +396,11 @@ func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]http.H
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	_, err := vm.client.Connected(ctx, &vmpb.ConnectedRequest{
-		NodeId:  nodeID.Bytes(),
-		Version: nodeVersion.String(),
+		NodeId: nodeID.Bytes(),
+		Name:   nodeVersion.Name,
+		Major:  uint32(nodeVersion.Major),
+		Minor:  uint32(nodeVersion.Minor),
+		Patch:  uint32(nodeVersion.Patch),
 	})
 	return err
 }
@@ -541,14 +544,15 @@ func (vm *VMClient) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 	return err
 }
 
-func (vm *VMClient) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
-	_, err := vm.client.CrossChainAppRequestFailed(
-		ctx,
-		&vmpb.CrossChainAppRequestFailedMsg{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-		},
-	)
+func (vm *VMClient) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
+	msg := &vmpb.CrossChainAppRequestFailedMsg{
+		ChainId:      chainID[:],
+		RequestId:    requestID,
+		ErrorCode:    appErr.Code,
+		ErrorMessage: appErr.Message,
+	}
+
+	_, err := vm.client.CrossChainAppRequestFailed(ctx, msg)
 	return err
 }
 
@@ -589,14 +593,15 @@ func (vm *VMClient) AppResponse(ctx context.Context, nodeID ids.NodeID, requestI
 	return err
 }
 
-func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, err := vm.client.AppRequestFailed(
-		ctx,
-		&vmpb.AppRequestFailedMsg{
-			NodeId:    nodeID.Bytes(),
-			RequestId: requestID,
-		},
-	)
+func (vm *VMClient) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
+	msg := &vmpb.AppRequestFailedMsg{
+		NodeId:       nodeID.Bytes(),
+		RequestId:    requestID,
+		ErrorCode:    appErr.Code,
+		ErrorMessage: appErr.Message,
+	}
+
+	_, err := vm.client.AppRequestFailed(ctx, msg)
 	return err
 }
 

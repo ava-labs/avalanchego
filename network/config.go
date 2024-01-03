@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -125,6 +125,9 @@ type Config struct {
 	MaxClockDifference time.Duration     `json:"maxClockDifference"`
 	PingFrequency      time.Duration     `json:"pingFrequency"`
 	AllowPrivateIPs    bool              `json:"allowPrivateIPs"`
+
+	SupportedACPs set.Set[uint32] `json:"supportedACPs"`
+	ObjectedACPs  set.Set[uint32] `json:"objectedACPs"`
 
 	// The compression type to use when compressing outbound messages.
 	// Assumes all peers support this compression type.

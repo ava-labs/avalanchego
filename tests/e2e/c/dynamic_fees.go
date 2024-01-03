@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -42,14 +42,14 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		privateNetwork := e2e.Env.NewPrivateNetwork()
 
 		ginkgo.By("allocating a pre-funded key")
-		key := privateNetwork.GetConfig().FundedKeys[0]
+		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := evm.GetEthAddress(key)
 
 		ginkgo.By("initializing a coreth client")
-		node := privateNetwork.GetNodes()[0]
+		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
-			NodeID: node.GetID(),
-			URI:    node.GetProcessContext().URI,
+			NodeID: node.NodeID,
+			URI:    node.URI,
 		}
 		ethClient := e2e.NewEthClient(nodeURI)
 

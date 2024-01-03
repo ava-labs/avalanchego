@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -51,12 +51,14 @@ func (a *atomic) CrossChainAppRequestFailed(
 	ctx context.Context,
 	chainID ids.ID,
 	requestID uint32,
+	appErr *common.AppError,
 ) error {
 	h := a.handler.Get()
 	return h.CrossChainAppRequestFailed(
 		ctx,
 		chainID,
 		requestID,
+		appErr,
 	)
 }
 
@@ -96,12 +98,14 @@ func (a *atomic) AppRequestFailed(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
+	appErr *common.AppError,
 ) error {
 	h := a.handler.Get()
 	return h.AppRequestFailed(
 		ctx,
 		nodeID,
 		requestID,
+		appErr,
 	)
 }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -32,6 +32,7 @@ type validatorMetadata struct {
 	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
 	PotentialReward          uint64        `v0:"true"`
 	PotentialDelegateeReward uint64        `v0:"true"`
+	StakerStartTime          uint64        `          v1:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -58,7 +59,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		// potential reward and uptime was stored but potential delegatee reward
 		// was not
 		tmp := preDelegateeRewardMetadata{}
-		if _, err := metadataCodec.Unmarshal(bytes, &tmp); err != nil {
+		if _, err := MetadataCodec.Unmarshal(bytes, &tmp); err != nil {
 			return err
 		}
 
@@ -67,7 +68,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		metadata.PotentialReward = tmp.PotentialReward
 	default:
 		// everything was stored
-		if _, err := metadataCodec.Unmarshal(bytes, metadata); err != nil {
+		if _, err := MetadataCodec.Unmarshal(bytes, metadata); err != nil {
 			return err
 		}
 	}
@@ -130,6 +131,7 @@ type validatorState interface {
 	WriteValidatorMetadata(
 		dbPrimary database.KeyValueWriter,
 		dbSubnet database.KeyValueWriter,
+		codecVersion uint16,
 	) error
 }
 
@@ -230,13 +232,14 @@ func (m *metadata) DeleteValidatorMetadata(vdrID ids.NodeID, subnetID ids.ID) {
 func (m *metadata) WriteValidatorMetadata(
 	dbPrimary database.KeyValueWriter,
 	dbSubnet database.KeyValueWriter,
+	codecVersion uint16,
 ) error {
 	for vdrID, updatedSubnets := range m.updatedMetadata {
 		for subnetID := range updatedSubnets {
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := metadataCodec.Marshal(v0, metadata)
+			metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
 			if err != nil {
 				return err
 			}

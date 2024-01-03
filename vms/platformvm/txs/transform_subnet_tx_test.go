@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -223,7 +223,7 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x03,
 	}
 	var unsignedSimpleTransformTx UnsignedTx = simpleTransformTx
-	unsignedSimpleTransformTxBytes, err := Codec.Marshal(Version, &unsignedSimpleTransformTx)
+	unsignedSimpleTransformTxBytes, err := Codec.Marshal(CodecVersion, &unsignedSimpleTransformTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedSimpleTransformTxBytes, unsignedSimpleTransformTxBytes)
 
@@ -520,7 +520,7 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 	var unsignedComplexTransformTx UnsignedTx = complexTransformTx
-	unsignedComplexTransformTxBytes, err := Codec.Marshal(Version, &unsignedComplexTransformTx)
+	unsignedComplexTransformTxBytes, err := Codec.Marshal(CodecVersion, &unsignedComplexTransformTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexTransformTxBytes, unsignedComplexTransformTxBytes)
 

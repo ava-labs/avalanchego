@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -43,7 +43,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		network := e2e.Env.GetNetwork()
 
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
-			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
+			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
 			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
@@ -91,17 +91,13 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		e2e.WaitForHealthy(node)
 
 		ginkgo.By("retrieving new node's id and pop")
-		infoClient := info.NewClient(node.GetProcessContext().URI)
+		infoClient := info.NewClient(node.URI)
 		nodeID, nodePOP, err := infoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
 
+		// Adding a validator should not break interchain transfer.
+		endTime := time.Now().Add(30 * time.Second)
 		ginkgo.By("adding the new node as a validator", func() {
-			startTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-			// Validation duration doesn't actually matter to this
-			// test - it is only ensuring that adding a validator
-			// doesn't break interchain transfer.
-			endTime := startTime.Add(30 * time.Second)
-
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
@@ -114,7 +110,6 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: nodeID,
-						Start:  uint64(startTime.Unix()),
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
@@ -136,13 +131,8 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			require.NoError(err)
 		})
 
+		// Adding a delegator should not break interchain transfer.
 		ginkgo.By("adding a delegator to the new node", func() {
-			startTime := time.Now().Add(e2e.DefaultValidatorStartTimeDiff)
-			// Delegation duration doesn't actually matter to this
-			// test - it is only ensuring that adding a delegator
-			// doesn't break interchain transfer.
-			endTime := startTime.Add(15 * time.Second)
-
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
@@ -150,7 +140,6 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: nodeID,
-						Start:  uint64(startTime.Unix()),
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
@@ -220,7 +209,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		require.Positive(balance.Cmp(big.NewInt(0)))
 
 		ginkgo.By("stopping validator node to free up resources for a bootstrap check")
-		require.NoError(node.Stop())
+		require.NoError(node.Stop(e2e.DefaultContext()))
 
 		e2e.CheckBootstrapIsPossible(network)
 	})

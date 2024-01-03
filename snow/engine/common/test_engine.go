@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -125,7 +125,7 @@ type EngineTest struct {
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error
 	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys set.Set[uint64]) error
 	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error
@@ -138,7 +138,7 @@ type EngineTest struct {
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error
 }
 
 func (e *EngineTest) Default(cant bool) {
@@ -562,9 +562,9 @@ func (e *EngineTest) CrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	return errCrossChainAppRequest
 }
 
-func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error {
 	if e.CrossChainAppRequestFailedF != nil {
-		return e.CrossChainAppRequestFailedF(ctx, chainID, requestID)
+		return e.CrossChainAppRequestFailedF(ctx, chainID, requestID, appErr)
 	}
 	if !e.CantCrossChainAppRequestFailed {
 		return nil
@@ -614,9 +614,9 @@ func (e *EngineTest) AppResponse(ctx context.Context, nodeID ids.NodeID, request
 	return errAppResponse
 }
 
-func (e *EngineTest) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (e *EngineTest) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error {
 	if e.AppRequestFailedF != nil {
-		return e.AppRequestFailedF(ctx, nodeID, requestID)
+		return e.AppRequestFailedF(ctx, nodeID, requestID, appErr)
 	}
 	if !e.CantAppRequestFailed {
 		return nil

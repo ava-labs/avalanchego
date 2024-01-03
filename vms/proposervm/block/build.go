@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -31,7 +31,7 @@ func BuildUnsigned(
 		timestamp: timestamp,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &block)
+	bytes, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func Build(
 	}
 	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockIntf)
+	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &blockIntf)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func Build(
 		return nil, err
 	}
 
-	block.bytes, err = c.Marshal(codecVersion, &blockIntf)
+	block.bytes, err = Codec.Marshal(CodecVersion, &blockIntf)
 	return block, err
 }
 
@@ -100,7 +100,7 @@ func BuildHeader(
 		Body:   bodyID,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &header)
+	bytes, err := Codec.Marshal(CodecVersion, &header)
 	header.bytes = bytes
 	return &header, err
 }
@@ -117,7 +117,7 @@ func BuildOption(
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &block)
+	bytes, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
 	}

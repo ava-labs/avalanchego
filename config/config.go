@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -81,6 +81,7 @@ var (
 		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
 	}
 
+	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
 	errAuthPasswordTooWeak                    = errors.New("API auth password is not strong enough")
@@ -346,6 +347,25 @@ func getNetworkConfig(
 		allowPrivateIPs = v.GetBool(NetworkAllowPrivateIPsKey)
 	}
 
+	var supportedACPs set.Set[uint32]
+	for _, acp := range v.GetIntSlice(ACPSupportKey) {
+		if acp < 0 || acp > math.MaxInt32 {
+			return network.Config{}, fmt.Errorf("invalid ACP: %d", acp)
+		}
+		supportedACPs.Add(uint32(acp))
+	}
+
+	var objectedACPs set.Set[uint32]
+	for _, acp := range v.GetIntSlice(ACPObjectKey) {
+		if acp < 0 || acp > math.MaxInt32 {
+			return network.Config{}, fmt.Errorf("invalid ACP: %d", acp)
+		}
+		objectedACPs.Add(uint32(acp))
+	}
+	if supportedACPs.Overlaps(objectedACPs) {
+		return network.Config{}, errConflictingACPOpinion
+	}
+
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
 			MaxInboundConnsPerSec: maxInboundConnsPerSec,
@@ -424,6 +444,9 @@ func getNetworkConfig(
 		AllowPrivateIPs:              allowPrivateIPs,
 		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),
 		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
+
+		SupportedACPs: supportedACPs,
+		ObjectedACPs:  objectedACPs,
 
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),

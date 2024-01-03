@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -395,4 +396,47 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(appBytes, innerMsg.AppBytes)
 		},
 	)
+}
+
+func TestAppError(t *testing.T) {
+	require := require.New(t)
+
+	mb, err := newMsgBuilder(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		time.Second,
+	)
+	require.NoError(err)
+
+	nodeID := ids.GenerateTestNodeID()
+	chainID := ids.GenerateTestID()
+	requestID := uint32(1)
+	errorCode := int32(2)
+	errorMessage := "hello world"
+
+	want := &p2p.Message{
+		Message: &p2p.Message_AppError{
+			AppError: &p2p.AppError{
+				ChainId:      chainID[:],
+				RequestId:    requestID,
+				ErrorCode:    errorCode,
+				ErrorMessage: errorMessage,
+			},
+		},
+	}
+
+	outMsg, err := mb.createOutbound(want, compression.TypeNone, false)
+	require.NoError(err)
+
+	got, err := mb.parseInbound(outMsg.Bytes(), nodeID, func() {})
+	require.NoError(err)
+
+	require.Equal(nodeID, got.NodeID())
+	require.Equal(AppErrorOp, got.Op())
+
+	msg, ok := got.Message().(*p2p.AppError)
+	require.True(ok)
+	require.Equal(errorCode, msg.ErrorCode)
+	require.Equal(errorMessage, msg.ErrorMessage)
 }

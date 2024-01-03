@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fixture
@@ -33,7 +33,7 @@ var (
 )
 
 type TestData struct {
-	FundedKeys []*secp256k1.PrivateKey
+	PreFundedKeys []*secp256k1.PrivateKey
 }
 
 // http server allocating resources to tests potentially executing in parallel
@@ -68,14 +68,14 @@ func (s *testDataServer) allocateKeys(w http.ResponseWriter, r *http.Request) {
 	defer s.lock.Unlock()
 
 	// Only fulfill requests for available keys
-	if keyCount > len(s.FundedKeys) {
+	if keyCount > len(s.PreFundedKeys) {
 		http.Error(w, requestedKeyCountExceedsAvailable, http.StatusInternalServerError)
 		return
 	}
 
 	// Allocate the requested number of keys
-	remainingKeys := len(s.FundedKeys) - keyCount
-	allocatedKeys := s.FundedKeys[remainingKeys:]
+	remainingKeys := len(s.PreFundedKeys) - keyCount
+	allocatedKeys := s.PreFundedKeys[remainingKeys:]
 
 	keysDoc := &keysDocument{
 		Keys: allocatedKeys,
@@ -88,7 +88,7 @@ func (s *testDataServer) allocateKeys(w http.ResponseWriter, r *http.Request) {
 
 	// Forget the allocated keys
 	utils.ZeroSlice(allocatedKeys)
-	s.FundedKeys = s.FundedKeys[:remainingKeys]
+	s.PreFundedKeys = s.PreFundedKeys[:remainingKeys]
 }
 
 // Serve test data via http to ensure allocation is synchronized even when
@@ -122,9 +122,9 @@ func ServeTestData(testData TestData) (string, error) {
 	return address, nil
 }
 
-// Retrieve the specified number of funded test keys from the provided URI. A given
+// Retrieve the specified number of pre-funded test keys from the provided URI. A given
 // key is allocated at most once during the life of the test data server.
-func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, error) {
+func AllocatePreFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, error) {
 	if count <= 0 {
 		return nil, errInvalidKeyCount
 	}
@@ -144,13 +144,13 @@ func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, err
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to request funded keys: %w", err)
+		return nil, fmt.Errorf("failed to request pre-funded keys: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response for funded keys: %w", err)
+		return nil, fmt.Errorf("failed to read response for pre-funded keys: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		if strings.TrimSpace(string(body)) == requestedKeyCountExceedsAvailable {
@@ -161,7 +161,7 @@ func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, err
 
 	keysDoc := &keysDocument{}
 	if err := json.Unmarshal(body, keysDoc); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal funded keys: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal pre-funded keys: %w", err)
 	}
 	return keysDoc.Keys, nil
 }

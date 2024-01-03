@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
 func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *testing.T) {
@@ -47,7 +48,8 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 	proVM := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Time{},
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -61,7 +63,7 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	initialState := []byte("genesis state")
 
 	err := proVM.Initialize(

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -82,7 +82,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 				TxID:        ids.GenerateTestID(),
 				OutputIndex: rand.Uint32(),
 			},
-			Asset: avax.Asset{ID: ids.ID{'y', 'e', 'e', 't'}},
+			Asset: avax.Asset{ID: env.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 100000,
 				OutputOwners: secp256k1fx.OutputOwners{

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -166,30 +166,30 @@ func TestSetLen(t *testing.T) {
 
 	s := newSet()
 
-	len := s.Len()
-	require.Zero(len)
+	setLen := s.Len()
+	require.Zero(setLen)
 
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))
 
-	len = s.Len()
-	require.Equal(1, len)
+	setLen = s.Len()
+	require.Equal(1, setLen)
 
 	nodeID1 := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, 1))
 
-	len = s.Len()
-	require.Equal(2, len)
+	setLen = s.Len()
+	require.Equal(2, setLen)
 
 	require.NoError(s.RemoveWeight(nodeID1, 1))
 
-	len = s.Len()
-	require.Equal(1, len)
+	setLen = s.Len()
+	require.Equal(1, setLen)
 
 	require.NoError(s.RemoveWeight(nodeID0, 1))
 
-	len = s.Len()
-	require.Zero(len)
+	setLen = s.Len()
+	require.Zero(setLen)
 }
 
 func TestSetMap(t *testing.T) {
@@ -342,9 +342,9 @@ func TestSetString(t *testing.T) {
 
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1))
 
-	expected := "Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
-		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +
-		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806"
+	expected := `Validator Set: (Size = 2, Weight = 9223372036854775807)
+    Validator[0]: NodeID-111111111111111111116DBWJs, 1
+    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806`
 	result := s.String()
 	require.Equal(expected, result)
 }

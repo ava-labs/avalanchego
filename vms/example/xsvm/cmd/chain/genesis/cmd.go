@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -34,7 +34,7 @@ func genesisFunc(c *cobra.Command, args []string) error {
 		return err
 	}
 
-	genesisBytes, err := genesis.Codec.Marshal(genesis.Version, config.Genesis)
+	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, config.Genesis)
 	if err != nil {
 		return err
 	}

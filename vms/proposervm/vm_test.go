@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
@@ -74,6 +74,7 @@ func init() {
 func initTestProposerVM(
 	t *testing.T,
 	proBlkStartTime time.Time,
+	durangoTime time.Time,
 	minPChainHeight uint64,
 ) (
 	*fullVM,
@@ -136,6 +137,7 @@ func initTestProposerVM(
 		coreVM,
 		Config{
 			ActivationTime:      proBlkStartTime,
+			DurangoTime:         durangoTime,
 			MinimumPChainHeight: minPChainHeight,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -180,8 +182,7 @@ func initTestProposerVM(
 		}, nil
 	}
 
-	ctx := snow.DefaultContextTest()
-	ctx.ChainID = ids.ID{1}
+	ctx := snowtest.Context(t, ids.ID{1})
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -215,13 +216,44 @@ func initTestProposerVM(
 	return coreVM, valState, proVM, coreGenBlk, db
 }
 
+func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
+	var (
+		ctx              = context.Background()
+		childBlockHeight = chainTip.Height() + 1
+		parentTimestamp  = chainTip.Timestamp()
+	)
+
+	for {
+		slot := proposer.TimeToSlot(parentTimestamp, vm.Clock.Time().Truncate(time.Second))
+		delay, err := vm.MinDelayForProposer(
+			ctx,
+			childBlockHeight,
+			pchainHeight,
+			vm.ctx.NodeID,
+			slot,
+		)
+		if err != nil {
+			return err
+		}
+
+		vm.Clock.Set(parentTimestamp.Add(delay))
+		if delay < proposer.MaxLookAheadWindow {
+			return nil
+		}
+	}
+}
+
 // VM.BuildBlock tests section
 
 func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	require := require.New(t)
 
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -253,7 +285,11 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 	require := require.New(t)
 
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -287,7 +323,11 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -320,7 +360,11 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -401,7 +445,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
+	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -412,7 +456,11 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -493,7 +541,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
+	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -505,7 +553,11 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -543,7 +595,11 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -615,7 +671,11 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -681,7 +741,11 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 func TestPreFork_Initialize(t *testing.T) {
 	require := require.New(t)
 
-	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	var (
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
+	)
+	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -700,7 +764,11 @@ func TestPreFork_Initialize(t *testing.T) {
 func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	var (
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -737,8 +805,11 @@ func TestPreFork_BuildBlock(t *testing.T) {
 func TestPreFork_ParseBlock(t *testing.T) {
 	require := require.New(t)
 
-	// setup
-	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	var (
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -773,7 +844,11 @@ func TestPreFork_ParseBlock(t *testing.T) {
 func TestPreFork_SetPreference(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	var (
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -874,6 +949,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -901,7 +977,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}, nil
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -1045,7 +1121,11 @@ func (b *wrappedBlock) Verify(ctx context.Context) error {
 func TestInnerBlockDeduplication(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // disable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1192,7 +1272,7 @@ func TestInnerVMRollback(t *testing.T) {
 		}
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -1219,6 +1299,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -1308,6 +1389,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -1345,7 +1427,11 @@ func TestInnerVMRollback(t *testing.T) {
 func TestBuildBlockDuringWindow(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
+	)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1446,8 +1532,11 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
-	forkTime := time.Unix(0, 0)
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
+	)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1540,8 +1629,11 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 func TestTooFarAdvanced(t *testing.T) {
 	require := require.New(t)
 
-	forkTime := time.Unix(0, 0)
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
+	)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1631,7 +1723,11 @@ func TestTooFarAdvanced(t *testing.T) {
 func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1705,7 +1801,11 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 func TestLaggedPChainHeight(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1795,7 +1895,8 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -1840,7 +1941,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -2004,7 +2105,8 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2049,7 +2151,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
@@ -2165,11 +2267,12 @@ func TestVMInnerBlkCache(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create a VM
-	innerVM := mocks.NewMockChainVM(ctrl)
+	innerVM := block.NewMockChainVM(ctrl)
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Time{},
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2199,7 +2302,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
@@ -2269,8 +2372,11 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	require := require.New(t)
-	forkTime := time.Unix(0, 0)
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -2345,8 +2451,11 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 
 func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 	require := require.New(t)
-	forkTime := time.Unix(0, 0)
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -2385,7 +2494,7 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 
 type blockWithVerifyContext struct {
 	*snowman.MockBlock
-	*mocks.MockWithVerifyContext
+	*block.MockWithVerifyContext
 }
 
 // Ensures that we call [VerifyWithContext] rather than [Verify] on blocks that
@@ -2396,11 +2505,12 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create a VM
-	innerVM := mocks.NewMockChainVM(ctrl)
+	innerVM := block.NewMockChainVM(ctrl)
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Time{},
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2433,7 +2543,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
 	}
 
-	snowCtx := snow.DefaultContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
@@ -2455,7 +2565,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		pChainHeight := uint64(0)
 		innerBlk := blockWithVerifyContext{
 			MockBlock:             snowman.NewMockBlock(ctrl),
-			MockWithVerifyContext: mocks.NewMockWithVerifyContext(ctrl),
+			MockWithVerifyContext: block.NewMockWithVerifyContext(ctrl),
 		}
 		innerBlk.MockWithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(true, nil).Times(2)
 		innerBlk.MockWithVerifyContext.EXPECT().VerifyWithContext(context.Background(),
@@ -2503,7 +2613,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		// false for ShouldVerifyWithContext
 		innerBlk := blockWithVerifyContext{
 			MockBlock:             snowman.NewMockBlock(ctrl),
-			MockWithVerifyContext: mocks.NewMockWithVerifyContext(ctrl),
+			MockWithVerifyContext: block.NewMockWithVerifyContext(ctrl),
 		}
 		innerBlk.MockWithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(false, nil)
 		innerBlk.MockBlock.EXPECT().Verify(gomock.Any()).Return(nil)
@@ -2526,7 +2636,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		// Ensure we call Verify on a block that doesn't have a valid context
 		innerBlk := blockWithVerifyContext{
 			MockBlock:             snowman.NewMockBlock(ctrl),
-			MockWithVerifyContext: mocks.NewMockWithVerifyContext(ctrl),
+			MockWithVerifyContext: block.NewMockWithVerifyContext(ctrl),
 		}
 		innerBlk.MockBlock.EXPECT().Verify(gomock.Any()).Return(nil)
 		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
@@ -2592,7 +2702,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		},
 	}
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = &validators.TestState{
 		T: t,
@@ -2613,7 +2723,8 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2714,6 +2825,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
@@ -2758,6 +2870,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
+			DurangoTime:         mockable.MaxTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: newNumHistoricalBlocks,

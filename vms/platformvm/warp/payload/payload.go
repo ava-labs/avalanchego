@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package payload
@@ -22,7 +22,7 @@ type Payload interface {
 
 func Parse(bytes []byte) (Payload, error) {
 	var payload Payload
-	if _, err := c.Unmarshal(bytes, &payload); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &payload); err != nil {
 		return nil, err
 	}
 	payload.initialize(bytes)
@@ -30,7 +30,7 @@ func Parse(bytes []byte) (Payload, error) {
 }
 
 func initialize(p Payload) error {
-	bytes, err := c.Marshal(codecVersion, &p)
+	bytes, err := Codec.Marshal(CodecVersion, &p)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal %T payload: %w", p, err)
 	}

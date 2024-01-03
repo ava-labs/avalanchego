@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -241,4 +241,43 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 	require.False(iter.Next())
 
 	require.Zero(db.nodeCache.currentSize)
+}
+
+// Test that deleting the empty key and flushing works correctly.
+// Previously, there was a bug that occurred when deleting the empty key
+// if the cache was empty. The size of the cache entry was reported as 0,
+// which caused the cache's currentSize to be 0, so on resize() we didn't
+// call onEviction. This caused the empty key to not be deleted from the baseDB.
+func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
+	require := require.New(t)
+	cacheSize := 200
+	evictionBatchSize := cacheSize
+	baseDB := memdb.New()
+	db := newIntermediateNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+		evictionBatchSize,
+		4,
+	)
+
+	emptyKey := ToKey([]byte{})
+	require.NoError(db.Put(emptyKey, newNode(emptyKey)))
+	require.NoError(db.Flush())
+
+	emptyDBKey := db.constructDBKey(emptyKey)
+	has, err := baseDB.Has(emptyDBKey)
+	require.NoError(err)
+	require.True(has)
+
+	require.NoError(db.Delete(ToKey([]byte{})))
+	require.NoError(db.Flush())
+
+	emptyDBKey = db.constructDBKey(emptyKey)
+	has, err = baseDB.Has(emptyDBKey)
+	require.NoError(err)
+	require.False(has)
 }
