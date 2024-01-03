@@ -43,7 +43,7 @@ func NewBanffCommitBlock(
 			},
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotCommitBlock struct {
@@ -75,5 +75,5 @@ func NewApricotCommitBlock(
 			Hght:   height,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }

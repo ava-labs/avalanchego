@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"syscall"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 

@@ -96,22 +96,3 @@ type ConsensusContext struct {
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
 }
-
-func DefaultContextTest() *Context {
-	sk, err := bls.NewSecretKey()
-	if err != nil {
-		panic(err)
-	}
-	pk := bls.PublicFromSecretKey(sk)
-	return &Context{
-		NetworkID:    0,
-		SubnetID:     ids.Empty,
-		ChainID:      ids.Empty,
-		NodeID:       ids.EmptyNodeID,
-		PublicKey:    pk,
-		Log:          logging.NoLog{},
-		BCLookup:     ids.NewAliaser(),
-		Metrics:      metrics.NewOptionalGatherer(),
-		ChainDataDir: "",
-	}
-}

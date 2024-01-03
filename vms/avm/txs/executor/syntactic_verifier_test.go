@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -32,25 +32,8 @@ var (
 	}
 )
 
-func newContext(t testing.TB) *snow.Context {
-	require := require.New(t)
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.ChainID = ids.GenerateTestID()
-	ctx.XChainID = ctx.ChainID
-	ctx.CChainID = ids.GenerateTestID()
-
-	aliaser := ctx.BCLookup.(ids.Aliaser)
-	require.NoError(aliaser.Alias(ctx.XChainID, "X"))
-	require.NoError(aliaser.Alias(ctx.XChainID, ctx.XChainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-	return ctx
-}
-
 func TestSyntacticVerifierBaseTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
@@ -420,7 +403,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
@@ -1027,7 +1010,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierOperationTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
@@ -1514,7 +1497,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierImportTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
@@ -1912,7 +1895,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierExportTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
