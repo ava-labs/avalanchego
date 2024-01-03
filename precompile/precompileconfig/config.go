@@ -40,12 +40,14 @@ type PredicateContext struct {
 }
 
 // Predicater is an optional interface for StatefulPrecompileContracts to implement.
-// If implemented, the predicate will be enforced on every transaction in a block, prior to
-// the block's execution.
-// If VerifyPredicate returns an error, the block will fail verification with no further processing.
-// WARNING: If you are implementing a custom precompile, beware that coreth
-// will not maintain backwards compatibility of this interface and your code should not
-// rely on this. Designed for use only by precompiles that ship with coreth.
+// If implemented, the predicate will be called for each predicate included in the
+// access list of a transaction.
+// PredicateGas will be called while calculating the IntrinsicGas of a transaction
+// causing it to be dropped if the total gas goes above the tx gas limit.
+// VerifyPredicate is used to populate a bit set of predicates verified prior to
+// block execution, which can be accessed via the StateDB during execution.
+// The bitset is stored in the block, so that historical blocks can be re-verified
+// without calling VerifyPredicate.
 type Predicater interface {
 	PredicateGas(predicateBytes []byte) (uint64, error)
 	VerifyPredicate(predicateContext *PredicateContext, predicateBytes []byte) error
