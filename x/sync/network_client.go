@@ -282,8 +282,7 @@ func (c *networkClient) request(
 		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, ctx.Err()
 	case response = <-handler.responseChan:
-		elapsedSeconds := time.Since(startTime).Seconds()
-		bandwidth := float64(len(response))/elapsedSeconds + epsilon
+		bandwidth := EstimateBandwidth(len(response), startTime)
 		c.peers.TrackBandwidth(nodeID, bandwidth)
 	}
 	if handler.failed {
@@ -297,6 +296,11 @@ func (c *networkClient) request(
 		zap.Int("responseLen", len(response)),
 	)
 	return response, nil
+}
+
+func EstimateBandwidth(msgSize int, requestTime time.Time) float64 {
+	elapsedSeconds := time.Since(requestTime).Seconds()
+	return float64(msgSize)/elapsedSeconds + epsilon
 }
 
 func (c *networkClient) Connected(
