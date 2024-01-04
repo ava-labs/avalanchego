@@ -5,6 +5,7 @@ package hierarchycodec
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -20,6 +21,20 @@ func TestVectors(t *testing.T) {
 func TestMultipleTags(t *testing.T) {
 	for _, test := range codec.MultipleTagsTests {
 		c := New(mockable.MaxTime, []string{"tag1", "tag2"}, defaultMaxSliceLength)
+		test(c, t)
+	}
+}
+
+func TestEnforceSliceLen(t *testing.T) {
+	for _, test := range codec.EnforceSliceLenTests {
+		c := NewDefault(mockable.MaxTime)
+		test(c, t)
+	}
+}
+
+func TestIgnoreSliceLen(t *testing.T) {
+	for _, test := range codec.IgnoreSliceLenTests {
+		c := NewDefault(time.Time{})
 		test(c, t)
 	}
 }
