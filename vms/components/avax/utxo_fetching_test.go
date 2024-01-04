@@ -5,6 +5,7 @@ package avax
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -39,7 +40,7 @@ func TestFetchUTXOs(t *testing.T) {
 		},
 	}
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
 
 	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
@@ -72,7 +73,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	addr2 := ids.GenerateTestShortID()
 	addrs := set.Of(addr0, addr1)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
 
 	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))

@@ -6,6 +6,7 @@ package executor
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -36,6 +37,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},
@@ -393,6 +395,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},
@@ -761,6 +764,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},
@@ -877,6 +881,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 	typeToFxIndex := make(map[reflect.Type]int)
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},

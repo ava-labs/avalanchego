@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -72,14 +73,16 @@ type TypeCodec interface {
 //  7. nil slices are marshaled as empty slices
 type genericCodec struct {
 	typer       TypeCodec
+	durangoTime time.Time // Time after which [maxSliceLen] will be ignored
 	maxSliceLen uint32
 	fielder     StructFielder
 }
 
 // New returns a new, concurrency-safe codec
-func New(typer TypeCodec, tagNames []string, maxSliceLen uint32) codec.Codec {
+func New(typer TypeCodec, tagNames []string, durangoTime time.Time, maxSliceLen uint32) codec.Codec {
 	return &genericCodec{
 		typer:       typer,
+		durangoTime: durangoTime,
 		maxSliceLen: maxSliceLen,
 		fielder:     NewStructFielder(tagNames),
 	}
@@ -361,7 +364,14 @@ func (c *genericCodec) marshal(
 		return p.Err
 	case reflect.Slice:
 		numElts := value.Len() // # elements in the slice/array. 0 if this slice is nil.
-		if uint32(numElts) > c.maxSliceLen {
+		if numElts > math.MaxInt32 {
+			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts,
+				math.MaxInt32,
+			)
+		}
+		if time.Now().Before(c.durangoTime) && uint32(numElts) > c.maxSliceLen {
 			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
 				codec.ErrMaxSliceLenExceeded,
 				numElts,
@@ -391,19 +401,12 @@ func (c *genericCodec) marshal(
 		}
 		return nil
 	case reflect.Array:
-		numElts := value.Len()
 		if elemKind := value.Type().Kind(); elemKind == reflect.Uint8 {
 			sliceVal := value.Convert(reflect.TypeOf([]byte{}))
 			p.PackFixedBytes(sliceVal.Bytes())
 			return p.Err
 		}
-		if uint32(numElts) > c.maxSliceLen {
-			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
-				codec.ErrMaxSliceLenExceeded,
-				numElts,
-				c.maxSliceLen,
-			)
-		}
+		numElts := value.Len()
 		for i := 0; i < numElts; i++ { // Process each element in the array
 			if err := c.marshal(value.Index(i), p, typeStack); err != nil {
 				return err
@@ -424,7 +427,14 @@ func (c *genericCodec) marshal(
 	case reflect.Map:
 		keys := value.MapKeys()
 		numElts := len(keys)
-		if uint32(numElts) > c.maxSliceLen {
+		if numElts > math.MaxInt32 {
+			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts,
+				math.MaxInt32,
+			)
+		}
+		if time.Now().Before(c.durangoTime) && uint32(numElts) > c.maxSliceLen {
 			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
 				codec.ErrMaxSliceLenExceeded,
 				numElts,
@@ -586,18 +596,18 @@ func (c *genericCodec) unmarshal(
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
 		}
-		if numElts32 > c.maxSliceLen {
-			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
-				codec.ErrMaxSliceLenExceeded,
-				numElts32,
-				c.maxSliceLen,
-			)
-		}
 		if numElts32 > math.MaxInt32 {
 			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
 				codec.ErrMaxSliceLenExceeded,
 				numElts32,
 				math.MaxInt32,
+			)
+		}
+		if time.Now().Before(c.durangoTime) && numElts32 > c.maxSliceLen {
+			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts32,
+				c.maxSliceLen,
 			)
 		}
 		numElts := int(numElts32)
@@ -694,7 +704,14 @@ func (c *genericCodec) unmarshal(
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal map: %w", p.Err)
 		}
-		if numElts32 > c.maxSliceLen {
+		if numElts32 > math.MaxInt32 {
+			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts32,
+				math.MaxInt32,
+			)
+		}
+		if time.Now().Before(c.durangoTime) && numElts32 > c.maxSliceLen {
 			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
 				codec.ErrMaxSliceLenExceeded,
 				numElts32,
