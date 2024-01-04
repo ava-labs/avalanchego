@@ -382,11 +382,11 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     }
 }
 
-impl DbRev<MutStore> {
-    pub fn into_shared(self) -> DbRev<SharedStore> {
+impl From<DbRev<MutStore>> for DbRev<SharedStore> {
+    fn from(value: DbRev<MutStore>) -> Self {
         DbRev {
-            header: self.header,
-            merkle: self.merkle.into(),
+            header: value.header,
+            merkle: value.merkle.into(),
         }
     }
 }
@@ -470,7 +470,7 @@ impl Db {
     }
 
     /// Open a database.
-    pub fn new_internal<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, DbError> {
+    fn new_internal<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, DbError> {
         let open_options = if cfg.truncate {
             file::Options::Truncate
         } else {

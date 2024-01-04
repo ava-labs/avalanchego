@@ -72,9 +72,9 @@ pub struct Merkle<S, T> {
     phantom: PhantomData<T>,
 }
 
-impl<T> Merkle<MutStore, T> {
-    pub fn into(self) -> Merkle<SharedStore, T> {
-        let store = self.store.into_shared();
+impl<T> From<Merkle<MutStore, T>> for Merkle<SharedStore, T> {
+    fn from(value: Merkle<MutStore, T>) -> Self {
+        let store = value.store.into();
         Merkle {
             store: Box::new(store),
             phantom: PhantomData,

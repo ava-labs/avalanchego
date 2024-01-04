@@ -215,7 +215,7 @@ impl Proposal {
             revisions.inner.pop_back();
         }
 
-        revisions.base_revision = Arc::new(rev.into_shared());
+        revisions.base_revision = Arc::new(rev.into());
 
         // update the rolling window of root hashes
         revisions.root_hashes.push_front(kv_root_hash.clone());

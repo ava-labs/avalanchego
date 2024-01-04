@@ -235,14 +235,14 @@ struct CompactSpaceInner<M> {
     regn_nbit: u64,
 }
 
-impl CompactSpaceInner<StoreRevMut> {
-    pub fn into_shared(self) -> CompactSpaceInner<StoreRevShared> {
+impl From<CompactSpaceInner<StoreRevMut>> for CompactSpaceInner<StoreRevShared> {
+    fn from(value: CompactSpaceInner<StoreRevMut>) -> CompactSpaceInner<StoreRevShared> {
         CompactSpaceInner {
-            meta_space: self.meta_space.into_shared(),
-            compact_space: self.compact_space.into_shared(),
-            header: self.header,
-            alloc_max_walk: self.alloc_max_walk,
-            regn_nbit: self.regn_nbit,
+            meta_space: value.meta_space.into(),
+            compact_space: value.compact_space.into(),
+            header: value.header,
+            alloc_max_walk: value.alloc_max_walk,
+            regn_nbit: value.regn_nbit,
         }
     }
 }
@@ -565,13 +565,13 @@ impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     }
 }
 
-impl CompactSpace<Node, StoreRevMut> {
+impl From<Box<CompactSpace<Node, StoreRevMut>>> for CompactSpace<Node, StoreRevShared> {
     #[allow(clippy::unwrap_used)]
-    pub fn into_shared(self) -> CompactSpace<Node, StoreRevShared> {
-        let inner = self.inner.into_inner().unwrap();
+    fn from(value: Box<CompactSpace<Node, StoreRevMut>>) -> Self {
+        let inner = value.inner.into_inner().unwrap();
         CompactSpace {
-            inner: RwLock::new(inner.into_shared()),
-            obj_cache: self.obj_cache,
+            inner: RwLock::new(inner.into()),
+            obj_cache: value.obj_cache,
         }
     }
 }

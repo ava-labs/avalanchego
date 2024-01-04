@@ -359,6 +359,24 @@ impl CachedStore for StoreRevShared {
     }
 }
 
+impl From<StoreRevMut> for StoreRevShared {
+    fn from(value: StoreRevMut) -> Self {
+        let mut pages = Vec::new();
+        let deltas = std::mem::take(&mut *value.deltas.write());
+        for (pid, page) in deltas.pages.into_iter() {
+            pages.push(DeltaPage(pid, page));
+        }
+        pages.sort_by_key(|p| p.0);
+        let delta = StoreDelta(pages);
+
+        let rev = Arc::new(StoreRev {
+            base_space: RwLock::new(value.base_space),
+            delta,
+        });
+        StoreRevShared(rev)
+    }
+}
+
 #[derive(Debug)]
 struct StoreRef {
     data: Vec<u8>,
@@ -428,22 +446,6 @@ impl StoreRevMut {
             deltas: Default::default(),
             prev_deltas: other.deltas.clone(),
         }
-    }
-
-    pub fn into_shared(self) -> StoreRevShared {
-        let mut pages = Vec::new();
-        let deltas = std::mem::take(&mut *self.deltas.write());
-        for (pid, page) in deltas.pages.into_iter() {
-            pages.push(DeltaPage(pid, page));
-        }
-        pages.sort_by_key(|p| p.0);
-        let delta = StoreDelta(pages);
-
-        let rev = Arc::new(StoreRev {
-            base_space: RwLock::new(self.base_space),
-            delta,
-        });
-        StoreRevShared(rev)
     }
 
     fn get_page_mut<'a>(
