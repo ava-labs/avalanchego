@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -166,30 +166,30 @@ func TestSetLen(t *testing.T) {
 
 	s := newSet()
 
-	len := s.Len()
-	require.Zero(len)
+	setLen := s.Len()
+	require.Zero(setLen)
 
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, 1))
 
-	len = s.Len()
-	require.Equal(1, len)
+	setLen = s.Len()
+	require.Equal(1, setLen)
 
 	nodeID1 := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, 1))
 
-	len = s.Len()
-	require.Equal(2, len)
+	setLen = s.Len()
+	require.Equal(2, setLen)
 
 	require.NoError(s.RemoveWeight(nodeID1, 1))
 
-	len = s.Len()
-	require.Equal(1, len)
+	setLen = s.Len()
+	require.Equal(1, setLen)
 
 	require.NoError(s.RemoveWeight(nodeID0, 1))
 
-	len = s.Len()
-	require.Zero(len)
+	setLen = s.Len()
+	require.Zero(setLen)
 }
 
 func TestSetMap(t *testing.T) {

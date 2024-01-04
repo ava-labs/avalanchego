@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e
@@ -132,5 +132,5 @@ func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
 	privateNetworksDir := filepath.Join(sharedNetwork.Dir, PrivateNetworksDirName)
 	te.require.NoError(os.MkdirAll(privateNetworksDir, perms.ReadWriteExecute))
 
-	return StartNetwork(sharedNetwork.ExecPath, privateNetworksDir)
+	return StartNetwork(sharedNetwork.AvalancheGoPath, privateNetworksDir)
 }

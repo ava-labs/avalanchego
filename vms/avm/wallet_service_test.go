@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -39,7 +39,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			require.NoError(err)
 			changeAddrStr, err := env.vm.FormatLocalAddress(testChangeAddr)
 			require.NoError(err)
-			_, fromAddrsStr := sampleAddrs(t, env.vm, addrs)
+			_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
 			args := &SendMultipleArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -67,9 +67,9 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			require.NoError(env.walletService.SendMultiple(nil, args, reply))
 			require.Equal(changeAddrStr, reply.ChangeAddr)
 
-			env.vm.ctx.Lock.Lock()
-
 			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
+
+			env.vm.ctx.Lock.Lock()
 
 			_, err = env.vm.state.GetTx(reply.TxID)
 			require.NoError(err)

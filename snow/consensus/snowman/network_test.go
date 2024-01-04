@@ -1,15 +1,16 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
 
 import (
 	"context"
+	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -65,8 +66,10 @@ func (n *Network) shuffleColors() {
 	utils.Sort(n.colors)
 }
 
-func (n *Network) AddNode(sm Consensus) error {
-	if err := sm.Initialize(snow.DefaultConsensusContextTest(), n.params, Genesis.ID(), Genesis.Height(), Genesis.Timestamp()); err != nil {
+func (n *Network) AddNode(t testing.TB, sm Consensus) error {
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	if err := sm.Initialize(ctx, n.params, Genesis.ID(), Genesis.Height(), Genesis.Timestamp()); err != nil {
 		return err
 	}
 

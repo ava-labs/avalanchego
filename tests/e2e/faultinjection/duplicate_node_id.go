@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package faultinjection
@@ -49,7 +49,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		require.ErrorIs(err, context.DeadlineExceeded)
 
 		ginkgo.By("stopping the first new node")
-		require.NoError(node1.Stop())
+		require.NoError(node1.Stop(e2e.DefaultContext()))
 
 		ginkgo.By("checking that the second new node becomes healthy within timeout")
 		e2e.WaitForHealthy(node2)

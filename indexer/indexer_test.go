@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -20,7 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -67,7 +68,6 @@ func TestNewIndexer(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&indexer{}, idxrIntf)
 	idxr := idxrIntf.(*indexer)
-	require.NotNil(idxr.codec)
 	require.NotNil(idxr.log)
 	require.NotNil(idxr.db)
 	require.False(idxr.closed)
@@ -153,8 +153,8 @@ func TestIndexer(t *testing.T) {
 	idxr.clock.Set(now)
 
 	// Assert state is right
-	chain1Ctx := snow.DefaultConsensusContextTest()
-	chain1Ctx.ChainID = ids.GenerateTestID()
+	snow1Ctx := snowtest.Context(t, snowtest.CChainID)
+	chain1Ctx := snowtest.ConsensusContext(snow1Ctx)
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(isIncomplete)
@@ -163,7 +163,7 @@ func TestIndexer(t *testing.T) {
 	require.False(previouslyIndexed)
 
 	// Register this chain, creating a new index
-	chainVM := mocks.NewMockChainVM(ctrl)
+	chainVM := block.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -258,8 +258,8 @@ func TestIndexer(t *testing.T) {
 	require.Contains(server.endpoints, "/block")
 
 	// Register a DAG chain
-	chain2Ctx := snow.DefaultConsensusContextTest()
-	chain2Ctx.ChainID = ids.GenerateTestID()
+	snow2Ctx := snowtest.Context(t, snowtest.XChainID)
+	chain2Ctx := snowtest.ConsensusContext(snow2Ctx)
 	isIncomplete, err = idxr.isIncomplete(chain2Ctx.ChainID)
 	require.NoError(err)
 	require.False(isIncomplete)
@@ -418,15 +418,15 @@ func TestIncompleteIndex(t *testing.T) {
 	require.False(idxr.indexingEnabled)
 
 	// Register a chain
-	chain1Ctx := snow.DefaultConsensusContextTest()
-	chain1Ctx.ChainID = ids.GenerateTestID()
+	snow1Ctx := snowtest.Context(t, snowtest.CChainID)
+	chain1Ctx := snowtest.ConsensusContext(snow1Ctx)
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(isIncomplete)
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	chainVM := mocks.NewMockChainVM(ctrl)
+	chainVM := block.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -500,13 +500,14 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	require.IsType(&indexer{}, idxrIntf)
 	idxr := idxrIntf.(*indexer)
 
-	// Assert state is right
-	chain1Ctx := snow.DefaultConsensusContextTest()
-	chain1Ctx.ChainID = ids.GenerateTestID()
-	chain1Ctx.SubnetID = ids.GenerateTestID()
+	// Create chain1Ctx for a random subnet + chain.
+	chain1Ctx := snowtest.ConsensusContext(&snow.Context{
+		ChainID:  ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+	})
 
 	// RegisterChain should return without adding an index for this chain
-	chainVM := mocks.NewMockChainVM(ctrl)
+	chainVM := block.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	require.Empty(idxr.blockIndices)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -98,7 +98,7 @@ type Chain interface {
 	avax.UTXODeleter
 
 	// Returns a view that contains the merkleized portion of the state.
-	NewView() (merkledb.TrieView, error)
+	NewView() (merkledb.View, error)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -1340,7 +1340,7 @@ func (*state) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[
 			continue
 		}
 
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, stakerData)
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, stakerData)
 		if err != nil {
 			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
@@ -1549,7 +1549,7 @@ func (s *state) processPendingStakers() (map[ids.ID]*stakingTxAndReward, error) 
 	return output, nil
 }
 
-func (s *state) NewView() (merkledb.TrieView, error) {
+func (s *state) NewView() (merkledb.View, error) {
 	return s.merkleDB.NewView(context.TODO(), merkledb.ViewChanges{})
 }
 
@@ -1602,7 +1602,7 @@ func (*state) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[
 			continue
 		}
 
-		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, data)
 		if err != nil {
 			return fmt.Errorf("failed to serialize pending stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
@@ -1639,7 +1639,7 @@ func (s *state) writeTxs() error {
 
 		// Note that we're serializing a [txBytesAndStatus] here, not a
 		// *txs.Tx, so we don't use [txs.Codec].
-		txBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stx)
+		txBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to serialize tx: %w", err)
 		}
@@ -1663,7 +1663,7 @@ func (s *state) writeRewardUTXOs() error {
 		rewardUTXOsDB := linkeddb.NewDefault(rawRewardUTXOsDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}
@@ -1704,7 +1704,7 @@ func (s *state) writeUTXOs(batchOps *[]database.BatchOp) error {
 		}
 
 		// insert the UTXO
-		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+		utxoBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, utxo)
 		if err != nil {
 			return err
 		}
@@ -1749,7 +1749,7 @@ func (s *state) writeSubnetOwners(batchOps *[]database.BatchOp) error {
 	for subnetID, owner := range s.subnetOwners {
 		owner := owner
 
-		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		ownerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &owner)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
@@ -1792,7 +1792,7 @@ func (s *state) writeLocalUptimes() error {
 		for subnetID, uptime := range subnetIDToUptime {
 			key := merkleLocalUptimesKey(vdrID, subnetID)
 
-			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.Version, uptime)
+			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, uptime)
 			if err != nil {
 				return err
 			}

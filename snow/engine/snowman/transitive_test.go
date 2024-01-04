@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -98,7 +98,7 @@ func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common
 }
 
 func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 	return setup(t, engCfg)
 }
 
@@ -328,7 +328,7 @@ func TestEngineQuery(t *testing.T) {
 func TestEngineMultipleQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		AlphaPreference:       2,
@@ -747,7 +747,7 @@ func TestEngineRepoll(t *testing.T) {
 func TestVoteCanceling(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		AlphaPreference:       2,
@@ -851,7 +851,7 @@ func TestVoteCanceling(t *testing.T) {
 func TestEngineNoQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -904,7 +904,7 @@ func TestEngineNoQuery(t *testing.T) {
 func TestEngineNoRepollQuery(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1596,7 +1596,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 func TestEngineAggressivePolling(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewManager()
@@ -1684,7 +1684,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 func TestEngineDoubleChit(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     2,
 		AlphaPreference:       2,
@@ -1794,7 +1794,7 @@ func TestEngineDoubleChit(t *testing.T) {
 func TestEngineBuildBlockLimit(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 	engCfg.Params.K = 1
 	engCfg.Params.AlphaPreference = 1
 	engCfg.Params.AlphaConfidence = 1
@@ -2816,7 +2816,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfig()
+	engCfg := DefaultConfig(t)
 	engCfg.Params = snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,

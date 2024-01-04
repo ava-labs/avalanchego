@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -31,13 +32,21 @@ const (
 
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
-	_ Gossiper = (*PullGossiper[testTx, *testTx])(nil)
+	_ Gossiper = (*PullGossiper[*testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
+	_ Gossiper = (*TestGossiper)(nil)
 
 	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
 	_ Accumulator[*testTx] = (*NoOpAccumulator[*testTx])(nil)
+	_ Accumulator[*testTx] = (*TestAccumulator[*testTx])(nil)
 
 	metricLabels = []string{typeLabel}
+	pushLabels   = prometheus.Labels{
+		typeLabel: pushType,
+	}
+	pullLabels = prometheus.Labels{
+		typeLabel: pullType,
+	}
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -51,13 +60,6 @@ type Accumulator[T Gossipable] interface {
 	Gossiper
 	// Add queues gossipables to be gossiped
 	Add(gossipables ...T)
-}
-
-// GossipableAny exists to help create non-nil pointers to a concrete Gossipable
-// ref: https://stackoverflow.com/questions/69573113/how-can-i-instantiate-a-non-nil-pointer-of-type-argument-with-generic-go
-type GossipableAny[T any] interface {
-	*T
-	Gossipable
 }
 
 // ValidatorGossiper only calls [Gossip] if the given node is a validator
@@ -121,35 +123,34 @@ func (v ValidatorGossiper) Gossip(ctx context.Context) error {
 	return v.Gossiper.Gossip(ctx)
 }
 
-func NewPullGossiper[T any, U GossipableAny[T]](
+func NewPullGossiper[T Gossipable](
 	log logging.Logger,
-	set Set[U],
+	marshaller Marshaller[T],
+	set Set[T],
 	client *p2p.Client,
 	metrics Metrics,
 	pollSize int,
-) *PullGossiper[T, U] {
-	return &PullGossiper[T, U]{
-		log:      log,
-		set:      set,
-		client:   client,
-		metrics:  metrics,
-		pollSize: pollSize,
-		labels: prometheus.Labels{
-			typeLabel: pullType,
-		},
+) *PullGossiper[T] {
+	return &PullGossiper[T]{
+		log:        log,
+		marshaller: marshaller,
+		set:        set,
+		client:     client,
+		metrics:    metrics,
+		pollSize:   pollSize,
 	}
 }
 
-type PullGossiper[T any, U GossipableAny[T]] struct {
-	log      logging.Logger
-	set      Set[U]
-	client   *p2p.Client
-	metrics  Metrics
-	pollSize int
-	labels   prometheus.Labels
+type PullGossiper[T Gossipable] struct {
+	log        logging.Logger
+	marshaller Marshaller[T]
+	set        Set[T]
+	client     *p2p.Client
+	metrics    Metrics
+	pollSize   int
 }
 
-func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
+func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	bloom, salt, err := p.set.GetFilter()
 	if err != nil {
 		return err
@@ -165,7 +166,8 @@ func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
 	}
 
 	for i := 0; i < p.pollSize; i++ {
-		if err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse); err != nil {
+		err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse)
+		if err != nil && !errors.Is(err, p2p.ErrNoPeers) {
 			return err
 		}
 	}
@@ -173,7 +175,7 @@ func (p *PullGossiper[_, _]) Gossip(ctx context.Context) error {
 	return nil
 }
 
-func (p *PullGossiper[T, U]) handleResponse(
+func (p *PullGossiper[_]) handleResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
@@ -198,8 +200,8 @@ func (p *PullGossiper[T, U]) handleResponse(
 	for _, bytes := range response.Gossip {
 		receivedBytes += len(bytes)
 
-		gossipable := U(new(T))
-		if err := gossipable.Unmarshal(bytes); err != nil {
+		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
+		if err != nil {
 			p.log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
@@ -208,7 +210,7 @@ func (p *PullGossiper[T, U]) handleResponse(
 			continue
 		}
 
-		hash := gossipable.GetID()
+		hash := gossipable.GossipID()
 		p.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
@@ -225,13 +227,13 @@ func (p *PullGossiper[T, U]) handleResponse(
 		}
 	}
 
-	receivedCountMetric, err := p.metrics.receivedCount.GetMetricWith(p.labels)
+	receivedCountMetric, err := p.metrics.receivedCount.GetMetricWith(pullLabels)
 	if err != nil {
 		p.log.Error("failed to get received count metric", zap.Error(err))
 		return
 	}
 
-	receivedBytesMetric, err := p.metrics.receivedBytes.GetMetricWith(p.labels)
+	receivedBytesMetric, err := p.metrics.receivedBytes.GetMetricWith(pullLabels)
 	if err != nil {
 		p.log.Error("failed to get received bytes metric", zap.Error(err))
 		return
@@ -242,25 +244,22 @@ func (p *PullGossiper[T, U]) handleResponse(
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](marshaller Marshaller[T], client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
 	return &PushGossiper[T]{
+		marshaller:       marshaller,
 		client:           client,
 		metrics:          metrics,
 		targetGossipSize: targetGossipSize,
-		labels: prometheus.Labels{
-			typeLabel: pushType,
-		},
-		pending: buffer.NewUnboundedDeque[T](0),
+		pending:          buffer.NewUnboundedDeque[T](0),
 	}
 }
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
+	marshaller       Marshaller[T]
 	client           *p2p.Client
 	metrics          Metrics
 	targetGossipSize int
-
-	labels prometheus.Labels
 
 	lock    sync.Mutex
 	pending buffer.Deque[T]
@@ -286,7 +285,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 			break
 		}
 
-		bytes, err := gossipable.Marshal()
+		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			// remove this item so we don't get stuck in a loop
 			_, _ = p.pending.PopLeft()
@@ -303,12 +302,12 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return err
 	}
 
-	sentCountMetric, err := p.metrics.sentCount.GetMetricWith(p.labels)
+	sentCountMetric, err := p.metrics.sentCount.GetMetricWith(pushLabels)
 	if err != nil {
 		return fmt.Errorf("failed to get sent count metric: %w", err)
 	}
 
-	sentBytesMetric, err := p.metrics.sentBytes.GetMetricWith(p.labels)
+	sentBytesMetric, err := p.metrics.sentBytes.GetMetricWith(pushLabels)
 	if err != nil {
 		return fmt.Errorf("failed to get sent bytes metric: %w", err)
 	}
@@ -359,3 +358,32 @@ func (NoOpAccumulator[_]) Gossip(context.Context) error {
 }
 
 func (NoOpAccumulator[T]) Add(...T) {}
+
+type TestGossiper struct {
+	GossipF func(ctx context.Context) error
+}
+
+func (t *TestGossiper) Gossip(ctx context.Context) error {
+	return t.GossipF(ctx)
+}
+
+type TestAccumulator[T Gossipable] struct {
+	GossipF func(ctx context.Context) error
+	AddF    func(...T)
+}
+
+func (t TestAccumulator[T]) Gossip(ctx context.Context) error {
+	if t.GossipF == nil {
+		return nil
+	}
+
+	return t.GossipF(ctx)
+}
+
+func (t TestAccumulator[T]) Add(gossipables ...T) {
+	if t.AddF == nil {
+		return
+	}
+
+	t.AddF(gossipables...)
+}

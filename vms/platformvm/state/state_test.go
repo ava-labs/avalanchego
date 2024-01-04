@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -603,23 +603,25 @@ func TestParsedStateBlock(t *testing.T) {
 	}
 
 	{
-		blk, err := block.NewApricotProposalBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+		tx := &txs.Tx{
 			Unsigned: &txs.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
-		})
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+		blk, err := block.NewApricotProposalBlock(ids.GenerateTestID(), 1000, tx)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := block.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{
-			{
-				Unsigned: &txs.RewardValidatorTx{
-					TxID: ids.GenerateTestID(),
-				},
+		tx := &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
 			},
-		})
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+		blk, err := block.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{tx})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
@@ -637,23 +639,27 @@ func TestParsedStateBlock(t *testing.T) {
 	}
 
 	{
-		blk, err := block.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, &txs.Tx{
+		tx := &txs.Tx{
 			Unsigned: &txs.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
-		}, []*txs.Tx{})
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+
+		blk, err := block.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, tx, []*txs.Tx{})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := block.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{
-			{
-				Unsigned: &txs.RewardValidatorTx{
-					TxID: ids.GenerateTestID(),
-				},
+		tx := &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
 			},
-		})
+		}
+		require.NoError(tx.Initialize(txs.Codec))
+
+		blk, err := block.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{tx})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
@@ -665,7 +671,7 @@ func TestParsedStateBlock(t *testing.T) {
 			Status: choices.Accepted,
 		}
 
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.Version, &stBlk)
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
 		require.NoError(err)
 
 		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)

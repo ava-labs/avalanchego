@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -10,8 +10,6 @@ import (
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
@@ -22,41 +20,38 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ p2p.Handler = (*Handler[testTx, *testTx])(nil)
+var _ p2p.Handler = (*Handler[*testTx])(nil)
 
-func NewHandler[T any, U GossipableAny[T]](
+func NewHandler[T Gossipable](
 	log logging.Logger,
-	accumulator Accumulator[U],
-	set Set[U],
+	marshaller Marshaller[T],
+	accumulator Accumulator[T],
+	set Set[T],
 	metrics Metrics,
 	targetResponseSize int,
-) *Handler[T, U] {
-	return &Handler[T, U]{
+) *Handler[T] {
+	return &Handler[T]{
 		Handler:            p2p.NoOpHandler{},
 		log:                log,
+		marshaller:         marshaller,
 		accumulator:        accumulator,
 		set:                set,
 		metrics:            metrics,
 		targetResponseSize: targetResponseSize,
-		pullLabels: prometheus.Labels{
-			typeLabel: pullType,
-		},
 	}
 }
 
-type Handler[T any, U GossipableAny[T]] struct {
+type Handler[T Gossipable] struct {
 	p2p.Handler
-	accumulator        Accumulator[U]
+	marshaller         Marshaller[T]
+	accumulator        Accumulator[T]
 	log                logging.Logger
-	set                Set[U]
+	set                Set[T]
 	metrics            Metrics
 	targetResponseSize int
-
-	pullLabels prometheus.Labels
-	pushLabels prometheus.Labels
 }
 
-func (h Handler[_, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
 	request := &sdk.PullGossipRequest{}
 	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, err
@@ -68,23 +63,23 @@ func (h Handler[_, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, 
 	}
 
 	filter := &BloomFilter{
-		Bloom: &bloomfilter.Filter{},
-		Salt:  salt,
+		bloom: &bloomfilter.Filter{},
+		salt:  salt,
 	}
-	if err := filter.Bloom.UnmarshalBinary(request.Filter); err != nil {
+	if err := filter.bloom.UnmarshalBinary(request.Filter); err != nil {
 		return nil, err
 	}
 
 	responseSize := 0
 	gossipBytes := make([][]byte, 0)
-	h.set.Iterate(func(gossipable U) bool {
+	h.set.Iterate(func(gossipable T) bool {
 		// filter out what the requesting peer already knows about
 		if filter.Has(gossipable) {
 			return true
 		}
 
 		var bytes []byte
-		bytes, err = gossipable.Marshal()
+		bytes, err = h.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			return false
 		}
@@ -105,12 +100,12 @@ func (h Handler[_, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, 
 		Gossip: gossipBytes,
 	}
 
-	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(h.pullLabels)
+	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(pullLabels)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sent count metric: %w", err)
 	}
 
-	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(h.pullLabels)
+	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(pullLabels)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sent bytes metric: %w", err)
 	}
@@ -121,7 +116,7 @@ func (h Handler[_, U]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, 
 	return proto.Marshal(response)
 }
 
-func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	msg := &sdk.PushGossip{}
 	if err := proto.Unmarshal(gossipBytes, msg); err != nil {
 		h.log.Debug("failed to unmarshal gossip", zap.Error(err))
@@ -131,8 +126,8 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 	receivedBytes := 0
 	for _, bytes := range msg.Gossip {
 		receivedBytes += len(bytes)
-		gossipable := U(new(T))
-		if err := gossipable.Unmarshal(bytes); err != nil {
+		gossipable, err := h.marshaller.UnmarshalGossip(bytes)
+		if err != nil {
 			h.log.Debug("failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
 				zap.Error(err),
@@ -144,7 +139,7 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 			h.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", gossipable.GetID()),
+				zap.Stringer("id", gossipable.GossipID()),
 				zap.Error(err),
 			)
 			continue
@@ -159,13 +154,13 @@ func (h Handler[T, U]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipB
 		return
 	}
 
-	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(h.pushLabels)
+	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(pushLabels)
 	if err != nil {
 		h.log.Error("failed to get received count metric", zap.Error(err))
 		return
 	}
 
-	receivedBytesMetric, err := h.metrics.receivedBytes.GetMetricWith(h.pushLabels)
+	receivedBytesMetric, err := h.metrics.receivedBytes.GetMetricWith(pushLabels)
 	if err != nil {
 		h.log.Error("failed to get received bytes metric", zap.Error(err))
 		return

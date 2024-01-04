@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -18,6 +19,8 @@ import (
 )
 
 var (
+	_ gossip.Gossipable = (*Tx)(nil)
+
 	ErrNilSignedTx = errors.New("nil signed tx is not valid")
 
 	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
@@ -45,12 +48,12 @@ func NewSigned(
 }
 
 func (tx *Tx) Initialize(c codec.Manager) error {
-	signedBytes, err := c.Marshal(Version, tx)
+	signedBytes, err := c.Marshal(CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -75,7 +78,7 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 		return nil, fmt.Errorf("couldn't parse tx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -90,6 +93,10 @@ func (tx *Tx) Bytes() []byte {
 }
 
 func (tx *Tx) ID() ids.ID {
+	return tx.TxID
+}
+
+func (tx *Tx) GossipID() ids.ID {
 	return tx.TxID
 }
 
@@ -125,7 +132,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 // Note: We explicitly pass the codec in Sign since we may need to sign P-Chain
 // genesis txs whose length exceed the max length of txs.Codec.
 func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
-	unsignedBytes, err := c.Marshal(Version, &tx.Unsigned)
+	unsignedBytes, err := c.Marshal(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -146,7 +153,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(Version, tx)
+	signedBytes, err := c.Marshal(CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

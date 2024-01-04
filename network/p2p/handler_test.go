@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -56,8 +56,8 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 
 			called := false
 			handler := NewValidatorHandler(
-				&testHandler{
-					appGossipF: func(context.Context, ids.NodeID, []byte) {
+				&TestHandler{
+					AppGossipF: func(context.Context, ids.NodeID, []byte) {
 						called = true
 					},
 				},

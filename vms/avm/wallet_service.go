@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -31,27 +33,27 @@ type WalletService struct {
 }
 
 func (w *WalletService) decided(txID ids.ID) {
-	if _, ok := w.pendingTxs.Get(txID); !ok {
+	if !w.pendingTxs.Delete(txID) {
 		return
 	}
 
 	w.vm.ctx.Log.Info("tx decided over wallet API",
 		zap.Stringer("txID", txID),
 	)
-	w.pendingTxs.Delete(txID)
-
 	for {
 		txID, tx, ok := w.pendingTxs.Oldest()
 		if !ok {
 			return
 		}
 
-		txBytes := tx.Bytes()
-		_, err := w.vm.IssueTx(txBytes)
+		err := w.vm.network.IssueVerifiedTx(context.TODO(), tx)
 		if err == nil {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
 			)
+			return
+		}
+		if errors.Is(err, mempool.ErrDuplicateTx) {
 			return
 		}
 
@@ -63,12 +65,7 @@ func (w *WalletService) decided(txID ids.ID) {
 	}
 }
 
-func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
-	tx, err := w.vm.parser.ParseTx(txBytes)
-	if err != nil {
-		return ids.ID{}, err
-	}
-
+func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 	txID := tx.ID()
 	w.vm.ctx.Log.Info("issuing tx over wallet API",
 		zap.Stringer("txID", txID),
@@ -82,14 +79,17 @@ func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
 	}
 
 	if w.pendingTxs.Len() == 0 {
-		_, err := w.vm.IssueTx(txBytes)
-		if err != nil {
-			return ids.ID{}, err
+		if err := w.vm.network.IssueVerifiedTx(context.TODO(), tx); err == nil {
+			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
+				zap.Stringer("txID", txID),
+			)
+		} else if !errors.Is(err, mempool.ErrDuplicateTx) {
+			w.vm.ctx.Log.Warn("failed to issue tx over wallet API",
+				zap.Stringer("txID", txID),
+				zap.Error(err),
+			)
+			return ids.Empty, err
 		}
-
-		w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
-			zap.Stringer("txID", txID),
-		)
 	} else {
 		w.vm.ctx.Log.Info("enqueueing tx over wallet API",
 			zap.Stringer("txID", txID),
@@ -142,10 +142,15 @@ func (w *WalletService) IssueTx(_ *http.Request, args *api.FormattedTx, reply *a
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
 
+	tx, err := w.vm.parser.ParseTx(txBytes)
+	if err != nil {
+		return err
+	}
+
 	w.vm.ctx.Lock.Lock()
 	defer w.vm.ctx.Lock.Unlock()
 
-	txID, err := w.issue(txBytes)
+	txID, err := w.issue(tx)
 	reply.TxID = txID
 	return err
 }
@@ -291,7 +296,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 	codec := w.vm.parser.Codec()
 	avax.SortTransferableOutputs(outs, codec)
 
-	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.vm.ctx.NetworkID,
 		BlockchainID: w.vm.ctx.ChainID,
 		Outs:         outs,
@@ -302,7 +307,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		return err
 	}
 
-	txID, err := w.issue(tx.Bytes())
+	txID, err := w.issue(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

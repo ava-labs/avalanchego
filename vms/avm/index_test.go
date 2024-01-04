@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -52,11 +52,14 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		env.vm.state.AddUTXO(utxo)
 
 		// make transaction
-		tx := buildTX(utxoID, txAssetID, addr)
+		tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-		// issue transaction
+		env.vm.ctx.Lock.Unlock()
+
 		issueAndAccept(require, env.vm, env.issuer, tx)
+
+		env.vm.ctx.Lock.Lock()
 
 		txs = append(txs, tx)
 	}
@@ -93,11 +96,15 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		env.vm.state.AddUTXO(utxo)
 
 		// make transaction
-		tx := buildTX(utxoID, txAssetID, addr)
+		tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addr)
 		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+
+		env.vm.ctx.Lock.Unlock()
 
 		// issue transaction
 		issueAndAccept(require, env.vm, env.issuer, tx)
+
+		env.vm.ctx.Lock.Lock()
 
 		addressTxMap[addr] = tx
 	}
@@ -142,11 +149,14 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	env.vm.state.AddUTXO(utxo)
 
 	// make transaction
-	tx := buildTX(utxoID, txAssetID, addrs...)
+	tx := buildTX(env.vm.ctx.XChainID, utxoID, txAssetID, addrs...)
 	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	// issue transaction
+	env.vm.ctx.Lock.Unlock()
+
 	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	env.vm.ctx.Lock.Lock()
 
 	assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
 	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
@@ -258,7 +268,7 @@ func buildUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax
 	}
 }
 
-func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
+func buildTX(chainID ids.ID, utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposer
@@ -41,8 +41,12 @@ func TestWindowerNoValidators(t *testing.T) {
 	require.Zero(delay)
 
 	expectedProposer, err := w.ExpectedProposer(context.Background(), chainHeight, pChainHeight, slot)
-	require.ErrorIs(err, ErrNoProposersAvailable)
+	require.ErrorIs(err, ErrAnyoneCanPropose)
 	require.Equal(ids.EmptyNodeID, expectedProposer)
+
+	delay, err = w.MinDelayForProposer(context.Background(), chainHeight, pChainHeight, nodeID, slot)
+	require.ErrorIs(err, ErrAnyoneCanPropose)
+	require.Zero(delay)
 }
 
 func TestWindowerRepeatedValidator(t *testing.T) {

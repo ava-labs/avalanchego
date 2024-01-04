@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snow
@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	_ Acceptor = noOpAcceptor{}
 	_ Acceptor = acceptorWrapper{}
 
 	_ AcceptorGroup = (*acceptorGroup)(nil)
@@ -29,12 +28,6 @@ type Acceptor interface {
 	// shut down and not commit [container] or any other container to its
 	// database as accepted.
 	Accept(ctx *ConsensusContext, containerID ids.ID, container []byte) error
-}
-
-type noOpAcceptor struct{}
-
-func (noOpAcceptor) Accept(*ConsensusContext, ids.ID, []byte) error {
-	return nil
 }
 
 type acceptorWrapper struct {

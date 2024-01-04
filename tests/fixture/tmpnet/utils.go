@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -54,6 +54,10 @@ type NodeURI struct {
 func GetNodeURIs(nodes []*Node) []NodeURI {
 	uris := make([]NodeURI, 0, len(nodes))
 	for _, node := range nodes {
+		if node.IsEphemeral {
+			// Avoid returning URIs for nodes whose lifespan is indeterminate
+			continue
+		}
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it is not currently running.
 		if len(node.URI) > 0 {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tx
@@ -34,7 +34,7 @@ func NewPayload(
 		Amount:   amount,
 		To:       to,
 	}
-	bytes, err := Codec.Marshal(Version, p)
+	bytes, err := Codec.Marshal(CodecVersion, p)
 	p.bytes = bytes
 	return p, err
 }

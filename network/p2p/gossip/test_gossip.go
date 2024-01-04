@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -10,26 +10,30 @@ import (
 )
 
 var (
-	_ Gossipable   = (*testTx)(nil)
-	_ Set[*testTx] = (*testSet)(nil)
+	_ Gossipable          = (*testTx)(nil)
+	_ Set[*testTx]        = (*testSet)(nil)
+	_ Marshaller[*testTx] = (*testMarshaller)(nil)
 )
 
 type testTx struct {
 	id ids.ID
 }
 
-func (t *testTx) GetID() ids.ID {
+func (t *testTx) GossipID() ids.ID {
 	return t.id
 }
 
-func (t *testTx) Marshal() ([]byte, error) {
-	return t.id[:], nil
+type testMarshaller struct{}
+
+func (testMarshaller) MarshalGossip(tx *testTx) ([]byte, error) {
+	return tx.id[:], nil
 }
 
-func (t *testTx) Unmarshal(bytes []byte) error {
-	t.id = ids.ID{}
-	copy(t.id[:], bytes)
-	return nil
+func (testMarshaller) UnmarshalGossip(bytes []byte) (*testTx, error) {
+	id, err := ids.ToID(bytes)
+	return &testTx{
+		id: id,
+	}, err
 }
 
 type testSet struct {
@@ -61,6 +65,5 @@ func (t *testSet) Iterate(f func(gossipable *testTx) bool) {
 }
 
 func (t *testSet) GetFilter() ([]byte, []byte, error) {
-	bloom, err := t.bloom.Bloom.MarshalBinary()
-	return bloom, t.bloom.Salt[:], err
+	return t.bloom.Marshal()
 }

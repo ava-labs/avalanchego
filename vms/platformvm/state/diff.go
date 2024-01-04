@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -80,7 +80,7 @@ func NewDiff(
 	}, nil
 }
 
-func (d *diff) NewView() (merkledb.TrieView, error) {
+func (d *diff) NewView() (merkledb.View, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -455,7 +455,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 	// writeSubnetOwners
 	for subnetID, owner := range d.subnetOwners {
 		owner := owner
-		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		ownerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &owner)
 		if err != nil {
 			return merkledb.ViewChanges{}, fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
@@ -538,7 +538,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 					return merkledb.ViewChanges{}, err
 				}
 
-				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakingTxAndReward{
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(block.CodecVersion, &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					StartTime:       txIDAndReward.startTime,
 					PotentialReward: txIDAndReward.reward,
@@ -600,7 +600,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 					return merkledb.ViewChanges{}, err
 				}
 
-				stakersDataBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stakingTxAndReward{
+				stakersDataBytes, err := txs.GenesisCodec.Marshal(block.CodecVersion, &stakingTxAndReward{
 					TxBytes:         tx.Bytes(),
 					StartTime:       txIDAndReward.startTime,
 					PotentialReward: txIDAndReward.reward,
@@ -642,7 +642,7 @@ func (d *diff) getMerkleChanges() (merkledb.ViewChanges, error) {
 		}
 
 		// Inserting a UTXO
-		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+		utxoBytes, err := txs.GenesisCodec.Marshal(block.CodecVersion, utxo)
 		if err != nil {
 			return merkledb.ViewChanges{}, err
 		}
