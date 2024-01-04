@@ -1454,6 +1454,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	peers = tracker.NewPeers()
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
@@ -1463,16 +1464,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		cpuTracker,
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
-		tracker.NewPeers(),
+		peers,
 	)
 	require.NoError(err)
 
 	engineConfig := smeng.Config{
-		Ctx:           bootstrapConfig.Ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            bootstrapConfig.VM,
-		Sender:        bootstrapConfig.Sender,
-		Validators:    beacons,
+		Ctx:                 bootstrapConfig.Ctx,
+		AllGetsServer:       snowGetHandler,
+		VM:                  bootstrapConfig.VM,
+		Sender:              bootstrapConfig.Sender,
+		Validators:          beacons,
+		ConnectedValidators: peers,
 		Params: snowball.Parameters{
 			K:                     1,
 			AlphaPreference:       1,
@@ -1485,6 +1487,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxItemProcessingTime: 1,
 		},
 		Consensus: &smcon.Topological{},
+
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)

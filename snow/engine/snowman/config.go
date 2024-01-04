@@ -25,4 +25,8 @@ type Config struct {
 	Params              snowball.Parameters
 	Consensus           snowman.Consensus
 	PartialSync         bool
+
+	// used for block-backfilling
+	AncestorsMaxContainersSent     int
+	AncestorsMaxContainersReceived int
 }

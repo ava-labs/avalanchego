@@ -870,6 +870,10 @@ func (m *manager) createAvalancheChain(
 		ConnectedValidators: connectedValidators,
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
+
+		// block backfilling stuff
+		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
 	if err != nil {
@@ -1217,6 +1221,10 @@ func (m *manager) createSnowmanChain(
 		Params:              consensusParams,
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
+
+		// block backfilling stuff
+		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {

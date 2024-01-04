@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
 	"github.com/ava-labs/avalanchego/snow/event"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -64,9 +65,9 @@ type Transitive struct {
 	common.AcceptedStateSummaryHandler
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
-	common.AncestorsHandler
 	common.AppHandler
-	validators.Connector
+
+	*syncer.BlockBackfiller
 
 	requestID uint32
 
@@ -145,9 +146,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
-		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
-		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                ancestor.NewTree(),
 		nonVerifiedCache:            nonVerifiedCache,
@@ -156,6 +155,18 @@ func newTransitive(config Config) (*Transitive, error) {
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
 	}
+	t.BlockBackfiller = syncer.NewBlockBackfiller(
+		syncer.BlockBackfillerConfig{
+			Ctx:                            config.Ctx,
+			VM:                             config.VM,
+			Sender:                         config.Sender,
+			Validators:                     config.Validators,
+			Peers:                          config.ConnectedValidators,
+			AncestorsMaxContainersSent:     config.AncestorsMaxContainersSent,
+			AncestorsMaxContainersReceived: config.AncestorsMaxContainersReceived,
+			SharedRequestID:                &t.requestID,
+		},
+	)
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
@@ -476,8 +487,7 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
-		t.Ctx.StateSyncing.Set(false)
-		return nil
+		return t.BlockBackfiller.Start(ctx)
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("messageString", msg),
@@ -549,7 +559,9 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
 	}
-	return nil
+
+	// Start Block backfilling if needed
+	return t.BlockBackfiller.Start(ctx)
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -1140,4 +1152,18 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 		metrics: &t.metrics,
 		tree:    t.nonVerifieds,
 	})
+}
+
+func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := t.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+	return t.BlockBackfiller.Connected(ctx, nodeID)
+}
+
+func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := t.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+	return t.BlockBackfiller.Disconnected(nodeID)
 }

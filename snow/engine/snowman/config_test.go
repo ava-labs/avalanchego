@@ -36,5 +36,8 @@ func DefaultConfig(t testing.TB) Config {
 			MaxItemProcessingTime: 1,
 		},
 		Consensus: &snowman.Topological{},
+
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
 	}
 }
