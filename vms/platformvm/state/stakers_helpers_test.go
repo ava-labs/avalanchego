@@ -32,10 +32,6 @@ import (
 var (
 	_ Versions = (*versionsHolder)(nil)
 
-	xChainID    = ids.Empty.Prefix(0)
-	cChainID    = ids.Empty.Prefix(1)
-	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
