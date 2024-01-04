@@ -868,7 +868,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	myTime := p.Clock.Time()
 	myTimeUnix := uint64(myTime.Unix())
 	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTimeUnix))
-
 	p.Metrics.ClockSkew.Observe(clockDifference)
 
 	if msg.Client != nil {
