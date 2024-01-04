@@ -313,6 +313,11 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		return nil, fmt.Errorf("could not create secret key: %w", err)
 	}
 
+	shortNodeID, err := ids.ShortNodeIDFromNodeID(data.nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create shortNodeID from nodeID: %w", err)
+	}
+
 	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
@@ -321,7 +326,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: data.nodeID,
+			NodeID: shortNodeID,
 			Start:  uint64(data.startTime.Unix()),
 			End:    uint64(data.endTime.Unix()),
 			Wght:   vm.MinValidatorStake,

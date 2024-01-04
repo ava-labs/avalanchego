@@ -94,6 +94,8 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		infoClient := info.NewClient(node.URI)
 		nodeID, nodePOP, err := infoClient.GetNodeID(e2e.DefaultContext())
 		require.NoError(err)
+		shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+		require.NoError(err)
 
 		// Adding a validator should not break interchain transfer.
 		endTime := time.Now().Add(30 * time.Second)
@@ -109,7 +111,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			_, err = pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: nodeID,
+						NodeID: shortNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
@@ -139,7 +141,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: nodeID,
+						NodeID: shortNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},

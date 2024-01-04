@@ -112,7 +112,7 @@ var (
 	keys = secp256k1.TestKeys()
 
 	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs           []ids.NodeID
+	genesisNodeIDs           []ids.ShortNodeID
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
@@ -130,7 +130,7 @@ func init() {
 		// TODO: use ids.GenerateTestNodeID() instead of ids.BuildTestNodeID
 		// Can be done when TestGetState is refactored
 		nodeBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+		nodeID := ids.BuildTestShortNodeID(nodeBytes[:])
 
 		genesisNodeIDs = append(genesisNodeIDs, nodeID)
 	}
@@ -364,7 +364,8 @@ func TestGenesis(t *testing.T) {
 	// Ensure current validator set of primary network is correct
 	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
-	for _, nodeID := range genesisNodeIDs {
+	for _, sNodeID := range genesisNodeIDs {
+		nodeID := ids.NodeIDFromShortNodeID(sNodeID)
 		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
 		require.True(ok)
 	}
@@ -537,7 +538,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}()
 
 	// Use nodeID that is already in the genesis
-	repeatNodeID := genesisNodeIDs[0]
+	repeatNodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 
 	startTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
@@ -574,7 +575,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	var (
 		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 		endTime   = startTime.Add(defaultMinStakingDuration)
-		nodeID    = genesisNodeIDs[0]
+		nodeID    = ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 	)
 
 	// create valid tx
@@ -624,7 +625,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	var (
 		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 		endTime   = startTime.Add(defaultMinStakingDuration)
-		nodeID    = genesisNodeIDs[0]
+		nodeID    = ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 	)
 
 	// create valid tx
@@ -879,7 +880,6 @@ func TestCreateSubnet(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := genesisNodeIDs[0]
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
 		[]ids.ShortID{ // control keys
@@ -920,6 +920,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
+	nodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
@@ -1718,7 +1719,7 @@ func TestMaxStakeAmount(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := genesisNodeIDs[0]
+	nodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 
 	tests := []struct {
 		description string
@@ -1904,7 +1905,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
 
 	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
-	_, err = secondVM.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
+	_, err = secondVM.state.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		valTx.NodeID(),
+	)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 

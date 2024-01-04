@@ -77,20 +77,20 @@ var (
 	testSubnet1  *txs.Tx
 
 	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs []ids.NodeID
+	genesisNodeIDs []ids.ShortNodeID
 )
 
 func init() {
-	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	genesisNodeIDs = make([]ids.ShortNodeID, len(preFundedKeys))
 	for i := range preFundedKeys {
-		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+		genesisNodeIDs[i] = ids.GenerateTestShortNodeID()
 	}
 }
 
 type stakerStatus uint
 
 type staker struct {
-	nodeID             ids.NodeID
+	nodeID             ids.ShortNodeID
 	rewardAddress      ids.ShortID
 	startTime, endTime time.Time
 }
@@ -100,8 +100,8 @@ type test struct {
 	stakers               []staker
 	subnetStakers         []staker
 	advanceTimeTo         []time.Time
-	expectedStakers       map[ids.NodeID]stakerStatus
-	expectedSubnetStakers map[ids.NodeID]stakerStatus
+	expectedStakers       map[ids.ShortNodeID]stakerStatus
+	expectedSubnetStakers map[ids.ShortNodeID]stakerStatus
 }
 
 type environment struct {

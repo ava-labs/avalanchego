@@ -4,51 +4,60 @@
 package ids
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const (
 	NodeIDPrefix = "NodeID-"
-	NodeIDLen    = ShortIDLen
+
+	NodeIDLen = 32
 )
 
 var (
 	EmptyNodeID = NodeID{}
 
-	errShortNodeID = errors.New("insufficient NodeID length")
+	ErrBadNodeIDLength = errors.New("bad nodeID length")
 
 	_ utils.Sortable[NodeID] = NodeID{}
 )
 
-type NodeID ShortID
-
-func (id NodeID) String() string {
-	return ShortID(id).PrefixedString(NodeIDPrefix)
+// NodeID embeds a string, rather than being a type alias for a string
+// to be able to use custom marshaller for json encoding.
+// See https://github.com/golang/go/blob/go1.20.8/src/encoding/json/encode.go#L1004-L1026
+// which checks for the string type first, then checks to see if a custom marshaller exists,
+// then checks if any other of the primitive types are provided.
+type NodeID struct {
+	buf string
 }
 
-func (id NodeID) Bytes() []byte {
-	return id[:]
+func (n NodeID) Bytes() []byte {
+	return []byte(n.buf)
 }
 
-func (id NodeID) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + id.String() + `"`), nil
+func (n NodeID) String() string {
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	str, _ := cb58.Encode([]byte(n.buf))
+	return NodeIDPrefix + str
 }
 
-func (id NodeID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
+func (n NodeID) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + n.String() + `"`), nil
 }
 
-func (id *NodeID) UnmarshalJSON(b []byte) error {
+func (n *NodeID) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == nullStr { // If "null", do nothing
 		return nil
-	} else if len(str) <= 2+len(NodeIDPrefix) {
+	}
+	if len(str) <= 2+len(NodeIDPrefix) {
 		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(NodeIDPrefix))
 	}
 
@@ -58,35 +67,66 @@ func (id *NodeID) UnmarshalJSON(b []byte) error {
 	}
 
 	var err error
-	*id, err = NodeIDFromString(str[1:lastIndex])
+	*n, err = NodeIDFromString(str[1:lastIndex])
 	return err
 }
 
-func (id *NodeID) UnmarshalText(text []byte) error {
-	return id.UnmarshalJSON(text)
+func (n NodeID) MarshalText() ([]byte, error) {
+	return []byte(n.String()), nil
 }
 
-func (id NodeID) Compare(other NodeID) int {
-	return bytes.Compare(id[:], other[:])
+func (n *NodeID) UnmarshalText(text []byte) error {
+	return n.UnmarshalJSON(text)
 }
 
-// ToNodeID attempt to convert a byte slice into a node id
-func ToNodeID(bytes []byte) (NodeID, error) {
-	nodeID, err := ToShortID(bytes)
-	return NodeID(nodeID), err
+func (n NodeID) Compare(other NodeID) int {
+	return strings.Compare(n.buf, other.buf)
+}
+
+func ToNodeID(src []byte) (NodeID, error) {
+	switch {
+	case len(src) == 0:
+		return EmptyNodeID, nil
+
+	case len(src) == ShortIDLen || len(src) == NodeIDLen:
+		return NodeID{
+			buf: string(src),
+		}, nil
+
+	default:
+		return EmptyNodeID, fmt.Errorf("%w: expected %d or %d bytes but got %d", ErrBadNodeIDLength, ShortNodeIDLen, NodeIDLen, len(src))
+	}
+}
+
+func NodeIDFromShortNodeID(nodeID ShortNodeID) NodeID {
+	if nodeID == EmptyShortNodeID {
+		return EmptyNodeID
+	}
+	return NodeID{
+		buf: string(nodeID.Bytes()),
+	}
 }
 
 func NodeIDFromCert(cert *staking.Certificate) NodeID {
-	return hashing.ComputeHash160Array(
-		hashing.ComputeHash256(cert.Raw),
-	)
+	return NodeID{
+		buf: string(hashing.ComputeHash160(
+			hashing.ComputeHash256(cert.Raw),
+		)),
+	}
 }
 
 // NodeIDFromString is the inverse of NodeID.String()
 func NodeIDFromString(nodeIDStr string) (NodeID, error) {
-	asShort, err := ShortFromPrefixedString(nodeIDStr, NodeIDPrefix)
-	if err != nil {
-		return NodeID{}, err
+	s, found := strings.CutPrefix(nodeIDStr, NodeIDPrefix)
+	if !found {
+		return EmptyNodeID, fmt.Errorf("ID: %s is missing the prefix: %s", nodeIDStr, NodeIDPrefix)
 	}
-	return NodeID(asShort), nil
+
+	bytes, err := cb58.Decode(s)
+	if err != nil {
+		return EmptyNodeID, err
+	}
+	return NodeID{
+		buf: string(bytes),
+	}, nil
 }

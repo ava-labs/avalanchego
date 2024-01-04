@@ -1228,10 +1228,8 @@ func (s *Service) buildAddValidatorTx(args *AddValidatorArgs) (*txs.Tx, ids.Shor
 	}
 
 	// Parse the node ID
-	var nodeID ids.NodeID
-	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID = s.vm.ctx.NodeID
-	} else {
+	nodeID := s.vm.ctx.NodeID // default if node's ID not specified
+	if args.NodeID != ids.EmptyNodeID {
 		nodeID = args.NodeID
 	}
 
@@ -1347,10 +1345,8 @@ func (s *Service) buildAddDelegatorTx(args *AddDelegatorArgs) (*txs.Tx, ids.Shor
 		return nil, ids.ShortEmpty, errStartTimeTooLate
 	}
 
-	var nodeID ids.NodeID
-	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID = s.vm.ctx.NodeID
-	} else {
+	nodeID := s.vm.ctx.NodeID // // default if node's ID is not specified
+	if args.NodeID != ids.EmptyNodeID {
 		nodeID = args.NodeID
 	}
 

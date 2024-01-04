@@ -874,10 +874,10 @@ func TestInboundMessageToString(t *testing.T) {
 	inboundMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	require.Equal("NodeID-111111111111111111116DBWJs Op: pong Message: uptime:100", inboundMsg.String())
+	require.Equal("NodeID-45PJLL Op: pong Message: uptime:100", inboundMsg.String())
 
 	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyNodeID, ids.Empty, 1)
-	require.Equal("NodeID-111111111111111111116DBWJs Op: get_state_summary_frontier_failed Message: ChainID: 11111111111111111111111111111111LpoYY RequestID: 1", internalMsg.String())
+	require.Equal("NodeID-45PJLL Op: get_state_summary_frontier_failed Message: ChainID: 11111111111111111111111111111111LpoYY RequestID: 1", internalMsg.String())
 }
 
 func TestEmptyInboundMessage(t *testing.T) {

@@ -38,7 +38,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			} {
 				addr, err := ids.ShortFromString(addrStr)
 				require.NoError(err)
-				addrMap[addrStr], err = address.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], addr[:])
+				addrMap[addrStr], err = address.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], addr.Bytes())
 				require.NoError(err)
 			}
 			avmArgs := avm.BuildGenesisArgs{
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
-					NodeID:    ids.BuildTestNodeID(id[:]),
+					NodeID:    ids.BuildTestShortNodeID(id[:]),
 				},
 				RewardOwner: &api.Owner{
 					Threshold: 1,

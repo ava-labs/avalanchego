@@ -1020,11 +1020,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
-		genesisNodeIDs[0]: defaultWeight,
-		genesisNodeIDs[1]: defaultWeight,
-		genesisNodeIDs[2]: defaultWeight,
-		genesisNodeIDs[3]: defaultWeight,
-		genesisNodeIDs[4]: defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[0]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[1]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[2]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[3]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[4]): defaultWeight,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1118,12 +1118,12 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
-		genesisNodeIDs[0]: defaultWeight,
-		genesisNodeIDs[1]: defaultWeight,
-		genesisNodeIDs[2]: defaultWeight,
-		genesisNodeIDs[3]: defaultWeight,
-		genesisNodeIDs[4]: defaultWeight,
-		extraNodeID:       vm.MaxValidatorStake,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[0]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[1]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[2]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[3]): defaultWeight,
+		ids.NodeIDFromShortNodeID(genesisNodeIDs[4]): defaultWeight,
+		extraNodeID: vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1501,6 +1501,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		nodeID = ids.GenerateTestNodeID()
 		addr   = keys[0].PublicKey().Address()
 	)
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	require.NoError(err)
 	sk1, err := bls.NewSecretKey()
 	require.NoError(err)
 
@@ -1523,7 +1525,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryStartTime.Unix()),
 			End:    uint64(primaryEndTime.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -1658,7 +1660,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryReStartTime.Unix()),
 			End:    uint64(primaryReEndTime.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -1782,6 +1784,9 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// Add a primary network validator with no BLS key
 	nodeID := ids.GenerateTestNodeID()
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	require.NoError(err)
+
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
@@ -1861,7 +1866,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryStartTime2.Unix()),
 			End:    uint64(primaryEndTime2.Unix()),
 			Wght:   vm.MinValidatorStake,
@@ -1949,6 +1954,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// Add a primary network validator with no BLS key
 	nodeID := ids.GenerateTestNodeID()
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	require.NoError(err)
 	addr := keys[0].PublicKey().Address()
 	primaryTx1, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
@@ -2069,7 +2076,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  uint64(primaryStartTime2.Unix()),
 			End:    uint64(primaryEndTime2.Unix()),
 			Wght:   vm.MinValidatorStake,

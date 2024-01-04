@@ -107,7 +107,7 @@ func defaultAddress(t *testing.T, service *Service) {
 func TestAddValidator(t *testing.T) {
 	require := require.New(t)
 
-	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
+	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-45PJLL","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := stdjson.Marshal(&args)
 	require.NoError(err)
@@ -494,7 +494,7 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := genesisNodeIDs[0]
+	delegatorNodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[0])
 	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
@@ -616,7 +616,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
 			gotVdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-			if gotVdr.NodeID != vdr.NodeID {
+			if gotVdr.NodeID != ids.NodeIDFromShortNodeID(vdr.NodeID) {
 				continue
 			}
 
@@ -629,7 +629,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := genesisNodeIDs[1]
+	validatorNodeID := ids.NodeIDFromShortNodeID(genesisNodeIDs[1])
 	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := delegatorStartTime.Add(defaultMinStakingDuration)
 

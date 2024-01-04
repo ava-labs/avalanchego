@@ -73,7 +73,7 @@ func (w *walletWithOptions) IssueAddSubnetValidatorTx(
 }
 
 func (w *walletWithOptions) IssueRemoveSubnetValidatorTx(
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {

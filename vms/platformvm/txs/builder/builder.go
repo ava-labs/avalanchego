@@ -459,6 +459,10 @@ func (b *builder) NewAddValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -472,7 +476,7 @@ func (b *builder) NewAddValidatorTx(
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  startTime,
 			End:    endTime,
 			Wght:   stakeAmount,
@@ -501,6 +505,10 @@ func (b *builder) NewAddDelegatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -514,7 +522,7 @@ func (b *builder) NewAddDelegatorTx(
 			Outs:         unlockedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: sNodeID,
 			Start:  startTime,
 			End:    endTime,
 			Wght:   stakeAmount,
@@ -542,6 +550,10 @@ func (b *builder) NewAddSubnetValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -563,7 +575,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		}},
 		SubnetValidator: txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: sNodeID,
 				Start:  startTime,
 				End:    endTime,
 				Wght:   weight,
@@ -585,6 +597,10 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
+	sNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		return nil, err
+	}
 	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -605,7 +621,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 			Outs:         outs,
 		}},
 		Subnet:     subnetID,
-		NodeID:     nodeID,
+		NodeID:     sNodeID,
 		SubnetAuth: subnetAuth,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

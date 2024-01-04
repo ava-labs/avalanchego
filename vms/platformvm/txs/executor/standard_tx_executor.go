@@ -278,7 +278,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	if tx.Validator.NodeID == ids.EmptyNodeID {
+	if tx.Validator.NodeID == ids.EmptyShortNodeID {
 		return errEmptyNodeID
 	}
 
@@ -299,7 +299,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
+	if e.Config.PartialSyncPrimaryNetwork && ids.NodeIDFromShortNodeID(tx.Validator.NodeID) == e.Ctx.NodeID {
 		e.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
 			zap.String("reason", "primary network is not being fully synced"),
 			zap.Stringer("txID", txID),
@@ -447,7 +447,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 
 	if e.Config.PartialSyncPrimaryNetwork &&
 		tx.Subnet == constants.PrimaryNetworkID &&
-		tx.Validator.NodeID == e.Ctx.NodeID {
+		ids.NodeIDFromShortNodeID(tx.Validator.NodeID) == e.Ctx.NodeID {
 		e.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
 			zap.String("reason", "primary network is not being fully synced"),
 			zap.Stringer("txID", txID),

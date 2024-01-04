@@ -190,7 +190,7 @@ func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
 	utx := &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{},
 		Validator: txs.Validator{
-			NodeID: ids.GenerateTestNodeID(),
+			NodeID: ids.GenerateTestShortNodeID(),
 			Start:  startTime,
 			End:    endTime,
 		},

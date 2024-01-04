@@ -91,9 +91,12 @@ func TestStateSyncGenesis(t *testing.T) {
 func newInitializedState(require *require.Assertions) (State, database.Database) {
 	s, db := newUninitializedState(require)
 
+	initialShortNodeID, err := ids.ShortNodeIDFromNodeID(initialNodeID)
+	require.NoError(err)
+
 	initialValidator := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: initialNodeID,
+			NodeID: initialShortNodeID,
 			Start:  uint64(initialTime.Unix()),
 			End:    uint64(initialValidatorEndTime.Unix()),
 			Wght:   units.Avax,

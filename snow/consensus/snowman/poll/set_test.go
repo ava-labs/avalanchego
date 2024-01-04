@@ -260,7 +260,7 @@ func TestSetString(t *testing.T) {
 	expected := `current polls: (Size = 1)
     RequestID 0:
         waiting on Bag[ids.NodeID]: (Size = 1)
-            NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
+            NodeID-SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1
         received Bag[ids.ID]: (Size = 0)`
 	require.True(s.Add(0, vdrs))
 	require.Equal(expected, s.String())

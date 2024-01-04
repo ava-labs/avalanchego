@@ -16,7 +16,7 @@ const defaultWeight = 10000
 func TestBoundedBy(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestShortNodeID()
 
 	// case 1: a starts, a finishes, b starts, b finishes
 	aStartTime := uint64(0)
