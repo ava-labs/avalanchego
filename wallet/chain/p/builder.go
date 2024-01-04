@@ -843,7 +843,7 @@ func (b *builder) getBalance(
 	for _, utxo := range utxos {
 		outIntf := utxo.Out
 		if lockedOut, ok := outIntf.(*stakeable.LockOut); ok {
-			if !options.AllowStakeableLocked() && lockedOut.Locktime > uint64(minIssuanceTime) {
+			if !options.AllowStakeableLocked() && lockedOut.Locktime > minIssuanceTime {
 				// This output is currently locked, so this output can't be
 				// burned.
 				continue
@@ -927,7 +927,7 @@ func (b *builder) spend(
 			// iteration of the UTXO set
 			continue
 		}
-		if uint64(minIssuanceTime) >= lockedOut.Locktime {
+		if minIssuanceTime >= lockedOut.Locktime {
 			// This output isn't locked, so it will be handled during the next
 			// iteration of the UTXO set
 			continue
@@ -1006,7 +1006,7 @@ func (b *builder) spend(
 
 		outIntf := utxo.Out
 		if lockedOut, ok := outIntf.(*stakeable.LockOut); ok {
-			if lockedOut.Locktime > uint64(minIssuanceTime) {
+			if lockedOut.Locktime > minIssuanceTime {
 				// This output is currently locked, so this output can't be
 				// burned.
 				continue

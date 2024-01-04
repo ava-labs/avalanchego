@@ -295,7 +295,7 @@ func (h *handler) Spend(
 		out := utxo.Out
 		inner, ok := out.(*stakeable.LockOut)
 		if ok {
-			if inner.Locktime > uint64(now) {
+			if inner.Locktime > now {
 				// This output is currently locked, so this output can't be
 				// burned. Additionally, it may have already been consumed
 				// above. Regardless, we skip to the next UTXO

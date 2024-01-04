@@ -305,7 +305,6 @@ func (s *spender) Mint(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-
 	time := uint64(s.clock.Unix())
 	ops := []*txs.Operation{}
 	keys := [][]*secp256k1.PrivateKey{}
