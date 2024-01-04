@@ -871,10 +871,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.Metrics.ClockSkew.Observe(clockDifference)
 
-	if clockDifference > p.MaxClockDifference.Seconds() {
-
-	}
-
 	if msg.Client != nil {
 		p.version = &version.Application{
 			Name:  msg.Client.Name,
