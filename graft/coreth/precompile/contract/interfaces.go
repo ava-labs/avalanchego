@@ -41,7 +41,6 @@ type StateDB interface {
 	GetTxHash() common.Hash
 
 	Suicide(common.Address) bool
-	Finalise(deleteEmptyObjects bool)
 
 	Snapshot() int
 	RevertToSnapshot(int)
