@@ -6,12 +6,17 @@ package peer
 import (
 	"crypto"
 	"crypto/rand"
+	"errors"
+	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+var errTimestampTooFarInFuture = errors.New("timestamp too far in the future")
 
 // UnsignedIP is used for a validator to claim an IP. The [Timestamp] is used to
 // ensure that the most updated IP claim is tracked by peers for a given
@@ -49,7 +54,23 @@ type SignedIP struct {
 	Signature []byte
 }
 
-func (ip *SignedIP) Verify(cert *staking.Certificate) error {
+// Returns nil if:
+// * [ip.Signature] is a valid signature over [ip.UnsignedIP] from
+// the provided [cert].
+// * [ip.Timestamp] is not more than [maxTimeAhead] ahead of [now].
+func (ip *SignedIP) Verify(
+	cert *staking.Certificate,
+	now time.Time,
+	maxTimeAhead time.Duration,
+) error {
+	nowUnix := uint64(now.Unix())
+	// Note that it is expected that the [ipSigningTime] can be in the past. We
+	// are just verifying that the claimed signing time isn't too far in the
+	// future here.
+	if ip.Timestamp > nowUnix && ip.Timestamp-nowUnix > uint64(maxTimeAhead.Seconds()) {
+		return fmt.Errorf("%w: timestamp %d more than %s ahead", errTimestampTooFarInFuture, ip.Timestamp, maxTimeAhead)
+	}
+
 	return staking.CheckSignature(
 		cert,
 		ip.UnsignedIP.bytes(),

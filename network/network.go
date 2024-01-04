@@ -1029,7 +1029,11 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 			},
 			Signature: ip.Signature,
 		}
-		if err := signedIP.Verify(ip.Cert); err != nil {
+		if err := signedIP.Verify(
+			ip.Cert,
+			n.peerConfig.Clock.Time(),
+			n.peerConfig.MaxClockDifference,
+		); err != nil {
 			return nil, err
 		}
 		ipAuths[i] = &ipAuth{
