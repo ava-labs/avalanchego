@@ -16,7 +16,7 @@ func TestNew(t *testing.T) {
 		require         = require.New(t)
 		maxN     uint64 = 10000
 		p               = 0.1
-		maxBytes uint64 = 1 * units.MiB // 1 MiB
+		maxBytes        = 1 * units.MiB // 1 MiB
 	)
 	f, err := New(maxN, p, maxBytes)
 	require.NoError(err)
