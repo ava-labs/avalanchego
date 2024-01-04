@@ -1084,6 +1084,9 @@ func (n *Node) initVMs() error {
 	if err := block.InitCodec(durangoTime); err != nil {
 		return err
 	}
+	if err := coreth.InitCodec(durangoTime); err != nil {
+		return err
+	}
 
 	// Register the VMs that Avalanche supports
 	err := utils.Err(
