@@ -13,11 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-var (
-	repairedKey = []byte("atomicTrieHasBonusBlocks")
-)
+var repairedKey = []byte("atomicTrieHasBonusBlocks")
 
-// TODO: Remove this after the DUpgrade
+// TODO: Remove this after the Durango
 // repairAtomicTrie applies the bonus blocks to the atomic trie so all nodes
 // can have a canonical atomic trie.
 // Initially, bonus blocks were not indexed into the atomic trie. However, a

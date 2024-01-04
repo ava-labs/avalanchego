@@ -34,7 +34,7 @@ import (
 
 // TestJumpTableCopy tests that deep copy is necessery to prevent modify shared jump table
 func TestJumpTableCopy(t *testing.T) {
-	tbl := newDUpgradeInstructionSet()
+	tbl := newDurangoInstructionSet()
 	require.Equal(t, uint64(0), tbl[SLOAD].constantGas)
 
 	// a deep copy won't modify the shared jump table

@@ -54,8 +54,8 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	if !ok {
 		return newEVMBlockContext(header, chain, author, nil)
 	}
-	// Prior to the DUpgrade, the VM enforces the extra data is smaller than or
-	// equal to this size. After the DUpgrade, the VM pre-verifies the extra
+	// Prior to the Durango, the VM enforces the extra data is smaller than or
+	// equal to this size. After the Durango, the VM pre-verifies the extra
 	// data past the dynamic fee rollup window is valid.
 	predicateResults, err := predicate.ParseResults(predicateBytes)
 	if err != nil {

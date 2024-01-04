@@ -65,7 +65,7 @@ var (
 	apricotPhase1InstructionSet    = newApricotPhase1InstructionSet()
 	apricotPhase2InstructionSet    = newApricotPhase2InstructionSet()
 	apricotPhase3InstructionSet    = newApricotPhase3InstructionSet()
-	dUpgradeInstructionSet         = newDUpgradeInstructionSet()
+	durangoInstructionSet          = newDurangoInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -89,7 +89,7 @@ func validate(jt JumpTable) JumpTable {
 	return jt
 }
 
-func newDUpgradeInstructionSet() JumpTable {
+func newDurangoInstructionSet() JumpTable {
 	instructionSet := newApricotPhase3InstructionSet()
 	enable3855(&instructionSet) // PUSH0 instruction
 	enable3860(&instructionSet) // Limit and meter initcode

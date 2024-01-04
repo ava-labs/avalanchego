@@ -44,7 +44,7 @@ var (
 
 func TestSendWarpMessage(t *testing.T) {
 	require := require.New(t)
-	issuer, vm, _, _, _ := GenesisVM(t, true, genesisJSONDUpgrade, "", "")
+	issuer, vm, _, _, _ := GenesisVM(t, true, genesisJSONDurango, "", "")
 
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -237,7 +237,7 @@ func TestValidateInvalidWarpBlockHash(t *testing.T) {
 
 func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.UnsignedMessage, validSignature bool, txPayload []byte) {
 	require := require.New(t)
-	issuer, vm, _, _, _ := GenesisVM(t, true, genesisJSONDUpgrade, "", "")
+	issuer, vm, _, _, _ := GenesisVM(t, true, genesisJSONDurango, "", "")
 
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -387,7 +387,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 
 func TestReceiveWarpMessage(t *testing.T) {
 	require := require.New(t)
-	issuer, vm, _, _, _ := GenesisVM(t, true, genesisJSONDUpgrade, "", "")
+	issuer, vm, _, _, _ := GenesisVM(t, true, genesisJSONDurango, "", "")
 
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -563,7 +563,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 }
 
 func TestMessageSignatureRequestsToVM(t *testing.T) {
-	_, vm, _, _, appSender := GenesisVM(t, true, genesisJSONDUpgrade, "", "")
+	_, vm, _, _, appSender := GenesisVM(t, true, genesisJSONDurango, "", "")
 
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -623,7 +623,7 @@ func TestMessageSignatureRequestsToVM(t *testing.T) {
 }
 
 func TestBlockSignatureRequestsToVM(t *testing.T) {
-	_, vm, _, _, appSender := GenesisVM(t, true, genesisJSONDUpgrade, "", "")
+	_, vm, _, _, appSender := GenesisVM(t, true, genesisJSONDurango, "", "")
 
 	defer func() {
 		err := vm.Shutdown(context.Background())

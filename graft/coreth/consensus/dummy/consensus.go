@@ -187,15 +187,13 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 
 // modified from consensus.go
 func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, uncle bool) error {
-	var (
-		config = chain.Config()
-	)
+	config := chain.Config()
 	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
 	}
 	switch {
-	case config.IsDUpgrade(header.Time):
+	case config.IsDurango(header.Time):
 		if len(header.Extra) < params.DynamicFeeExtraDataSize {
 			return fmt.Errorf("expected extra-data field length >= %d, found %d", params.DynamicFeeExtraDataSize, len(header.Extra))
 		}
@@ -217,7 +215,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
 		return consensus.ErrFutureBlock
 	}
-	//if header.Time <= parent.Time {
+	// if header.Time <= parent.Time {
 	if header.Time < parent.Time {
 		return errInvalidBlockTime
 	}
@@ -395,7 +393,8 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 }
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, state *state.StateDB, txs []*types.Transaction,
-	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+	uncles []*types.Header, receipts []*types.Receipt,
+) (*types.Block, error) {
 	var (
 		contribution, extDataGasUsed *big.Int
 		extraData                    []byte
