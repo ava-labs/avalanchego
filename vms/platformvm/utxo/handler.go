@@ -171,7 +171,7 @@ func (h *handler) Spend(
 	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
-	now := h.clk.Time().Unix()
+	now := uint64(h.clk.Time().Unix())
 
 	ins := []*avax.TransferableInput{}
 	returnedOuts := []*avax.TransferableOutput{}
@@ -199,7 +199,7 @@ func (h *handler) Spend(
 			// iteration of the UTXO set
 			continue
 		}
-		if out.Locktime <= uint64(now) {
+		if out.Locktime <= now {
 			// This output is no longer locked, so it will be handled during the
 			// next iteration of the UTXO set
 			continue
@@ -418,7 +418,7 @@ func (h *handler) Authorize(
 	kc := secp256k1fx.NewKeychain(keys...)
 
 	// Make sure that the operation is valid after a minimum time
-	now := h.clk.Time().Unix()
+	now := uint64(h.clk.Time().Unix())
 
 	// Attempt to prove ownership of the subnet
 	indices, signers, matches := kc.Match(owner, now)

@@ -14,9 +14,9 @@ import (
 func MatchOwners(
 	owners *secp256k1fx.OutputOwners,
 	addrs set.Set[ids.ShortID],
-	minIssuanceTime int64,
+	minIssuanceTime uint64,
 ) ([]uint32, bool) {
-	if owners.Locktime > uint64(minIssuanceTime) {
+	if owners.Locktime > minIssuanceTime {
 		return nil, false
 	}
 
