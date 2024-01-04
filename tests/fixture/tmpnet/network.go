@@ -577,7 +577,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	// Wait for nodes to become subnet validators
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
 	for _, subnet := range createdSubnets {
-		if err := waitForActiveValidators(ctx, w, pChainClient, subnet, n.Nodes); err != nil {
+		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
 			return err
 		}
 
@@ -593,6 +593,15 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	}
 
 	return nil
+}
+
+func (n *Network) GetURIForNodeID(nodeID ids.NodeID) (string, error) {
+	for _, node := range n.Nodes {
+		if node.NodeID == nodeID {
+			return node.URI, nil
+		}
+	}
+	return "", fmt.Errorf("%s is not known to the network", nodeID)
 }
 
 func (n *Network) GetNodeURIs() []NodeURI {

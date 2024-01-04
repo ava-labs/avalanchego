@@ -68,6 +68,9 @@ type Subnet struct {
 	// The private key that owns the subnet
 	OwningKey *secp256k1.PrivateKey
 
+	// IDs of the nodes responsible for validating the subnet
+	ValidatorIDs []ids.NodeID
+
 	Chains []*Chain
 }
 
@@ -188,6 +191,8 @@ func (s *Subnet) AddValidators(ctx context.Context, nodes []*Node) error {
 		if err != nil {
 			return err
 		}
+
+		s.ValidatorIDs = append(s.ValidatorIDs, node.NodeID)
 	}
 
 	return nil
@@ -236,7 +241,6 @@ func waitForActiveValidators(
 	w io.Writer,
 	pChainClient platformvm.Client,
 	subnet *Subnet,
-	nodes []*Node,
 ) error {
 	ticker := time.NewTicker(DefaultPollingInterval)
 	defer ticker.Stop()
@@ -258,8 +262,8 @@ func waitForActiveValidators(
 			validatorSet.Add(validator.NodeID)
 		}
 		allActive := true
-		for _, node := range nodes {
-			if !validatorSet.Contains(node.NodeID) {
+		for _, validatorID := range subnet.ValidatorIDs {
+			if !validatorSet.Contains(validatorID) {
 				allActive = false
 			}
 		}

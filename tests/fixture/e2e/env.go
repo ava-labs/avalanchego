@@ -88,8 +88,10 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 	// Wait for chains to have bootstrapped on all nodes
 	Eventually(func() bool {
 		for _, subnet := range network.Subnets {
-			for _, node := range network.Nodes {
-				infoClient := info.NewClient(node.URI)
+			for _, validatorID := range subnet.ValidatorIDs {
+				uri, err := network.GetURIForNodeID(validatorID)
+				require.NoError(err)
+				infoClient := info.NewClient(uri)
 				for _, chain := range subnet.Chains {
 					isBootstrapped, err := infoClient.IsBootstrapped(DefaultContext(), chain.ChainID.String())
 					// Ignore errors since a chain id that is not yet known will result in a recoverable error.
