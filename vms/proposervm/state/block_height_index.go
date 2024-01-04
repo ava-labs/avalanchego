@@ -19,8 +19,9 @@ var (
 	heightPrefix   = []byte("height")
 	metadataPrefix = []byte("metadata")
 
-	forkKey       = []byte("fork")
-	checkpointKey = []byte("checkpoint")
+	forkKey             = []byte("fork")
+	checkpointKey       = []byte("checkpoint")
+	latestBackfilledKey = []byte("latestBackfilled")
 )
 
 type HeightIndexGetter interface {
@@ -32,12 +33,16 @@ type HeightIndexGetter interface {
 	// Fork height is stored when the first post-fork block/option is accepted.
 	// Before that, fork height won't be found.
 	GetForkHeight() (uint64, error)
+
+	GetLastBackfilledBlkID() (ids.ID, error)
 }
 
 type HeightIndexWriter interface {
 	SetForkHeight(height uint64) error
 	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
 	DeleteBlockIDAtHeight(height uint64) error
+
+	SetLastBackfilledBlkID(blkID ids.ID) error
 }
 
 // A checkpoint is the blockID of the next block to be considered
@@ -138,4 +143,12 @@ func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
 
 func (hi *heightIndex) DeleteCheckpoint() error {
 	return hi.metadataDB.Delete(checkpointKey)
+}
+
+func (hi *heightIndex) SetLastBackfilledBlkID(blkID ids.ID) error {
+	return database.PutID(hi.metadataDB, latestBackfilledKey, blkID)
+}
+
+func (hi *heightIndex) GetLastBackfilledBlkID() (ids.ID, error) {
+	return database.GetID(hi.metadataDB, latestBackfilledKey)
 }

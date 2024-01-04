@@ -33,7 +33,12 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 func (b *postForkBlock) acceptOuterBlk() error {
 	// Update in-memory references
 	b.status = choices.Accepted
-	b.vm.lastAcceptedTime = b.Timestamp()
+
+	// following backfill introduction we may store past
+	// blocks, hence safeguard lastAcceptedTime
+	if b.Timestamp().After(b.vm.lastAcceptedTime) {
+		b.vm.lastAcceptedTime = b.Timestamp()
+	}
 
 	return b.vm.acceptPostForkBlock(b)
 }
