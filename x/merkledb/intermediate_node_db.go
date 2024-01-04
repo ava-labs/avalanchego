@@ -4,7 +4,6 @@
 package merkledb
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -13,8 +12,6 @@ import (
 )
 
 const defaultBufferLength = 256
-
-var errCacheSizeTooSmall = errors.New("cache size must be larger than or equal to write buffer size")
 
 // Holds intermediate nodes. That is, those without values.
 // Changes to this database aren't written to [baseDB] until
@@ -51,10 +48,7 @@ func newIntermediateNodeDB(
 	writeBufferSize int,
 	evictionBatchSize int,
 	tokenSize int,
-) (*intermediateNodeDB, error) {
-	if cacheSize < writeBufferSize {
-		return nil, errCacheSizeTooSmall
-	}
+) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,
 		baseDB:            db,
@@ -69,7 +63,7 @@ func newIntermediateNodeDB(
 		result.onEviction,
 	)
 
-	return result, nil
+	return result
 }
 
 // A non-nil error is considered fatal and closes [db.baseDB].
@@ -117,6 +111,15 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n *node) err
 
 func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
+		db.metrics.IntermediateNodeCacheHit()
+		if cachedValue == nil {
+			return nil, database.ErrNotFound
+		}
+		return cachedValue, nil
+	}
+	db.metrics.IntermediateNodeCacheMiss()
+
+	if cachedValue, isCached := db.writeBuffer.Get(key); isCached {
 		db.metrics.IntermediateNodeCacheHit()
 		if cachedValue == nil {
 			return nil, database.ErrNotFound
