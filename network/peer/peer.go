@@ -872,21 +872,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	p.Metrics.ClockSkew.Observe(clockDifference)
 
 	if clockDifference > p.MaxClockDifference.Seconds() {
-		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
-			p.Log.Warn("beacon reports out of sync time",
-				zap.Stringer("nodeID", p.id),
-				zap.Uint64("peerTime", msg.MyTime),
-				zap.Uint64("myTime", myTimeUnix),
-			)
-		} else {
-			p.Log.Debug("peer reports out of sync time",
-				zap.Stringer("nodeID", p.id),
-				zap.Uint64("peerTime", msg.MyTime),
-				zap.Uint64("myTime", myTimeUnix),
-			)
-		}
-		p.StartClose()
-		return
+
 	}
 
 	if msg.Client != nil {
@@ -997,10 +983,22 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		Signature: msg.Sig,
 	}
 	if err := p.ip.Verify(p.cert, myTime, p.MaxClockDifference); err != nil {
-		p.Log.Debug("timestamp/signature verification failed",
-			zap.Stringer("nodeID", p.id),
-			zap.Error(err),
-		)
+		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
+			p.Log.Warn("beacon has invalid signature or is out of sync",
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", msg.MyTime),
+				zap.Uint64("myTime", myTimeUnix),
+				zap.Error(err),
+			)
+		} else {
+			p.Log.Debug("peer has invalid signature or is out of sync",
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", msg.MyTime),
+				zap.Uint64("myTime", myTimeUnix),
+				zap.Error(err),
+			)
+		}
+
 		p.StartClose()
 		return
 	}
