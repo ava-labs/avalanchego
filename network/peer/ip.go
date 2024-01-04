@@ -16,7 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var errTimestampTooFarInFuture = errors.New("timestamp too far in the future")
+var (
+	errTimestampTooFarInFuture = errors.New("timestamp too far in the future")
+	errInvalidSignature        = errors.New("invalid signature")
+)
 
 // UnsignedIP is used for a validator to claim an IP. The [Timestamp] is used to
 // ensure that the most updated IP claim is tracked by peers for a given
@@ -71,9 +74,12 @@ func (ip *SignedIP) Verify(
 		return fmt.Errorf("%w: timestamp %d more than %s ahead", errTimestampTooFarInFuture, ip.Timestamp, maxTimeAhead)
 	}
 
-	return staking.CheckSignature(
+	if err := staking.CheckSignature(
 		cert,
 		ip.UnsignedIP.bytes(),
 		ip.Signature,
-	)
+	); err != nil {
+		return fmt.Errorf("%w: %w", errInvalidSignature, err)
+	}
+	return nil
 }
