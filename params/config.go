@@ -76,7 +76,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC)),
 		BanffBlockTimestamp:             utils.TimeToNewUint64(time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC)),
 		CortinaBlockTimestamp:           utils.TimeToNewUint64(time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC)),
-		// TODO Add DUpgrade timestamp
+		// TODO Add Durango timestamp
 	}
 
 	// AvalancheFujiChainConfig is the configuration for the Fuji Test Network
@@ -103,7 +103,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC)),
 		BanffBlockTimestamp:             utils.TimeToNewUint64(time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC)),
 		CortinaBlockTimestamp:           utils.TimeToNewUint64(time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC)),
-		// TODO Add DUpgrade timestamp
+		// TODO Add Durango timestamp
 	}
 
 	// AvalancheLocalChainConfig is the configuration for the Avalanche Local Network
@@ -130,7 +130,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
-		DUpgradeBlockTimestamp:          utils.NewUint64(0),
+		DurangoBlockTimestamp:           utils.NewUint64(0),
 	}
 
 	TestChainConfig = &ChainConfig{
@@ -157,7 +157,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
-		DUpgradeBlockTimestamp:          utils.NewUint64(0),
+		DurangoBlockTimestamp:           utils.NewUint64(0),
 	}
 
 	TestLaunchConfig = &ChainConfig{
@@ -184,7 +184,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhase1Config = &ChainConfig{
@@ -211,7 +211,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhase2Config = &ChainConfig{
@@ -238,7 +238,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhase3Config = &ChainConfig{
@@ -265,7 +265,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhase4Config = &ChainConfig{
@@ -292,7 +292,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhase5Config = &ChainConfig{
@@ -319,7 +319,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhasePre6Config = &ChainConfig{
@@ -346,7 +346,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhase6Config = &ChainConfig{
@@ -373,7 +373,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: nil,
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestApricotPhasePost6Config = &ChainConfig{
@@ -400,7 +400,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestBanffChainConfig = &ChainConfig{
@@ -427,7 +427,7 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           nil,
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
 	TestCortinaChainConfig = &ChainConfig{
@@ -454,10 +454,10 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
-		DUpgradeBlockTimestamp:          nil,
+		DurangoBlockTimestamp:           nil,
 	}
 
-	TestDUpgradeChainConfig = &ChainConfig{
+	TestDurangoChainConfig = &ChainConfig{
 		AvalancheContext:                AvalancheContext{utils.TestSnowContext()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
@@ -546,10 +546,10 @@ type ChainConfig struct {
 	BanffBlockTimestamp *uint64 `json:"banffBlockTimestamp,omitempty"`
 	// Cortina increases the block gas limit to 15M. (nil = no fork, 0 = already activated)
 	CortinaBlockTimestamp *uint64 `json:"cortinaBlockTimestamp,omitempty"`
-	// DUpgrade activates the Shanghai Execution Spec Upgrade from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips)
+	// Durango activates the Shanghai Execution Spec Upgrade from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips)
 	// and Avalanche Warp Messaging. (nil = no fork, 0 = already activated)
 	// Note: EIP-4895 is excluded since withdrawals are not relevant to the Avalanche C-Chain or Subnets running the EVM.
-	DUpgradeBlockTimestamp *uint64 `json:"dUpgradeBlockTimestamp,omitempty"`
+	DurangoBlockTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
 	CancunTime *uint64 `json:"cancunTime,omitempty"`
 
@@ -591,7 +591,7 @@ func (c *ChainConfig) Description() string {
 	banner += fmt.Sprintf(" - Apricot Phase Post-6 Timestamp:   @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0\n", ptrToString(c.ApricotPhasePost6BlockTimestamp))
 	banner += fmt.Sprintf(" - Banff Timestamp:                  @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", ptrToString(c.BanffBlockTimestamp))
 	banner += fmt.Sprintf(" - Cortina Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(c.CortinaBlockTimestamp))
-	banner += fmt.Sprintf(" - DUpgrade Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.DUpgradeBlockTimestamp))
+	banner += fmt.Sprintf(" - Durango Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.DurangoBlockTimestamp))
 	banner += fmt.Sprintf(" - Cancun Timestamp:                 @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.CancunTime))
 	banner += "\n"
 	return banner
@@ -711,10 +711,10 @@ func (c *ChainConfig) IsCortina(time uint64) bool {
 	return utils.IsTimestampForked(c.CortinaBlockTimestamp, time)
 }
 
-// IsDUpgrade returns whether [time] represents a block
-// with a timestamp after the DUpgrade upgrade time.
-func (c *ChainConfig) IsDUpgrade(time uint64) bool {
-	return utils.IsTimestampForked(c.DUpgradeBlockTimestamp, time)
+// IsDurango returns whether [time] represents a block
+// with a timestamp after the Durango upgrade time.
+func (c *ChainConfig) IsDurango(time uint64) bool {
+	return utils.IsTimestampForked(c.DurangoBlockTimestamp, time)
 }
 
 // IsCancun returns whether [time] represents a block
@@ -835,7 +835,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "apricotPhasePost6BlockTimestamp", timestamp: c.ApricotPhasePost6BlockTimestamp},
 		{name: "banffBlockTimestamp", timestamp: c.BanffBlockTimestamp},
 		{name: "cortinaBlockTimestamp", timestamp: c.CortinaBlockTimestamp},
-		{name: "dUpgradeBlockTimestamp", timestamp: c.DUpgradeBlockTimestamp},
+		{name: "durangoBlockTimestamp", timestamp: c.DurangoBlockTimestamp},
 		{name: "cancunTime", timestamp: c.CancunTime},
 	} {
 		if lastFork.name != "" {
@@ -934,8 +934,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time
 	if isForkTimestampIncompatible(c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp, time) {
 		return newTimestampCompatError("Cortina fork block timestamp", c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp)
 	}
-	if isForkTimestampIncompatible(c.DUpgradeBlockTimestamp, newcfg.DUpgradeBlockTimestamp, time) {
-		return newTimestampCompatError("DUpgrade fork block timestamp", c.DUpgradeBlockTimestamp, newcfg.DUpgradeBlockTimestamp)
+	if isForkTimestampIncompatible(c.DurangoBlockTimestamp, newcfg.DurangoBlockTimestamp, time) {
+		return newTimestampCompatError("Durango fork block timestamp", c.DurangoBlockTimestamp, newcfg.DurangoBlockTimestamp)
 	}
 	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, time) {
 		return newTimestampCompatError("Cancun fork block timestamp", c.CancunTime, newcfg.CancunTime)
@@ -1068,7 +1068,7 @@ type Rules struct {
 	IsApricotPhasePre6, IsApricotPhase6, IsApricotPhasePost6                            bool
 	IsBanff                                                                             bool
 	IsCortina                                                                           bool
-	IsDUpgrade                                                                          bool
+	IsDurango                                                                           bool
 
 	// ActivePrecompiles maps addresses to stateful precompiled contracts that are enabled
 	// for this rule set.
@@ -1118,7 +1118,7 @@ func (c *ChainConfig) AvalancheRules(blockNum *big.Int, timestamp uint64) Rules 
 	rules.IsApricotPhasePost6 = c.IsApricotPhasePost6(timestamp)
 	rules.IsBanff = c.IsBanff(timestamp)
 	rules.IsCortina = c.IsCortina(timestamp)
-	rules.IsDUpgrade = c.IsDUpgrade(timestamp)
+	rules.IsDurango = c.IsDurango(timestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.ActivePrecompiles = make(map[common.Address]precompileconfig.Config)

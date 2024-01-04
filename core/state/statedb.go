@@ -1214,7 +1214,7 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 //
 // Potential EIPs:
 // - Reset access list (Berlin/ApricotPhase2)
-// - Add coinbase to access list (EIP-3651/DUpgrade)
+// - Add coinbase to access list (EIP-3651/Durango)
 // - Reset transient storage (EIP-1153)
 func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
 	if rules.IsApricotPhase2 {
@@ -1236,7 +1236,7 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 				al.AddSlot(el.Address, key)
 			}
 		}
-		if rules.IsDUpgrade { // EIP-3651: warm coinbase
+		if rules.IsDurango { // EIP-3651: warm coinbase
 			al.AddAddress(coinbase)
 		}
 

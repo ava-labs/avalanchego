@@ -306,7 +306,7 @@ func TestStateProcessorErrors(t *testing.T) {
 		}
 	}
 
-	// ErrMaxInitCodeSizeExceeded, for this we need extra Shanghai (DUpgrade/EIP-3860) enabled.
+	// ErrMaxInitCodeSizeExceeded, for this we need extra Shanghai (Durango/EIP-3860) enabled.
 	{
 		var (
 			db    = rawdb.NewMemoryDatabase()
@@ -334,7 +334,7 @@ func TestStateProcessorErrors(t *testing.T) {
 					ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
 					BanffBlockTimestamp:             utils.NewUint64(0),
 					CortinaBlockTimestamp:           utils.NewUint64(0),
-					DUpgradeBlockTimestamp:          utils.NewUint64(0),
+					DurangoBlockTimestamp:           utils.NewUint64(0),
 				},
 				Alloc: GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): GenesisAccount{

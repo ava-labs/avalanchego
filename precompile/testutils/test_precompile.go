@@ -92,7 +92,7 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state cont
 	chainConfig := test.ChainConfig
 	if chainConfig == nil {
 		mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-		mockChainConfig.EXPECT().IsDUpgrade(gomock.Any()).AnyTimes().Return(true)
+		mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
 		chainConfig = mockChainConfig
 	}
 

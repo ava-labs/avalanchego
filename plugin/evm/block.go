@@ -399,9 +399,9 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
 
 	switch {
-	case !rules.IsDUpgrade && rules.PredicatersExist():
-		return errors.New("cannot enable predicates before DUpgrade activation")
-	case !rules.IsDUpgrade:
+	case !rules.IsDurango && rules.PredicatersExist():
+		return errors.New("cannot enable predicates before Durango activation")
+	case !rules.IsDurango:
 		return nil
 	}
 

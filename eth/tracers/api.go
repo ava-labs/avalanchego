@@ -1086,8 +1086,8 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 		copy.CortinaBlockTimestamp = timestamp
 		canon = false
 	}
-	if timestamp := override.DUpgradeBlockTimestamp; timestamp != nil {
-		copy.DUpgradeBlockTimestamp = timestamp
+	if timestamp := override.DurangoBlockTimestamp; timestamp != nil {
+		copy.DurangoBlockTimestamp = timestamp
 		canon = false
 	}
 	if timestamp := override.CancunTime; timestamp != nil {
