@@ -43,7 +43,9 @@ type blockMetrics struct {
 	parseStateSummary,
 	parseStateSummaryErr,
 	getStateSummary,
-	getStateSummaryErr metric.Averager
+	getStateSummaryErr,
+	backfillBlocksEnabled,
+	backfillBlocks metric.Averager
 }
 
 func (m *blockMetrics) Initialize(
@@ -88,6 +90,8 @@ func (m *blockMetrics) Initialize(
 		m.parseStateSummaryErr = newAverager(namespace, "parse_state_summary_err", reg, &errs)
 		m.getStateSummary = newAverager(namespace, "get_state_summary", reg, &errs)
 		m.getStateSummaryErr = newAverager(namespace, "get_state_summary_err", reg, &errs)
+		m.backfillBlocksEnabled = newAverager(namespace, "backfill_blocks_enabled", reg, &errs)
+		m.backfillBlocks = newAverager(namespace, "backfill_blocks", reg, &errs)
 	}
 	return errs.Err
 }

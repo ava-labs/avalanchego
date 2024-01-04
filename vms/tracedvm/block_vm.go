@@ -59,6 +59,8 @@ type blockVM struct {
 	getLastStateSummaryTag        string
 	parseStateSummaryTag          string
 	getStateSummaryTag            string
+	backfillBlocksEnabledTag      string
+	backfillBlocksTag             string
 	tracer                        trace.Tracer
 }
 

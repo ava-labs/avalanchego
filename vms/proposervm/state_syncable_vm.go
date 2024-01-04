@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -158,4 +159,12 @@ func (vm *VM) buildStateSummary(ctx context.Context, innerSummary block.StateSum
 		block:        block,
 		vm:           vm,
 	}, nil
+}
+
+func (*VM) BackfillBlocksEnabled(context.Context) (ids.ID, uint64, error) {
+	return ids.Empty, 0, block.ErrBlockBackfillingNotEnabled
+}
+
+func (*VM) BackfillBlocks(context.Context, [][]byte) (ids.ID, uint64, error) {
+	return ids.Empty, 0, block.ErrStopBlockBackfilling
 }
