@@ -17,13 +17,13 @@ import (
 const CodecVersion = txs.CodecVersion
 
 var (
-	Codec codec.Manager
-
 	// GenesisCode allows blocks of larger than usual size to be parsed.
 	// While this gives flexibility in accommodating large genesis blocks
 	// it must not be used to parse new, unverified blocks which instead
 	// must be processed by Codec
 	GenesisCodec codec.Manager
+
+	Codec codec.Manager
 )
 
 // TODO: Remove after v1.11.x has activated
