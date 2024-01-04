@@ -67,7 +67,7 @@ func (ip *SignedIP) Verify(
 	maxTimeAhead time.Duration,
 ) error {
 	nowUnix := uint64(now.Unix())
-	// Note that it is expected that the [ipSigningTime] can be in the past. We
+	// Note that it is expected that the [ip.Timestamp] can be in the past. We
 	// are just verifying that the claimed signing time isn't too far in the
 	// future here.
 	if ip.Timestamp > nowUnix && ip.Timestamp-nowUnix > uint64(maxTimeAhead.Seconds()) {
