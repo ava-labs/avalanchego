@@ -230,11 +230,10 @@ type BlockChain struct {
 
 	stopping atomic.Bool // false if chain is running, true when stopped
 
-	engine     consensus.Engine
-	validator  Validator  // Block and state validator interface
-	prefetcher Prefetcher // Block state prefetcher interface
-	processor  Processor  // Block transaction processor interface
-	vmConfig   vm.Config
+	engine    consensus.Engine
+	validator Validator // Block and state validator interface
+	processor Processor // Block transaction processor interface
+	vmConfig  vm.Config
 
 	lastAccepted *types.Block // Prevents reorgs past this height
 
@@ -335,7 +334,6 @@ func NewBlockChain(
 	}
 	bc.stateCache = state.NewDatabaseWithNodeDB(bc.db, bc.triedb)
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
-	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
 	bc.hc, err = NewHeaderChain(db, chainConfig, cacheConfig, engine)
@@ -1321,8 +1319,6 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	statedb.StartPrefetcher("chain", bc.cacheConfig.TriePrefetcherParallelism)
 	activeState = statedb
 
-	// If we have a followup block, run that against the current state to pre-cache
-	// transactions and probabilistically some of the account/storage trie nodes.
 	// Process block using the parent state as reference point
 	pstart := time.Now()
 	receipts, logs, usedGas, err := bc.processor.Process(block, parent, statedb, bc.vmConfig)

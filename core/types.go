@@ -27,8 +27,6 @@
 package core
 
 import (
-	"sync/atomic"
-
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
@@ -44,14 +42,6 @@ type Validator interface {
 	// ValidateState validates the given statedb and optionally the receipts and
 	// gas used.
 	ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error
-}
-
-// Prefetcher is an interface for pre-caching transaction signatures and state.
-type Prefetcher interface {
-	// Prefetch processes the state changes according to the Ethereum rules by running
-	// the transaction messages using the statedb, but any changes are discarded. The
-	// only goal is to pre-cache transaction signatures and state trie nodes.
-	Prefetch(block *types.Block, statedb *state.StateDB, cfg vm.Config, interrupt *atomic.Bool)
 }
 
 // Processor is an interface for processing blocks using a given initial state.
