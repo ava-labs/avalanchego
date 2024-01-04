@@ -116,6 +116,15 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key Key, n *node) err
 }
 
 func (db *intermediateNodeDB) Get(key Key) (*node, error) {
+	if cachedValue, isCached := db.writeBuffer.Get(key); isCached {
+		db.metrics.IntermediateNodeCacheHit()
+		if cachedValue == nil {
+			return nil, database.ErrNotFound
+		}
+		return cachedValue, nil
+	}
+	db.metrics.IntermediateNodeCacheMiss()
+
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.IntermediateNodeCacheHit()
 		if cachedValue == nil {
