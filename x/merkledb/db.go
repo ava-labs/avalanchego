@@ -336,7 +336,8 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	)
 	currentOps := make([]database.BatchOp, 0, opsSizeLimit)
 	valueIt := db.NewIterator()
-	defer valueIt.Release()
+	// ensure valueIt is captured and release gets called on the latest copy of valueIt
+	defer func() { valueIt.Release() }()
 	for valueIt.Next() {
 		if len(currentOps) >= opsSizeLimit {
 			view, err := newView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
