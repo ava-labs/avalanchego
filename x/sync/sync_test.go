@@ -580,7 +580,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 func TestFindNextKeyRandom(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(1704383220955266000)) // #nosec G404
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -614,10 +614,10 @@ func TestFindNextKeyRandom(t *testing.T) {
 	// Put random keys into the databases
 	for _, db := range []database.Database{remoteDB, localDB} {
 		for i := 0; i < numKeyValues; i++ {
-			key := make([]byte, r.Intn(maxKeyLen))
-			_, _ = r.Read(key)
-			val := make([]byte, r.Intn(maxValLen))
-			_, _ = r.Read(val)
+			key := make([]byte, rand.Intn(maxKeyLen))
+			_, _ = rand.Read(key)
+			val := make([]byte, rand.Intn(maxValLen))
+			_, _ = rand.Read(val)
 			require.NoError(db.Put(key, val))
 		}
 	}
@@ -632,10 +632,10 @@ func TestFindNextKeyRandom(t *testing.T) {
 		)
 		// Generate a valid range start and end
 		for rangeStart == nil || bytes.Compare(rangeStart, rangeEnd) == 1 {
-			rangeStart = make([]byte, r.Intn(maxRangeStartLen)+1)
-			_, _ = r.Read(rangeStart)
-			rangeEnd = make([]byte, r.Intn(maxRangeEndLen)+1)
-			_, _ = r.Read(rangeEnd)
+			rangeStart = make([]byte, rand.Intn(maxRangeStartLen)+1)
+			_, _ = rand.Read(rangeStart)
+			rangeEnd = make([]byte, rand.Intn(maxRangeEndLen)+1)
+			_, _ = rand.Read(rangeEnd)
 		}
 
 		startKey := maybe.Nothing[[]byte]()
