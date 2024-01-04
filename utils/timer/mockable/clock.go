@@ -35,10 +35,10 @@ func (c *Clock) UnixTime() time.Time {
 }
 
 // Unix returns the unix timestamp on this clock.
-func (c *Clock) Unix() int64 {
+func (c *Clock) Unix() uint64 {
 	unix := c.Time().Unix()
 	if unix < 0 {
 		unix = 0
 	}
-	return unix
+	return uint64(unix)
 }

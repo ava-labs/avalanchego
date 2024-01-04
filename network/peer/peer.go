@@ -511,7 +511,7 @@ func (p *peer) writeMessages() {
 
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
-		p.Clock.Unix(),
+		int64(p.Clock.Unix()),
 		mySignedIP.IPPort,
 		legacyApplication.String(),
 		myVersion.Name,
@@ -875,13 +875,13 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			p.Log.Warn("beacon reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
-				zap.Int64("myTime", myTime),
+				zap.Uint64("myTime", myTime),
 			)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
-				zap.Int64("myTime", myTime),
+				zap.Uint64("myTime", myTime),
 			)
 		}
 		p.StartClose()

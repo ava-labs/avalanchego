@@ -243,7 +243,7 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, response 
 	}
 
 	var (
-		now                 = uint64(s.vm.clock.Unix())
+		now                 = s.vm.clock.Unix()
 		unlockeds           = map[ids.ID]uint64{}
 		lockedStakeables    = map[ids.ID]uint64{}
 		lockedNotStakeables = map[ids.ID]uint64{}

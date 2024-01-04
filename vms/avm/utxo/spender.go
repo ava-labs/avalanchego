@@ -117,7 +117,7 @@ func (s *spender) Spend(
 	error,
 ) {
 	amountsSpent := make(map[ids.ID]uint64, len(amounts))
-	time := uint64(s.clock.Unix())
+	time := s.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*secp256k1.PrivateKey{}
@@ -183,7 +183,7 @@ func (s *spender) SpendNFT(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-	time := uint64(s.clock.Unix())
+	time := s.clock.Unix()
 
 	ops := []*txs.Operation{}
 	keys := [][]*secp256k1.PrivateKey{}
@@ -256,7 +256,7 @@ func (s *spender) SpendAll(
 	error,
 ) {
 	amountsSpent := make(map[ids.ID]uint64)
-	time := uint64(s.clock.Unix())
+	time := s.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*secp256k1.PrivateKey{}
@@ -305,7 +305,7 @@ func (s *spender) Mint(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-	time := uint64(s.clock.Unix())
+	time := s.clock.Unix()
 	ops := []*txs.Operation{}
 	keys := [][]*secp256k1.PrivateKey{}
 
@@ -378,7 +378,7 @@ func (s *spender) MintNFT(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-	time := uint64(s.clock.Unix())
+	time := s.clock.Unix()
 
 	ops := []*txs.Operation{}
 	keys := [][]*secp256k1.PrivateKey{}

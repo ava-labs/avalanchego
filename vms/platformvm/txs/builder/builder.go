@@ -240,7 +240,7 @@ func (b *builder) NewImportTx(
 	signers := [][]*secp256k1.PrivateKey{}
 
 	importedAmounts := make(map[ids.ID]uint64)
-	now := uint64(b.clk.Unix())
+	now := b.clk.Unix()
 	for _, utxo := range atomicUTXOs {
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
 		if err != nil {
