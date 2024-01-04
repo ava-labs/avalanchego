@@ -88,8 +88,8 @@ func createAllowListRoleSetter(precompileAddr common.Address, role Role) contrac
 			return nil, 0, err
 		}
 
-		// do not use strict mode after DUpgrade
-		useStrictMode := !contract.IsDUpgradeActivated(evm)
+		// do not use strict mode after Durango
+		useStrictMode := !contract.IsDurangoActivated(evm)
 		modifyAddress, err := UnpackModifyAllowListInput(input, role, useStrictMode)
 
 		if err != nil {
@@ -109,7 +109,7 @@ func createAllowListRoleSetter(precompileAddr common.Address, role Role) contrac
 		if !callerStatus.CanModify(modifyStatus, role) {
 			return nil, remainingGas, fmt.Errorf("%w: modify address: %s, from role: %s, to role: %s", ErrCannotModifyAllowList, callerAddr, modifyStatus, role)
 		}
-		if contract.IsDUpgradeActivated(evm) {
+		if contract.IsDurangoActivated(evm) {
 			if remainingGas, err = contract.DeductGas(remainingGas, AllowListEventGasCost); err != nil {
 				return nil, 0, err
 			}
@@ -159,8 +159,8 @@ func createReadAllowList(precompileAddr common.Address) contract.RunStatefulPrec
 			return nil, 0, err
 		}
 
-		// We skip the fixed length check with DUpgrade
-		useStrictMode := !contract.IsDUpgradeActivated(evm)
+		// We skip the fixed length check with Durango
+		useStrictMode := !contract.IsDurangoActivated(evm)
 		readAddress, err := UnpackReadAllowListInput(input, useStrictMode)
 		if err != nil {
 			return nil, remainingGas, err
@@ -200,7 +200,7 @@ func CreateAllowListFunctions(precompileAddr common.Address) []*contract.Statefu
 		} else if noRoleFnName, _ := NoRole.GetSetterFunctionName(); name == noRoleFnName {
 			fn = contract.NewStatefulPrecompileFunction(method.ID, createAllowListRoleSetter(precompileAddr, NoRole))
 		} else if managerFnName, _ := ManagerRole.GetSetterFunctionName(); name == managerFnName {
-			fn = contract.NewStatefulPrecompileFunctionWithActivator(method.ID, createAllowListRoleSetter(precompileAddr, ManagerRole), contract.IsDUpgradeActivated)
+			fn = contract.NewStatefulPrecompileFunctionWithActivator(method.ID, createAllowListRoleSetter(precompileAddr, ManagerRole), contract.IsDurangoActivated)
 		} else {
 			panic(fmt.Sprintf("unexpected method name: %s", name))
 		}

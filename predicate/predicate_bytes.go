@@ -54,8 +54,8 @@ func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
 // GetPredicateResultBytes returns the predicate result bytes from the extra data and
 // true iff the predicate results bytes have non-zero length.
 func GetPredicateResultBytes(extraData []byte) ([]byte, bool) {
-	// Prior to the DUpgrade, the VM enforces the extra data is smaller than or equal to this size.
-	// After the DUpgrade, the VM pre-verifies the extra data past the dynamic fee rollup window is
+	// Prior to Durango, the VM enforces the extra data is smaller than or equal to this size.
+	// After Durango, the VM pre-verifies the extra data past the dynamic fee rollup window is
 	// valid.
 	if len(extraData) <= params.DynamicFeeExtraDataSize {
 		return nil, false

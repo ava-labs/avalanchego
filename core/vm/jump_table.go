@@ -63,7 +63,7 @@ var (
 	constantinopleInstructionSet   = newConstantinopleInstructionSet()
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	subnetEVMInstructionSet        = newSubnetEVMInstructionSet()
-	dUpgradeInstructionSet         = newDUpgradeInstructionSet()
+	durangoInstructionSet          = newDurangoInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -87,9 +87,9 @@ func validate(jt JumpTable) JumpTable {
 	return jt
 }
 
-// newDUpgradeInstructionSet returns the frontier, homestead, byzantium,
-// constantinople, istanbul, petersburg, subnet-evm, d-upgrade instructions.
-func newDUpgradeInstructionSet() JumpTable {
+// newDurangoInstructionSet returns the frontier, homestead, byzantium,
+// constantinople, istanbul, petersburg, subnet-evm, durango instructions.
+func newDurangoInstructionSet() JumpTable {
 	instructionSet := newSubnetEVMInstructionSet()
 	enable3855(&instructionSet) // PUSH0 instruction
 	enable3860(&instructionSet) // Limit and meter initcode

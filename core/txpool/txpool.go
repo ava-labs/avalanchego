@@ -1580,7 +1580,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.rules.Store(&rules)
 	pool.eip2718.Store(rules.IsSubnetEVM)
 	pool.eip1559.Store(rules.IsSubnetEVM)
-	pool.eip3860.Store(rules.IsDUpgrade)
+	pool.eip3860.Store(rules.IsDurango)
 }
 
 // promoteExecutables moves transactions that have become processable from the

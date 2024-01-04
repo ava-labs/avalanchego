@@ -95,7 +95,7 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state cont
 			mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
 			mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
 			mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
-			mockChainConfig.EXPECT().IsDUpgrade(gomock.Any()).AnyTimes().Return(true)
+			mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
 			return mockChainConfig
 		}
 	}

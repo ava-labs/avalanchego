@@ -302,7 +302,7 @@ func TestStateProcessorErrors(t *testing.T) {
 		}
 	}
 
-	// ErrMaxInitCodeSizeExceeded, for this we need extra Shanghai (DUpgrade/EIP-3860) enabled.
+	// ErrMaxInitCodeSizeExceeded, for this we need extra Shanghai (Durango/EIP-3860) enabled.
 	{
 		var (
 			db    = rawdb.NewMemoryDatabase()
@@ -320,7 +320,7 @@ func TestStateProcessorErrors(t *testing.T) {
 					MuirGlacierBlock:    big.NewInt(0),
 					MandatoryNetworkUpgrades: params.MandatoryNetworkUpgrades{
 						SubnetEVMTimestamp: utils.NewUint64(0),
-						DUpgradeTimestamp:  utils.NewUint64(0),
+						DurangoTimestamp:   utils.NewUint64(0),
 					},
 					FeeConfig: params.DefaultFeeConfig,
 				},

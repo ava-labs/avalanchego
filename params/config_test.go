@@ -274,7 +274,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 			MuirGlacierBlock:    big.NewInt(0),
 			MandatoryNetworkUpgrades: MandatoryNetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
-				DUpgradeTimestamp:  utils.NewUint64(0),
+				DurangoTimestamp:   utils.NewUint64(0),
 			},
 			GenesisPrecompiles: Precompiles{},
 		},
@@ -310,7 +310,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 		"istanbulBlock": 0,
 		"muirGlacierBlock": 0,
 		"subnetEVMTimestamp": 0,
-		"dUpgradeTimestamp": 0,
+		"durangoTimestamp": 0,
 		"upgrades": {
 			"precompileUpgrades": [
 				{

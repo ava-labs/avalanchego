@@ -34,7 +34,7 @@ var (
 	errInvalidAddressedPayload = errors.New("cannot unpack addressed payload")
 	errInvalidBlockHashPayload = errors.New("cannot unpack block hash payload")
 	errCannotGetNumSigners     = errors.New("cannot fetch num signers from warp message")
-	errWarpCannotBeActivated   = errors.New("warp cannot be activated before DUpgrade")
+	errWarpCannotBeActivated   = errors.New("warp cannot be activated before Durango")
 	errFailedVerification      = errors.New("cannot verify warp signature")
 )
 
@@ -78,9 +78,9 @@ func (*Config) Key() string { return ConfigKey }
 // Verify tries to verify Config and returns an error accordingly.
 func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	if c.Timestamp() != nil {
-		// If Warp attempts to activate before the DUpgrade, fail verification
+		// If Warp attempts to activate before Durango, fail verification
 		timestamp := *c.Timestamp()
-		if !chainConfig.IsDUpgrade(timestamp) {
+		if !chainConfig.IsDurango(timestamp) {
 			return errWarpCannotBeActivated
 		}
 	}

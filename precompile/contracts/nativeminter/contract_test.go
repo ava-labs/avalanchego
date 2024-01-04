@@ -174,12 +174,12 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
-		"mint doesn't log pre-DUpgrade": {
+		"mint doesn't log pre-Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
 			InputFn: func(t testing.TB) []byte {
@@ -197,12 +197,12 @@ var (
 				require.Len(t, logsData, 0)
 			},
 		},
-		"mint with extra padded bytes should fail pre-DUpgrade": {
+		"mint with extra padded bytes should fail pre-Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
 			InputFn: func(t testing.TB) []byte {
@@ -218,12 +218,12 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidLen.Error(),
 		},
-		"mint with extra padded bytes should succeed with DUpgrade": {
+		"mint with extra padded bytes should succeed with Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
 			InputFn: func(t testing.TB) []byte {

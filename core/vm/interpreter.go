@@ -70,8 +70,8 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	var table *JumpTable
 	switch {
-	case evm.chainRules.IsDUpgrade:
-		table = &dUpgradeInstructionSet
+	case evm.chainRules.IsDurango:
+		table = &durangoInstructionSet
 	case evm.chainRules.IsSubnetEVM:
 		table = &subnetEVMInstructionSet
 	case evm.chainRules.IsIstanbul:

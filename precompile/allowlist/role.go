@@ -13,7 +13,7 @@ import (
 // 1. NoRole - this is equivalent to common.Hash{} and deletes the key from the DB when set
 // 2. EnabledRole - allowed to call the precompile
 // 3. Admin - allowed to both modify the allowlist and call the precompile
-// 4. Manager - allowed to add and remove only enabled addresses and also call the precompile. (only after DUpgrade)
+// 4. Manager - allowed to add and remove only enabled addresses and also call the precompile. (only after Durango)
 var (
 	NoRole      = Role(common.BigToHash(common.Big0))
 	EnabledRole = Role(common.BigToHash(common.Big1))

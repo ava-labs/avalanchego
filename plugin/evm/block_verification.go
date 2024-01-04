@@ -59,7 +59,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	}
 
 	switch {
-	case rules.IsDUpgrade:
+	case rules.IsDurango:
 		if len(ethHeader.Extra) < params.DynamicFeeExtraDataSize {
 			return fmt.Errorf(
 				"expected header ExtraData to be len >= %d but got %d",

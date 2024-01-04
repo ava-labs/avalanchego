@@ -106,10 +106,10 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 			}),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false)
+				config.EXPECT().IsDurango(gomock.Any()).Return(false)
 				return config
 			}(),
-			ExpectedError: ErrCannotAddManagersBeforeDUpgrade.Error(),
+			ExpectedError: ErrCannotAddManagersBeforeDurango.Error(),
 		},
 		"nil member allow list config in allowlist": {
 			Config: mkConfigWithAllowList(module, &AllowListConfig{

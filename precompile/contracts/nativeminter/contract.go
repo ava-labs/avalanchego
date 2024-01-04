@@ -63,7 +63,7 @@ func UnpackMintNativeCoinInput(input []byte, useStrictMode bool) (common.Address
 	// Initially we had this check to ensure that the input was the correct length.
 	// However solidity does not always pack the input to the correct length, and allows
 	// for extra padding bytes to be added to the end of the input. Therefore, we have removed
-	// this check with the DUpgrade. We still need to keep this check for backwards compatibility.
+	// this check with Durango. We still need to keep this check for backwards compatibility.
 	if useStrictMode && len(input) != mintInputLen {
 		return common.Address{}, nil, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
@@ -84,7 +84,7 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 
-	useStrictMode := !contract.IsDUpgradeActivated(accessibleState)
+	useStrictMode := !contract.IsDurangoActivated(accessibleState)
 	to, amount, err := UnpackMintNativeCoinInput(input, useStrictMode)
 	if err != nil {
 		return nil, remainingGas, err
@@ -97,7 +97,7 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, caller)
 	}
 
-	if contract.IsDUpgradeActivated(accessibleState) {
+	if contract.IsDurangoActivated(accessibleState) {
 		if remainingGas, err = contract.DeductGas(remainingGas, NativeCoinMintedEventGasCost); err != nil {
 			return nil, 0, err
 		}

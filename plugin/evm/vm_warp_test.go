@@ -47,7 +47,7 @@ var (
 func TestSendWarpMessage(t *testing.T) {
 	require := require.New(t)
 	genesis := &core.Genesis{}
-	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDUpgrade)))
+	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
 		warp.ConfigKey: warp.NewDefaultConfig(subnetEVMUtils.NewUint64(0)),
 	}
@@ -247,7 +247,7 @@ func TestValidateInvalidWarpBlockHash(t *testing.T) {
 func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.UnsignedMessage, validSignature bool, txPayload []byte) {
 	require := require.New(t)
 	genesis := &core.Genesis{}
-	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDUpgrade)))
+	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
 		warp.ConfigKey: warp.NewDefaultConfig(subnetEVMUtils.NewUint64(0)),
 	}
@@ -404,7 +404,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 func TestReceiveWarpMessage(t *testing.T) {
 	require := require.New(t)
 	genesis := &core.Genesis{}
-	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDUpgrade)))
+	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
 		warp.ConfigKey: warp.NewDefaultConfig(subnetEVMUtils.NewUint64(0)),
 	}

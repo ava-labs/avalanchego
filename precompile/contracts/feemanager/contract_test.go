@@ -301,7 +301,7 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
-		"set config with extra padded bytes should fail before DUpgrade": {
+		"set config with extra padded bytes should fail before Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -313,7 +313,7 @@ var (
 			},
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
 			SuppliedGas: SetFeeConfigGasCost,
@@ -324,7 +324,7 @@ var (
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 		},
-		"set config with extra padded bytes should succeed with DUpgrade": {
+		"set config with extra padded bytes should succeed with Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -336,7 +336,7 @@ var (
 			},
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
 			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
@@ -357,13 +357,13 @@ var (
 			},
 		},
 		// from https://github.com/ava-labs/subnet-evm/issues/487
-		"setFeeConfig regression test should fail before DUpgrade": {
+		"setFeeConfig regression test should fail before Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
 			SuppliedGas: SetFeeConfigGasCost,
@@ -374,13 +374,13 @@ var (
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 		},
-		"setFeeConfig regression test should succeed after DUpgrade": {
+		"setFeeConfig regression test should succeed after Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
 			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
@@ -400,12 +400,12 @@ var (
 				assertFeeEvent(t, logsTopics, logsData, allowlist.TestEnabledAddr, zeroFeeConfig, regressionFeeConfig)
 			},
 		},
-		"set config should not emit event before DUpgrade": {
+		"set config should not emit event before Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(false).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
 			InputFn: func(t testing.TB) []byte {

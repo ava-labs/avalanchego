@@ -82,7 +82,7 @@ var (
 				assertFeeRecipientsAllowed(t, logsTopics, logsData, allowlist.TestEnabledAddr)
 			},
 		},
-		"set fee recipients should not emit events pre-DUpgrade": {
+		"set fee recipients should not emit events pre-Durango": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -95,7 +95,7 @@ var (
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
 				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
-				mockChainConfig.EXPECT().IsDUpgrade(gomock.Any()).AnyTimes().Return(false)
+				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
 			},
 			SuppliedGas: AllowFeeRecipientsGasCost,
@@ -170,7 +170,7 @@ var (
 				assertRewardAddressChanged(t, logsTopics, logsData, allowlist.TestManagerAddr, common.Address{}, rewardAddress)
 			},
 		},
-		"change reward address should not emit events pre-DUpgrade": {
+		"change reward address should not emit events pre-Durango": {
 			Caller:     allowlist.TestManagerAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -183,7 +183,7 @@ var (
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
 				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
-				mockChainConfig.EXPECT().IsDUpgrade(gomock.Any()).AnyTimes().Return(false)
+				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
 			},
 			SuppliedGas: SetRewardAddressGasCost,
@@ -238,7 +238,7 @@ var (
 				assertRewardsDisabled(t, logsTopics, logsData, allowlist.TestEnabledAddr)
 			},
 		},
-		"disable rewards should not emit event pre-DUpgrade": {
+		"disable rewards should not emit event pre-Durango": {
 			Caller:     allowlist.TestManagerAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -251,7 +251,7 @@ var (
 				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
 				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
-				mockChainConfig.EXPECT().IsDUpgrade(gomock.Any()).AnyTimes().Return(false)
+				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
 			},
 			SuppliedGas: SetRewardAddressGasCost,

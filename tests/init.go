@@ -180,7 +180,7 @@ var Forks = map[string]*params.ChainConfig{
 			SubnetEVMTimestamp: utils.NewUint64(0),
 		},
 	},
-	"DUpgrade": {
+	"Durango": {
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
@@ -192,7 +192,7 @@ var Forks = map[string]*params.ChainConfig{
 		IstanbulBlock:       big.NewInt(0),
 		MandatoryNetworkUpgrades: params.MandatoryNetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
-			DUpgradeTimestamp:  utils.NewUint64(0),
+			DurangoTimestamp:   utils.NewUint64(0),
 		},
 	},
 }

@@ -24,7 +24,7 @@ func TestVerify(t *testing.T) {
 			Config: NewConfig(utils.NewUint64(3), admins, enableds, managers, nil),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
-				config.EXPECT().IsDUpgrade(gomock.Any()).Return(true).AnyTimes()
+				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			}(),
 			ExpectedError: "",

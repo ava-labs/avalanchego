@@ -178,7 +178,7 @@ func UnpackSetFeeConfigInput(input []byte, useStrictMode bool) (commontype.FeeCo
 	// Initially we had this check to ensure that the input was the correct length.
 	// However solidity does not always pack the input to the correct length, and allows
 	// for extra padding bytes to be added to the end of the input. Therefore, we have removed
-	// this check with the DUpgrade. We still need to keep this check for backwards compatibility.
+	// this check with the Durango. We still need to keep this check for backwards compatibility.
 	if useStrictMode && len(input) != feeConfigInputLen {
 		return commontype.FeeConfig{}, fmt.Errorf("%w: %d", ErrInvalidLen, len(input))
 	}
@@ -213,8 +213,8 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 
-	// do not use strict mode after DUpgrade
-	useStrictMode := !contract.IsDUpgradeActivated(accessibleState)
+	// do not use strict mode after Durango
+	useStrictMode := !contract.IsDurangoActivated(accessibleState)
 	feeConfig, err := UnpackSetFeeConfigInput(input, useStrictMode)
 	if err != nil {
 		return nil, remainingGas, err
@@ -227,7 +227,7 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotChangeFee, caller)
 	}
 
-	if contract.IsDUpgradeActivated(accessibleState) {
+	if contract.IsDurangoActivated(accessibleState) {
 		if remainingGas, err = contract.DeductGas(remainingGas, FeeConfigChangedEventGasCost); err != nil {
 			return nil, 0, err
 		}

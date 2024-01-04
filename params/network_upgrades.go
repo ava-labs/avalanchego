@@ -10,22 +10,22 @@ import (
 var (
 	LocalNetworkUpgrades = MandatoryNetworkUpgrades{
 		SubnetEVMTimestamp: utils.NewUint64(0),
-		DUpgradeTimestamp:  utils.NewUint64(0),
+		DurangoTimestamp:   utils.NewUint64(0),
 	}
 
 	FujiNetworkUpgrades = MandatoryNetworkUpgrades{
 		SubnetEVMTimestamp: utils.NewUint64(0),
-		// DUpgradeTimestamp: utils.NewUint64(0), // TODO: Uncomment and set this to the correct value
+		// DurangoTimestamp: utils.NewUint64(0), // TODO: Uncomment and set this to the correct value
 	}
 
 	MainnetNetworkUpgrades = MandatoryNetworkUpgrades{
 		SubnetEVMTimestamp: utils.NewUint64(0),
-		// DUpgradeTimestamp: utils.NewUint64(0), // TODO: Uncomment and set this to the correct value
+		// DurangoTimestamp: utils.NewUint64(0), // TODO: Uncomment and set this to the correct value
 	}
 
 	UnitTestNetworkUpgrades = MandatoryNetworkUpgrades{
 		SubnetEVMTimestamp: utils.NewUint64(0),
-		DUpgradeTimestamp:  utils.NewUint64(0),
+		DurangoTimestamp:   utils.NewUint64(0),
 	}
 )
 
@@ -36,10 +36,10 @@ var (
 type MandatoryNetworkUpgrades struct {
 	// SubnetEVMTimestamp is a placeholder that activates Avalanche Upgrades prior to ApricotPhase6 (nil = no fork, 0 = already activated)
 	SubnetEVMTimestamp *uint64 `json:"subnetEVMTimestamp,omitempty"`
-	// DUpgrade activates the Shanghai Execution Spec Upgrade from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips)
+	// Durango activates the Shanghai Execution Spec Upgrade from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips)
 	// and Avalanche Warp Messaging. (nil = no fork, 0 = already activated)
 	// Note: EIP-4895 is excluded since withdrawals are not relevant to the Avalanche C-Chain or Subnets running the EVM.
-	DUpgradeTimestamp *uint64 `json:"dUpgradeTimestamp,omitempty"`
+	DurangoTimestamp *uint64 `json:"durangoTimestamp,omitempty"`
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
 	CancunTime *uint64 `json:"cancunTime,omitempty"`
 }
@@ -48,8 +48,8 @@ func (m *MandatoryNetworkUpgrades) CheckMandatoryCompatible(newcfg *MandatoryNet
 	if isForkTimestampIncompatible(m.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, time) {
 		return newTimestampCompatError("SubnetEVM fork block timestamp", m.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
-	if isForkTimestampIncompatible(m.DUpgradeTimestamp, newcfg.DUpgradeTimestamp, time) {
-		return newTimestampCompatError("DUpgrade fork block timestamp", m.DUpgradeTimestamp, newcfg.DUpgradeTimestamp)
+	if isForkTimestampIncompatible(m.DurangoTimestamp, newcfg.DurangoTimestamp, time) {
+		return newTimestampCompatError("Durango fork block timestamp", m.DurangoTimestamp, newcfg.DurangoTimestamp)
 	}
 	if isForkTimestampIncompatible(m.CancunTime, newcfg.CancunTime, time) {
 		return newTimestampCompatError("Cancun fork block timestamp", m.CancunTime, m.CancunTime)
@@ -60,7 +60,7 @@ func (m *MandatoryNetworkUpgrades) CheckMandatoryCompatible(newcfg *MandatoryNet
 func (m *MandatoryNetworkUpgrades) mandatoryForkOrder() []fork {
 	return []fork{
 		{name: "subnetEVMTimestamp", timestamp: m.SubnetEVMTimestamp},
-		{name: "dUpgradeTimestamp", timestamp: m.DUpgradeTimestamp},
+		{name: "durangoTimestamp", timestamp: m.DurangoTimestamp},
 	}
 }
 
