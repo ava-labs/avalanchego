@@ -20,10 +20,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const (
-	verificationEvictionBatchSize = 0
-	verificationCacheSize         = math.MaxInt
-)
+const verificationCacheSize = math.MaxUint16
 
 var (
 	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
@@ -861,11 +858,12 @@ func getStandaloneView(ctx context.Context, ops []database.BatchOp, size int) (*
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize:         verificationEvictionBatchSize,
-			Tracer:                    trace.Noop,
-			ValueNodeCacheSize:        verificationCacheSize,
-			IntermediateNodeCacheSize: verificationCacheSize,
-			BranchFactor:              tokenSizeToBranchFactor[size],
+			BranchFactor:                tokenSizeToBranchFactor[size],
+			Tracer:                      trace.Noop,
+			ValueNodeCacheSize:          verificationCacheSize,
+			IntermediateNodeCacheSize:   verificationCacheSize,
+			IntermediateWriteBufferSize: verificationCacheSize,
+			IntermediateWriteBatchSize:  verificationCacheSize,
 		},
 		&mockMetrics{},
 	)
