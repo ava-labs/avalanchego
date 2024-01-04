@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
@@ -21,6 +22,7 @@ var DefaultExecutionConfig = ExecutionConfig{
 	BlockIDCacheSize:             8192,
 	FxOwnerCacheSize:             4 * units.MiB,
 	ChecksumsEnabled:             false,
+	MempoolPruneFrequency:        30 * time.Minute,
 }
 
 // ExecutionConfig provides execution parameters of PlatformVM
@@ -35,6 +37,7 @@ type ExecutionConfig struct {
 	BlockIDCacheSize             int            `json:"block-id-cache-size"`
 	FxOwnerCacheSize             int            `json:"fx-owner-cache-size"`
 	ChecksumsEnabled             bool           `json:"checksums-enabled"`
+	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
 }
 
 // GetExecutionConfig returns an ExecutionConfig
