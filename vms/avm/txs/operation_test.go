@@ -5,6 +5,7 @@ package txs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -79,7 +80,7 @@ func TestOperationVerify(t *testing.T) {
 func TestOperationSorting(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&testOperable{}))
 
 	m := codec.NewDefaultManager()

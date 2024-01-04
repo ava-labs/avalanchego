@@ -4,6 +4,8 @@
 package payload
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils"
@@ -14,17 +16,13 @@ const (
 	CodecVersion = 0
 
 	MaxMessageSize = 24 * units.KiB
-
-	// Note: Modifying this variable can have subtle implications on memory
-	// usage when parsing malformed payloads.
-	MaxSliceLen = 24 * 1024
 )
 
 var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewManager(MaxMessageSize)
-	lc := linearcodec.NewCustomMaxLength(MaxSliceLen)
+	lc := linearcodec.NewDefault(time.Time{})
 
 	err := utils.Err(
 		lc.RegisterType(&Hash{}),

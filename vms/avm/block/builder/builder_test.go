@@ -514,9 +514,12 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	_, ok := mempool.Get(txID)
 	require.True(ok)
 
-	parser, err := block.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	backend := &txexecutor.Backend{
