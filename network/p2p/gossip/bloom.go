@@ -11,22 +11,17 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-const targetSizeMultiplier = 2
-
-// NewBloomFilter returns a new instance of a bloom filter with at least [minExpectedElements] elements
+// NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
 // anticipated at any moment, and a false positive probability of [falsePositiveProbability].
-//
-// If the number of elements that are tracked with the bloom filter exceeds [minExpectedElements], the size
-// of the bloom filter will grow to maintain the same [falsePositiveProbability].
 //
 // Invariant: The returned bloom filter is not safe to reset concurrently with
 // other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
-	minExpectedElements int,
+	minTargetElements int,
 	falsePositiveProbability float64,
 ) (*BloomFilter, error) {
 	numHashes, numEntries := bloom.OptimalParameters(
-		minExpectedElements,
+		minTargetElements,
 		falsePositiveProbability,
 	)
 	b, err := bloom.New(numHashes, numEntries)
@@ -36,7 +31,7 @@ func NewBloomFilter(
 
 	salt, err := randomSalt()
 	return &BloomFilter{
-		minExpectedElements:      minExpectedElements,
+		minTargetElements:        minTargetElements,
 		falsePositiveProbability: falsePositiveProbability,
 		maxCount:                 bloom.EstimateCount(numHashes, numEntries, falsePositiveProbability),
 		bloom:                    b,
@@ -45,7 +40,7 @@ func NewBloomFilter(
 }
 
 type BloomFilter struct {
-	minExpectedElements      int
+	minTargetElements        int
 	falsePositiveProbability float64
 
 	maxCount int
@@ -75,17 +70,21 @@ func (b *BloomFilter) Marshal() ([]byte, []byte) {
 }
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches [falsePositiveProbability].
+//
+// If the number of elements that are tracked with the bloom filter exceeds [minTargetElements], the size
+// of the bloom filter will grow to maintain the same [falsePositiveProbability].
+//
 // Returns true if the bloom filter was reset.
 func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
-	currentSize int,
+	targetElements int,
 ) (bool, error) {
 	if bloomFilter.bloom.Count() < bloomFilter.maxCount {
 		return false, nil
 	}
 
 	numHashes, numEntries := bloom.OptimalParameters(
-		safemath.Max(bloomFilter.minExpectedElements, currentSize*targetSizeMultiplier),
+		safemath.Max(bloomFilter.minTargetElements, targetElements),
 		bloomFilter.falsePositiveProbability,
 	)
 	newBloom, err := bloom.New(numHashes, numEntries)
