@@ -19,7 +19,7 @@ import (
 // other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
 	minTargetElements int,
-	targetFalsePositiveProbability float64,
+	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
 ) (*BloomFilter, error) {
 	numHashes, numEntries := bloom.OptimalParameters(
