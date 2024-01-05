@@ -1243,9 +1243,11 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 
 func (n *network) runTimers() {
 	gossipPeerlists := time.NewTicker(n.config.PeerListGossipFreq)
+	resetValidatorTracker := time.NewTicker(time.Minute)
 	updateUptimes := time.NewTicker(n.config.UptimeMetricFreq)
 	defer func() {
 		gossipPeerlists.Stop()
+		resetValidatorTracker.Stop()
 		updateUptimes.Stop()
 	}()
 
@@ -1254,7 +1256,15 @@ func (n *network) runTimers() {
 		case <-n.onCloseCtx.Done():
 			return
 		case <-gossipPeerlists.C:
-			n.gossipPeerLists()
+			n.pushGossipPeerLists()
+		case <-resetValidatorTracker.C:
+			if err := n.validatorTracker.ResetBloom(); err != nil {
+				n.peerConfig.Log.Error("failed to reset validator tracker bloom filter",
+					zap.Error(err),
+				)
+			} else {
+				n.peerConfig.Log.Debug("reset validator tracker bloom filter")
+			}
 		case <-updateUptimes.C:
 			primaryUptime, err := n.NodeUptime(constants.PrimaryNetworkID)
 			if err != nil {
@@ -1281,8 +1291,8 @@ func (n *network) runTimers() {
 	}
 }
 
-// gossipPeerLists gossips validators to peers in the network
-func (n *network) gossipPeerLists() {
+// pushGossipPeerLists gossips validators to peers in the network
+func (n *network) pushGossipPeerLists() {
 	peers := n.samplePeers(
 		constants.PrimaryNetworkID,
 		int(n.config.PeerListValidatorGossipSize),

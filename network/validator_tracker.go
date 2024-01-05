@@ -22,8 +22,8 @@ import (
 
 const (
 	minCountEstimate               = 128
-	targetFalsePositiveProbability = .01
-	maxFalsePositiveProbability    = .05
+	targetFalsePositiveProbability = .001
+	maxFalsePositiveProbability    = .01
 )
 
 var _ validators.SetCallbackListener = (*ValidatorTracker)(nil)
@@ -109,13 +109,13 @@ func (v *ValidatorTracker) addConnectedValidator(nodeID ids.NodeID, ip *ips.Clai
 	// the bloom filter.
 	if count := v.connectedValidatorsBloom.Count(); count >= v.maxConnectedValidatorsBloomCount {
 		if err := v.resetBloom(); err != nil {
-			v.log.Error("failed to reset bloom filter",
+			v.log.Error("failed to reset validator tracker bloom filter",
 				zap.Int("maxCount", v.maxConnectedValidatorsBloomCount),
 				zap.Int("currentCount", count),
 				zap.Error(err),
 			)
 		} else {
-			v.log.Info("reset validator IP bloom filter",
+			v.log.Info("reset validator tracker bloom filter",
 				zap.Int("currentCount", count),
 			)
 		}
