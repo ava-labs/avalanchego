@@ -5,6 +5,7 @@ package txs
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -27,11 +28,13 @@ var (
 	GenesisCodec codec.Manager
 )
 
-func init() {
-	c := linearcodec.NewDefault()
-	Codec = codec.NewDefaultManager()
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	GenesisCodec = codec.NewManager(math.MaxInt32)
+// TODO: Remove after v1.11.x has activated
+//
+// Invariant: InitCodec, Codec, and GenesisCodec must not be accessed
+// concurrently
+func InitCodec(durangoTime time.Time) error {
+	c := linearcodec.NewDefault(durangoTime)
+	gc := linearcodec.NewDefault(time.Time{})
 
 	errs := wrappers.Errs{}
 	for _, c := range []linearcodec.Codec{c, gc} {
@@ -46,12 +49,25 @@ func init() {
 
 		errs.Add(RegisterDUnsignedTxsTypes(c))
 	}
+
+	newCodec := codec.NewDefaultManager()
+	newGenesisCodec := codec.NewManager(math.MaxInt32)
 	errs.Add(
-		Codec.RegisterCodec(CodecVersion, c),
-		GenesisCodec.RegisterCodec(CodecVersion, gc),
+		newCodec.RegisterCodec(CodecVersion, c),
+		newGenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
-		panic(errs.Err)
+		return errs.Err
+	}
+
+	Codec = newCodec
+	GenesisCodec = newGenesisCodec
+	return nil
+}
+
+func init() {
+	if err := InitCodec(time.Time{}); err != nil {
+		panic(err)
 	}
 }
 

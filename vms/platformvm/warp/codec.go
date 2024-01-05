@@ -5,6 +5,7 @@ package warp
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -17,7 +18,7 @@ var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewManager(math.MaxInt)
-	lc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+	lc := linearcodec.NewDefault(time.Time{})
 
 	err := utils.Err(
 		lc.RegisterType(&BitSetSignature{}),

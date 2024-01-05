@@ -5,6 +5,7 @@ package indexer
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -15,7 +16,7 @@ const CodecVersion = 0
 var Codec codec.Manager
 
 func init() {
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	lc := linearcodec.NewDefault(time.Time{})
 	Codec = codec.NewManager(math.MaxInt)
 
 	if err := Codec.RegisterCodec(CodecVersion, lc); err != nil {
