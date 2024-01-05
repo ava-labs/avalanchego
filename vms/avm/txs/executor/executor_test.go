@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -37,7 +38,10 @@ func TestBaseTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := block.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{secpFx},
+	)
 	require.NoError(err)
 	codec := parser.Codec()
 
@@ -142,7 +146,10 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := block.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{secpFx},
+	)
 	require.NoError(err)
 	codec := parser.Codec()
 
@@ -285,7 +292,10 @@ func TestOperationTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := block.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{secpFx},
+	)
 	require.NoError(err)
 	codec := parser.Codec()
 

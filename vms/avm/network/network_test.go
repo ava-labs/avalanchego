@@ -59,9 +59,12 @@ func TestNetworkAppGossip(t *testing.T) {
 		},
 	}
 
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(t, err)
 	require.NoError(t, testTx.Initialize(parser.Codec()))
 
@@ -183,11 +186,14 @@ func TestNetworkAppGossip(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			parser, err := txs.NewParser([]fxs.Fx{
-				&secp256k1fx.Fx{},
-				&nftfx.Fx{},
-				&propertyfx.Fx{},
-			})
+			parser, err := txs.NewParser(
+				time.Time{},
+				[]fxs.Fx{
+					&secp256k1fx.Fx{},
+					&nftfx.Fx{},
+					&propertyfx.Fx{},
+				},
+			)
 			require.NoError(err)
 
 			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
@@ -319,11 +325,14 @@ func TestNetworkIssueTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			parser, err := txs.NewParser([]fxs.Fx{
-				&secp256k1fx.Fx{},
-				&nftfx.Fx{},
-				&propertyfx.Fx{},
-			})
+			parser, err := txs.NewParser(
+				time.Time{},
+				[]fxs.Fx{
+					&secp256k1fx.Fx{},
+					&nftfx.Fx{},
+					&propertyfx.Fx{},
+				},
+			)
 			require.NoError(err)
 
 			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
@@ -406,11 +415,14 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			parser, err := txs.NewParser([]fxs.Fx{
-				&secp256k1fx.Fx{},
-				&nftfx.Fx{},
-				&propertyfx.Fx{},
-			})
+			parser, err := txs.NewParser(
+				time.Time{},
+				[]fxs.Fx{
+					&secp256k1fx.Fx{},
+					&nftfx.Fx{},
+					&propertyfx.Fx{},
+				},
+			)
 			require.NoError(err)
 
 			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
@@ -449,9 +461,12 @@ func TestNetworkGossipTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	appSender := common.NewMockSender(ctrl)

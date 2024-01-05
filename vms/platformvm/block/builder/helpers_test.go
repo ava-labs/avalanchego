@@ -330,7 +330,7 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 	require := require.New(t)
 
 	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(),
+		registry: linearcodec.NewDefault(time.Time{}),
 		clk:      clk,
 		log:      log,
 	}
