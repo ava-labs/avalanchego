@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -161,16 +161,19 @@ type Config struct {
 	//
 	// If 0 is specified, [runtime.NumCPU] will be used.
 	RootGenConcurrency uint
-	// The number of bytes to write to disk when intermediate nodes are evicted
-	// from their cache and written to disk.
-	EvictionBatchSize uint
+
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
 	HistoryLength uint
-	// The number of bytes to cache nodes with values.
+	// The number of bytes used to cache nodes with values.
 	ValueNodeCacheSize uint
-	// The number of bytes to cache nodes without values.
+	// The number of bytes used to cache nodes without values.
 	IntermediateNodeCacheSize uint
+	// The number of bytes used to store nodes without values in memory before forcing them onto disk.
+	IntermediateWriteBufferSize uint
+	// The number of bytes to write to disk when intermediate nodes are evicted
+	// from the write buffer and written to disk.
+	IntermediateWriteBatchSize uint
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
@@ -256,11 +259,22 @@ func newDatabase(
 			return make([]byte, 0, defaultBufferLength)
 		},
 	}
+
 	trieDB := &merkleDB{
-		metrics:              metrics,
-		baseDB:               db,
-		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
-		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize), BranchFactorToTokenSize[config.BranchFactor]),
+		metrics: metrics,
+		baseDB:  db,
+		intermediateNodeDB: newIntermediateNodeDB(
+			db,
+			bufferPool,
+			metrics,
+			int(config.IntermediateNodeCacheSize),
+			int(config.IntermediateWriteBufferSize),
+			int(config.IntermediateWriteBatchSize),
+			BranchFactorToTokenSize[config.BranchFactor]),
+		valueNodeDB: newValueNodeDB(db,
+			bufferPool,
+			metrics,
+			int(config.ValueNodeCacheSize)),
 		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
@@ -321,7 +335,8 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	)
 	currentOps := make([]database.BatchOp, 0, opsSizeLimit)
 	valueIt := db.NewIterator()
-	defer valueIt.Release()
+	// ensure valueIt is captured and release gets called on the latest copy of valueIt
+	defer func() { valueIt.Release() }()
 	for valueIt.Next() {
 		if len(currentOps) >= opsSizeLimit {
 			view, err := newView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
@@ -483,19 +498,11 @@ func (db *merkleDB) PrefetchPath(key []byte) error {
 
 func (db *merkleDB) prefetchPath(keyBytes []byte) error {
 	return visitPathToKey(db, ToKey(keyBytes), func(n *node) error {
-		if !n.hasValue() {
-			// this value is already in the cache, so skip writing
-			// to avoid grabbing the cache write lock
-			if _, ok := db.intermediateNodeDB.nodeCache.Get(n.key); ok {
-				return nil
-			}
-			return db.intermediateNodeDB.nodeCache.Put(n.key, n)
+		if n.hasValue() {
+			db.valueNodeDB.nodeCache.Put(n.key, n)
+		} else {
+			db.intermediateNodeDB.nodeCache.Put(n.key, n)
 		}
-		// this value is already in the cache, so skip writing
-		if _, ok := db.valueNodeDB.nodeCache.Get(n.key); ok {
-			return nil
-		}
-		db.valueNodeDB.nodeCache.Put(n.key, n)
 		return nil
 	})
 }
