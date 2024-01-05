@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/ips"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSignedIpVerify(t *testing.T) {
