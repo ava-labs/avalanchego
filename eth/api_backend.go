@@ -57,6 +57,7 @@ type EthAPIBackend struct {
 	extRPCEnabled            bool
 	allowUnprotectedTxs      bool
 	allowUnprotectedTxHashes map[common.Hash]struct{} // Invariant: read-only after creation.
+	allowUnfinalizedQueries  bool
 	eth                      *Ethereum
 	gpo                      *gasprice.Oracle
 }
@@ -66,8 +67,12 @@ func (b *EthAPIBackend) ChainConfig() *params.ChainConfig {
 	return b.eth.blockchain.Config()
 }
 
-func (b *EthAPIBackend) GetVMConfig() *vm.Config {
-	return b.eth.blockchain.GetVMConfig()
+func (b *EthAPIBackend) IsAllowUnfinalizedQueries() bool {
+	return b.allowUnfinalizedQueries
+}
+
+func (b *EthAPIBackend) SetAllowUnfinalizedQueries(allow bool) {
+	b.allowUnfinalizedQueries = allow
 }
 
 func (b *EthAPIBackend) CurrentBlock() *types.Header {
@@ -89,7 +94,7 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 		return acceptedBlock.Header(), nil
 	}
 
-	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+	if !b.IsAllowUnfinalizedQueries() && acceptedBlock != nil {
 		if number.Int64() > acceptedBlock.Number().Int64() {
 			return nil, ErrUnfinalizedData
 		}
@@ -113,7 +118,7 @@ func (b *EthAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*ty
 	}
 
 	acceptedBlock := b.eth.LastAcceptedBlock()
-	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+	if !b.IsAllowUnfinalizedQueries() && acceptedBlock != nil {
 		if header.Number.Cmp(acceptedBlock.Number()) > 0 {
 			return nil, ErrUnfinalizedData
 		}
@@ -149,7 +154,7 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 		return acceptedBlock, nil
 	}
 
-	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+	if !b.IsAllowUnfinalizedQueries() && acceptedBlock != nil {
 		if number.Int64() > acceptedBlock.Number().Int64() {
 			return nil, ErrUnfinalizedData
 		}
@@ -174,7 +179,7 @@ func (b *EthAPIBackend) BlockByHash(ctx context.Context, hash common.Hash) (*typ
 	}
 
 	acceptedBlock := b.eth.LastAcceptedBlock()
-	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+	if !b.IsAllowUnfinalizedQueries() && acceptedBlock != nil {
 		if number.Cmp(acceptedBlock.Number()) > 0 {
 			return nil, ErrUnfinalizedData
 		}
@@ -345,7 +350,7 @@ func (b *EthAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) 
 	// expectations with clients (expect an empty response when a transaction
 	// does not exist).
 	acceptedBlock := b.eth.LastAcceptedBlock()
-	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil && tx != nil {
+	if !b.IsAllowUnfinalizedQueries() && acceptedBlock != nil && tx != nil {
 		if blockNumber > acceptedBlock.NumberU64() {
 			return nil, common.Hash{}, 0, 0, nil
 		}
