@@ -33,26 +33,12 @@ func TestParseErrors(t *testing.T) {
 			err:   errInvalidNumSeeds,
 		},
 		{
-			bytes: []byte{
-				0x81, // missing next byte of numSeeds
-			},
-			err: errInvalidNumSeeds,
-		},
-		{
 			bytes: NewMaliciousFilter(0, 1).Marshal(),
 			err:   errTooFewSeeds,
 		},
 		{
 			bytes: NewMaliciousFilter(17, 1).Marshal(),
 			err:   errTooManySeeds,
-		},
-		{
-			bytes: []byte{
-				0x81, 0x00, // num seeds = 1
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // seeds[0]
-				0xff, // entries
-			},
-			err: errPaddedNumSeeds,
 		},
 		{
 			bytes: NewMaliciousFilter(1, 0).Marshal(),

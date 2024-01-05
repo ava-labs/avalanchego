@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"math/bits"
 	"sync"
 )
@@ -27,7 +26,6 @@ var (
 	errInvalidNumSeeds = errors.New("invalid num seeds")
 	errTooFewSeeds     = errors.New("too few seeds")
 	errTooManySeeds    = errors.New("too many seeds")
-	errPaddedNumSeeds  = errors.New("number of seeds unnecessarily padded")
 	errTooFewEntries   = errors.New("too few entries")
 )
 
@@ -80,18 +78,13 @@ func (f *Filter) Add(hash uint64) {
 	f.count++
 }
 
-// FalsePositiveProbability is a lower-bound on the probability of false
-// positives. For values where numBits >> numSeeds, the predicted probability is
-// fairly accurate.
-func (f *Filter) FalsePositiveProbability() float64 {
-	numSeeds := float64(len(f.seeds))
-	numBits := float64(f.numBits)
-
+// Count returns the number of elements that have been added to the bloom
+// filter.
+func (f *Filter) Count() int {
 	f.lock.RLock()
-	numAdded := float64(f.count)
-	f.lock.RUnlock()
+	defer f.lock.RUnlock()
 
-	return falsePositiveProbability(numSeeds, numBits, numAdded)
+	return f.count
 }
 
 func (f *Filter) Contains(hash uint64) bool {
@@ -128,12 +121,6 @@ func newSeeds(numSeeds int) ([]uint64, error) {
 	return seeds, nil
 }
 
-// ref: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=903775
-func falsePositiveProbability(numSeeds, numBits, numAdded float64) float64 {
-	bitCollisionProbability := 1. - math.Exp(-numSeeds*numAdded/numBits)
-	return math.Pow(bitCollisionProbability, numSeeds)
-}
-
 func contains(seeds []uint64, entries []byte, hash uint64) bool {
 	var (
 		numBits          = bitsPerByte * uint64(len(entries))
@@ -151,22 +138,13 @@ func contains(seeds []uint64, entries []byte, hash uint64) bool {
 
 func marshal(seeds []uint64, entries []byte) []byte {
 	numSeeds := len(seeds)
-	numSeedsUint64 := uint64(numSeeds)
-	seedsOffset := uintSize(numSeedsUint64)
-	entriesOffset := seedsOffset + numSeeds*bytesPerUint64
+	entriesOffset := 1 + numSeeds*bytesPerUint64
 
 	bytes := make([]byte, entriesOffset+len(entries))
-	binary.PutUvarint(bytes, numSeedsUint64)
+	bytes[0] = byte(numSeeds)
 	for i, seed := range seeds {
-		binary.BigEndian.PutUint64(bytes[seedsOffset+i*bytesPerUint64:], seed)
+		binary.BigEndian.PutUint64(bytes[1+i*bytesPerUint64:], seed)
 	}
 	copy(bytes[entriesOffset:], entries)
 	return bytes
-}
-
-func uintSize(value uint64) int {
-	if value == 0 {
-		return 1
-	}
-	return (bits.Len64(value) + 6) / 7
 }

@@ -14,7 +14,7 @@ import (
 // [maxExpectedElements] elements anticipated at any moment, and a false
 // positive probability of [falsePositiveProbability].
 func NewBloomFilter(
-	maxExpectedElements uint64,
+	maxExpectedElements int,
 	falsePositiveProbability float64,
 ) (*BloomFilter, error) {
 	bloom, err := bloom.New(bloom.OptimalParameters(
@@ -65,11 +65,15 @@ func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	falsePositiveProbability float64,
 ) (bool, error) {
-	if bloomFilter.bloom.FalsePositiveProbability() < falsePositiveProbability {
+	numSeeds, numBytes := bloomFilter.bloom.Parameters()
+	// TODO: Precalculate maxEntries, as it is independent of the current state
+	// of the bloom filter.
+	maxEntries := bloom.EstimateEntries(numSeeds, numBytes, falsePositiveProbability)
+	if bloomFilter.bloom.Count() < maxEntries {
 		return false, nil
 	}
 
-	newBloom, err := bloom.New(bloomFilter.bloom.Parameters())
+	newBloom, err := bloom.New(numSeeds, numBytes)
 	if err != nil {
 		return false, err
 	}

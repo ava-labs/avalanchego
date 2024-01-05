@@ -14,22 +14,17 @@ type ReadFilter struct {
 }
 
 func Parse(bytes []byte) (*ReadFilter, error) {
-	numSeeds, seedsOffset := binary.Uvarint(bytes)
-	switch {
-	case seedsOffset <= 0:
+	if len(bytes) == 0 {
 		return nil, errInvalidNumSeeds
+	}
+	numSeeds := bytes[0]
+	entriesOffset := 1 + int(numSeeds)*bytesPerUint64
+	switch {
 	case numSeeds < minSeeds:
 		return nil, fmt.Errorf("%w: %d < %d", errTooFewSeeds, numSeeds, minSeeds)
 	case numSeeds > maxSeeds:
 		return nil, fmt.Errorf("%w: %d > %d", errTooManySeeds, numSeeds, maxSeeds)
-	}
-
-	if expectedSeedsOffset := uintSize(numSeeds); expectedSeedsOffset != seedsOffset {
-		return nil, fmt.Errorf("%w: %d != %d", errPaddedNumSeeds, seedsOffset, expectedSeedsOffset)
-	}
-
-	entriesOffset := seedsOffset + int(numSeeds)*bytesPerUint64
-	if len(bytes) < entriesOffset+minEntries { // numEntries = len(bytes) - entriesOffset
+	case len(bytes) < entriesOffset+minEntries: // numEntries = len(bytes) - entriesOffset
 		return nil, errTooFewEntries
 	}
 
@@ -38,7 +33,7 @@ func Parse(bytes []byte) (*ReadFilter, error) {
 		entries: bytes[entriesOffset:],
 	}
 	for i := range f.seeds {
-		f.seeds[i] = binary.BigEndian.Uint64(bytes[seedsOffset+i*bytesPerUint64:])
+		f.seeds[i] = binary.BigEndian.Uint64(bytes[1+i*bytesPerUint64:])
 	}
 	return f, nil
 }

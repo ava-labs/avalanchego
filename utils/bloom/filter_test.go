@@ -4,8 +4,6 @@
 package bloom
 
 import (
-	"encoding/binary"
-	"fmt"
 	"math/rand"
 	"testing"
 
@@ -63,7 +61,7 @@ func TestNormalUsage(t *testing.T) {
 		}
 	}
 
-	require.InDelta(filter.FalsePositiveProbability(), 0.01, 1e-4)
+	require.Equal(len(toAdd), filter.Count())
 
 	numSeeds, numBytes := filter.Parameters()
 	require.Equal(initialNumSeeds, numSeeds)
@@ -79,51 +77,6 @@ func TestNormalUsage(t *testing.T) {
 
 	parsedFilterBytes := parsedFilter.Marshal()
 	require.Equal(filterBytes, parsedFilterBytes)
-}
-
-func TestFalsePositiveProbability(t *testing.T) {
-	tests := []struct {
-		numSeeds                             float64
-		numBits                              float64
-		numAdded                             float64
-		expectedFalsePositiveProbability     float64
-		allowedFalsePositiveProbabilityDelta float64
-	}{
-		{
-			numSeeds:                             8,
-			numBits:                              10_000,
-			numAdded:                             0,
-			expectedFalsePositiveProbability:     0,
-			allowedFalsePositiveProbabilityDelta: 0,
-		},
-		{ // params from OptimalParameters(10_000, .01)
-			numSeeds:                             7,
-			numBits:                              11_982 * 8,
-			numAdded:                             10_000,
-			expectedFalsePositiveProbability:     .01,
-			allowedFalsePositiveProbabilityDelta: 1e-4,
-		},
-		{ // params from OptimalParameters(100_000, .001)
-			numSeeds:                             10,
-			numBits:                              179_720 * 8,
-			numAdded:                             100_000,
-			expectedFalsePositiveProbability:     .001,
-			allowedFalsePositiveProbabilityDelta: 1e-7,
-		},
-		{ // params from OptimalParameters(10_000, .01)
-			numSeeds:                             7,
-			numBits:                              11_982 * 8,
-			numAdded:                             15_000,
-			expectedFalsePositiveProbability:     .05,
-			allowedFalsePositiveProbabilityDelta: .01,
-		},
-	}
-	for _, test := range tests {
-		t.Run(fmt.Sprintf("%f_%f_%f", test.numSeeds, test.numBits, test.numAdded), func(t *testing.T) {
-			p := falsePositiveProbability(test.numSeeds, test.numBits, test.numAdded)
-			require.InDelta(t, test.expectedFalsePositiveProbability, p, test.allowedFalsePositiveProbabilityDelta)
-		})
-	}
 }
 
 func BenchmarkAdd(b *testing.B) {
@@ -144,16 +97,4 @@ func BenchmarkMarshal(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f.Marshal()
 	}
-}
-
-func FuzzUintSize(f *testing.F) {
-	f.Add(uint64(0))
-	for i := 0; i < 64; i++ {
-		f.Add(uint64(1) << i)
-	}
-	f.Fuzz(func(t *testing.T, value uint64) {
-		length := uintSize(value)
-		expectedLength := len(binary.AppendUvarint(nil, value))
-		require.Equal(t, expectedLength, length)
-	})
 }
