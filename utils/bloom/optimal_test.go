@@ -22,12 +22,12 @@ func TestOptimalHashes(t *testing.T) {
 		{ // invalid params
 			numEntries:     0,
 			count:          1024,
-			expectedHashes: maxHashes,
+			expectedHashes: minHashes,
 		},
 		{ // invalid params
 			numEntries:     1024,
 			count:          0,
-			expectedHashes: minHashes,
+			expectedHashes: maxHashes,
 		},
 		{
 			numEntries:     math.MaxInt,

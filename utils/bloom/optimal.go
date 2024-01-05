@@ -30,9 +30,9 @@ func OptimalParameters(count int, falsePositiveProbability float64) (int, int) {
 func OptimalHashes(numEntries, count int) int {
 	switch {
 	case numEntries < minEntries:
-		return maxHashes
-	case count <= 0:
 		return minHashes
+	case count <= 0:
+		return maxHashes
 	}
 
 	numHashes := math.Ceil(float64(numEntries) * bitsPerByte * math.Ln2 / float64(count))
