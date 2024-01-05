@@ -38,9 +38,12 @@ var (
 
 func init() {
 	var err error
-	parser, err = block.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err = block.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	if err != nil {
 		panic(err)
 	}

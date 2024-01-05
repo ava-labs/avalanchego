@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -40,8 +40,9 @@ type parser struct {
 	gc  linearcodec.Codec
 }
 
-func NewParser(fxs []fxs.Fx) (Parser, error) {
+func NewParser(durangoTime time.Time, fxs []fxs.Fx) (Parser, error) {
 	return NewCustomParser(
+		durangoTime,
 		make(map[reflect.Type]int),
 		&mockable.Clock{},
 		logging.NoLog{},
@@ -50,13 +51,14 @@ func NewParser(fxs []fxs.Fx) (Parser, error) {
 }
 
 func NewCustomParser(
+	durangoTime time.Time,
 	typeToFxIndex map[reflect.Type]int,
 	clock *mockable.Clock,
 	log logging.Logger,
 	fxs []fxs.Fx,
 ) (Parser, error) {
-	gc := linearcodec.New([]string{reflectcodec.DefaultTagName}, 1<<20)
-	c := linearcodec.NewDefault()
+	gc := linearcodec.NewDefault(time.Time{})
+	c := linearcodec.NewDefault(durangoTime)
 
 	gcm := codec.NewManager(math.MaxInt32)
 	cm := codec.NewDefaultManager()
