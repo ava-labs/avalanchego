@@ -12,17 +12,19 @@ import (
 )
 
 // NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
-// anticipated at any moment, and a false positive probability of [falsePositiveProbability].
+// anticipated at any moment, and a false positive probability of [targetFalsePositiveProbability]. If the
+// false positive probability exceeds [resetFalsePositiveProbability], the bloom filter will be reset.
 //
 // Invariant: The returned bloom filter is not safe to reset concurrently with
 // other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
 	minTargetElements int,
-	falsePositiveProbability float64,
+	targetFalsePositiveProbability float64,
+	resetFalsePositiveProbability float64,
 ) (*BloomFilter, error) {
 	numHashes, numEntries := bloom.OptimalParameters(
 		minTargetElements,
-		falsePositiveProbability,
+		targetFalsePositiveProbability,
 	)
 	b, err := bloom.New(numHashes, numEntries)
 	if err != nil {
@@ -31,17 +33,19 @@ func NewBloomFilter(
 
 	salt, err := randomSalt()
 	return &BloomFilter{
-		minTargetElements:        minTargetElements,
-		falsePositiveProbability: falsePositiveProbability,
-		maxCount:                 bloom.EstimateCount(numHashes, numEntries, falsePositiveProbability),
-		bloom:                    b,
-		salt:                     salt,
+		minTargetElements:              minTargetElements,
+		targetFalsePositiveProbability: targetFalsePositiveProbability,
+		resetFalsePositiveProbability:  resetFalsePositiveProbability,
+		maxCount:                       bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability),
+		bloom:                          b,
+		salt:                           salt,
 	}, err
 }
 
 type BloomFilter struct {
-	minTargetElements        int
-	falsePositiveProbability float64
+	minTargetElements              int
+	targetFalsePositiveProbability float64
+	resetFalsePositiveProbability  float64
 
 	maxCount int
 	bloom    *bloom.Filter
@@ -69,10 +73,10 @@ func (b *BloomFilter) Marshal() ([]byte, []byte) {
 	return bloomBytes, salt[:]
 }
 
-// ResetBloomFilterIfNeeded resets a bloom filter if it breaches [falsePositiveProbability].
+// ResetBloomFilterIfNeeded resets a bloom filter if it breaches [targetFalsePositiveProbability].
 //
-// If the number of elements that are tracked with the bloom filter exceeds [minTargetElements], the size
-// of the bloom filter will grow to maintain the same [falsePositiveProbability].
+// If [targetElements] exceeds [minTargetElements], the size of the bloom filter will grow to maintain
+// the same [targetFalsePositiveProbability].
 //
 // Returns true if the bloom filter was reset.
 func ResetBloomFilterIfNeeded(
@@ -85,7 +89,7 @@ func ResetBloomFilterIfNeeded(
 
 	numHashes, numEntries := bloom.OptimalParameters(
 		safemath.Max(bloomFilter.minTargetElements, targetElements),
-		bloomFilter.falsePositiveProbability,
+		bloomFilter.targetFalsePositiveProbability,
 	)
 	newBloom, err := bloom.New(numHashes, numEntries)
 	if err != nil {
@@ -95,7 +99,7 @@ func ResetBloomFilterIfNeeded(
 	if err != nil {
 		return false, err
 	}
-	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, bloomFilter.falsePositiveProbability)
+	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, bloomFilter.resetFalsePositiveProbability)
 	bloomFilter.bloom = newBloom
 	bloomFilter.salt = salt
 	return true, nil
