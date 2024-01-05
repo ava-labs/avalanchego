@@ -5,6 +5,7 @@ package evm
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -15,29 +16,41 @@ import (
 // Codec does serialization and deserialization
 var Codec codec.Manager
 
-func init() {
-	Codec = codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&UnsignedImportTx{}),
-		c.RegisterType(&UnsignedExportTx{}),
+// TODO: Remove after v1.11.x has activated
+//
+// Invariant: InitCodec and Codec must not be accessed concurrently
+func InitCodec(durangoTime time.Time) error {
+	var (
+		lc       = linearcodec.NewDefault(durangoTime)
+		newCodec = codec.NewDefaultManager()
+		errs     = wrappers.Errs{}
 	)
-	c.SkipRegistrations(3)
 	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		Codec.RegisterCodec(codecVersion, c),
+		lc.RegisterType(&UnsignedImportTx{}),
+		lc.RegisterType(&UnsignedExportTx{}),
 	)
-
+	lc.SkipRegistrations(3)
+	errs.Add(
+		lc.RegisterType(&secp256k1fx.TransferInput{}),
+		lc.RegisterType(&secp256k1fx.MintOutput{}),
+		lc.RegisterType(&secp256k1fx.TransferOutput{}),
+		lc.RegisterType(&secp256k1fx.MintOperation{}),
+		lc.RegisterType(&secp256k1fx.Credential{}),
+		lc.RegisterType(&secp256k1fx.Input{}),
+		lc.RegisterType(&secp256k1fx.OutputOwners{}),
+		newCodec.RegisterCodec(codecVersion, lc),
+	)
 	if errs.Errored() {
-		panic(errs.Err)
+		return errs.Err
+	}
+
+	Codec = newCodec
+	return nil
+}
+
+func init() {
+	if err := InitCodec(time.Time{}); err != nil {
+		panic(err)
 	}
 }
 

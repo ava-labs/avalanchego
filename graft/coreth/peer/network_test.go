@@ -888,7 +888,7 @@ func TestNetworkRouting(t *testing.T) {
 
 func buildCodec(t *testing.T, types ...interface{}) codec.Manager {
 	codecManager := codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	for _, typ := range types {
 		assert.NoError(t, c.RegisterType(typ))
 	}
