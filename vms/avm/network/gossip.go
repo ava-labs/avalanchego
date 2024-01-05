@@ -64,27 +64,25 @@ func newGossipMempool(
 	log logging.Logger,
 	txVerifier TxVerifier,
 	parser txs.Parser,
-	maxExpectedElements int,
-	falsePositiveProbability,
-	maxFalsePositiveProbability float64,
+	minTargetElements int,
+	targetFalsePositiveProbability float64,
+	resetFalsePositiveProbability float64,
 ) (*gossipMempool, error) {
-	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
+	bloom, err := gossip.NewBloomFilter(minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
-		Mempool:                     mempool,
-		log:                         log,
-		txVerifier:                  txVerifier,
-		parser:                      parser,
-		maxFalsePositiveProbability: maxFalsePositiveProbability,
-		bloom:                       bloom,
+		Mempool:    mempool,
+		log:        log,
+		txVerifier: txVerifier,
+		parser:     parser,
+		bloom:      bloom,
 	}, err
 }
 
 type gossipMempool struct {
 	mempool.Mempool
-	log                         logging.Logger
-	txVerifier                  TxVerifier
-	parser                      txs.Parser
-	maxFalsePositiveProbability float64
+	log        logging.Logger
+	txVerifier TxVerifier
+	parser     txs.Parser
 
 	lock  sync.RWMutex
 	bloom *gossip.BloomFilter
@@ -127,7 +125,7 @@ func (g *gossipMempool) AddVerified(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.maxFalsePositiveProbability)
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len())
 	if err != nil {
 		return err
 	}
