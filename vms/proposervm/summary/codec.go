@@ -6,6 +6,7 @@ package summary
 import (
 	"errors"
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -20,7 +21,7 @@ var (
 )
 
 func init() {
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	lc := linearcodec.NewDefault(time.Time{})
 	Codec = codec.NewManager(math.MaxInt32)
 	if err := Codec.RegisterCodec(CodecVersion, lc); err != nil {
 		panic(err)

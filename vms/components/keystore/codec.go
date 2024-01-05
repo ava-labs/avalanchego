@@ -5,6 +5,7 @@ package keystore
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -19,9 +20,9 @@ var (
 )
 
 func init() {
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	Codec = codec.NewDefaultManager()
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	lc := linearcodec.NewDefault(time.Time{})
 	LegacyCodec = codec.NewManager(math.MaxInt32)
 
 	err := utils.Err(
