@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -100,7 +100,7 @@ func (v *ValidatorTracker) removeConnectedValidator(nodeID ids.NodeID) {
 	v.connectedValidators = v.connectedValidators[:newNumConnectedValidators]
 }
 
-func (v *ValidatorTracker) GetValidatorIPs(except *gossip.BloomFilter, maxNumIPs int) []*ips.ClaimedIPPort {
+func (v *ValidatorTracker) GetValidatorIPs(except *bloom.ReadFilter, salt ids.ID, maxNumIPs int) []*ips.ClaimedIPPort {
 	var (
 		uniform = sampler.NewUniform()
 		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)
@@ -117,7 +117,8 @@ func (v *ValidatorTracker) GetValidatorIPs(except *gossip.BloomFilter, maxNumIPs
 		}
 
 		ip := v.connectedValidators[index]
-		if !except.Has(ip) {
+		gossipID := ip.GossipID()
+		if !bloom.Contains(except, gossipID[:], salt[:]) {
 			ips = append(ips, ip)
 		}
 	}

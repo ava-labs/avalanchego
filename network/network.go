@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -24,12 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -570,9 +570,10 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 	}
 }
 
-func (n *network) Peers(knownPeers *gossip.BloomFilter) []*ips.ClaimedIPPort {
+func (n *network) Peers(knownPeers *bloom.ReadFilter, salt ids.ID) []*ips.ClaimedIPPort {
 	return n.validatorTracker.GetValidatorIPs(
 		knownPeers,
+		salt,
 		int(n.config.PeerListNumValidatorIPs),
 	)
 }

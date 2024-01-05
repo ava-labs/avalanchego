@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -18,10 +18,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -33,18 +33,8 @@ import (
 var (
 	errClosed = errors.New("closed")
 
-	emptyBloomFilter *gossip.BloomFilter
-
 	_ Peer = (*peer)(nil)
 )
-
-func init() {
-	var err error
-	emptyBloomFilter, err = gossip.NewBloomFilter(2, .5)
-	if err != nil {
-		panic(err)
-	}
-}
 
 // Peer encapsulates all of the functionality required to send and receive
 // messages with a remote peer.
@@ -625,7 +615,7 @@ func (p *peer) sendNetworkMessages() {
 	for {
 		select {
 		case <-p.peerListChan:
-			peerIPs := p.Config.Network.Peers(emptyBloomFilter)
+			peerIPs := p.Config.Network.Peers(bloom.EmptyFilter, ids.Empty)
 			if len(peerIPs) == 0 {
 				p.Log.Verbo(
 					"skipping peer gossip as there are no unknown peers",
@@ -984,15 +974,29 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	knownPeers := emptyBloomFilter
+	var (
+		knownPeers = bloom.EmptyFilter
+		salt       ids.ID
+	)
 	if msg.KnownPeers != nil {
 		var err error
-		knownPeers, err = gossip.ParseBloomFilter(msg.KnownPeers.Filter, msg.KnownPeers.Salt)
+		salt, err = ids.ToID(msg.KnownPeers.Salt)
 		if err != nil {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
-				zap.String("field", "KnownPeers"),
+				zap.String("field", "KnownPeers.Salt"),
+			)
+			p.StartClose()
+			return
+		}
+
+		knownPeers, err = bloom.Parse(msg.KnownPeers.Filter)
+		if err != nil {
+			p.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.HandshakeOp),
+				zap.String("field", "KnownPeers.Salt"),
 			)
 			p.StartClose()
 			return
@@ -1032,7 +1036,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.gotHandshake.Set(true)
 
-	peerIPs := p.Network.Peers(knownPeers)
+	peerIPs := p.Network.Peers(knownPeers, salt)
 
 	// We bypass throttling here to ensure that the peerlist message is
 	// acknowledged timely.
