@@ -1243,6 +1243,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 
 func (n *network) runTimers() {
 	gossipPeerlists := time.NewTicker(n.config.PeerListGossipFreq)
+	// TODO: Add frequency as a config
 	resetValidatorTracker := time.NewTicker(time.Minute)
 	updateUptimes := time.NewTicker(n.config.UptimeMetricFreq)
 	defer func() {
