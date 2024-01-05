@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 // NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
@@ -89,7 +89,7 @@ func ResetBloomFilterIfNeeded(
 	}
 
 	numHashes, numEntries := bloom.OptimalParameters(
-		safemath.Max(bloomFilter.minTargetElements, targetElements),
+		math.Max(bloomFilter.minTargetElements, targetElements),
 		bloomFilter.targetFalsePositiveProbability,
 	)
 	newBloom, err := bloom.New(numHashes, numEntries)
