@@ -5,6 +5,7 @@ package avax
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -32,7 +33,7 @@ func TestUTXOVerifyEmpty(t *testing.T) {
 func TestUTXOSerialize(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
 
 	require.NoError(c.RegisterType(&secp256k1fx.MintOutput{}))

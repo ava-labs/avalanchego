@@ -259,23 +259,22 @@ func newDatabase(
 			return make([]byte, 0, defaultBufferLength)
 		},
 	}
-	iNodeDB, err := newIntermediateNodeDB(
-		db,
-		bufferPool,
-		metrics,
-		int(config.IntermediateNodeCacheSize),
-		int(config.IntermediateWriteBufferSize),
-		int(config.IntermediateWriteBatchSize),
-		BranchFactorToTokenSize[config.BranchFactor])
-	if err != nil {
-		return nil, err
-	}
 
 	trieDB := &merkleDB{
-		metrics:              metrics,
-		baseDB:               db,
-		intermediateNodeDB:   iNodeDB,
-		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
+		metrics: metrics,
+		baseDB:  db,
+		intermediateNodeDB: newIntermediateNodeDB(
+			db,
+			bufferPool,
+			metrics,
+			int(config.IntermediateNodeCacheSize),
+			int(config.IntermediateWriteBufferSize),
+			int(config.IntermediateWriteBatchSize),
+			BranchFactorToTokenSize[config.BranchFactor]),
+		valueNodeDB: newValueNodeDB(db,
+			bufferPool,
+			metrics,
+			int(config.ValueNodeCacheSize)),
 		history:              newTrieHistory(int(config.HistoryLength)),
 		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
@@ -336,7 +335,8 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	)
 	currentOps := make([]database.BatchOp, 0, opsSizeLimit)
 	valueIt := db.NewIterator()
-	defer valueIt.Release()
+	// ensure valueIt is captured and release gets called on the latest copy of valueIt
+	defer func() { valueIt.Release() }()
 	for valueIt.Next() {
 		if len(currentOps) >= opsSizeLimit {
 			view, err := newView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
