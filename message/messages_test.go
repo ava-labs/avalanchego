@@ -146,8 +146,8 @@ func TestMessage(t *testing.T) {
 			desc: "peer_list message with no compression",
 			op:   PeerListOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_PeerList{
-					PeerList: &p2p.PeerList{
+				Message: &p2p.Message_PeerList_{
+					PeerList_: &p2p.PeerList{
 						ClaimedIpPorts: []*p2p.ClaimedIpPort{
 							{
 								X509Certificate: testTLSCert.Certificate[0],
@@ -168,8 +168,8 @@ func TestMessage(t *testing.T) {
 			desc: "peer_list message with gzip compression",
 			op:   PeerListOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_PeerList{
-					PeerList: &p2p.PeerList{
+				Message: &p2p.Message_PeerList_{
+					PeerList_: &p2p.PeerList{
 						ClaimedIpPorts: []*p2p.ClaimedIpPort{
 							{
 								X509Certificate: testTLSCert.Certificate[0],
@@ -190,8 +190,8 @@ func TestMessage(t *testing.T) {
 			desc: "peer_list message with zstd compression",
 			op:   PeerListOp,
 			msg: &p2p.Message{
-				Message: &p2p.Message_PeerList{
-					PeerList: &p2p.PeerList{
+				Message: &p2p.Message_PeerList_{
+					PeerList_: &p2p.PeerList{
 						ClaimedIpPorts: []*p2p.ClaimedIpPort{
 							{
 								X509Certificate: testTLSCert.Certificate[0],

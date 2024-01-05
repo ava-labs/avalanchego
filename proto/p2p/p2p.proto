@@ -29,6 +29,7 @@ message Message {
     Ping ping = 11;
     Pong pong = 12;
     Handshake handshake = 13;
+    GetPeerList get_peer_list = 35;
     PeerList peer_list = 14;
 
     // State-sync messages:
@@ -152,15 +153,25 @@ message ClaimedIpPort {
   bytes tx_id = 6;
 }
 
+// GetPeerList contains a bloom filter of the currently known validator IPs.
+//
+// GetPeerList must not be responded to until finishing the handshake. After the
+// handshake is completed, GetPeerlist messages should be responded to with a
+// Peerlist message containing validators that are not present in the bloom
+// filter.
+message GetPeerList {
+  BloomFilter known_peers = 1;
+}
+
 // PeerList contains network-level metadata for a set of validators.
 //
 // PeerList must be sent in response to an inbound Handshake message from a
 // remote peer a peer wants to connect to. Once a PeerList is received after
 // a Handshake message, the p2p handshake is complete and the connection is
 // established.
-
-// Peers should periodically send PeerList messages to allow peers to
-// discover each other.
+//
+// PeerList should be sent in response to a GetPeerlist message if the handshake
+// has been completed.
 message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
 }

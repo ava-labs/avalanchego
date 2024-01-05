@@ -22,6 +22,7 @@ const (
 	PingOp Op = iota
 	PongOp
 	HandshakeOp
+	GetPeerListOp
 	PeerListOp
 	// State sync:
 	GetStateSummaryFrontierOp
@@ -71,6 +72,7 @@ var (
 		PingOp,
 		PongOp,
 		HandshakeOp,
+		GetPeerListOp,
 		PeerListOp,
 	}
 
@@ -209,6 +211,8 @@ func (op Op) String() string {
 		return "pong"
 	case HandshakeOp:
 		return "handshake"
+	case GetPeerListOp:
+		return "get_peerlist"
 	case PeerListOp:
 		return "peerlist"
 	// State sync
@@ -301,8 +305,8 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.Pong, nil
 	case *p2p.Message_Handshake:
 		return msg.Handshake, nil
-	case *p2p.Message_PeerList:
-		return msg.PeerList, nil
+	case *p2p.Message_PeerList_:
+		return msg.PeerList_, nil
 	// State sync:
 	case *p2p.Message_GetStateSummaryFrontier:
 		return msg.GetStateSummaryFrontier, nil
@@ -358,7 +362,9 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return PongOp, nil
 	case *p2p.Message_Handshake:
 		return HandshakeOp, nil
-	case *p2p.Message_PeerList:
+	case *p2p.Message_GetPeerList:
+		return GetPeerListOp, nil
+	case *p2p.Message_PeerList_:
 		return PeerListOp, nil
 	case *p2p.Message_GetStateSummaryFrontier:
 		return GetStateSummaryFrontierOp, nil

@@ -285,8 +285,8 @@ func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bo
 	}
 	return b.builder.createOutbound(
 		&p2p.Message{
-			Message: &p2p.Message_PeerList{
-				PeerList: &p2p.PeerList{
+			Message: &p2p.Message_PeerList_{
+				PeerList_: &p2p.PeerList{
 					ClaimedIpPorts: claimIPPorts,
 				},
 			},

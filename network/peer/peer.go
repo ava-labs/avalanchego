@@ -693,6 +693,10 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handleHandshake(m)
 		msg.OnFinishedHandling()
 		return
+	case *p2p.GetPeerList:
+		p.handleGetPeerList(m)
+		msg.OnFinishedHandling()
+		return
 	case *p2p.PeerList:
 		p.handlePeerList(m)
 		msg.OnFinishedHandling()
@@ -986,6 +990,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
 				zap.String("field", "KnownPeers.Salt"),
+				zap.Error(err),
 			)
 			p.StartClose()
 			return
@@ -997,6 +1002,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
 				zap.String("field", "KnownPeers.Salt"),
+				zap.Error(err),
 			)
 			p.StartClose()
 			return
@@ -1056,6 +1062,65 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		p.Log.Debug("failed to send peer list for handshake",
 			zap.Stringer("nodeID", p.id),
 			zap.Error(p.onClosingCtx.Err()),
+		)
+	}
+}
+
+func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
+	if !p.finishedHandshake.Get() {
+		p.Log.Verbo("dropping get peer list message",
+			zap.Stringer("nodeID", p.id),
+		)
+		return
+	}
+
+	knownPeersMsg := msg.GetKnownPeers()
+	salt, err := ids.ToID(knownPeersMsg.GetSalt())
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.GetPeerListOp),
+			zap.String("field", "KnownPeers.Salt"),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+
+	filter, err := bloom.Parse(knownPeersMsg.GetFilter())
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.GetPeerListOp),
+			zap.String("field", "KnownPeers.Salt"),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+
+	peerIPs := p.Network.Peers(filter, salt)
+	if len(peerIPs) == 0 {
+		p.Log.Debug("skipping sending of empty peer list",
+			zap.Stringer("nodeID", p.id),
+		)
+		return
+	}
+
+	// Bypass throttling is disabled here to follow the non-handshake message
+	// sending pattern.
+	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
+	if err != nil {
+		p.Log.Error("failed to create peer list message",
+			zap.Stringer("nodeID", p.id),
+			zap.Error(err),
+		)
+		return
+	}
+
+	if !p.Send(p.onClosingCtx, peerListMsg) {
+		p.Log.Debug("failed to send peer list",
+			zap.Stringer("nodeID", p.id),
 		)
 	}
 }
