@@ -665,10 +665,9 @@ impl Db {
 
     /// Create a new mutable store and an alterable revision of the DB on top.
     fn new_store(
+        &self,
         cached_space: &Universe<Arc<CachedSpace>>,
         reset_store_headers: bool,
-        payload_regn_nbit: u64,
-        cfg: &DbConfig,
     ) -> Result<(Universe<StoreRevMut>, DbRev<MutStore>), DbError> {
         let mut offset = Db::PARAM_SIZE as usize;
         let db_header: DiskAddress = DiskAddress::from(offset);
@@ -713,9 +712,9 @@ impl Db {
         let mut rev: DbRev<CompactSpace<Node, StoreRevMut>> = Db::new_revision(
             header_refs,
             (store.merkle.meta.clone(), store.merkle.payload.clone()),
-            payload_regn_nbit,
-            cfg.payload_max_walk,
-            &cfg.rev,
+            self.payload_regn_nbit,
+            self.cfg.payload_max_walk,
+            &self.cfg.rev,
         )?;
         #[allow(clippy::unwrap_used)]
         rev.flush_dirty().unwrap();
@@ -800,12 +799,7 @@ impl Db {
     ) -> Result<proposal::Proposal, DbError> {
         let mut inner = self.inner.write();
         let reset_store_headers = inner.reset_store_headers;
-        let (store, mut rev) = Db::new_store(
-            &inner.cached_space,
-            reset_store_headers,
-            self.payload_regn_nbit,
-            &self.cfg,
-        )?;
+        let (store, mut rev) = self.new_store(&inner.cached_space, reset_store_headers)?;
 
         // Flip the reset flag after resetting the store headers.
         if reset_store_headers {
