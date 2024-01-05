@@ -5,23 +5,24 @@ package gossip
 
 import (
 	"crypto/rand"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
+
+const targetSizeMultiplier = 2
 
 // NewBloomFilter returns a new instance of a bloom filter with at most
 // [maxExpectedElements] elements anticipated at any moment, and a false
 // positive probability of [falsePositiveProbability].
-//
-// Invariant: The returned bloom filter is not safe to reset concurrently with
-// other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
-	maxExpectedElements int,
+	minExpectedElements int,
 	falsePositiveProbability float64,
 ) (*BloomFilter, error) {
 	bloom, err := bloom.New(bloom.OptimalParameters(
-		maxExpectedElements,
+		minExpectedElements,
 		falsePositiveProbability,
 	))
 	if err != nil {
@@ -30,13 +31,18 @@ func NewBloomFilter(
 
 	salt, err := randomSalt()
 	return &BloomFilter{
-		bloom: bloom,
-		salt:  salt,
+		minExpectedElements: minExpectedElements,
+		bloom:               bloom,
+		salt:                salt,
 	}, err
 }
 
 type BloomFilter struct {
-	bloom *bloom.Filter
+	l  sync.RWMutex
+	rl sync.Mutex
+
+	minExpectedElements int
+	bloom               *bloom.Filter
 	// salt is provided to eventually unblock collisions in Bloom. It's possible
 	// that conflicting Gossipable items collide in the bloom filter, so a salt
 	// is generated to eventually resolve collisions.
@@ -44,22 +50,30 @@ type BloomFilter struct {
 }
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
 	h := gossipable.GossipID()
 	bloom.Add(b.bloom, h[:], b.salt[:])
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
 	h := gossipable.GossipID()
 	return bloom.Contains(b.bloom, h[:], b.salt[:])
 }
 
-// TODO: Remove error from the return
-func (b *BloomFilter) Marshal() ([]byte, []byte, error) {
+func (b *BloomFilter) Marshal() ([]byte, []byte) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
 	bloomBytes := b.bloom.Marshal()
 	// salt must be copied here to ensure the bytes aren't overwritten if salt
 	// is later modified.
 	salt := b.salt
-	return bloomBytes, salt[:], nil
+	return bloomBytes, salt[:]
 }
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches a target false
@@ -67,16 +81,25 @@ func (b *BloomFilter) Marshal() ([]byte, []byte, error) {
 func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	falsePositiveProbability float64,
+	currentSize int,
 ) (bool, error) {
+	bloomFilter.l.RLock()
 	numHashes, numEntries := bloomFilter.bloom.Parameters()
 	// TODO: Precalculate maxCount, as it is independent of the current state
 	// of the bloom filter.
 	maxCount := bloom.EstimateCount(numHashes, numEntries, falsePositiveProbability)
 	if bloomFilter.bloom.Count() < maxCount {
+		bloomFilter.l.RUnlock()
 		return false, nil
 	}
 
-	newBloom, err := bloom.New(numHashes, numEntries)
+	bloomFilter.l.RUnlock()
+	bloomFilter.l.Lock()
+	defer bloomFilter.l.Unlock()
+	newBloom, err := bloom.New(bloom.OptimalParameters(
+		safemath.Max(bloomFilter.minExpectedElements, currentSize*targetSizeMultiplier),
+		falsePositiveProbability,
+	))
 	if err != nil {
 		return false, err
 	}
