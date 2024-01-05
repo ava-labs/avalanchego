@@ -40,7 +40,7 @@ type Filter struct {
 }
 
 // New creates a new Filter with the specified number of hashes and bytes for
-// entries.
+// entries. The returned bloom filter is safe for concurrent usage.
 func New(numHashes, numEntries int) (*Filter, error) {
 	if numEntries < minEntries {
 		return nil, errTooFewEntries

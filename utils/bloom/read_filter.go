@@ -13,6 +13,7 @@ type ReadFilter struct {
 	entries   []byte
 }
 
+// Parse [bytes] into a read-only bloom filter.
 func Parse(bytes []byte) (*ReadFilter, error) {
 	if len(bytes) == 0 {
 		return nil, errInvalidNumHashes
