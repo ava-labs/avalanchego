@@ -251,7 +251,7 @@ func TestUintSize(t *testing.T) {
 	// Test lower bound
 	expectedSize := c.uintSize(0)
 	actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), 0)
-	require.Equal(t, expectedSize, actualSize, 0)
+	require.Equal(t, expectedSize, actualSize)
 
 	// Test upper bound
 	expectedSize = c.uintSize(math.MaxUint64)
