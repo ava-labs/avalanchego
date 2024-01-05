@@ -16,14 +16,14 @@ import (
 
 func TestBloomFilterRefresh(t *testing.T) {
 	tests := []struct {
-		name                     string
-		falsePositiveProbability float64
-		add                      []*testTx
-		expected                 []*testTx
+		name                          string
+		resetFalsePositiveProbability float64
+		add                           []*testTx
+		expected                      []*testTx
 	}{
 		{
-			name:                     "no refresh",
-			falsePositiveProbability: 1,
+			name:                          "no refresh",
+			resetFalsePositiveProbability: 1,
 			add: []*testTx{
 				{id: ids.ID{0}},
 			},
@@ -32,8 +32,8 @@ func TestBloomFilterRefresh(t *testing.T) {
 			},
 		},
 		{
-			name:                     "refresh",
-			falsePositiveProbability: 0.1,
+			name:                          "refresh",
+			resetFalsePositiveProbability: 0.1,
 			add: []*testTx{
 				{id: ids.ID{0}},
 				{id: ids.ID{1}},
@@ -50,12 +50,15 @@ func TestBloomFilterRefresh(t *testing.T) {
 			b, err := bloom.New(1, 10)
 			require.NoError(err)
 			bloom := BloomFilter{
-				bloom:                         b,
-				resetFalsePositiveProbability: tt.falsePositiveProbability,
+				bloom:                          b,
+				targetFalsePositiveProbability: 0.01,
+				resetFalsePositiveProbability:  tt.resetFalsePositiveProbability,
 			}
 
 			for _, item := range tt.add {
-				bloomBytes, saltBytes := bloom.Marshal()
+				bloomBytes, saltBytes, err := bloom.Marshal()
+				require.NoError(err)
+
 				initialBloomBytes := slices.Clone(bloomBytes)
 				initialSaltBytes := slices.Clone(saltBytes)
 
