@@ -65,8 +65,7 @@ func OptimalEntries(count int, falsePositiveProbability float64) int {
 		return math.MaxInt
 	}
 
-	log := math.Log(falsePositiveProbability)
-	entriesInBits := -float64(count) * log / ln2Squared
+	entriesInBits := -float64(count) * math.Log(falsePositiveProbability) / ln2Squared
 	entries := (entriesInBits + bitsPerByte - 1) / bitsPerByte
 	// Converting a floating-point value to an int produces an undefined value
 	// if the floating-point value cannot be represented as an int. To avoid

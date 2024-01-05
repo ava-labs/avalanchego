@@ -103,6 +103,10 @@ func TestOptimalEntries(t *testing.T) {
 	}
 }
 
+func TestLog(t *testing.T) {
+	require.Equal(t, math.Log(math.SmallestNonzeroFloat64), float64(-744.4400719213812))
+}
+
 func TestEstimateEntries(t *testing.T) {
 	tests := []struct {
 		numHashes                int
