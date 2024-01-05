@@ -95,6 +95,13 @@ func TestEstimateEntries(t *testing.T) {
 	}
 }
 
+func FuzzEstimateEntries(f *testing.F) {
+	f.Fuzz(func(t *testing.T, numSeeds, numBytes int, falsePositiveProbability float64) {
+		entries := EstimateEntries(numSeeds, numBytes, falsePositiveProbability)
+		require.GreaterOrEqual(t, entries, 0)
+	})
+}
+
 func TestEstimateEntriesSteps(t *testing.T) {
 	tests := []struct {
 		numSeeds                 int
@@ -162,7 +169,11 @@ func TestEstimateEntriesSteps(t *testing.T) {
 			if exp > 1 {
 				t.Fatal("exp is greater than 1")
 			}
-			entries := -math.Log(exp) * numBits * invNumSeeds
+			entriesF := -math.Log(exp) * numBits * invNumSeeds
+			if entriesF < 0 {
+				t.Fatal("entriesF is negative")
+			}
+			entries := int(math.Ceil(entriesF))
 			if entries < 0 {
 				t.Fatal("entries is negative")
 			}
