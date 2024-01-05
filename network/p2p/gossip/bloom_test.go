@@ -51,7 +51,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			require.NoError(err)
 			bloom := BloomFilter{
 				bloom:                          b,
-				targetFalsePositiveProbability: 0.01,
+				targetFalsePositiveProbability: tt.resetFalsePositiveProbability,
 				resetFalsePositiveProbability:  tt.resetFalsePositiveProbability,
 			}
 
