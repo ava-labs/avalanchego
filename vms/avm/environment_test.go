@@ -7,6 +7,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	stdjson "encoding/json"
 
@@ -228,9 +229,12 @@ func setup(tb testing.TB, c *envConfig) *environment {
 func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
 	require := require.New(tb)
 
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	cm := parser.GenesisCodec()
