@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/internal/ethapi"
@@ -78,8 +77,8 @@ func (b *testBackend) ChainDb() ethdb.Database {
 	return b.db
 }
 
-func (b *testBackend) GetVMConfig() *vm.Config {
-	return &vm.Config{AllowUnfinalizedQueries: true}
+func (b *testBackend) IsAllowUnfinalizedQueries() bool {
+	return true
 }
 
 func (b *testBackend) GetMaxBlocksPerRequest() int64 {

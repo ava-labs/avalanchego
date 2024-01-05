@@ -893,8 +893,8 @@ func (fb *filterBackend) SubscribeAcceptedTransactionEvent(ch chan<- core.NewTxs
 	return fb.bc.SubscribeAcceptedTransactionEvent(ch)
 }
 
-func (fb *filterBackend) GetVMConfig() *vm.Config {
-	return fb.bc.GetVMConfig()
+func (fb *filterBackend) IsAllowUnfinalizedQueries() bool {
+	return false
 }
 
 func (fb *filterBackend) LastAcceptedBlock() *types.Block {
