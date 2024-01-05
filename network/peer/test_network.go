@@ -19,7 +19,7 @@ func (testNetwork) AllowConnection(ids.NodeID) bool {
 	return true
 }
 
-func (testNetwork) Track(ids.NodeID, []*ips.ClaimedIPPort) error {
+func (testNetwork) Track([]*ips.ClaimedIPPort) error {
 	return nil
 }
 

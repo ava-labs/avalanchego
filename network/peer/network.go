@@ -19,10 +19,9 @@ type Network interface {
 	// connection is no longer desired and should be terminated.
 	AllowConnection(peerID ids.NodeID) bool
 
-	// Track allows the peer to notify the network of a potential new peer to
-	// connect to, given the [ips] of the peers it sent us during the peer
-	// handshake.
-	Track(peerID ids.NodeID, ips []*ips.ClaimedIPPort) error
+	// Track allows the peer to notify the network of potential new peers to
+	// connect to.
+	Track(ips []*ips.ClaimedIPPort) error
 
 	// Disconnected is called when the peer finishes shutting down. It is not
 	// guaranteed that [Connected] was called for the provided peer. However, it

@@ -1109,7 +1109,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		}
 	}
 
-	if err := p.Network.Track(p.id, discoveredIPs); err != nil {
+	if err := p.Network.Track(discoveredIPs); err != nil {
 		p.Log.Debug("message with invalid field",
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PeerListOp),

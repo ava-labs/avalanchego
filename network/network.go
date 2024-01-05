@@ -474,7 +474,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return isValidator || n.WantsConnection(nodeID)
 }
 
-func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) error {
+func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
 	// Perform all signature verification and hashing before grabbing the peer
 	// lock.
 	// Note: Avoiding signature verification when the IP isn't needed is a
@@ -486,10 +486,6 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 	// processed the IP; which should be very rare.
 	ipAuths, err := n.authenticateIPs(claimedIPPorts)
 	if err != nil {
-		n.peerConfig.Log.Debug("authenticating claimed IPs failed",
-			zap.Stringer("nodeID", peerID),
-			zap.Error(err),
-		)
 		return err
 	}
 
