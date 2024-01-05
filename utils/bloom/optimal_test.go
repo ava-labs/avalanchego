@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const largestFloat64LessThan1 float64 = 1 - 1e-16
+
 func TestEstimateEntries(t *testing.T) {
 	tests := []struct {
 		numSeeds                 int
@@ -18,6 +20,30 @@ func TestEstimateEntries(t *testing.T) {
 		falsePositiveProbability float64
 		expectedEntries          int
 	}{
+		{ // invalid params
+			numSeeds:                 0,
+			numBytes:                 2_048,
+			falsePositiveProbability: .5,
+			expectedEntries:          0,
+		},
+		{ // invalid params
+			numSeeds:                 1,
+			numBytes:                 0,
+			falsePositiveProbability: .5,
+			expectedEntries:          0,
+		},
+		{ // invalid params
+			numSeeds:                 1,
+			numBytes:                 1,
+			falsePositiveProbability: 2,
+			expectedEntries:          math.MaxInt,
+		},
+		{ // invalid params
+			numSeeds:                 1,
+			numBytes:                 1,
+			falsePositiveProbability: -1,
+			expectedEntries:          0,
+		},
 		{
 			numSeeds:                 8,
 			numBytes:                 2_048,
@@ -46,6 +72,18 @@ func TestEstimateEntries(t *testing.T) {
 			numSeeds:                 7,
 			numBytes:                 11_982,
 			falsePositiveProbability: 1,
+			expectedEntries:          math.MaxInt,
+		},
+		{ // params from OptimalParameters(10_000, .01)
+			numSeeds:                 7,
+			numBytes:                 11_982,
+			falsePositiveProbability: math.SmallestNonzeroFloat64,
+			expectedEntries:          0,
+		},
+		{ // params from OptimalParameters(10_000, .01)
+			numSeeds:                 7,
+			numBytes:                 11_982,
+			falsePositiveProbability: largestFloat64LessThan1,
 			expectedEntries:          math.MaxInt,
 		},
 	}

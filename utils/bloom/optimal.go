@@ -34,6 +34,17 @@ func OptimalParameters(maxEntries int, falsePositiveProbability float64) (int, i
 //
 // ref: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=903775
 func EstimateEntries(numSeeds, numBytes int, falsePositiveProbability float64) int {
+	switch {
+	case numSeeds < minSeeds:
+		return 0
+	case numBytes < minEntries:
+		return 0
+	case falsePositiveProbability <= 0:
+		return 0
+	case falsePositiveProbability >= 1:
+		return math.MaxInt
+	}
+
 	invNumSeeds := 1 / float64(numSeeds)
 	numBits := float64(numBytes * 8)
 	exp := 1 - math.Pow(falsePositiveProbability, invNumSeeds)
