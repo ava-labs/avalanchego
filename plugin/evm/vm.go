@@ -656,7 +656,7 @@ func (vm *VM) Initialize(
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
 	// interface. The fx will register all of its types, which can be safely
 	// ignored by the VM's codec.
-	vm.baseCodec = linearcodec.NewDefault()
+	vm.baseCodec = linearcodec.NewDefault(time.Time{})
 
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err

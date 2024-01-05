@@ -6,6 +6,7 @@ package evm
 import (
 	"math/big"
 	"math/rand"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils"
 
@@ -77,7 +78,7 @@ func (t *TestUnsignedTx) EVMStateTransfer(ctx *snow.Context, state *state.StateD
 
 func testTxCodec() codec.Manager {
 	codec := codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 
 	errs := wrappers.Errs{}
 	errs.Add(
