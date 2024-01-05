@@ -78,7 +78,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
@@ -1075,6 +1077,17 @@ func (n *Node) initVMs() error {
 		VMManager:    n.VMManager,
 	})
 
+	durangoTime := version.GetDurangoTime(n.Config.NetworkID)
+	if err := txs.InitCodec(durangoTime); err != nil {
+		return err
+	}
+	if err := block.InitCodec(durangoTime); err != nil {
+		return err
+	}
+	if err := coreth.InitCodec(durangoTime); err != nil {
+		return err
+	}
+
 	// Register the VMs that Avalanche supports
 	err := utils.Err(
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
@@ -1106,7 +1119,7 @@ func (n *Node) initVMs() error {
 				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
 				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
 				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
-				DurangoTime:                   version.GetDurangoTime(n.Config.NetworkID),
+				DurangoTime:                   durangoTime,
 				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
@@ -1114,6 +1127,7 @@ func (n *Node) initVMs() error {
 			Config: avmconfig.Config{
 				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
+				DurangoTime:      durangoTime,
 			},
 		}),
 		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),

@@ -4,6 +4,8 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils"
@@ -14,14 +16,13 @@ const (
 	CodecVersion = 0
 
 	maxMessageSize = 512 * units.KiB
-	maxSliceLen    = maxMessageSize
 )
 
 var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewManager(maxMessageSize)
-	lc := linearcodec.NewCustomMaxLength(maxSliceLen)
+	lc := linearcodec.NewDefault(time.Time{})
 
 	err := utils.Err(
 		lc.RegisterType(&Tx{}),
