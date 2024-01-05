@@ -50,17 +50,16 @@ func TestBloomFilterRefresh(t *testing.T) {
 			b, err := bloom.New(1, 10)
 			require.NoError(err)
 			bloom := BloomFilter{
-				bloom: b,
+				bloom:                         b,
+				resetFalsePositiveProbability: tt.falsePositiveProbability,
 			}
 
 			for _, item := range tt.add {
-				bloomBytes, saltBytes, err := bloom.Marshal()
-				require.NoError(err)
-
+				bloomBytes, saltBytes := bloom.Marshal()
 				initialBloomBytes := slices.Clone(bloomBytes)
 				initialSaltBytes := slices.Clone(saltBytes)
 
-				_, err = ResetBloomFilterIfNeeded(&bloom, tt.falsePositiveProbability)
+				_, err = ResetBloomFilterIfNeeded(&bloom, len(tt.add))
 				require.NoError(err)
 				bloom.Add(item)
 
