@@ -251,6 +251,12 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
+	validatorTracker, err := NewValidatorTracker(log)
+	if err != nil {
+		return nil, fmt.Errorf("initializing validator tracker failed with: %w", err)
+	}
+	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, validatorTracker)
+
 	peerConfig := &peer.Config{
 		ReadBufferSize:  config.PeerReadBufferSize,
 		WriteBufferSize: config.PeerWriteBufferSize,
@@ -276,9 +282,6 @@ func NewNetwork(
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
-
-	validatorTracker := NewValidatorTracker()
-	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, validatorTracker)
 
 	n := &network{
 		config:               config,
