@@ -5,6 +5,7 @@ package state
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -22,8 +23,8 @@ const (
 var MetadataCodec codec.Manager
 
 func init() {
-	c0 := linearcodec.New([]string{CodecVersion0Tag}, math.MaxInt32)
-	c1 := linearcodec.New([]string{CodecVersion0Tag, CodecVersion1Tag}, math.MaxInt32)
+	c0 := linearcodec.New(time.Time{}, []string{CodecVersion0Tag}, math.MaxInt32)
+	c1 := linearcodec.New(time.Time{}, []string{CodecVersion0Tag, CodecVersion1Tag}, math.MaxInt32)
 	MetadataCodec = codec.NewManager(math.MaxInt32)
 
 	err := utils.Err(

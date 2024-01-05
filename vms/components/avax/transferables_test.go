@@ -5,6 +5,7 @@ package avax
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -42,7 +43,7 @@ func TestTransferableOutputVerify(t *testing.T) {
 func TestTransferableOutputSorting(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&TestTransferable{}))
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
@@ -84,7 +85,7 @@ func TestTransferableOutputSorting(t *testing.T) {
 func TestTransferableOutputSerialization(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
@@ -175,7 +176,7 @@ func TestTransferableInputVerify(t *testing.T) {
 func TestTransferableInputSorting(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&TestTransferable{}))
 
 	ins := []*TransferableInput{
@@ -232,7 +233,7 @@ func TestTransferableInputSorting(t *testing.T) {
 func TestTransferableInputSerialization(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&secp256k1fx.TransferInput{}))
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
