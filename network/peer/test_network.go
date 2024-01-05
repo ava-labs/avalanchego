@@ -25,6 +25,10 @@ func (testNetwork) Track([]*ips.ClaimedIPPort) error {
 
 func (testNetwork) Disconnected(ids.NodeID) {}
 
+func (testNetwork) KnownPeers() ([]byte, ids.ID) {
+	return bloom.EmptyFilter.Marshal(), ids.Empty
+}
+
 func (testNetwork) Peers(*bloom.ReadFilter, ids.ID) []*ips.ClaimedIPPort {
 	return nil
 }

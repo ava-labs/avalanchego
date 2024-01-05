@@ -181,6 +181,15 @@ func (v *ValidatorTracker) ResetBloom() error {
 	return v.resetBloom()
 }
 
+// Bloom returns the binary representation of the bloom filter along with the
+// random salt.
+func (v *ValidatorTracker) Bloom() ([]byte, ids.ID) {
+	v.lock.RLock()
+	defer v.lock.RUnlock()
+
+	return v.connectedValidatorsBloom.Marshal(), v.connectedValidatorsBloomSalt
+}
+
 // resetBloom creates a new bloom filter with a reasonable size for the current
 // validator set size. This function additionally populates the new bloom filter
 // with the currently connected validators.

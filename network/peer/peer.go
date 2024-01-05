@@ -510,6 +510,8 @@ func (p *peer) writeMessages() {
 		Patch: myVersion.Patch,
 	}
 
+	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
+
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
@@ -524,6 +526,8 @@ func (p *peer) writeMessages() {
 		p.MySubnets.List(),
 		p.SupportedACPs,
 		p.ObjectedACPs,
+		knownPeersFilter,
+		knownPeersSalt,
 	)
 	if err != nil {
 		p.Log.Error("failed to create message",

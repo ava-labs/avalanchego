@@ -569,6 +569,10 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 	}
 }
 
+func (n *network) KnownPeers() ([]byte, ids.ID) {
+	return n.validatorTracker.Bloom()
+}
+
 func (n *network) Peers(knownPeers *bloom.ReadFilter, salt ids.ID) []*ips.ClaimedIPPort {
 	return n.validatorTracker.GetValidatorIPs(
 		knownPeers,
