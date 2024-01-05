@@ -30,6 +30,7 @@ var (
 )
 
 type Filter struct {
+	// numBits is always equal to [bitsPerByte * len(entries)]
 	numBits uint64
 
 	lock      sync.RWMutex
