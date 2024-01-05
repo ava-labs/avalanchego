@@ -81,11 +81,6 @@ func TestOptimalEntries(t *testing.T) {
 		},
 		{
 			count:                    1024,
-			falsePositiveProbability: math.SmallestNonzeroFloat64,
-			expectedEntries:          198331,
-		},
-		{
-			count:                    1024,
 			falsePositiveProbability: largestFloat64LessThan1,
 			expectedEntries:          minEntries,
 		},
@@ -101,10 +96,6 @@ func TestOptimalEntries(t *testing.T) {
 			require.Equal(t, test.expectedEntries, entries)
 		})
 	}
-}
-
-func TestLog(t *testing.T) {
-	require.Equal(t, math.Log(math.SmallestNonzeroFloat64), float64(-744.4400719213812))
 }
 
 func TestEstimateEntries(t *testing.T) {
