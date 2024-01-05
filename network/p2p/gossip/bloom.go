@@ -14,9 +14,11 @@ import (
 
 const targetSizeMultiplier = 2
 
-// NewBloomFilter returns a new instance of a bloom filter with at most
-// [maxExpectedElements] elements anticipated at any moment, and a false
-// positive probability of [falsePositiveProbability].
+// NewBloomFilter returns a new instance of a bloom filter with at least [minExpectedElements] elements
+// anticipated at any moment, and a false positive probability of [falsePositiveProbability].
+//
+// If the number of elements that are tracked with the bloom filter exceeds [minExpectedElements], the size
+// of the bloom filter will grow to maintain the same [falsePositiveProbability].
 func NewBloomFilter(
 	minExpectedElements int,
 	falsePositiveProbability float64,
