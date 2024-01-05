@@ -18,9 +18,8 @@ import (
 )
 
 var (
-	_ p2p.Handler                = (*txGossipHandler)(nil)
-	_ gossip.Marshaller[*txs.Tx] = (*txMarshaller)(nil)
-	_ gossip.Gossipable          = (*txs.Tx)(nil)
+	_ p2p.Handler       = (*txGossipHandler)(nil)
+	_ gossip.Gossipable = (*txs.Tx)(nil)
 )
 
 // txGossipHandler is the handler called when serving gossip messages
@@ -61,25 +60,23 @@ func newGossipMempool(
 	mempool mempool.Mempool,
 	log logging.Logger,
 	txVerifier TxVerifier,
-	maxExpectedElements int,
-	falsePositiveProbability float64,
-	maxFalsePositiveProbability float64,
+	minTargetElements int,
+	targetFalsePositiveProbability float64,
+	resetFalsePositiveProbability float64,
 ) (*gossipMempool, error) {
-	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
+	bloom, err := gossip.NewBloomFilter(minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
-		Mempool:                     mempool,
-		log:                         log,
-		txVerifier:                  txVerifier,
-		bloom:                       bloom,
-		maxFalsePositiveProbability: maxFalsePositiveProbability,
+		Mempool:    mempool,
+		log:        log,
+		txVerifier: txVerifier,
+		bloom:      bloom,
 	}, err
 }
 
 type gossipMempool struct {
 	mempool.Mempool
-	log                         logging.Logger
-	txVerifier                  TxVerifier
-	maxFalsePositiveProbability float64
+	log        logging.Logger
+	txVerifier TxVerifier
 
 	lock  sync.RWMutex
 	bloom *gossip.BloomFilter
@@ -113,7 +110,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.maxFalsePositiveProbability)
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len())
 	if err != nil {
 		return err
 	}
