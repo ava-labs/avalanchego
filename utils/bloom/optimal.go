@@ -6,49 +6,68 @@ package bloom
 import (
 	"math"
 
-	bloomfilter "github.com/holiman/bloomfilter/v2"
-
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// OptimalParameters calculates the optimal [numSeeds] and [numBytes] that
-// should be allocated for a bloom filter which will contain [maxEntries] and
-// target [falsePositiveProbability].
-func OptimalParameters(maxEntries int, falsePositiveProbability float64) (int, int) {
-	optimalNumBits := bloomfilter.OptimalM(uint64(maxEntries), falsePositiveProbability)
-	numBytes := (optimalNumBits + bitsPerByte - 1) / bitsPerByte
-	numBytes = safemath.Max(numBytes, minEntries)
-	numBits := numBytes * bitsPerByte
+const ln2Squared = math.Ln2 * math.Ln2
 
-	numSeeds := bloomfilter.OptimalK(numBits, uint64(maxEntries))
-	numSeeds = safemath.Max(numSeeds, minSeeds)
-	numSeeds = safemath.Min(numSeeds, maxSeeds)
-	return int(numSeeds), int(numBytes)
+// OptimalParameters calculates the optimal [numHashes] and [numEntries] that
+// should be allocated for a bloom filter which will contain [count] and target
+// [falsePositiveProbability].
+func OptimalParameters(count int, falsePositiveProbability float64) (int, int) {
+	numEntries := OptimalEntries(count, falsePositiveProbability)
+	numHashes := OptimalHashes(numEntries, count)
+	return numHashes, numEntries
 }
 
-// EstimateEntries estimates the number of entries that must be added to a bloom
-// filter with [numSeeds] and [numBytes] to reach [falsePositiveProbability].
-// This is derived by inversing a lower-bound on the probability of false
-// positives. For values where numBits >> numSeeds, the predicted probability is
-// fairly accurate.
+// OptimalHashes calculates the number of hashes which will minimize the false
+// positive probability of a bloom filter with [numEntries] after [count]
+// additions.
 //
-// ref: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=903775
-func EstimateEntries(numSeeds, numBytes int, falsePositiveProbability float64) int {
+// It is guaranteed to return a value in the range [minHashes, maxHashes].
+//
+// ref: https://en.wikipedia.org/wiki/Bloom_filter
+func OptimalHashes(numEntries, count int) int {
 	switch {
-	case numSeeds < minSeeds:
-		return 0
-	case numBytes < minEntries:
-		return 0
-	case falsePositiveProbability <= 0:
-		return 0
+	case numEntries < minEntries:
+		return maxHashes
+	case count <= 0:
+		return minHashes
+	}
+
+	numHashes := math.Ceil(float64(numEntries) * bitsPerByte * math.Ln2 / float64(count))
+	// Converting a floating-point value to an int produces an undefined value
+	// if the floating-point value cannot be represented as an int. To avoid
+	// this undefined behavior, we explicitly check against MaxInt here.
+	//
+	// ref: https://go.dev/ref/spec#Conversions
+	if numHashes >= maxHashes {
+		return maxHashes
+	}
+	return safemath.Max(int(numHashes), minHashes)
+}
+
+// OptimalEntries calculates the optimal number of entries to use when creating
+// a new Bloom filter when targenting a size of [count] with
+// [falsePositiveProbability] assuming that the optimal number of hashes is
+// used.
+//
+// It is guaranteed to return a value in the range [minEntries, MaxInt].
+//
+// ref: https://en.wikipedia.org/wiki/Bloom_filter
+func OptimalEntries(count int, falsePositiveProbability float64) int {
+	switch {
+	case count <= 0:
+		return minEntries
 	case falsePositiveProbability >= 1:
+		return minEntries
+	case falsePositiveProbability <= 0:
 		return math.MaxInt
 	}
 
-	invNumSeeds := 1 / float64(numSeeds)
-	numBits := float64(numBytes * 8)
-	exp := 1 - math.Pow(falsePositiveProbability, invNumSeeds)
-	entries := math.Ceil(-math.Log(exp) * numBits * invNumSeeds)
+	log := math.Log(falsePositiveProbability)
+	entriesInBits := -float64(count) * log / ln2Squared
+	entries := (entriesInBits + bitsPerByte - 1) / bitsPerByte
 	// Converting a floating-point value to an int produces an undefined value
 	// if the floating-point value cannot be represented as an int. To avoid
 	// this undefined behavior, we explicitly check against MaxInt here.
@@ -57,5 +76,41 @@ func EstimateEntries(numSeeds, numBytes int, falsePositiveProbability float64) i
 	if entries >= math.MaxInt {
 		return math.MaxInt
 	}
-	return int(entries)
+	return safemath.Max(int(entries), minEntries)
+}
+
+// EstimateCount estimates the number of additions a bloom filter with
+// [numHashes] and [numEntries] must have to reach [falsePositiveProbability].
+// This is derived by inversing a lower-bound on the probability of false
+// positives. For values where numBits >> numHashes, the predicted probability
+// is fairly accurate.
+//
+// It is guaranteed to return a value in the range [0, MaxInt].
+//
+// ref: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=903775
+func EstimateCount(numHashes, numEntries int, falsePositiveProbability float64) int {
+	switch {
+	case numHashes < minHashes:
+		return 0
+	case numEntries < minEntries:
+		return 0
+	case falsePositiveProbability <= 0:
+		return 0
+	case falsePositiveProbability >= 1:
+		return math.MaxInt
+	}
+
+	invNumHashes := 1 / float64(numHashes)
+	numBits := float64(numEntries * 8)
+	exp := 1 - math.Pow(falsePositiveProbability, invNumHashes)
+	count := math.Ceil(-math.Log(exp) * numBits * invNumHashes)
+	// Converting a floating-point value to an int produces an undefined value
+	// if the floating-point value cannot be represented as an int. To avoid
+	// this undefined behavior, we explicitly check against MaxInt here.
+	//
+	// ref: https://go.dev/ref/spec#Conversions
+	if count >= math.MaxInt {
+		return math.MaxInt
+	}
+	return int(count)
 }

@@ -65,15 +65,15 @@ func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	falsePositiveProbability float64,
 ) (bool, error) {
-	numSeeds, numBytes := bloomFilter.bloom.Parameters()
-	// TODO: Precalculate maxEntries, as it is independent of the current state
+	numHashes, numEntries := bloomFilter.bloom.Parameters()
+	// TODO: Precalculate maxCount, as it is independent of the current state
 	// of the bloom filter.
-	maxEntries := bloom.EstimateEntries(numSeeds, numBytes, falsePositiveProbability)
-	if bloomFilter.bloom.Count() < maxEntries {
+	maxCount := bloom.EstimateCount(numHashes, numEntries, falsePositiveProbability)
+	if bloomFilter.bloom.Count() < maxCount {
 		return false, nil
 	}
 
-	newBloom, err := bloom.New(numSeeds, numBytes)
+	newBloom, err := bloom.New(numHashes, numEntries)
 	if err != nil {
 		return false, err
 	}

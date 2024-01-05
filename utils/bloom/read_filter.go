@@ -9,39 +9,39 @@ import (
 )
 
 type ReadFilter struct {
-	seeds   []uint64
-	entries []byte
+	hashSeeds []uint64
+	entries   []byte
 }
 
 func Parse(bytes []byte) (*ReadFilter, error) {
 	if len(bytes) == 0 {
-		return nil, errInvalidNumSeeds
+		return nil, errInvalidNumHashes
 	}
-	numSeeds := bytes[0]
-	entriesOffset := 1 + int(numSeeds)*bytesPerUint64
+	numHashes := bytes[0]
+	entriesOffset := 1 + int(numHashes)*bytesPerUint64
 	switch {
-	case numSeeds < minSeeds:
-		return nil, fmt.Errorf("%w: %d < %d", errTooFewSeeds, numSeeds, minSeeds)
-	case numSeeds > maxSeeds:
-		return nil, fmt.Errorf("%w: %d > %d", errTooManySeeds, numSeeds, maxSeeds)
+	case numHashes < minHashes:
+		return nil, fmt.Errorf("%w: %d < %d", errTooFewHashes, numHashes, minHashes)
+	case numHashes > maxHashes:
+		return nil, fmt.Errorf("%w: %d > %d", errTooManyHashes, numHashes, maxHashes)
 	case len(bytes) < entriesOffset+minEntries: // numEntries = len(bytes) - entriesOffset
 		return nil, errTooFewEntries
 	}
 
 	f := &ReadFilter{
-		seeds:   make([]uint64, numSeeds),
-		entries: bytes[entriesOffset:],
+		hashSeeds: make([]uint64, numHashes),
+		entries:   bytes[entriesOffset:],
 	}
-	for i := range f.seeds {
-		f.seeds[i] = binary.BigEndian.Uint64(bytes[1+i*bytesPerUint64:])
+	for i := range f.hashSeeds {
+		f.hashSeeds[i] = binary.BigEndian.Uint64(bytes[1+i*bytesPerUint64:])
 	}
 	return f, nil
 }
 
 func (f *ReadFilter) Contains(hash uint64) bool {
-	return contains(f.seeds, f.entries, hash)
+	return contains(f.hashSeeds, f.entries, hash)
 }
 
 func (f *ReadFilter) Marshal() []byte {
-	return marshal(f.seeds, f.entries)
+	return marshal(f.hashSeeds, f.entries)
 }

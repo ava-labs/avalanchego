@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewMaliciousFilter(numSeeds, numBytes int) *Filter {
+func NewMaliciousFilter(numHashes, numEntries int) *Filter {
 	f := &Filter{
-		numBits: uint64(numBytes * bitsPerByte),
-		seeds:   make([]uint64, numSeeds),
-		entries: make([]byte, numBytes),
-		count:   0,
+		numBits:   uint64(numEntries * bitsPerByte),
+		hashSeeds: make([]uint64, numHashes),
+		entries:   make([]byte, numEntries),
+		count:     0,
 	}
 	for i := range f.entries {
 		f.entries[i] = math.MaxUint8
@@ -30,15 +30,15 @@ func TestParseErrors(t *testing.T) {
 	}{
 		{
 			bytes: nil,
-			err:   errInvalidNumSeeds,
+			err:   errInvalidNumHashes,
 		},
 		{
 			bytes: NewMaliciousFilter(0, 1).Marshal(),
-			err:   errTooFewSeeds,
+			err:   errTooFewHashes,
 		},
 		{
 			bytes: NewMaliciousFilter(17, 1).Marshal(),
-			err:   errTooManySeeds,
+			err:   errTooManyHashes,
 		},
 		{
 			bytes: NewMaliciousFilter(1, 0).Marshal(),
@@ -46,7 +46,7 @@ func TestParseErrors(t *testing.T) {
 		},
 		{
 			bytes: []byte{
-				0x01, // num seeds = 1
+				0x01, // num hashes = 1
 			},
 			err: errTooFewEntries,
 		},
@@ -71,7 +71,7 @@ func BenchmarkParse(b *testing.B) {
 }
 
 func BenchmarkContains(b *testing.B) {
-	f := NewMaliciousFilter(maxSeeds, 1)
+	f := NewMaliciousFilter(maxHashes, 1)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -86,16 +86,16 @@ func FuzzParseThenMarshal(f *testing.F) {
 			return
 		}
 
-		marshalledBytes := marshal(f.seeds, f.entries)
+		marshalledBytes := marshal(f.hashSeeds, f.entries)
 		require.Equal(t, bytes, marshalledBytes)
 	})
 }
 
 func FuzzMarshalThenParse(f *testing.F) {
-	f.Fuzz(func(t *testing.T, numSeeds int, entries []byte) {
+	f.Fuzz(func(t *testing.T, numHashes int, entries []byte) {
 		require := require.New(t)
 
-		seeds, err := newSeeds(numSeeds)
+		hashSeeds, err := newHashSeeds(numHashes)
 		if err != nil {
 			return
 		}
@@ -103,10 +103,10 @@ func FuzzMarshalThenParse(f *testing.F) {
 			return
 		}
 
-		marshalledBytes := marshal(seeds, entries)
+		marshalledBytes := marshal(hashSeeds, entries)
 		rf, err := Parse(marshalledBytes)
 		require.NoError(err)
-		require.Equal(seeds, rf.seeds)
+		require.Equal(hashSeeds, rf.hashSeeds)
 		require.Equal(entries, rf.entries)
 	})
 }

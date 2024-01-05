@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	minSeeds   = 1
-	maxSeeds   = 16 // Supports a false positive probability of 2^-16 when using optimal size values
+	minHashes  = 1
+	maxHashes  = 16 // Supports a false positive probability of 2^-16 when using optimal size values
 	minEntries = 1
 
 	bitsPerByte    = 8
@@ -23,52 +23,52 @@ const (
 )
 
 var (
-	errInvalidNumSeeds = errors.New("invalid num seeds")
-	errTooFewSeeds     = errors.New("too few seeds")
-	errTooManySeeds    = errors.New("too many seeds")
-	errTooFewEntries   = errors.New("too few entries")
+	errInvalidNumHashes = errors.New("invalid num hashes")
+	errTooFewHashes     = errors.New("too few hashes")
+	errTooManyHashes    = errors.New("too many hashes")
+	errTooFewEntries    = errors.New("too few entries")
 )
 
 type Filter struct {
 	numBits uint64
 
-	lock    sync.RWMutex
-	seeds   []uint64
-	entries []byte
-	count   int
+	lock      sync.RWMutex
+	hashSeeds []uint64
+	entries   []byte
+	count     int
 }
 
-// New creates a new Filter with the specified number of seeds and bytes for
+// New creates a new Filter with the specified number of hashes and bytes for
 // entries.
-func New(numSeeds, numBytes int) (*Filter, error) {
-	if numBytes < minEntries {
+func New(numHashes, numEntries int) (*Filter, error) {
+	if numEntries < minEntries {
 		return nil, errTooFewEntries
 	}
 
-	seeds, err := newSeeds(numSeeds)
+	hashSeeds, err := newHashSeeds(numHashes)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Filter{
-		numBits: uint64(numBytes * bitsPerByte),
-		seeds:   seeds,
-		entries: make([]byte, numBytes),
-		count:   0,
+		numBits:   uint64(numEntries * bitsPerByte),
+		hashSeeds: hashSeeds,
+		entries:   make([]byte, numEntries),
+		count:     0,
 	}, nil
 }
 
-// Parameters returns the [numSeeds] and [numBytes] that were used when creating
-// this filter.
+// Parameters returns the [numHashes] and [numEntries] that were used when
+// creating this filter.
 func (f *Filter) Parameters() (int, int) {
-	return len(f.seeds), len(f.entries)
+	return len(f.hashSeeds), len(f.entries)
 }
 
 func (f *Filter) Add(hash uint64) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	for _, seed := range f.seeds {
+	for _, seed := range f.hashSeeds {
 		hash = bits.RotateLeft64(hash, hashRotation) ^ seed
 		index := hash % f.numBits
 		byteIndex := index / bitsPerByte
@@ -91,43 +91,43 @@ func (f *Filter) Contains(hash uint64) bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
-	return contains(f.seeds, f.entries, hash)
+	return contains(f.hashSeeds, f.entries, hash)
 }
 
 func (f *Filter) Marshal() []byte {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
-	return marshal(f.seeds, f.entries)
+	return marshal(f.hashSeeds, f.entries)
 }
 
-func newSeeds(numSeeds int) ([]uint64, error) {
+func newHashSeeds(count int) ([]uint64, error) {
 	switch {
-	case numSeeds < minSeeds:
-		return nil, fmt.Errorf("%w: %d < %d", errTooFewSeeds, numSeeds, minSeeds)
-	case numSeeds > maxSeeds:
-		return nil, fmt.Errorf("%w: %d > %d", errTooManySeeds, numSeeds, maxSeeds)
+	case count < minHashes:
+		return nil, fmt.Errorf("%w: %d < %d", errTooFewHashes, count, minHashes)
+	case count > maxHashes:
+		return nil, fmt.Errorf("%w: %d > %d", errTooManyHashes, count, maxHashes)
 	}
 
-	seedsBytes := make([]byte, numSeeds*bytesPerUint64)
-	if _, err := rand.Reader.Read(seedsBytes); err != nil {
+	bytes := make([]byte, count*bytesPerUint64)
+	if _, err := rand.Reader.Read(bytes); err != nil {
 		return nil, err
 	}
 
-	seeds := make([]uint64, numSeeds)
+	seeds := make([]uint64, count)
 	for i := range seeds {
-		seeds[i] = binary.BigEndian.Uint64(seedsBytes[i*bytesPerUint64:])
+		seeds[i] = binary.BigEndian.Uint64(bytes[i*bytesPerUint64:])
 	}
 	return seeds, nil
 }
 
-func contains(seeds []uint64, entries []byte, hash uint64) bool {
+func contains(hashSeeds []uint64, entries []byte, hash uint64) bool {
 	var (
 		numBits          = bitsPerByte * uint64(len(entries))
 		accumulator byte = 1
 	)
-	for seedIndex := 0; seedIndex < len(seeds) && accumulator != 0; seedIndex++ {
-		hash = bits.RotateLeft64(hash, hashRotation) ^ seeds[seedIndex]
+	for seedIndex := 0; seedIndex < len(hashSeeds) && accumulator != 0; seedIndex++ {
+		hash = bits.RotateLeft64(hash, hashRotation) ^ hashSeeds[seedIndex]
 		index := hash % numBits
 		byteIndex := index / bitsPerByte
 		bitIndex := index % bitsPerByte
@@ -136,13 +136,13 @@ func contains(seeds []uint64, entries []byte, hash uint64) bool {
 	return accumulator != 0
 }
 
-func marshal(seeds []uint64, entries []byte) []byte {
-	numSeeds := len(seeds)
-	entriesOffset := 1 + numSeeds*bytesPerUint64
+func marshal(hashSeeds []uint64, entries []byte) []byte {
+	numHashes := len(hashSeeds)
+	entriesOffset := 1 + numHashes*bytesPerUint64
 
 	bytes := make([]byte, entriesOffset+len(entries))
-	bytes[0] = byte(numSeeds)
-	for i, seed := range seeds {
+	bytes[0] = byte(numHashes)
+	for i, seed := range hashSeeds {
 		binary.BigEndian.PutUint64(bytes[1+i*bytesPerUint64:], seed)
 	}
 	copy(bytes[entriesOffset:], entries)

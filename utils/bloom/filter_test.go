@@ -14,29 +14,29 @@ import (
 
 func TestNewErrors(t *testing.T) {
 	tests := []struct {
-		numSeeds int
-		numBytes int
-		err      error
+		numHashes  int
+		numEntires int
+		err        error
 	}{
 		{
-			numSeeds: 0,
-			numBytes: 1,
-			err:      errTooFewSeeds,
+			numHashes:  0,
+			numEntires: 1,
+			err:        errTooFewHashes,
 		},
 		{
-			numSeeds: 17,
-			numBytes: 1,
-			err:      errTooManySeeds,
+			numHashes:  17,
+			numEntires: 1,
+			err:        errTooManyHashes,
 		},
 		{
-			numSeeds: 8,
-			numBytes: 0,
-			err:      errTooFewEntries,
+			numHashes:  8,
+			numEntires: 0,
+			err:        errTooFewEntries,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.err.Error(), func(t *testing.T) {
-			_, err := New(test.numSeeds, test.numBytes)
+			_, err := New(test.numHashes, test.numEntires)
 			require.ErrorIs(t, err, test.err)
 		})
 	}
@@ -50,8 +50,8 @@ func TestNormalUsage(t *testing.T) {
 		toAdd[i] = rand.Uint64() //#nosec G404
 	}
 
-	initialNumSeeds, initialNumBytes := OptimalParameters(1024, 0.01)
-	filter, err := New(initialNumSeeds, initialNumBytes)
+	initialNumHashes, initialNumBytes := OptimalParameters(1024, 0.01)
+	filter, err := New(initialNumHashes, initialNumBytes)
 	require.NoError(err)
 
 	for i, elem := range toAdd {
@@ -63,9 +63,9 @@ func TestNormalUsage(t *testing.T) {
 
 	require.Equal(len(toAdd), filter.Count())
 
-	numSeeds, numBytes := filter.Parameters()
-	require.Equal(initialNumSeeds, numSeeds)
-	require.Equal(initialNumBytes, numBytes)
+	numHashes, numEntries := filter.Parameters()
+	require.Equal(initialNumHashes, numHashes)
+	require.Equal(initialNumBytes, numEntries)
 
 	filterBytes := filter.Marshal()
 	parsedFilter, err := Parse(filterBytes)

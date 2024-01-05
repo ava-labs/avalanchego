@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
-const bytesPerSeed = 8
+const bytesPerHash = 8
 
 var errMaxBytes = errors.New("too large")
 
@@ -22,11 +22,11 @@ type Filter interface {
 }
 
 func New(maxN int, p float64, maxBytes int) (Filter, error) {
-	numSeeds, numBytes := bloom.OptimalParameters(maxN, p)
-	if neededBytes := 1 + numSeeds*bytesPerSeed + numBytes; neededBytes > maxBytes {
+	numHashes, numEntries := bloom.OptimalParameters(maxN, p)
+	if neededBytes := 1 + numHashes*bytesPerHash + numEntries; neededBytes > maxBytes {
 		return nil, errMaxBytes
 	}
-	f, err := bloom.New(numSeeds, numBytes)
+	f, err := bloom.New(numHashes, numEntries)
 	return &fitler{
 		filter: f,
 	}, err
