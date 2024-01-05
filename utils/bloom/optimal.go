@@ -48,6 +48,14 @@ func EstimateEntries(numSeeds, numBytes int, falsePositiveProbability float64) i
 	invNumSeeds := 1 / float64(numSeeds)
 	numBits := float64(numBytes * 8)
 	exp := 1 - math.Pow(falsePositiveProbability, invNumSeeds)
-	entries := -math.Log(exp) * numBits * invNumSeeds
-	return int(math.Ceil(entries))
+	entries := math.Ceil(-math.Log(exp) * numBits * invNumSeeds)
+	// Converting a floating-point value to an int produces an undefined value
+	// if the floating-point value cannot be represented as an int. To avoid
+	// this undefined behavior, we explicitly check against MaxInt here.
+	//
+	// ref: https://go.dev/ref/spec#Conversions
+	if entries >= math.MaxInt {
+		return math.MaxInt
+	}
+	return int(entries)
 }
