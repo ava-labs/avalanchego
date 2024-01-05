@@ -13,6 +13,9 @@ import (
 // NewBloomFilter returns a new instance of a bloom filter with at most
 // [maxExpectedElements] elements anticipated at any moment, and a false
 // positive probability of [falsePositiveProbability].
+//
+// Invariant: The returned bloom filter is not safe to reset concurrently with
+// other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
 	maxExpectedElements int,
 	falsePositiveProbability float64,
