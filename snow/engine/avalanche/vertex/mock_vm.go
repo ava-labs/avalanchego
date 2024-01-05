@@ -143,21 +143,6 @@ func (mr *MockLinearizableVMMockRecorder) CreateHandlers(arg0 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHandlers", reflect.TypeOf((*MockLinearizableVM)(nil).CreateHandlers), arg0)
 }
 
-// CreateStaticHandlers mocks base method.
-func (m *MockLinearizableVM) CreateStaticHandlers(arg0 context.Context) (map[string]http.Handler, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateStaticHandlers", arg0)
-	ret0, _ := ret[0].(map[string]http.Handler)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateStaticHandlers indicates an expected call of CreateStaticHandlers.
-func (mr *MockLinearizableVMMockRecorder) CreateStaticHandlers(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStaticHandlers", reflect.TypeOf((*MockLinearizableVM)(nil).CreateStaticHandlers), arg0)
-}
-
 // CrossChainAppRequest mocks base method.
 func (m *MockLinearizableVM) CrossChainAppRequest(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
 	m.ctrl.T.Helper()

@@ -399,24 +399,22 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ctx.AVAXAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
+	_, encodedGenesisBytes, err := api.BuildGenesis(
+		ctx.AVAXAssetID,
+		json.Uint32(constants.UnitTestID),
+		genesisUTXOs,
+		genesisValidators,
+		nil,
+		json.Uint64(defaultGenesisTime.Unix()),
+		json.Uint64(360*units.MegaAvax),
+		"",
+		formatting.Hex,
+	)
+	if err != nil {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
+	genesisBytes, err := formatting.Decode(formatting.Hex, encodedGenesisBytes)
 	if err != nil {
 		panic(err)
 	}

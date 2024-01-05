@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -143,7 +144,7 @@ type mutableSharedMemory struct {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []byte) {
+func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (genesis.Genesis, []byte) {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(keys))
@@ -179,25 +180,23 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 		}
 	}
 
-	buildGenesisArgs := api.BuildGenesisArgs{
-		Encoding:      formatting.Hex,
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
+	genesis, formattedGenesisBytes, err := api.BuildGenesis(
+		avaxAssetID,
+		json.Uint32(constants.UnitTestID),
+		genesisUTXOs,
+		genesisValidators,
+		nil,
+		json.Uint64(defaultGenesisTime.Unix()),
+		json.Uint64(360*units.MegaAvax),
+		"",
+		formatting.Hex,
+	)
 	require.NoError(err)
 
-	return &buildGenesisArgs, genesisBytes
+	genesisBytes, err := formatting.Decode(formatting.Hex, formattedGenesisBytes)
+	require.NoError(err)
+
+	return genesis, genesisBytes
 }
 
 func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
