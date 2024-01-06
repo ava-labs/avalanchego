@@ -1314,9 +1314,9 @@ func (n *network) pushGossipPeerLists() {
 func (n *network) pullGossipPeerLists() {
 	peers := n.samplePeers(
 		constants.PrimaryNetworkID,
-		1, // =numValidatorsToSample
-		0, // =numNonValidatorsToSample
-		0, // =numPeersToSample
+		1, // numValidatorsToSample
+		0, // numNonValidatorsToSample
+		0, // numPeersToSample
 		subnets.NoOpAllower,
 	)
 
