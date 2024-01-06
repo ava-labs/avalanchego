@@ -305,6 +305,8 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.Pong, nil
 	case *p2p.Message_Handshake:
 		return msg.Handshake, nil
+	case *p2p.Message_GetPeerList:
+		return msg.GetPeerList, nil
 	case *p2p.Message_PeerList_:
 		return msg.PeerList_, nil
 	// State sync:

@@ -636,7 +636,7 @@ func (p *peer) sendNetworkMessages() {
 	for {
 		select {
 		case <-p.peerListChan:
-			peerIPs := p.Config.Network.Peers(bloom.EmptyFilter, ids.Empty)
+			peerIPs := p.Config.Network.Peers(p.id, bloom.EmptyFilter, ids.Empty)
 			if len(peerIPs) == 0 {
 				p.Log.Verbo(
 					"skipping peer gossip as there are no unknown peers",
@@ -1082,7 +1082,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.gotHandshake.Set(true)
 
-	peerIPs := p.Network.Peers(knownPeers, salt)
+	peerIPs := p.Network.Peers(p.id, knownPeers, salt)
 
 	// We bypass throttling here to ensure that the peerlist message is
 	// acknowledged timely.
@@ -1139,7 +1139,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 		return
 	}
 
-	peerIPs := p.Network.Peers(filter, salt)
+	peerIPs := p.Network.Peers(p.id, filter, salt)
 	if len(peerIPs) == 0 {
 		p.Log.Debug("skipping sending of empty peer list",
 			zap.Stringer("nodeID", p.id),

@@ -33,5 +33,9 @@ type Network interface {
 	KnownPeers() (bloomFilter []byte, salt ids.ID)
 
 	// Peers returns peers that are not known.
-	Peers(knownPeers *bloom.ReadFilter, peerSalt ids.ID) []*ips.ClaimedIPPort
+	Peers(
+		peerID ids.NodeID,
+		knownPeers *bloom.ReadFilter,
+		peerSalt ids.ID,
+	) []*ips.ClaimedIPPort
 }

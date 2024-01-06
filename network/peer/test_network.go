@@ -29,6 +29,6 @@ func (testNetwork) KnownPeers() ([]byte, ids.ID) {
 	return bloom.EmptyFilter.Marshal(), ids.Empty
 }
 
-func (testNetwork) Peers(*bloom.ReadFilter, ids.ID) []*ips.ClaimedIPPort {
+func (testNetwork) Peers(ids.NodeID, *bloom.ReadFilter, ids.ID) []*ips.ClaimedIPPort {
 	return nil
 }

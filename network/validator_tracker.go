@@ -146,7 +146,7 @@ func (v *ValidatorTracker) removeConnectedValidator(nodeID ids.NodeID) {
 	v.connectedValidators = v.connectedValidators[:newNumConnectedValidators]
 }
 
-func (v *ValidatorTracker) GetValidatorIPs(except *bloom.ReadFilter, salt ids.ID, maxNumIPs int) []*ips.ClaimedIPPort {
+func (v *ValidatorTracker) GetValidatorIPs(exceptNodeID ids.NodeID, exceptIPs *bloom.ReadFilter, salt ids.ID, maxNumIPs int) []*ips.ClaimedIPPort {
 	var (
 		uniform = sampler.NewUniform()
 		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)
@@ -163,8 +163,13 @@ func (v *ValidatorTracker) GetValidatorIPs(except *bloom.ReadFilter, salt ids.ID
 		}
 
 		ip := v.connectedValidators[index]
+		nodeID := ip.NodeID()
+		if nodeID == exceptNodeID {
+			continue
+		}
+
 		gossipID := ip.GossipID()
-		if !bloom.Contains(except, gossipID[:], salt[:]) {
+		if !bloom.Contains(exceptIPs, gossipID[:], salt[:]) {
 			ips = append(ips, ip)
 		}
 	}

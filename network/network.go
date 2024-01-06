@@ -573,8 +573,9 @@ func (n *network) KnownPeers() ([]byte, ids.ID) {
 	return n.validatorTracker.Bloom()
 }
 
-func (n *network) Peers(knownPeers *bloom.ReadFilter, salt ids.ID) []*ips.ClaimedIPPort {
+func (n *network) Peers(except ids.NodeID, knownPeers *bloom.ReadFilter, salt ids.ID) []*ips.ClaimedIPPort {
 	return n.validatorTracker.GetValidatorIPs(
+		except,
 		knownPeers,
 		salt,
 		int(n.config.PeerListNumValidatorIPs),
