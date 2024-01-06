@@ -36,9 +36,10 @@ func NewBloomFilter(
 		minTargetElements:              minTargetElements,
 		targetFalsePositiveProbability: targetFalsePositiveProbability,
 		resetFalsePositiveProbability:  resetFalsePositiveProbability,
-		maxCount:                       bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability),
-		bloom:                          b,
-		salt:                           salt,
+
+		maxCount: bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability),
+		bloom:    b,
+		salt:     salt,
 	}, err
 }
 
