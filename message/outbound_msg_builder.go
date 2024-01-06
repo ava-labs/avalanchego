@@ -36,6 +36,11 @@ type OutboundMsgBuilder interface {
 		knownPeersSalt ids.ID,
 	) (OutboundMessage, error)
 
+	GetPeerList(
+		knownPeersFilter []byte,
+		knownPeersSalt ids.ID,
+	) (OutboundMessage, error)
+
 	PeerList(
 		peers []*ips.ClaimedIPPort,
 		bypassThrottling bool,
@@ -276,6 +281,26 @@ func (b *outMsgBuilder) Handshake(
 		},
 		compression.TypeNone,
 		true,
+	)
+}
+
+func (b *outMsgBuilder) GetPeerList(
+	knownPeersFilter []byte,
+	knownPeersSalt ids.ID,
+) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_GetPeerList{
+				GetPeerList: &p2p.GetPeerList{
+					KnownPeers: &p2p.BloomFilter{
+						Filter: knownPeersFilter,
+						Salt:   knownPeersSalt[:],
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
 	)
 }
 

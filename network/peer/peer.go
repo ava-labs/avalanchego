@@ -92,6 +92,11 @@ type Peer interface {
 	// sent.
 	StartSendPeerList()
 
+	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
+	// on this peer's gossip routine. It is not guaranteed that a PeerList will
+	// be sent.
+	StartSendGetPeerList()
+
 	// StartClose will begin shutting down the peer. It will not block.
 	StartClose()
 
@@ -171,6 +176,10 @@ type peer struct {
 	// peerListChan signals that we should attempt to send a PeerList to this
 	// peer
 	peerListChan chan struct{}
+
+	// getPeerListChan signals that we should attempt to send a GetPeerList to
+	// this peer
+	getPeerListChan chan struct{}
 }
 
 // Start a new peer instance.
@@ -198,6 +207,7 @@ func Start(
 		onClosed:           make(chan struct{}),
 		observedUptimes:    make(map[ids.ID]uint32),
 		peerListChan:       make(chan struct{}, 1),
+		getPeerListChan:    make(chan struct{}, 1),
 	}
 
 	go p.readMessages()
@@ -307,6 +317,13 @@ func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 func (p *peer) StartSendPeerList() {
 	select {
 	case p.peerListChan <- struct{}{}:
+	default:
+	}
+}
+
+func (p *peer) StartSendGetPeerList() {
+	select {
+	case p.getPeerListChan <- struct{}{}:
 	default:
 	}
 }
@@ -641,6 +658,25 @@ func (p *peer) sendNetworkMessages() {
 
 			if !p.Send(p.onClosingCtx, msg) {
 				p.Log.Debug("failed to send peer list",
+					zap.Stringer("nodeID", p.id),
+				)
+			}
+		case <-p.getPeerListChan:
+			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
+
+			// Bypass throttling is disabled here to follow the non-handshake
+			// message sending pattern.
+			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
+			if err != nil {
+				p.Log.Error("failed to create get peer list message",
+					zap.Stringer("nodeID", p.id),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			if !p.Send(p.onClosingCtx, msg) {
+				p.Log.Debug("failed to send get peer list",
 					zap.Stringer("nodeID", p.id),
 				)
 			}
