@@ -23,6 +23,10 @@ var (
 	_ gossip.Marshaller[*txs.Tx] = (*txParser)(nil)
 )
 
+// bloomChurnMultiplier is the number used to multiply the size of the mempool
+// to determine how large of a bloom filter to create.
+const bloomChurnMultiplier = 3
+
 // txGossipHandler is the handler called when serving gossip messages
 type txGossipHandler struct {
 	p2p.NoOpHandler
@@ -125,7 +129,7 @@ func (g *gossipMempool) AddVerified(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len())
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
 	if err != nil {
 		return err
 	}
