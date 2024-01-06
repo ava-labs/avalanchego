@@ -54,6 +54,7 @@ var (
 		PeerListNonValidatorGossipSize: 100,
 		PeerListPeersGossipSize:        100,
 		PeerListGossipFreq:             time.Second,
+		PeerListPullGossipFreq:         time.Second,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
 		PingPongTimeout:      30 * time.Second,
@@ -114,6 +115,8 @@ var (
 		AllowPrivateIPs:    true,
 
 		CompressionType: constants.DefaultNetworkCompressionType,
+
+		ValidatorTrackerResetFreq: constants.DefaultNetworkValidatorTrackerResetFreq,
 
 		UptimeCalculator:  uptime.NewManager(uptime.NewTestState(), &mockable.Clock{}),
 		UptimeMetricFreq:  30 * time.Second,

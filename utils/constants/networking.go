@@ -32,6 +32,9 @@ const (
 	DefaultNetworkPeerListNonValidatorGossipSize = 0
 	DefaultNetworkPeerListPeersGossipSize        = 10
 	DefaultNetworkPeerListGossipFreq             = time.Minute
+	DefaultNetworkPeerListPullGossipFreq         = 2 * time.Second
+
+	DefaultNetworkValidatorTrackerResetFreq = time.Minute
 
 	// Inbound Connection Throttling
 	DefaultInboundConnUpgradeThrottlerCooldown = 10 * time.Second
