@@ -143,8 +143,8 @@ type network struct {
 	sendFailRateCalculator safemath.Averager
 
 	// Tracks which peers know about which peers
-	validatorTracker *ipTracker
-	peersLock        sync.RWMutex
+	ipTracker *ipTracker
+	peersLock sync.RWMutex
 	// trackedIPs contains the set of IPs that we are currently attempting to
 	// connect to. An entry is added to this set when we first start attempting
 	// to connect to the peer. An entry is deleted from this set once we have
@@ -237,16 +237,16 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	validatorTracker, err := newIPTracker(log)
+	ipTracker, err := newIPTracker(log)
 	if err != nil {
-		return nil, fmt.Errorf("initializing validator tracker failed with: %w", err)
+		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
 	}
-	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, validatorTracker)
+	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, ipTracker)
 
 	// Track all default bootstrappers to ensure their current IPs are gossiped
 	// like validator IPs.
 	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
-		validatorTracker.ManuallyTrack(bootstrapper.ID)
+		ipTracker.ManuallyTrack(bootstrapper.ID)
 	}
 
 	peerConfig := &peer.Config{
@@ -296,11 +296,11 @@ func NewNetwork(
 			time.Now(),
 		)),
 
-		trackedIPs:       make(map[ids.NodeID]*trackedIP),
-		validatorTracker: validatorTracker,
-		connectingPeers:  peer.NewSet(),
-		connectedPeers:   peer.NewSet(),
-		router:           router,
+		trackedIPs:      make(map[ids.NodeID]*trackedIP),
+		ipTracker:       ipTracker,
+		connectingPeers: peer.NewSet(),
+		connectedPeers:  peer.NewSet(),
+		router:          router,
 	}
 	n.peerConfig.Network = n
 	return n, nil
@@ -434,7 +434,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		Timestamp: peerIP.Timestamp,
 		Signature: peerIP.Signature,
 	}
-	n.validatorTracker.Connected(newIP)
+	n.ipTracker.Connected(newIP)
 
 	n.metrics.markConnected(peer)
 
@@ -454,7 +454,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		return true
 	}
 	_, iAmAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return iAmAValidator || n.validatorTracker.WantsConnection(nodeID)
+	return iAmAValidator || n.ipTracker.WantsConnection(nodeID)
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
@@ -472,7 +472,7 @@ func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
 // call. Note that this is from the perspective of a single peer object, because
 // a peer with the same ID can reconnect to this network instance.
 func (n *network) Disconnected(nodeID ids.NodeID) {
-	n.validatorTracker.Disconnected(nodeID)
+	n.ipTracker.Disconnected(nodeID)
 
 	n.peersLock.RLock()
 	_, connecting := n.connectingPeers.GetByID(nodeID)
@@ -488,11 +488,11 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 }
 
 func (n *network) KnownPeers() ([]byte, ids.ID) {
-	return n.validatorTracker.Bloom()
+	return n.ipTracker.Bloom()
 }
 
 func (n *network) Peers(except ids.NodeID, knownPeers *bloom.ReadFilter, salt ids.ID) []*ips.ClaimedIPPort {
-	return n.validatorTracker.GetValidatorIPs(
+	return n.ipTracker.GetValidatorIPs(
 		except,
 		knownPeers,
 		salt,
@@ -578,7 +578,7 @@ func (n *network) Dispatch() error {
 }
 
 func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
-	n.validatorTracker.ManuallyTrack(nodeID)
+	n.ipTracker.ManuallyTrack(nodeID)
 
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
@@ -608,7 +608,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 	//
 	// Note: Avoiding signature verification when the IP isn't needed is a
 	// **significant** performance optimization.
-	if !n.validatorTracker.ShouldVerifyIP(ip) {
+	if !n.ipTracker.ShouldVerifyIP(ip) {
 		n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		return nil
 	}
@@ -631,7 +631,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	if !n.validatorTracker.AddIP(ip) {
+	if !n.ipTracker.AddIP(ip) {
 		return nil
 	}
 
@@ -777,7 +777,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
 	if ok {
-		if n.validatorTracker.WantsConnection(nodeID) {
+		if n.ipTracker.WantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(nodeID, tracked)
@@ -799,7 +799,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	n.connectedPeers.Remove(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
-	if ip, wantsConnection := n.validatorTracker.GetIP(nodeID); wantsConnection {
+	if ip, wantsConnection := n.ipTracker.GetIP(nodeID); wantsConnection {
 		tracked := newTrackedIP(ip.IPPort)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(nodeID, tracked)
@@ -850,7 +850,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 			// trackedIPs and this goroutine. This prevents a memory leak when
 			// the tracked nodeID leaves the validator set and is never able to
 			// be connected to.
-			if !n.validatorTracker.WantsConnection(nodeID) {
+			if !n.ipTracker.WantsConnection(nodeID) {
 				// Typically [n.trackedIPs[nodeID]] will already equal [ip], but
 				// the reference to [ip] is refreshed to avoid any potential
 				// race conditions before removing the entry.
@@ -1167,7 +1167,7 @@ func (n *network) runTimers() {
 		case <-pullGossipPeerlists.C:
 			n.pullGossipPeerLists()
 		case <-resetValidatorTracker.C:
-			if err := n.validatorTracker.ResetBloom(); err != nil {
+			if err := n.ipTracker.ResetBloom(); err != nil {
 				n.peerConfig.Log.Error("failed to reset validator tracker bloom filter",
 					zap.Error(err),
 				)
