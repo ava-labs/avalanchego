@@ -38,12 +38,9 @@ func (fc *FeeCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -54,12 +51,9 @@ func (fc *FeeCalculator) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -70,12 +64,9 @@ func (fc *FeeCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -86,12 +77,9 @@ func (fc *FeeCalculator) CreateChainTx(*txs.CreateChainTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -102,12 +90,9 @@ func (fc *FeeCalculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -126,12 +111,9 @@ func (fc *FeeCalculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) e
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -142,12 +124,9 @@ func (fc *FeeCalculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -158,12 +137,9 @@ func (fc *FeeCalculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipT
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -178,12 +154,9 @@ func (fc *FeeCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -198,12 +171,9 @@ func (fc *FeeCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessD
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -214,12 +184,9 @@ func (fc *FeeCalculator) BaseTx(*txs.BaseTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -230,12 +197,9 @@ func (fc *FeeCalculator) ImportTx(*txs.ImportTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -246,14 +210,20 @@ func (fc *FeeCalculator) ExportTx(*txs.ExportTx) error {
 		return nil
 	}
 
-	var (
-		consumedUnits fees.Dimensions
-		err           error
-	)
-	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+	consumedUnits := commonConsumedUnits(fc.Tx)
 
+	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
+}
+
+func commonConsumedUnits(tx *txs.Tx) fees.Dimensions {
+	var consumedUnits fees.Dimensions
+	consumedUnits[fees.Bandwidth] = uint64(len(tx.Bytes()))
+
+	// TODO ABENEGIA: consider accounting for input complexity
+	consumedUnits[fees.UTXORead] = uint64(tx.Unsigned.InputIDs().Len())
+	return consumedUnits
 }
 
 func processFees(cfg *config.Config, chainTime time.Time, fc *fees.Manager, consumedUnits fees.Dimensions) (uint64, error) {
