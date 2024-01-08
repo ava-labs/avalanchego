@@ -59,8 +59,8 @@ type ipTracker struct {
 
 	// An IP is marked as gossipable if:
 	// - The node is a validator
-	// - The node it is connected
-	// - The IP the node connected with is equal to its latest IP
+	// - The node is connected
+	// - The IP the node connected with is its latest IP
 	gossipableIndicies map[ids.NodeID]int
 	gossipableIPs      []*ips.ClaimedIPPort
 
@@ -104,8 +104,7 @@ func (v *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
 
 	prevIP, ok := v.mostRecentValidatorIPs[nodeID]
 	return !ok || // This would be the first IP
-		prevIP.Timestamp < ip.Timestamp || // This would be a newer IP
-		(prevIP.Timestamp == ip.Timestamp && !prevIP.IPPort.Equal(ip.IPPort)) // This would be a conflicting IP
+		prevIP.Timestamp < ip.Timestamp // This would be a newer IP
 }
 
 // AddIP returns true if the addition of the provided IP updated the most
@@ -130,23 +129,14 @@ func (v *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 		return true
 	}
 
-	if prevIP.Timestamp > ip.Timestamp {
-		// This IP is older than the previously known IP.
+	if prevIP.Timestamp >= ip.Timestamp {
+		// This IP is not newer than the previously known IP.
 		return false
 	}
 
-	if prevIP.Timestamp < ip.Timestamp {
-		v.updateMostRecentValidatorIP(nodeID, ip)
-		v.removeGossipableIP(nodeID)
-		return true
-	}
-
-	if !prevIP.IPPort.Equal(ip.IPPort) {
-		// If we are observed multiple IPs with the same timestamp, we should
-		// not mark them as gossipable.
-		v.removeGossipableIP(nodeID)
-	}
-	return false
+	v.updateMostRecentValidatorIP(nodeID, ip)
+	v.removeGossipableIP(nodeID)
+	return true
 }
 
 func (v *ipTracker) GetIP(nodeID ids.NodeID) (*ips.ClaimedIPPort, bool) {
@@ -184,13 +174,8 @@ func (v *ipTracker) Connected(ip *ips.ClaimedIPPort) {
 
 	if prevIP.Timestamp < ip.Timestamp {
 		v.updateMostRecentValidatorIP(nodeID, ip)
-		v.addGossipableIP(nodeID, ip)
-		return
 	}
-
-	if prevIP.IPPort.Equal(ip.IPPort) {
-		v.addGossipableIP(nodeID, ip)
-	}
+	v.addGossipableIP(nodeID, ip)
 }
 
 func (v *ipTracker) Disconnected(nodeID ids.NodeID) {
