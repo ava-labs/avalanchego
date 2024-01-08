@@ -75,55 +75,55 @@ type ipTracker struct {
 	maxBloomCount  int
 }
 
-func (v *ipTracker) ManuallyTrack(nodeID ids.NodeID) {
-	v.lock.Lock()
-	defer v.lock.Unlock()
+func (i *ipTracker) ManuallyTrack(nodeID ids.NodeID) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	if !v.validators.Contains(nodeID) {
-		v.onValidatorAdded(nodeID)
+	if !i.validators.Contains(nodeID) {
+		i.onValidatorAdded(nodeID)
 	}
-	v.manuallyTracked.Add(nodeID)
+	i.manuallyTracked.Add(nodeID)
 }
 
-func (v *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
-	v.lock.RLock()
-	defer v.lock.RUnlock()
+func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
 
-	return v.validators.Contains(nodeID) || v.manuallyTracked.Contains(nodeID)
+	return i.validators.Contains(nodeID) || i.manuallyTracked.Contains(nodeID)
 }
 
-func (v *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
+func (i *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
 	nodeID := ip.NodeID()
 
-	v.lock.RLock()
-	defer v.lock.RUnlock()
+	i.lock.RLock()
+	defer i.lock.RUnlock()
 
-	if !v.validators.Contains(nodeID) {
+	if !i.validators.Contains(nodeID) {
 		return false
 	}
 
-	prevIP, ok := v.mostRecentValidatorIPs[nodeID]
+	prevIP, ok := i.mostRecentValidatorIPs[nodeID]
 	return !ok || // This would be the first IP
 		prevIP.Timestamp < ip.Timestamp // This would be a newer IP
 }
 
 // AddIP returns true if the addition of the provided IP updated the most
 // recently known IP of a validator.
-func (v *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
+func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 	nodeID := ip.NodeID()
 
-	v.lock.Lock()
-	defer v.lock.Unlock()
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	if !v.validators.Contains(nodeID) {
+	if !i.validators.Contains(nodeID) {
 		return false
 	}
 
-	prevIP, ok := v.mostRecentValidatorIPs[nodeID]
+	prevIP, ok := i.mostRecentValidatorIPs[nodeID]
 	if !ok {
 		// This is the first IP we've heard from the validator, so it is the
 		// most recent.
-		v.updateMostRecentValidatorIP(nodeID, ip)
+		i.updateMostRecentValidatorIP(nodeID, ip)
 		// Because we didn't previously have an IP, we know we aren't currently
 		// connected to them.
 		return true
@@ -134,36 +134,36 @@ func (v *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 		return false
 	}
 
-	v.updateMostRecentValidatorIP(nodeID, ip)
-	v.removeGossipableIP(nodeID)
+	i.updateMostRecentValidatorIP(nodeID, ip)
+	i.removeGossipableIP(nodeID)
 	return true
 }
 
-func (v *ipTracker) GetIP(nodeID ids.NodeID) (*ips.ClaimedIPPort, bool) {
-	v.lock.RLock()
-	defer v.lock.RUnlock()
+func (i *ipTracker) GetIP(nodeID ids.NodeID) (*ips.ClaimedIPPort, bool) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
 
-	ip, ok := v.mostRecentValidatorIPs[nodeID]
+	ip, ok := i.mostRecentValidatorIPs[nodeID]
 	return ip, ok
 }
 
-func (v *ipTracker) Connected(ip *ips.ClaimedIPPort) {
+func (i *ipTracker) Connected(ip *ips.ClaimedIPPort) {
 	nodeID := ip.NodeID()
 
-	v.lock.Lock()
-	defer v.lock.Unlock()
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	v.connected[nodeID] = ip
-	if !v.validators.Contains(nodeID) {
+	i.connected[nodeID] = ip
+	if !i.validators.Contains(nodeID) {
 		return
 	}
 
-	prevIP, ok := v.mostRecentValidatorIPs[nodeID]
+	prevIP, ok := i.mostRecentValidatorIPs[nodeID]
 	if !ok {
 		// This is the first IP we've heard from the validator, so it is the
 		// most recent.
-		v.updateMostRecentValidatorIP(nodeID, ip)
-		v.addGossipableIP(nodeID, ip)
+		i.updateMostRecentValidatorIP(nodeID, ip)
+		i.addGossipableIP(nodeID, ip)
 		return
 	}
 
@@ -173,126 +173,126 @@ func (v *ipTracker) Connected(ip *ips.ClaimedIPPort) {
 	}
 
 	if prevIP.Timestamp < ip.Timestamp {
-		v.updateMostRecentValidatorIP(nodeID, ip)
+		i.updateMostRecentValidatorIP(nodeID, ip)
 	}
-	v.addGossipableIP(nodeID, ip)
+	i.addGossipableIP(nodeID, ip)
 }
 
-func (v *ipTracker) Disconnected(nodeID ids.NodeID) {
-	v.lock.Lock()
-	defer v.lock.Unlock()
+func (i *ipTracker) Disconnected(nodeID ids.NodeID) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	delete(v.connected, nodeID)
-	v.removeGossipableIP(nodeID)
+	delete(i.connected, nodeID)
+	i.removeGossipableIP(nodeID)
 }
 
-func (v *ipTracker) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
-	v.lock.Lock()
-	defer v.lock.Unlock()
+func (i *ipTracker) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, _ uint64) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	v.onValidatorAdded(nodeID)
+	i.onValidatorAdded(nodeID)
 }
 
-func (v *ipTracker) onValidatorAdded(nodeID ids.NodeID) {
-	if v.manuallyTracked.Contains(nodeID) {
+func (i *ipTracker) onValidatorAdded(nodeID ids.NodeID) {
+	if i.manuallyTracked.Contains(nodeID) {
 		return
 	}
 
-	v.validators.Add(nodeID)
-	ip, connected := v.connected[nodeID]
+	i.validators.Add(nodeID)
+	ip, connected := i.connected[nodeID]
 	if !connected {
 		return
 	}
 
-	v.updateMostRecentValidatorIP(nodeID, ip)
-	v.addGossipableIP(nodeID, ip)
+	i.updateMostRecentValidatorIP(nodeID, ip)
+	i.addGossipableIP(nodeID, ip)
 }
 
 func (*ipTracker) OnValidatorWeightChanged(ids.NodeID, uint64, uint64) {}
 
-func (v *ipTracker) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
-	v.lock.Lock()
-	defer v.lock.Unlock()
+func (i *ipTracker) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	if v.manuallyTracked.Contains(nodeID) {
+	if i.manuallyTracked.Contains(nodeID) {
 		return
 	}
 
-	delete(v.mostRecentValidatorIPs, nodeID)
-	v.validators.Remove(nodeID)
-	v.removeGossipableIP(nodeID)
+	delete(i.mostRecentValidatorIPs, nodeID)
+	i.validators.Remove(nodeID)
+	i.removeGossipableIP(nodeID)
 }
 
-func (v *ipTracker) updateMostRecentValidatorIP(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
-	v.mostRecentValidatorIPs[nodeID] = ip
-	oldCount := v.bloomAdditions[nodeID]
+func (i *ipTracker) updateMostRecentValidatorIP(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
+	i.mostRecentValidatorIPs[nodeID] = ip
+	oldCount := i.bloomAdditions[nodeID]
 	if oldCount >= maxIPEntriesPerValidator {
 		return
 	}
 
 	// If the validator set is growing rapidly, we should increase the size of
 	// the bloom filter.
-	if count := v.bloom.Count(); count >= v.maxBloomCount {
-		if err := v.resetBloom(); err != nil {
-			v.log.Error("failed to reset validator tracker bloom filter",
-				zap.Int("maxCount", v.maxBloomCount),
+	if count := i.bloom.Count(); count >= i.maxBloomCount {
+		if err := i.resetBloom(); err != nil {
+			i.log.Error("failed to reset validator tracker bloom filter",
+				zap.Int("maxCount", i.maxBloomCount),
 				zap.Int("currentCount", count),
 				zap.Error(err),
 			)
 		} else {
-			v.log.Info("reset validator tracker bloom filter",
+			i.log.Info("reset validator tracker bloom filter",
 				zap.Int("currentCount", count),
 			)
 		}
 		return
 	}
 
-	v.bloomAdditions[nodeID] = oldCount + 1
+	i.bloomAdditions[nodeID] = oldCount + 1
 	gossipID := ip.GossipID()
-	bloom.Add(v.bloom, gossipID[:], v.bloomSalt[:])
+	bloom.Add(i.bloom, gossipID[:], i.bloomSalt[:])
 }
 
-func (v *ipTracker) addGossipableIP(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
-	v.gossipableIndicies[nodeID] = len(v.gossipableIPs)
-	v.gossipableIPs = append(v.gossipableIPs, ip)
+func (i *ipTracker) addGossipableIP(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
+	i.gossipableIndicies[nodeID] = len(i.gossipableIPs)
+	i.gossipableIPs = append(i.gossipableIPs, ip)
 }
 
-func (v *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
-	indexToRemove, wasGossipable := v.gossipableIndicies[nodeID]
+func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
+	indexToRemove, wasGossipable := i.gossipableIndicies[nodeID]
 	if !wasGossipable {
 		return
 	}
 
-	newNumGossipable := len(v.gossipableIPs) - 1
+	newNumGossipable := len(i.gossipableIPs) - 1
 	if newNumGossipable != indexToRemove {
-		replacementIP := v.gossipableIPs[newNumGossipable]
+		replacementIP := i.gossipableIPs[newNumGossipable]
 		replacementNodeID := replacementIP.NodeID()
-		v.gossipableIndicies[replacementNodeID] = indexToRemove
-		v.gossipableIPs[indexToRemove] = replacementIP
+		i.gossipableIndicies[replacementNodeID] = indexToRemove
+		i.gossipableIPs[indexToRemove] = replacementIP
 	}
 
-	delete(v.gossipableIndicies, nodeID)
-	v.gossipableIPs[newNumGossipable] = nil
-	v.gossipableIPs = v.gossipableIPs[:newNumGossipable]
+	delete(i.gossipableIndicies, nodeID)
+	i.gossipableIPs[newNumGossipable] = nil
+	i.gossipableIPs = i.gossipableIPs[:newNumGossipable]
 }
 
-func (v *ipTracker) GetValidatorIPs(exceptNodeID ids.NodeID, exceptIPs *bloom.ReadFilter, salt ids.ID, maxNumIPs int) []*ips.ClaimedIPPort {
+func (i *ipTracker) GetValidatorIPs(exceptNodeID ids.NodeID, exceptIPs *bloom.ReadFilter, salt ids.ID, maxNumIPs int) []*ips.ClaimedIPPort {
 	var (
 		uniform = sampler.NewUniform()
 		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)
 	)
 
-	v.lock.RLock()
-	defer v.lock.RUnlock()
+	i.lock.RLock()
+	defer i.lock.RUnlock()
 
-	uniform.Initialize(uint64(len(v.gossipableIPs)))
+	uniform.Initialize(uint64(len(i.gossipableIPs)))
 	for len(ips) < maxNumIPs {
 		index, err := uniform.Next()
 		if err != nil {
 			return ips
 		}
 
-		ip := v.gossipableIPs[index]
+		ip := i.gossipableIPs[index]
 		nodeID := ip.NodeID()
 		if nodeID == exceptNodeID {
 			continue
@@ -309,33 +309,33 @@ func (v *ipTracker) GetValidatorIPs(exceptNodeID ids.NodeID, exceptIPs *bloom.Re
 // ResetBloom prunes the current bloom filter. This must be called periodically
 // to ensure that validators that change their IPs are updated correctly and
 // that validators that left the validator set are removed.
-func (v *ipTracker) ResetBloom() error {
-	v.lock.Lock()
-	defer v.lock.Unlock()
+func (i *ipTracker) ResetBloom() error {
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
-	return v.resetBloom()
+	return i.resetBloom()
 }
 
 // Bloom returns the binary representation of the bloom filter along with the
 // random salt.
-func (v *ipTracker) Bloom() ([]byte, ids.ID) {
-	v.lock.RLock()
-	defer v.lock.RUnlock()
+func (i *ipTracker) Bloom() ([]byte, ids.ID) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
 
-	return v.bloom.Marshal(), v.bloomSalt
+	return i.bloom.Marshal(), i.bloomSalt
 }
 
 // resetBloom creates a new bloom filter with a reasonable size for the current
 // validator set size. This function additionally populates the new bloom filter
 // with the current most recently known IPs of validators.
-func (v *ipTracker) resetBloom() error {
+func (i *ipTracker) resetBloom() error {
 	var newSalt ids.ID
 	_, err := rand.Reader.Read(newSalt[:])
 	if err != nil {
 		return err
 	}
 
-	count := math.Max(maxIPEntriesPerValidator*v.validators.Len(), minCountEstimate)
+	count := math.Max(maxIPEntriesPerValidator*i.validators.Len(), minCountEstimate)
 	numHashes, numEntries := bloom.OptimalParameters(
 		count,
 		targetFalsePositiveProbability,
@@ -345,16 +345,16 @@ func (v *ipTracker) resetBloom() error {
 		return err
 	}
 
-	v.bloom = newFilter
-	maps.Clear(v.bloomAdditions)
-	v.bloomSalt = newSalt
-	v.maxBloomCount = bloom.EstimateCount(numHashes, numEntries, maxFalsePositiveProbability)
+	i.bloom = newFilter
+	maps.Clear(i.bloomAdditions)
+	i.bloomSalt = newSalt
+	i.maxBloomCount = bloom.EstimateCount(numHashes, numEntries, maxFalsePositiveProbability)
 
-	for _, ip := range v.mostRecentValidatorIPs {
+	for _, ip := range i.mostRecentValidatorIPs {
 		gossipID := ip.GossipID()
 		bloom.Add(newFilter, gossipID[:], newSalt[:])
 		nodeID := ip.NodeID()
-		v.bloomAdditions[nodeID]++
+		i.bloomAdditions[nodeID]++
 	}
 	return nil
 }
