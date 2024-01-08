@@ -11,7 +11,11 @@ import (
 
 const bytesPerHash = 8
 
-var errMaxBytes = errors.New("too large")
+var (
+	_ Filter = (*filter)(nil)
+
+	errMaxBytes = errors.New("too large")
+)
 
 type Filter interface {
 	// Add adds to filter, assumed thread safe
