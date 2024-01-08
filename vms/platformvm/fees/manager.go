@@ -5,13 +5,16 @@ package fees
 
 import "github.com/ava-labs/avalanchego/utils/math"
 
+// 1. Fees are not dynamic yet. We'll add mechanism for fee updating iterativelly
+// 2. Not all fees dimensions are correctly prices. We'll add other dimensions iteratively
+
 const (
 	Bandwidth Dimension = 0
-	// Compute   Dimension = 1 // TODO ABENEGIA: we'll add others interatively
-	UTXORead  Dimension = 1
-	UTXOWrite Dimension = 2 // includes delete
+	// Compute   Dimension = 1
+	// UTXORead  Dimension = 2
+	// UTXOWrite Dimension = 3 // includes delete
 
-	FeeDimensions = 3
+	FeeDimensions = 4
 )
 
 type (
@@ -24,22 +27,14 @@ type Manager struct {
 	unitPrices Dimensions
 
 	// cumulatedUnits helps aggregating the units consumed by a block
-	// so that we can verify it's not too big/build it properly
+	// so that we can verify it's not too big/build it properly.
 	cumulatedUnits Dimensions
 }
 
-func NewManager(initialUnitPrices Dimensions) *Manager {
+func NewManager(unitPrices Dimensions) *Manager {
 	return &Manager{
-		unitPrices: initialUnitPrices,
+		unitPrices: unitPrices,
 	}
-}
-
-func (m *Manager) UnitPrices() Dimensions {
-	var d Dimensions
-	for i := Dimension(0); i < FeeDimensions; i++ {
-		d[i] = m.unitPrices[i]
-	}
-	return d
 }
 
 func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
@@ -58,6 +53,9 @@ func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	return fee, nil
 }
 
+// CumulateUnits tries to cumulate the consumed units [units]. Before
+// actually cumulating them, it checks whether the result would breach [bounds].
+// If so, it returns the first dimension to breach bounds.
 func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 	// Ensure we can consume (don't want partial update of values)
 	for i := Dimension(0); i < FeeDimensions; i++ {

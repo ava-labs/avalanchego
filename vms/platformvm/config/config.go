@@ -4,6 +4,7 @@
 package config
 
 import (
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -107,6 +109,9 @@ type Config struct {
 	// Time of the Durango network upgrade
 	DurangoTime time.Time
 
+	// Time of the E network upgrade
+	EForkTime time.Time
+
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
 	// window.
@@ -135,6 +140,10 @@ func (c *Config) IsCortinaActivated(timestamp time.Time) bool {
 
 func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.DurangoTime)
+}
+
+func (c *Config) IsEForkActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EForkTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
@@ -169,4 +178,13 @@ func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 	}
 
 	c.Chains.QueueChainCreation(chainParams)
+}
+
+func (*Config) BlockMaxConsumedUnits() fees.Dimensions {
+	// TODO ABENEGIA: to be set
+	var res fees.Dimensions
+	for i := fees.Dimension(0); i < fees.FeeDimensions; i++ {
+		res[i] = math.MaxUint64
+	}
+	return res
 }
