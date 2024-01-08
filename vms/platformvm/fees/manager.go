@@ -14,7 +14,7 @@ const (
 	// UTXORead  Dimension = 2
 	// UTXOWrite Dimension = 3 // includes delete
 
-	FeeDimensions = 4
+	FeeDimensions = 1
 )
 
 type (

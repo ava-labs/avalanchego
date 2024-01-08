@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -105,7 +104,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		}
 	)
-	verifiedSignedTx.SetBytes([]byte{1}, []byte{2})
+
+	unsignedBytes := []byte{1}
+	signedBytes := []byte{2}
+	verifiedSignedTx.SetBytes(unsignedBytes, signedBytes)
 
 	tests := []test{
 		{
@@ -608,15 +610,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 						FeeConfig: config.FeeConfig{
 							DefaultUnitPrices: fees.Dimensions{
 								10,
-								11,
-								12,
-								13,
 							},
 							DefaultBlockMaxConsumedUnits: fees.Dimensions{
-								0,
-								10 * units.KiB,
-								10 * units.KiB,
-								10 * units.KiB,
+								uint64(len(signedBytes)) - 1,
 							},
 						},
 						EForkTime: activeForkTime, // activate latest fork,
@@ -667,15 +663,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 						FeeConfig: config.FeeConfig{
 							DefaultUnitPrices: fees.Dimensions{
 								10,
-								11,
-								12,
-								13,
 							},
 							DefaultBlockMaxConsumedUnits: fees.Dimensions{
-								10 * units.KiB,
-								10 * units.KiB,
-								10 * units.KiB,
-								10 * units.KiB,
+								uint64(len(signedBytes)),
 							},
 						},
 						EForkTime: activeForkTime, // activate latest fork,
