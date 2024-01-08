@@ -222,7 +222,11 @@ func commonConsumedUnits(tx *txs.Tx) fees.Dimensions {
 	consumedUnits[fees.Bandwidth] = uint64(len(tx.Bytes()))
 
 	// TODO ABENEGIA: consider accounting for input complexity
-	consumedUnits[fees.UTXORead] = uint64(tx.Unsigned.InputIDs().Len())
+	// TODO ABENEGIA: consider handling imports/exports differently
+	insCount := tx.Unsigned.InputIDs().Len()
+	outsCount := len(tx.Unsigned.Outputs())
+	consumedUnits[fees.UTXORead] = uint64(insCount)              // inputs are read
+	consumedUnits[fees.UTXOWrite] = uint64(insCount + outsCount) // inputs are deleted, outputs are created
 	return consumedUnits
 }
 

@@ -11,10 +11,10 @@ import "github.com/ava-labs/avalanchego/utils/math"
 const (
 	Bandwidth Dimension = 0
 	UTXORead  Dimension = 1
-	// UTXOWrite Dimension = 2 // includes delete
+	UTXOWrite Dimension = 2 // includes delete
 	// Compute   Dimension = 3
 
-	FeeDimensions = 2
+	FeeDimensions = 3
 )
 
 type (
