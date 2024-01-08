@@ -10,11 +10,6 @@ import (
 )
 
 const (
-	// Constants defining the names of shell variables whose value can
-	// configure temporary network orchestration.
-	NetworkDirEnvName = "TMPNET_NETWORK_DIR"
-	RootDirEnvName    = "TMPNET_ROOT_DIR"
-
 	DefaultNetworkTimeout = 2 * time.Minute
 
 	// Minimum required to ensure connectivity-based health checks will pass
@@ -48,12 +43,14 @@ func DefaultFlags() FlagsMap {
 	}
 }
 
-// C-Chain config for testing.
-func DefaultCChainConfig() FlagsMap {
-	// Supply only non-default configuration to ensure that default
-	// values will be used. Available C-Chain configuration options are
-	// defined in the `github.com/ava-labs/coreth/evm` package.
-	return FlagsMap{
-		"log-level": "trace",
+// A set of chain configurations appropriate for testing.
+func DefaultChainConfigs() map[string]FlagsMap {
+	return map[string]FlagsMap{
+		// Supply only non-default configuration to ensure that default
+		// values will be used. Available C-Chain configuration options are
+		// defined in the `github.com/ava-labs/coreth/evm` package.
+		"C": {
+			"log-level": "trace",
+		},
 	}
 }

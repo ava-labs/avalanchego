@@ -30,6 +30,7 @@ the following non-test files:
 | flags.go          | FlagsMap    | Simplifies configuration of avalanchego flags  |
 | genesis.go        |             | Creates test genesis                           |
 | network.go        | Network     | Orchestrates and configures temporary networks |
+| network_config.go | Network     | Reads and writes network configuration         |
 | node.go           | Node        | Orchestrates and configures nodes              |
 | node_config.go    | Node        | Reads and writes node configuration            |
 | node_process.go   | NodeProcess | Orchestrates node processes                    |
@@ -73,59 +74,24 @@ network.
 A temporary network can be managed in code:
 
 ```golang
-network, _ := tmpnet.StartNetwork(
-    ctx,                                           // Context used to limit duration of waiting for network health
-    ginkgo.GinkgoWriter,                           // Writer to report progress of network start
-    "",                                            // Use default root dir (~/.tmpnet)
-    &tmpnet.Network{
-        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
-            ExecPath: "/path/to/avalanchego",      // Defining the avalanchego exec path is required
-        },
-    },
-    5,                                             // Number of initial validating nodes
-    50,                                            // Number of pre-funded keys to create
+network, _ := tmpnet.NewDefaultNetwork(
+    ginkgo.GinkgoWriter,                  // Writer to report progress of initialization
+    "/path/to/avalanchego",               // The path to the binary that nodes will execute
+    5,                                    // Number of initial validating nodes
+)
+_ = network.Create("")                    // Finalize network configuration and write to disk
+_ = network.Start(                        // Start the nodes of the network and wait until they report healthy
+    ctx,                                  // Context used to limit duration of waiting for network health
+    ginkgo.GinkgoWriter,                  // Writer to report progress of network start
 )
 
-uris := network.GetURIs()
+uris := network.GetNodeURIs()
 
 // Use URIs to interact with the network
 
 // Stop all nodes in the network
-network.Stop()
+network.Stop(context.Background())
 ```
-
-If non-default node behavior is required, the `Network` instance
-supplied to `StartNetwork()` can be initialized with explicit node
-configuration and by supplying a nodeCount argument of `0`:
-
-```golang
-network, _ := tmpnet.StartNetwork(
-    ctx,
-    ginkgo.GinkgoWriter,
-    "",
-    &tmpnet.Network{
-        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
-            ExecPath: "/path/to/avalanchego",
-        },
-        Nodes: []*Node{
-            {                                                       // node1 configuration is customized
-                Flags: FlagsMap{                                    // Any and all node flags can be configured here
-                    config.DataDirKey: "/custom/path/to/node/data",
-                }
-            },
-        },
-        {},                                                         // node2 uses default configuration
-        {},                                                         // node3 uses default configuration
-        {},                                                         // node4 uses default configuration
-        {},                                                         // node5 uses default configuration
-    },
-    0,                                                              // Node count must be zero when setting node config
-    50,
-)
-```
-
-Further examples of code-based usage are located in the [e2e
-tests](../../e2e/e2e_test.go).
 
 ## Networking configuration
 
@@ -161,18 +127,18 @@ HOME
             ├── chains
             │   └── C
             │       └── config.json                      // C-Chain config for all nodes
-            ├── defaults.json                            // Default flags and configuration for network
+            ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
             └── network.env                              // Sets network dir env var to simplify network usage
 ```
 
-### Default flags and configuration
+### Common networking configuration
 
-The default avalanchego node flags (e.g. `--staking-port=`) and
-default configuration like the avalanchego path are stored at
-`[network-dir]/defaults.json`. The value for a given defaulted flag
-will be set on initial and subsequently added nodes that do not supply
-values for a given defaulted flag.
+Network configuration such as default flags (e.g. `--log-level=`),
+runtime defaults (e.g. avalanchego path) and pre-funded private keys
+are stored at `[network-dir]/config.json`. A given default will only
+be applied to a new node on its addition to the network if the node
+does not explicitly set a given value.
 
 ### Genesis
 

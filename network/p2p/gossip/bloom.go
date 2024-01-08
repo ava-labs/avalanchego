@@ -5,27 +5,25 @@ package gossip
 
 import (
 	"crypto/rand"
-	"encoding/binary"
-	"hash"
-
-	bloomfilter "github.com/holiman/bloomfilter/v2"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 )
-
-var _ hash.Hash64 = (*hasher)(nil)
 
 // NewBloomFilter returns a new instance of a bloom filter with at most
 // [maxExpectedElements] elements anticipated at any moment, and a false
 // positive probability of [falsePositiveProbability].
+//
+// Invariant: The returned bloom filter is not safe to reset concurrently with
+// other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
-	maxExpectedElements uint64,
+	maxExpectedElements int,
 	falsePositiveProbability float64,
 ) (*BloomFilter, error) {
-	bloom, err := bloomfilter.NewOptimal(
+	bloom, err := bloom.New(bloom.OptimalParameters(
 		maxExpectedElements,
 		falsePositiveProbability,
-	)
+	))
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +36,7 @@ func NewBloomFilter(
 }
 
 type BloomFilter struct {
-	bloom *bloomfilter.Filter
+	bloom *bloom.Filter
 	// salt is provided to eventually unblock collisions in Bloom. It's possible
 	// that conflicting Gossipable items collide in the bloom filter, so a salt
 	// is generated to eventually resolve collisions.
@@ -47,28 +45,21 @@ type BloomFilter struct {
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
 	h := gossipable.GossipID()
-	salted := &hasher{
-		hash: h[:],
-		salt: b.salt,
-	}
-	b.bloom.Add(salted)
+	bloom.Add(b.bloom, h[:], b.salt[:])
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
 	h := gossipable.GossipID()
-	salted := &hasher{
-		hash: h[:],
-		salt: b.salt,
-	}
-	return b.bloom.Contains(salted)
+	return bloom.Contains(b.bloom, h[:], b.salt[:])
 }
 
+// TODO: Remove error from the return
 func (b *BloomFilter) Marshal() ([]byte, []byte, error) {
-	bloomBytes, err := b.bloom.MarshalBinary()
+	bloomBytes := b.bloom.Marshal()
 	// salt must be copied here to ensure the bytes aren't overwritten if salt
 	// is later modified.
 	salt := b.salt
-	return bloomBytes, salt[:], err
+	return bloomBytes, salt[:], nil
 }
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches a target false
@@ -77,11 +68,15 @@ func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	falsePositiveProbability float64,
 ) (bool, error) {
-	if bloomFilter.bloom.FalsePosititveProbability() < falsePositiveProbability {
+	numHashes, numEntries := bloomFilter.bloom.Parameters()
+	// TODO: Precalculate maxCount, as it is independent of the current state
+	// of the bloom filter.
+	maxCount := bloom.EstimateCount(numHashes, numEntries, falsePositiveProbability)
+	if bloomFilter.bloom.Count() < maxCount {
 		return false, nil
 	}
 
-	newBloom, err := bloomfilter.New(bloomFilter.bloom.M(), bloomFilter.bloom.K())
+	newBloom, err := bloom.New(numHashes, numEntries)
 	if err != nil {
 		return false, err
 	}
@@ -99,40 +94,4 @@ func randomSalt() (ids.ID, error) {
 	salt := ids.ID{}
 	_, err := rand.Read(salt[:])
 	return salt, err
-}
-
-type hasher struct {
-	hash []byte
-	salt ids.ID
-}
-
-func (h *hasher) Write(p []byte) (n int, err error) {
-	h.hash = append(h.hash, p...)
-	return len(p), nil
-}
-
-func (h *hasher) Sum(b []byte) []byte {
-	h.hash = append(h.hash, b...)
-	return h.hash
-}
-
-func (h *hasher) Reset() {
-	h.hash = ids.Empty[:]
-}
-
-func (*hasher) BlockSize() int {
-	return ids.IDLen
-}
-
-func (h *hasher) Sum64() uint64 {
-	salted := ids.ID{}
-	for i := 0; i < len(h.hash) && i < ids.IDLen; i++ {
-		salted[i] = h.hash[i] ^ h.salt[i]
-	}
-
-	return binary.BigEndian.Uint64(salted[:])
-}
-
-func (h *hasher) Size() int {
-	return len(h.hash)
 }
