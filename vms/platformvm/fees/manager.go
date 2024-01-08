@@ -22,6 +22,8 @@ type (
 	Dimensions [FeeDimensions]uint64
 )
 
+// DummyUnitPrices should be dropped and
+// unit prices should be retrieved from state/config
 // TODO ABENEGIA: drop this
 var DummyUnitPrices Dimensions
 

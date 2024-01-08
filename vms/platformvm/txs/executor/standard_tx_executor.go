@@ -559,6 +559,16 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    e.Backend,
+		ChainTime:  e.State.GetTimestamp(),
+		Tx:         e.Tx,
+		feeManager: e.BlkFeeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -566,7 +576,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return err
