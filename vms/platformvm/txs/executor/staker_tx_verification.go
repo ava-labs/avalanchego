@@ -163,7 +163,7 @@ func verifyAddValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := FeeCalculator{
-		Backend:    backend,
+		Config:     backend.Config,
 		ChainTime:  currentTimestamp,
 		Tx:         sTx,
 		feeManager: feeManager,
@@ -260,7 +260,7 @@ func verifyAddSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := FeeCalculator{
-		Backend:    backend,
+		Config:     backend.Config,
 		ChainTime:  currentTimestamp,
 		Tx:         sTx,
 		feeManager: feeManager,
@@ -340,7 +340,7 @@ func verifyRemoveSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := FeeCalculator{
-		Backend:    backend,
+		Config:     backend.Config,
 		ChainTime:  chainState.GetTimestamp(),
 		Tx:         sTx,
 		feeManager: feeManager,
@@ -463,7 +463,7 @@ func verifyAddDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := FeeCalculator{
-		Backend:    backend,
+		Config:     backend.Config,
 		ChainTime:  chainState.GetTimestamp(),
 		Tx:         sTx,
 		feeManager: feeManager,
@@ -589,7 +589,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := FeeCalculator{
-		Backend:    backend,
+		Config:     backend.Config,
 		ChainTime:  currentTimestamp,
 		Tx:         sTx,
 		feeManager: feeManager,
@@ -738,7 +738,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := FeeCalculator{
-		Backend:    backend,
+		Config:     backend.Config,
 		ChainTime:  currentTimestamp,
 		Tx:         sTx,
 		feeManager: feeManager,
@@ -798,7 +798,7 @@ func verifyTransferSubnetOwnershipTx(
 
 	// Verify the flowcheck
 	feeCalculator := FeeCalculator{
-		Backend:    backend,
+		Config:     backend.Config,
 		ChainTime:  chainState.GetTimestamp(),
 		Tx:         sTx,
 		feeManager: feeManager,

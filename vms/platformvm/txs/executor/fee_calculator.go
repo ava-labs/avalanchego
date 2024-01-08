@@ -23,7 +23,7 @@ var (
 
 type FeeCalculator struct {
 	// inputs, to be filled before visitor methods are called
-	*Backend
+	Config     *config.Config
 	ChainTime  time.Time
 	Tx         *txs.Tx
 	feeManager *fees.Manager
