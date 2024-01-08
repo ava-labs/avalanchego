@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -88,6 +89,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 // added to the staking set.
 func verifyAddValidatorTx(
 	backend *Backend,
+	feeManager *fees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddValidatorTx,
@@ -160,6 +162,16 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    backend,
+		ChainTime:  currentTimestamp,
+		Tx:         sTx,
+		feeManager: feeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return nil, err
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -167,7 +179,7 @@ func verifyAddValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkValidatorFee,
+			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -182,6 +194,7 @@ func verifyAddValidatorTx(
 // AddSubnetValidatorTx.
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
+	feeManager *fees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
@@ -246,6 +259,16 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    backend,
+		ChainTime:  currentTimestamp,
+		Tx:         sTx,
+		feeManager: feeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -253,7 +276,7 @@ func verifyAddSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.AddSubnetValidatorFee,
+			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -274,6 +297,7 @@ func verifyAddSubnetValidatorTx(
 // * The flow checker passes.
 func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
+	feeManager *fees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
@@ -315,6 +339,16 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    backend,
+		ChainTime:  chainState.GetTimestamp(),
+		Tx:         sTx,
+		feeManager: feeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return nil, false, err
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -322,7 +356,7 @@ func verifyRemoveSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -336,6 +370,7 @@ func verifyRemoveSubnetValidatorTx(
 // added to the staking set.
 func verifyAddDelegatorTx(
 	backend *Backend,
+	feeManager *fees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddDelegatorTx,
@@ -427,6 +462,16 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    backend,
+		ChainTime:  chainState.GetTimestamp(),
+		Tx:         sTx,
+		feeManager: feeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return nil, err
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -434,7 +479,7 @@ func verifyAddDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkDelegatorFee,
+			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -449,6 +494,7 @@ func verifyAddDelegatorTx(
 // AddPermissionlessValidatorTx.
 func verifyAddPermissionlessValidatorTx(
 	backend *Backend,
+	feeManager *fees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
@@ -531,15 +577,10 @@ func verifyAddPermissionlessValidatorTx(
 		)
 	}
 
-	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
 		if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
 			return err
 		}
-
-		txFee = backend.Config.AddSubnetValidatorFee
-	} else {
-		txFee = backend.Config.AddPrimaryNetworkValidatorFee
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
@@ -547,6 +588,16 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    backend,
+		ChainTime:  currentTimestamp,
+		Tx:         sTx,
+		feeManager: feeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -554,7 +605,7 @@ func verifyAddPermissionlessValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: txFee,
+			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -569,6 +620,7 @@ func verifyAddPermissionlessValidatorTx(
 // AddPermissionlessDelegatorTx.
 func verifyAddPermissionlessDelegatorTx(
 	backend *Backend,
+	feeManager *fees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
@@ -672,7 +724,6 @@ func verifyAddPermissionlessDelegatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
 		// Invariant: Delegators must only be able to reference validator
 		//            transactions that implement [txs.ValidatorTx]. All
@@ -683,13 +734,19 @@ func verifyAddPermissionlessDelegatorTx(
 		if validator.Priority.IsPermissionedValidator() {
 			return ErrDelegateToPermissionedValidator
 		}
-
-		txFee = backend.Config.AddSubnetDelegatorFee
-	} else {
-		txFee = backend.Config.AddPrimaryNetworkDelegatorFee
 	}
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    backend,
+		ChainTime:  currentTimestamp,
+		Tx:         sTx,
+		feeManager: feeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -697,7 +754,7 @@ func verifyAddPermissionlessDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: txFee,
+			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -715,6 +772,7 @@ func verifyAddPermissionlessDelegatorTx(
 // * The flow checker passes.
 func verifyTransferSubnetOwnershipTx(
 	backend *Backend,
+	feeManager *fees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
@@ -739,6 +797,16 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
+	feeCalculator := FeeCalculator{
+		Backend:    backend,
+		ChainTime:  chainState.GetTimestamp(),
+		Tx:         sTx,
+		feeManager: feeManager,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -746,7 +814,7 @@ func verifyTransferSubnetOwnershipTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+			backend.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)

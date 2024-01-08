@@ -252,6 +252,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
 		DurangoTime:            durangoTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	db := memdb.New()
@@ -1135,6 +1136,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1222,6 +1224,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1272,6 +1275,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1613,6 +1617,7 @@ func TestUnverifiedParent(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1776,6 +1781,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1824,6 +1830,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1923,6 +1930,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		BanffTime:              latestForkTime,
 		CortinaTime:            latestForkTime,
 		DurangoTime:            latestForkTime,
+		EForkTime:              mockable.MaxTime,
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

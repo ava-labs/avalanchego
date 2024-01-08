@@ -22,6 +22,9 @@ type (
 	Dimensions [FeeDimensions]uint64
 )
 
+// TODO ABENEGIA: drop this
+var DummyUnitPrices Dimensions
+
 type Manager struct {
 	// Avax prices per units for all fee dimensions
 	unitPrices Dimensions

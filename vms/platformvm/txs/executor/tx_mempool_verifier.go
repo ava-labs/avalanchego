@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -90,9 +91,10 @@ func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 	}
 
 	executor := StandardTxExecutor{
-		Backend: v.Backend,
-		State:   baseState,
-		Tx:      v.Tx,
+		Backend:       v.Backend,
+		BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+		State:         baseState,
+		Tx:            v.Tx,
 	}
 	err = tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because the time will be advanced

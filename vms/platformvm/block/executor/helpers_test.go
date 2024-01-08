@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -248,9 +249,10 @@ func addSubnet(env *environment) {
 	}
 
 	executor := executor.StandardTxExecutor{
-		Backend: env.backend,
-		State:   stateDiff,
-		Tx:      testSubnet1,
+		Backend:       env.backend,
+		BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+		State:         stateDiff,
+		Tx:            testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {
@@ -316,6 +318,8 @@ func defaultConfig() *config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         mockable.MaxTime,
+		DurangoTime:       mockable.MaxTime,
+		EForkTime:         mockable.MaxTime,
 	}
 }
 
