@@ -42,7 +42,7 @@ Define any flags/configurations in [`e2e.go`](./e2e.go).
 Create a new package to implement feature-specific tests, or add tests to an existing package. For example:
 
 ```
-.
+tests
 └── e2e
     ├── README.md
     ├── e2e.go
