@@ -156,11 +156,13 @@ func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 	c.Chains.QueueChainCreation(chainParams)
 }
 
-func (*Config) BlockMaxConsumedUnits() fees.Dimensions {
-	// TODO ABENEGIA: to be set
-	var res fees.Dimensions
-	for i := fees.Dimension(0); i < fees.FeeDimensions; i++ {
-		res[i] = math.MaxUint64
+func (c *Config) BlockMaxConsumedUnits(timestamp time.Time) fees.Dimensions {
+	if !c.IsEForkActivated(timestamp) {
+		var res fees.Dimensions
+		for i := fees.Dimension(0); i < fees.FeeDimensions; i++ {
+			res[i] = math.MaxUint64
+		}
+		return res
 	}
-	return res
+	return c.DefaultBlockMaxConsumedUnits
 }

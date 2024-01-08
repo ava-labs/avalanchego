@@ -6,7 +6,11 @@ package config
 import "github.com/ava-labs/avalanchego/vms/platformvm/fees"
 
 type FeeConfig struct {
+	// Post E Fork, the unit fee for each dimension, denominated in Avax
 	DefaultUnitPrices fees.Dimensions
+
+	// Post E Fork, the max complexity of a block for each dimension
+	DefaultBlockMaxConsumedUnits fees.Dimensions
 
 	// Pre E Fork, fee that is burned by every non-state creating transaction
 	TxFee uint64

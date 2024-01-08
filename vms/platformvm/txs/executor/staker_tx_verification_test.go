@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -545,7 +546,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: ErrFutureStakeTime,
 		},
 		{
-			name: "success",
+			name: "success pre EFork",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
@@ -576,6 +577,116 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				mockState := state.NewMockChain(ctrl)
 				mockState.EXPECT().GetTimestamp().Return(now).Times(2) // chain time is after Durango fork activation since now.After(activeForkTime)
+				mockState.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
+				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				primaryNetworkVdr := &state.Staker{
+					EndTime: mockable.MaxTime,
+				}
+				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddPermissionlessValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "unit bound breached post EFork",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				flowChecker := utxo.NewMockVerifier(ctrl)
+
+				return &Backend{
+					FlowChecker: flowChecker,
+					Config: &config.Config{
+						FeeConfig: config.FeeConfig{
+							DefaultUnitPrices: fees.Dimensions{
+								10,
+								11,
+								12,
+								13,
+							},
+							DefaultBlockMaxConsumedUnits: fees.Dimensions{
+								0,
+								10 * units.KiB,
+								10 * units.KiB,
+								10 * units.KiB,
+							},
+						},
+						EForkTime: activeForkTime, // activate latest fork,
+					},
+					Ctx:          ctx,
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(now).Times(2) // chain time is after EFork fork activation since now.After(activeForkTime)
+				mockState.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
+				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				primaryNetworkVdr := &state.Staker{
+					EndTime: mockable.MaxTime,
+				}
+				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddPermissionlessValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: errFailedConsumedUnitsCumulation,
+		},
+		{
+			name: "success post EFork",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				flowChecker := utxo.NewMockVerifier(ctrl)
+				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(nil)
+
+				return &Backend{
+					FlowChecker: flowChecker,
+					Config: &config.Config{
+						FeeConfig: config.FeeConfig{
+							DefaultUnitPrices: fees.Dimensions{
+								10,
+								11,
+								12,
+								13,
+							},
+							DefaultBlockMaxConsumedUnits: fees.Dimensions{
+								10 * units.KiB,
+								10 * units.KiB,
+								10 * units.KiB,
+								10 * units.KiB,
+							},
+						},
+						EForkTime: activeForkTime, // activate latest fork,
+					},
+					Ctx:          ctx,
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(now).Times(2) // chain time is after EFork fork activation since now.After(activeForkTime)
 				mockState.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)

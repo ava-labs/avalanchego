@@ -44,7 +44,7 @@ func (fc *FeeCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -60,7 +60,7 @@ func (fc *FeeCalculator) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -76,7 +76,7 @@ func (fc *FeeCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -92,7 +92,7 @@ func (fc *FeeCalculator) CreateChainTx(*txs.CreateChainTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -108,7 +108,7 @@ func (fc *FeeCalculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -132,7 +132,7 @@ func (fc *FeeCalculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) e
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -148,7 +148,7 @@ func (fc *FeeCalculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -164,7 +164,7 @@ func (fc *FeeCalculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipT
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -184,7 +184,7 @@ func (fc *FeeCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -204,7 +204,7 @@ func (fc *FeeCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessD
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -220,7 +220,7 @@ func (fc *FeeCalculator) BaseTx(*txs.BaseTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -236,7 +236,7 @@ func (fc *FeeCalculator) ImportTx(*txs.ImportTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
@@ -252,12 +252,12 @@ func (fc *FeeCalculator) ExportTx(*txs.ExportTx) error {
 	)
 	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
 
-	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func processFees(cfg *config.Config, fc *fees.Manager, consumedUnits fees.Dimensions) (uint64, error) {
-	boundBreached, dimension := fc.CumulateUnits(consumedUnits, cfg.BlockMaxConsumedUnits())
+func processFees(cfg *config.Config, chainTime time.Time, fc *fees.Manager, consumedUnits fees.Dimensions) (uint64, error) {
+	boundBreached, dimension := fc.CumulateUnits(consumedUnits, cfg.BlockMaxConsumedUnits(chainTime))
 	if boundBreached {
 		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}

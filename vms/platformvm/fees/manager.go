@@ -61,10 +61,10 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 	for i := Dimension(0); i < FeeDimensions; i++ {
 		consumed, err := math.Add64(m.cumulatedUnits[i], units[i])
 		if err != nil {
-			return false, i
+			return true, i
 		}
 		if consumed > bounds[i] {
-			return false, i
+			return true, i
 		}
 	}
 
@@ -72,9 +72,9 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 	for i := Dimension(0); i < FeeDimensions; i++ {
 		consumed, err := math.Add64(m.cumulatedUnits[i], units[i])
 		if err != nil {
-			return false, i
+			return true, i
 		}
 		m.cumulatedUnits[i] = consumed
 	}
-	return true, 0
+	return false, 0
 }
