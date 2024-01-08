@@ -148,13 +148,8 @@ type network struct {
 	sendFailRateCalculator safemath.Averager
 
 	// Tracks which peers know about which peers
-	validatorTracker *ValidatorTracker
+	validatorTracker *ipTracker
 	peersLock        sync.RWMutex
-	// peerIPs contains the most up to date set of signed IPs for nodes we are
-	// currently connected or attempting to connect to.
-	// Note: The txID provided inside of a claimed IP is not verified and should
-	//       not be accessed from this map.
-	peerIPs map[ids.NodeID]*ips.ClaimedIPPort
 	// trackedIPs contains the set of IPs that we are currently attempting to
 	// connect to. An entry is added to this set when we first start attempting
 	// to connect to the peer. An entry is deleted from this set once we have
@@ -251,7 +246,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	validatorTracker, err := NewValidatorTracker(log)
+	validatorTracker, err := newIPTracker(log)
 	if err != nil {
 		return nil, fmt.Errorf("initializing validator tracker failed with: %w", err)
 	}
@@ -304,7 +299,6 @@ func NewNetwork(
 			time.Now(),
 		)),
 
-		peerIPs:          make(map[ids.NodeID]*ips.ClaimedIPPort),
 		trackedIPs:       make(map[ids.NodeID]*trackedIP),
 		validatorTracker: validatorTracker,
 		connectingPeers:  peer.NewSet(),
@@ -428,21 +422,6 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		return
 	}
 
-	peerIP := peer.IP()
-	newIP := &ips.ClaimedIPPort{
-		Cert:      peer.Cert(),
-		IPPort:    peerIP.IPPort,
-		Timestamp: peerIP.Timestamp,
-		Signature: peerIP.Signature,
-	}
-	prevIP, ok := n.peerIPs[nodeID]
-	if !ok || prevIP.Timestamp < newIP.Timestamp {
-		// If the IP wasn't previously tracked, then we never could have
-		// gossiped it. If the previous IP was stale, we should gossip the newer
-		// IP.
-		n.peerIPs[nodeID] = newIP
-	}
-
 	if tracked, ok := n.trackedIPs[nodeID]; ok {
 		tracked.stopTracking()
 		delete(n.trackedIPs, nodeID)
@@ -451,7 +430,14 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
-	n.validatorTracker.Connected(nodeID, newIP)
+	peerIP := peer.IP()
+	newIP := &ips.ClaimedIPPort{
+		Cert:      peer.Cert(),
+		IPPort:    peerIP.IPPort,
+		Timestamp: peerIP.Timestamp,
+		Signature: peerIP.Signature,
+	}
+	n.validatorTracker.Connected(newIP)
 
 	n.metrics.markConnected(peer)
 
@@ -475,76 +461,11 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
-	// Perform all signature verification and hashing before grabbing the peer
-	// lock.
-	// Note: Avoiding signature verification when the IP isn't needed is a
-	// **significant** performance optimization.
-	// Note: To avoid signature verification when the IP isn't needed, we
-	// optimistically filter out IPs. This can result in us not tracking an IP
-	// that we otherwise would have. This case can only happen if the node
-	// became a validator between the time we verified the signature and when we
-	// processed the IP; which should be very rare.
-	ipAuths, err := n.authenticateIPs(claimedIPPorts)
-	if err != nil {
-		return err
-	}
-
-	// Atomically modify peer data
-	n.peersLock.Lock()
-	defer n.peersLock.Unlock()
-	for i, ip := range claimedIPPorts {
-		ipAuth := ipAuths[i]
-		nodeID := ipAuth.nodeID
-		// Invariant: [ip] is only used to modify local node state if
-		// [verifiedIP] is true.
-		// Note: modifying peer-level state is allowed regardless of
-		// [verifiedIP].
-		verifiedIP := ipAuth.verified
-
-		// Re-fetch latest info for a [nodeID] in case it changed since we last
-		// held [peersLock].
-		prevIP, previouslyTracked, shouldUpdateOurIP, shouldDial := n.peerIPStatus(nodeID, ip)
-		tracked, isTracked := n.trackedIPs[nodeID]
-
-		// Evaluate if the gossiped IP is useful to us or to the peer that
-		// shared it with us.
-		switch {
-		case previouslyTracked && prevIP.Timestamp >= ip.Timestamp:
-			n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
-		case verifiedIP && shouldUpdateOurIP:
-			// In the future, we should gossip this IP rather than the old IP.
-			n.peerIPs[nodeID] = ip
-
-			// If the new IP is equal to the old IP, there is no reason to
-			// refresh the references to it. This can happen when a node
-			// restarts but does not change their IP.
-			if prevIP.IPPort.Equal(ip.IPPort) {
-				continue
-			}
-
-			// We should update any existing outbound connection attempts.
-			if isTracked {
-				// Stop tracking the old IP and start tracking the new one.
-				tracked := tracked.trackNewIP(ip.IPPort)
-				n.trackedIPs[nodeID] = tracked
-				n.dial(nodeID, tracked)
-			}
-		case verifiedIP && shouldDial:
-			// Invariant: [isTracked] is false here.
-
-			// We don't need to reset gossip about this validator because
-			// we've never gossiped it before.
-			n.peerIPs[nodeID] = ip
-
-			tracked := newTrackedIP(ip.IPPort)
-			n.trackedIPs[nodeID] = tracked
-			n.dial(nodeID, tracked)
-		default:
-			// This IP isn't desired
-			n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
+	for _, ip := range claimedIPPorts {
+		if err := n.track(ip); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
@@ -694,6 +615,60 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 	}
 }
 
+func (n *network) track(ip *ips.ClaimedIPPort) error {
+	// To avoid signature verification when the IP isn't needed, we
+	// optimistically filter out IPs. This can result in us not tracking an IP
+	// that we otherwise would have. This case can only happen if the node
+	// became a validator between the time we verified the signature and when we
+	// processed the IP; which should be very rare.
+	//
+	// Note: Avoiding signature verification when the IP isn't needed is a
+	// **significant** performance optimization.
+	if !n.validatorTracker.ShouldVerifyIP(ip) {
+		n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
+		return nil
+	}
+
+	// Perform all signature verification and hashing before grabbing the peer
+	// lock.
+	signedIP := peer.SignedIP{
+		UnsignedIP: peer.UnsignedIP{
+			IPPort:    ip.IPPort,
+			Timestamp: ip.Timestamp,
+		},
+		Signature: ip.Signature,
+	}
+	if err := signedIP.Verify(ip.Cert); err != nil {
+		return err
+	}
+
+	nodeID := ip.NodeID()
+
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
+
+	if !n.validatorTracker.AddIP(ip) {
+		return nil
+	}
+
+	if _, connected := n.connectedPeers.GetByID(nodeID); connected {
+		// If I'm currently connected to [nodeID] then I'll attempt to dial them
+		// when we disconnect.
+		return nil
+	}
+
+	tracked, isTracked := n.trackedIPs[nodeID]
+	if isTracked {
+		// Stop tracking the old IP and start tracking the new one.
+		tracked = tracked.trackNewIP(ip.IPPort)
+	} else {
+		tracked = newTrackedIP(ip.IPPort)
+	}
+	n.trackedIPs[nodeID] = tracked
+	n.dial(nodeID, tracked)
+	return nil
+}
+
 // getPeers returns a slice of connected peers from a set of [nodeIDs].
 //
 //   - [nodeIDs] the IDs of the peers that should be returned if they are
@@ -824,7 +799,6 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 			n.dial(nodeID, tracked)
 		} else {
 			tracked.stopTracking()
-			delete(n.peerIPs, nodeID)
 			delete(n.trackedIPs, nodeID)
 		}
 	}
@@ -846,59 +820,9 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 		tracked := newTrackedIP(prevIP.IPPort)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(nodeID, tracked)
-	} else {
-		delete(n.peerIPs, nodeID)
 	}
 
 	n.metrics.markDisconnected(peer)
-}
-
-// ipAuth is a helper struct used to convey information about an
-// [*ips.ClaimedIPPort].
-type ipAuth struct {
-	nodeID   ids.NodeID
-	verified bool
-}
-
-func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
-	ipAuths := make([]*ipAuth, len(ips))
-	for i, ip := range ips {
-		nodeID := ids.NodeIDFromCert(ip.Cert)
-		n.peersLock.RLock()
-		_, _, shouldUpdateOurIP, shouldDial := n.peerIPStatus(nodeID, ip)
-		n.peersLock.RUnlock()
-		if !shouldUpdateOurIP && !shouldDial {
-			ipAuths[i] = &ipAuth{
-				nodeID: nodeID,
-			}
-			continue
-		}
-
-		// Verify signature if needed
-		signedIP := peer.SignedIP{
-			UnsignedIP: peer.UnsignedIP{
-				IPPort:    ip.IPPort,
-				Timestamp: ip.Timestamp,
-			},
-			Signature: ip.Signature,
-		}
-		if err := signedIP.Verify(ip.Cert); err != nil {
-			return nil, err
-		}
-		ipAuths[i] = &ipAuth{
-			nodeID:   nodeID,
-			verified: true,
-		}
-	}
-	return ipAuths, nil
-}
-
-// peerIPStatus assumes the caller holds [peersLock]
-func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.ClaimedIPPort, bool, bool, bool) {
-	prevIP, previouslyTracked := n.peerIPs[nodeID]
-	shouldUpdateOurIP := previouslyTracked && prevIP.Timestamp < ip.Timestamp
-	shouldDial := !previouslyTracked && n.WantsConnection(nodeID)
-	return prevIP, previouslyTracked, shouldUpdateOurIP, shouldDial
 }
 
 // dial will spin up a new goroutine and attempt to establish a connection with
@@ -949,7 +873,6 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 				// race conditions before removing the entry.
 				if ip, exists := n.trackedIPs[nodeID]; exists {
 					ip.stopTracking()
-					delete(n.peerIPs, nodeID)
 					delete(n.trackedIPs, nodeID)
 				}
 				n.peersLock.Unlock()
@@ -1171,7 +1094,6 @@ func (n *network) StartClose() {
 
 		for nodeID, tracked := range n.trackedIPs {
 			tracked.stopTracking()
-			delete(n.peerIPs, nodeID)
 			delete(n.trackedIPs, nodeID)
 		}
 
