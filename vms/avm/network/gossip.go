@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -64,7 +64,7 @@ func newGossipMempool(
 	log logging.Logger,
 	txVerifier TxVerifier,
 	parser txs.Parser,
-	maxExpectedElements uint64,
+	maxExpectedElements int,
 	falsePositiveProbability,
 	maxFalsePositiveProbability float64,
 ) (*gossipMempool, error) {

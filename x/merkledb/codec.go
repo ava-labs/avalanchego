@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"math/bits"
 	"sync"
 
 	"golang.org/x/exp/maps"
@@ -101,14 +102,10 @@ func (c *codecImpl) childSize(index byte, childEntry *child) int {
 
 // based on the current implementation of codecImpl.encodeUint which uses binary.PutUvarint
 func (*codecImpl) uintSize(value uint64) int {
-	// binary.PutUvarint repeatedly divides by 128 until the value is under 128,
-	// so count the number of times that will occur
-	i := 0
-	for value >= 0x80 {
-		value >>= 7
-		i++
+	if value == 0 {
+		return 1
 	}
-	return i + 1
+	return (bits.Len64(value) + 6) / 7
 }
 
 func (c *codecImpl) keySize(p Key) int {

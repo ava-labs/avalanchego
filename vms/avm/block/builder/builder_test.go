@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -514,9 +514,12 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	_, ok := mempool.Get(txID)
 	require.True(ok)
 
-	parser, err := block.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	backend := &txexecutor.Backend{

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e
@@ -69,7 +69,7 @@ func NewTestEnvironment(flagVars *FlagVars) *TestEnvironment {
 		network = StartNetwork(flagVars.AvalancheGoExecPath(), DefaultNetworkDir)
 	}
 
-	uris := tmpnet.GetNodeURIs(network.Nodes)
+	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")
 	tests.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
 
@@ -132,5 +132,5 @@ func (te *TestEnvironment) NewPrivateNetwork() *tmpnet.Network {
 	privateNetworksDir := filepath.Join(sharedNetwork.Dir, PrivateNetworksDirName)
 	te.require.NoError(os.MkdirAll(privateNetworksDir, perms.ReadWriteExecute))
 
-	return StartNetwork(sharedNetwork.AvalancheGoPath, privateNetworksDir)
+	return StartNetwork(sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath, privateNetworksDir)
 }

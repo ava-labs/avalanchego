@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -148,9 +148,7 @@ func NewTestGenesis(
 
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{
-		Config: &params.ChainConfig{
-			ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
-		},
+		Config:     params.AvalancheLocalChainConfig,
 		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
 		GasLimit:   defaultGasLimit,
 		Alloc:      cChainBalances,
