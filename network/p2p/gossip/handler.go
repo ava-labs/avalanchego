@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	bloomfilter "github.com/holiman/bloomfilter/v2"
-
 	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
@@ -17,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -62,19 +61,18 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, err
 	}
 
-	filter := &BloomFilter{
-		bloom: &bloomfilter.Filter{},
-		salt:  salt,
-	}
-	if err := filter.bloom.UnmarshalBinary(request.Filter); err != nil {
+	filter, err := bloom.Parse(request.Filter)
+	if err != nil {
 		return nil, err
 	}
 
 	responseSize := 0
 	gossipBytes := make([][]byte, 0)
 	h.set.Iterate(func(gossipable T) bool {
+		gossipID := gossipable.GossipID()
+
 		// filter out what the requesting peer already knows about
-		if filter.Has(gossipable) {
+		if bloom.Contains(filter, gossipID[:], salt[:]) {
 			return true
 		}
 
