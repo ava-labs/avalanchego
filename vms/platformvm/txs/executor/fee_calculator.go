@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -16,7 +17,6 @@ import (
 var (
 	_ txs.Visitor = (*FeeCalculator)(nil)
 
-	errNotYetImplemented             = errors.New("not yet implemented")
 	errFailedFeeCalculation          = errors.New("failed fee calculation")
 	errFailedConsumedUnitsCumulation = errors.New("failed cumulating consumed units")
 )
@@ -64,56 +64,196 @@ func (fc *FeeCalculator) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 	return err
 }
 
-func (*FeeCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) CreateChainTx(*txs.CreateChainTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) CreateChainTx(*txs.CreateChainTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
 func (*FeeCalculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return errNotYetImplemented
+	return nil // no fees
 }
 
 func (*FeeCalculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return errNotYetImplemented
+	return nil // no fees
 }
 
-func (*FeeCalculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.TxFee
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.TransformSubnetTxFee
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.TxFee
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		if tx.Subnet != constants.PrimaryNetworkID {
+			fc.Fee = fc.Config.AddSubnetValidatorFee
+		} else {
+			fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
+		}
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		if tx.Subnet != constants.PrimaryNetworkID {
+			fc.Fee = fc.Config.AddSubnetDelegatorFee
+		} else {
+			fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+		}
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) BaseTx(*txs.BaseTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) BaseTx(*txs.BaseTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.TxFee
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) ImportTx(*txs.ImportTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) ImportTx(*txs.ImportTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.TxFee
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
-func (*FeeCalculator) ExportTx(*txs.ExportTx) error {
-	return errNotYetImplemented
+func (fc *FeeCalculator) ExportTx(*txs.ExportTx) error {
+	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+		fc.Fee = fc.Config.TxFee
+		return nil
+	}
+
+	var (
+		consumedUnits fees.Dimensions
+		err           error
+	)
+	consumedUnits[fees.Bandwidth] = uint64(len(fc.Tx.Bytes()))
+
+	fc.Fee, err = processFees(fc.Config, fc.feeManager, consumedUnits)
+	return err
 }
 
 func processFees(cfg *config.Config, fc *fees.Manager, consumedUnits fees.Dimensions) (uint64, error) {
