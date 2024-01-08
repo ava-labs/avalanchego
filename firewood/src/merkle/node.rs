@@ -157,6 +157,7 @@ impl NodeType {
 pub struct Node {
     pub(super) root_hash: OnceLock<TrieHash>,
     encoded: OnceLock<Vec<u8>>,
+    is_encoded_longer_than_hash_len: OnceLock<bool>,
     // lazy_dirty is an atomicbool, but only writers ever set it
     // Therefore, we can always use Relaxed ordering. It's atomic
     // just to ensure Sync + Send.
@@ -173,6 +174,7 @@ impl PartialEq for Node {
         let Node {
             root_hash,
             encoded,
+            is_encoded_longer_than_hash_len: _,
             lazy_dirty: _,
             inner,
         } = self;
@@ -187,6 +189,7 @@ impl Clone for Node {
     fn clone(&self) -> Self {
         Self {
             root_hash: self.root_hash.clone(),
+            is_encoded_longer_than_hash_len: self.is_encoded_longer_than_hash_len.clone(),
             encoded: self.encoded.clone(),
             lazy_dirty: AtomicBool::new(self.is_dirty()),
             inner: self.inner.clone(),
@@ -199,6 +202,7 @@ impl From<NodeType> for Node {
         let mut s = Self {
             root_hash: OnceLock::new(),
             encoded: OnceLock::new(),
+            is_encoded_longer_than_hash_len: OnceLock::new(),
             inner,
             lazy_dirty: AtomicBool::new(false),
         };
@@ -222,6 +226,7 @@ impl Node {
             Self {
                 root_hash: OnceLock::new(),
                 encoded: OnceLock::new(),
+                is_encoded_longer_than_hash_len: OnceLock::new(),
                 inner: NodeType::Branch(
                     BranchNode {
                         // path: vec![].into(),
@@ -249,7 +254,9 @@ impl Node {
     }
 
     fn is_encoded_longer_than_hash_len<S: ShaleStore<Node>>(&self, store: &S) -> bool {
-        self.get_encoded(store).len() >= TRIE_HASH_LEN
+        *self
+            .is_encoded_longer_than_hash_len
+            .get_or_init(|| self.get_encoded(store).len() >= TRIE_HASH_LEN)
     }
 
     pub(super) fn rehash(&mut self) {
@@ -273,13 +280,21 @@ impl Node {
         &mut self.inner
     }
 
-    pub(super) fn new_from_hash(root_hash: Option<TrieHash>, inner: NodeType) -> Self {
+    pub(super) fn new_from_hash(
+        root_hash: Option<TrieHash>,
+        is_encoded_longer_than_hash_len: Option<bool>,
+        inner: NodeType,
+    ) -> Self {
         Self {
             root_hash: match root_hash {
                 Some(h) => OnceLock::from(h),
                 None => OnceLock::new(),
             },
             encoded: OnceLock::new(),
+            is_encoded_longer_than_hash_len: match is_encoded_longer_than_hash_len {
+                Some(v) => OnceLock::from(v),
+                None => OnceLock::new(),
+            },
             inner,
             lazy_dirty: AtomicBool::new(false),
         }
@@ -298,7 +313,6 @@ impl Node {
 struct Meta {
     root_hash: [u8; TRIE_HASH_LEN],
     attrs: NodeAttributes,
-    is_encoded_longer_than_hash_len: Option<bool>,
 }
 
 impl Meta {
@@ -360,24 +374,46 @@ impl Storable for Node {
             None
         };
 
+        let is_encoded_longer_than_hash_len =
+            if attrs.contains(NodeAttributes::IS_ENCODED_BIG_VALID) {
+                Some(false)
+            } else if attrs.contains(NodeAttributes::LONG) {
+                Some(true)
+            } else {
+                None
+            };
+
+        let meta_raw = mem
+            .get_view(offset, 1_u64)
+            .ok_or(ShaleError::InvalidCacheView {
+                offset,
+                size: 1_u64,
+            })?;
+
+        offset += 1;
+
         #[allow(clippy::indexing_slicing)]
-        match meta_raw.as_deref()[TRIE_HASH_LEN + 1].try_into()? {
+        match meta_raw.as_deref()[0].try_into()? {
             NodeTypeId::Branch => {
                 let inner = NodeType::Branch(Box::new(BranchNode::deserialize(offset, mem)?));
 
-                Ok(Self::new_from_hash(root_hash, inner))
+                Ok(Self::new_from_hash(
+                    root_hash,
+                    is_encoded_longer_than_hash_len,
+                    inner,
+                ))
             }
 
             NodeTypeId::Extension => {
                 let inner = NodeType::Extension(ExtNode::deserialize(offset, mem)?);
-                let node = Self::new_from_hash(root_hash, inner);
+                let node = Self::new_from_hash(root_hash, is_encoded_longer_than_hash_len, inner);
 
                 Ok(node)
             }
 
             NodeTypeId::Leaf => {
                 let inner = NodeType::Leaf(LeafNode::deserialize(offset, mem)?);
-                let node = Self::new_from_hash(root_hash, inner);
+                let node = Self::new_from_hash(root_hash, is_encoded_longer_than_hash_len, inner);
 
                 Ok(node)
             }
@@ -386,6 +422,7 @@ impl Storable for Node {
 
     fn serialized_len(&self) -> u64 {
         Meta::SIZE as u64
+            + 1
             + match &self.inner {
                 NodeType::Branch(n) => {
                     // TODO: add path
@@ -412,6 +449,12 @@ impl Storable for Node {
 
         if let Some(b) = self.encoded.get() {
             attrs.insert(if b.len() > TRIE_HASH_LEN {
+                NodeAttributes::LONG
+            } else {
+                NodeAttributes::IS_ENCODED_BIG_VALID
+            });
+        } else if let Some(b) = self.is_encoded_longer_than_hash_len.get() {
+            attrs.insert(if *b {
                 NodeAttributes::LONG
             } else {
                 NodeAttributes::IS_ENCODED_BIG_VALID

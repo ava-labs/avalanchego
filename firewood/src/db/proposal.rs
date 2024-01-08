@@ -34,6 +34,7 @@ pub struct Proposal {
     pub(super) rev: DbRev<MutStore>,
     pub(super) store: Universe<StoreRevMut>,
     pub(super) committed: Arc<Mutex<bool>>,
+    pub(super) root_hash: TrieHash,
 
     pub(super) parent: ProposalBase,
 }
@@ -106,6 +107,9 @@ impl Proposal {
                 }
             }
         })?;
+
+        // Calculated the root hash before flushing so it can be persisted.
+        let hash = rev.kv_root_hash()?;
         #[allow(clippy::unwrap_used)]
         rev.flush_dirty().unwrap();
 
@@ -118,6 +122,7 @@ impl Proposal {
             rev,
             store,
             committed: Arc::new(Mutex::new(false)),
+            root_hash: hash,
             parent,
         })
     }
@@ -132,6 +137,7 @@ impl Proposal {
             rev,
             store,
             committed,
+            root_hash: hash,
             parent,
         } = self;
 
@@ -152,10 +158,7 @@ impl Proposal {
             committed_root_hash.expect("committed_root_hash should not be none");
         match &parent {
             ProposalBase::Proposal(p) => {
-                let parent_root_hash = p.rev.kv_root_hash().ok();
-                let parent_root_hash =
-                    parent_root_hash.expect("parent_root_hash should not be none");
-                if parent_root_hash != committed_root_hash {
+                if p.root_hash != committed_root_hash {
                     return Err(DbError::InvalidProposal);
                 }
             }
@@ -168,9 +171,6 @@ impl Proposal {
                 }
             }
         };
-
-        let kv_root_hash = rev.kv_root_hash().ok();
-        let kv_root_hash = kv_root_hash.expect("kv_root_hash should not be none");
 
         // clear the staging layer and apply changes to the CachedSpace
         let (merkle_payload_redo, merkle_payload_wal) = store.merkle.payload.delta();
@@ -218,14 +218,14 @@ impl Proposal {
         revisions.base_revision = Arc::new(rev.into());
 
         // update the rolling window of root hashes
-        revisions.root_hashes.push_front(kv_root_hash.clone());
+        revisions.root_hashes.push_front(hash.clone());
         if revisions.root_hashes.len() > max_revisions {
             revisions
                 .root_hashes
                 .resize(max_revisions, TrieHash([0; TRIE_HASH_LEN]));
         }
 
-        rev_inner.root_hash_staging.write(0, &kv_root_hash.0);
+        rev_inner.root_hash_staging.write(0, &hash.0);
         let (root_hash_redo, root_hash_wal) = rev_inner.root_hash_staging.delta();
 
         // schedule writes to the disk

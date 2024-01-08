@@ -824,6 +824,9 @@ impl Db {
                 }
             }
         })?;
+
+        // Calculated the root hash before flushing so it can be persisted.
+        let root_hash = rev.kv_root_hash()?;
         #[allow(clippy::unwrap_used)]
         rev.flush_dirty().unwrap();
 
@@ -835,6 +838,7 @@ impl Db {
             rev,
             store,
             committed: Arc::new(Mutex::new(false)),
+            root_hash,
             parent,
         })
     }
