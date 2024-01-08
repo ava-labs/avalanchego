@@ -43,7 +43,6 @@ rand = "0.8.5"
 triehash = "0.8.4"
 assert_cmd = "2.0.7"
 predicates = "3.0.1"
-serial_test = "2.0.0"
 clap = { version = "4.3.1", features = ['derive'] }
 test-case = "3.1.0"
 pprof = { version = "0.13.0", features = ["flamegraph"] }
