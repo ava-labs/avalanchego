@@ -15,28 +15,28 @@ import (
 func TestNewErrors(t *testing.T) {
 	tests := []struct {
 		numHashes  int
-		numEntires int
+		numEntries int
 		err        error
 	}{
 		{
 			numHashes:  0,
-			numEntires: 1,
+			numEntries: 1,
 			err:        errTooFewHashes,
 		},
 		{
 			numHashes:  17,
-			numEntires: 1,
+			numEntries: 1,
 			err:        errTooManyHashes,
 		},
 		{
 			numHashes:  8,
-			numEntires: 0,
+			numEntries: 0,
 			err:        errTooFewEntries,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.err.Error(), func(t *testing.T) {
-			_, err := New(test.numHashes, test.numEntires)
+			_, err := New(test.numHashes, test.numEntries)
 			require.ErrorIs(t, err, test.err)
 		})
 	}

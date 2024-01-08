@@ -11,7 +11,11 @@ import (
 
 const bytesPerHash = 8
 
-var errMaxBytes = errors.New("too large")
+var (
+	_ Filter = (*filter)(nil)
+
+	errMaxBytes = errors.New("too large")
+)
 
 type Filter interface {
 	// Add adds to filter, assumed thread safe
@@ -27,21 +31,21 @@ func New(maxN int, p float64, maxBytes int) (Filter, error) {
 		return nil, errMaxBytes
 	}
 	f, err := bloom.New(numHashes, numEntries)
-	return &fitler{
+	return &filter{
 		filter: f,
 	}, err
 }
 
-type fitler struct {
+type filter struct {
 	filter *bloom.Filter
 }
 
-func (f *fitler) Add(bl ...[]byte) {
+func (f *filter) Add(bl ...[]byte) {
 	for _, b := range bl {
 		bloom.Add(f.filter, b, nil)
 	}
 }
 
-func (f *fitler) Check(b []byte) bool {
+func (f *filter) Check(b []byte) bool {
 	return bloom.Contains(f.filter, b, nil)
 }

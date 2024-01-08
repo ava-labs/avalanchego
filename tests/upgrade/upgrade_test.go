@@ -6,7 +6,6 @@ package upgrade
 import (
 	"flag"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 )
 
@@ -55,21 +53,9 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			ginkgo.By(fmt.Sprintf("restarting node %q with %q binary", node.NodeID, avalancheGoExecPathToUpgradeTo))
 			require.NoError(node.Stop(e2e.DefaultContext()))
 
-			// A node must start with sufficient bootstrap nodes to represent a quorum. Since the node's current
-			// bootstrap configuration may not satisfy this requirement (i.e. if on network start the node was one of
-			// the first validators), updating the node to bootstrap from all running validators maximizes the
-			// chances of a successful start.
-			//
-			// TODO(marun) Refactor node start to do this automatically
-			bootstrapIPs, bootstrapIDs, err := network.GetBootstrapIPsAndIDs()
-			require.NoError(err)
-			require.NotEmpty(bootstrapIDs)
-			node.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-			node.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
-			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPath
-			require.NoError(node.Write())
+			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
 
-			require.NoError(node.Start(ginkgo.GinkgoWriter))
+			require.NoError(network.StartNode(e2e.DefaultContext(), ginkgo.GinkgoWriter, node))
 
 			ginkgo.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
 			e2e.WaitForHealthy(node)
