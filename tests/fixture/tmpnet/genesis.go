@@ -148,9 +148,7 @@ func NewTestGenesis(
 
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{
-		Config: &params.ChainConfig{
-			ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
-		},
+		Config:     params.AvalancheLocalChainConfig,
 		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
 		GasLimit:   defaultGasLimit,
 		Alloc:      cChainBalances,

@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -45,10 +46,9 @@ func main() {
 	rootCmd.AddCommand(versionCmd)
 
 	var (
-		rootDir           string
-		execPath          string
-		nodeCount         uint8
-		preFundedKeyCount uint8
+		rootDir   string
+		execPath  string
+		nodeCount uint8
 	)
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network",
@@ -60,15 +60,21 @@ func main() {
 
 			// Root dir will be defaulted on start if not provided
 
-			network := &tmpnet.Network{
-				NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
-					AvalancheGoPath: execPath,
-				},
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
-			defer cancel()
-			network, err := tmpnet.StartNetwork(ctx, os.Stdout, rootDir, network, int(nodeCount), int(preFundedKeyCount))
+			network, err := tmpnet.NewDefaultNetwork(os.Stdout, execPath, int(nodeCount))
 			if err != nil {
+				return err
+			}
+
+			if err := network.Create(rootDir); err != nil {
+				return err
+			}
+
+			// Extreme upper bound, should never take this long
+			networkStartTimeout := 2 * time.Minute
+
+			ctx, cancel := context.WithTimeout(context.Background(), networkStartTimeout)
+			defer cancel()
+			if err := network.Start(ctx, os.Stdout); err != nil {
 				return err
 			}
 
@@ -94,7 +100,6 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
 	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
-	startNetworkCmd.PersistentFlags().Uint8Var(&preFundedKeyCount, "pre-funded-key-count", tmpnet.DefaultPreFundedKeyCount, "Number of pre-funded keys the network should start with")
 	rootCmd.AddCommand(startNetworkCmd)
 
 	var networkDir string
