@@ -61,7 +61,7 @@ func newGossipMempool(
 	mempool mempool.Mempool,
 	log logging.Logger,
 	txVerifier TxVerifier,
-	maxExpectedElements uint64,
+	maxExpectedElements int,
 	falsePositiveProbability float64,
 	maxFalsePositiveProbability float64,
 ) (*gossipMempool, error) {

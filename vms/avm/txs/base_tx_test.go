@@ -5,6 +5,7 @@ package txs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -125,9 +126,12 @@ func TestBaseTxSerialization(t *testing.T) {
 		Memo: []byte{0x00, 0x01, 0x02, 0x03},
 	}}}
 
-	parser, err := NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	require.NoError(tx.Initialize(parser.Codec()))

@@ -6,13 +6,12 @@ package gossip
 import (
 	"testing"
 
-	bloomfilter "github.com/holiman/bloomfilter/v2"
-
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
@@ -48,7 +47,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			b, err := bloomfilter.New(10, 1)
+			b, err := bloom.New(1, 10)
 			require.NoError(err)
 			bloom := BloomFilter{
 				bloom: b,
@@ -68,8 +67,6 @@ func TestBloomFilterRefresh(t *testing.T) {
 				require.Equal(initialBloomBytes, bloomBytes)
 				require.Equal(initialSaltBytes, saltBytes)
 			}
-
-			require.Equal(uint64(len(tt.expected)), bloom.bloom.N())
 
 			for _, expected := range tt.expected {
 				require.True(bloom.Has(expected))

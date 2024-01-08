@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -36,9 +37,12 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -406,9 +410,12 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -1013,9 +1020,12 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -1500,9 +1510,12 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -1898,9 +1911,12 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
