@@ -1293,6 +1293,15 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
         last_key: Option<K>,
         limit: Option<usize>,
     ) -> Result<Option<api::RangeProof<Vec<u8>, Vec<u8>>>, api::Error> {
+        if let (Some(k1), Some(k2)) = (&first_key, &last_key) {
+            if k1.as_ref() > k2.as_ref() {
+                return Err(api::Error::InvalidRange {
+                    first_key: k1.as_ref().to_vec(),
+                    last_key: k2.as_ref().to_vec(),
+                });
+            }
+        }
+
         // limit of 0 is always an empty RangeProof
         if limit == Some(0) {
             return Ok(None);
@@ -1698,6 +1707,26 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn range_proof_invalid_bounds() {
+        let merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+        let start_key = &[0x01];
+        let end_key = &[0x00];
+
+        match merkle
+            .range_proof::<&[u8]>(root, Some(start_key), Some(end_key), Some(1))
+            .await
+        {
+            Err(api::Error::InvalidRange {
+                first_key,
+                last_key,
+            }) if first_key == start_key && last_key == end_key => (),
+            Err(api::Error::InvalidRange { .. }) => panic!("wrong bounds on InvalidRange error"),
+            _ => panic!("expected InvalidRange error"),
+        }
     }
 
     #[tokio::test]

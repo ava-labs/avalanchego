@@ -64,6 +64,13 @@ pub enum Error {
     #[error("Incorrect root hash for commit: {provided:?} != {current:?}")]
     IncorrectRootHash { provided: HashKey, current: HashKey },
 
+    /// Invalid range
+    #[error("Invalid range: {first_key:?} > {last_key:?}")]
+    InvalidRange {
+        first_key: Vec<u8>,
+        last_key: Vec<u8>,
+    },
+
     #[error("IO error: {0}")]
     IO(std::io::Error),
 
