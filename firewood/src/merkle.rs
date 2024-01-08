@@ -177,7 +177,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
             .map(|node| node.as_ptr())
     }
 
-    pub fn get_store(&self) -> &dyn ShaleStore<Node> {
+    pub fn get_store(&self) -> &S {
         self.store.as_ref()
     }
 

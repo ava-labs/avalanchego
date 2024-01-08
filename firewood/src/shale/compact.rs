@@ -576,7 +576,9 @@ impl From<Box<CompactSpace<Node, StoreRevMut>>> for CompactSpace<Node, StoreRevS
     }
 }
 
-impl<T: Storable + 'static, M: CachedStore + Send + Sync> ShaleStore<T> for CompactSpace<T, M> {
+impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> ShaleStore<T>
+    for CompactSpace<T, M>
+{
     fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.serialized_len() + extra;
         #[allow(clippy::unwrap_used)]

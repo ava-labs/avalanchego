@@ -165,12 +165,13 @@ impl<T: Storable> Deref for Obj<T> {
 }
 
 /// User handle that offers read & write access to the stored [ShaleStore] item.
+#[derive(Debug)]
 pub struct ObjRef<'a, T: Storable> {
     inner: Option<Obj<T>>,
     cache: &'a ObjCache<T>,
 }
 
-impl<'a, T: Storable> ObjRef<'a, T> {
+impl<'a, T: Storable + Debug> ObjRef<'a, T> {
     const fn new(inner: Option<Obj<T>>, cache: &'a ObjCache<T>) -> Self {
         Self { inner, cache }
     }
@@ -191,7 +192,7 @@ impl<'a, T: Storable> ObjRef<'a, T> {
     }
 }
 
-impl<'a, T: Storable> Deref for ObjRef<'a, T> {
+impl<'a, T: Storable + Debug> Deref for ObjRef<'a, T> {
     type Target = Obj<T>;
     fn deref(&self) -> &Obj<T> {
         // TODO: Something is seriously wrong here but I'm not quite sure about the best approach for the fix
@@ -219,7 +220,7 @@ impl<'a, T: Storable> Drop for ObjRef<'a, T> {
 
 /// A persistent item storage backed by linear logical space. New items can be created and old
 /// items could be retrieved or dropped.
-pub trait ShaleStore<T: Storable> {
+pub trait ShaleStore<T: Storable + Debug> {
     /// Dereference [DiskAddress] to a unique handle that allows direct access to the item in memory.
     fn get_item(&'_ self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError>;
     /// Allocate a new item.
