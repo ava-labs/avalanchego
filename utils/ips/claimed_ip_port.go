@@ -4,6 +4,8 @@
 package ips
 
 import (
+	"sync"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -13,7 +15,7 @@ import (
 const (
 	// Certificate length, signature length, IP, timestamp, tx ID
 	baseIPCertDescLen = 2*wrappers.IntLen + IPPortLen + wrappers.LongLen + ids.IDLen
-	preimageLen       = ids.IDLen + IPPortLen + wrappers.LongLen
+	preimageLen       = ids.IDLen + wrappers.LongLen
 )
 
 // A self contained proof that a peer is claiming ownership of an IPPort at a
@@ -30,26 +32,34 @@ type ClaimedIPPort struct {
 	// actually claimed by the peer in question, and not by a malicious peer
 	// trying to get us to dial bogus IPPorts.
 	Signature []byte
+
+	initOnce sync.Once
+	nodeID   ids.NodeID
+	gossipID ids.ID
 }
 
 func (i *ClaimedIPPort) NodeID() ids.NodeID {
-	// TODO: Don't recalculate
-	return ids.NodeIDFromCert(i.Cert)
+	i.initOnce.Do(i.init)
+	return i.nodeID
 }
 
 func (i *ClaimedIPPort) GossipID() ids.ID {
-	// TODO: Don't recalculate
-	packer := wrappers.Packer{
-		Bytes: make([]byte, preimageLen),
-	}
-	nodeID := i.NodeID()
-	packer.PackFixedBytes(nodeID[:])
-	PackIP(&packer, i.IPPort)
-	packer.PackLong(i.Timestamp)
-	return hashing.ComputeHash256Array(packer.Bytes)
+	i.initOnce.Do(i.init)
+	return i.gossipID
 }
 
 // Returns the length of the byte representation of this ClaimedIPPort.
 func (i *ClaimedIPPort) BytesLen() int {
 	return baseIPCertDescLen + len(i.Cert.Raw) + len(i.Signature)
+}
+
+func (i *ClaimedIPPort) init() {
+	i.nodeID = ids.NodeIDFromCert(i.Cert)
+
+	packer := wrappers.Packer{
+		Bytes: make([]byte, preimageLen),
+	}
+	packer.PackFixedBytes(i.nodeID[:])
+	packer.PackLong(i.Timestamp)
+	i.gossipID = hashing.ComputeHash256Array(packer.Bytes)
 }
