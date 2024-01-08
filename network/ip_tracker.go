@@ -85,6 +85,13 @@ func (v *ipTracker) ManuallyTrack(nodeID ids.NodeID) {
 	v.manuallyTracked.Add(nodeID)
 }
 
+func (v *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
+	v.lock.RLock()
+	defer v.lock.RUnlock()
+
+	return v.validators.Contains(nodeID) || v.manuallyTracked.Contains(nodeID)
+}
+
 func (v *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
 	nodeID := ip.NodeID()
 

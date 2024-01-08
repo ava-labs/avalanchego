@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
@@ -75,12 +76,6 @@ type Network interface {
 	// Should only be called once, will run until either a fatal error occurs,
 	// or the network is closed.
 	Dispatch() error
-
-	// WantsConnection returns true if this node is willing to attempt to
-	// connect to the provided nodeID. If the node is attempting to connect to
-	// the minimum number of peers, then it should only connect if the peer is a
-	// validator or beacon.
-	WantsConnection(ids.NodeID) bool
 
 	// Attempt to connect to this IP. The network will never stop attempting to
 	// connect to this ID.
@@ -158,10 +153,6 @@ type network struct {
 	connectingPeers peer.Set
 	connectedPeers  peer.Set
 	closing         bool
-
-	// Tracks special peers that the network should always track
-	manuallyTrackedIDsLock sync.RWMutex
-	manuallyTrackedIDs     set.Set[ids.NodeID]
 
 	// router is notified about all peer [Connected] and [Disconnected] events
 	// as well as all non-handshake peer messages.
@@ -251,6 +242,12 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing validator tracker failed with: %w", err)
 	}
 	config.Validators.RegisterCallbackListener(constants.PrimaryNetworkID, validatorTracker)
+
+	// Track all default bootstrappers to ensure their current IPs are gossiped
+	// like validator IPs.
+	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
+		validatorTracker.ManuallyTrack(bootstrapper.ID)
+	}
 
 	peerConfig := &peer.Config{
 		ReadBufferSize:  config.PeerReadBufferSize,
@@ -456,8 +453,8 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	if !n.config.RequireValidatorToConnect {
 		return true
 	}
-	_, isValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return isValidator || n.WantsConnection(nodeID)
+	_, iAmAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+	return iAmAValidator || n.validatorTracker.WantsConnection(nodeID)
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
@@ -580,21 +577,8 @@ func (n *network) Dispatch() error {
 	return errs.Err
 }
 
-func (n *network) WantsConnection(nodeID ids.NodeID) bool {
-	if _, ok := n.config.Validators.GetValidator(constants.PrimaryNetworkID, nodeID); ok {
-		return true
-	}
-
-	n.manuallyTrackedIDsLock.RLock()
-	defer n.manuallyTrackedIDsLock.RUnlock()
-
-	return n.manuallyTrackedIDs.Contains(nodeID)
-}
-
 func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
-	n.manuallyTrackedIDsLock.Lock()
-	n.manuallyTrackedIDs.Add(nodeID)
-	n.manuallyTrackedIDsLock.Unlock()
+	n.validatorTracker.ManuallyTrack(nodeID)
 
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
@@ -793,7 +777,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
 	if ok {
-		if n.WantsConnection(nodeID) {
+		if n.validatorTracker.WantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(nodeID, tracked)
@@ -815,9 +799,8 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	n.connectedPeers.Remove(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
-	if n.WantsConnection(nodeID) {
-		prevIP := n.peerIPs[nodeID]
-		tracked := newTrackedIP(prevIP.IPPort)
+	if ip, wantsConnection := n.validatorTracker.GetIP(nodeID); wantsConnection {
+		tracked := newTrackedIP(ip.IPPort)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(nodeID, tracked)
 	}
@@ -867,7 +850,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 			// trackedIPs and this goroutine. This prevents a memory leak when
 			// the tracked nodeID leaves the validator set and is never able to
 			// be connected to.
-			if !n.WantsConnection(nodeID) {
+			if !n.validatorTracker.WantsConnection(nodeID) {
 				// Typically [n.trackedIPs[nodeID]] will already equal [ip], but
 				// the reference to [ip] is refreshed to avoid any potential
 				// race conditions before removing the entry.
