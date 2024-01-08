@@ -233,7 +233,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetAncestors(arg0, arg1, arg2, arg
 }
 
 // GetPeerList mocks base method.
-func (m *MockOutboundMsgBuilder) GetPeerList(arg0 []byte, arg1 ids.ID) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) GetPeerList(arg0, arg1 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPeerList", arg0, arg1)
 	ret0, _ := ret[0].(OutboundMessage)
@@ -263,7 +263,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 }
 
 // Handshake mocks base method.
-func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32, arg13 []byte, arg14 ids.ID) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32, arg13, arg14 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Handshake", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
 	ret0, _ := ret[0].(OutboundMessage)

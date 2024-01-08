@@ -30,12 +30,12 @@ type Network interface {
 	Disconnected(peerID ids.NodeID)
 
 	// KnownPeers returns the bloom filter of the known peers.
-	KnownPeers() (bloomFilter []byte, salt ids.ID)
+	KnownPeers() (bloomFilter []byte, salt []byte)
 
 	// Peers returns peers that are not known.
 	Peers(
 		peerID ids.NodeID,
 		knownPeers *bloom.ReadFilter,
-		peerSalt ids.ID,
+		peerSalt []byte,
 	) []*ips.ClaimedIPPort
 }

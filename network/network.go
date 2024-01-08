@@ -487,12 +487,12 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 	}
 }
 
-func (n *network) KnownPeers() ([]byte, ids.ID) {
+func (n *network) KnownPeers() ([]byte, []byte) {
 	return n.ipTracker.Bloom()
 }
 
-func (n *network) Peers(except ids.NodeID, knownPeers *bloom.ReadFilter, salt ids.ID) []*ips.ClaimedIPPort {
-	return n.ipTracker.GetValidatorIPs(
+func (n *network) Peers(except ids.NodeID, knownPeers *bloom.ReadFilter, salt []byte) []*ips.ClaimedIPPort {
+	return n.ipTracker.GetGossipableIPs(
 		except,
 		knownPeers,
 		salt,

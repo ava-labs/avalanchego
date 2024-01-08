@@ -23,11 +23,12 @@ import (
 )
 
 const (
+	saltSize                       = 32
 	minCountEstimate               = 128
 	targetFalsePositiveProbability = .001
 	maxFalsePositiveProbability    = .01
 	// By setting maxIPEntriesPerValidator > 1, we allow validators to update
-	// their IP at least once per bloom filter recent.
+	// their IP at least once per bloom filter reset.
 	maxIPEntriesPerValidator = 2
 )
 
@@ -71,7 +72,7 @@ type ipTracker struct {
 	// false positives, we limit each validator to maxIPEntriesPerValidator in
 	// the bloom filter.
 	bloomAdditions map[ids.NodeID]int // Number of IPs added to the bloom
-	bloomSalt      ids.ID
+	bloomSalt      []byte
 	maxBloomCount  int
 }
 
@@ -249,7 +250,7 @@ func (i *ipTracker) updateMostRecentValidatorIP(nodeID ids.NodeID, ip *ips.Claim
 
 	i.bloomAdditions[nodeID] = oldCount + 1
 	gossipID := ip.GossipID()
-	bloom.Add(i.bloom, gossipID[:], i.bloomSalt[:])
+	bloom.Add(i.bloom, gossipID[:], i.bloomSalt)
 }
 
 func (i *ipTracker) addGossipableIP(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
@@ -276,7 +277,16 @@ func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 	i.gossipableIPs = i.gossipableIPs[:newNumGossipable]
 }
 
-func (i *ipTracker) GetValidatorIPs(exceptNodeID ids.NodeID, exceptIPs *bloom.ReadFilter, salt ids.ID, maxNumIPs int) []*ips.ClaimedIPPort {
+// GetGossipableIPs returns the latest IPs of connected validators. The returned
+// IPs will not contain [exceptNodeID] or any IPs contained in [exceptIPs]. If
+// the number of eligible IPs to return low, it's possible that every IP will be
+// iterated over while handling this call.
+func (i *ipTracker) GetGossipableIPs(
+	exceptNodeID ids.NodeID,
+	exceptIPs *bloom.ReadFilter,
+	salt []byte,
+	maxNumIPs int,
+) []*ips.ClaimedIPPort {
 	var (
 		uniform = sampler.NewUniform()
 		ips     = make([]*ips.ClaimedIPPort, 0, maxNumIPs)
@@ -299,7 +309,7 @@ func (i *ipTracker) GetValidatorIPs(exceptNodeID ids.NodeID, exceptIPs *bloom.Re
 		}
 
 		gossipID := ip.GossipID()
-		if !bloom.Contains(exceptIPs, gossipID[:], salt[:]) {
+		if !bloom.Contains(exceptIPs, gossipID[:], salt) {
 			ips = append(ips, ip)
 		}
 	}
@@ -318,7 +328,7 @@ func (i *ipTracker) ResetBloom() error {
 
 // Bloom returns the binary representation of the bloom filter along with the
 // random salt.
-func (i *ipTracker) Bloom() ([]byte, ids.ID) {
+func (i *ipTracker) Bloom() ([]byte, []byte) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
@@ -329,8 +339,8 @@ func (i *ipTracker) Bloom() ([]byte, ids.ID) {
 // validator set size. This function additionally populates the new bloom filter
 // with the current most recently known IPs of validators.
 func (i *ipTracker) resetBloom() error {
-	var newSalt ids.ID
-	_, err := rand.Reader.Read(newSalt[:])
+	newSalt := make([]byte, saltSize)
+	_, err := rand.Reader.Read(newSalt)
 	if err != nil {
 		return err
 	}
@@ -350,11 +360,10 @@ func (i *ipTracker) resetBloom() error {
 	i.bloomSalt = newSalt
 	i.maxBloomCount = bloom.EstimateCount(numHashes, numEntries, maxFalsePositiveProbability)
 
-	for _, ip := range i.mostRecentValidatorIPs {
+	for nodeID, ip := range i.mostRecentValidatorIPs {
 		gossipID := ip.GossipID()
-		bloom.Add(newFilter, gossipID[:], newSalt[:])
-		nodeID := ip.NodeID()
-		i.bloomAdditions[nodeID]++
+		bloom.Add(newFilter, gossipID[:], newSalt)
+		i.bloomAdditions[nodeID] = 1
 	}
 	return nil
 }

@@ -33,12 +33,12 @@ type OutboundMsgBuilder interface {
 		supportedACPs []uint32,
 		objectedACPs []uint32,
 		knownPeersFilter []byte,
-		knownPeersSalt ids.ID,
+		knownPeersSalt []byte,
 	) (OutboundMessage, error)
 
 	GetPeerList(
 		knownPeersFilter []byte,
-		knownPeersSalt ids.ID,
+		knownPeersSalt []byte,
 	) (OutboundMessage, error)
 
 	PeerList(
@@ -248,7 +248,7 @@ func (b *outMsgBuilder) Handshake(
 	supportedACPs []uint32,
 	objectedACPs []uint32,
 	knownPeersFilter []byte,
-	knownPeersSalt ids.ID,
+	knownPeersSalt []byte,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
@@ -274,7 +274,7 @@ func (b *outMsgBuilder) Handshake(
 					ObjectedAcps:  objectedACPs,
 					KnownPeers: &p2p.BloomFilter{
 						Filter: knownPeersFilter,
-						Salt:   knownPeersSalt[:],
+						Salt:   knownPeersSalt,
 					},
 				},
 			},
@@ -286,7 +286,7 @@ func (b *outMsgBuilder) Handshake(
 
 func (b *outMsgBuilder) GetPeerList(
 	knownPeersFilter []byte,
-	knownPeersSalt ids.ID,
+	knownPeersSalt []byte,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
@@ -294,7 +294,7 @@ func (b *outMsgBuilder) GetPeerList(
 				GetPeerList: &p2p.GetPeerList{
 					KnownPeers: &p2p.BloomFilter{
 						Filter: knownPeersFilter,
-						Salt:   knownPeersSalt[:],
+						Salt:   knownPeersSalt,
 					},
 				},
 			},

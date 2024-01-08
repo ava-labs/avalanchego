@@ -30,6 +30,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+// maxBloomSaltLen restricts the allowed size of the bloom salt to prevent
+// excessively expensive bloom filter contains checks.
+const maxBloomSaltLen = 32
+
 var (
 	errClosed = errors.New("closed")
 
@@ -636,7 +640,7 @@ func (p *peer) sendNetworkMessages() {
 	for {
 		select {
 		case <-p.peerListChan:
-			peerIPs := p.Config.Network.Peers(p.id, bloom.EmptyFilter, ids.Empty)
+			peerIPs := p.Config.Network.Peers(p.id, bloom.EmptyFilter, nil)
 			if len(peerIPs) == 0 {
 				p.Log.Verbo(
 					"skipping peer gossip as there are no unknown peers",
@@ -1020,29 +1024,29 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	var (
 		knownPeers = bloom.EmptyFilter
-		salt       ids.ID
+		salt       []byte
 	)
 	if msg.KnownPeers != nil {
 		var err error
-		salt, err = ids.ToID(msg.KnownPeers.Salt)
+		knownPeers, err = bloom.Parse(msg.KnownPeers.Filter)
 		if err != nil {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
-				zap.String("field", "KnownPeers.Salt"),
+				zap.String("field", "KnownPeers.Filter"),
 				zap.Error(err),
 			)
 			p.StartClose()
 			return
 		}
 
-		knownPeers, err = bloom.Parse(msg.KnownPeers.Filter)
-		if err != nil {
+		salt = msg.KnownPeers.Salt
+		if saltLen := len(salt); saltLen > maxBloomSaltLen {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
 				zap.String("field", "KnownPeers.Salt"),
-				zap.Error(err),
+				zap.Int("saltLen", saltLen),
 			)
 			p.StartClose()
 			return
@@ -1115,25 +1119,25 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	}
 
 	knownPeersMsg := msg.GetKnownPeers()
-	salt, err := ids.ToID(knownPeersMsg.GetSalt())
+	filter, err := bloom.Parse(knownPeersMsg.GetFilter())
 	if err != nil {
 		p.Log.Debug("message with invalid field",
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.GetPeerListOp),
-			zap.String("field", "KnownPeers.Salt"),
+			zap.String("field", "KnownPeers.Filter"),
 			zap.Error(err),
 		)
 		p.StartClose()
 		return
 	}
 
-	filter, err := bloom.Parse(knownPeersMsg.GetFilter())
-	if err != nil {
+	salt := knownPeersMsg.GetSalt()
+	if saltLen := len(salt); saltLen > maxBloomSaltLen {
 		p.Log.Debug("message with invalid field",
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.GetPeerListOp),
 			zap.String("field", "KnownPeers.Salt"),
-			zap.Error(err),
+			zap.Int("saltLen", saltLen),
 		)
 		p.StartClose()
 		return
