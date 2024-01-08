@@ -459,9 +459,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
-						DurangoTime:           activeForkTime, // activate latest fork,
-						EForkTime:             mockable.MaxTime,
+						FeeConfig: config.FeeConfig{
+							AddSubnetValidatorFee: 1,
+						},
+						DurangoTime: activeForkTime, // activate latest fork,
+						EForkTime:   mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -506,10 +508,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						CortinaTime:           activeForkTime,
-						DurangoTime:           mockable.MaxTime,
-						EForkTime:             mockable.MaxTime,
-						AddSubnetValidatorFee: 1,
+						FeeConfig: config.FeeConfig{
+							AddSubnetValidatorFee: 1,
+						},
+						CortinaTime: activeForkTime,
+						DurangoTime: mockable.MaxTime,
+						EForkTime:   mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -559,9 +563,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
-						DurangoTime:           activeForkTime, // activate latest fork,
-						EForkTime:             mockable.MaxTime,
+						FeeConfig: config.FeeConfig{
+							AddSubnetValidatorFee: 1,
+						},
+						DurangoTime: activeForkTime, // activate latest fork,
+						EForkTime:   mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -594,11 +600,13 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				backend    = tt.backendF(ctrl)
-				feeManager = fees.NewManager(fees.DummyUnitPrices)
-				state      = tt.stateF(ctrl)
-				sTx        = tt.sTxF()
-				tx         = tt.txF()
+				backend = tt.backendF(ctrl)
+
+				defaultUnitPrices = backend.Config.DefaultUnitPrices
+				feeManager        = fees.NewManager(defaultUnitPrices)
+				state             = tt.stateF(ctrl)
+				sTx               = tt.sTxF()
+				tx                = tt.txF()
 			)
 
 			err := verifyAddPermissionlessValidatorTx(backend, feeManager, state, sTx, tx)

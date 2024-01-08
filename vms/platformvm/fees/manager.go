@@ -22,11 +22,6 @@ type (
 	Dimensions [FeeDimensions]uint64
 )
 
-// DummyUnitPrices should be dropped and
-// unit prices should be retrieved from state/config
-// TODO ABENEGIA: drop this
-var DummyUnitPrices Dimensions
-
 type Manager struct {
 	// Avax prices per units for all fee dimensions
 	unitPrices Dimensions

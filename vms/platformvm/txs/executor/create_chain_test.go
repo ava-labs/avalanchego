@@ -51,7 +51,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitPrices),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -93,7 +93,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitPrices),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -129,7 +129,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitPrices),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -162,7 +162,7 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitPrices),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -237,7 +237,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+				BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitPrices),
 				State:         stateDiff,
 				Tx:            tx,
 			}

@@ -92,7 +92,7 @@ func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 
 	executor := StandardTxExecutor{
 		Backend:       v.Backend,
-		BlkFeeManager: fees.NewManager(fees.DummyUnitPrices),
+		BlkFeeManager: fees.NewManager(v.Backend.Config.DefaultUnitPrices),
 		State:         baseState,
 		Tx:            v.Tx,
 	}
