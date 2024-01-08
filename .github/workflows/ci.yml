@@ -45,18 +45,8 @@ jobs:
       - run: ./scripts/coverage.sh
         shell: bash
 
-  build_image:
-    name: Build Docker Image
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3
-      - run: echo ${{ secrets.docker_pass }} | docker login --username ${{ secrets.docker_username }} --password-stdin
-        shell: bash
-      - run: CURRENT_BRANCH=${{ github.head_ref || github.ref_name }} PUSH_DOCKER_IMAGE=true ./scripts/build_image.sh
-        shell: bash
-
-  e2e_test:
-    name: e2e tests
+  e2e_precompile:
+    name: e2e precompile tests
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
@@ -87,16 +77,94 @@ jobs:
       - name: Build Subnet-EVM Plugin Binary
         shell: bash
         run: ./scripts/build.sh /tmp/e2e-test/avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
-      - name: Run E2E Tests
+      - name: Run E2E Precompile Tests
         shell: bash
-        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/data ./scripts/run_ginkgo.sh
-      - name: Run Warp E2E Tests
-        shell: bash
-        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/data ./scripts/run_ginkgo_warp.sh
+        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/precompile-data ./scripts/run_ginkgo_precompile.sh
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: subnet-evm-e2e-logs
+          name: subnet-evm-e2e-logs-precompile
           path: /tmp/network-runner-root-data*/
           retention-days: 5
+  e2e_warp:
+    name: e2e warp tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.12'
+          check-latest: true
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18.15"
+      - name: NPM Clean Install
+        run: npm ci
+        working-directory: ./contracts
+      - name: Hardhat Clean
+        run: npx hardhat clean
+        working-directory: ./contracts
+      - name: Hardhat Compile
+        run: npx hardhat compile
+        working-directory: ./contracts
+      - name: Install AvalancheGo Release
+        shell: bash
+        run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh
+      - name: Build Subnet-EVM Plugin Binary
+        shell: bash
+        run: ./scripts/build.sh /tmp/e2e-test/avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+      - name: Run Warp E2E Tests
+        shell: bash
+        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/warp-data ./scripts/run_ginkgo_warp.sh
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: subnet-evm-e2e-logs-warp
+          path: /tmp/network-runner-root-data*/
+          retention-days: 5
+  e2e_load:
+    name: e2e load tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '~1.20.12'
+          check-latest: true
+      - name: Install AvalancheGo Release
+        shell: bash
+        run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh
+      - name: Build Subnet-EVM Plugin Binary
+        shell: bash
+        run: ./scripts/build.sh /tmp/e2e-test/avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+      - name: Run E2E Load Tests
+        shell: bash
+        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/load-data ./scripts/run_ginkgo_load.sh
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: subnet-evm-e2e-logs-load
+          path: /tmp/network-runner-root-data*/
+          retention-days: 5
+
+  build_image:
+    name: Build Docker Image
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: echo ${{ secrets.docker_pass }} | docker login --username ${{ secrets.docker_username }} --password-stdin
+        shell: bash
+      - run: CURRENT_BRANCH=${{ github.head_ref || github.ref_name }} PUSH_DOCKER_IMAGE=true ./scripts/build_image.sh
+        shell: bash
