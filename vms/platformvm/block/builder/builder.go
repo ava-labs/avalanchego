@@ -380,7 +380,7 @@ func packBlockTxs(
 
 		executor := &txexecutor.StandardTxExecutor{
 			Backend:       backend,
-			BlkFeeManager: fees.NewManager(backend.Config.DefaultUnitPrices),
+			BlkFeeManager: fees.NewManager(backend.Config.DefaultUnitFees),
 			State:         txDiff,
 			Tx:            tx,
 		}

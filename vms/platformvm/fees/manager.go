@@ -5,16 +5,15 @@ package fees
 
 import "github.com/ava-labs/avalanchego/utils/math"
 
-// 1. Fees are not dynamic yet. We'll add mechanism for fee updating iterativelly
-// 2. Not all fees dimensions are correctly prices. We'll add other dimensions iteratively
+// Fees are not dynamic yet. We'll add mechanism for fee updating iterativelly
 
 const (
 	Bandwidth Dimension = 0
 	UTXORead  Dimension = 1
 	UTXOWrite Dimension = 2 // includes delete
-	// Compute   Dimension = 3
+	Compute   Dimension = 3 // any other cost, tx-specific
 
-	FeeDimensions = 3
+	FeeDimensions = 4
 )
 
 type (
@@ -23,17 +22,17 @@ type (
 )
 
 type Manager struct {
-	// Avax prices per units for all fee dimensions
-	unitPrices Dimensions
+	// Avax denominated unit fees for all fee dimensions
+	unitFees Dimensions
 
 	// cumulatedUnits helps aggregating the units consumed by a block
 	// so that we can verify it's not too big/build it properly.
 	cumulatedUnits Dimensions
 }
 
-func NewManager(unitPrices Dimensions) *Manager {
+func NewManager(unitFees Dimensions) *Manager {
 	return &Manager{
-		unitPrices: unitPrices,
+		unitFees: unitFees,
 	}
 }
 
@@ -41,7 +40,7 @@ func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	fee := uint64(0)
 
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		contribution, err := math.Mul64(m.unitPrices[i], units[i])
+		contribution, err := math.Mul64(m.unitFees[i], units[i])
 		if err != nil {
 			return 0, err
 		}

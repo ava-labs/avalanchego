@@ -250,7 +250,7 @@ func addSubnet(env *environment) {
 
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
-		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitPrices),
+		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}

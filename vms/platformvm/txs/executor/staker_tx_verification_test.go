@@ -608,7 +608,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						FeeConfig: config.FeeConfig{
-							DefaultUnitPrices: fees.Dimensions{
+							DefaultUnitFees: fees.Dimensions{
 								10,
 							},
 							DefaultBlockMaxConsumedUnits: fees.Dimensions{
@@ -661,7 +661,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						FeeConfig: config.FeeConfig{
-							DefaultUnitPrices: fees.Dimensions{
+							DefaultUnitFees: fees.Dimensions{
 								10,
 							},
 							DefaultBlockMaxConsumedUnits: fees.Dimensions{
@@ -703,11 +703,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			var (
 				backend = tt.backendF(ctrl)
 
-				defaultUnitPrices = backend.Config.DefaultUnitPrices
-				feeManager        = fees.NewManager(defaultUnitPrices)
-				state             = tt.stateF(ctrl)
-				sTx               = tt.sTxF()
-				tx                = tt.txF()
+				feeManager = fees.NewManager(backend.Config.DefaultUnitFees)
+				state      = tt.stateF(ctrl)
+				sTx        = tt.sTxF()
+				tx         = tt.txF()
 			)
 
 			err := verifyAddPermissionlessValidatorTx(backend, feeManager, state, sTx, tx)

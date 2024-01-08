@@ -7,7 +7,9 @@ import "github.com/ava-labs/avalanchego/vms/platformvm/fees"
 
 type FeeConfig struct {
 	// Post E Fork, the unit fee for each dimension, denominated in Avax
-	DefaultUnitPrices fees.Dimensions
+	// As long as fees are multidimensional but not dynamic, [DefaultUnitFees]
+	// will be the unit fees
+	DefaultUnitFees fees.Dimensions
 
 	// Post E Fork, the max complexity of a block for each dimension
 	DefaultBlockMaxConsumedUnits fees.Dimensions

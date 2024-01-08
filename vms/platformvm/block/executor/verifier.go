@@ -456,7 +456,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		inputs         set.Set[ids.ID]
 		funcs          = make([]func(), 0, len(txs))
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
-		feeManager     = fees.NewManager(v.txExecutorBackend.Config.DefaultUnitPrices)
+		feeManager     = fees.NewManager(v.txExecutorBackend.Config.DefaultUnitFees)
 	)
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
