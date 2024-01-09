@@ -90,7 +90,7 @@ func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	return i.validators.Contains(nodeID) || i.manuallyTracked.Contains(nodeID)
+	return i.validators.Contains(nodeID)
 }
 
 func (i *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
