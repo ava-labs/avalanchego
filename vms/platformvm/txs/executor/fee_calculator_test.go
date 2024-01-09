@@ -25,13 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestAddValidatorTxFees(t *testing.T) {
-	// For simplicity, we define a single AddValidatorTx
-	// and we change config parameters in the different test cases
-	r := require.New(t)
-
-	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
+var (
+	feeTestsDefaultCfg = config.FeeConfig{
 		DefaultUnitFees: fees.Dimensions{
 			1 * units.MicroAvax,
 			2 * units.MicroAvax,
@@ -39,30 +34,49 @@ func TestAddValidatorTxFees(t *testing.T) {
 			4 * units.MicroAvax,
 		},
 		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
+			3000,
+			3500,
 			1000,
 			1000,
 		},
-		AddPrimaryNetworkValidatorFee: 0,
+
+		TxFee:                         1 * units.Avax,
+		CreateAssetTxFee:              2 * units.Avax,
+		CreateSubnetTxFee:             3 * units.Avax,
+		TransformSubnetTxFee:          4 * units.Avax,
+		CreateBlockchainTxFee:         5 * units.Avax,
+		AddPrimaryNetworkValidatorFee: 6 * units.Avax,
+		AddPrimaryNetworkDelegatorFee: 7 * units.Avax,
+		AddSubnetValidatorFee:         8 * units.Avax,
+		AddSubnetDelegatorFee:         9 * units.Avax,
 	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	validatorWeight := uint64(2024)
-	inputs, outputs, stakes, _ := txsCreationHelpers(defaultCtx, validatorWeight)
+	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
+	feeTestDefaultStakeWeight = uint64(2024)
+)
+
+type feeTests struct {
+	description      string
+	cfgAndChainTimeF func() (*config.Config, time.Time)
+	expectedError    error
+	checksF          func(*testing.T, *FeeCalculator)
+}
+
+func TestAddValidatorTxFees(t *testing.T) {
+	// For simplicity, we define a single AddValidatorTx
+	// and we change config parameters in the different test cases
+	r := require.New(t)
+
+	defaultCtx := snowtest.Context(t, snowtest.PChainID)
+
+	baseTx, stakes, _ := txsCreationHelpers(defaultCtx)
 	uTx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx: baseTx,
 		Validator: txs.Validator{
 			NodeID: defaultCtx.NodeID,
 			Start:  uint64(time.Now().Truncate(time.Second).Unix()),
 			End:    uint64(time.Now().Truncate(time.Second).Add(time.Hour).Unix()),
-			Wght:   validatorWeight,
+			Wght:   feeTestDefaultStakeWeight,
 		},
 		StakeOuts: stakes,
 		RewardsOwner: &secp256k1fx.OutputOwners{
@@ -72,17 +86,10 @@ func TestAddValidatorTxFees(t *testing.T) {
 		},
 		DelegationShares: reward.PercentDenominator,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -90,7 +97,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -109,7 +116,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -121,9 +128,9 @@ func TestAddValidatorTxFees(t *testing.T) {
 				require.Equal(t, 3721*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						266,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						266,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -137,7 +144,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -173,57 +180,26 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	validatorWeight := uint64(2024)
 	subnetID := ids.GenerateTestID()
-	inputs, outputs, _, subnetAuth := txsCreationHelpers(defaultCtx, validatorWeight)
+	baseTx, _, subnetAuth := txsCreationHelpers(defaultCtx)
 	uTx := &txs.AddSubnetValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
+		BaseTx: baseTx,
 		SubnetValidator: txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: defaultCtx.NodeID,
 				Start:  uint64(time.Now().Truncate(time.Second).Unix()),
 				End:    uint64(time.Now().Truncate(time.Second).Add(time.Hour).Unix()),
-				Wght:   validatorWeight,
+				Wght:   feeTestDefaultStakeWeight,
 			},
 			Subnet: subnetID,
 		},
 		SubnetAuth: subnetAuth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -231,7 +207,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -240,7 +216,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
 		{
@@ -250,7 +226,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -259,12 +235,12 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3355*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3347*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						172,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						172,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -278,7 +254,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -314,39 +290,15 @@ func TestAddDelegatorTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	validatorWeight := uint64(2024)
-	inputs, outputs, stakes, _ := txsCreationHelpers(defaultCtx, validatorWeight)
+	baseTx, stakes, _ := txsCreationHelpers(defaultCtx)
 	uTx := &txs.AddDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Outs:         outputs,
-			Ins:          inputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
+		BaseTx: baseTx,
 		Validator: txs.Validator{
 			NodeID: defaultCtx.NodeID,
 			Start:  uint64(time.Now().Truncate(time.Second).Unix()),
 			End:    uint64(time.Now().Truncate(time.Second).Add(time.Hour).Unix()),
-			Wght:   validatorWeight,
+			Wght:   feeTestDefaultStakeWeight,
 		},
 		StakeOuts: stakes,
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
@@ -355,17 +307,10 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -373,7 +318,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -382,7 +327,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
 			},
 		},
 		{
@@ -392,7 +337,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -401,12 +346,12 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3725*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3717*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						266,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						266,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -420,7 +365,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -456,32 +401,10 @@ func TestCreateChainTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, subnetAuth := txsCreationHelpers(defaultCtx, 0)
+	baseTx, _, subnetAuth := txsCreationHelpers(defaultCtx)
 	uTx := &txs.CreateChainTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx:      baseTx,
 		SubnetID:    ids.GenerateTestID(),
 		ChainName:   "testingStuff",
 		VMID:        ids.GenerateTestID(),
@@ -489,17 +412,10 @@ func TestCreateChainTxFees(t *testing.T) {
 		GenesisData: []byte{0xff},
 		SubnetAuth:  subnetAuth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -507,7 +423,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -516,7 +432,7 @@ func TestCreateChainTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.CreateBlockchainTxFee, fc.Fee)
 			},
 		},
 		{
@@ -526,7 +442,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -538,9 +454,9 @@ func TestCreateChainTxFees(t *testing.T) {
 				require.Equal(t, 3390*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						172,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						172,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -554,7 +470,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -590,48 +506,19 @@ func TestCreateSubnetTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, _ := txsCreationHelpers(defaultCtx, 0)
+	baseTx, _, _ := txsCreationHelpers(defaultCtx)
 	uTx := &txs.CreateSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx: baseTx,
 		Owner: &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -639,7 +526,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -648,7 +535,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.CreateSubnetTxFee, fc.Fee)
 			},
 		},
 		{
@@ -658,7 +545,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -670,9 +557,9 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				require.Equal(t, 3295*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						172,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						172,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -686,7 +573,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -722,47 +609,18 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, auth := txsCreationHelpers(defaultCtx, 0)
+	baseTx, _, auth := txsCreationHelpers(defaultCtx)
 	uTx := &txs.RemoveSubnetValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx:     baseTx,
 		NodeID:     ids.GenerateTestNodeID(),
 		Subnet:     ids.GenerateTestID(),
 		SubnetAuth: auth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -770,7 +628,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -779,7 +637,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -789,7 +647,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -801,9 +659,9 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				require.Equal(t, 3323*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						172,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						172,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -817,7 +675,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -853,32 +711,10 @@ func TestTransformSubnetTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, auth := txsCreationHelpers(defaultCtx, 0)
+	baseTx, _, auth := txsCreationHelpers(defaultCtx)
 	uTx := &txs.TransformSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx:                   baseTx,
 		Subnet:                   ids.GenerateTestID(),
 		AssetID:                  ids.GenerateTestID(),
 		InitialSupply:            0x1000000000000000,
@@ -895,17 +731,10 @@ func TestTransformSubnetTxFees(t *testing.T) {
 		UptimeRequirement:        0,
 		SubnetAuth:               auth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -913,7 +742,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -922,7 +751,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.TransformSubnetTxFee, fc.Fee)
 			},
 		},
 		{
@@ -932,7 +761,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -944,9 +773,9 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				require.Equal(t, 3408*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						172,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						172,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -960,7 +789,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -996,32 +825,10 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, _ := txsCreationHelpers(defaultCtx, 0)
+	baseTx, _, _ := txsCreationHelpers(defaultCtx)
 	uTx := &txs.TransferSubnetOwnershipTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx: baseTx,
 		Subnet: ids.GenerateTestID(),
 		SubnetAuth: &secp256k1fx.Input{
 			SigIndices: []uint32{3},
@@ -1034,17 +841,10 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 			},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -1052,7 +852,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1061,7 +861,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -1071,7 +871,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1083,9 +883,9 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				require.Equal(t, 3339*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						172,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						172,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -1099,7 +899,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1135,34 +935,12 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, stakes, _ := txsCreationHelpers(defaultCtx, 0)
+	baseTx, stakes, _ := txsCreationHelpers(defaultCtx)
 	sk, err := bls.NewSecretKey()
 	r.NoError(err)
 	uTx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx:    baseTx,
 		Subnet:    ids.GenerateTestID(),
 		Signer:    signer.NewProofOfPossession(sk),
 		StakeOuts: stakes,
@@ -1182,17 +960,10 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 		},
 		DelegationShares: reward.PercentDenominator,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -1200,7 +971,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1209,7 +980,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
 		{
@@ -1219,7 +990,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1231,9 +1002,9 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				require.Equal(t, 3941*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						266,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						266,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -1247,7 +1018,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1283,32 +1054,10 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, stakes, _ := txsCreationHelpers(defaultCtx, 2*units.KiloAvax)
+	baseTx, stakes, _ := txsCreationHelpers(defaultCtx)
 	uTx := &txs.AddPermissionlessDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx: baseTx,
 		Validator: txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  12345,
@@ -1325,17 +1074,10 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 			},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -1343,7 +1085,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1352,7 +1094,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.AddSubnetDelegatorFee, fc.Fee)
 			},
 		},
 		{
@@ -1362,7 +1104,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1374,9 +1116,9 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				require.Equal(t, 3749*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						266,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						266,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -1390,7 +1132,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1426,42 +1168,13 @@ func TestBaseTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			1000,
-			1500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, _ := txsCreationHelpers(defaultCtx, 2*units.KiloAvax)
-	uTx := &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    defaultCtx.NetworkID,
-		BlockchainID: defaultCtx.ChainID,
-		Ins:          inputs,
-		Outs:         outputs,
-	}}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	baseTx, _, _ := txsCreationHelpers(defaultCtx)
+	uTx := &baseTx
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -1469,7 +1182,7 @@ func TestBaseTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1478,7 +1191,7 @@ func TestBaseTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -1488,7 +1201,7 @@ func TestBaseTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1500,9 +1213,9 @@ func TestBaseTxFees(t *testing.T) {
 				require.Equal(t, 3255*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						172,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						172,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -1516,7 +1229,7 @@ func TestBaseTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1552,32 +1265,10 @@ func TestImportTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			3000,
-			2500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, _ := txsCreationHelpers(defaultCtx, 2*units.KiloAvax)
+	baseTx, _, _ := txsCreationHelpers(defaultCtx)
 	uTx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx:      baseTx,
 		SourceChain: ids.GenerateTestID(),
 		ImportedInputs: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
@@ -1591,17 +1282,10 @@ func TestImportTxFees(t *testing.T) {
 			},
 		}},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -1609,7 +1293,7 @@ func TestImportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1618,7 +1302,7 @@ func TestImportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -1628,7 +1312,7 @@ func TestImportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1640,9 +1324,9 @@ func TestImportTxFees(t *testing.T) {
 				require.Equal(t, 5829*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						2180,                     // this is more complex rule, gotta check against hard-coded value
-						262,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						2180,
+						262,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -1656,7 +1340,7 @@ func TestImportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1692,46 +1376,17 @@ func TestExportTxFees(t *testing.T) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
-	defaultFeeCfg := config.FeeConfig{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			3000,
-			2500,
-			1000,
-			1000,
-		},
-		AddPrimaryNetworkValidatorFee: 0,
-	}
 
-	// create a well formed AddValidatorTx
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-	inputs, outputs, _, _ := txsCreationHelpers(defaultCtx, 2*units.KiloAvax)
+	baseTx, outputs, _ := txsCreationHelpers(defaultCtx)
 	uTx := &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    defaultCtx.NetworkID,
-			BlockchainID: defaultCtx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-		}},
+		BaseTx:           baseTx,
 		DestinationChain: ids.GenerateTestID(),
 		ExportedOutputs:  outputs,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, signers)
+	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	type test struct {
-		description      string
-		cfgAndChainTimeF func() (*config.Config, time.Time)
-		expectedError    error
-		checksF          func(*testing.T, *FeeCalculator)
-	}
-
-	tests := []test{
+	tests := []feeTests{
 		{
 			description: "pre E fork",
 			cfgAndChainTimeF: func() (*config.Config, time.Time) {
@@ -1739,7 +1394,7 @@ func TestExportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(-1 * time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1748,7 +1403,7 @@ func TestExportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
 		{
@@ -1758,7 +1413,7 @@ func TestExportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1767,12 +1422,12 @@ func TestExportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3617*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3665*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())), // this is a simple rule, can assert easily
-						1090,                     // this is more complex rule, gotta check against hard-coded value
-						254,                      // this is more complex rule, gotta check against hard-coded value
+						uint64(len(stx.Bytes())),
+						1090,
+						266,
 						0,
 					},
 					fc.feeManager.GetCumulatedUnits(),
@@ -1786,7 +1441,7 @@ func TestExportTxFees(t *testing.T) {
 				chainTime := eForkTime.Add(time.Second)
 
 				cfg := &config.Config{
-					FeeConfig:   defaultFeeCfg,
+					FeeConfig:   feeTestsDefaultCfg,
 					DurangoTime: time.Time{}, // durango already active
 					EForkTime:   eForkTime,
 				}
@@ -1816,13 +1471,12 @@ func TestExportTxFees(t *testing.T) {
 	}
 }
 
-func txsCreationHelpers(defaultCtx *snow.Context, stakeWeight uint64) (
-	inputs []*avax.TransferableInput,
-	outputs []*avax.TransferableOutput,
+func txsCreationHelpers(defaultCtx *snow.Context) (
+	baseTx txs.BaseTx,
 	stakes []*avax.TransferableOutput,
 	auth *secp256k1fx.Input,
 ) {
-	inputs = []*avax.TransferableInput{{
+	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.ID{'t', 'x', 'I', 'D'},
 			OutputIndex: 2,
@@ -1833,7 +1487,7 @@ func txsCreationHelpers(defaultCtx *snow.Context, stakeWeight uint64) (
 			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 		},
 	}}
-	outputs = []*avax.TransferableOutput{{
+	outputs := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: defaultCtx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: uint64(1234),
@@ -1848,7 +1502,7 @@ func txsCreationHelpers(defaultCtx *snow.Context, stakeWeight uint64) (
 		Out: &stakeable.LockOut{
 			Locktime: uint64(time.Now().Add(time.Second).Unix()),
 			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt: stakeWeight,
+				Amt: feeTestDefaultStakeWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -1859,5 +1513,14 @@ func txsCreationHelpers(defaultCtx *snow.Context, stakeWeight uint64) (
 	auth = &secp256k1fx.Input{
 		SigIndices: []uint32{0, 1},
 	}
-	return inputs, outputs, stakes, auth
+	baseTx = txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    defaultCtx.NetworkID,
+			BlockchainID: defaultCtx.ChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+		},
+	}
+
+	return baseTx, stakes, auth
 }
