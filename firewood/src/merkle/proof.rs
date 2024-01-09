@@ -4,6 +4,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+use crate::shale::ObjWriteError;
 use crate::shale::{disk_address::DiskAddress, ShaleError, ShaleStore};
 use crate::v2::api::HashKey;
 use nix::errno::Errno;
@@ -56,8 +57,8 @@ pub enum ProofError {
     Shale(ShaleError),
     #[error("invalid root hash")]
     InvalidRootHash,
-    #[error("failed writing the node")]
-    WriteError,
+    #[error("{0}")]
+    WriteError(#[from] ObjWriteError),
 }
 
 impl From<DataStoreError> for ProofError {
@@ -295,16 +296,14 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                             let child_node = decode_subproof(merkle, proofs_map, &child_hash)?;
 
                             // insert the leaf to the empty slot
-                            parent_node_ref
-                                .write(|node| {
-                                    #[allow(clippy::indexing_slicing)]
-                                    let node = node
-                                        .inner_mut()
-                                        .as_branch_mut()
-                                        .expect("parent_node_ref must be a branch");
-                                    node.chd_mut()[child_index] = Some(child_node.as_ptr());
-                                })
-                                .map_err(|_| ProofError::WriteError)?;
+                            parent_node_ref.write(|node| {
+                                #[allow(clippy::indexing_slicing)]
+                                let node = node
+                                    .inner_mut()
+                                    .as_branch_mut()
+                                    .expect("parent_node_ref must be a branch");
+                                node.chd_mut()[child_index] = Some(child_node.as_ptr());
+                            })?;
 
                             child_node
                         }
@@ -314,15 +313,13 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 NodeType::Extension(n) if n.chd().is_null() => {
                     let child_node = decode_subproof(merkle, proofs_map, &child_hash)?;
 
-                    parent_node_ref
-                        .write(|node| {
-                            let node = node
-                                .inner_mut()
-                                .as_extension_mut()
-                                .expect("parent_node_ref must be an extension");
-                            *node.chd_mut() = child_node.as_ptr();
-                        })
-                        .map_err(|_| ProofError::WriteError)?;
+                    parent_node_ref.write(|node| {
+                        let node = node
+                            .inner_mut()
+                            .as_extension_mut()
+                            .expect("parent_node_ref must be an extension");
+                        *node.chd_mut() = child_node.as_ptr();
+                    })?;
 
                     child_node
                 }
@@ -401,9 +398,8 @@ fn decode_subproof<'a, S: ShaleStore<Node>, T, N: AsRef<[u8]>>(
         .get(child_hash)
         .ok_or(ProofError::ProofNodeMissing)?;
     let child_node = NodeType::decode(child_proof.as_ref())?;
-    merkle
-        .put_node(Node::from(child_node))
-        .map_err(ProofError::InvalidNode)
+    let node = merkle.put_node(Node::from(child_node))?;
+    Ok(node)
 }
 
 fn locate_subproof(
