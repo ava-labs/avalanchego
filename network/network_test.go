@@ -159,7 +159,7 @@ func newDefaultResourceTracker() tracker.ResourceTracker {
 	return tracker
 }
 
-func newTestNetwork(count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
+func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
@@ -168,7 +168,7 @@ func newTestNetwork(count int) (*testDialer, []*testListener, []ids.NodeID, []*C
 	)
 	for i := 0; i < count; i++ {
 		ip, listener := dialer.NewListener()
-		nodeID, tlsCert, tlsConfig := getTLS(i)
+		nodeID, tlsCert, tlsConfig := getTLS(t, i)
 
 		config := defaultConfig
 		config.TLSConfig = tlsConfig
@@ -201,7 +201,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *sync.WaitGroup) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(len(handlers))
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
 
 	var (
 		networks = make([]*network, len(configs))
@@ -402,7 +402,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
 	network := networks[0]
-	nodeID, tlsCert, _ := getTLS(1)
+	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
 	_, err := network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
@@ -430,7 +430,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(2)
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
@@ -520,7 +520,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 func TestDialDeletesNonValidators(t *testing.T) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(2)
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
 
 	vdrs := validators.NewManager()
 	for _, nodeID := range nodeIDs {
@@ -687,7 +687,7 @@ func TestDialContext(t *testing.T) {
 func TestAllowConnectionAsAValidator(t *testing.T) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(2)
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
