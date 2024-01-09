@@ -4,43 +4,15 @@
 package network
 
 import (
-	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
-
-var (
-	ip      *ips.ClaimedIPPort
-	otherIP *ips.ClaimedIPPort
-)
-
-func init() {
-	ip = ips.NewClaimedIPPort(
-		staking.CertificateFromX509(tlsCerts[0].Leaf),
-		ips.IPPort{
-			IP:   net.IPv4(127, 0, 0, 1),
-			Port: 9651,
-		},
-		1,   // timestamp
-		nil, // signature
-	)
-	otherIP = ips.NewClaimedIPPort(
-		staking.CertificateFromX509(tlsCerts[1].Leaf),
-		ips.IPPort{
-			IP:   net.IPv4(127, 0, 0, 1),
-			Port: 9651,
-		},
-		1,   // timestamp
-		nil, // signature
-	)
-}
 
 func newTestIPTracker(t *testing.T) *ipTracker {
 	tracker, err := newIPTracker(logging.NoLog{})
