@@ -6,11 +6,24 @@ package bloom
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 )
 
-var EmptyFilter = &ReadFilter{
-	hashSeeds: make([]uint64, minHashes),
-	entries:   make([]byte, minEntries),
+var (
+	EmptyFilter = &ReadFilter{
+		hashSeeds: make([]uint64, minHashes),
+		entries:   make([]byte, minEntries),
+	}
+	FullFilter = &ReadFilter{
+		hashSeeds: make([]uint64, minHashes),
+		entries:   make([]byte, minEntries),
+	}
+)
+
+func init() {
+	for i := range FullFilter.entries {
+		FullFilter.entries[i] = math.MaxUint8
+	}
 }
 
 type ReadFilter struct {

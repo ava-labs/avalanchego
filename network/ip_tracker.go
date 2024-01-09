@@ -205,6 +205,8 @@ func (i *ipTracker) onValidatorAdded(nodeID ids.NodeID) {
 		return
 	}
 
+	// Because we only track validator IPs, the from the connection is
+	// guaranteed to be the most up-to-date IP that we know.
 	i.updateMostRecentValidatorIP(nodeID, ip)
 	i.addGossipableIP(nodeID, ip)
 }
