@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -34,67 +35,85 @@ type FeeCalculator struct {
 	Fee uint64
 }
 
-func (fc *FeeCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
+func (fc *FeeCalculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	var err error
+	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+func (fc *FeeCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.AddSubnetValidatorFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (fc *FeeCalculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	var err error
+	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) CreateChainTx(*txs.CreateChainTx) error {
+func (fc *FeeCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
+func (fc *FeeCalculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -107,41 +126,47 @@ func (*FeeCalculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil // no fees
 }
 
-func (fc *FeeCalculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+func (fc *FeeCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (fc *FeeCalculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TransformSubnetTxFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+func (fc *FeeCalculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -156,9 +181,15 @@ func (fc *FeeCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	var err error
+	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
@@ -173,63 +204,108 @@ func (fc *FeeCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessD
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	var err error
+	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) BaseTx(*txs.BaseTx) error {
+func (fc *FeeCalculator) BaseTx(tx *txs.BaseTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) ImportTx(*txs.ImportTx) error {
+func (fc *FeeCalculator) ImportTx(tx *txs.ImportTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+	copy(ins, tx.Ins)
+	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-	var err error
+	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, ins)
+	if err != nil {
+		return err
+	}
+
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) ExportTx(*txs.ExportTx) error {
+func (fc *FeeCalculator) ExportTx(tx *txs.ExportTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
-	consumedUnits := commonConsumedUnits(fc.Tx)
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	var err error
+	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
 	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
 	return err
 }
 
-func commonConsumedUnits(tx *txs.Tx) fees.Dimensions {
+func commonConsumedUnits(sTx *txs.Tx, allOuts []*avax.TransferableOutput, allIns []*avax.TransferableInput) (fees.Dimensions, error) {
 	var consumedUnits fees.Dimensions
-	consumedUnits[fees.Bandwidth] = uint64(len(tx.Bytes()))
+	consumedUnits[fees.Bandwidth] = uint64(len(sTx.Bytes()))
 
-	// TODO ABENEGIA: consider accounting for input complexity
 	// TODO ABENEGIA: consider handling imports/exports differently
-	insCount := tx.Unsigned.InputIDs().Len()
-	outsCount := len(tx.Unsigned.Outputs())
-	consumedUnits[fees.UTXORead] = uint64(insCount)              // inputs are read
-	consumedUnits[fees.UTXOWrite] = uint64(insCount + outsCount) // inputs are deleted, outputs are created
-	return consumedUnits
+	var (
+		insCost  uint64
+		insSize  uint64
+		outsSize uint64
+	)
+
+	for _, in := range allIns {
+		cost, err := in.In.Cost()
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
+		}
+		insCost += cost
+
+		inSize, err := txs.Codec.Size(txs.CodecVersion, in)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
+		}
+		insSize += uint64(inSize)
+	}
+
+	for _, out := range allOuts {
+		outSize, err := txs.Codec.Size(txs.CodecVersion, out)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
+		}
+		outsSize += uint64(outSize)
+	}
+
+	consumedUnits[fees.UTXORead] = insCost + insSize   // inputs are read
+	consumedUnits[fees.UTXOWrite] = insSize + outsSize // inputs are deleted, outputs are created
+	return consumedUnits, nil
 }
 
 func processFees(cfg *config.Config, chainTime time.Time, fc *fees.Manager, consumedUnits fees.Dimensions) (uint64, error) {
