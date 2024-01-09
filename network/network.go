@@ -274,7 +274,6 @@ func NewNetwork(
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
-
 	n := &network{
 		config:               config,
 		peerConfig:           peerConfig,
