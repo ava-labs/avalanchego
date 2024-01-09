@@ -77,3 +77,7 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 	}
 	return false, 0
 }
+
+func (m *Manager) GetCumulatedUnits() Dimensions {
+	return m.cumulatedUnits
+}
