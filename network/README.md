@@ -98,13 +98,13 @@ Note left of Node: Peer-3 was never sampled, so we haven't connected yet!
 Node --> Peer-3: No connection
 ```
 
-To guarantee that a node can discover all peers, each node periodically sends a `GetPeerList` message to a random peer requesting any unknown peers.
+To guarantee that a node can discover all peers, each node periodically sends a `GetPeerList` message to a random peer requesting unknown peers.
 
 ##### PeerList Gossip
 
 ###### Messages
 
-`GetPeerList` messages contain a bloom filter to only include peers that aren't already known about to optimize bandwidth. `GetPeerList` messages are important to guarantee that a node will always and efficiently learn of all peers that should be connected to.
+`GetPeerList` messages contain a bloom filter of already known peers to optimize bandwidth.
 
 A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains networking-level metadata about the peer that provides the necessary information to connect to it.
 
