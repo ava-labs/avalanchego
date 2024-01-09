@@ -629,7 +629,7 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
         if ptr < DiskAddress::from(CompactSpaceHeader::MSIZE as usize) {
             return Err(ShaleError::InvalidAddressLength {
                 expected: DiskAddress::from(CompactSpaceHeader::MSIZE as usize),
-                found: ptr.0.unwrap().get() as u64,
+                found: ptr.0.map(|inner| inner.get()).unwrap_or_default() as u64,
             });
         }
 

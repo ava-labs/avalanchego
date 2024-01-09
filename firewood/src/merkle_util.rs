@@ -64,7 +64,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T: BinarySerde> MerkleSetup<S, T> {
             .map_err(|_err| DataStoreError::GetError)
     }
 
-    pub const fn get_root(&self) -> DiskAddress {
+    pub const fn get_sentinel_address(&self) -> DiskAddress {
         self.root
     }
 
