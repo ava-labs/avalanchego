@@ -471,8 +471,6 @@ func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
 // call. Note that this is from the perspective of a single peer object, because
 // a peer with the same ID can reconnect to this network instance.
 func (n *network) Disconnected(nodeID ids.NodeID) {
-	n.ipTracker.Disconnected(nodeID)
-
 	n.peersLock.RLock()
 	_, connecting := n.connectingPeers.GetByID(nodeID)
 	peer, connected := n.connectedPeers.GetByID(nodeID)
@@ -790,6 +788,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 }
 
 func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
+	n.ipTracker.Disconnected(nodeID)
 	n.router.Disconnected(nodeID)
 
 	n.peersLock.Lock()
