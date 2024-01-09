@@ -108,17 +108,17 @@ To guarantee that a node can discover all peers, each node periodically sends a 
 
 A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains signed networking-level metadata about the peer that provides the necessary information to connect to it.
 
-Once peer metadata is received, the node will add that data to its bloom filter to prevent learning about this data again.
+Once peer metadata is received, the node will add that data to its bloom filter to prevent learning about it again.
 
 ###### Gossip
 
 Handshake messages provide a node with some knowledge of peers in the network, but offers no guarantee that learning about a subset of peers from each peer the node connects with will result in the node learning about every peer in the network.
 
-In order to provide an eventual guarantee that all peers in the network learn of one another, each node periodically requests that another peer sends peer data that is not currently known. Over time, this guarantees that every peer will eventually learn of every other peer.
+To provide an eventual guarantee that all peers learn of one another, each node periodically requests new peer from a random peer.
 
-To optimize bandwidth, each node attempts to track the latest IPs of validators. The validator's nodeID and timestamp are inserted into a bloom filter which is used to avoid unnecessary gossip.
+To optimize bandwidth, each node tracks the most recent IPs of validators. The validator's nodeID and timestamp are inserted into a bloom filter which is used to select only necessary IPs to gossip.
 
-To prevent the bloom filter from having too many false positives, the number of entries a validator is allowed to have in the bloom filter is capped. Periodically, a new bloom filter is generated. Generating the new bloom filter both removes stale entires and modifies the hash functions to avoid persistent hash collisions.
+To prevent the bloom filter from having too many false positives, the number of entries a validator is allowed to have in the bloom filter is capped. Periodically, a new bloom filter is generated. Generating the new bloom filter both removes stale entries and modifies the hash functions to avoid persistent hash collisions.
 
 A node follows the following steps for of `PeerList` gossip:
 
