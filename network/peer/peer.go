@@ -97,8 +97,8 @@ type Peer interface {
 	StartSendPeerList()
 
 	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
-	// on this peer's gossip routine. It is not guaranteed that a PeerList will
-	// be sent.
+	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
+	// will be sent.
 	StartSendGetPeerList()
 
 	// StartClose will begin shutting down the peer. It will not block.
