@@ -18,7 +18,7 @@ use crate::{
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
 };
 
-use super::{BinarySerde, NodeObjRef, TRIE_HASH_LEN};
+use super::{BinarySerde, NodeObjRef};
 
 #[derive(Debug, Error)]
 pub enum ProofError {
@@ -102,7 +102,7 @@ pub struct Proof<N>(pub HashMap<HashKey, N>);
 #[derive(Debug)]
 enum SubProof {
     Data(Vec<u8>),
-    Hash([u8; TRIE_HASH_LEN]),
+    Hash(HashKey),
 }
 
 impl<N: AsRef<[u8]> + Send> Proof<N> {
@@ -114,7 +114,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     pub fn verify<K: AsRef<[u8]>>(
         &self,
         key: K,
-        root_hash: [u8; 32],
+        root_hash: HashKey,
     ) -> Result<Option<Vec<u8>>, ProofError> {
         let mut key_nibbles = Nibbles::<0>::new(key.as_ref()).into_iter();
 
@@ -147,7 +147,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
     pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
         &self,
-        root_hash: [u8; 32],
+        root_hash: HashKey,
         first_key: K,
         last_key: K,
         keys: Vec<K>,
@@ -262,7 +262,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     fn proof_to_path<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySerde>(
         &self,
         key: K,
-        root_hash: [u8; 32],
+        root_hash: HashKey,
         merkle_setup: &mut MerkleSetup<S, T>,
         allow_non_existent_node: bool,
     ) -> Result<Option<Vec<u8>>, ProofError> {
@@ -391,8 +391,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
 fn decode_subproof<'a, S: ShaleStore<Node>, T, N: AsRef<[u8]>>(
     merkle: &'a Merkle<S, T>,
-    proofs_map: &HashMap<[u8; 32], N>,
-    child_hash: &[u8; 32],
+    proofs_map: &HashMap<HashKey, N>,
+    child_hash: &HashKey,
 ) -> Result<NodeObjRef<'a>, ProofError> {
     let child_proof = proofs_map
         .get(child_hash)
@@ -459,7 +459,7 @@ fn locate_subproof(
     }
 }
 
-fn generate_subproof_hash(encoded: &[u8]) -> Result<[u8; 32], ProofError> {
+fn generate_subproof_hash(encoded: &[u8]) -> Result<HashKey, ProofError> {
     match encoded.len() {
         0..=31 => {
             let sub_hash = sha3::Keccak256::digest(encoded).into();
