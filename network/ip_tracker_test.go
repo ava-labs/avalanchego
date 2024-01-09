@@ -739,5 +739,4 @@ func TestIPTracker_ShouldVerifyIP(t *testing.T) {
 	require.True(tracker.AddIP(ip))
 	require.False(tracker.ShouldVerifyIP(ip))
 	require.True(tracker.ShouldVerifyIP(newerIP))
-
 }
