@@ -6,7 +6,6 @@ package bloom
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 )
 
 var (
@@ -22,7 +21,7 @@ var (
 
 func init() {
 	for i := range FullFilter.entries {
-		FullFilter.entries[i] = math.MaxUint8
+		FullFilter.entries[i] = 0xFF
 	}
 }
 
