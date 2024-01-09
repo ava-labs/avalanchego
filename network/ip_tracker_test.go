@@ -23,12 +23,8 @@ var (
 
 func init() {
 	{
-		cert, err := staking.NewTLSCert()
-		if err != nil {
-			panic(err)
-		}
 		ip = &ips.ClaimedIPPort{
-			Cert: staking.CertificateFromX509(cert.Leaf),
+			Cert: staking.CertificateFromX509(tlsCerts[0].Leaf),
 			IPPort: ips.IPPort{
 				IP:   net.IPv4(127, 0, 0, 1),
 				Port: 9651,
@@ -38,12 +34,8 @@ func init() {
 	}
 
 	{
-		cert, err := staking.NewTLSCert()
-		if err != nil {
-			panic(err)
-		}
 		otherIP = &ips.ClaimedIPPort{
-			Cert: staking.CertificateFromX509(cert.Leaf),
+			Cert: staking.CertificateFromX509(tlsCerts[1].Leaf),
 			IPPort: ips.IPPort{
 				IP:   net.IPv4(127, 0, 0, 1),
 				Port: 9651,
