@@ -4,11 +4,14 @@
 package network
 
 import (
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -31,7 +34,19 @@ func requireEqual(t *testing.T, expected, actual *ipTracker) {
 }
 
 func TestIPTracker_ManuallyTrack(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+	cert := staking.CertificateFromX509(tlsCert.Leaf)
+
+	ip := &ips.ClaimedIPPort{
+		Cert: cert,
+		IPPort: ips.IPPort{
+			IP:   net.IPv4(127, 0, 0, 1),
+			Port: 9651,
+		},
+		Timestamp: 1,
+	}
+	nodeID := ip.NodeID()
 	tests := []struct {
 		name          string
 		initialState  *ipTracker
@@ -44,8 +59,62 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 			nodeID:       nodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.manuallyTracked.Add(nodeID)
 				tracker.validators.Add(nodeID)
+				tracker.manuallyTracked.Add(nodeID)
+				return tracker
+			}(),
+		},
+		{
+			name: "connected non-validator",
+			initialState: func() *ipTracker {
+				tracker := newTestIPTracker(t)
+				tracker.Connected(ip)
+				return tracker
+			}(),
+			nodeID: nodeID,
+			expectedState: func() *ipTracker {
+				tracker := newTestIPTracker(t)
+				tracker.Connected(ip)
+				tracker.mostRecentValidatorIPs[nodeID] = ip
+				tracker.bloomAdditions[nodeID] = 1
+				tracker.gossipableIndicies[nodeID] = 0
+				tracker.gossipableIPs = []*ips.ClaimedIPPort{
+					ip,
+				}
+				tracker.validators.Add(nodeID)
+				tracker.manuallyTracked.Add(nodeID)
+				return tracker
+			}(),
+		},
+		{
+			name: "non-connected validator",
+			initialState: func() *ipTracker {
+				tracker := newTestIPTracker(t)
+				tracker.onValidatorAdded(nodeID)
+				return tracker
+			}(),
+			nodeID: nodeID,
+			expectedState: func() *ipTracker {
+				tracker := newTestIPTracker(t)
+				tracker.onValidatorAdded(nodeID)
+				tracker.manuallyTracked.Add(nodeID)
+				return tracker
+			}(),
+		},
+		{
+			name: "connected validator",
+			initialState: func() *ipTracker {
+				tracker := newTestIPTracker(t)
+				tracker.Connected(ip)
+				tracker.onValidatorAdded(nodeID)
+				return tracker
+			}(),
+			nodeID: nodeID,
+			expectedState: func() *ipTracker {
+				tracker := newTestIPTracker(t)
+				tracker.Connected(ip)
+				tracker.onValidatorAdded(nodeID)
+				tracker.manuallyTracked.Add(nodeID)
 				return tracker
 			}(),
 		},
