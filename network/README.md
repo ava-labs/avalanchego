@@ -127,15 +127,15 @@ sequenceDiagram
 Note left of Node: Initialize bloom filter
 Note left of Node: Bloom: [0, 0, 0]
 Node->>Peer-123: GetPeerList [0, 0, 0]
-Note right of Peer-123: Any peers could be sent
+Note right of Peer-123: Any peers can be sent.
 Peer-123->>Node: PeerList - Peer-1
 Note left of Node: Bloom: [1, 0, 0]
 Node->>Peer-123: GetPeerList [1, 0, 0]
-Note right of Peer-123: Either Peer-2 or Peer-3 could be sent
+Note right of Peer-123: Either Peer-2 or Peer-3 can be sent.
 Peer-123->>Node: PeerList - Peer-3
 Note left of Node: Bloom: [1, 0, 1]
 Node->>Peer-123: GetPeerList [1, 0, 1]
-Note right of Peer-123: Only Peer-2 cand be sent
+Note right of Peer-123: Only Peer-2 can be sent.
 Peer-123->>Node: PeerList - Peer-2
 Note left of Node: Bloom: [1, 1, 1]
 Node->>Peer-123: GetPeerList [1, 1, 1]
