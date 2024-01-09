@@ -46,7 +46,7 @@ When starting an Avalanche node, a node needs to be able to initiate some proces
 In Avalanche, nodes connect to an initial set of bootstrapper nodes known as **beacons** (this is user-configurable). Once connected to a set of beacons, a node is able to discover other nodes in the network. Over time, a node eventually discovers other peers in the network through `PeerList` messages it receives through:
 
 - The handshake initiated between two peers when attempting to connect to a peer (see [Connecting](#connecting)).
-- Periodicly sending `GetPeerList` messages that request a `PeerList` response containing unknown peers (see [Connected](#connected)).
+- Responses to periodicly sent `GetPeerList` messages requesting a `PeerList` containing unknown peers (see [Connected](#connected)).
 
 #### Connecting
 
