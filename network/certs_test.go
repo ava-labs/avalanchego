@@ -6,8 +6,11 @@ package network
 import (
 	"crypto/tls"
 	"sync"
+	"testing"
 
 	_ "embed"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -51,15 +54,13 @@ func init() {
 	}
 }
 
-func getTLS(index int) (ids.NodeID, *tls.Certificate, *tls.Config) {
+func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config) {
 	certLock.Lock()
 	defer certLock.Unlock()
 
 	for len(tlsCerts) <= index {
 		cert, err := staking.NewTLSCert()
-		if err != nil {
-			panic(err)
-		}
+		require.NoError(t, err)
 		tlsCerts = append(tlsCerts, cert)
 	}
 	for len(tlsConfigs) <= index {
