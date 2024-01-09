@@ -94,16 +94,14 @@ func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 }
 
 func (i *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
-	nodeID := ip.NodeID()
-
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	if !i.validators.Contains(nodeID) {
+	if !i.validators.Contains(ip.NodeID) {
 		return false
 	}
 
-	prevIP, ok := i.mostRecentValidatorIPs[nodeID]
+	prevIP, ok := i.mostRecentValidatorIPs[ip.NodeID]
 	return !ok || // This would be the first IP
 		prevIP.Timestamp < ip.Timestamp // This would be a newer IP
 }
@@ -111,20 +109,18 @@ func (i *ipTracker) ShouldVerifyIP(ip *ips.ClaimedIPPort) bool {
 // AddIP returns true if the addition of the provided IP updated the most
 // recently known IP of a validator.
 func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
-	nodeID := ip.NodeID()
-
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	if !i.validators.Contains(nodeID) {
+	if !i.validators.Contains(ip.NodeID) {
 		return false
 	}
 
-	prevIP, ok := i.mostRecentValidatorIPs[nodeID]
+	prevIP, ok := i.mostRecentValidatorIPs[ip.NodeID]
 	if !ok {
 		// This is the first IP we've heard from the validator, so it is the
 		// most recent.
-		i.updateMostRecentValidatorIP(nodeID, ip)
+		i.updateMostRecentValidatorIP(ip)
 		// Because we didn't previously have an IP, we know we aren't currently
 		// connected to them.
 		return true
@@ -135,8 +131,8 @@ func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 		return false
 	}
 
-	i.updateMostRecentValidatorIP(nodeID, ip)
-	i.removeGossipableIP(nodeID)
+	i.updateMostRecentValidatorIP(ip)
+	i.removeGossipableIP(ip.NodeID)
 	return true
 }
 
@@ -149,22 +145,20 @@ func (i *ipTracker) GetIP(nodeID ids.NodeID) (*ips.ClaimedIPPort, bool) {
 }
 
 func (i *ipTracker) Connected(ip *ips.ClaimedIPPort) {
-	nodeID := ip.NodeID()
-
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	i.connected[nodeID] = ip
-	if !i.validators.Contains(nodeID) {
+	i.connected[ip.NodeID] = ip
+	if !i.validators.Contains(ip.NodeID) {
 		return
 	}
 
-	prevIP, ok := i.mostRecentValidatorIPs[nodeID]
+	prevIP, ok := i.mostRecentValidatorIPs[ip.NodeID]
 	if !ok {
 		// This is the first IP we've heard from the validator, so it is the
 		// most recent.
-		i.updateMostRecentValidatorIP(nodeID, ip)
-		i.addGossipableIP(nodeID, ip)
+		i.updateMostRecentValidatorIP(ip)
+		i.addGossipableIP(ip)
 		return
 	}
 
@@ -174,9 +168,9 @@ func (i *ipTracker) Connected(ip *ips.ClaimedIPPort) {
 	}
 
 	if prevIP.Timestamp < ip.Timestamp {
-		i.updateMostRecentValidatorIP(nodeID, ip)
+		i.updateMostRecentValidatorIP(ip)
 	}
-	i.addGossipableIP(nodeID, ip)
+	i.addGossipableIP(ip)
 }
 
 func (i *ipTracker) Disconnected(nodeID ids.NodeID) {
@@ -207,8 +201,8 @@ func (i *ipTracker) onValidatorAdded(nodeID ids.NodeID) {
 
 	// Because we only track validator IPs, the from the connection is
 	// guaranteed to be the most up-to-date IP that we know.
-	i.updateMostRecentValidatorIP(nodeID, ip)
-	i.addGossipableIP(nodeID, ip)
+	i.updateMostRecentValidatorIP(ip)
+	i.addGossipableIP(ip)
 }
 
 func (*ipTracker) OnValidatorWeightChanged(ids.NodeID, uint64, uint64) {}
@@ -226,9 +220,9 @@ func (i *ipTracker) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	i.removeGossipableIP(nodeID)
 }
 
-func (i *ipTracker) updateMostRecentValidatorIP(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
-	i.mostRecentValidatorIPs[nodeID] = ip
-	oldCount := i.bloomAdditions[nodeID]
+func (i *ipTracker) updateMostRecentValidatorIP(ip *ips.ClaimedIPPort) {
+	i.mostRecentValidatorIPs[ip.NodeID] = ip
+	oldCount := i.bloomAdditions[ip.NodeID]
 	if oldCount >= maxIPEntriesPerValidator {
 		return
 	}
@@ -250,13 +244,12 @@ func (i *ipTracker) updateMostRecentValidatorIP(nodeID ids.NodeID, ip *ips.Claim
 		return
 	}
 
-	i.bloomAdditions[nodeID] = oldCount + 1
-	gossipID := ip.GossipID()
-	bloom.Add(i.bloom, gossipID[:], i.bloomSalt)
+	i.bloomAdditions[ip.NodeID] = oldCount + 1
+	bloom.Add(i.bloom, ip.GossipID[:], i.bloomSalt)
 }
 
-func (i *ipTracker) addGossipableIP(nodeID ids.NodeID, ip *ips.ClaimedIPPort) {
-	i.gossipableIndicies[nodeID] = len(i.gossipableIPs)
+func (i *ipTracker) addGossipableIP(ip *ips.ClaimedIPPort) {
+	i.gossipableIndicies[ip.NodeID] = len(i.gossipableIPs)
 	i.gossipableIPs = append(i.gossipableIPs, ip)
 }
 
@@ -269,8 +262,7 @@ func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 	newNumGossipable := len(i.gossipableIPs) - 1
 	if newNumGossipable != indexToRemove {
 		replacementIP := i.gossipableIPs[newNumGossipable]
-		replacementNodeID := replacementIP.NodeID()
-		i.gossipableIndicies[replacementNodeID] = indexToRemove
+		i.gossipableIndicies[replacementIP.NodeID] = indexToRemove
 		i.gossipableIPs[indexToRemove] = replacementIP
 	}
 
@@ -305,13 +297,11 @@ func (i *ipTracker) GetGossipableIPs(
 		}
 
 		ip := i.gossipableIPs[index]
-		nodeID := ip.NodeID()
-		if nodeID == exceptNodeID {
+		if ip.NodeID == exceptNodeID {
 			continue
 		}
 
-		gossipID := ip.GossipID()
-		if !bloom.Contains(exceptIPs, gossipID[:], salt) {
+		if !bloom.Contains(exceptIPs, ip.GossipID[:], salt) {
 			ips = append(ips, ip)
 		}
 	}
@@ -363,8 +353,7 @@ func (i *ipTracker) resetBloom() error {
 	i.maxBloomCount = bloom.EstimateCount(numHashes, numEntries, maxFalsePositiveProbability)
 
 	for nodeID, ip := range i.mostRecentValidatorIPs {
-		gossipID := ip.GossipID()
-		bloom.Add(newFilter, gossipID[:], newSalt)
+		bloom.Add(newFilter, ip.GossipID[:], newSalt)
 		i.bloomAdditions[nodeID] = 1
 	}
 	return nil

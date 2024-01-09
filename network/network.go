@@ -427,12 +427,12 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.peersLock.Unlock()
 
 	peerIP := peer.IP()
-	newIP := &ips.ClaimedIPPort{
-		Cert:      peer.Cert(),
-		IPPort:    peerIP.IPPort,
-		Timestamp: peerIP.Timestamp,
-		Signature: peerIP.Signature,
-	}
+	newIP := ips.NewClaimedIPPort(
+		peer.Cert(),
+		peerIP.IPPort,
+		peerIP.Timestamp,
+		peerIP.Signature,
+	)
 	n.ipTracker.Connected(newIP)
 
 	n.metrics.markConnected(peer)
@@ -606,7 +606,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 	// Note: Avoiding signature verification when the IP isn't needed is a
 	// **significant** performance optimization.
 	if !n.ipTracker.ShouldVerifyIP(ip) {
-		n.metrics.numUselessPeerListBytes.Add(float64(ip.BytesLen()))
+		n.metrics.numUselessPeerListBytes.Add(float64(ip.Size()))
 		return nil
 	}
 
@@ -623,8 +623,6 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 		return err
 	}
 
-	nodeID := ip.NodeID()
-
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
@@ -632,21 +630,21 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 		return nil
 	}
 
-	if _, connected := n.connectedPeers.GetByID(nodeID); connected {
+	if _, connected := n.connectedPeers.GetByID(ip.NodeID); connected {
 		// If I'm currently connected to [nodeID] then I'll attempt to dial them
 		// when we disconnect.
 		return nil
 	}
 
-	tracked, isTracked := n.trackedIPs[nodeID]
+	tracked, isTracked := n.trackedIPs[ip.NodeID]
 	if isTracked {
 		// Stop tracking the old IP and start tracking the new one.
 		tracked = tracked.trackNewIP(ip.IPPort)
 	} else {
 		tracked = newTrackedIP(ip.IPPort)
 	}
-	n.trackedIPs[nodeID] = tracked
-	n.dial(nodeID, tracked)
+	n.trackedIPs[ip.NodeID] = tracked
+	n.dial(ip.NodeID, tracked)
 	return nil
 }
 

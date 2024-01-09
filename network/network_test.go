@@ -396,15 +396,17 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	nodeID, tlsCert, _ := getTLS(t, 1)
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
-	err := network.Track([]*ips.ClaimedIPPort{{
-		Cert: staking.CertificateFromX509(tlsCert.Leaf),
-		IPPort: ips.IPPort{
-			IP:   net.IPv4(123, 132, 123, 123),
-			Port: 10000,
-		},
-		Timestamp: 1000,
-		Signature: nil,
-	}})
+	err := network.Track([]*ips.ClaimedIPPort{
+		ips.NewClaimedIPPort(
+			staking.CertificateFromX509(tlsCert.Leaf),
+			ips.IPPort{
+				IP:   net.IPv4(123, 132, 123, 123),
+				Port: 10000,
+			},
+			1000, // timestamp
+			nil,  // signature
+		),
+	})
 	// The signature is wrong so this peer tracking info isn't useful.
 	require.ErrorIs(err, rsa.ErrVerification)
 
@@ -549,12 +551,14 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	wg.Add(len(networks))
 	for i, net := range networks {
 		if i != 0 {
-			err := net.Track([]*ips.ClaimedIPPort{{
-				Cert:      staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
-				IPPort:    ip.IPPort,
-				Timestamp: ip.Timestamp,
-				Signature: ip.Signature,
-			}})
+			err := net.Track([]*ips.ClaimedIPPort{
+				ips.NewClaimedIPPort(
+					staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
+					ip.IPPort,
+					ip.Timestamp,
+					ip.Signature,
+				),
+			})
 			require.NoError(err)
 		}
 

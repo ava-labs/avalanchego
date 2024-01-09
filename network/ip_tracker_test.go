@@ -22,27 +22,24 @@ var (
 )
 
 func init() {
-	{
-		ip = &ips.ClaimedIPPort{
-			Cert: staking.CertificateFromX509(tlsCerts[0].Leaf),
-			IPPort: ips.IPPort{
-				IP:   net.IPv4(127, 0, 0, 1),
-				Port: 9651,
-			},
-			Timestamp: 1,
-		}
-	}
-
-	{
-		otherIP = &ips.ClaimedIPPort{
-			Cert: staking.CertificateFromX509(tlsCerts[1].Leaf),
-			IPPort: ips.IPPort{
-				IP:   net.IPv4(127, 0, 0, 1),
-				Port: 9651,
-			},
-			Timestamp: 1,
-		}
-	}
+	ip = ips.NewClaimedIPPort(
+		staking.CertificateFromX509(tlsCerts[0].Leaf),
+		ips.IPPort{
+			IP:   net.IPv4(127, 0, 0, 1),
+			Port: 9651,
+		},
+		1,   // timestamp
+		nil, // signature
+	)
+	otherIP = ips.NewClaimedIPPort(
+		staking.CertificateFromX509(tlsCerts[1].Leaf),
+		ips.IPPort{
+			IP:   net.IPv4(127, 0, 0, 1),
+			Port: 9651,
+		},
+		1,   // timestamp
+		nil, // signature
+	)
 }
 
 func newTestIPTracker(t *testing.T) *ipTracker {
@@ -52,11 +49,12 @@ func newTestIPTracker(t *testing.T) *ipTracker {
 }
 
 func newerTestIP(ip *ips.ClaimedIPPort) *ips.ClaimedIPPort {
-	return &ips.ClaimedIPPort{
-		Cert:      ip.Cert,
-		IPPort:    ip.IPPort,
-		Timestamp: ip.Timestamp + 1,
-	}
+	return ips.NewClaimedIPPort(
+		ip.Cert,
+		ip.IPPort,
+		ip.Timestamp+1,
+		ip.Signature,
+	)
 }
 
 func requireEqual(t *testing.T, expected, actual *ipTracker) {
@@ -72,7 +70,6 @@ func requireEqual(t *testing.T, expected, actual *ipTracker) {
 }
 
 func TestIPTracker_ManuallyTrack(t *testing.T) {
-	nodeID := ip.NodeID()
 	tests := []struct {
 		name          string
 		initialState  *ipTracker
@@ -82,11 +79,11 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 		{
 			name:         "non-connected non-validator",
 			initialState: newTestIPTracker(t),
-			nodeID:       nodeID,
+			nodeID:       ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.validators.Add(nodeID)
-				tracker.manuallyTracked.Add(nodeID)
+				tracker.validators.Add(ip.NodeID)
+				tracker.manuallyTracked.Add(ip.NodeID)
 				return tracker
 			}(),
 		},
@@ -97,18 +94,18 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 				tracker.Connected(ip)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
 				tracker.Connected(ip)
-				tracker.mostRecentValidatorIPs[nodeID] = ip
-				tracker.bloomAdditions[nodeID] = 1
-				tracker.gossipableIndicies[nodeID] = 0
+				tracker.mostRecentValidatorIPs[ip.NodeID] = ip
+				tracker.bloomAdditions[ip.NodeID] = 1
+				tracker.gossipableIndicies[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
-				tracker.validators.Add(nodeID)
-				tracker.manuallyTracked.Add(nodeID)
+				tracker.validators.Add(ip.NodeID)
+				tracker.manuallyTracked.Add(ip.NodeID)
 				return tracker
 			}(),
 		},
@@ -116,14 +113,14 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 			name: "non-connected validator",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
-				tracker.manuallyTracked.Add(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
+				tracker.manuallyTracked.Add(ip.NodeID)
 				return tracker
 			}(),
 		},
@@ -132,15 +129,15 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
 				tracker.Connected(ip)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
 				tracker.Connected(ip)
-				tracker.onValidatorAdded(nodeID)
-				tracker.manuallyTracked.Add(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
+				tracker.manuallyTracked.Add(ip.NodeID)
 				return tracker
 			}(),
 		},
@@ -154,7 +151,6 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 }
 
 func TestIPTracker_AddIP(t *testing.T) {
-	nodeID := ip.NodeID()
 	newerIP := newerTestIP(ip)
 	tests := []struct {
 		name            string
@@ -174,16 +170,16 @@ func TestIPTracker_AddIP(t *testing.T) {
 			name: "first known IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				return tracker
 			}(),
 			ip:              ip,
 			expectedUpdated: true,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
-				tracker.mostRecentValidatorIPs[nodeID] = ip
-				tracker.bloomAdditions[nodeID] = 1
+				tracker.onValidatorAdded(ip.NodeID)
+				tracker.mostRecentValidatorIPs[ip.NodeID] = ip
+				tracker.bloomAdditions[ip.NodeID] = 1
 				return tracker
 			}(),
 		},
@@ -191,7 +187,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 			name: "older IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(newerIP.NodeID)
 				require.True(t, tracker.AddIP(newerIP))
 				return tracker
 			}(),
@@ -199,7 +195,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 			expectedUpdated: false,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(newerIP.NodeID)
 				require.True(t, tracker.AddIP(newerIP))
 				return tracker
 			}(),
@@ -208,7 +204,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 			name: "same IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
 				return tracker
 			}(),
@@ -216,7 +212,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 			expectedUpdated: false,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
 				return tracker
 			}(),
@@ -225,7 +221,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 			name: "disconnected newer IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
 				return tracker
 			}(),
@@ -233,10 +229,10 @@ func TestIPTracker_AddIP(t *testing.T) {
 			expectedUpdated: true,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
-				tracker.mostRecentValidatorIPs[nodeID] = newerIP
-				tracker.bloomAdditions[nodeID] = 2
+				tracker.mostRecentValidatorIPs[newerIP.NodeID] = newerIP
+				tracker.bloomAdditions[newerIP.NodeID] = 2
 				return tracker
 			}(),
 		},
@@ -244,7 +240,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 			name: "connected newer IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
 				return tracker
 			}(),
@@ -252,11 +248,11 @@ func TestIPTracker_AddIP(t *testing.T) {
 			expectedUpdated: true,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
-				tracker.mostRecentValidatorIPs[nodeID] = newerIP
-				tracker.bloomAdditions[nodeID] = 2
-				delete(tracker.gossipableIndicies, nodeID)
+				tracker.mostRecentValidatorIPs[newerIP.NodeID] = newerIP
+				tracker.bloomAdditions[newerIP.NodeID] = 2
+				delete(tracker.gossipableIndicies, newerIP.NodeID)
 				tracker.gossipableIPs = tracker.gossipableIPs[:0]
 				return tracker
 			}(),
@@ -272,7 +268,6 @@ func TestIPTracker_AddIP(t *testing.T) {
 }
 
 func TestIPTracker_Connected(t *testing.T) {
-	nodeID := ip.NodeID()
 	newerIP := newerTestIP(ip)
 	tests := []struct {
 		name          string
@@ -286,7 +281,7 @@ func TestIPTracker_Connected(t *testing.T) {
 			ip:           ip,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.connected[nodeID] = ip
+				tracker.connected[ip.NodeID] = ip
 				return tracker
 			}(),
 		},
@@ -294,17 +289,17 @@ func TestIPTracker_Connected(t *testing.T) {
 			name: "first known IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				return tracker
 			}(),
 			ip: ip,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
-				tracker.connected[nodeID] = ip
-				tracker.mostRecentValidatorIPs[nodeID] = ip
-				tracker.bloomAdditions[nodeID] = 1
-				tracker.gossipableIndicies[nodeID] = 0
+				tracker.onValidatorAdded(ip.NodeID)
+				tracker.connected[ip.NodeID] = ip
+				tracker.mostRecentValidatorIPs[ip.NodeID] = ip
+				tracker.bloomAdditions[ip.NodeID] = 1
+				tracker.gossipableIndicies[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
@@ -315,16 +310,16 @@ func TestIPTracker_Connected(t *testing.T) {
 			name: "connected with older IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(newerIP.NodeID)
 				require.True(t, tracker.AddIP(newerIP))
 				return tracker
 			}(),
 			ip: ip,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(newerIP.NodeID)
 				require.True(t, tracker.AddIP(newerIP))
-				tracker.connected[nodeID] = ip
+				tracker.connected[ip.NodeID] = ip
 				return tracker
 			}(),
 		},
@@ -332,19 +327,19 @@ func TestIPTracker_Connected(t *testing.T) {
 			name: "connected with newer IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
 				return tracker
 			}(),
 			ip: newerIP,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
-				tracker.connected[nodeID] = newerIP
-				tracker.mostRecentValidatorIPs[nodeID] = newerIP
-				tracker.bloomAdditions[nodeID] = 2
-				tracker.gossipableIndicies[nodeID] = 0
+				tracker.connected[newerIP.NodeID] = newerIP
+				tracker.mostRecentValidatorIPs[newerIP.NodeID] = newerIP
+				tracker.bloomAdditions[newerIP.NodeID] = 2
+				tracker.gossipableIndicies[newerIP.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					newerIP,
 				}
@@ -355,17 +350,17 @@ func TestIPTracker_Connected(t *testing.T) {
 			name: "connected with same IP",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
 				return tracker
 			}(),
 			ip: ip,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
-				tracker.connected[nodeID] = ip
-				tracker.gossipableIndicies[nodeID] = 0
+				tracker.connected[ip.NodeID] = ip
+				tracker.gossipableIndicies[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
@@ -382,8 +377,6 @@ func TestIPTracker_Connected(t *testing.T) {
 }
 
 func TestIPTracker_Disconnected(t *testing.T) {
-	nodeID := ip.NodeID()
-	otherNodeID := otherIP.NodeID()
 	tests := []struct {
 		name          string
 		initialState  *ipTracker
@@ -397,24 +390,24 @@ func TestIPTracker_Disconnected(t *testing.T) {
 				tracker.Connected(ip)
 				return tracker
 			}(),
-			nodeID:        nodeID,
+			nodeID:        ip.NodeID,
 			expectedState: newTestIPTracker(t),
 		},
 		{
 			name: "latest gossipable",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
-				delete(tracker.connected, nodeID)
-				delete(tracker.gossipableIndicies, nodeID)
+				delete(tracker.connected, ip.NodeID)
+				delete(tracker.gossipableIndicies, ip.NodeID)
 				tracker.gossipableIPs = tracker.gossipableIPs[:0]
 				return tracker
 			}(),
@@ -423,22 +416,22 @@ func TestIPTracker_Disconnected(t *testing.T) {
 			name: "non-latest gossipable",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
-				tracker.onValidatorAdded(otherNodeID)
+				tracker.onValidatorAdded(otherIP.NodeID)
 				tracker.Connected(otherIP)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
-				tracker.onValidatorAdded(otherNodeID)
+				tracker.onValidatorAdded(otherIP.NodeID)
 				tracker.Connected(otherIP)
-				delete(tracker.connected, nodeID)
+				delete(tracker.connected, ip.NodeID)
 				tracker.gossipableIndicies = map[ids.NodeID]int{
-					otherNodeID: 0,
+					otherIP.NodeID: 0,
 				}
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					otherIP,
@@ -456,7 +449,6 @@ func TestIPTracker_Disconnected(t *testing.T) {
 }
 
 func TestIPTracker_OnValidatorAdded(t *testing.T) {
-	nodeID := ip.NodeID()
 	tests := []struct {
 		name          string
 		initialState  *ipTracker
@@ -467,23 +459,23 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 			name: "manually tracked",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.ManuallyTrack(nodeID)
+				tracker.ManuallyTrack(ip.NodeID)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.ManuallyTrack(nodeID)
+				tracker.ManuallyTrack(ip.NodeID)
 				return tracker
 			}(),
 		},
 		{
 			name:         "disconnected",
 			initialState: newTestIPTracker(t),
-			nodeID:       nodeID,
+			nodeID:       ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.validators.Add(nodeID)
+				tracker.validators.Add(ip.NodeID)
 				return tracker
 			}(),
 		},
@@ -494,14 +486,14 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 				tracker.Connected(ip)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
 				tracker.Connected(ip)
-				tracker.validators.Add(nodeID)
-				tracker.mostRecentValidatorIPs[nodeID] = ip
-				tracker.bloomAdditions[nodeID] = 1
-				tracker.gossipableIndicies[nodeID] = 0
+				tracker.validators.Add(ip.NodeID)
+				tracker.mostRecentValidatorIPs[ip.NodeID] = ip
+				tracker.bloomAdditions[ip.NodeID] = 1
+				tracker.gossipableIndicies[ip.NodeID] = 0
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					ip,
 				}
@@ -518,8 +510,6 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 }
 
 func TestIPTracker_OnValidatorRemoved(t *testing.T) {
-	nodeID := ip.NodeID()
-	otherNodeID := otherIP.NodeID()
 	tests := []struct {
 		name          string
 		initialState  *ipTracker
@@ -530,16 +520,16 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 			name: "manually tracked",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.ManuallyTrack(nodeID)
-				tracker.onValidatorAdded(nodeID)
+				tracker.ManuallyTrack(ip.NodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.ManuallyTrack(nodeID)
-				tracker.onValidatorAdded(nodeID)
+				tracker.ManuallyTrack(ip.NodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
 				return tracker
 			}(),
@@ -548,17 +538,17 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 			name: "not gossipable",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				require.True(t, tracker.AddIP(ip))
-				delete(tracker.mostRecentValidatorIPs, nodeID)
-				tracker.validators.Remove(nodeID)
+				delete(tracker.mostRecentValidatorIPs, ip.NodeID)
+				tracker.validators.Remove(ip.NodeID)
 				return tracker
 			}(),
 		},
@@ -566,18 +556,18 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 			name: "latest gossipable",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
-				delete(tracker.mostRecentValidatorIPs, nodeID)
-				tracker.validators.Remove(nodeID)
-				delete(tracker.gossipableIndicies, nodeID)
+				delete(tracker.mostRecentValidatorIPs, ip.NodeID)
+				tracker.validators.Remove(ip.NodeID)
+				delete(tracker.gossipableIndicies, ip.NodeID)
 				tracker.gossipableIPs = tracker.gossipableIPs[:0]
 				return tracker
 			}(),
@@ -586,23 +576,23 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 			name: "non-latest gossipable",
 			initialState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
-				tracker.onValidatorAdded(otherNodeID)
+				tracker.onValidatorAdded(otherIP.NodeID)
 				tracker.Connected(otherIP)
 				return tracker
 			}(),
-			nodeID: nodeID,
+			nodeID: ip.NodeID,
 			expectedState: func() *ipTracker {
 				tracker := newTestIPTracker(t)
-				tracker.onValidatorAdded(nodeID)
+				tracker.onValidatorAdded(ip.NodeID)
 				tracker.Connected(ip)
-				tracker.onValidatorAdded(otherNodeID)
+				tracker.onValidatorAdded(otherIP.NodeID)
 				tracker.Connected(otherIP)
-				delete(tracker.mostRecentValidatorIPs, nodeID)
-				tracker.validators.Remove(nodeID)
+				delete(tracker.mostRecentValidatorIPs, ip.NodeID)
+				tracker.validators.Remove(ip.NodeID)
 				tracker.gossipableIndicies = map[ids.NodeID]int{
-					otherNodeID: 0,
+					otherIP.NodeID: 0,
 				}
 				tracker.gossipableIPs = []*ips.ClaimedIPPort{
 					otherIP,
@@ -622,20 +612,16 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 func TestIPTracker_GetGossipableIPs(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ip.NodeID()
-	gossipID := ip.GossipID()
-	otherNodeID := otherIP.NodeID()
-
 	tracker := newTestIPTracker(t)
 	tracker.Connected(ip)
 	tracker.Connected(otherIP)
-	tracker.onValidatorAdded(nodeID)
-	tracker.onValidatorAdded(otherNodeID)
+	tracker.onValidatorAdded(ip.NodeID)
+	tracker.onValidatorAdded(otherIP.NodeID)
 
 	gossipableIPs := tracker.GetGossipableIPs(ids.EmptyNodeID, bloom.EmptyFilter, nil, 2)
 	require.ElementsMatch([]*ips.ClaimedIPPort{ip, otherIP}, gossipableIPs)
 
-	gossipableIPs = tracker.GetGossipableIPs(nodeID, bloom.EmptyFilter, nil, 2)
+	gossipableIPs = tracker.GetGossipableIPs(ip.NodeID, bloom.EmptyFilter, nil, 2)
 	require.Equal([]*ips.ClaimedIPPort{otherIP}, gossipableIPs)
 
 	gossipableIPs = tracker.GetGossipableIPs(ids.EmptyNodeID, bloom.FullFilter, nil, 2)
@@ -643,26 +629,23 @@ func TestIPTracker_GetGossipableIPs(t *testing.T) {
 
 	filter, err := bloom.New(8, 1024)
 	require.NoError(err)
-	bloom.Add(filter, gossipID[:], nil)
+	bloom.Add(filter, ip.GossipID[:], nil)
 
 	readFilter, err := bloom.Parse(filter.Marshal())
 	require.NoError(err)
 
-	gossipableIPs = tracker.GetGossipableIPs(nodeID, readFilter, nil, 2)
+	gossipableIPs = tracker.GetGossipableIPs(ip.NodeID, readFilter, nil, 2)
 	require.Equal([]*ips.ClaimedIPPort{otherIP}, gossipableIPs)
 }
 
 func TestIPTracker_BloomFiltersEverything(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ip.NodeID()
-	otherNodeID := otherIP.NodeID()
-
 	tracker := newTestIPTracker(t)
 	tracker.Connected(ip)
 	tracker.Connected(otherIP)
-	tracker.onValidatorAdded(nodeID)
-	tracker.onValidatorAdded(otherNodeID)
+	tracker.onValidatorAdded(ip.NodeID)
+	tracker.onValidatorAdded(otherIP.NodeID)
 
 	bloomBytes, salt := tracker.Bloom()
 	readFilter, err := bloom.Parse(bloomBytes)
@@ -690,51 +673,44 @@ func TestIPTracker_BloomGrowsWithValidatorSet(t *testing.T) {
 func TestIPTracker_BloomResetsDynamically(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ip.NodeID()
-	gossipID := ip.GossipID()
-	otherNodeID := otherIP.NodeID()
-	otherGossipID := otherIP.GossipID()
-
 	tracker := newTestIPTracker(t)
 	tracker.Connected(ip)
-	tracker.onValidatorAdded(nodeID)
-	tracker.OnValidatorRemoved(nodeID, 0)
+	tracker.onValidatorAdded(ip.NodeID)
+	tracker.OnValidatorRemoved(ip.NodeID, 0)
 	tracker.maxBloomCount = 1
 	tracker.Connected(otherIP)
-	tracker.onValidatorAdded(otherNodeID)
+	tracker.onValidatorAdded(otherIP.NodeID)
 
 	bloomBytes, salt := tracker.Bloom()
 	readFilter, err := bloom.Parse(bloomBytes)
 	require.NoError(err)
 
-	require.True(bloom.Contains(readFilter, otherGossipID[:], salt))
-	require.False(bloom.Contains(readFilter, gossipID[:], salt))
+	require.False(bloom.Contains(readFilter, ip.GossipID[:], salt))
+	require.True(bloom.Contains(readFilter, otherIP.GossipID[:], salt))
 }
 
 func TestIPTracker_PreventBloomFilterAddition(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ip.NodeID()
 	newerIP := newerTestIP(ip)
 	newestIP := newerTestIP(newerIP)
 
 	tracker := newTestIPTracker(t)
-	tracker.onValidatorAdded(nodeID)
+	tracker.onValidatorAdded(ip.NodeID)
 	require.True(tracker.AddIP(ip))
 	require.True(tracker.AddIP(newerIP))
 	require.True(tracker.AddIP(newestIP))
-	require.Equal(maxIPEntriesPerValidator, tracker.bloomAdditions[nodeID])
+	require.Equal(maxIPEntriesPerValidator, tracker.bloomAdditions[ip.NodeID])
 }
 
 func TestIPTracker_ShouldVerifyIP(t *testing.T) {
 	require := require.New(t)
 
-	nodeID := ip.NodeID()
 	newerIP := newerTestIP(ip)
 
 	tracker := newTestIPTracker(t)
 	require.False(tracker.ShouldVerifyIP(ip))
-	tracker.onValidatorAdded(nodeID)
+	tracker.onValidatorAdded(ip.NodeID)
 	require.True(tracker.ShouldVerifyIP(ip))
 	require.True(tracker.AddIP(ip))
 	require.False(tracker.ShouldVerifyIP(ip))

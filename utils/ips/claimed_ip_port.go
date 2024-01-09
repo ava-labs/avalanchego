@@ -4,8 +4,6 @@
 package ips
 
 import (
-	"sync"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -32,34 +30,36 @@ type ClaimedIPPort struct {
 	// actually claimed by the peer in question, and not by a malicious peer
 	// trying to get us to dial bogus IPPorts.
 	Signature []byte
-
-	initOnce sync.Once
-	nodeID   ids.NodeID
-	gossipID ids.ID
+	// NodeID derived from the peer certificate.
+	NodeID ids.NodeID
+	// GossipID derived from the nodeID and timestamp.
+	GossipID ids.ID
 }
 
-func (i *ClaimedIPPort) NodeID() ids.NodeID {
-	i.initOnce.Do(i.init)
-	return i.nodeID
-}
-
-func (i *ClaimedIPPort) GossipID() ids.ID {
-	i.initOnce.Do(i.init)
-	return i.gossipID
-}
-
-// Returns the length of the byte representation of this ClaimedIPPort.
-func (i *ClaimedIPPort) BytesLen() int {
-	return baseIPCertDescLen + len(i.Cert.Raw) + len(i.Signature)
-}
-
-func (i *ClaimedIPPort) init() {
-	i.nodeID = ids.NodeIDFromCert(i.Cert)
+func NewClaimedIPPort(
+	cert *staking.Certificate,
+	ipPort IPPort,
+	timestamp uint64,
+	signature []byte,
+) *ClaimedIPPort {
+	ip := &ClaimedIPPort{
+		Cert:      cert,
+		IPPort:    ipPort,
+		Timestamp: timestamp,
+		Signature: signature,
+		NodeID:    ids.NodeIDFromCert(cert),
+	}
 
 	packer := wrappers.Packer{
 		Bytes: make([]byte, preimageLen),
 	}
-	packer.PackFixedBytes(i.nodeID[:])
-	packer.PackLong(i.Timestamp)
-	i.gossipID = hashing.ComputeHash256Array(packer.Bytes)
+	packer.PackFixedBytes(ip.NodeID[:])
+	packer.PackLong(timestamp)
+	ip.GossipID = hashing.ComputeHash256Array(packer.Bytes)
+	return ip
+}
+
+// Returns the approximate size of the binary representation of this ClaimedIPPort.
+func (i *ClaimedIPPort) Size() int {
+	return baseIPCertDescLen + len(i.Cert.Raw) + len(i.Signature)
 }

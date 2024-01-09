@@ -1204,15 +1204,15 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			return
 		}
 
-		discoveredIPs[i] = &ips.ClaimedIPPort{
-			Cert: tlsCert,
-			IPPort: ips.IPPort{
+		discoveredIPs[i] = ips.NewClaimedIPPort(
+			tlsCert,
+			ips.IPPort{
 				IP:   claimedIPPort.IpAddr,
 				Port: uint16(claimedIPPort.IpPort),
 			},
-			Timestamp: claimedIPPort.Timestamp,
-			Signature: claimedIPPort.Signature,
-		}
+			claimedIPPort.Timestamp,
+			claimedIPPort.Signature,
+		)
 	}
 
 	if err := p.Network.Track(discoveredIPs); err != nil {
