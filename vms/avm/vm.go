@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
@@ -501,8 +502,10 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	}
 
 	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
-		Backend: vm.txBackend,
-		Tx:      tx,
+		Backend:       vm.txBackend,
+		BlkFeeManager: fees.NewManager(vm.Config.DefaultUnitFees),
+		BlkTimestamp:  vm.state.GetTimestamp(),
+		Tx:            tx,
 	})
 	if err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -132,7 +134,10 @@ func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
@@ -233,7 +238,10 @@ func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -520,7 +528,10 @@ func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -620,8 +631,11 @@ func TestForceAcceptImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
-		notLinearized:  true,
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
+		notLinearized: true,
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))

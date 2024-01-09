@@ -1078,6 +1078,7 @@ func (n *Node) initVMs() error {
 	})
 
 	durangoTime := version.GetDurangoTime(n.Config.NetworkID)
+	eForkTime := version.GetEForkTime(n.Config.NetworkID)
 	if err := txs.InitCodec(durangoTime); err != nil {
 		return err
 	}
@@ -1122,7 +1123,7 @@ func (n *Node) initVMs() error {
 				BanffTime:         version.GetBanffTime(n.Config.NetworkID),
 				CortinaTime:       version.GetCortinaTime(n.Config.NetworkID),
 				DurangoTime:       durangoTime,
-				EForkTime:         version.GetEForkTime(n.Config.NetworkID),
+				EForkTime:         eForkTime,
 				UseCurrentHeight:  n.Config.UseCurrentHeight,
 			},
 		}),
@@ -1131,6 +1132,7 @@ func (n *Node) initVMs() error {
 				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 				DurangoTime:      durangoTime,
+				EForkTime:        eForkTime,
 			},
 		}),
 		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),

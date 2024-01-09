@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 )
 
 const (
@@ -47,7 +49,9 @@ var (
 
 type SyntacticVerifier struct {
 	*Backend
-	Tx *txs.Tx
+	BlkFeeManager *fees.Manager
+	BlkTimestamp  time.Time
+	Tx            *txs.Tx
 }
 
 func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
@@ -55,8 +59,18 @@ func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
+	feeCalculator := FeeCalculator{
+		feeManager: v.BlkFeeManager,
+		Config:     v.Config,
+		ChainTime:  v.BlkTimestamp,
+		Tx:         v.Tx,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	err := avax.VerifyTx(
-		v.Config.TxFee,
+		feeCalculator.Fee,
 		v.FeeAssetID,
 		[][]*avax.TransferableInput{tx.Ins},
 		[][]*avax.TransferableOutput{tx.Outs},
@@ -118,8 +132,18 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 		return err
 	}
 
+	feeCalculator := FeeCalculator{
+		feeManager: v.BlkFeeManager,
+		Config:     v.Config,
+		ChainTime:  v.BlkTimestamp,
+		Tx:         v.Tx,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	err := avax.VerifyTx(
-		v.Config.CreateAssetTxFee,
+		feeCalculator.Fee,
 		v.FeeAssetID,
 		[][]*avax.TransferableInput{tx.Ins},
 		[][]*avax.TransferableOutput{tx.Outs},
@@ -166,8 +190,18 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 		return err
 	}
 
+	feeCalculator := FeeCalculator{
+		feeManager: v.BlkFeeManager,
+		Config:     v.Config,
+		ChainTime:  v.BlkTimestamp,
+		Tx:         v.Tx,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	err := avax.VerifyTx(
-		v.Config.TxFee,
+		feeCalculator.Fee,
 		v.FeeAssetID,
 		[][]*avax.TransferableInput{tx.Ins},
 		[][]*avax.TransferableOutput{tx.Outs},
@@ -226,8 +260,18 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
+	feeCalculator := FeeCalculator{
+		feeManager: v.BlkFeeManager,
+		Config:     v.Config,
+		ChainTime:  v.BlkTimestamp,
+		Tx:         v.Tx,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	err := avax.VerifyTx(
-		v.Config.TxFee,
+		feeCalculator.Fee,
 		v.FeeAssetID,
 		[][]*avax.TransferableInput{
 			tx.Ins,
@@ -268,8 +312,18 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
+	feeCalculator := FeeCalculator{
+		feeManager: v.BlkFeeManager,
+		Config:     v.Config,
+		ChainTime:  v.BlkTimestamp,
+		Tx:         v.Tx,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	err := avax.VerifyTx(
-		v.Config.TxFee,
+		feeCalculator.Fee,
 		v.FeeAssetID,
 		[][]*avax.TransferableInput{tx.Ins},
 		[][]*avax.TransferableOutput{
