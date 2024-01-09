@@ -106,9 +106,9 @@ To guarantee that a node can discover all peers, each node periodically sends a 
 
 `GetPeerList` messages contain a bloom filter of already known peers to optimize bandwidth.
 
-A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains networking-level metadata about the peer that provides the necessary information to connect to it.
+A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains signed networking-level metadata about the peer that provides the necessary information to connect to it.
 
-Once peer data is received from a peer, the receiving node will add that data to its bloom filter to prevent learning about this data again in the future unnecessarily.
+Once peer metadata is received, the node will add that data to its bloom filter to prevent learning about this data again.
 
 ###### Gossip
 
