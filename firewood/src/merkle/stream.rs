@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{node::Node, BranchNode, Merkle, NodeType, ObjRef};
+use super::{node::Node, BranchNode, Merkle, NodeObjRef, NodeType};
 use crate::{
     shale::{DiskAddress, ShaleStore},
     v2::api,
@@ -18,7 +18,7 @@ enum IteratorState<'a> {
     StartAtKey(Key),
     /// Continue iterating after the last node in the `visited_node_path`
     Iterating {
-        visited_node_path: Vec<(ObjRef<'a>, u8)>,
+        visited_node_path: Vec<(NodeObjRef<'a>, u8)>,
     },
 }
 
@@ -160,8 +160,8 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
 }
 
 enum NodeRef<'a> {
-    New(ObjRef<'a>),
-    Visited(ObjRef<'a>),
+    New(NodeObjRef<'a>),
+    Visited(NodeObjRef<'a>),
 }
 
 #[derive(Debug)]
@@ -178,7 +178,7 @@ impl<'a> NodeRef<'a> {
         }
     }
 
-    fn into_node(self) -> ObjRef<'a> {
+    fn into_node(self) -> NodeObjRef<'a> {
         match self {
             Self::New(node) => node,
             Self::Visited(node) => node,
@@ -188,7 +188,7 @@ impl<'a> NodeRef<'a> {
 
 fn find_next_result<'a, S: ShaleStore<Node>, T>(
     merkle: &'a Merkle<S, T>,
-    visited_path: &mut Vec<(ObjRef<'a>, u8)>,
+    visited_path: &mut Vec<(NodeObjRef<'a>, u8)>,
 ) -> Result<Option<(Key, Value)>, super::MerkleError> {
     let next = find_next_node_with_data(merkle, visited_path)?.map(|(next_node, value)| {
         let partial_path = match next_node.inner() {
@@ -209,8 +209,8 @@ fn find_next_result<'a, S: ShaleStore<Node>, T>(
 
 fn find_next_node_with_data<'a, S: ShaleStore<Node>, T>(
     merkle: &'a Merkle<S, T>,
-    visited_path: &mut Vec<(ObjRef<'a>, u8)>,
-) -> Result<Option<(ObjRef<'a>, Vec<u8>)>, super::MerkleError> {
+    visited_path: &mut Vec<(NodeObjRef<'a>, u8)>,
+) -> Result<Option<(NodeObjRef<'a>, Vec<u8>)>, super::MerkleError> {
     use InnerNode::*;
 
     let Some((visited_parent, visited_pos)) = visited_path.pop() else {
@@ -301,7 +301,7 @@ fn get_children_iter(branch: &BranchNode) -> impl Iterator<Item = (DiskAddress, 
 fn next_node<'a, S, T, Iter>(
     merkle: &'a Merkle<S, T>,
     mut children: Iter,
-    parents: &mut Vec<(ObjRef<'a>, u8)>,
+    parents: &mut Vec<(NodeObjRef<'a>, u8)>,
     node: &mut NodeRef<'a>,
     pos: &mut u8,
 ) -> Result<MustUse<bool>, super::MerkleError>
@@ -328,7 +328,7 @@ where
 }
 
 /// create an iterator over the key-nibbles from all parents _excluding_ the sentinal node.
-fn nibble_iter_from_parents<'a>(parents: &'a [(ObjRef, u8)]) -> impl Iterator<Item = u8> + 'a {
+fn nibble_iter_from_parents<'a>(parents: &'a [(NodeObjRef, u8)]) -> impl Iterator<Item = u8> + 'a {
     parents
         .iter()
         .skip(1) // always skip the sentinal node

@@ -28,8 +28,8 @@ pub use proof::{Proof, ProofError};
 pub use stream::MerkleKeyValueStream;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 
-type ObjRef<'a> = shale::ObjRef<'a, Node>;
-type ParentRefs<'a> = Vec<(ObjRef<'a>, u8)>;
+type NodeObjRef<'a> = shale::ObjRef<'a, Node>;
+type ParentRefs<'a> = Vec<(NodeObjRef<'a>, u8)>;
 type ParentAddresses = Vec<(DiskAddress, u8)>;
 pub type MerkleWithEncoder = Merkle<CompactSpace<Node, PlainMem>, Bincode>;
 
@@ -83,11 +83,11 @@ impl<T> From<Merkle<MutStore, T>> for Merkle<SharedStore, T> {
 }
 
 impl<S: ShaleStore<Node>, T> Merkle<S, T> {
-    pub fn get_node(&self, ptr: DiskAddress) -> Result<ObjRef, MerkleError> {
+    pub fn get_node(&self, ptr: DiskAddress) -> Result<NodeObjRef, MerkleError> {
         self.store.get_item(ptr).map_err(Into::into)
     }
 
-    pub fn put_node(&self, node: Node) -> Result<ObjRef, MerkleError> {
+    pub fn put_node(&self, node: Node) -> Result<NodeObjRef, MerkleError> {
         self.store.put_item(node, 0).map_err(Into::into)
     }
 
@@ -111,7 +111,7 @@ where
 
     // TODO: use `encode` / `decode` instead of `node.encode` / `node.decode` after extention node removal.
     #[allow(dead_code)]
-    fn encode(&self, node: &ObjRef) -> Result<Vec<u8>, MerkleError> {
+    fn encode(&self, node: &NodeObjRef) -> Result<Vec<u8>, MerkleError> {
         let encoded = match node.inner() {
             NodeType::Leaf(n) => EncodedNode::new(EncodedNodeType::Leaf(n.clone())),
             NodeType::Branch(n) => {
@@ -254,8 +254,8 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
     #[allow(clippy::too_many_arguments)]
     fn split(
         &self,
-        mut node_to_split: ObjRef,
-        parents: &mut [(ObjRef, u8)],
+        mut node_to_split: NodeObjRef,
+        parents: &mut [(NodeObjRef, u8)],
         insert_path: &[u8],
         n_path: Vec<u8>,
         n_value: Option<Data>,
@@ -498,7 +498,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
         key: K,
         mut val: Vec<u8>,
         root: DiskAddress,
-    ) -> Result<(impl Iterator<Item = ObjRef>, Vec<DiskAddress>), MerkleError> {
+    ) -> Result<(impl Iterator<Item = NodeObjRef>, Vec<DiskAddress>), MerkleError> {
         // as we split a node, we need to track deleted nodes and parents
         let mut deleted = Vec::new();
         let mut parents = Vec::new();
@@ -1088,17 +1088,17 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
 
     fn get_node_by_key<'a, K: AsRef<[u8]>>(
         &'a self,
-        node_ref: ObjRef<'a>,
+        node_ref: NodeObjRef<'a>,
         key: K,
-    ) -> Result<Option<ObjRef<'a>>, MerkleError> {
+    ) -> Result<Option<NodeObjRef<'a>>, MerkleError> {
         self.get_node_by_key_with_callbacks(node_ref, key, |_, _| {}, |_, _| {})
     }
 
     fn get_node_and_parents_by_key<'a, K: AsRef<[u8]>>(
         &'a self,
-        node_ref: ObjRef<'a>,
+        node_ref: NodeObjRef<'a>,
         key: K,
-    ) -> Result<(Option<ObjRef<'a>>, ParentRefs<'a>), MerkleError> {
+    ) -> Result<(Option<NodeObjRef<'a>>, ParentRefs<'a>), MerkleError> {
         let mut parents = Vec::new();
         let node_ref = self.get_node_by_key_with_callbacks(
             node_ref,
@@ -1114,9 +1114,9 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
 
     fn get_node_and_parent_addresses_by_key<'a, K: AsRef<[u8]>>(
         &'a self,
-        node_ref: ObjRef<'a>,
+        node_ref: NodeObjRef<'a>,
         key: K,
-    ) -> Result<(Option<ObjRef<'a>>, ParentAddresses), MerkleError> {
+    ) -> Result<(Option<NodeObjRef<'a>>, ParentAddresses), MerkleError> {
         let mut parents = Vec::new();
         let node_ref = self.get_node_by_key_with_callbacks(
             node_ref,
@@ -1132,11 +1132,11 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
 
     fn get_node_by_key_with_callbacks<'a, K: AsRef<[u8]>>(
         &'a self,
-        mut node_ref: ObjRef<'a>,
+        mut node_ref: NodeObjRef<'a>,
         key: K,
         mut start_loop_callback: impl FnMut(DiskAddress, u8),
-        mut end_loop_callback: impl FnMut(ObjRef<'a>, u8),
-    ) -> Result<Option<ObjRef<'a>>, MerkleError> {
+        mut end_loop_callback: impl FnMut(NodeObjRef<'a>, u8),
+    ) -> Result<Option<NodeObjRef<'a>>, MerkleError> {
         let mut key_nibbles = Nibbles::<1>::new(key.as_ref()).into_iter();
 
         loop {
@@ -1377,7 +1377,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
     }
 }
 
-fn set_parent(new_chd: DiskAddress, parents: &mut [(ObjRef, u8)]) {
+fn set_parent(new_chd: DiskAddress, parents: &mut [(NodeObjRef, u8)]) {
     #[allow(clippy::unwrap_used)]
     let (p_ref, idx) = parents.last_mut().unwrap();
     #[allow(clippy::unwrap_used)]
@@ -1394,7 +1394,7 @@ fn set_parent(new_chd: DiskAddress, parents: &mut [(ObjRef, u8)]) {
         .unwrap();
 }
 
-pub struct Ref<'a>(ObjRef<'a>);
+pub struct Ref<'a>(NodeObjRef<'a>);
 
 pub struct RefMut<'a, S, T> {
     ptr: DiskAddress,

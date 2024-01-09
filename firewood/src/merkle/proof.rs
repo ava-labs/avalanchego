@@ -18,7 +18,7 @@ use crate::{
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
 };
 
-use super::{BinarySerde, ObjRef, TRIE_HASH_LEN};
+use super::{BinarySerde, NodeObjRef, TRIE_HASH_LEN};
 
 #[derive(Debug, Error)]
 pub enum ProofError {
@@ -393,7 +393,7 @@ fn decode_subproof<'a, S: ShaleStore<Node>, T, N: AsRef<[u8]>>(
     merkle: &'a Merkle<S, T>,
     proofs_map: &HashMap<[u8; 32], N>,
     child_hash: &[u8; 32],
-) -> Result<ObjRef<'a>, ProofError> {
+) -> Result<NodeObjRef<'a>, ProofError> {
     let child_proof = proofs_map
         .get(child_hash)
         .ok_or(ProofError::ProofNodeMissing)?;
