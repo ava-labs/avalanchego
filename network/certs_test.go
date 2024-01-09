@@ -10,10 +10,11 @@ import (
 
 	_ "embed"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/stretchr/testify/require"
 )
 
 var (
