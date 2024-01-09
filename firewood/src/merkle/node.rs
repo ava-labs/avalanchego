@@ -313,6 +313,7 @@ impl Node {
 struct Meta {
     root_hash: [u8; TRIE_HASH_LEN],
     attrs: NodeAttributes,
+    type_id: NodeTypeId,
 }
 
 impl Meta {
@@ -374,6 +375,9 @@ impl Storable for Node {
             None
         };
 
+        #[allow(clippy::indexing_slicing)]
+        let type_id: NodeTypeId = meta_raw.as_deref()[TRIE_HASH_LEN + 1].try_into()?;
+
         let is_encoded_longer_than_hash_len =
             if attrs.contains(NodeAttributes::IS_ENCODED_BIG_VALID) {
                 Some(false)
@@ -383,17 +387,7 @@ impl Storable for Node {
                 None
             };
 
-        let meta_raw = mem
-            .get_view(offset, 1_u64)
-            .ok_or(ShaleError::InvalidCacheView {
-                offset,
-                size: 1_u64,
-            })?;
-
-        offset += 1;
-
-        #[allow(clippy::indexing_slicing)]
-        match meta_raw.as_deref()[0].try_into()? {
+        match type_id {
             NodeTypeId::Branch => {
                 let inner = NodeType::Branch(Box::new(BranchNode::deserialize(offset, mem)?));
 
