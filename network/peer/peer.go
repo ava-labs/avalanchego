@@ -667,9 +667,6 @@ func (p *peer) sendNetworkMessages() {
 			}
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
-
-			// Bypass throttling is disabled here to follow the non-handshake
-			// message sending pattern.
 			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
 			if err != nil {
 				p.Log.Error("failed to create get peer list message",
