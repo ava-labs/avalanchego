@@ -114,7 +114,7 @@ Once peer metadata is received, the node will add that data to its bloom filter 
 
 Handshake messages provide a node with some knowledge of peers in the network, but offers no guarantee that learning about a subset of peers from each peer the node connects with will result in the node learning about every peer in the network.
 
-To provide an eventual guarantee that all peers learn of one another, each node periodically requests new peer from a random peer.
+To provide an eventual guarantee that all peers learn of one another, each node periodically requests peers from a random peer.
 
 To optimize bandwidth, each node tracks the most recent IPs of validators. The validator's nodeID and timestamp are inserted into a bloom filter which is used to select only necessary IPs to gossip.
 
