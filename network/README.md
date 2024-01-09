@@ -125,7 +125,7 @@ A node follows the following steps for of `PeerList` gossip:
 ```mermaid
 sequenceDiagram
 Note left of Node: Initialize bloom filter
-Note left of Node: Peer-123: 
+Note left of Node: Bloom: [0, 0, 0]
 Node->>Peer-123: GetPeerList [0, 0, 0]
 Peer-123->>Node: PeerList - Peer-1
 Note left of Node: Bloom: [1, 0, 0]
