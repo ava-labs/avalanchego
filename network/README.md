@@ -98,7 +98,7 @@ Note left of Node: Peer-3 was never sampled, so we haven't connected yet!
 Node --> Peer-3: No connection
 ```
 
-To guarantee that a node can discover all peers, each node periodically sends a `GetPeerList` message to a random peer requesting unknown peers.
+To guarantee that a node can discover all peers, each node periodically sends a `GetPeerList` message to a random peer.
 
 ##### PeerList Gossip
 
