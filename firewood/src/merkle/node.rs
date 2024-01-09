@@ -416,7 +416,6 @@ impl Storable for Node {
 
     fn serialized_len(&self) -> u64 {
         Meta::SIZE as u64
-            + 1
             + match &self.inner {
                 NodeType::Branch(n) => {
                     // TODO: add path
