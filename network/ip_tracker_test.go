@@ -725,3 +725,19 @@ func TestIPTracker_PreventBloomFilterAddition(t *testing.T) {
 	require.True(tracker.AddIP(newestIP))
 	require.Equal(maxIPEntriesPerValidator, tracker.bloomAdditions[nodeID])
 }
+
+func TestIPTracker_ShouldVerifyIP(t *testing.T) {
+	require := require.New(t)
+
+	nodeID := ip.NodeID()
+	newerIP := newerTestIP(ip)
+
+	tracker := newTestIPTracker(t)
+	require.False(tracker.ShouldVerifyIP(ip))
+	tracker.onValidatorAdded(nodeID)
+	require.True(tracker.ShouldVerifyIP(ip))
+	require.True(tracker.AddIP(ip))
+	require.False(tracker.ShouldVerifyIP(ip))
+	require.True(tracker.ShouldVerifyIP(newerIP))
+
+}
