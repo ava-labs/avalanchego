@@ -1150,11 +1150,11 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 func (n *network) runTimers() {
 	pushGossipPeerlists := time.NewTicker(n.config.PeerListGossipFreq)
 	pullGossipPeerlists := time.NewTicker(n.config.PeerListPullGossipFreq)
-	resetValidatorTracker := time.NewTicker(n.config.ValidatorTrackerResetFreq)
+	resetPeerListBloom := time.NewTicker(n.config.PeerListBloomResetFreq)
 	updateUptimes := time.NewTicker(n.config.UptimeMetricFreq)
 	defer func() {
 		pushGossipPeerlists.Stop()
-		resetValidatorTracker.Stop()
+		resetPeerListBloom.Stop()
 		updateUptimes.Stop()
 	}()
 
@@ -1166,13 +1166,13 @@ func (n *network) runTimers() {
 			n.pushGossipPeerLists()
 		case <-pullGossipPeerlists.C:
 			n.pullGossipPeerLists()
-		case <-resetValidatorTracker.C:
+		case <-resetPeerListBloom.C:
 			if err := n.ipTracker.ResetBloom(); err != nil {
-				n.peerConfig.Log.Error("failed to reset validator tracker bloom filter",
+				n.peerConfig.Log.Error("failed to reset ip tracker bloom filter",
 					zap.Error(err),
 				)
 			} else {
-				n.peerConfig.Log.Debug("reset validator tracker bloom filter")
+				n.peerConfig.Log.Debug("reset ip tracker bloom filter")
 			}
 		case <-updateUptimes.C:
 			primaryUptime, err := n.NodeUptime(constants.PrimaryNetworkID)

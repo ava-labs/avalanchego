@@ -157,6 +157,7 @@ func NewTestNetwork(
 			PeerListPeersGossipSize:        constants.DefaultNetworkPeerListPeersGossipSize,
 			PeerListGossipFreq:             constants.DefaultNetworkPeerListGossipFreq,
 			PeerListPullGossipFreq:         constants.DefaultNetworkPeerListPullGossipFreq,
+			PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
 		},
 
 		DelayConfig: DelayConfig{
@@ -168,7 +169,6 @@ func NewTestNetwork(
 		CompressionType:              constants.DefaultNetworkCompressionType,
 		PingFrequency:                constants.DefaultPingFrequency,
 		AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
-		ValidatorTrackerResetFreq:    constants.DefaultNetworkValidatorTrackerResetFreq,
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
 		MaximumInboundMessageTimeout: constants.DefaultNetworkMaximumInboundTimeout,
 

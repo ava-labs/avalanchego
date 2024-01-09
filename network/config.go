@@ -76,6 +76,10 @@ type PeerListGossipConfig struct {
 	// PeerListPullGossipFreq is the frequency that this node will attempt to
 	// request signed IPs from its peers.
 	PeerListPullGossipFreq time.Duration `json:"peerListPullGossipFreq"`
+
+	// PeerListBloomResetFreq is how frequently this node will recalculate the
+	// IP tracker's bloom filter.
+	PeerListBloomResetFreq time.Duration `json:"peerListBloomResetFreq"`
 }
 
 type TimeoutConfig struct {
@@ -145,10 +149,6 @@ type Config struct {
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`
-
-	// ValidatorTrackerResetFreq is how frequently this node will recalculate
-	// the validator tracker bloom filter.
-	ValidatorTrackerResetFreq time.Duration `json:"validatorTrackerResetFreq"`
 
 	UptimeCalculator uptime.Calculator `json:"-"`
 
