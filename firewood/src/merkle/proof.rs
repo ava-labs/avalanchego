@@ -273,38 +273,43 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             .get_node(sentinel)
             .map_err(|_| ProofError::NoSuchNode)?;
 
-        let mut key_nibbles = Nibbles::<0>::new(key.as_ref()).into_iter();
+        let mut key_nibbles = Nibbles::<1>::new(key.as_ref()).into_iter().peekable();
 
         let mut child_hash = root_hash;
         let proofs_map = &self.0;
-        let mut child_index = 0;
 
         let sub_proof = loop {
             // Link the child to the parent based on the node type.
             // if a child is already linked, use it instead
             let child_node = match &parent_node_ref.inner() {
                 #[allow(clippy::indexing_slicing)]
-                NodeType::Branch(n) => match n.chd()[child_index] {
-                    // If the child already resolved, then use the existing node.
-                    Some(node) => merkle.get_node(node)?,
-                    None => {
-                        let child_node = decode_subproof(merkle, proofs_map, &child_hash)?;
+                NodeType::Branch(n) => {
+                    let Some(child_index) = key_nibbles.next().map(usize::from) else {
+                        break None;
+                    };
 
-                        // insert the leaf to the empty slot
-                        parent_node_ref
-                            .write(|node| {
-                                #[allow(clippy::indexing_slicing)]
-                                let node = node
-                                    .inner_mut()
-                                    .as_branch_mut()
-                                    .expect("parent_node_ref is a branch");
-                                node.chd_mut()[child_index] = Some(child_node.as_ptr());
-                            })
-                            .map_err(|_| ProofError::WriteError)?;
+                    match n.chd()[child_index] {
+                        // If the child already resolved, then use the existing node.
+                        Some(node) => merkle.get_node(node)?,
+                        None => {
+                            let child_node = decode_subproof(merkle, proofs_map, &child_hash)?;
 
-                        child_node
+                            // insert the leaf to the empty slot
+                            parent_node_ref
+                                .write(|node| {
+                                    #[allow(clippy::indexing_slicing)]
+                                    let node = node
+                                        .inner_mut()
+                                        .as_branch_mut()
+                                        .expect("parent_node_ref must be a branch");
+                                    node.chd_mut()[child_index] = Some(child_node.as_ptr());
+                                })
+                                .map_err(|_| ProofError::WriteError)?;
+
+                            child_node
+                        }
                     }
-                },
+                }
 
                 NodeType::Extension(n) if n.chd().is_null() => {
                     let child_node = decode_subproof(merkle, proofs_map, &child_hash)?;
@@ -314,7 +319,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                             let node = node
                                 .inner_mut()
                                 .as_extension_mut()
-                                .expect("parent_node_ref is an extension");
+                                .expect("parent_node_ref must be an extension");
                             *node.chd_mut() = child_node.as_ptr();
                         })
                         .map_err(|_| ProofError::WriteError)?;
@@ -354,14 +359,12 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 }
 
                 NodeType::Branch(n) => {
-                    if let Some(index) = key_nibbles.next() {
+                    if let Some(index) = key_nibbles.peek() {
                         let subproof = n
                             .chd_encode()
-                            .get(index as usize)
+                            .get(*index as usize)
                             .and_then(|inner| inner.as_ref())
                             .map(|data| &**data);
-
-                        child_index = index as usize;
 
                         subproof
                     } else {
