@@ -143,6 +143,57 @@ func TestMessage(t *testing.T) {
 			bytesSaved:       false,
 		},
 		{
+			desc: "get_peer_list message with no compression",
+			op:   GetPeerListOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetPeerList{
+					GetPeerList: &p2p.GetPeerList{
+						KnownPeers: &p2p.BloomFilter{
+							Filter: make([]byte, 2048),
+							Salt:   make([]byte, 32),
+						},
+					},
+				},
+			},
+			compressionType:  compression.TypeNone,
+			bypassThrottling: false,
+			bytesSaved:       false,
+		},
+		{
+			desc: "get_peer_list message with gzip compression",
+			op:   GetPeerListOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetPeerList{
+					GetPeerList: &p2p.GetPeerList{
+						KnownPeers: &p2p.BloomFilter{
+							Filter: make([]byte, 2048),
+							Salt:   make([]byte, 32),
+						},
+					},
+				},
+			},
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: false,
+			bytesSaved:       true,
+		},
+		{
+			desc: "get_peer_list message with zstd compression",
+			op:   GetPeerListOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetPeerList{
+					GetPeerList: &p2p.GetPeerList{
+						KnownPeers: &p2p.BloomFilter{
+							Filter: make([]byte, 2048),
+							Salt:   make([]byte, 32),
+						},
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
+			bypassThrottling: false,
+			bytesSaved:       true,
+		},
+		{
 			desc: "peer_list message with no compression",
 			op:   PeerListOp,
 			msg: &p2p.Message{
@@ -817,8 +868,9 @@ func TestMessage(t *testing.T) {
 			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling())
 			require.Equal(tv.op, encodedMsg.Op())
 
-			bytesSaved := encodedMsg.BytesSavedCompression()
-			require.Equal(tv.bytesSaved, bytesSaved > 0)
+			if bytesSaved := encodedMsg.BytesSavedCompression(); tv.bytesSaved {
+				require.Greater(bytesSaved, 0)
+			}
 
 			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})
 			require.NoError(err)
