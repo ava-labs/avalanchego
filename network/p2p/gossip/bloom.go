@@ -85,7 +85,7 @@ func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	targetElements int,
 ) (bool, error) {
-	if bloomFilter.bloom.Count() < bloomFilter.maxCount {
+	if bloomFilter.bloom.Count() <= bloomFilter.maxCount {
 		return false, nil
 	}
 
