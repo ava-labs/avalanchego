@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -151,11 +151,7 @@ type PullGossiper[T Gossipable] struct {
 }
 
 func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
-	bloom, salt, err := p.set.GetFilter()
-	if err != nil {
-		return err
-	}
-
+	bloom, salt := p.set.GetFilter()
 	request := &sdk.PullGossipRequest{
 		Filter: bloom,
 		Salt:   salt,

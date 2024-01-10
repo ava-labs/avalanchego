@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -89,7 +89,7 @@ func ReadNode(dataDir string) (*Node, error) {
 }
 
 // Reads nodes from the specified network directory.
-func ReadNodes(networkDir string) ([]*Node, error) {
+func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
@@ -109,6 +109,10 @@ func ReadNodes(networkDir string) ([]*Node, error) {
 			continue
 		} else if err != nil {
 			return nil, err
+		}
+
+		if !includeEphemeral && node.IsEphemeral {
+			continue
 		}
 
 		nodes = append(nodes, node)

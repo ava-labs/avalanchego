@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -137,7 +137,8 @@ func (vm *VM) Initialize(
 	vm.ctx = chainCtx
 	vm.db = db
 
-	vm.codecRegistry = linearcodec.NewDefault()
+	// Note: this codec is never used to serialize anything
+	vm.codecRegistry = linearcodec.NewDefault(time.Time{})
 	vm.fx = &secp256k1fx.Fx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
