@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -703,7 +704,10 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -819,7 +823,10 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -918,7 +925,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1056,7 +1066,10 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1159,7 +1172,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1305,7 +1321,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1405,7 +1424,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+			EForkTime:   mockable.MaxTime,
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},

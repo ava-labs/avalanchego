@@ -298,6 +298,8 @@ func defaultConfig() *config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
+		DurangoTime:       time.Time{},
+		EForkTime:         mockable.MaxTime,
 	}
 }
 

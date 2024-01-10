@@ -15,4 +15,11 @@ type Config struct {
 
 	// Time of the Durango network upgrade
 	DurangoTime time.Time
+
+	// Time of the E network upgrade
+	EForkTime time.Time
+}
+
+func (c *Config) IsEForkActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EForkTime)
 }

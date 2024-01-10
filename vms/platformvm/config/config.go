@@ -107,6 +107,9 @@ type Config struct {
 	// Time of the Durango network upgrade
 	DurangoTime time.Time
 
+	// Time of the E network upgrade
+	EForkTime time.Time
+
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
 	// window.
@@ -135,6 +138,10 @@ func (c *Config) IsCortinaActivated(timestamp time.Time) bool {
 
 func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.DurangoTime)
+}
+
+func (c *Config) IsEForkActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EForkTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

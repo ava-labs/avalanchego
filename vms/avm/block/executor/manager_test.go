@@ -14,7 +14,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
@@ -124,7 +126,12 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(ctrl *gomock.Controller) *manager {
 				return &manager{
-					backend: &executor.Backend{},
+					backend: &executor.Backend{
+						Config: &config.Config{
+							DurangoTime: time.Time{},
+							EForkTime:   mockable.MaxTime,
+						},
+					},
 				}
 			},
 			expectedErr: ErrChainNotSynced,
@@ -142,6 +149,10 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config: &config.Config{
+							DurangoTime: time.Time{},
+							EForkTime:   mockable.MaxTime,
+						},
 					},
 				}
 			},
@@ -170,6 +181,10 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config: &config.Config{
+							DurangoTime: time.Time{},
+							EForkTime:   mockable.MaxTime,
+						},
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -202,6 +217,10 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config: &config.Config{
+							DurangoTime: time.Time{},
+							EForkTime:   mockable.MaxTime,
+						},
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -234,6 +253,10 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config: &config.Config{
+							DurangoTime: time.Time{},
+							EForkTime:   mockable.MaxTime,
+						},
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
