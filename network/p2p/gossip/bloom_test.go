@@ -56,9 +56,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			}
 
 			for _, item := range tt.add {
-				bloomBytes, saltBytes, err := bloom.Marshal()
-				require.NoError(err)
-
+				bloomBytes, saltBytes := bloom.Marshal()
 				initialBloomBytes := slices.Clone(bloomBytes)
 				initialSaltBytes := slices.Clone(saltBytes)
 

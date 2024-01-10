@@ -132,7 +132,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {
+func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 

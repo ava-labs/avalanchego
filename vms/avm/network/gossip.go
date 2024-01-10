@@ -150,7 +150,7 @@ func (g *gossipMempool) Iterate(f func(*txs.Tx) bool) {
 	g.Mempool.Iterate(f)
 }
 
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {
+func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
