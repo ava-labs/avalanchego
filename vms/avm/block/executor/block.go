@@ -76,10 +76,11 @@ func (b *Block) Verify(context.Context) error {
 
 	// Syntactic verification is generally pretty fast, so we verify this first
 	// before performing any possible DB reads.
+	feeManager := fees.NewManager(b.manager.backend.Config.DefaultUnitFees)
 	for _, tx := range txs {
 		err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
 			Backend:       b.manager.backend,
-			BlkFeeManager: fees.NewManager(b.manager.backend.Config.DefaultUnitFees),
+			BlkFeeManager: feeManager,
 			BlkTimestamp:  newChainTime,
 			Tx:            tx,
 		})
