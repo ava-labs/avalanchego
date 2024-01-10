@@ -163,6 +163,10 @@ func (n *Node) getDataDir() string {
 
 // Writes the current state of the metrics endpoint to disk
 func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
+	if len(n.URI) == 0 {
+		// No URI to request metrics from
+		return nil
+	}
 	uri := n.URI + "/ext/metrics"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
