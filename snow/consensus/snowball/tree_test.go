@@ -25,7 +25,8 @@ func TestSnowballSingleton(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            5,
+		BetaVirtuous:    2,
+		BetaRogue:       5,
 	}
 	tree := NewTree(params, Red)
 
@@ -65,7 +66,8 @@ func TestSnowballRecordUnsuccessfulPoll(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            5,
+		BetaVirtuous:    3,
+		BetaRogue:       5,
 	}
 	tree := NewTree(params, Red)
 
@@ -94,7 +96,8 @@ func TestSnowballBinary(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, Red)
 	tree.Add(Blue)
@@ -136,7 +139,8 @@ func TestSnowballLastBinary(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    2,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, zero)
 	tree.Add(one)
@@ -179,7 +183,8 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, zero)
 	tree.Add(one)
@@ -235,7 +240,8 @@ func TestSnowballNewUnary(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            3,
+		BetaVirtuous:    2,
+		BetaRogue:       3,
 	}
 	tree := NewTree(params, zero)
 	tree.Add(one)
@@ -284,7 +290,8 @@ func TestSnowballTransitiveReset(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    2,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, zero)
 	tree.Add(two)
@@ -367,7 +374,8 @@ func TestSnowballTrinary(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, Green)
 	tree.Add(Red)
@@ -420,7 +428,8 @@ func TestSnowballCloseTrinary(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, yellow)
 	tree.Add(cyan)
@@ -468,7 +477,8 @@ func TestSnowballAddRejected(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, c0000)
 	tree.Add(c1000)
@@ -516,7 +526,8 @@ func TestSnowballResetChild(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, c0000)
 	tree.Add(c0100)
@@ -578,7 +589,8 @@ func TestSnowballResetSibling(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, c0000)
 	tree.Add(c0100)
@@ -637,7 +649,8 @@ func TestSnowball5Colors(t *testing.T) {
 		K:               5,
 		AlphaPreference: 5,
 		AlphaConfidence: 5,
-		Beta:            30,
+		BetaVirtuous:    20,
+		BetaRogue:       30,
 	}
 
 	colors := []ids.ID{}
@@ -676,7 +689,8 @@ func TestSnowballFineGrained(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, c0000)
 
@@ -769,7 +783,8 @@ func TestSnowballDoubleAdd(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            5,
+		BetaVirtuous:    3,
+		BetaRogue:       5,
 	}
 	tree := NewTree(params, Red)
 	tree.Add(Red)
@@ -789,7 +804,8 @@ func TestSnowballConsistent(t *testing.T) {
 			K:               20,
 			AlphaPreference: 15,
 			AlphaConfidence: 15,
-			Beta:            30,
+			BetaVirtuous:    20,
+			BetaRogue:       30,
 		}
 		seed   uint64 = 0
 		source        = prng.NewMT19937()
@@ -821,7 +837,8 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 		K:               1,
 		AlphaPreference: 1,
 		AlphaConfidence: 1,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, c0000)
 
@@ -901,7 +918,8 @@ func TestSnowballRecordPreferencePollBinary(t *testing.T) {
 		K:               3,
 		AlphaPreference: 2,
 		AlphaConfidence: 3,
-		Beta:            2,
+		BetaVirtuous:    2,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, Red)
 	tree.Add(Blue)
@@ -935,7 +953,8 @@ func TestSnowballRecordPreferencePollUnary(t *testing.T) {
 		K:               3,
 		AlphaPreference: 2,
 		AlphaConfidence: 3,
-		Beta:            2,
+		BetaVirtuous:    2,
+		BetaRogue:       2,
 	}
 	tree := NewTree(params, Red)
 	require.Equal(Red, tree.Preference())

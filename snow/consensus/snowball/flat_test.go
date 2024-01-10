@@ -18,7 +18,8 @@ func TestFlat(t *testing.T) {
 		K:               3,
 		AlphaPreference: 2,
 		AlphaConfidence: 3,
-		Beta:            2,
+		BetaVirtuous:    1,
+		BetaRogue:       2,
 	}
 	f := NewFlat(params, Red)
 	f.Add(Green)

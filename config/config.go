@@ -112,7 +112,8 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
 		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
-		Beta:                  v.GetInt(SnowCommitThresholdKey),
+		BetaVirtuous:          v.GetInt(SnowCommitThresholdKey),
+		BetaRogue:             v.GetInt(SnowCommitThresholdKey),
 		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
 		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
@@ -123,7 +124,8 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		p.AlphaConfidence = p.AlphaPreference
 	}
 	if v.IsSet(SnowRogueCommitThresholdKey) {
-		p.Beta = v.GetInt(SnowRogueCommitThresholdKey)
+		p.BetaVirtuous = v.GetInt(SnowRogueCommitThresholdKey)
+		p.BetaRogue = v.GetInt(SnowRogueCommitThresholdKey)
 	}
 	return p
 }
