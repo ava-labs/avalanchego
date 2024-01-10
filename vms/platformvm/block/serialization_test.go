@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -113,7 +113,7 @@ func TestBanffBlockSerialization(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			require := require.New(t)
 
-			got, err := Codec.Marshal(Version, &block)
+			got, err := Codec.Marshal(CodecVersion, &block)
 			require.NoError(err)
 			require.Equal(test.bytes, got)
 		})

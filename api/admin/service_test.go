@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
@@ -20,7 +20,6 @@ import (
 type loadVMsTest struct {
 	admin          *Admin
 	ctrl           *gomock.Controller
-	mockLog        *logging.MockLogger
 	mockVMManager  *vms.MockManager
 	mockVMRegistry *registry.MockVMRegistry
 }
@@ -28,18 +27,16 @@ type loadVMsTest struct {
 func initLoadVMsTest(t *testing.T) *loadVMsTest {
 	ctrl := gomock.NewController(t)
 
-	mockLog := logging.NewMockLogger(ctrl)
 	mockVMRegistry := registry.NewMockVMRegistry(ctrl)
 	mockVMManager := vms.NewMockManager(ctrl)
 
 	return &loadVMsTest{
 		admin: &Admin{Config: Config{
-			Log:        mockLog,
+			Log:        logging.NoLog{},
 			VMRegistry: mockVMRegistry,
 			VMManager:  mockVMManager,
 		}},
 		ctrl:           ctrl,
-		mockLog:        mockLog,
 		mockVMManager:  mockVMManager,
 		mockVMRegistry: mockVMRegistry,
 	}
@@ -67,7 +64,6 @@ func TestLoadVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
@@ -84,7 +80,6 @@ func TestLoadVMsReloadFails(t *testing.T) {
 
 	resources := initLoadVMsTest(t)
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	// Reload fails
 	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(nil, nil, errTest)
 
@@ -108,7 +103,6 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	// every vm is at least aliased to itself.
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)

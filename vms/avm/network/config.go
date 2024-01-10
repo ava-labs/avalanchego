@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -45,7 +45,7 @@ type Config struct {
 	// ExpectedBloomFilterElements is the number of elements to expect when
 	// creating a new bloom filter. The larger this number is, the larger the
 	// bloom filter will be.
-	ExpectedBloomFilterElements uint64 `json:"expected-bloom-filter-elements"`
+	ExpectedBloomFilterElements int `json:"expected-bloom-filter-elements"`
 	// ExpectedBloomFilterFalsePositiveProbability is the expected probability
 	// of a false positive after having inserted ExpectedBloomFilterElements
 	// into a bloom filter. The smaller this number is, the larger the bloom

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -6,7 +6,6 @@ package indexer
 import (
 	"fmt"
 	"io"
-	"math"
 	"sync"
 
 	"github.com/gorilla/rpc/v2"
@@ -15,8 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -32,26 +29,18 @@ import (
 )
 
 const (
-	indexNamePrefix = "index-"
-	codecVersion    = uint16(0)
-	// Max size, in bytes, of something serialized by this indexer
-	// Assumes no containers are larger than math.MaxUint32
-	// wrappers.IntLen accounts for the size of the container bytes
-	// wrappers.LongLen accounts for the timestamp of the container
-	// ids.IDLen accounts for the container ID
-	// wrappers.ShortLen accounts for the codec version
-	codecMaxSize = int(constants.DefaultMaxMessageSize) + wrappers.IntLen + wrappers.LongLen + ids.IDLen + wrappers.ShortLen
+	indexNamePrefix         = "index-"
+	txPrefix                = 0x01
+	vtxPrefix               = 0x02
+	blockPrefix             = 0x03
+	isIncompletePrefix      = 0x04
+	previouslyIndexedPrefix = 0x05
 )
 
 var (
-	txPrefix                = byte(0x01)
-	vtxPrefix               = byte(0x02)
-	blockPrefix             = byte(0x03)
-	isIncompletePrefix      = byte(0x04)
-	previouslyIndexedPrefix = byte(0x05)
-	hasRunKey               = []byte{0x07}
-
 	_ Indexer = (*indexer)(nil)
+
+	hasRunKey = []byte{0x07}
 )
 
 // Config for an indexer
@@ -80,7 +69,6 @@ type Indexer interface {
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	indexer := &indexer{
-		codec:                codec.NewManager(codecMaxSize),
 		log:                  config.Log,
 		db:                   config.DB,
 		allowIncompleteIndex: config.AllowIncompleteIndex,
@@ -88,19 +76,13 @@ func NewIndexer(config Config) (Indexer, error) {
 		blockAcceptorGroup:   config.BlockAcceptorGroup,
 		txAcceptorGroup:      config.TxAcceptorGroup,
 		vertexAcceptorGroup:  config.VertexAcceptorGroup,
-		txIndices:            map[ids.ID]Index{},
-		vtxIndices:           map[ids.ID]Index{},
-		blockIndices:         map[ids.ID]Index{},
+		txIndices:            map[ids.ID]*index{},
+		vtxIndices:           map[ids.ID]*index{},
+		blockIndices:         map[ids.ID]*index{},
 		pathAdder:            config.APIServer,
 		shutdownF:            config.ShutdownF,
 	}
 
-	if err := indexer.codec.RegisterCodec(
-		codecVersion,
-		linearcodec.NewCustomMaxLength(math.MaxUint32),
-	); err != nil {
-		return nil, fmt.Errorf("couldn't register codec: %w", err)
-	}
 	hasRun, err := indexer.hasRun()
 	if err != nil {
 		return nil, err
@@ -110,7 +92,6 @@ func NewIndexer(config Config) (Indexer, error) {
 }
 
 type indexer struct {
-	codec  codec.Manager
 	clock  mockable.Clock
 	lock   sync.RWMutex
 	log    logging.Logger
@@ -134,11 +115,11 @@ type indexer struct {
 	indexingEnabled bool
 
 	// Chain ID --> index of blocks of that chain (if applicable)
-	blockIndices map[ids.ID]Index
+	blockIndices map[ids.ID]*index
 	// Chain ID --> index of vertices of that chain (if applicable)
-	vtxIndices map[ids.ID]Index
+	vtxIndices map[ids.ID]*index
 	// Chain ID --> index of txs of that chain (if applicable)
-	txIndices map[ids.ID]Index
+	txIndices map[ids.ID]*index
 
 	// Notifies of newly accepted blocks
 	blockAcceptorGroup snow.AcceptorGroup
@@ -331,12 +312,12 @@ func (i *indexer) registerChainHelper(
 	prefixEnd byte,
 	name, endpoint string,
 	acceptorGroup snow.AcceptorGroup,
-) (Index, error) {
+) (*index, error) {
 	prefix := make([]byte, ids.IDLen+wrappers.ByteLen)
 	copy(prefix, chainID[:])
 	prefix[ids.IDLen] = prefixEnd
 	indexDB := prefixdb.New(prefix, i.db)
-	index, err := newIndex(indexDB, i.log, i.codec, i.clock)
+	index, err := newIndex(indexDB, i.log, i.clock)
 	if err != nil {
 		_ = indexDB.Close()
 		return nil, err
@@ -353,7 +334,7 @@ func (i *indexer) registerChainHelper(
 	codec := json.NewCodec()
 	apiServer.RegisterCodec(codec, "application/json")
 	apiServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := apiServer.RegisterService(&service{Index: index}, "index"); err != nil {
+	if err := apiServer.RegisterService(&service{index: index}, "index"); err != nil {
 		_ = index.Close()
 		return nil, err
 	}

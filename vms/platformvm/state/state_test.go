@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -649,7 +649,7 @@ func TestParsedStateBlock(t *testing.T) {
 			Status: choices.Accepted,
 		}
 
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.Version, &stBlk)
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
 		require.NoError(err)
 
 		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)

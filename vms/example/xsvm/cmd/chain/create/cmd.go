@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package create
@@ -55,7 +55,7 @@ func createFunc(c *cobra.Command, args []string) error {
 	// Get the P-chain wallet
 	pWallet := wallet.P()
 
-	genesisBytes, err := genesis.Codec.Marshal(genesis.Version, &genesis.Genesis{
+	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
 		Timestamp: 0,
 		Allocations: []genesis.Allocation{
 			{

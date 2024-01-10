@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -216,7 +216,7 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 		0x44, 0x55, 0x66, 0x77,
 	}
 	var unsignedSimpleAddPrimaryTx UnsignedTx = simpleAddPrimaryTx
-	unsignedSimpleAddPrimaryTxBytes, err := Codec.Marshal(Version, &unsignedSimpleAddPrimaryTx)
+	unsignedSimpleAddPrimaryTxBytes, err := Codec.Marshal(CodecVersion, &unsignedSimpleAddPrimaryTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedSimpleAddPrimaryTxBytes, unsignedSimpleAddPrimaryTxBytes)
 
@@ -599,7 +599,7 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 	var unsignedComplexAddPrimaryTx UnsignedTx = complexAddPrimaryTx
-	unsignedComplexAddPrimaryTxBytes, err := Codec.Marshal(Version, &unsignedComplexAddPrimaryTx)
+	unsignedComplexAddPrimaryTxBytes, err := Codec.Marshal(CodecVersion, &unsignedComplexAddPrimaryTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexAddPrimaryTxBytes, unsignedComplexAddPrimaryTxBytes)
 
@@ -972,7 +972,7 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 		0x44, 0x55, 0x66, 0x77,
 	}
 	var unsignedSimpleAddSubnetTx UnsignedTx = simpleAddSubnetTx
-	unsignedSimpleAddSubnetTxBytes, err := Codec.Marshal(Version, &unsignedSimpleAddSubnetTx)
+	unsignedSimpleAddSubnetTxBytes, err := Codec.Marshal(CodecVersion, &unsignedSimpleAddSubnetTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedSimpleAddSubnetTxBytes, unsignedSimpleAddSubnetTxBytes)
 
@@ -1355,7 +1355,7 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 	var unsignedComplexAddSubnetTx UnsignedTx = complexAddSubnetTx
-	unsignedComplexAddSubnetTxBytes, err := Codec.Marshal(Version, &unsignedComplexAddSubnetTx)
+	unsignedComplexAddSubnetTxBytes, err := Codec.Marshal(CodecVersion, &unsignedComplexAddSubnetTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexAddSubnetTxBytes, unsignedComplexAddSubnetTxBytes)
 

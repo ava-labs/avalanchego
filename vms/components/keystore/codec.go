@@ -1,31 +1,28 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	// CodecVersion is the current default codec version
-	CodecVersion = 0
-)
+const CodecVersion = 0
 
-// Codecs do serialization and deserialization
 var (
 	Codec       codec.Manager
 	LegacyCodec codec.Manager
 )
 
 func init() {
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	Codec = codec.NewDefaultManager()
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	lc := linearcodec.NewDefault(time.Time{})
 	LegacyCodec = codec.NewManager(math.MaxInt32)
 
 	err := utils.Err(

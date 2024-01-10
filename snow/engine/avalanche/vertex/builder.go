@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -62,10 +62,10 @@ func buildVtx(
 	utils.Sort(parentIDs)
 	utils.SortByHash(txs)
 
-	codecVer := codecVersion
+	codecVer := CodecVersion
 	if stopVertex {
 		// use new codec version for the "StopVertex"
-		codecVer = codecVersionWithStopVtx
+		codecVer = CodecVersionWithStopVtx
 	}
 
 	innerVtx := innerStatelessVertex{
@@ -80,7 +80,7 @@ func buildVtx(
 		return nil, err
 	}
 
-	vtxBytes, err := c.Marshal(innerVtx.Version, innerVtx)
+	vtxBytes, err := Codec.Marshal(innerVtx.Version, innerVtx)
 	vtx := statelessVertex{
 		innerStatelessVertex: innerVtx,
 		id:                   hashing.ComputeHash256Array(vtxBytes),

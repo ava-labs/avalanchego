@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -39,7 +39,7 @@ type BanffBlock interface {
 func initialize(blk Block, commonBlk *CommonBlock) error {
 	// We serialize this block as a pointer so that it can be deserialized into
 	// a Block
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(CodecVersion, &blk)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal block: %w", err)
 	}
