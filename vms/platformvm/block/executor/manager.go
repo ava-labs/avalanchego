@@ -127,26 +127,26 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return ErrChainNotSynced
 	}
 
-	state, err := state.NewDiff(m.preferred, m)
+	stateDiff, err := state.NewDiff(m.preferred, m)
 	if err != nil {
 		return err
 	}
 
-	nextBlkTime, _, err := executor.NextBlockTime(state, m.txExecutorBackend.Clk)
+	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
 		return err
 	}
 
-	changes, err := executor.AdvanceTimeTo(m.txExecutorBackend, state, nextBlkTime)
+	changes, err := executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
 		return err
 	}
-	changes.Apply(state)
-	state.SetTimestamp(nextBlkTime)
+	changes.Apply(stateDiff)
+	stateDiff.SetTimestamp(nextBlkTime)
 
 	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend: m.txExecutorBackend,
-		State:   state,
+		State:   stateDiff,
 		Tx:      tx,
 	})
 	// We ignore [errFutureStakeTime] here because the time will be advanced
