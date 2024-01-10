@@ -108,7 +108,7 @@ func (n *Node) writeMetricsSnapshot(data []byte) error {
 	}
 	// Create a compatible filesystem from the current timestamp
 	ts := time.Now().UTC().Format(time.RFC3339)
-	ts = strings.Replace(strings.Replace(ts, ":", "", -1), "-", "", -1)
+	ts = strings.ReplaceAll(strings.ReplaceAll(ts, ":", ""), "-", "")
 	metricsPath := filepath.Join(metricsDir, ts)
 	return os.WriteFile(metricsPath, data, perms.ReadWrite)
 }
