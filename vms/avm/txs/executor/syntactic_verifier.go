@@ -61,6 +61,7 @@ func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
 
 	feeCalculator := FeeCalculator{
 		feeManager: v.BlkFeeManager,
+		Codec:      v.Codec,
 		Config:     v.Config,
 		ChainTime:  v.BlkTimestamp,
 		Tx:         v.Tx,
@@ -134,6 +135,7 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 
 	feeCalculator := FeeCalculator{
 		feeManager: v.BlkFeeManager,
+		Codec:      v.Codec,
 		Config:     v.Config,
 		ChainTime:  v.BlkTimestamp,
 		Tx:         v.Tx,
@@ -192,6 +194,7 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 
 	feeCalculator := FeeCalculator{
 		feeManager: v.BlkFeeManager,
+		Codec:      v.Codec,
 		Config:     v.Config,
 		ChainTime:  v.BlkTimestamp,
 		Tx:         v.Tx,
@@ -262,6 +265,7 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 
 	feeCalculator := FeeCalculator{
 		feeManager: v.BlkFeeManager,
+		Codec:      v.Codec,
 		Config:     v.Config,
 		ChainTime:  v.BlkTimestamp,
 		Tx:         v.Tx,
@@ -314,6 +318,7 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 
 	feeCalculator := FeeCalculator{
 		feeManager: v.BlkFeeManager,
+		Codec:      v.Codec,
 		Config:     v.Config,
 		ChainTime:  v.BlkTimestamp,
 		Tx:         v.Tx,
