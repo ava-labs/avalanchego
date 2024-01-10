@@ -106,16 +106,10 @@ var (
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	p := snowball.Parameters{
-		K:               v.GetInt(SnowSampleSizeKey),
-		AlphaPreference: v.GetInt(SnowPreferenceQuorumSizeKey),
-		AlphaConfidence: v.GetInt(SnowConfidenceQuorumSizeKey),
-		// During the X-chain linearization we require BetaVirtuous and
-		// BetaRogue to be equal. Therefore we use the more conservative
-		// BetaRogue value for both BetaVirtuous and BetaRogue.
-		//
-		// TODO: After the X-chain linearization use the
-		// SnowVirtuousCommitThresholdKey as before.
-		BetaVirtuous:          v.GetInt(SnowRogueCommitThresholdKey),
+		K:                     v.GetInt(SnowSampleSizeKey),
+		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
+		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
+		BetaVirtuous:          v.GetInt(SnowVirtuousCommitThresholdKey),
 		BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
 		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
 		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
