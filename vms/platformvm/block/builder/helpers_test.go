@@ -256,14 +256,11 @@ func defaultState(
 ) state.State {
 	require := require.New(t)
 
-	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
 	genesisBytes := buildGenesisTest(t, ctx)
 	state, err := state.New(
 		db,
 		genesisBytes,
-		prometheus.NewRegistry(),
 		cfg,
-		execCfg,
 		ctx,
 		metrics.Noop,
 		rewards,

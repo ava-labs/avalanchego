@@ -6,10 +6,9 @@ package state
 import (
 	"context"
 	"math"
+	"strconv"
 	"testing"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -161,16 +162,15 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 }
 
 func newStateFromDB(require *require.Assertions, db database.Database) State {
-	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(
 		db,
 		metrics.Noop,
 		&config.Config{
 			Validators: validators.NewManager(),
 		},
-		execCfg,
-		&snow.Context{},
-		prometheus.NewRegistry(),
+		&snow.Context{
+			Log: logging.NoLog{},
+		},
 		reward.NewCalculator(reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .1 * reward.PercentDenominator,
@@ -336,14 +336,28 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		startTime = time.Now()
 		endTime   = startTime.Add(24 * time.Hour)
 		stakers   = make([]Staker, numNodes)
+		addedTxs  = make([]*txs.Tx, numNodes)
 	)
 	for i := 0; i < numNodes; i++ {
+		valTx := txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Start:  uint64(startTime.Add(time.Duration(i) * time.Second).Unix()),
+			End:    uint64(endTime.Add(time.Duration(i) * time.Second).Unix()),
+			Wght:   uint64(i + 1),
+		}
+		addedTxs[i] = &txs.Tx{
+			Unsigned: &txs.AddValidatorTx{
+				Validator: valTx,
+			},
+		}
+		addedTxs[i].SetBytes([]byte{0x1}, []byte(strconv.Itoa(10*i)))
+
 		stakers[i] = Staker{
-			TxID:            ids.GenerateTestID(),
-			NodeID:          ids.GenerateTestNodeID(),
-			Weight:          uint64(i + 1),
-			StartTime:       startTime.Add(time.Duration(i) * time.Second),
-			EndTime:         endTime.Add(time.Duration(i) * time.Second),
+			TxID:            addedTxs[i].ID(),
+			NodeID:          valTx.NodeID,
+			Weight:          valTx.Wght,
+			StartTime:       valTx.StartTime(),
+			EndTime:         valTx.EndTime(),
 			PotentialReward: uint64(i + 1),
 		}
 		if i%2 == 0 {
@@ -357,6 +371,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	}
 
 	type diff struct {
+		addedTxs          []*txs.Tx
 		addedValidators   []Staker
 		addedDelegators   []Staker
 		removedDelegators []Staker
@@ -373,6 +388,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		},
 		{
 			// Add a subnet validator
+			addedTxs:                    []*txs.Tx{addedTxs[0]},
 			addedValidators:             []Staker{stakers[0]},
 			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
 			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
@@ -389,6 +405,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{ // Add a primary network validator
+			addedTxs:        []*txs.Tx{addedTxs[1]},
 			addedValidators: []Staker{stakers[1]},
 			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[1].NodeID: {
@@ -417,6 +434,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		},
 		{
 			// Add 2 subnet validators and a primary network validator
+			addedTxs:        []*txs.Tx{addedTxs[0], addedTxs[1], addedTxs[2]},
 			addedValidators: []Staker{stakers[0], stakers[1], stakers[2]},
 			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[1].NodeID: {
@@ -443,7 +461,11 @@ func TestStateAddRemoveValidator(t *testing.T) {
 			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 	}
+
 	for currentIndex, diff := range diffs {
+		for _, tx := range diff.addedTxs {
+			state.AddTx(tx, status.Committed)
+		}
 		for _, added := range diff.addedValidators {
 			added := added
 			state.PutCurrentValidator(&added)
@@ -652,12 +674,12 @@ func TestParsedStateBlock(t *testing.T) {
 		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
 		require.NoError(err)
 
-		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
 		require.NoError(err)
 		require.True(isStateBlk)
 		require.Equal(blk.ID(), gotBlk.ID())
 
-		gotBlk, _, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
 		require.NoError(err)
 		require.False(isStateBlk)
 		require.Equal(blk.ID(), gotBlk.ID())
@@ -699,4 +721,27 @@ func TestStateSubnetOwner(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner2, owner)
+}
+
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
+	// Attempt to parse as blocks.Block
+	blk, err := block.Parse(block.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, false, nil
+	}
+
+	// Fallback to [stateBlk]
+	blkState := stateBlk{}
+	if _, err := block.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, false, err
+	}
+
+	blkState.Blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return blkState.Blk, true, nil
 }
