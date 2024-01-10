@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
@@ -97,4 +98,13 @@ func (n *Node) Write() error {
 		return nil
 	}
 	return n.writeConfig()
+}
+
+func (n *Node) writeMetricsSnapshot(data []byte) error {
+	metricsDir := filepath.Join(n.getDataDir(), "metrics")
+	if err := os.MkdirAll(metricsDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create metrics dir: %w", err)
+	}
+	metricsPath := filepath.Join(metricsDir, time.Now().Format(time.RFC3339))
+	return os.WriteFile(metricsPath, data, perms.ReadWrite)
 }
