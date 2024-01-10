@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -130,6 +130,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	mempool.EXPECT().Get(txID).Return(nil, false)
 	mempool.EXPECT().GetDropReason(txID).Return(nil)
 	mempool.EXPECT().Add(tx).Return(nil)
+	mempool.EXPECT().Len().Return(0)
 	mempool.EXPECT().RequestBuildBlock(false)
 
 	gossipMempool, err := newGossipMempool(

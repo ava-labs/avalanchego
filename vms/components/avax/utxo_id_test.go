@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -6,6 +6,7 @@ package avax
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +24,7 @@ func TestUTXOIDVerifyNil(t *testing.T) {
 func TestUTXOID(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 

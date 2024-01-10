@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -67,6 +67,9 @@ type Mempool interface {
 	// possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
+
+	// Len returns the number of txs in the mempool.
+	Len() int
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
@@ -245,4 +248,11 @@ func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
 	case m.toEngine <- common.PendingTxs:
 	default:
 	}
+}
+
+func (m *mempool) Len() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.unissuedTxs.Len()
 }

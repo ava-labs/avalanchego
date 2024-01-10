@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -124,6 +124,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
 			},
@@ -300,6 +301,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock(false)
 				return mempool
 			},

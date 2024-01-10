@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -42,13 +42,14 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 
 func newDefaultConfig() Config {
 	return Config{
-		EvictionBatchSize:         10,
-		HistoryLength:             defaultHistoryLength,
-		ValueNodeCacheSize:        units.MiB,
-		IntermediateNodeCacheSize: units.MiB,
-		Reg:                       prometheus.NewRegistry(),
-		Tracer:                    trace.Noop,
-		BranchFactor:              BranchFactor16,
+		IntermediateWriteBatchSize:  10,
+		HistoryLength:               defaultHistoryLength,
+		ValueNodeCacheSize:          units.MiB,
+		IntermediateNodeCacheSize:   units.MiB,
+		IntermediateWriteBufferSize: units.KiB,
+		Reg:                         prometheus.NewRegistry(),
+		Tracer:                      trace.Noop,
+		BranchFactor:                BranchFactor16,
 	}
 }
 
@@ -807,7 +808,7 @@ func TestMerkleDBClear(t *testing.T) {
 
 	// Assert caches are empty.
 	require.Zero(db.valueNodeDB.nodeCache.Len())
-	require.Zero(db.intermediateNodeDB.nodeCache.currentSize)
+	require.Zero(db.intermediateNodeDB.writeBuffer.currentSize)
 
 	// Assert history has only the clearing change.
 	require.Len(db.history.lastChanges, 1)
