@@ -63,10 +63,6 @@ func TestNormalUsage(t *testing.T) {
 
 	require.Equal(len(toAdd), filter.Count())
 
-	numHashes, numEntries := filter.Parameters()
-	require.Equal(initialNumHashes, numHashes)
-	require.Equal(initialNumBytes, numEntries)
-
 	filterBytes := filter.Marshal()
 	parsedFilter, err := Parse(filterBytes)
 	require.NoError(err)

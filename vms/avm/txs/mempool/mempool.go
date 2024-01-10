@@ -63,6 +63,9 @@ type Mempool interface {
 	// unissued. This allows previously dropped txs to be possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
+
+	// Len returns the number of txs in the mempool.
+	Len() int
 }
 
 type mempool struct {
@@ -232,4 +235,11 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
+}
+
+func (m *mempool) Len() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.unissuedTxs.Len()
 }
