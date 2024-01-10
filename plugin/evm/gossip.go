@@ -109,7 +109,7 @@ func (tx *GossipAtomicTx) GossipID() ids.ID {
 }
 
 func NewGossipEthTxPool(mempool *txpool.TxPool) (*GossipEthTxPool, error) {
-	bloom, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
+	bloom, err := gossip.NewBloomFilter(txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
 	}
@@ -139,10 +139,11 @@ func (g *GossipEthTxPool) Subscribe(ctx context.Context) {
 			return
 		case pendingTxs := <-g.pendingTxs:
 			g.lock.Lock()
+			optimalElements := (g.mempool.PendingSize() + len(pendingTxs.Txs)) * txGossipBloomChurnMultiplier
 			for _, pendingTx := range pendingTxs.Txs {
 				tx := &GossipEthTx{Tx: pendingTx}
 				g.bloom.Add(tx)
-				reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, txGossipMaxFalsePositiveRate)
+				reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, optimalElements)
 				if err != nil {
 					log.Error("failed to reset bloom filter", "err", err)
 					continue
@@ -174,7 +175,7 @@ func (g *GossipEthTxPool) Iterate(f func(tx *GossipEthTx) bool) {
 	})
 }
 
-func (g *GossipEthTxPool) GetFilter() ([]byte, []byte, error) {
+func (g *GossipEthTxPool) GetFilter() ([]byte, []byte) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 

@@ -86,7 +86,7 @@ type Mempool struct {
 
 // NewMempool returns a Mempool with [maxSize]
 func NewMempool(ctx *snow.Context, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
-	bloom, err := gossip.NewBloomFilter(txGossipBloomMaxItems, txGossipBloomFalsePositiveRate)
+	bloom, err := gossip.NewBloomFilter(txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
 	}
@@ -340,7 +340,7 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 	}
 
 	m.bloom.Add(&GossipAtomicTx{Tx: tx})
-	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, txGossipMaxFalsePositiveRate)
+	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*txGossipBloomChurnMultiplier)
 	if err != nil {
 		return err
 	}
@@ -375,7 +375,7 @@ func (m *Mempool) Iterate(f func(tx *GossipAtomicTx) bool) {
 	}
 }
 
-func (m *Mempool) GetFilter() ([]byte, []byte, error) {
+func (m *Mempool) GetFilter() ([]byte, []byte) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
