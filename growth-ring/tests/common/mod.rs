@@ -614,7 +614,7 @@ impl PaintingSim {
         state: &mut WalStoreEmulState,
         canvas: &mut Canvas,
         wal: WalLoader,
-        ops: &Vec<PaintStrokes>,
+        ops: &[PaintStrokes],
         ringid_map: &HashMap<WalRingId, usize>,
     ) -> bool {
         if ops.is_empty() {
