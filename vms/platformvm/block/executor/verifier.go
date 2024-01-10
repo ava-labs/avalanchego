@@ -66,7 +66,6 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	// Advance the time to [b.Timestamp()].
-
 	if _, err = executor.AdvanceTimeTo(v.txExecutorBackend, onDecisionState, b.Timestamp()); err != nil {
 		return err
 	}
