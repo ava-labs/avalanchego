@@ -66,7 +66,7 @@ func newGossipMempool(
 	log logging.Logger,
 	txVerifier TxVerifier,
 	minTargetElements int,
-	targetFalsePositiveProbability float64,
+	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
 ) (*gossipMempool, error) {
 	bloom, err := gossip.NewBloomFilter(minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
