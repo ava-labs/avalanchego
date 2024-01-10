@@ -53,6 +53,7 @@ var (
 
 	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
 	feeTestDefaultStakeWeight = uint64(2024)
+	durangoTime               = time.Time{} // assume durango is active in these tests
 )
 
 type feeTests struct {
@@ -63,8 +64,6 @@ type feeTests struct {
 }
 
 func TestAddValidatorTxFees(t *testing.T) {
-	// For simplicity, we define a single AddValidatorTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -86,7 +85,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 		},
 		DelegationShares: reward.PercentDenominator,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -98,7 +97,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -117,7 +116,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -128,7 +127,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				require.Equal(t, 3721*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						266,
 						0,
@@ -145,10 +144,10 @@ func TestAddValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
-				cfg.DefaultBlockMaxConsumedUnits[0] = uint64(len(stx.Bytes())) - 1
+				cfg.DefaultBlockMaxConsumedUnits[0] = uint64(len(sTx.Bytes())) - 1
 
 				return cfg, chainTime
 			},
@@ -165,7 +164,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -175,8 +174,6 @@ func TestAddValidatorTxFees(t *testing.T) {
 }
 
 func TestAddSubnetValidatorTxFees(t *testing.T) {
-	// For simplicity, we define a single AddSubnetValidatorTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -196,7 +193,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 		},
 		SubnetAuth: subnetAuth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -208,7 +205,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -227,7 +224,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -238,7 +235,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				require.Equal(t, 3347*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						172,
 						0,
@@ -255,7 +252,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -275,7 +272,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -285,8 +282,6 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 }
 
 func TestAddDelegatorTxFees(t *testing.T) {
-	// For simplicity, we define a single AddDelegatorTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -307,7 +302,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -319,7 +314,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -338,7 +333,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -349,7 +344,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				require.Equal(t, 3717*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						266,
 						0,
@@ -366,7 +361,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -386,7 +381,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -396,8 +391,6 @@ func TestAddDelegatorTxFees(t *testing.T) {
 }
 
 func TestCreateChainTxFees(t *testing.T) {
-	// For simplicity, we define a single CreateChainTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -412,7 +405,7 @@ func TestCreateChainTxFees(t *testing.T) {
 		GenesisData: []byte{0xff},
 		SubnetAuth:  subnetAuth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -424,7 +417,7 @@ func TestCreateChainTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -443,7 +436,7 @@ func TestCreateChainTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -454,7 +447,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				require.Equal(t, 3390*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						172,
 						0,
@@ -471,7 +464,7 @@ func TestCreateChainTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -491,7 +484,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -501,8 +494,6 @@ func TestCreateChainTxFees(t *testing.T) {
 }
 
 func TestCreateSubnetTxFees(t *testing.T) {
-	// For simplicity, we define a single CreateSubnetTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -515,7 +506,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -527,7 +518,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -546,7 +537,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -557,7 +548,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				require.Equal(t, 3295*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						172,
 						0,
@@ -574,7 +565,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -594,7 +585,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -604,8 +595,6 @@ func TestCreateSubnetTxFees(t *testing.T) {
 }
 
 func TestRemoveSubnetValidatorTxFees(t *testing.T) {
-	// For simplicity, we define a single RemoveSubnetValidatorTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -617,7 +606,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 		Subnet:     ids.GenerateTestID(),
 		SubnetAuth: auth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -629,7 +618,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -648,7 +637,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -659,7 +648,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				require.Equal(t, 3323*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						172,
 						0,
@@ -676,7 +665,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -696,7 +685,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -706,8 +695,6 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 }
 
 func TestTransformSubnetTxFees(t *testing.T) {
-	// For simplicity, we define a single TransformSubnetTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -731,7 +718,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 		UptimeRequirement:        0,
 		SubnetAuth:               auth,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -743,7 +730,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -762,7 +749,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -773,7 +760,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				require.Equal(t, 3408*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						172,
 						0,
@@ -790,7 +777,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -810,7 +797,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -820,8 +807,6 @@ func TestTransformSubnetTxFees(t *testing.T) {
 }
 
 func TestTransferSubnetOwnershipTxFees(t *testing.T) {
-	// For simplicity, we define a single TransferSubnetOwnershipTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -841,7 +826,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 			},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -853,7 +838,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -872,7 +857,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -883,7 +868,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				require.Equal(t, 3339*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						172,
 						0,
@@ -900,7 +885,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -920,7 +905,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -930,8 +915,6 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 }
 
 func TestAddPermissionlessValidatorTxFees(t *testing.T) {
-	// For simplicity, we define a single AddPermissionlessValidatorTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -960,7 +943,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 		},
 		DelegationShares: reward.PercentDenominator,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -972,7 +955,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -991,7 +974,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1002,7 +985,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				require.Equal(t, 3941*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						266,
 						0,
@@ -1019,7 +1002,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -1039,7 +1022,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1049,8 +1032,6 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 }
 
 func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
-	// For simplicity, we define a single AddPermissionlessDelegatorTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1074,7 +1055,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 			},
 		},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -1086,7 +1067,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1105,7 +1086,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1116,7 +1097,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				require.Equal(t, 3749*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						266,
 						0,
@@ -1133,7 +1114,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -1153,7 +1134,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1163,15 +1144,13 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 }
 
 func TestBaseTxFees(t *testing.T) {
-	// For simplicity, we define a single BaseTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
 
 	baseTx, _, _ := txsCreationHelpers(defaultCtx)
 	uTx := &baseTx
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -1183,7 +1162,7 @@ func TestBaseTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1202,7 +1181,7 @@ func TestBaseTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1213,7 +1192,7 @@ func TestBaseTxFees(t *testing.T) {
 				require.Equal(t, 3255*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						172,
 						0,
@@ -1230,7 +1209,7 @@ func TestBaseTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -1250,7 +1229,7 @@ func TestBaseTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1260,8 +1239,6 @@ func TestBaseTxFees(t *testing.T) {
 }
 
 func TestImportTxFees(t *testing.T) {
-	// For simplicity, we define a single ImportTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1282,7 +1259,7 @@ func TestImportTxFees(t *testing.T) {
 			},
 		}},
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -1294,7 +1271,7 @@ func TestImportTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1313,7 +1290,7 @@ func TestImportTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1324,7 +1301,7 @@ func TestImportTxFees(t *testing.T) {
 				require.Equal(t, 5829*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						2180,
 						262,
 						0,
@@ -1341,7 +1318,7 @@ func TestImportTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -1361,7 +1338,7 @@ func TestImportTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1371,8 +1348,6 @@ func TestImportTxFees(t *testing.T) {
 }
 
 func TestExportTxFees(t *testing.T) {
-	// For simplicity, we define a single ExportTx
-	// and we change config parameters in the different test cases
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1383,7 +1358,7 @@ func TestExportTxFees(t *testing.T) {
 		DestinationChain: ids.GenerateTestID(),
 		ExportedOutputs:  outputs,
 	}
-	stx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
+	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
 	tests := []feeTests{
@@ -1395,7 +1370,7 @@ func TestExportTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1414,7 +1389,7 @@ func TestExportTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 
@@ -1425,7 +1400,7 @@ func TestExportTxFees(t *testing.T) {
 				require.Equal(t, 3665*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(stx.Bytes())),
+						uint64(len(sTx.Bytes())),
 						1090,
 						266,
 						0,
@@ -1442,7 +1417,7 @@ func TestExportTxFees(t *testing.T) {
 
 				cfg := &config.Config{
 					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: time.Time{}, // durango already active
+					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
@@ -1462,7 +1437,7 @@ func TestExportTxFees(t *testing.T) {
 				feeManager: fees.NewManager(cfg.DefaultUnitFees),
 				Config:     cfg,
 				ChainTime:  chainTime,
-				Tx:         stx,
+				Tx:         sTx,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
