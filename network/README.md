@@ -118,7 +118,7 @@ To provide an eventual guarantee that all peers learn of one another, each node 
 
 To optimize bandwidth, each node tracks the most recent IPs of validators. The validator's nodeID and timestamp are inserted into a bloom filter which is used to select only necessary IPs to gossip.
 
-To prevent the bloom filter from having too many false positives, the number of entries a validator is allowed to have in the bloom filter is capped. Periodically, a new bloom filter is generated. Generating the new bloom filter both removes stale entries and modifies the hash functions to avoid persistent hash collisions.
+As the number of entries increases in the bloom filter, the probability of a false positive increases. False positives can cause recent IPs not to be gossiped when they otherwise should be, slowing down the rate of `PeerList` gossip. To prevent the bloom filter from having too many false positives, a new bloom filter is periodically generated and the number of entries a validator is allowed to have in the bloom filter is capped. Generating the new bloom filter both removes stale entries and modifies the hash functions to avoid persistent hash collisions.
 
 A node follows the following steps for of `PeerList` gossip:
 

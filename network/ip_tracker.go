@@ -80,9 +80,13 @@ func (i *ipTracker) ManuallyTrack(nodeID ids.NodeID) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	// We treat manually tracked nodes as if they were validators.
 	if !i.validators.Contains(nodeID) {
 		i.onValidatorAdded(nodeID)
 	}
+	// Now that the node is marked as a validator, freeze it's validation
+	// status. Future calls to OnValidatorAdded or OnValidatorRemoved will be
+	// treated as noops.
 	i.manuallyTracked.Add(nodeID)
 }
 
