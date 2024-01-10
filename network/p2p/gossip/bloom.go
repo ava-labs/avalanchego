@@ -66,13 +66,12 @@ func (b *BloomFilter) Has(gossipable Gossipable) bool {
 	return bloom.Contains(b.bloom, h[:], b.salt[:])
 }
 
-// TODO: Remove error from the return
-func (b *BloomFilter) Marshal() ([]byte, []byte, error) {
+func (b *BloomFilter) Marshal() ([]byte, []byte) {
 	bloomBytes := b.bloom.Marshal()
 	// salt must be copied here to ensure the bytes aren't overwritten if salt
 	// is later modified.
 	salt := b.salt
-	return bloomBytes, salt[:], nil
+	return bloomBytes, salt[:]
 }
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches [targetFalsePositiveProbability].
