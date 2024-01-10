@@ -12,7 +12,7 @@ var _ Consensus = (*Flat)(nil)
 
 func NewFlat(params Parameters, choice ids.ID) Consensus {
 	return &Flat{
-		nnarySnowball: newNnarySnowball(params.BetaVirtuous, params.BetaRogue, choice),
+		nnarySnowball: newNnarySnowball(params.Beta, params.Beta, choice),
 		params:        params,
 	}
 }
