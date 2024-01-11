@@ -59,12 +59,6 @@ func New(numHashes, numEntries int) (*Filter, error) {
 	}, nil
 }
 
-// Parameters returns the [numHashes] and [numEntries] that were used when
-// creating this filter.
-func (f *Filter) Parameters() (int, int) {
-	return len(f.hashSeeds), len(f.entries)
-}
-
 func (f *Filter) Add(hash uint64) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
