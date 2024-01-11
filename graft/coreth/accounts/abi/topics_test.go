@@ -27,6 +27,7 @@
 package abi
 
 import (
+	"math"
 	"math/big"
 	"reflect"
 	"testing"
@@ -34,6 +35,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
+
+var MaxHash = common.HexToHash("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 
 func TestMakeTopics(t *testing.T) {
 	type args struct {
@@ -64,9 +67,27 @@ func TestMakeTopics(t *testing.T) {
 			false,
 		},
 		{
-			"support *big.Int types in topics",
-			args{[][]interface{}{{big.NewInt(1).Lsh(big.NewInt(2), 254)}}},
-			[][]common.Hash{{common.Hash{128}}},
+			"support positive *big.Int types in topics",
+			args{[][]interface{}{
+				{big.NewInt(1)},
+				{big.NewInt(1).Lsh(big.NewInt(2), 254)},
+			}},
+			[][]common.Hash{
+				{common.HexToHash("0000000000000000000000000000000000000000000000000000000000000001")},
+				{common.Hash{128}},
+			},
+			false,
+		},
+		{
+			"support negative *big.Int types in topics",
+			args{[][]interface{}{
+				{big.NewInt(-1)},
+				{big.NewInt(math.MinInt64)},
+			}},
+			[][]common.Hash{
+				{MaxHash},
+				{common.HexToHash("ffffffffffffffffffffffffffffffffffffffffffffffff8000000000000000")},
+			},
 			false,
 		},
 		{
