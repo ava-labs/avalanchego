@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -6,44 +6,48 @@ package network
 import (
 	"context"
 	"sync"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-// We allow [recentCacheSize] to be fairly large because we only store hashes
-// in the cache, not entire transactions.
-const recentCacheSize = 512
-
-var _ Network = (*network)(nil)
+const txGossipHandlerID = 0
 
 type Network interface {
 	common.AppHandler
 
+	// Gossip starts gossiping transactions and blocks until it completes.
+	Gossip(ctx context.Context)
 	// IssueTx verifies the transaction at the currently preferred state, adds
 	// it to the mempool, and gossips it to the network.
-	//
-	// Invariant: Assumes the context lock is held.
 	IssueTx(context.Context, *txs.Tx) error
 }
 
 type network struct {
-	// We embed a noop handler for all unhandled messages
-	common.AppHandler
+	*p2p.Network
 
-	ctx                       *snow.Context
-	manager                   executor.Manager
-	mempool                   mempool.Mempool
+	log                       logging.Logger
+	txVerifier                TxVerifier
+	mempool                   *gossipMempool
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
+
+	txPushGossiper    gossip.Accumulator[*txs.Tx]
+	txPullGossiper    gossip.Gossiper
+	txGossipFrequency time.Duration
 
 	// gossip related attributes
 	recentTxsLock sync.Mutex
@@ -51,32 +55,140 @@ type network struct {
 }
 
 func New(
-	ctx *snow.Context,
-	manager executor.Manager,
+	log logging.Logger,
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	vdrs validators.State,
+	txVerifier TxVerifier,
 	mempool mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
-) Network {
-	return &network{
-		AppHandler: common.NewNoOpAppHandler(ctx.Log),
+	registerer prometheus.Registerer,
+	config Config,
+) (Network, error) {
+	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
+	if err != nil {
+		return nil, err
+	}
 
-		ctx:                       ctx,
-		manager:                   manager,
-		mempool:                   mempool,
+	marshaller := txMarshaller{}
+	validators := p2p.NewValidators(
+		p2pNetwork.Peers,
+		log,
+		subnetID,
+		vdrs,
+		config.MaxValidatorSetStaleness,
+	)
+	txGossipClient := p2pNetwork.NewClient(
+		txGossipHandlerID,
+		p2p.WithValidatorSampling(validators),
+	)
+	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
+	if err != nil {
+		return nil, err
+	}
+
+	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
+		marshaller,
+		txGossipClient,
+		txGossipMetrics,
+		config.TargetGossipSize,
+	)
+
+	gossipMempool, err := newGossipMempool(
+		mempool,
+		log,
+		txVerifier,
+		config.ExpectedBloomFilterElements,
+		config.ExpectedBloomFilterFalsePositiveProbability,
+		config.MaxBloomFilterFalsePositiveProbability,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var txPullGossiper gossip.Gossiper
+	txPullGossiper = gossip.NewPullGossiper[*txs.Tx](
+		log,
+		marshaller,
+		gossipMempool,
+		txGossipClient,
+		txGossipMetrics,
+		config.PullGossipPollSize,
+	)
+
+	// Gossip requests are only served if a node is a validator
+	txPullGossiper = gossip.ValidatorGossiper{
+		Gossiper:   txPullGossiper,
+		NodeID:     nodeID,
+		Validators: validators,
+	}
+
+	handler := gossip.NewHandler[*txs.Tx](
+		log,
+		marshaller,
+		txPushGossiper,
+		gossipMempool,
+		txGossipMetrics,
+		config.TargetGossipSize,
+	)
+
+	validatorHandler := p2p.NewValidatorHandler(
+		p2p.NewThrottlerHandler(
+			handler,
+			p2p.NewSlidingWindowThrottler(
+				config.PullGossipThrottlingPeriod,
+				config.PullGossipThrottlingLimit,
+			),
+			log,
+		),
+		validators,
+		log,
+	)
+
+	// We allow pushing txs between all peers, but only serve gossip requests
+	// from validators
+	txGossipHandler := txGossipHandler{
+		appGossipHandler:  handler,
+		appRequestHandler: validatorHandler,
+	}
+
+	if err := p2pNetwork.AddHandler(txGossipHandlerID, txGossipHandler); err != nil {
+		return nil, err
+	}
+
+	return &network{
+		Network:                   p2pNetwork,
+		log:                       log,
+		txVerifier:                txVerifier,
+		mempool:                   gossipMempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		appSender:                 appSender,
-		recentTxs:                 &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
+		txPushGossiper:            txPushGossiper,
+		txPullGossiper:            txPullGossiper,
+		txGossipFrequency:         config.PullGossipFrequency,
+		recentTxs:                 &cache.LRU[ids.ID, struct{}]{Size: config.LegacyPushGossipCacheSize},
+	}, nil
+}
+
+func (n *network) Gossip(ctx context.Context) {
+	// If the node is running partial sync, we should not perform any pull
+	// gossip.
+	if n.partialSyncPrimaryNetwork {
+		return
 	}
+
+	gossip.Every(ctx, n.log, n.txPullGossiper, n.txGossipFrequency)
 }
 
 func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
-	n.ctx.Log.Debug("called AppGossip message handler",
+	n.log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
 
 	if n.partialSyncPrimaryNetwork {
-		n.ctx.Log.Debug("dropping AppGossip message",
+		n.log.Debug("dropping AppGossip message",
 			zap.String("reason", "primary network is not being fully synced"),
 		)
 		return nil
@@ -84,15 +196,16 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
-		n.ctx.Log.Debug("dropping AppGossip message",
+		n.log.Debug("forwarding AppGossip to p2p network",
 			zap.String("reason", "failed to parse message"),
 		)
-		return nil
+
+		return n.Network.AppGossip(ctx, nodeID, msgBytes)
 	}
 
 	msg, ok := msgIntf.(*message.Tx)
 	if !ok {
-		n.ctx.Log.Debug("dropping unexpected message",
+		n.log.Debug("dropping unexpected message",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
@@ -100,7 +213,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 
 	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
-		n.ctx.Log.Verbo("received invalid tx",
+		n.log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),
 			zap.Binary("tx", msg.Tx),
 			zap.Error(err),
@@ -109,20 +222,11 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	}
 	txID := tx.ID()
 
-	// We need to grab the context lock here to avoid racy behavior with
-	// transaction verification + mempool modifications.
-	//
-	// Invariant: tx should not be referenced again without the context lock
-	// held to avoid any data races.
-	n.ctx.Lock.Lock()
-	defer n.ctx.Lock.Unlock()
-
-	if reason := n.mempool.GetDropReason(txID); reason != nil {
-		// If the tx is being dropped - just ignore it
-		return nil
-	}
 	if err := n.issueTx(tx); err == nil {
-		n.gossipTx(ctx, txID, msgBytes)
+		n.legacyGossipTx(ctx, txID, msgBytes)
+
+		n.txPushGossiper.Add(tx)
+		return n.txPushGossiper.Gossip(ctx)
 	}
 	return nil
 }
@@ -142,29 +246,13 @@ func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	}
 
 	txID := tx.ID()
-	n.gossipTx(ctx, txID, msgBytes)
-	return nil
+	n.legacyGossipTx(ctx, txID, msgBytes)
+	n.txPushGossiper.Add(tx)
+	return n.txPushGossiper.Gossip(ctx)
 }
 
 // returns nil if the tx is in the mempool
 func (n *network) issueTx(tx *txs.Tx) error {
-	txID := tx.ID()
-	if n.mempool.Has(txID) {
-		// The tx is already in the mempool
-		return nil
-	}
-
-	// Verify the tx at the currently preferred state
-	if err := n.manager.VerifyTx(tx); err != nil {
-		n.ctx.Log.Debug("tx failed verification",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-
-		n.mempool.MarkDropped(txID, err)
-		return err
-	}
-
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
 	if n.partialSyncPrimaryNetwork {
@@ -172,21 +260,18 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	if err := n.mempool.Add(tx); err != nil {
-		n.ctx.Log.Debug("tx failed to be added to the mempool",
-			zap.Stringer("txID", txID),
+		n.log.Debug("tx failed to be added to the mempool",
+			zap.Stringer("txID", tx.ID()),
 			zap.Error(err),
 		)
 
-		n.mempool.MarkDropped(txID, err)
 		return err
 	}
-
-	n.mempool.RequestBuildBlock(false)
 
 	return nil
 }
 
-func (n *network) gossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
+func (n *network) legacyGossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
 	n.recentTxsLock.Lock()
 	_, has := n.recentTxs.Get(txID)
 	n.recentTxs.Put(txID, struct{}{})
@@ -197,12 +282,12 @@ func (n *network) gossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
 		return
 	}
 
-	n.ctx.Log.Debug("gossiping tx",
+	n.log.Debug("gossiping tx",
 		zap.Stringer("txID", txID),
 	)
 
 	if err := n.appSender.SendAppGossip(ctx, msgBytes); err != nil {
-		n.ctx.Log.Error("failed to gossip tx",
+		n.log.Error("failed to gossip tx",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)

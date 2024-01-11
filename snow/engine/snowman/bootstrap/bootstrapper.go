@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -781,6 +781,7 @@ func (b *Bootstrapper) Timeout(ctx context.Context) error {
 func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 	b.Ctx.Log.Debug("Checking for new frontiers")
 	b.restarted = true
+	b.outstandingRequests = bimap.New[common.Request, ids.ID]()
 	return b.startBootstrapping(ctx)
 }
 

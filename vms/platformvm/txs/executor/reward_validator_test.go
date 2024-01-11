@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -25,7 +25,7 @@ import (
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -128,7 +128,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -225,7 +225,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -264,16 +264,20 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
 	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
-		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
 
+	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
-		delTx.Unsigned.(*txs.AddDelegatorTx),
+		addDelTx,
+		addDelTx.StartTime(),
 		1000000,
 	)
 	require.NoError(err)
@@ -345,7 +349,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -384,18 +388,22 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
 	vdrRewardAmt := uint64(2000000)
 	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
-		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		time.Unix(int64(vdrStartTime), 0),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
 
+	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
 	delRewardAmt := uint64(1000000)
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
-		delTx.Unsigned.(*txs.AddDelegatorTx),
+		addDelTx,
+		time.Unix(int64(delStartTime), 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -560,7 +568,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -599,18 +607,22 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	)
 	require.NoError(err)
 
+	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
 	vdrRewardAmt := uint64(2000000)
 	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
-		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
 
+	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
 	delRewardAmt := uint64(1000000)
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
-		delTx.Unsigned.(*txs.AddDelegatorTx),
+		addDelTx,
+		time.Unix(int64(delStartTime), 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -718,7 +730,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -759,16 +771,20 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
 	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
-		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
 
+	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
-		delTx.Unsigned.(*txs.AddDelegatorTx),
+		addDelTx,
+		addDelTx.StartTime(),
 		1000000,
 	)
 	require.NoError(err)

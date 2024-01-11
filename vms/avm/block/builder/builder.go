@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -93,15 +93,19 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		remainingSize = targetBlockSize
 	)
 	for {
-		tx := b.mempool.Peek(remainingSize)
-		if tx == nil {
+		tx, exists := b.mempool.Peek()
+		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
+		// that we will only stop building a block once there are no
+		// transactions in the mempool or the block is at least
+		// [targetBlockSize - mempool.MaxTxSize] bytes full.
+		if !exists || len(tx.Bytes()) > remainingSize {
 			break
 		}
-		b.mempool.Remove([]*txs.Tx{tx})
+		b.mempool.Remove(tx)
 
 		// Invariant: [tx] has already been syntactically verified.
 
-		txDiff, err := wrapState(stateDiff)
+		txDiff, err := state.NewDiffOn(stateDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -165,18 +169,4 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	return b.manager.NewBlock(statelessBlk), nil
-}
-
-type stateGetter struct {
-	state state.Chain
-}
-
-func (s stateGetter) GetState(ids.ID) (state.Chain, bool) {
-	return s.state, true
-}
-
-func wrapState(parentState state.Chain) (state.Diff, error) {
-	return state.NewDiff(ids.Empty, stateGetter{
-		state: parentState,
-	})
 }

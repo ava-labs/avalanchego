@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type Info struct {
@@ -19,5 +20,7 @@ type Info struct {
 	LastReceived          time.Time              `json:"lastReceived"`
 	ObservedUptime        json.Uint32            `json:"observedUptime"`
 	ObservedSubnetUptimes map[ids.ID]json.Uint32 `json:"observedSubnetUptimes"`
-	TrackedSubnets        []ids.ID               `json:"trackedSubnets"`
+	TrackedSubnets        set.Set[ids.ID]        `json:"trackedSubnets"`
+	SupportedACPs         set.Set[uint32]        `json:"supportedACPs"`
+	ObjectedACPs          set.Set[uint32]        `json:"objectedACPs"`
 }

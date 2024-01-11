@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -43,7 +43,7 @@ func NewBanffAbortBlock(
 			},
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }
 
 type ApricotAbortBlock struct {
@@ -78,5 +78,5 @@ func NewApricotAbortBlock(
 			Hght:   height,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, &blk.CommonBlock)
 }

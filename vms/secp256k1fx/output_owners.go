@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -21,7 +21,6 @@ var (
 	ErrOutputUnspendable    = errors.New("output is unspendable")
 	ErrOutputUnoptimized    = errors.New("output representation should be optimized")
 	ErrAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
-	ErrMarshal              = errors.New("cannot marshal without ctx")
 )
 
 type OutputOwners struct {
@@ -37,8 +36,8 @@ type OutputOwners struct {
 	ctx *snow.Context
 }
 
-// InitCtx assigns the OutputOwners.ctx object to given [ctx] object
-// Must be called at least once for MarshalJSON to work successfully
+// InitCtx allows addresses to be formatted into their human readable format
+// during json marshalling.
 func (out *OutputOwners) InitCtx(ctx *snow.Context) {
 	out.ctx = ctx
 }
@@ -59,14 +58,7 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 // Fields returns JSON keys in a map that can be used with marshal JSON
 // to serialize OutputOwners struct
 func (out *OutputOwners) Fields() (map[string]interface{}, error) {
-	addrsLen := len(out.Addrs)
-
-	// we need out.ctx to do this, if its absent, throw error
-	if addrsLen > 0 && out.ctx == nil {
-		return nil, ErrMarshal
-	}
-
-	addresses := make([]string, addrsLen)
+	addresses := make([]string, len(out.Addrs))
 	for i, addr := range out.Addrs {
 		// for each [addr] in [Addrs] we attempt to format it given
 		// the [out.ctx] object
@@ -138,8 +130,13 @@ func (out *OutputOwners) Sort() {
 }
 
 // formatAddress formats a given [addr] into human readable format using
-// [ChainID] and [NetworkID] from the provided [ctx].
+// [ChainID] and [NetworkID] if a non-nil [ctx] is provided. If [ctx] is not
+// provided, the address will be returned in cb58 format.
 func formatAddress(ctx *snow.Context, addr ids.ShortID) (string, error) {
+	if ctx == nil {
+		return addr.String(), nil
+	}
+
 	chainIDAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
 	if err != nil {
 		return "", err

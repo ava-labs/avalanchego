@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -38,11 +38,6 @@ func (v *Validator) StartTime() time.Time {
 // EndTime is the time that this validator will leave the validator set
 func (v *Validator) EndTime() time.Time {
 	return time.Unix(int64(v.End), 0)
-}
-
-// Duration is the amount of time that this validator will be in the validator set
-func (v *Validator) Duration() time.Duration {
-	return v.EndTime().Sub(v.StartTime())
 }
 
 // Weight is this validator's weight when sampling

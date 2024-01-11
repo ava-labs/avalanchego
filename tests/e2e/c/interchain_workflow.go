@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -37,7 +37,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		ethClient := e2e.NewEthClient(nodeURI)
 
 		ginkgo.By("allocating a pre-funded key to send from and a recipient key to deliver to")
-		senderKey := e2e.Env.AllocateFundedKey()
+		senderKey := e2e.Env.AllocatePreFundedKey()
 		senderEthAddress := evm.GetEthAddress(senderKey)
 		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)

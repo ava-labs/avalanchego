@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -81,21 +81,14 @@ func FuzzCodecKey(f *testing.F) {
 		) {
 			require := require.New(t)
 			codec := codec.(*codecImpl)
-			reader := bytes.NewReader(b)
-			startLen := reader.Len()
-			got, err := codec.decodeKey(reader)
+			got, err := codec.decodeKey(b)
 			if err != nil {
 				t.SkipNow()
 			}
-			endLen := reader.Len()
-			numRead := startLen - endLen
 
 			// Encoding [got] should be the same as [b].
-			var buf bytes.Buffer
-			codec.encodeKey(&buf, got)
-			bufBytes := buf.Bytes()
-			require.Len(bufBytes, numRead)
-			require.Equal(b[:numRead], bufBytes)
+			gotBytes := codec.encodeKey(got)
+			require.Equal(b, gotBytes)
 		},
 	)
 }
@@ -165,7 +158,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				}
 
 				nodeBytes := codec.encodeDBNode(&node)
-
+				require.Len(nodeBytes, codec.encodedDBNodeSize(&node))
 				var gotNode dbNode
 				require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
 				require.Equal(node, gotNode)
@@ -248,7 +241,28 @@ func FuzzEncodeHashValues(f *testing.F) {
 
 func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 	codec := codec.(*codecImpl)
-	bytes := bytes.NewReader(binary.AppendUvarint(nil, math.MaxInt))
-	_, err := codec.decodeKey(bytes)
+	_, err := codec.decodeKey(binary.AppendUvarint(nil, math.MaxInt))
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+}
+
+func TestUintSize(t *testing.T) {
+	c := codec.(*codecImpl)
+
+	// Test lower bound
+	expectedSize := c.uintSize(0)
+	actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), 0)
+	require.Equal(t, expectedSize, actualSize)
+
+	// Test upper bound
+	expectedSize = c.uintSize(math.MaxUint64)
+	actualSize = binary.PutUvarint(make([]byte, binary.MaxVarintLen64), math.MaxUint64)
+	require.Equal(t, expectedSize, actualSize)
+
+	// Test powers of 2
+	for power := 0; power < 64; power++ {
+		n := uint64(1) << uint(power)
+		expectedSize := c.uintSize(n)
+		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), n)
+		require.Equal(t, expectedSize, actualSize, power)
+	}
 }

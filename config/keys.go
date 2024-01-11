@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -13,6 +13,8 @@ const (
 	GenesisFileKey                                     = "genesis-file"
 	GenesisFileContentKey                              = "genesis-file-content"
 	NetworkNameKey                                     = "network-id"
+	ACPSupportKey                                      = "acp-support"
+	ACPObjectKey                                       = "acp-object"
 	TxFeeKey                                           = "tx-fee"
 	CreateAssetTxFeeKey                                = "create-asset-tx-fee"
 	CreateSubnetTxFeeKey                               = "create-subnet-tx-fee"

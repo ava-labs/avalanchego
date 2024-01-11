@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -198,7 +198,14 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
 			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+				// We should only fail to get a change proof if we have insufficient history.
+				// Other errors are unexpected.
 				return err
+			}
+			if errors.Is(err, merkledb.ErrNoEndRoot) {
+				// [s.db] doesn't have [endRoot] in its history.
+				// We can't generate a change/range proof. Drop this request.
+				return nil
 			}
 
 			// [s.db] doesn't have sufficient history to generate change proof.
@@ -390,6 +397,8 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 		return errInvalidStartRootHash
 	case len(req.EndRootHash) != hashing.HashLen:
 		return errInvalidEndRootHash
+	case bytes.Equal(req.EndRootHash, ids.Empty[:]):
+		return merkledb.ErrEmptyProof
 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
@@ -411,6 +420,8 @@ func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
 		return errInvalidKeyLimit
 	case len(req.RootHash) != ids.IDLen:
 		return errInvalidRootHash
+	case bytes.Equal(req.RootHash, ids.Empty[:]):
+		return merkledb.ErrEmptyProof
 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:

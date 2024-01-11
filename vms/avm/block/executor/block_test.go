@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -857,28 +857,27 @@ func TestBlockReject(t *testing.T) {
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
+				mempool.EXPECT().RequestBuildBlock()
 
-				preferredID := ids.GenerateTestID()
-				mockPreferredState := state.NewMockDiff(ctrl)
-				mockPreferredState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).AnyTimes()
-				mockPreferredState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
+				lastAcceptedID := ids.GenerateTestID()
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
-						preferred: preferredID,
-						mempool:   mempool,
-						metrics:   metrics.NewMockMetrics(ctrl),
+						lastAccepted: lastAcceptedID,
+						mempool:      mempool,
+						metrics:      metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
 							Bootstrapped: true,
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
 						},
+						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
-							preferredID: {
-								onAcceptState: mockPreferredState,
-							},
 							blockID: {},
 						},
 					},
@@ -916,28 +915,27 @@ func TestBlockReject(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Add(tx1).Return(nil)
 				mempool.EXPECT().Add(tx2).Return(nil)
+				mempool.EXPECT().RequestBuildBlock()
 
-				preferredID := ids.GenerateTestID()
-				mockPreferredState := state.NewMockDiff(ctrl)
-				mockPreferredState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).AnyTimes()
-				mockPreferredState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
+				lastAcceptedID := ids.GenerateTestID()
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
+				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
-						preferred: preferredID,
-						mempool:   mempool,
-						metrics:   metrics.NewMockMetrics(ctrl),
+						lastAccepted: lastAcceptedID,
+						mempool:      mempool,
+						metrics:      metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
 							Bootstrapped: true,
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
 						},
+						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
-							preferredID: {
-								onAcceptState: mockPreferredState,
-							},
 							blockID: {},
 						},
 					},

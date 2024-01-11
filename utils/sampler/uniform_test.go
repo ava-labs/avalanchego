@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -19,12 +19,16 @@ var (
 		sampler Uniform
 	}{
 		{
-			name:    "replacer",
-			sampler: &uniformReplacer{},
+			name: "replacer",
+			sampler: &uniformReplacer{
+				rng: globalRNG,
+			},
 		},
 		{
-			name:    "resampler",
-			sampler: &uniformResample{},
+			name: "resampler",
+			sampler: &uniformResample{
+				rng: globalRNG,
+			},
 		},
 		{
 			name:    "best",
@@ -155,54 +159,4 @@ func UniformLazilySample(t *testing.T, s Uniform) {
 
 		s.Reset()
 	}
-}
-
-func TestSeeding(t *testing.T) {
-	require := require.New(t)
-
-	s1 := NewBestUniform(30)
-	s2 := NewBestUniform(30)
-
-	s1.Initialize(50)
-	s2.Initialize(50)
-
-	s1.Seed(0)
-
-	s1.Reset()
-	s1Val, err := s1.Next()
-	require.NoError(err)
-
-	s2.Seed(1)
-	s2.Reset()
-
-	s1.Seed(0)
-	v, err := s2.Next()
-	require.NoError(err)
-	require.NotEqual(s1Val, v)
-
-	s1.ClearSeed()
-
-	_, err = s1.Next()
-	require.NoError(err)
-}
-
-func TestSeedingProducesTheSame(t *testing.T) {
-	require := require.New(t)
-
-	s := NewBestUniform(30)
-
-	s.Initialize(50)
-
-	s.Seed(0)
-	s.Reset()
-
-	val0, err := s.Next()
-	require.NoError(err)
-
-	s.Seed(0)
-	s.Reset()
-
-	val1, err := s.Next()
-	require.NoError(err)
-	require.Equal(val0, val1)
 }

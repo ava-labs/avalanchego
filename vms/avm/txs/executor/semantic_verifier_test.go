@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -6,6 +6,7 @@ package executor
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -30,11 +32,12 @@ import (
 )
 
 func TestSemanticVerifierBaseTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},
@@ -387,16 +390,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 }
 
 func TestSemanticVerifierExportTx(t *testing.T) {
-	ctx := newContext(t)
-	ctrl := gomock.NewController(t)
-
-	validatorState := validators.NewMockState(ctrl)
-	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)
-	ctx.ValidatorState = validatorState
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},
@@ -756,7 +755,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ids.GenerateTestID(), nil)
@@ -765,6 +764,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	typeToFxIndex := make(map[reflect.Type]int)
 	secpFx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},
@@ -873,13 +873,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 }
 
 func TestSemanticVerifierImportTx(t *testing.T) {
-	ctrl := gomock.NewController(t)
-
-	ctx := newContext(t)
-
-	validatorState := validators.NewMockState(ctrl)
-	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)
-	ctx.ValidatorState = validatorState
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	m := atomic.NewMemory(prefixdb.New([]byte{0}, memdb.New()))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
@@ -887,6 +881,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 	typeToFxIndex := make(map[reflect.Type]int)
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewCustomParser(
+		time.Time{},
 		typeToFxIndex,
 		new(mockable.Clock),
 		logging.NoWarn{},

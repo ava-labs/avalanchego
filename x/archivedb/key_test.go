@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package archivedb
@@ -21,9 +21,7 @@ func TestNaturalDescSortingForSameKey(t *testing.T) {
 	entry := [][]byte{key0, key1, key2, key3}
 	expected := [][]byte{key3, key2, key1, key0}
 
-	slices.SortFunc(entry, func(i, j []byte) bool {
-		return bytes.Compare(i, j) < 0
-	})
+	slices.SortFunc(entry, bytes.Compare)
 
 	require.Equal(t, expected, entry)
 }
@@ -37,9 +35,7 @@ func TestSortingDifferentPrefix(t *testing.T) {
 	entry := [][]byte{key0, key1, key2, key3}
 	expected := [][]byte{key1, key0, key3, key2}
 
-	slices.SortFunc(entry, func(i, j []byte) bool {
-		return bytes.Compare(i, j) < 0
-	})
+	slices.SortFunc(entry, bytes.Compare)
 
 	require.Equal(t, expected, entry)
 }

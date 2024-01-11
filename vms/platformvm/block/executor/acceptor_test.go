@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -124,7 +125,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
 	childID := ids.GenerateTestID()
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
 		onAcceptState:  onAcceptState,
 		atomicRequests: atomicRequests,
@@ -207,16 +208,15 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
 	childID := ids.GenerateTestID()
-	atomicRequests := map[ids.ID]*atomic.Requests{ids.GenerateTestID(): nil}
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	calledOnAcceptFunc := false
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
-		onAcceptState:  onAcceptState,
-		atomicRequests: atomicRequests,
-		standardBlockState: standardBlockState{
-			onAcceptFunc: func() {
-				calledOnAcceptFunc = true
-			},
+		onAcceptState: onAcceptState,
+		onAcceptFunc: func() {
+			calledOnAcceptFunc = true
 		},
+
+		atomicRequests: atomicRequests,
 	}
 	// Give [blk] a child.
 	childOnAcceptState := state.NewMockDiff(ctrl)
@@ -281,13 +281,21 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	calledOnAcceptFunc := false
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	parentState := &blockState{
-		statelessBlock: parentStatelessBlk,
-		onAcceptState:  parentOnAcceptState,
 		proposalBlockState: proposalBlockState{
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},
+		statelessBlock: parentStatelessBlk,
+
+		onAcceptState: parentOnAcceptState,
+		onAcceptFunc: func() {
+			calledOnAcceptFunc = true
+		},
+
+		atomicRequests: atomicRequests,
 	}
 	acceptor.backend.blkIDToState[parentID] = parentState
 
@@ -309,12 +317,20 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	err = acceptor.ApricotCommitBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
 
+	parentOnCommitState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
-	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: onAcceptState,
+		onAcceptState: parentState.onCommitState,
+		onAcceptFunc:  parentState.onAcceptFunc,
+
+		inputs:         parentState.inputs,
+		timestamp:      parentOnCommitState.GetTimestamp(),
+		atomicRequests: parentState.atomicRequests,
 	}
+
+	batch := database.NewMockBatch(ctrl)
 
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
@@ -329,12 +345,15 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
 		s.EXPECT().AddStatelessBlock(blk).Times(1),
 
-		onAcceptState.EXPECT().Apply(s).Times(1),
-		s.EXPECT().Commit().Return(nil).Times(1),
+		parentOnCommitState.EXPECT().Apply(s).Times(1),
+		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
+		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
 		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		s.EXPECT().Abort().Times(1),
 	)
 
 	require.NoError(acceptor.ApricotCommitBlock(blk))
+	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
@@ -372,13 +391,21 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
+	calledOnAcceptFunc := false
+	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	parentState := &blockState{
-		statelessBlock: parentStatelessBlk,
-		onAcceptState:  parentOnAcceptState,
 		proposalBlockState: proposalBlockState{
 			onAbortState:  parentOnAbortState,
 			onCommitState: parentOnCommitState,
 		},
+		statelessBlock: parentStatelessBlk,
+
+		onAcceptState: parentOnAcceptState,
+		onAcceptFunc: func() {
+			calledOnAcceptFunc = true
+		},
+
+		atomicRequests: atomicRequests,
 	}
 	acceptor.backend.blkIDToState[parentID] = parentState
 
@@ -400,13 +427,20 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	err = acceptor.ApricotAbortBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
 
+	parentOnAbortState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
-
-	onAcceptState := state.NewMockDiff(ctrl)
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: onAcceptState,
+		onAcceptState: parentState.onAbortState,
+		onAcceptFunc:  parentState.onAcceptFunc,
+
+		inputs:         parentState.inputs,
+		timestamp:      parentOnAbortState.GetTimestamp(),
+		atomicRequests: parentState.atomicRequests,
 	}
+
+	batch := database.NewMockBatch(ctrl)
 
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
@@ -421,11 +455,14 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
 		s.EXPECT().AddStatelessBlock(blk).Times(1),
 
-		onAcceptState.EXPECT().Apply(s).Times(1),
-		s.EXPECT().Commit().Return(nil).Times(1),
+		parentOnAbortState.EXPECT().Apply(s).Times(1),
+		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
+		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
 		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		s.EXPECT().Abort().Times(1),
 	)
 
 	require.NoError(acceptor.ApricotAbortBlock(blk))
+	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

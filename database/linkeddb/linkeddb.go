@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linkeddb
@@ -316,7 +316,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 		return node{}, err
 	}
 	n := node{}
-	_, err = c.Unmarshal(nodeBytes, &n)
+	_, err = Codec.Unmarshal(nodeBytes, &n)
 	if err == nil {
 		ldb.nodeCache.Put(keyStr, &n)
 	}
@@ -325,7 +325,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 
 func (ldb *linkedDB) putNode(key []byte, n node) error {
 	ldb.updatedNodes[string(key)] = &n
-	nodeBytes, err := c.Marshal(codecVersion, n)
+	nodeBytes, err := Codec.Marshal(CodecVersion, n)
 	if err != nil {
 		return err
 	}

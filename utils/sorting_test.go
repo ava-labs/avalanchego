@@ -1,12 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
 
 import (
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,8 +13,15 @@ var _ Sortable[sortable] = sortable(0)
 
 type sortable int
 
-func (s sortable) Less(other sortable) bool {
-	return s < other
+func (s sortable) Compare(other sortable) int {
+	switch {
+	case s < other:
+		return -1
+	case s > other:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func TestSortSliceSortable(t *testing.T) {
@@ -57,23 +62,6 @@ func TestSortSliceSortable(t *testing.T) {
 	s = []sortable{3, 1, 2}
 	Sort(s)
 	require.Equal([]sortable{1, 2, 3}, s)
-}
-
-func TestSortBytesIsSortedBytes(t *testing.T) {
-	require := require.New(t)
-
-	seed := time.Now().UnixNano()
-	t.Log("Seed: ", seed)
-	rand := rand.New(rand.NewSource(seed)) //#nosec G404
-
-	slices := make([][]byte, 1024)
-	for j := 0; j < len(slices); j++ {
-		slices[j] = make([]byte, 32)
-		_, _ = rand.Read(slices[j])
-	}
-	require.False(IsSortedBytes(slices))
-	SortBytes(slices)
-	require.True(IsSortedBytes(slices))
 }
 
 func TestIsSortedAndUniqueSortable(t *testing.T) {

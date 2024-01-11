@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -34,18 +34,21 @@ func Parse(s string) (*Semantic, error) {
 	}, nil
 }
 
-func ParseApplication(s string) (*Application, error) {
-	if !strings.HasPrefix(s, "avalanche/") {
+// TODO: Remove after v1.11.x is activated
+func ParseLegacyApplication(s string) (*Application, error) {
+	prefix := fmt.Sprintf("%s/", LegacyAppName)
+	if !strings.HasPrefix(s, prefix) {
 		return nil, fmt.Errorf("%w: %q", errMissingApplicationPrefix, s)
 	}
 
-	s = s[10:]
+	s = s[len(prefix):]
 	major, minor, patch, err := parseVersions(s)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Application{
+		Name:  Client, // Convert the legacy name to the current client name
 		Major: major,
 		Minor: minor,
 		Patch: patch,

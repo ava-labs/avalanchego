@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -28,8 +28,10 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	nodeSize := cacheEntrySize(n.key, n)
 
 	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
-	cacheSize := nodeSize * 20
-	evictionBatchSize := cacheSize
+	cacheSize := nodeSize * 100
+	bufferSize := nodeSize * 20
+
+	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
 		baseDB,
@@ -38,6 +40,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 		},
 		&mockMetrics{},
 		cacheSize,
+		bufferSize,
 		evictionBatchSize,
 		4,
 	)
@@ -78,7 +81,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 		node := newNode(Key{})
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
-		if newExpectedSize > cacheSize {
+		if newExpectedSize > bufferSize {
 			// Don't trigger eviction.
 			break
 		}
@@ -89,7 +92,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	}
 
 	// Assert cache has expected number of elements
-	require.Equal(added, db.nodeCache.fifo.Len())
+	require.Equal(added, db.writeBuffer.fifo.Len())
 
 	// Put one more element in the cache, which should trigger an eviction
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
@@ -100,14 +103,14 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require.NoError(db.Put(key, node))
 
 	// Assert cache has expected number of elements
-	require.Equal(1, db.nodeCache.fifo.Len())
-	gotKey, _, ok := db.nodeCache.fifo.Oldest()
+	require.Equal(1, db.writeBuffer.fifo.Len())
+	gotKey, _, ok := db.writeBuffer.fifo.Oldest()
 	require.True(ok)
 	require.Equal(ToKey([]byte{byte(added)}), gotKey)
 
 	// Get a node from the base database
 	// Use an early key that has been evicted from the cache
-	_, inCache := db.nodeCache.Get(node1Key)
+	_, inCache := db.writeBuffer.Get(node1Key)
 	require.False(inCache)
 	nodeRead, err := db.Get(node1Key)
 	require.NoError(err)
@@ -117,7 +120,7 @@ func Test_IntermediateNodeDB(t *testing.T) {
 	require.NoError(db.Flush())
 
 	// Assert the cache is empty
-	require.Zero(db.nodeCache.fifo.Len())
+	require.Zero(db.writeBuffer.fifo.Len())
 
 	// Assert the evicted cache elements were written to disk with prefix.
 	it := baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
@@ -132,8 +135,9 @@ func Test_IntermediateNodeDB(t *testing.T) {
 }
 
 func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
+	bufferSize := 200
 	cacheSize := 200
-	evictionBatchSize := cacheSize
+	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
 
 	f.Fuzz(func(
@@ -150,6 +154,7 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 				},
 				&mockMetrics{},
 				cacheSize,
+				bufferSize,
 				evictionBatchSize,
 				tokenSize,
 			)
@@ -182,7 +187,8 @@ func FuzzIntermediateNodeDBConstructDBKey(f *testing.F) {
 func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 	require := require.New(t)
 	cacheSize := 200
-	evictionBatchSize := cacheSize
+	bufferSize := 200
+	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
 		baseDB,
@@ -191,6 +197,7 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 		},
 		&mockMetrics{},
 		cacheSize,
+		bufferSize,
 		evictionBatchSize,
 		4,
 	)
@@ -217,7 +224,8 @@ func Test_IntermediateNodeDB_ConstructDBKey_DirtyBuffer(t *testing.T) {
 func TestIntermediateNodeDBClear(t *testing.T) {
 	require := require.New(t)
 	cacheSize := 200
-	evictionBatchSize := cacheSize
+	bufferSize := 200
+	evictionBatchSize := bufferSize
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
 		baseDB,
@@ -226,6 +234,7 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 		},
 		&mockMetrics{},
 		cacheSize,
+		bufferSize,
 		evictionBatchSize,
 		4,
 	)
@@ -240,5 +249,46 @@ func TestIntermediateNodeDBClear(t *testing.T) {
 	defer iter.Release()
 	require.False(iter.Next())
 
-	require.Zero(db.nodeCache.currentSize)
+	require.Zero(db.writeBuffer.currentSize)
+}
+
+// Test that deleting the empty key and flushing works correctly.
+// Previously, there was a bug that occurred when deleting the empty key
+// if the cache was empty. The size of the cache entry was reported as 0,
+// which caused the cache's currentSize to be 0, so on resize() we didn't
+// call onEviction. This caused the empty key to not be deleted from the baseDB.
+func TestIntermediateNodeDBDeleteEmptyKey(t *testing.T) {
+	require := require.New(t)
+	cacheSize := 200
+	bufferSize := 200
+	evictionBatchSize := bufferSize
+	baseDB := memdb.New()
+	db := newIntermediateNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+		bufferSize,
+		evictionBatchSize,
+		4,
+	)
+
+	emptyKey := ToKey([]byte{})
+	require.NoError(db.Put(emptyKey, newNode(emptyKey)))
+	require.NoError(db.Flush())
+
+	emptyDBKey := db.constructDBKey(emptyKey)
+	has, err := baseDB.Has(emptyDBKey)
+	require.NoError(err)
+	require.True(has)
+
+	require.NoError(db.Delete(ToKey([]byte{})))
+	require.NoError(db.Flush())
+
+	emptyDBKey = db.constructDBKey(emptyKey)
+	has, err = baseDB.Has(emptyDBKey)
+	require.NoError(err)
+	require.False(has)
 }

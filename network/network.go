@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -146,7 +146,7 @@ type network struct {
 	// Cancelled on close
 	onCloseCtx context.Context
 	// Call [onCloseCtxCancel] to cancel [onCloseCtx] during close()
-	onCloseCtxCancel func()
+	onCloseCtxCancel context.CancelFunc
 
 	sendFailRateCalculator safemath.Averager
 
@@ -271,6 +271,8 @@ func NewNetwork(
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
+		SupportedACPs:        config.SupportedACPs.List(),
+		ObjectedACPs:         config.ObjectedACPs.List(),
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
 		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),

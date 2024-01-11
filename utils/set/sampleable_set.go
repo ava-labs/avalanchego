@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package set
@@ -176,7 +176,7 @@ func (s *SampleableSet[_]) MarshalJSON() ([]byte, error) {
 		}
 	}
 	// Sort for determinism
-	utils.SortBytes(elementBytes)
+	slices.SortFunc(elementBytes, bytes.Compare)
 
 	// Build the JSON
 	var (

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -151,13 +151,15 @@ func overDelegated(
 	state state.Chain,
 	validator *state.Staker,
 	weightLimit uint64,
-	delegator *state.Staker,
+	delegatorWeight uint64,
+	delegatorStartTime time.Time,
+	delegatorEndTime time.Time,
 ) (bool, error) {
-	maxWeight, err := GetMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
+	maxWeight, err := GetMaxWeight(state, validator, delegatorStartTime, delegatorEndTime)
 	if err != nil {
 		return true, err
 	}
-	newMaxWeight, err := math.Add64(maxWeight, delegator.Weight)
+	newMaxWeight, err := math.Add64(maxWeight, delegatorWeight)
 	if err != nil {
 		return true, err
 	}

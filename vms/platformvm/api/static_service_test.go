@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -237,7 +237,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	require.Len(validators, 3)
 }
 
-func TestUTXOLess(t *testing.T) {
+func TestUTXOCompare(t *testing.T) {
 	var (
 		smallerAddr = ids.ShortID{}
 		largerAddr  = ids.ShortID{1}
@@ -251,72 +251,49 @@ func TestUTXOLess(t *testing.T) {
 		name     string
 		utxo1    UTXO
 		utxo2    UTXO
-		expected bool
+		expected int
 	}
 	tests := []test{
 		{
 			name:     "both empty",
 			utxo1:    UTXO{},
 			utxo2:    UTXO{},
-			expected: false,
+			expected: 0,
 		},
 		{
-			name:  "first locktime smaller",
+			name:  "locktime smaller",
 			utxo1: UTXO{},
 			utxo2: UTXO{
 				Locktime: 1,
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
-			name: "first locktime larger",
-			utxo1: UTXO{
-				Locktime: 1,
-			},
-			utxo2:    UTXO{},
-			expected: false,
-		},
-		{
-			name:  "first amount smaller",
+			name:  "amount smaller",
 			utxo1: UTXO{},
 			utxo2: UTXO{
 				Amount: 1,
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
-			name: "first amount larger",
-			utxo1: UTXO{
-				Amount: 1,
-			},
-			utxo2:    UTXO{},
-			expected: false,
-		},
-		{
-			name: "first address smaller",
+			name: "address smaller",
 			utxo1: UTXO{
 				Address: smallerAddrStr,
 			},
 			utxo2: UTXO{
 				Address: largerAddrStr,
 			},
-			expected: true,
-		},
-		{
-			name: "first address larger",
-			utxo1: UTXO{
-				Address: largerAddrStr,
-			},
-			utxo2: UTXO{
-				Address: smallerAddrStr,
-			},
-			expected: false,
+			expected: -1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.utxo1.Less(tt.utxo2))
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.utxo1.Compare(tt.utxo2))
+			require.Equal(-tt.expected, tt.utxo2.Compare(tt.utxo1))
 		})
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -50,30 +50,25 @@ type UTXO struct {
 }
 
 // TODO can we define this on *UTXO?
-func (utxo UTXO) Less(other UTXO) bool {
-	if utxo.Locktime < other.Locktime {
-		return true
-	} else if utxo.Locktime > other.Locktime {
-		return false
+func (utxo UTXO) Compare(other UTXO) int {
+	if locktimeCmp := utils.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
+		return locktimeCmp
 	}
-
-	if utxo.Amount < other.Amount {
-		return true
-	} else if utxo.Amount > other.Amount {
-		return false
+	if amountCmp := utils.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
+		return amountCmp
 	}
 
 	utxoAddr, err := bech32ToID(utxo.Address)
 	if err != nil {
-		return false
+		return 0
 	}
 
 	otherAddr, err := bech32ToID(other.Address)
 	if err != nil {
-		return false
+		return 0
 	}
 
-	return utxoAddr.Less(otherAddr)
+	return utxoAddr.Compare(otherAddr)
 }
 
 // TODO: Refactor APIStaker, APIValidators and merge them together for
@@ -395,7 +390,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := genesis.Codec.Marshal(genesis.Version, g)
+	bytes, err := genesis.Codec.Marshal(genesis.CodecVersion, g)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}

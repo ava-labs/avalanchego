@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -11,26 +11,26 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func (t *trieView) NewIterator() database.Iterator {
-	return t.NewIteratorWithStartAndPrefix(nil, nil)
+func (v *view) NewIterator() database.Iterator {
+	return v.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
-func (t *trieView) NewIteratorWithStart(start []byte) database.Iterator {
-	return t.NewIteratorWithStartAndPrefix(start, nil)
+func (v *view) NewIteratorWithStart(start []byte) database.Iterator {
+	return v.NewIteratorWithStartAndPrefix(start, nil)
 }
 
-func (t *trieView) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	return t.NewIteratorWithStartAndPrefix(nil, prefix)
+func (v *view) NewIteratorWithPrefix(prefix []byte) database.Iterator {
+	return v.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
-func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+func (v *view) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	var (
-		changes   = make([]KeyChange, 0, len(t.changes.values))
+		changes   = make([]KeyChange, 0, len(v.changes.values))
 		startKey  = ToKey(start)
 		prefixKey = ToKey(prefix)
 	)
 
-	for key, change := range t.changes.values {
+	for key, change := range v.changes.values {
 		if len(start) > 0 && startKey.Greater(key) || !key.HasPrefix(prefixKey) {
 			continue
 		}
@@ -41,13 +41,13 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 	}
 
 	// sort [changes] so they can be merged with the parent trie's state
-	slices.SortFunc(changes, func(a, b KeyChange) bool {
-		return bytes.Compare(a.Key, b.Key) == -1
+	slices.SortFunc(changes, func(a, b KeyChange) int {
+		return bytes.Compare(a.Key, b.Key)
 	})
 
 	return &viewIterator{
-		view:          t,
-		parentIter:    t.parentTrie.NewIteratorWithStartAndPrefix(start, prefix),
+		view:          v,
+		parentIter:    v.parentTrie.NewIteratorWithStartAndPrefix(start, prefix),
 		sortedChanges: changes,
 	}
 }
@@ -55,7 +55,7 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 // viewIterator walks over both the in memory database and the underlying database
 // at the same time.
 type viewIterator struct {
-	view       *trieView
+	view       *view
 	parentIter database.Iterator
 
 	key, value []byte
@@ -71,13 +71,7 @@ type viewIterator struct {
 // based on if the in memory changes or the underlying db should be read next
 func (it *viewIterator) Next() bool {
 	switch {
-	case it.view.db.closed:
-		// Short-circuit and set an error if the underlying database has been closed.
-		it.key = nil
-		it.value = nil
-		it.err = database.ErrClosed
-		return false
-	case it.view.invalidated:
+	case it.view.isInvalid():
 		it.key = nil
 		it.value = nil
 		it.err = ErrInvalid

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -20,13 +20,13 @@ import (
 var (
 	_ block.Visitor = (*verifier)(nil)
 
+	ErrConflictingBlockTxs = errors.New("block contains conflicting transactions")
+
 	errApricotBlockIssuedAfterFork                = errors.New("apricot block issued after fork")
 	errBanffProposalBlockWithMultipleTransactions = errors.New("BanffProposalBlock contains multiple transactions")
 	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                       = errors.New("incorrect block height")
 	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
-	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
-	errConflictingParentTxs                       = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
 )
 
@@ -51,7 +51,7 @@ func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	if len(b.Transactions) != 0 {
+	if !v.txExecutorBackend.Config.IsDurangoActivated(b.Timestamp()) && len(b.Transactions) != 0 {
 		return errBanffProposalBlockWithMultipleTransactions
 	}
 
@@ -60,11 +60,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onCommitState, err := state.NewDiff(parentID, v.backend)
-	if err != nil {
-		return err
-	}
-	onAbortState, err := state.NewDiff(parentID, v.backend)
+	onDecisionState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
@@ -73,20 +69,40 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
-		onCommitState,
+		onDecisionState,
 		nextChainTime,
 	)
 	if err != nil {
 		return err
 	}
 
-	onCommitState.SetTimestamp(nextChainTime)
-	changes.Apply(onCommitState)
+	onDecisionState.SetTimestamp(nextChainTime)
+	changes.Apply(onDecisionState)
 
-	onAbortState.SetTimestamp(nextChainTime)
-	changes.Apply(onAbortState)
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
+	if err != nil {
+		return err
+	}
 
-	return v.proposalBlock(&b.ApricotProposalBlock, onCommitState, onAbortState)
+	onCommitState, err := state.NewDiffOn(onDecisionState)
+	if err != nil {
+		return err
+	}
+
+	onAbortState, err := state.NewDiffOn(onDecisionState)
+	if err != nil {
+		return err
+	}
+
+	return v.proposalBlock(
+		&b.ApricotProposalBlock,
+		onDecisionState,
+		onCommitState,
+		onAbortState,
+		inputs,
+		atomicRequests,
+		onAcceptFunc,
+	)
 }
 
 func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -152,7 +168,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, onCommitState, onAbortState)
+	return v.proposalBlock(b, nil, onCommitState, onAbortState, nil, nil, nil)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -203,22 +219,22 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	if err := v.verifyUniqueInputs(b, atomicExecutor.Inputs); err != nil {
+	if err := v.verifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
 		return err
 	}
 
+	v.Mempool.Remove(b.Tx)
+
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		standardBlockState: standardBlockState{
-			inputs: atomicExecutor.Inputs,
-		},
 		statelessBlock: b,
-		onAcceptState:  atomicExecutor.OnAccept,
+
+		onAcceptState: atomicExecutor.OnAccept,
+
+		inputs:         atomicExecutor.Inputs,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
-
-	v.Mempool.Remove([]*txs.Tx{b.Tx})
 	return nil
 }
 
@@ -320,7 +336,7 @@ func (v *verifier) commonBlock(b block.Block) error {
 // abortBlock populates the state of this block if [nil] is returned
 func (v *verifier) abortBlock(b block.Block) error {
 	parentID := b.Parent()
-	onAcceptState, ok := v.getOnAbortState(parentID)
+	onAbortState, ok := v.getOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
@@ -328,8 +344,8 @@ func (v *verifier) abortBlock(b block.Block) error {
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
+		onAcceptState:  onAbortState,
+		timestamp:      onAbortState.GetTimestamp(),
 	}
 	return nil
 }
@@ -337,7 +353,7 @@ func (v *verifier) abortBlock(b block.Block) error {
 // commitBlock populates the state of this block if [nil] is returned
 func (v *verifier) commitBlock(b block.Block) error {
 	parentID := b.Parent()
-	onAcceptState, ok := v.getOnCommitState(parentID)
+	onCommitState, ok := v.getOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
@@ -345,8 +361,8 @@ func (v *verifier) commitBlock(b block.Block) error {
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
+		onAcceptState:  onCommitState,
+		timestamp:      onCommitState.GetTimestamp(),
 	}
 	return nil
 }
@@ -354,8 +370,12 @@ func (v *verifier) commitBlock(b block.Block) error {
 // proposalBlock populates the state of this block if [nil] is returned
 func (v *verifier) proposalBlock(
 	b *block.ApricotProposalBlock,
+	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
+	inputs set.Set[ids.ID],
+	atomicRequests map[ids.ID]*atomic.Requests,
+	onAcceptFunc func(),
 ) error {
 	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -373,21 +393,28 @@ func (v *verifier) proposalBlock(
 	onCommitState.AddTx(b.Tx, status.Committed)
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
+	v.Mempool.Remove(b.Tx)
+
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		proposalBlockState: proposalBlockState{
+			onDecisionState:       onDecisionState,
 			onCommitState:         onCommitState,
 			onAbortState:          onAbortState,
 			initiallyPreferCommit: txExecutor.PrefersCommit,
 		},
+
 		statelessBlock: b,
+
+		onAcceptFunc: onAcceptFunc,
+
+		inputs: inputs,
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp: onAbortState.GetTimestamp(),
+		timestamp:      onAbortState.GetTimestamp(),
+		atomicRequests: atomicRequests,
 	}
-
-	v.Mempool.Remove([]*txs.Tx{b.Tx})
 	return nil
 }
 
@@ -396,43 +423,67 @@ func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
 	onAcceptState state.Diff,
 ) error {
-	blkState := &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent())
+	if err != nil {
+		return err
 	}
 
-	// Finally we process the transactions
-	funcs := make([]func(), 0, len(b.Transactions))
-	for _, tx := range b.Transactions {
+	v.Mempool.Remove(b.Transactions...)
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		statelessBlock: b,
+
+		onAcceptState: onAcceptState,
+		onAcceptFunc:  onAcceptFunc,
+
+		timestamp:      onAcceptState.GetTimestamp(),
+		inputs:         inputs,
+		atomicRequests: atomicRequests,
+	}
+	return nil
+}
+
+func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID) (
+	set.Set[ids.ID],
+	map[ids.ID]*atomic.Requests,
+	func(),
+	error,
+) {
+	var (
+		onAcceptFunc   func()
+		inputs         set.Set[ids.ID]
+		funcs          = make([]func(), 0, len(txs))
+		atomicRequests = make(map[ids.ID]*atomic.Requests)
+	)
+	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: v.txExecutorBackend,
-			State:   onAcceptState,
+			State:   state,
 			Tx:      tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return err
+			return nil, nil, nil, err
 		}
 		// ensure it doesn't overlap with current input batch
-		if blkState.inputs.Overlaps(txExecutor.Inputs) {
-			return errConflictingBatchTxs
+		if inputs.Overlaps(txExecutor.Inputs) {
+			return nil, nil, nil, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
-		blkState.inputs.Union(txExecutor.Inputs)
+		inputs.Union(txExecutor.Inputs)
 
-		onAcceptState.AddTx(tx, status.Committed)
+		state.AddTx(tx, status.Committed)
 		if txExecutor.OnAccept != nil {
 			funcs = append(funcs, txExecutor.OnAccept)
 		}
 
 		for chainID, txRequests := range txExecutor.AtomicRequests {
 			// Add/merge in the atomic requests represented by [tx]
-			chainRequests, exists := blkState.atomicRequests[chainID]
+			chainRequests, exists := atomicRequests[chainID]
 			if !exists {
-				blkState.atomicRequests[chainID] = txRequests
+				atomicRequests[chainID] = txRequests
 				continue
 			}
 
@@ -441,48 +492,19 @@ func (v *verifier) standardBlock(
 		}
 	}
 
-	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
-		return err
+	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
+		return nil, nil, nil, err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
-		blkState.onAcceptFunc = funcs[0]
+		onAcceptFunc = funcs[0]
 	} else if numFuncs > 1 {
-		blkState.onAcceptFunc = func() {
+		onAcceptFunc = func() {
 			for _, f := range funcs {
 				f()
 			}
 		}
 	}
 
-	blkID := b.ID()
-	v.blkIDToState[blkID] = blkState
-
-	v.Mempool.Remove(b.Transactions)
-	return nil
-}
-
-// verifyUniqueInputs verifies that the inputs of the given block are not
-// duplicated in any of the parent blocks pinned in memory.
-func (v *verifier) verifyUniqueInputs(block block.Block, inputs set.Set[ids.ID]) error {
-	if inputs.Len() == 0 {
-		return nil
-	}
-
-	// Check for conflicts in ancestors.
-	for {
-		parentID := block.Parent()
-		parentState, ok := v.blkIDToState[parentID]
-		if !ok {
-			// The parent state isn't pinned in memory.
-			// This means the parent must be accepted already.
-			return nil
-		}
-
-		if parentState.inputs.Overlaps(inputs) {
-			return errConflictingParentTxs
-		}
-
-		block = parentState.statelessBlock
-	}
+	return inputs, atomicRequests, onAcceptFunc, nil
 }

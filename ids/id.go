@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -51,7 +51,7 @@ func (id ID) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte("\"" + str + "\""), nil
+	return []byte(`"` + str + `"`), nil
 }
 
 func (id *ID) UnmarshalJSON(b []byte) error {
@@ -145,6 +145,6 @@ func (id ID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-func (id ID) Less(other ID) bool {
-	return bytes.Compare(id[:], other[:]) < 0
+func (id ID) Compare(other ID) int {
+	return bytes.Compare(id[:], other[:])
 }

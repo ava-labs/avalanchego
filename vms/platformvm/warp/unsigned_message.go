@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -41,13 +41,13 @@ func ParseUnsignedMessage(b []byte) (*UnsignedMessage, error) {
 		bytes: b,
 		id:    hashing.ComputeHash256Array(b),
 	}
-	_, err := c.Unmarshal(b, msg)
+	_, err := Codec.Unmarshal(b, msg)
 	return msg, err
 }
 
 // Initialize recalculates the result of Bytes().
 func (m *UnsignedMessage) Initialize() error {
-	bytes, err := c.Marshal(codecVersion, m)
+	bytes, err := Codec.Marshal(CodecVersion, m)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal warp unsigned message: %w", err)
 	}

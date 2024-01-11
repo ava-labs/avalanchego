@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -14,11 +14,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 )
 
@@ -42,7 +41,7 @@ func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) blo
 
 	// create mock
 	ctrl := gomock.NewController(t)
-	vm := mocks.NewMockChainVM(ctrl)
+	vm := block.NewMockChainVM(ctrl)
 
 	if loadExpectations {
 		blk1 := snowman.NewMockBlock(ctrl)
@@ -86,7 +85,7 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	vm, stopper := buildClientHelper(require, testKey)
 	defer stopper.Stop(context.Background())
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 
 	require.NoError(vm.Initialize(context.Background(), ctx, memdb.New(), nil, nil, nil, nil, nil, nil))
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -65,11 +65,11 @@ func Parse(bytes []byte) (Message, error) {
 		// It must have been encoded with avalanchego's codec.
 		// TODO remove else statement remove once all nodes support proto encoding.
 		// i.e. when all nodes are on v1.11.0 or later.
-		version, err := c.Unmarshal(bytes, &msg)
+		version, err := Codec.Unmarshal(bytes, &msg)
 		if err != nil {
 			return nil, err
 		}
-		if version != codecVersion {
+		if version != CodecVersion {
 			return nil, ErrUnexpectedCodecVersion
 		}
 	}
@@ -78,7 +78,7 @@ func Parse(bytes []byte) (Message, error) {
 }
 
 func Build(msg Message) ([]byte, error) {
-	bytes, err := c.Marshal(codecVersion, &msg)
+	bytes, err := Codec.Marshal(CodecVersion, &msg)
 	msg.initialize(bytes)
 	return bytes, err
 }

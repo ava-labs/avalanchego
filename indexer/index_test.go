@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -8,12 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -24,15 +22,13 @@ func TestIndex(t *testing.T) {
 	// Setup
 	pageSize := uint64(64)
 	require := require.New(t)
-	codec := codec.NewDefaultManager()
-	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
-	idx := indexIntf.(*index)
 
 	// Populate "containers" with random IDs/bytes
 	containers := map[ids.ID][]byte{}
@@ -83,9 +79,8 @@ func TestIndex(t *testing.T) {
 	require.NoError(db.Commit())
 	require.NoError(idx.Close())
 	db = versiondb.New(baseDB)
-	indexIntf, err = newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	idx, err = newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
-	idx = indexIntf.(*index)
 
 	// Get all of the containers
 	containersList, err := idx.GetContainerRange(0, pageSize)
@@ -113,13 +108,11 @@ func TestIndex(t *testing.T) {
 func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	// Setup
 	require := require.New(t)
-	codec := codec.NewDefaultManager()
-	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
-	ctx := snow.DefaultConsensusContextTest()
-	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
-	idx := indexIntf.(*index)
 
 	// Insert [MaxFetchedByRange] + 1 containers
 	for i := uint64(0); i < MaxFetchedByRange+1; i++ {
@@ -153,11 +146,10 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 func TestDontIndexSameContainerTwice(t *testing.T) {
 	// Setup
 	require := require.New(t)
-	codec := codec.NewDefaultManager()
-	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
-	ctx := snow.DefaultConsensusContextTest()
-	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	idx, err := newIndex(db, logging.NoLog{}, mockable.Clock{})
 	require.NoError(err)
 
 	// Accept the same container twice

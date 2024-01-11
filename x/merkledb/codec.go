@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"math/bits"
 	"sync"
 
 	"golang.org/x/exp/maps"
@@ -29,11 +30,8 @@ const (
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minKeyLen + ids.IDLen + boolLen
 
-	estimatedKeyLen           = 64
-	estimatedValueLen         = 64
-	estimatedCompressedKeyLen = 8
-	// Child index, child compressed key, child ID, child has value
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedKeyLen + ids.IDLen + boolLen
+	estimatedKeyLen   = 64
+	estimatedValueLen = 64
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
@@ -62,15 +60,18 @@ type encoderDecoder interface {
 type encoder interface {
 	// Assumes [n] is non-nil.
 	encodeDBNode(n *dbNode) []byte
+	encodedDBNodeSize(n *dbNode) int
 
 	// Returns the bytes that will be hashed to generate [n]'s ID.
 	// Assumes [n] is non-nil.
 	encodeHashValues(n *node) []byte
+	encodeKey(key Key) []byte
 }
 
 type decoder interface {
 	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode) error
+	decodeKey(bytes []byte) (Key, error)
 }
 
 func newCodec() encoderDecoder {
@@ -91,16 +92,47 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
-	var (
-		numChildren = len(n.children)
-		// Estimate size of [n] to prevent memory allocations
-		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
-		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
-	)
+func (c *codecImpl) childSize(index byte, childEntry *child) int {
+	// * index
+	// * child ID
+	// * child key
+	// * bool indicating whether the child has a value
+	return c.uintSize(uint64(index)) + ids.IDLen + c.keySize(childEntry.compressedKey) + boolLen
+}
 
+// based on the current implementation of codecImpl.encodeUint which uses binary.PutUvarint
+func (*codecImpl) uintSize(value uint64) int {
+	if value == 0 {
+		return 1
+	}
+	return (bits.Len64(value) + 6) / 7
+}
+
+func (c *codecImpl) keySize(p Key) int {
+	return c.uintSize(uint64(p.length)) + bytesNeeded(p.length)
+}
+
+func (c *codecImpl) encodedDBNodeSize(n *dbNode) int {
+	// * number of children
+	// * bool indicating whether [n] has a value
+	// * the value (optional)
+	// * children
+	size := c.uintSize(uint64(len(n.children))) + boolLen
+	if n.value.HasValue() {
+		valueLen := len(n.value.Value())
+		size += c.uintSize(uint64(valueLen)) + valueLen
+	}
+	// for each non-nil entry, we add the additional size of the child entry
+	for index, entry := range n.children {
+		size += c.childSize(index, entry)
+	}
+	return size
+}
+
+func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
+	buf := bytes.NewBuffer(make([]byte, 0, c.encodedDBNodeSize(n)))
 	c.encodeMaybeByteSlice(buf, n.value)
-	c.encodeUint(buf, uint64(numChildren))
+	c.encodeUint(buf, uint64(len(n.children)))
 	// Note we insert children in order of increasing index
 	// for determinism.
 	keys := maps.Keys(n.children)
@@ -108,7 +140,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	for _, index := range keys {
 		entry := n.children[index]
 		c.encodeUint(buf, uint64(index))
-		c.encodeKey(buf, entry.compressedKey)
+		c.encodeKeyToBuffer(buf, entry.compressedKey)
 		_, _ = buf.Write(entry.id[:])
 		c.encodeBool(buf, entry.hasValue)
 	}
@@ -134,7 +166,7 @@ func (c *codecImpl) encodeHashValues(n *node) []byte {
 		_, _ = buf.Write(entry.id[:])
 	}
 	c.encodeMaybeByteSlice(buf, n.valueDigest)
-	c.encodeKey(buf, n.key)
+	c.encodeKeyToBuffer(buf, n.key)
 
 	return buf.Bytes()
 }
@@ -172,7 +204,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		}
 		previousChild = index
 
-		compressedKey, err := c.decodeKey(src)
+		compressedKey, err := c.decodeKeyFromReader(src)
 		if err != nil {
 			return err
 		}
@@ -330,12 +362,31 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, err
 }
 
-func (c *codecImpl) encodeKey(dst *bytes.Buffer, key Key) {
+func (c *codecImpl) encodeKey(key Key) []byte {
+	estimatedLen := binary.MaxVarintLen64 + len(key.Bytes())
+	dst := bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	c.encodeKeyToBuffer(dst, key)
+	return dst.Bytes()
+}
+
+func (c *codecImpl) encodeKeyToBuffer(dst *bytes.Buffer, key Key) {
 	c.encodeUint(dst, uint64(key.length))
 	_, _ = dst.Write(key.Bytes())
 }
 
-func (c *codecImpl) decodeKey(src *bytes.Reader) (Key, error) {
+func (c *codecImpl) decodeKey(b []byte) (Key, error) {
+	src := bytes.NewReader(b)
+	key, err := c.decodeKeyFromReader(src)
+	if err != nil {
+		return Key{}, err
+	}
+	if src.Len() != 0 {
+		return Key{}, errExtraSpace
+	}
+	return key, err
+}
+
+func (c *codecImpl) decodeKeyFromReader(src *bytes.Reader) (Key, error) {
 	if minKeyLen > src.Len() {
 		return Key{}, io.ErrUnexpectedEOF
 	}

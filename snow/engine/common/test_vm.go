@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -60,11 +60,11 @@ type TestVM struct {
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error
 	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -185,9 +185,9 @@ func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error {
 	if vm.AppRequestFailedF != nil {
-		return vm.AppRequestFailedF(ctx, nodeID, requestID)
+		return vm.AppRequestFailedF(ctx, nodeID, requestID, appErr)
 	}
 	if !vm.CantAppRequestFailed {
 		return nil
@@ -237,9 +237,9 @@ func (vm *TestVM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requ
 	return errCrossChainAppRequest
 }
 
-func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error {
 	if vm.CrossChainAppRequestFailedF != nil {
-		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID)
+		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID, appErr)
 	}
 	if !vm.CantCrossChainAppRequestFailed {
 		return nil

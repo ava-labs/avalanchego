@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -9,8 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-
-	stdjson "encoding/json"
+	"sync"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -59,7 +58,6 @@ var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
-	errBootstrapping             = errors.New("chain is currently bootstrapping")
 
 	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
 )
@@ -83,6 +81,8 @@ type VM struct {
 	clock mockable.Clock
 
 	registerer prometheus.Registerer
+
+	connectedPeers map[ids.NodeID]*version.Application
 
 	parser block.Parser
 
@@ -114,18 +114,37 @@ type VM struct {
 
 	txBackend *txexecutor.Backend
 
+	// Cancelled on shutdown
+	onShutdownCtx context.Context
+	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
+	onShutdownCtxCancel context.CancelFunc
+	awaitShutdown       sync.WaitGroup
+
+	networkConfig network.Config
 	// These values are only initialized after the chain has been linearized.
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
-	network      network.Network
+	network      *network.Network
 }
 
-func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
-	return nil
+func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	// If the chain isn't linearized yet, we must track the peers externally
+	// until the network is initialized.
+	if vm.network == nil {
+		vm.connectedPeers[nodeID] = version
+		return nil
+	}
+	return vm.network.Connected(ctx, nodeID, version)
 }
 
-func (*VM) Disconnected(context.Context, ids.NodeID) error {
-	return nil
+func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	// If the chain isn't linearized yet, we must track the peers externally
+	// until the network is initialized.
+	if vm.network == nil {
+		delete(vm.connectedPeers, nodeID)
+		return nil
+	}
+	return vm.network.Disconnected(ctx, nodeID)
 }
 
 /*
@@ -133,12 +152,6 @@ func (*VM) Disconnected(context.Context, ids.NodeID) error {
  ********************************* Common VM **********************************
  ******************************************************************************
  */
-
-type Config struct {
-	IndexTransactions    bool `json:"index-transactions"`
-	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
-	ChecksumsEnabled     bool `json:"checksums-enabled"`
-}
 
 func (vm *VM) Initialize(
 	_ context.Context,
@@ -154,15 +167,13 @@ func (vm *VM) Initialize(
 	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
 	vm.Atomic = network.NewAtomic(noopMessageHandler)
 
-	avmConfig := Config{}
-	if len(configBytes) > 0 {
-		if err := stdjson.Unmarshal(configBytes, &avmConfig); err != nil {
-			return err
-		}
-		ctx.Log.Info("VM config initialized",
-			zap.Reflect("config", avmConfig),
-		)
+	avmConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
 	}
+	ctx.Log.Info("VM config initialized",
+		zap.Reflect("config", avmConfig),
+	)
 
 	registerer := prometheus.NewRegistry()
 	if err := ctx.Metrics.Register(registerer); err != nil {
@@ -170,8 +181,9 @@ func (vm *VM) Initialize(
 	}
 	vm.registerer = registerer
 
+	vm.connectedPeers = make(map[ids.NodeID]*version.Application)
+
 	// Initialize metrics as soon as possible
-	var err error
 	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
@@ -207,6 +219,7 @@ func (vm *VM) Initialize(
 
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.parser, err = block.NewCustomParser(
+		vm.DurangoTime,
 		vm.typeToFxIndex,
 		&vm.clock,
 		ctx.Log,
@@ -264,6 +277,8 @@ func (vm *VM) Initialize(
 		Bootstrapped:  false,
 	}
 
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
+	vm.networkConfig = avmConfig.Network
 	return vm.state.Commit()
 }
 
@@ -305,6 +320,9 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.state == nil {
 		return nil
 	}
+
+	vm.onShutdownCtxCancel()
+	vm.awaitShutdown.Wait()
 
 	return utils.Err(
 		vm.state.Close(),
@@ -396,7 +414,7 @@ func (*VM) VerifyHeightIndex(context.Context) error {
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
+func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
 	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
@@ -424,18 +442,43 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 		mempool,
 	)
 
-	vm.network = network.New(
+	// Invariant: The context lock is not held when calling network.IssueTx.
+	vm.network, err = network.New(
 		vm.ctx,
 		vm.parser,
-		vm.chainManager,
+		network.NewLockedTxVerifier(
+			&vm.ctx.Lock,
+			vm.chainManager,
+		),
 		mempool,
 		vm.appSender,
+		vm.registerer,
+		vm.networkConfig,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+
+	// Notify the network of our current peers
+	for nodeID, version := range vm.connectedPeers {
+		if err := vm.network.Connected(ctx, nodeID, version); err != nil {
+			return err
+		}
+	}
+	vm.connectedPeers = nil
 
 	// Note: It's important only to switch the networking stack after the full
 	// chainVM has been initialized. Traffic will immediately start being
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
+
+	vm.awaitShutdown.Add(1)
+	go func() {
+		defer vm.awaitShutdown.Done()
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.network.Gossip(vm.onShutdownCtx)
+	}()
 
 	go func() {
 		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
@@ -477,32 +520,21 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
  ******************************************************************************
  */
 
-// IssueTx attempts to send a transaction to consensus.
-// If onDecide is specified, the function will be called when the transaction is
-// either accepted or rejected with the appropriate status. This function will
-// go out of scope when the transaction is removed from memory.
-func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
-	if !vm.bootstrapped || vm.Builder == nil {
-		return ids.ID{}, errBootstrapping
-	}
-
-	tx, err := vm.parser.ParseTx(b)
-	if err != nil {
-		vm.ctx.Log.Debug("failed to parse tx",
-			zap.Error(err),
-		)
-		return ids.ID{}, err
-	}
-
-	err = vm.network.IssueTx(context.TODO(), tx)
-	if err != nil {
+// issueTx attempts to send a transaction to consensus.
+//
+// Invariant: The context lock is not held
+// Invariant: This function is only called after Linearize has been called.
+func (vm *VM) issueTx(tx *txs.Tx) (ids.ID, error) {
+	txID := tx.ID()
+	err := vm.network.IssueTx(context.TODO(), tx)
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
+			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)
-		return ids.ID{}, err
+		return txID, err
 	}
-
-	return tx.ID(), nil
+	return txID, nil
 }
 
 /*
@@ -534,7 +566,7 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 		tx := &txs.Tx{
 			Unsigned: &genesisTx.CreateAssetTx,
 		}
-		if err := vm.parser.InitializeGenesisTx(tx); err != nil {
+		if err := tx.Initialize(genesisCodec); err != nil {
 			return err
 		}
 

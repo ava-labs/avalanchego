@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -39,8 +39,8 @@ type testValidator struct {
 	vdr    *Validator
 }
 
-func (v *testValidator) Less(o *testValidator) bool {
-	return v.vdr.Less(o.vdr)
+func (v *testValidator) Compare(o *testValidator) int {
+	return v.vdr.Compare(o.vdr)
 }
 
 func newTestValidator() *testValidator {

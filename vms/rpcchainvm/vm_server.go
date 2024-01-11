@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -369,11 +369,12 @@ func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (
 		return nil, err
 	}
 
-	peerVersion, err := version.ParseApplication(req.Version)
-	if err != nil {
-		return nil, err
+	peerVersion := &version.Application{
+		Name:  req.Name,
+		Major: int(req.Major),
+		Minor: int(req.Minor),
+		Patch: int(req.Patch),
 	}
-
 	return &emptypb.Empty{}, vm.vm.Connected(ctx, nodeID, peerVersion)
 }
 
@@ -536,7 +537,12 @@ func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.Cr
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId)
+
+	appErr := &common.AppError{
+		Code:    msg.ErrorCode,
+		Message: msg.ErrorMessage,
+	}
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId, appErr)
 }
 
 func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
@@ -564,7 +570,12 @@ func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmpb.AppRequestFa
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, nodeID, req.RequestId)
+
+	appErr := &common.AppError{
+		Code:    req.ErrorCode,
+		Message: req.ErrorMessage,
+	}
+	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, nodeID, req.RequestId, appErr)
 }
 
 func (vm *VMServer) AppResponse(ctx context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {

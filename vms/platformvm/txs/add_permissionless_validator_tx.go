@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -21,7 +21,8 @@ import (
 )
 
 var (
-	_ ValidatorTx = (*AddPermissionlessValidatorTx)(nil)
+	_ ValidatorTx     = (*AddPermissionlessValidatorTx)(nil)
+	_ ScheduledStaker = (*AddPermissionlessDelegatorTx)(nil)
 
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")

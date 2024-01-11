@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -39,8 +39,8 @@ type Validator struct {
 	NodeIDs        []ids.NodeID
 }
 
-func (v *Validator) Less(o *Validator) bool {
-	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes) < 0
+func (v *Validator) Compare(o *Validator) int {
+	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes)
 }
 
 // GetCanonicalValidatorSet returns the validator set of [subnetID] at
