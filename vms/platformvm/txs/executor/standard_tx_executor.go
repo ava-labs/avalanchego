@@ -16,10 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+
+	commonFees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -33,7 +35,7 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	BlkFeeManager *fees.Manager
+	BlkFeeManager *commonFees.Manager
 	State         state.Diff // state is expected to be modified
 	Tx            *txs.Tx
 
@@ -62,8 +64,8 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  e.BlkFeeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  e.BlkFeeManager,
 		Config:      e.Backend.Config,
 		ChainTime:   e.State.GetTimestamp(),
 		Credentials: e.Tx.Creds,
@@ -109,8 +111,8 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  e.BlkFeeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  e.BlkFeeManager,
 		Config:      e.Backend.Config,
 		ChainTime:   e.State.GetTimestamp(),
 		Credentials: e.Tx.Creds,
@@ -191,8 +193,8 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		feeCalculator := FeeCalculator{
-			feeManager:  e.BlkFeeManager,
+		feeCalculator := fees.Calculator{
+			FeeManager:  e.BlkFeeManager,
 			Config:      e.Backend.Config,
 			ChainTime:   e.State.GetTimestamp(),
 			Credentials: e.Tx.Creds,
@@ -249,8 +251,8 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  e.BlkFeeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  e.BlkFeeManager,
 		Config:      e.Backend.Config,
 		ChainTime:   e.State.GetTimestamp(),
 		Credentials: e.Tx.Creds,
@@ -559,8 +561,8 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  e.BlkFeeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  e.BlkFeeManager,
 		Config:      e.Backend.Config,
 		ChainTime:   e.State.GetTimestamp(),
 		Credentials: e.Tx.Creds,

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package executor
+package fees
 
 import (
 	"errors"
@@ -17,15 +17,15 @@ import (
 )
 
 var (
-	_ txs.Visitor = (*FeeCalculator)(nil)
+	_ txs.Visitor = (*Calculator)(nil)
 
 	errFailedFeeCalculation          = errors.New("failed fee calculation")
 	errFailedConsumedUnitsCumulation = errors.New("failed cumulating consumed units")
 )
 
-type FeeCalculator struct {
+type Calculator struct {
 	// setup, to be filled before visitor methods are called
-	feeManager *fees.Manager
+	FeeManager *fees.Manager
 	Config     *config.Config
 	ChainTime  time.Time
 
@@ -36,7 +36,7 @@ type FeeCalculator struct {
 	Fee uint64
 }
 
-func (fc *FeeCalculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
 		return nil
@@ -51,11 +51,11 @@ func (fc *FeeCalculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.AddSubnetValidatorFee
 		return nil
@@ -66,11 +66,11 @@ func (fc *FeeCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) erro
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
 		return nil
@@ -85,11 +85,11 @@ func (fc *FeeCalculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
+func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
 		return nil
@@ -100,11 +100,11 @@ func (fc *FeeCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
 		return nil
@@ -115,19 +115,19 @@ func (fc *FeeCalculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (*FeeCalculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	return nil // no fees
 }
 
-func (*FeeCalculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil // no fees
 }
 
-func (fc *FeeCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
@@ -138,11 +138,11 @@ func (fc *FeeCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TransformSubnetTxFee
 		return nil
@@ -153,11 +153,11 @@ func (fc *FeeCalculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
@@ -168,11 +168,11 @@ func (fc *FeeCalculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnersh
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetValidatorFee
@@ -191,11 +191,11 @@ func (fc *FeeCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetDelegatorFee
@@ -214,11 +214,11 @@ func (fc *FeeCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessD
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) BaseTx(tx *txs.BaseTx) error {
+func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
@@ -229,11 +229,11 @@ func (fc *FeeCalculator) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) ImportTx(tx *txs.ImportTx) error {
+func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
@@ -248,11 +248,11 @@ func (fc *FeeCalculator) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 
-func (fc *FeeCalculator) ExportTx(tx *txs.ExportTx) error {
+func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	if !fc.Config.IsEForkActivated(fc.ChainTime) {
 		fc.Fee = fc.Config.TxFee
 		return nil
@@ -267,7 +267,7 @@ func (fc *FeeCalculator) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.feeManager, consumedUnits)
+	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
 	return err
 }
 

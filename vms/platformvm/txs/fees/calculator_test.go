@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package executor
+package fees
 
 import (
 	"testing"
@@ -51,6 +51,7 @@ var (
 		AddSubnetDelegatorFee:         9 * units.Avax,
 	}
 
+	preFundedKeys             = secp256k1.TestKeys()
 	feeTestSigners            = [][]*secp256k1.PrivateKey{preFundedKeys}
 	feeTestDefaultStakeWeight = uint64(2024)
 	durangoTime               = time.Time{} // assume durango is active in these tests
@@ -60,7 +61,7 @@ type feeTests struct {
 	description      string
 	cfgAndChainTimeF func() (*config.Config, time.Time)
 	expectedError    error
-	checksF          func(*testing.T, *FeeCalculator)
+	checksF          func(*testing.T, *Calculator)
 }
 
 func TestAddValidatorTxFees(t *testing.T) {
@@ -104,7 +105,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
 			},
 		},
@@ -123,7 +124,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3719*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -132,7 +133,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 						266,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -152,7 +153,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -160,8 +161,8 @@ func TestAddValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -212,7 +213,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
@@ -231,7 +232,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3345*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -240,7 +241,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -260,7 +261,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -268,8 +269,8 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -321,7 +322,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
 			},
 		},
@@ -340,7 +341,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3715*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -349,7 +350,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 						266,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -369,7 +370,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -377,8 +378,8 @@ func TestAddDelegatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -424,7 +425,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.CreateBlockchainTxFee, fc.Fee)
 			},
 		},
@@ -443,7 +444,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3388*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -452,7 +453,7 @@ func TestCreateChainTxFees(t *testing.T) {
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -472,7 +473,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -480,8 +481,8 @@ func TestCreateChainTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -525,7 +526,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.CreateSubnetTxFee, fc.Fee)
 			},
 		},
@@ -544,7 +545,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3293*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -553,7 +554,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -573,7 +574,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -581,8 +582,8 @@ func TestCreateSubnetTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -625,7 +626,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -644,7 +645,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3321*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -653,7 +654,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -673,7 +674,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -681,8 +682,8 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -737,7 +738,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TransformSubnetTxFee, fc.Fee)
 			},
 		},
@@ -756,7 +757,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3406*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -765,7 +766,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -785,7 +786,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -793,8 +794,8 @@ func TestTransformSubnetTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -845,7 +846,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -864,7 +865,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3337*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -873,7 +874,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -893,7 +894,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -901,8 +902,8 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -962,7 +963,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
 			},
 		},
@@ -981,7 +982,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3939*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -990,7 +991,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 						266,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -1010,7 +1011,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -1018,8 +1019,8 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -1074,7 +1075,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.AddSubnetDelegatorFee, fc.Fee)
 			},
 		},
@@ -1093,7 +1094,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3747*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -1102,7 +1103,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 						266,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -1122,7 +1123,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -1130,8 +1131,8 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -1169,7 +1170,7 @@ func TestBaseTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -1188,7 +1189,7 @@ func TestBaseTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3253*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -1197,7 +1198,7 @@ func TestBaseTxFees(t *testing.T) {
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -1217,7 +1218,7 @@ func TestBaseTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -1225,8 +1226,8 @@ func TestBaseTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -1278,7 +1279,7 @@ func TestImportTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -1297,7 +1298,7 @@ func TestImportTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 5827*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -1306,7 +1307,7 @@ func TestImportTxFees(t *testing.T) {
 						262,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -1326,7 +1327,7 @@ func TestImportTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -1334,8 +1335,8 @@ func TestImportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,
@@ -1377,7 +1378,7 @@ func TestExportTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -1396,7 +1397,7 @@ func TestExportTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, 3663*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
@@ -1405,7 +1406,7 @@ func TestExportTxFees(t *testing.T) {
 						266,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -1425,7 +1426,7 @@ func TestExportTxFees(t *testing.T) {
 				return cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -1433,8 +1434,8 @@ func TestExportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
 				Config:      cfg,
 				ChainTime:   chainTime,
 				Credentials: sTx.Creds,

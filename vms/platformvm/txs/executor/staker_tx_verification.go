@@ -13,11 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonFees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -89,7 +90,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 // added to the staking set.
 func verifyAddValidatorTx(
 	backend *Backend,
-	feeManager *fees.Manager,
+	feeManager *commonFees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddValidatorTx,
@@ -162,8 +163,8 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  feeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  feeManager,
 		Config:      backend.Config,
 		ChainTime:   currentTimestamp,
 		Credentials: sTx.Creds,
@@ -194,7 +195,7 @@ func verifyAddValidatorTx(
 // AddSubnetValidatorTx.
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
-	feeManager *fees.Manager,
+	feeManager *commonFees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
@@ -259,8 +260,8 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  feeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  feeManager,
 		Config:      backend.Config,
 		ChainTime:   currentTimestamp,
 		Credentials: sTx.Creds,
@@ -297,7 +298,7 @@ func verifyAddSubnetValidatorTx(
 // * The flow checker passes.
 func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
-	feeManager *fees.Manager,
+	feeManager *commonFees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
@@ -339,8 +340,8 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  feeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  feeManager,
 		Config:      backend.Config,
 		ChainTime:   chainState.GetTimestamp(),
 		Credentials: sTx.Creds,
@@ -370,7 +371,7 @@ func verifyRemoveSubnetValidatorTx(
 // added to the staking set.
 func verifyAddDelegatorTx(
 	backend *Backend,
-	feeManager *fees.Manager,
+	feeManager *commonFees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddDelegatorTx,
@@ -462,8 +463,8 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  feeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  feeManager,
 		Config:      backend.Config,
 		ChainTime:   chainState.GetTimestamp(),
 		Credentials: sTx.Creds,
@@ -494,7 +495,7 @@ func verifyAddDelegatorTx(
 // AddPermissionlessValidatorTx.
 func verifyAddPermissionlessValidatorTx(
 	backend *Backend,
-	feeManager *fees.Manager,
+	feeManager *commonFees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
@@ -588,8 +589,8 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  feeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  feeManager,
 		Config:      backend.Config,
 		ChainTime:   currentTimestamp,
 		Credentials: sTx.Creds,
@@ -620,7 +621,7 @@ func verifyAddPermissionlessValidatorTx(
 // AddPermissionlessDelegatorTx.
 func verifyAddPermissionlessDelegatorTx(
 	backend *Backend,
-	feeManager *fees.Manager,
+	feeManager *commonFees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
@@ -737,8 +738,8 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  feeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  feeManager,
 		Config:      backend.Config,
 		ChainTime:   currentTimestamp,
 		Credentials: sTx.Creds,
@@ -772,7 +773,7 @@ func verifyAddPermissionlessDelegatorTx(
 // * The flow checker passes.
 func verifyTransferSubnetOwnershipTx(
 	backend *Backend,
-	feeManager *fees.Manager,
+	feeManager *commonFees.Manager,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
@@ -797,8 +798,8 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	feeCalculator := FeeCalculator{
-		feeManager:  feeManager,
+	feeCalculator := fees.Calculator{
+		FeeManager:  feeManager,
 		Config:      backend.Config,
 		ChainTime:   chainState.GetTimestamp(),
 		Credentials: sTx.Creds,
