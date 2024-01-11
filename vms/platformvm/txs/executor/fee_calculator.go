@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -29,7 +30,7 @@ type FeeCalculator struct {
 	ChainTime  time.Time
 
 	// inputs, to be filled before visitor methods are called
-	Tx *txs.Tx
+	Credentials []verify.Verifiable
 
 	// outputs of visitor execution
 	Fee uint64
@@ -45,7 +46,7 @@ func (fc *FeeCalculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -60,7 +61,7 @@ func (fc *FeeCalculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) erro
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -79,7 +80,7 @@ func (fc *FeeCalculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -94,7 +95,7 @@ func (fc *FeeCalculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func (fc *FeeCalculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func (fc *FeeCalculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -147,7 +148,7 @@ func (fc *FeeCalculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -162,7 +163,7 @@ func (fc *FeeCalculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnersh
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -185,7 +186,7 @@ func (fc *FeeCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -208,7 +209,7 @@ func (fc *FeeCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessD
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -223,7 +224,7 @@ func (fc *FeeCalculator) BaseTx(tx *txs.BaseTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -242,7 +243,7 @@ func (fc *FeeCalculator) ImportTx(tx *txs.ImportTx) error {
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, tx.Outs, ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, ins)
 	if err != nil {
 		return err
 	}
@@ -261,7 +262,7 @@ func (fc *FeeCalculator) ExportTx(tx *txs.ExportTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	consumedUnits, err := commonConsumedUnits(fc.Tx, outs, tx.Ins)
+	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -270,17 +271,29 @@ func (fc *FeeCalculator) ExportTx(tx *txs.ExportTx) error {
 	return err
 }
 
-func commonConsumedUnits(sTx *txs.Tx, allOuts []*avax.TransferableOutput, allIns []*avax.TransferableInput) (fees.Dimensions, error) {
+func commonConsumedUnits(
+	uTx txs.UnsignedTx,
+	credentials []verify.Verifiable,
+	allOuts []*avax.TransferableOutput,
+	allIns []*avax.TransferableInput,
+) (fees.Dimensions, error) {
 	var consumedUnits fees.Dimensions
-	consumedUnits[fees.Bandwidth] = uint64(len(sTx.Bytes()))
 
-	// TODO ABENEGIA: consider handling imports/exports differently
+	uTxSize, err := txs.Codec.Size(txs.CodecVersion, uTx)
+	if err != nil {
+		return consumedUnits, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
+	}
+	credsSize, err := txs.Codec.Size(txs.CodecVersion, credentials)
+	if err != nil {
+		return consumedUnits, fmt.Errorf("failed retrieving size of credentials: %w", err)
+	}
+	consumedUnits[fees.Bandwidth] = uint64(uTxSize + credsSize)
+
 	var (
 		insCost  uint64
 		insSize  uint64
 		outsSize uint64
 	)
-
 	for _, in := range allIns {
 		cost, err := in.In.Cost()
 		if err != nil {

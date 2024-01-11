@@ -124,10 +124,10 @@ func TestAddValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3721*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3719*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						741,
 						1090,
 						266,
 						0,
@@ -147,7 +147,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 					DurangoTime: durangoTime,
 					EForkTime:   eForkTime,
 				}
-				cfg.DefaultBlockMaxConsumedUnits[0] = uint64(len(sTx.Bytes())) - 1
+				cfg.DefaultBlockMaxConsumedUnits[0] = 741 - 1
 
 				return cfg, chainTime
 			},
@@ -161,10 +161,10 @@ func TestAddValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -232,10 +232,10 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3347*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3345*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						649,
 						1090,
 						172,
 						0,
@@ -269,10 +269,10 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -341,10 +341,10 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3717*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3715*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						737,
 						1090,
 						266,
 						0,
@@ -378,10 +378,10 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -444,10 +444,10 @@ func TestCreateChainTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3390*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3388*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						692,
 						1090,
 						172,
 						0,
@@ -481,10 +481,10 @@ func TestCreateChainTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -545,10 +545,10 @@ func TestCreateSubnetTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3295*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3293*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						597,
 						1090,
 						172,
 						0,
@@ -582,10 +582,10 @@ func TestCreateSubnetTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -645,10 +645,10 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3323*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3321*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						625,
 						1090,
 						172,
 						0,
@@ -682,10 +682,10 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -757,10 +757,10 @@ func TestTransformSubnetTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3408*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3406*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						710,
 						1090,
 						172,
 						0,
@@ -794,10 +794,10 @@ func TestTransformSubnetTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -865,10 +865,10 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3339*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3337*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						641,
 						1090,
 						172,
 						0,
@@ -902,10 +902,10 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -982,10 +982,10 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3941*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3939*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						961,
 						1090,
 						266,
 						0,
@@ -1019,10 +1019,10 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1094,10 +1094,10 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3749*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3747*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						769,
 						1090,
 						266,
 						0,
@@ -1131,10 +1131,10 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1189,10 +1189,10 @@ func TestBaseTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3255*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3253*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						557,
 						1090,
 						172,
 						0,
@@ -1226,10 +1226,10 @@ func TestBaseTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1298,10 +1298,10 @@ func TestImportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 5829*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5827*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						681,
 						2180,
 						262,
 						0,
@@ -1335,10 +1335,10 @@ func TestImportTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1397,10 +1397,10 @@ func TestExportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3665*units.MicroAvax, fc.Fee)
+				require.Equal(t, 3663*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						685,
 						1090,
 						266,
 						0,
@@ -1434,10 +1434,10 @@ func TestExportTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+				feeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
