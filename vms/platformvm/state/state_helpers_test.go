@@ -5,6 +5,7 @@ package state
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -212,6 +213,47 @@ func TestGetStakerRewardAttributes(t *testing.T) {
 			expectedAttributes: nil,
 			expectedErr:        ErrUnexpectedStakerType,
 		},
+		{
+			name: "getStakerRewardAttributes works across layers",
+			chainF: func(c *gomock.Controller) Chain {
+				// pile a diff on top of base state and let the target tx
+				// be included in base state.
+				state := NewMockState(c)
+				validatorTx := &txs.Tx{
+					Unsigned: &txs.AddPermissionlessValidatorTx{
+						BaseTx: txs.BaseTx{
+							BaseTx: avax.BaseTx{
+								Outs: outputs,
+							},
+						},
+						StakeOuts:             stakeOutputs,
+						ValidatorRewardsOwner: anOwner,
+						DelegatorRewardsOwner: anotherOwner,
+						DelegationShares:      shares,
+						Signer:                pop,
+					},
+				}
+				state.EXPECT().GetTx(stakerID).Return(validatorTx, status.Committed, nil)
+				state.EXPECT().GetTimestamp().Return(time.Now()) // needed to build diff
+				stateID := ids.GenerateTestID()
+
+				versions := NewMockVersions(c)
+				versions.EXPECT().GetState(stateID).Return(state, true).Times(2)
+
+				diff, err := NewDiff(stateID, versions)
+				require.NoError(t, err)
+				return diff
+			},
+			expectedAttributes: &StakerRewardAttributes{
+				Stake:                  stakeOutputs,
+				Outputs:                outputs,
+				Shares:                 shares,
+				ValidationRewardsOwner: anOwner,
+				DelegationRewardsOwner: anotherOwner,
+				ProofOfPossession:      pop,
+			},
+			expectedErr: nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -282,6 +324,32 @@ func TestGetChainSubnet(t *testing.T) {
 			},
 			expectedSubnetID: ids.Empty,
 			expectedErr:      errNotABlockchain,
+		},
+		{
+			name: "getChainSubnet works across layers",
+			chainF: func(c *gomock.Controller) Chain {
+				// pile a diff on top of base state and let the target tx
+				// be included in base state.
+				state := NewMockState(c)
+				createChainTx := &txs.Tx{
+					Unsigned: &txs.CreateChainTx{
+						SubnetID: subnetID,
+					},
+					TxID: chainID,
+				}
+				state.EXPECT().GetTx(chainID).Return(createChainTx, status.Committed, nil)
+				state.EXPECT().GetTimestamp().Return(time.Now()) // needed to build diff
+				stateID := ids.GenerateTestID()
+
+				versions := NewMockVersions(c)
+				versions.EXPECT().GetState(stateID).Return(state, true).Times(2)
+
+				diff, err := NewDiff(stateID, versions)
+				require.NoError(t, err)
+				return diff
+			},
+			expectedSubnetID: subnetID,
+			expectedErr:      nil,
 		},
 	}
 
