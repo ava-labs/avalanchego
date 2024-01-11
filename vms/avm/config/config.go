@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Struct collecting all the foundational parameters of the AVM

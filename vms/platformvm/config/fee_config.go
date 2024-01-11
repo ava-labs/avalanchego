@@ -3,7 +3,7 @@
 
 package config
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/fees"
+import "github.com/ava-labs/avalanchego/vms/components/fees"
 
 type FeeConfig struct {
 	// Post E Fork, the unit fee for each dimension, denominated in Avax

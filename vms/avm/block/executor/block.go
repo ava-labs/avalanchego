@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fees"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const SyncBound = 10 * time.Second
