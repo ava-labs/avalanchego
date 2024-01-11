@@ -1110,6 +1110,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 				zap.String("field", "Port"),
 				zap.Uint32("port", claimedIPPort.IpPort),
 			)
+			// TODO: After v1.11.x is activated, close the peer here.
 			continue
 		}
 
