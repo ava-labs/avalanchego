@@ -79,6 +79,9 @@ var (
 		ConsensusGossipOnAcceptValidatorSizeKey:            acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
+
+		SnowRogueCommitThresholdKey:    fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
+		SnowVirtuousCommitThresholdKey: fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
@@ -106,17 +109,11 @@ var (
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	p := snowball.Parameters{
-		K:               v.GetInt(SnowSampleSizeKey),
-		AlphaPreference: v.GetInt(SnowPreferenceQuorumSizeKey),
-		AlphaConfidence: v.GetInt(SnowConfidenceQuorumSizeKey),
-		// During the X-chain linearization we require BetaVirtuous and
-		// BetaRogue to be equal. Therefore we use the more conservative
-		// BetaRogue value for both BetaVirtuous and BetaRogue.
-		//
-		// TODO: After the X-chain linearization use the
-		// SnowVirtuousCommitThresholdKey as before.
-		BetaVirtuous:          v.GetInt(SnowRogueCommitThresholdKey),
-		BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
+		K:                     v.GetInt(SnowSampleSizeKey),
+		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
+		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
+		BetaVirtuous:          v.GetInt(SnowCommitThresholdKey),
+		BetaRogue:             v.GetInt(SnowCommitThresholdKey),
 		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
 		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
@@ -125,6 +122,10 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	if v.IsSet(SnowQuorumSizeKey) {
 		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
 		p.AlphaConfidence = p.AlphaPreference
+	}
+	if v.IsSet(SnowRogueCommitThresholdKey) {
+		p.BetaVirtuous = v.GetInt(SnowRogueCommitThresholdKey)
+		p.BetaRogue = v.GetInt(SnowRogueCommitThresholdKey)
 	}
 	return p
 }
