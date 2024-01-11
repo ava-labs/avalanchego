@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -62,6 +63,56 @@ type feeTests struct {
 	cfgAndChainTimeF func() (*config.Config, time.Time)
 	expectedError    error
 	checksF          func(*testing.T, *Calculator)
+}
+
+func TestPartiallyFulledTransactionsSizes(t *testing.T) {
+	var uTx *txs.AddValidatorTx
+	uTxSize, err := txs.Codec.Size(txs.CodecVersion, uTx)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 2)
+
+	uTx = &txs.AddValidatorTx{}
+	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 102)
+
+	// array of nil elements has size 0.
+	creds := make([]verify.Verifiable, 10)
+	uTxSize, err = txs.Codec.Size(txs.CodecVersion, creds)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 6)
+
+	creds[0] = &secp256k1fx.Credential{
+		Sigs: make([][secp256k1.SignatureLen]byte, 5),
+	}
+	uTxSize, err = txs.Codec.Size(txs.CodecVersion, creds)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 339)
+
+	var sTx *txs.Tx
+	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 2)
+
+	sTx = &txs.Tx{}
+	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 6)
+
+	sTx = &txs.Tx{
+		Unsigned: uTx,
+	}
+	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 110)
+
+	sTx = &txs.Tx{
+		Unsigned: uTx,
+		Creds:    creds,
+	}
+	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
+	require.NoError(t, err)
+	require.Equal(t, uTxSize, 443)
 }
 
 func TestAddValidatorTxFees(t *testing.T) {

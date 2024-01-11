@@ -90,7 +90,7 @@ func New(typer TypeCodec, tagNames []string, durangoTime time.Time, maxSliceLen 
 
 func (c *genericCodec) Size(value interface{}) (int, error) {
 	if value == nil {
-		return 0, errMarshalNil // can't marshal nil
+		return 0, nil // can't marshal nil
 	}
 
 	size, _, err := c.size(reflect.ValueOf(value), nil /*=typeStack*/)
@@ -126,14 +126,14 @@ func (c *genericCodec) size(
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
 		if value.IsNil() {
-			return 0, false, errMarshalNil
+			return 0, true, nil
 		}
 
 		return c.size(value.Elem(), typeStack)
 
 	case reflect.Interface:
 		if value.IsNil() {
-			return 0, false, errMarshalNil
+			return 0, true, nil
 		}
 
 		underlyingValue := value.Interface()
