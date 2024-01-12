@@ -144,9 +144,10 @@ func TestVerifyFinanceTx(t *testing.T) {
 			},
 			expectedErr: nil,
 			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
-				require.Equal(t, 2538*units.MicroAvax, calc.Fee)
-				// require.Empty(t, ins)
-				// require.Empty(t, outs)
+				expectedFee := 3014 * units.MicroAvax
+				require.Len(t, ins, 1)
+				require.Len(t, outs, 1)
+				require.Equal(t, expectedFee, ins[0].In.Amount()-outs[0].Out.Amount())
 				require.Empty(t, staked)
 			},
 		},
