@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
@@ -50,19 +51,19 @@ type hierarchyCodec struct {
 }
 
 // New returns a new, concurrency-safe codec
-func New(tagNames []string, maxSliceLen uint32) Codec {
+func New(durangoTime time.Time, tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &hierarchyCodec{
 		currentGroupID:  0,
 		nextTypeID:      0,
 		registeredTypes: bimap.New[typeID, reflect.Type](),
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames, durangoTime, maxSliceLen)
 	return hCodec
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec {
-	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+func NewDefault(durangoTime time.Time) Codec {
+	return New(durangoTime, []string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
 }
 
 // SkipRegistrations some number of type IDs
