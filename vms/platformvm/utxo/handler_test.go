@@ -9,18 +9,24 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ txs.UnsignedTx = (*dummyUnsignedTx)(nil)
@@ -31,6 +37,105 @@ type dummyUnsignedTx struct {
 
 func (*dummyUnsignedTx) Visit(txs.Visitor) error {
 	return nil
+}
+
+func TestVerifyFinanceTx(t *testing.T) {
+	fx := &secp256k1fx.Fx{}
+
+	require.NoError(t, fx.InitializeVM(&secp256k1fx.TestVM{}))
+	require.NoError(t, fx.Bootstrapped())
+
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
+	h := &handler{
+		ctx: ctx,
+		clk: &mockable.Clock{},
+		fx:  fx,
+	}
+
+	cfg := &config.Config{
+		FeeConfig: config.FeeConfig{
+			DefaultUnitFees: commonfees.Dimensions{
+				1 * units.MicroAvax,
+				2 * units.MicroAvax,
+				3 * units.MicroAvax,
+				4 * units.MicroAvax,
+			},
+			DefaultBlockMaxConsumedUnits: commonfees.Dimensions{
+				math.MaxUint64,
+				math.MaxUint64,
+				math.MaxUint64,
+				math.MaxUint64,
+			},
+		},
+	}
+
+	tests := []struct {
+		description   string
+		utxoReaderF   func(ctrl *gomock.Controller) avax.UTXOReader
+		keys          []*secp256k1.PrivateKey
+		amountToStake uint64
+		uTxF          func() txs.UnsignedTx
+		feeCalcF      func() *fees.Calculator
+		changeAddr    ids.ShortID
+
+		expectedErr error
+		checksF     func(*testing.T, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
+	}{
+		{
+			description: "no inputs, no outputs, no fee",
+			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().UTXOIDs(gomock.Any(), gomock.Any(), gomock.Any()).Return([]ids.ID{}, nil).AnyTimes()
+				return s
+			},
+			keys:          secp256k1.TestKeys(),
+			amountToStake: 0,
+			uTxF: func() txs.UnsignedTx {
+				unsignedTx := dummyUnsignedTx{
+					BaseTx: txs.BaseTx{},
+				}
+				unsignedTx.SetBytes([]byte{0})
+				return &unsignedTx
+			},
+			feeCalcF: func() *fees.Calculator {
+				fm := commonfees.NewManager(cfg.DefaultUnitFees)
+				feesCalc := fees.Calculator{
+					FeeManager:  fm,
+					Config:      cfg,
+					ChainTime:   time.Time{},
+					Credentials: []verify.Verifiable{},
+				}
+				return &feesCalc
+			},
+			expectedErr: nil,
+			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				require.Zero(t, calc.Fee)
+				require.Empty(t, ins)
+				require.Empty(t, outs)
+				require.Empty(t, staked)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			feeCalc := test.feeCalcF()
+
+			ins, outs, staked, _, err := h.FinanceTx(
+				test.utxoReaderF(ctrl),
+				test.keys,
+				test.amountToStake,
+				test.uTxF(),
+				feeCalc,
+				test.changeAddr,
+			)
+			require.ErrorIs(t, err, test.expectedErr)
+			test.checksF(t, feeCalc, ins, outs, staked)
+		})
+	}
 }
 
 func TestVerifySpendUTXOs(t *testing.T) {

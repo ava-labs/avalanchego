@@ -19,8 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Max number of items allowed in a page
@@ -445,9 +448,39 @@ func (b *builder) NewCreateSubnetTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	timestamp := b.state.GetTimestamp()
-	createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(timestamp)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, createSubnetTxFee, changeAddr)
+	var (
+		chainTime = b.state.GetTimestamp()
+		ins       []*avax.TransferableInput
+		outs      []*avax.TransferableOutput
+		signers   [][]*secp256k1.PrivateKey
+		err       error
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager: feesMan,
+			Config:     b.cfg,
+			ChainTime:  b.state.GetTimestamp(),
+			// Credentials: ,
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err := feeCalc.CreateSubnetTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			utx,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(chainTime)
+		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, createSubnetTxFee, changeAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
