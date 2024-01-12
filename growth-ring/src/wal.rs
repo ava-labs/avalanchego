@@ -3,6 +3,7 @@
 
 use async_trait::async_trait;
 use bytemuck::{cast_slice, Pod, Zeroable};
+use crc32fast::Hasher;
 use futures::{
     future::{self, FutureExt, TryFutureExt},
     stream::StreamExt,
@@ -578,7 +579,11 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         // the remaining rec fits in the block
                         let payload = rec;
                         blob.counter = self.state.counter;
-                        blob.crc32 = CRC32.checksum(payload);
+
+                        let mut hasher = Hasher::new();
+                        hasher.update(payload);
+                        blob.crc32 = hasher.finalize();
+
                         blob.rsize = rsize;
 
                         let (rs, rt) = if let Some(rs) = ring_start.take() {
@@ -610,7 +615,11 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         #[allow(clippy::indexing_slicing)]
                         let payload = &rec[..d as usize];
                         blob.counter = self.state.counter;
-                        blob.crc32 = CRC32.checksum(payload);
+
+                        let mut hasher = Hasher::new();
+                        hasher.update(payload);
+                        blob.crc32 = hasher.finalize();
+
                         blob.rsize = d;
 
                         blob.rtype = if ring_start.is_some() {
@@ -918,7 +927,11 @@ impl WalLoader {
     }
 
     fn verify_checksum_(data: &[u8], checksum: u32, p: &RecoverPolicy) -> Result<bool, WalError> {
-        if checksum == CRC32.checksum(data) {
+        let mut hasher = Hasher::new();
+        hasher.update(data);
+        let expected_checksum = hasher.finalize();
+
+        if checksum == expected_checksum {
             Ok(true)
         } else {
             match p {
@@ -1338,8 +1351,6 @@ impl WalLoader {
         ))
     }
 }
-
-pub const CRC32: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_CKSUM);
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
