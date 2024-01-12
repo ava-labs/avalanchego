@@ -1010,8 +1010,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			zap.String("field", "Port"),
 			zap.Uint32("port", msg.IpPort),
 		)
-		p.StartClose()
-		return
+		// p.StartClose()
+		// return
 	}
 
 	p.ip = &SignedIP{
