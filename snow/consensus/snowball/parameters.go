@@ -39,7 +39,7 @@ var (
 		K:                     20,
 		AlphaPreference:       15,
 		AlphaConfidence:       15,
-		BetaVirtuous:          15,
+		BetaVirtuous:          20,
 		BetaRogue:             20,
 		ConcurrentRepolls:     4,
 		OptimalProcessing:     10,
