@@ -537,54 +537,32 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 index += 1;
             }
 
+            #[allow(clippy::indexing_slicing)]
             NodeType::Extension(n) => {
                 // If either the key of left proof or right proof doesn't match with
                 // shortnode, stop here and the forkpoint is the shortnode.
-                let cur_key = n.path.clone().into_inner();
+                let path = &*n.path;
 
-                fork_left = if left_chunks.len() - index < cur_key.len() {
-                    #[allow(clippy::indexing_slicing)]
-                    left_chunks[index..].cmp(&cur_key)
-                } else {
-                    #[allow(clippy::indexing_slicing)]
-                    left_chunks[index..index + cur_key.len()].cmp(&cur_key)
-                };
-
-                fork_right = if right_chunks.len() - index < cur_key.len() {
-                    #[allow(clippy::indexing_slicing)]
-                    right_chunks[index..].cmp(&cur_key)
-                } else {
-                    #[allow(clippy::indexing_slicing)]
-                    right_chunks[index..index + cur_key.len()].cmp(&cur_key)
-                };
+                [fork_left, fork_right] = [&left_chunks[index..], &right_chunks[index..]]
+                    .map(|chunks| chunks.chunks(path.len()).next().unwrap_or_default())
+                    .map(|key| key.cmp(path));
 
                 if !fork_left.is_eq() || !fork_right.is_eq() {
                     break;
                 }
 
                 parent = u_ref.as_ptr();
+                index += path.len();
                 u_ref = merkle.get_node(n.chd())?;
-                index += cur_key.len();
             }
 
+            #[allow(clippy::indexing_slicing)]
             NodeType::Leaf(n) => {
-                let cur_key = n.path();
+                let path = &*n.path;
 
-                fork_left = if left_chunks.len() - index < cur_key.len() {
-                    #[allow(clippy::indexing_slicing)]
-                    left_chunks[index..].cmp(cur_key)
-                } else {
-                    #[allow(clippy::indexing_slicing)]
-                    left_chunks[index..index + cur_key.len()].cmp(cur_key)
-                };
-
-                fork_right = if right_chunks.len() - index < cur_key.len() {
-                    #[allow(clippy::indexing_slicing)]
-                    right_chunks[index..].cmp(cur_key)
-                } else {
-                    #[allow(clippy::indexing_slicing)]
-                    right_chunks[index..index + cur_key.len()].cmp(cur_key)
-                };
+                [fork_left, fork_right] = [&left_chunks[index..], &right_chunks[index..]]
+                    .map(|chunks| chunks.chunks(path.len()).next().unwrap_or_default())
+                    .map(|key| key.cmp(path));
 
                 break;
             }
