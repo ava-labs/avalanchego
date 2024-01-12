@@ -126,6 +126,10 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 	}
 	pWallet := wallet.P()
 
+	if _, err := fmt.Fprintf(w, "Creating chains for subnet %q\n", s.Name); err != nil {
+		return err
+	}
+
 	for _, chain := range s.Chains {
 		vmID, err := GetVMID(chain.VMName)
 		if err != nil {
@@ -145,7 +149,7 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 		}
 		chain.ChainID = createChainTx.ID()
 
-		if _, err := fmt.Fprintf(w, " created chain with ID %s for VM %s on subnet %s\n", chain.ChainID, chain.VMName, s.Name); err != nil {
+		if _, err := fmt.Fprintf(w, " created chain %q for VM %q on subnet %q\n", chain.ChainID, chain.VMName, s.Name); err != nil {
 			return err
 		}
 	}
@@ -196,7 +200,7 @@ func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes []*Node) 
 			return err
 		}
 
-		if _, err := fmt.Fprintf(w, " added %s as validator for subnet %s\n", node.NodeID, s.Name); err != nil {
+		if _, err := fmt.Fprintf(w, " added %s as validator for subnet `%s`\n", node.NodeID, s.Name); err != nil {
 			return err
 		}
 
@@ -253,7 +257,7 @@ func waitForActiveValidators(
 	ticker := time.NewTicker(DefaultPollingInterval)
 	defer ticker.Stop()
 
-	if _, err := fmt.Fprintf(w, " waiting for validators for subnet %s to become active\n", subnet.Name); err != nil {
+	if _, err := fmt.Fprintf(w, "Waiting for validators of subnet %q to become active\n", subnet.Name); err != nil {
 		return err
 	}
 
@@ -280,7 +284,7 @@ func waitForActiveValidators(
 			}
 		}
 		if allActive {
-			if _, err := fmt.Fprintf(w, "\n saw the expected active validators of subnet %s\n", subnet.Name); err != nil {
+			if _, err := fmt.Fprintf(w, "\n saw the expected active validators of subnet %q\n", subnet.Name); err != nil {
 				return err
 			}
 			return nil
@@ -288,7 +292,7 @@ func waitForActiveValidators(
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see the expected active validators of %s before timeout", subnet.Name)
+			return fmt.Errorf("failed to see the expected active validators of subnet %q before timeout", subnet.Name)
 		case <-ticker.C:
 		}
 	}

@@ -515,6 +515,9 @@ func (n *Network) GetSubnet(name string) *Subnet {
 func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
+		if _, err := fmt.Fprintf(w, "Creating subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
 		if subnet.SubnetID != ids.Empty {
 			// The subnet already exists
 			continue
@@ -524,7 +527,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 			// Allocate a pre-funded key and remove it from the network so it won't be used for
 			// other purposes
 			if len(n.PreFundedKeys) == 0 {
-				return fmt.Errorf("no pre-funded keys available to create subnet %s", subnet.Name)
+				return fmt.Errorf("no pre-funded keys available to create subnet %q", subnet.Name)
 			}
 			subnet.OwningKey = n.PreFundedKeys[len(n.PreFundedKeys)-1]
 			n.PreFundedKeys = n.PreFundedKeys[:len(n.PreFundedKeys)-1]
@@ -535,7 +538,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 			return err
 		}
 
-		if _, err := fmt.Fprintf(w, " created subnet %s with ID %d\n", subnet.Name, subnet.SubnetID); err != nil {
+		if _, err := fmt.Fprintf(w, " created subnet %q as %q\n", subnet.Name, subnet.SubnetID); err != nil {
 			return err
 		}
 
@@ -544,7 +547,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 			return err
 		}
 
-		if _, err := fmt.Fprintf(w, " wrote configuration for subnet %s\n", subnet.Name); err != nil {
+		if _, err := fmt.Fprintf(w, " wrote configuration for subnet %q\n", subnet.Name); err != nil {
 			return err
 		}
 
@@ -564,7 +567,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	}
 
 	// Reconfigure nodes for the new subnets and their chains
-	if _, err := fmt.Fprintf(w, " reconfiguring nodes to track the new subnet(s)\n"); err != nil {
+	if _, err := fmt.Fprintf(w, "Configured nodes to track new subnet(s). Restart is required.\n"); err != nil {
 		return err
 	}
 	for _, node := range n.Nodes {
@@ -580,6 +583,9 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 
 	// Add each node as a subnet validator
 	for _, subnet := range createdSubnets {
+		if _, err := fmt.Fprintf(w, "Adding validators for subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
 		if err := subnet.AddValidators(ctx, w, n.Nodes); err != nil {
 			return err
 		}
@@ -601,7 +607,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %s\n", subnet.Name); err != nil {
+		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %q\n", subnet.Name); err != nil {
 			return err
 		}
 	}
