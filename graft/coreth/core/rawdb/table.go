@@ -27,7 +27,7 @@
 package rawdb
 
 import (
-	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 // table is a wrapper around a database that prefixes each key access with a pre-
@@ -58,6 +58,80 @@ func (t *table) Has(key []byte) (bool, error) {
 // Get retrieves the given prefixed key if it's present in the database.
 func (t *table) Get(key []byte) ([]byte, error) {
 	return t.db.Get(append([]byte(t.prefix), key...))
+}
+
+// HasAncient is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) HasAncient(kind string, number uint64) (bool, error) {
+	return t.db.HasAncient(kind, number)
+}
+
+// Ancient is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) Ancient(kind string, number uint64) ([]byte, error) {
+	return t.db.Ancient(kind, number)
+}
+
+// AncientRange is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) AncientRange(kind string, start, count, maxBytes uint64) ([][]byte, error) {
+	return t.db.AncientRange(kind, start, count, maxBytes)
+}
+
+// Ancients is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) Ancients() (uint64, error) {
+	return t.db.Ancients()
+}
+
+// Tail is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) Tail() (uint64, error) {
+	return t.db.Tail()
+}
+
+// AncientSize is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) AncientSize(kind string) (uint64, error) {
+	return t.db.AncientSize(kind)
+}
+
+// ModifyAncients runs an ancient write operation on the underlying database.
+func (t *table) ModifyAncients(fn func(ethdb.AncientWriteOp) error) (int64, error) {
+	return t.db.ModifyAncients(fn)
+}
+
+func (t *table) ReadAncients(fn func(reader ethdb.AncientReaderOp) error) (err error) {
+	return t.db.ReadAncients(fn)
+}
+
+// TruncateHead is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) TruncateHead(items uint64) error {
+	return t.db.TruncateHead(items)
+}
+
+// TruncateTail is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) TruncateTail(items uint64) error {
+	return t.db.TruncateTail(items)
+}
+
+// Sync is a noop passthrough that just forwards the request to the underlying
+// database.
+func (t *table) Sync() error {
+	return t.db.Sync()
+}
+
+// MigrateTable processes the entries in a given table in sequence
+// converting them to a new format if they're of an old format.
+func (t *table) MigrateTable(kind string, convert convertLegacyFn) error {
+	return t.db.MigrateTable(kind, convert)
+}
+
+// AncientDatadir returns the ancient datadir of the underlying database.
+func (t *table) AncientDatadir() (string, error) {
+	return t.db.AncientDatadir()
 }
 
 // Put inserts the given value into the database at a prefixed version of the
@@ -134,6 +208,13 @@ func (t *table) NewBatch() ethdb.Batch {
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (t *table) NewBatchWithSize(size int) ethdb.Batch {
 	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix}
+}
+
+// NewSnapshot creates a database snapshot based on the current state.
+// The created snapshot will not be affected by all following mutations
+// happened on the database.
+func (t *table) NewSnapshot() (ethdb.Snapshot, error) {
+	return t.db.NewSnapshot()
 }
 
 // tableBatch is a wrapper around a database batch that prefixes each key access

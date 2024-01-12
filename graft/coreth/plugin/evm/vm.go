@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/eth/ethconfig"
-	"github.com/ava-labs/coreth/ethdb"
 	corethPrometheus "github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
@@ -49,6 +48,7 @@ import (
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/warp"
 	warpValidators "github.com/ava-labs/coreth/warp/validators"
+	"github.com/ethereum/go-ethereum/ethdb"
 
 	"github.com/prometheus/client_golang/prometheus"
 	// Force-load tracer engine to trigger registration
@@ -423,7 +423,7 @@ func (vm *VM) Initialize(
 	vm.shutdownChan = make(chan struct{}, 1)
 	// Use NewNested rather than New so that the structure of the database
 	// remains the same regardless of the provided baseDB type.
-	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, db)}
+	vm.chaindb = rawdb.NewDatabase(Database{prefixdb.NewNested(ethDBPrefix, db)})
 	vm.db = versiondb.New(db)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)

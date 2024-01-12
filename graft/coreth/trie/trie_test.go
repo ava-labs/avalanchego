@@ -40,11 +40,11 @@ import (
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
@@ -800,6 +800,7 @@ func (s *spongeDb) Get(key []byte) ([]byte, error)           { return nil, error
 func (s *spongeDb) Delete(key []byte) error                  { panic("implement me") }
 func (s *spongeDb) NewBatch() ethdb.Batch                    { return &spongeBatch{s} }
 func (s *spongeDb) NewBatchWithSize(size int) ethdb.Batch    { return &spongeBatch{s} }
+func (s *spongeDb) NewSnapshot() (ethdb.Snapshot, error)     { panic("implement me") }
 func (s *spongeDb) Stat(property string) (string, error)     { panic("implement me") }
 func (s *spongeDb) Compact(start []byte, limit []byte) error { panic("implement me") }
 func (s *spongeDb) Close() error                             { return nil }
