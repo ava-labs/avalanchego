@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -245,10 +245,13 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 		var cred *secp256k1fx.Credential
 		switch credImpl := credIntf.(type) {
 		case *secp256k1fx.Credential:
+			fxCred.FxID = secp256k1fx.ID
 			cred = credImpl
 		case *nftfx.Credential:
+			fxCred.FxID = nftfx.ID
 			cred = &credImpl.Credential
 		case *propertyfx.Credential:
+			fxCred.FxID = propertyfx.ID
 			cred = &credImpl.Credential
 		default:
 			return errUnknownCredentialType

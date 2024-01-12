@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -284,6 +284,26 @@ func InboundAppRequest(
 	}
 }
 
+func InboundAppError(
+	nodeID ids.NodeID,
+	chainID ids.ID,
+	requestID uint32,
+	errorCode int32,
+	errorMessage string,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     AppErrorOp,
+		message: &p2p.AppError{
+			ChainId:      chainID[:],
+			RequestId:    requestID,
+			ErrorCode:    errorCode,
+			ErrorMessage: errorMessage,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
 func InboundAppResponse(
 	chainID ids.ID,
 	requestID uint32,
@@ -304,7 +324,7 @@ func InboundAppResponse(
 
 func encodeIDs(ids []ids.ID, result [][]byte) {
 	for i, id := range ids {
-		copy := id
-		result[i] = copy[:]
+		id := id
+		result[i] = id[:]
 	}
 }

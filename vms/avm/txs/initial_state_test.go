@@ -1,11 +1,13 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
 
 import (
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +24,7 @@ var errTest = errors.New("non-nil error")
 func TestInitialStateVerifySerialization(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
@@ -79,7 +81,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 func TestInitialStateVerifyNil(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
@@ -92,7 +94,7 @@ func TestInitialStateVerifyNil(t *testing.T) {
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
@@ -107,7 +109,7 @@ func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 func TestInitialStateVerifyNilOutput(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
@@ -123,7 +125,7 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&avax.TestState{}))
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
@@ -140,7 +142,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	require.NoError(c.RegisterType(&avax.TestTransferable{}))
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
@@ -159,14 +161,31 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	require.NoError(is.Verify(m, numFxs))
 }
 
-func TestInitialStateLess(t *testing.T) {
-	require := require.New(t)
+func TestInitialStateCompare(t *testing.T) {
+	tests := []struct {
+		a        *InitialState
+		b        *InitialState
+		expected int
+	}{
+		{
+			a:        &InitialState{},
+			b:        &InitialState{},
+			expected: 0,
+		},
+		{
+			a: &InitialState{
+				FxIndex: 1,
+			},
+			b:        &InitialState{},
+			expected: 1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%d_%d_%d", test.a.FxIndex, test.b.FxIndex, test.expected), func(t *testing.T) {
+			require := require.New(t)
 
-	var is1, is2 InitialState
-	require.False(is1.Less(&is2))
-	require.False(is2.Less(&is1))
-
-	is1.FxIndex = 1
-	require.False(is1.Less(&is2))
-	require.True(is2.Less(&is1))
+			require.Equal(test.expected, test.a.Compare(test.b))
+			require.Equal(-test.expected, test.b.Compare(test.a))
+		})
+	}
 }

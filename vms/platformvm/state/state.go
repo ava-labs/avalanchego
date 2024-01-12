@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -289,6 +289,7 @@ type state struct {
 
 	validators validators.Manager
 	ctx        *snow.Context
+	cfg        *config.Config
 	metrics    metrics.Metrics
 	rewards    reward.Calculator
 
@@ -452,7 +453,7 @@ func New(
 	db database.Database,
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
-	validators validators.Manager,
+	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
@@ -461,7 +462,7 @@ func New(
 	s, err := newState(
 		db,
 		metrics,
-		validators,
+		cfg,
 		execCfg,
 		ctx,
 		metricsReg,
@@ -505,7 +506,7 @@ func New(
 func newState(
 	db database.Database,
 	metrics metrics.Metrics,
-	validators validators.Manager,
+	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
@@ -628,8 +629,9 @@ func newState(
 	return &state{
 		validatorState: newValidatorState(),
 
-		validators: validators,
+		validators: cfg.Validators,
 		ctx:        ctx,
+		cfg:        cfg,
 		metrics:    metrics,
 		rewards:    rewards,
 		baseDB:     baseDB,
@@ -1188,7 +1190,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			Height:   height,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := block.GenesisCodec.Marshal(block.Version, prefixStruct)
+		prefixBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, prefixStruct)
 		if err != nil {
 			return err
 		}
@@ -1320,13 +1322,20 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		validatorTx, ok := vdrTx.Unsigned.(txs.ValidatorTx)
+		// We expect genesis validator txs to be either AddValidatorTx or
+		// AddPermissionlessValidatorTx.
+		//
+		// TODO: Enforce stricter type check
+		validatorTx, ok := vdrTx.Unsigned.(txs.ScheduledStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", vdrTx.Unsigned)
+			return fmt.Errorf("expected a scheduled staker but got %T", vdrTx.Unsigned)
 		}
 
 		stakeAmount := validatorTx.Weight()
-		stakeDuration := validatorTx.EndTime().Sub(validatorTx.StartTime())
+		// Note: We use [StartTime()] here because genesis transactions are
+		// guaranteed to be pre-Durango activation.
+		startTime := validatorTx.StartTime()
+		stakeDuration := validatorTx.EndTime().Sub(startTime)
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
@@ -1342,7 +1351,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, startTime, potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1448,17 +1457,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 		tx, _, err := s.GetTx(txID)
 		if err != nil {
-			return err
-		}
-
-		metadataBytes := validatorIt.Value()
-		metadata := &validatorMetadata{
-			txID: txID,
-			// Note: we don't provide [LastUpdated] here because we expect it to
-			// always be present on disk.
-		}
-		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
-			return err
+			return fmt.Errorf("failed loading validator transaction txID %s, %w", txID, err)
 		}
 
 		stakerTx, ok := tx.Unsigned.(txs.Staker)
@@ -1466,7 +1465,27 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+		metadataBytes := validatorIt.Value()
+		metadata := &validatorMetadata{
+			txID: txID,
+		}
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			// Populate [StakerStartTime] using the tx as a default in the event
+			// it was added pre-durango and is not stored in the database.
+			//
+			// Note: We do not populate [LastUpdated] since it is expected to
+			// always be present on disk.
+			metadata.StakerStartTime = uint64(scheduledStakerTx.StartTime().Unix())
+		}
+		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
+			return err
+		}
+
+		staker, err := NewCurrentStaker(
+			txID,
+			stakerTx,
+			time.Unix(int64(metadata.StakerStartTime), 0),
+			metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1500,15 +1519,24 @@ func (s *state) loadCurrentValidators() error {
 		metadataBytes := subnetValidatorIt.Value()
 		metadata := &validatorMetadata{
 			txID: txID,
-			// use the start time as the fallback value
-			// in case it's not stored in the database
-			LastUpdated: uint64(stakerTx.StartTime().Unix()),
+		}
+		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			// Populate [StakerStartTime] and [LastUpdated] using the tx as a
+			// default in the event they are not stored in the database.
+			startTime := uint64(scheduledStakerTx.StartTime().Unix())
+			metadata.StakerStartTime = startTime
+			metadata.LastUpdated = startTime
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+		staker, err := NewCurrentStaker(
+			txID,
+			stakerTx,
+			time.Unix(int64(metadata.StakerStartTime), 0),
+			metadata.PotentialReward,
+		)
 		if err != nil {
 			return err
 		}
@@ -1538,20 +1566,32 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			metadata := &delegatorMetadata{
-				txID: txID,
-			}
-			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
-			if err != nil {
-				return err
-			}
-
 			stakerTx, ok := tx.Unsigned.(txs.Staker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+			metadataBytes := delegatorIt.Value()
+			metadata := &delegatorMetadata{
+				txID: txID,
+			}
+			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+				// Populate [StakerStartTime] using the tx as a default in the
+				// event it was added pre-durango and is not stored in the
+				// database.
+				metadata.StakerStartTime = uint64(scheduledStakerTx.StartTime().Unix())
+			}
+			err = parseDelegatorMetadata(metadataBytes, metadata)
+			if err != nil {
+				return err
+			}
+
+			staker, err := NewCurrentStaker(
+				txID,
+				stakerTx,
+				time.Unix(int64(metadata.StakerStartTime), 0),
+				metadata.PotentialReward,
+			)
 			if err != nil {
 				return err
 			}
@@ -1595,7 +1635,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1630,7 +1670,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1695,11 +1735,16 @@ func (s *state) initValidatorSets() error {
 }
 
 func (s *state) write(updateValidators bool, height uint64) error {
+	codecVersion := CodecVersion1
+	if !s.cfg.IsDurangoActivated(s.GetTimestamp()) {
+		codecVersion = CodecVersion0
+	}
+
 	return utils.Err(
 		s.writeBlocks(),
-		s.writeCurrentStakers(updateValidators, height),
+		s.writeCurrentStakers(updateValidators, height, codecVersion),
 		s.writePendingStakers(),
-		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
+		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
@@ -1925,7 +1970,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
+func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecVersion uint16) error {
 	heightBytes := database.PackUInt64(height)
 	rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
 	nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
@@ -1945,7 +1990,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			Height:   height,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := block.GenesisCodec.Marshal(block.Version, prefixStruct)
+		prefixBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, prefixStruct)
 		if err != nil {
 			return fmt.Errorf("failed to create prefix bytes: %w", err)
 		}
@@ -1984,17 +2029,19 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				//
 				// Invariant: It's impossible for a delegator to have been
 				// rewarded in the same block that the validator was added.
+				startTime := uint64(staker.StartTime.Unix())
 				metadata := &validatorMetadata{
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
 					UpDuration:               0,
-					LastUpdated:              uint64(staker.StartTime.Unix()),
+					LastUpdated:              startTime,
+					StakerStartTime:          startTime,
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := metadataCodec.Marshal(v0, metadata)
+				metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -2047,6 +2094,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				delegatorDB,
 				weightDiff,
 				validatorDiff,
+				codecVersion,
 			)
 			if err != nil {
 				return err
@@ -2066,7 +2114,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			// TODO: Remove this once we no longer support version rollbacks.
-			weightDiffBytes, err := block.GenesisCodec.Marshal(block.Version, weightDiff)
+			weightDiffBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, weightDiff)
 			if err != nil {
 				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 			}
@@ -2122,6 +2170,7 @@ func writeCurrentDelegatorDiff(
 	currentDelegatorList linkeddb.LinkedDB,
 	weightDiff *ValidatorWeightDiff,
 	validatorDiff *diffValidator,
+	codecVersion uint16,
 ) error {
 	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
@@ -2135,8 +2184,9 @@ func writeCurrentDelegatorDiff(
 		metadata := &delegatorMetadata{
 			txID:            staker.TxID,
 			PotentialReward: staker.PotentialReward,
+			StakerStartTime: uint64(staker.StartTime.Unix()),
 		}
-		if err := writeDelegatorMetadata(currentDelegatorList, metadata); err != nil {
+		if err := writeDelegatorMetadata(currentDelegatorList, metadata, codecVersion); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
 		}
 	}
@@ -2225,7 +2275,7 @@ func (s *state) writeTXs() error {
 
 		// Note that we're serializing a [txBytesAndStatus] here, not a
 		// *txs.Tx, so we don't use [txs.Codec].
-		txBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stx)
+		txBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to serialize tx: %w", err)
 		}
@@ -2250,7 +2300,7 @@ func (s *state) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}
@@ -2298,7 +2348,7 @@ func (s *state) writeSubnetOwners() error {
 		owner := owner
 		delete(s.subnetOwners, subnetID)
 
-		ownerBytes, err := block.GenesisCodec.Marshal(block.Version, &owner)
+		ownerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &owner)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
@@ -2379,7 +2429,7 @@ func (s *state) writeMetadata() error {
 	}
 
 	if s.indexedHeights != nil {
-		indexedHeightsBytes, err := block.GenesisCodec.Marshal(block.Version, s.indexedHeights)
+		indexedHeightsBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, s.indexedHeights)
 		if err != nil {
 			return err
 		}

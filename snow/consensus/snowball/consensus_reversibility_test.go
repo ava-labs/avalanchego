@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -8,23 +8,25 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/sampler"
+	"gonum.org/v1/gonum/mathext/prng"
 )
 
 func TestSnowballGovernance(t *testing.T) {
 	require := require.New(t)
 
-	numColors := 2
-	numNodes := 100
-	numByzantine := 10
-	numRed := 55
-	params := DefaultParameters
-	seed := int64(0)
+	var (
+		numColors           = 2
+		numNodes            = 100
+		numByzantine        = 10
+		numRed              = 55
+		params              = DefaultParameters
+		seed         uint64 = 0
+		source              = prng.NewMT19937()
+	)
 
-	nBitwise := Network{}
-	nBitwise.Initialize(params, numColors)
+	nBitwise := NewNetwork(params, numColors, source)
 
-	sampler.Seed(seed)
+	source.Seed(seed)
 	for i := 0; i < numRed; i++ {
 		nBitwise.AddNodeSpecificColor(NewTree, 0, []int{1})
 	}

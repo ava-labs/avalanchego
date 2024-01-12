@@ -1,13 +1,12 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
 import (
-	"math/rand"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
@@ -16,20 +15,24 @@ type newConsensusFunc func(params Parameters, choice ids.ID) Consensus
 type Network struct {
 	params         Parameters
 	colors         []ids.ID
+	rngSource      sampler.Source
 	nodes, running []Consensus
 }
 
-// Initialize sets the parameters for the network and adds [numColors] different
-// possible colors to the network configuration.
-func (n *Network) Initialize(params Parameters, numColors int) {
-	n.params = params
+// Create a new network with [numColors] different possible colors to finalize.
+func NewNetwork(params Parameters, numColors int, rngSource sampler.Source) *Network {
+	n := &Network{
+		params:    params,
+		rngSource: rngSource,
+	}
 	for i := 0; i < numColors; i++ {
 		n.colors = append(n.colors, ids.Empty.Prefix(uint64(i)))
 	}
+	return n
 }
 
 func (n *Network) AddNode(newConsensusFunc newConsensusFunc) Consensus {
-	s := sampler.NewUniform()
+	s := sampler.NewDeterministicUniform(n.rngSource)
 	s.Initialize(uint64(len(n.colors)))
 	indices, _ := s.Sample(len(n.colors))
 
@@ -78,15 +81,14 @@ func (n *Network) Finalized() bool {
 // performing an unbiased poll of the nodes in the network for that node.
 func (n *Network) Round() {
 	if len(n.running) > 0 {
-		runningInd := rand.Intn(len(n.running)) // #nosec G404
+		s := sampler.NewDeterministicUniform(n.rngSource)
+
+		s.Initialize(uint64(len(n.running)))
+		runningInd, _ := s.Next()
 		running := n.running[runningInd]
 
-		s := sampler.NewUniform()
 		s.Initialize(uint64(len(n.nodes)))
-		count := len(n.nodes)
-		if count > n.params.K {
-			count = n.params.K
-		}
+		count := math.Min(n.params.K, len(n.nodes))
 		indices, _ := s.Sample(count)
 		sampledColors := bag.Bag[ids.ID]{}
 		for _, index := range indices {

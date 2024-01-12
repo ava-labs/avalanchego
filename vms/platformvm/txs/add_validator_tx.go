@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -19,7 +19,8 @@ import (
 )
 
 var (
-	_ ValidatorTx = (*AddValidatorTx)(nil)
+	_ ValidatorTx     = (*AddValidatorTx)(nil)
+	_ ScheduledStaker = (*AddValidatorTx)(nil)
 
 	errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
 )

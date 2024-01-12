@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -71,4 +71,19 @@ func TestManagerLastAccepted(t *testing.T) {
 	}
 
 	require.Equal(t, lastAcceptedID, manager.LastAccepted())
+}
+
+func TestManagerSetPreference(t *testing.T) {
+	require := require.New(t)
+
+	initialPreference := ids.GenerateTestID()
+	manager := &manager{
+		preferred: initialPreference,
+	}
+	require.False(manager.SetPreference(initialPreference))
+
+	newPreference := ids.GenerateTestID()
+	require.True(manager.SetPreference(newPreference))
+	require.False(manager.SetPreference(newPreference))
+	require.True(manager.SetPreference(initialPreference))
 }

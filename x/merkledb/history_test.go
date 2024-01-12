@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -36,8 +36,7 @@ func Test_History_Simple(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-
-	origRootID := db.getMerkleRoot()
+	origRootID := db.rootID
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID, db.tokenSize))
 
 	batch = db.NewBatch()
@@ -165,13 +164,13 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Put([]byte("key"), []byte("value")))
 	require.NoError(batch.Write())
 
-	toBeDeletedRoot := db.getMerkleRoot()
+	root1 := db.getMerkleRoot()
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key"), []byte("value0")))
 	require.NoError(batch.Write())
 
-	startRoot := db.getMerkleRoot()
+	root2 := db.getMerkleRoot()
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("value0")))
@@ -185,31 +184,30 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Put([]byte("key2"), []byte("value3")))
 	require.NoError(batch.Write())
 
-	endRoot := db.getMerkleRoot()
+	root3 := db.getMerkleRoot()
 
 	// ensure these start as valid calls
-	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(root1, root3, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.NoError(err)
-	_, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(root2, root3, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.NoError(err)
 
-	_, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), -1)
+	_, err = db.history.getValueChanges(root2, root3, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), -1)
 	require.ErrorIs(err, ErrInvalidMaxLength)
 
-	_, err = db.history.getValueChanges(endRoot, startRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(root3, root2, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.ErrorIs(err, ErrInsufficientHistory)
 
-	// trigger the first root to be deleted by exiting the lookback window
+	// Cause root1 to be removed from the history
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key2"), []byte("value4")))
 	require.NoError(batch.Write())
 
-	// now this root should no longer be present
-	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(root1, root3, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.ErrorIs(err, ErrInsufficientHistory)
 
 	// same start/end roots should yield an empty changelist
-	changes, err := db.history.getValueChanges(endRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
+	changes, err := db.history.getValueChanges(root3, root3, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
 	require.NoError(err)
 	require.Empty(changes.values)
 }
@@ -339,8 +337,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-
-	origRootID := db.getMerkleRoot()
+	origRootID := db.rootID
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID, db.tokenSize))
 
 	batch = db.NewBatch()
@@ -382,8 +379,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-
-	origRootID := db.getMerkleRoot()
+	origRootID := db.rootID
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID, db.tokenSize))
 
 	batch = db.NewBatch()
@@ -415,8 +411,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-
-	origRootID := db.getMerkleRoot()
+	origRootID := db.rootID
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID, db.tokenSize))
 
 	batch = db.NewBatch()
@@ -444,7 +439,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	origRootID := db.getMerkleRoot()
+	origRootID := db.rootID
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID, db.tokenSize))
 
 	batch = db.NewBatch()
@@ -472,8 +467,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-
-	origRootID := db.getMerkleRoot()
+	origRootID := db.rootID
 	require.NoError(origProof.Verify(context.Background(), maybe.Some([]byte("k")), maybe.Some([]byte("key3")), origRootID, db.tokenSize))
 
 	batch = db.NewBatch()
@@ -658,6 +652,9 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 	for i := 0; i < maxHistoryLen; i++ { // Fill the history
 		changes = append(changes, &changeSummary{
 			rootID: ids.GenerateTestID(),
+			rootChange: change[maybe.Maybe[*node]]{
+				before: maybe.Some(&node{}),
+			},
 			nodes: map[Key]*change[*node]{
 				ToKey([]byte{byte(i)}): {
 					before: &node{},
@@ -693,7 +690,8 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			name:   "most recent change",
 			rootID: changes[maxHistoryLen-1].rootID,
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				require.Equal(newChangeSummary(defaultPreallocationSize), got)
+				expected := newChangeSummary(defaultPreallocationSize)
+				require.Equal(expected, got)
 			},
 		},
 		{

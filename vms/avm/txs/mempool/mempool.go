@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -6,14 +6,16 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
@@ -26,8 +28,6 @@ const (
 	// droppedTxIDsCacheSize is the maximum number of dropped txIDs to cache
 	droppedTxIDsCacheSize = 64
 
-	initialConsumedUTXOsSize = 512
-
 	// maxMempoolSize is the maximum number of bytes allowed in the mempool
 	maxMempoolSize = 64 * units.MiB
 )
@@ -35,21 +35,25 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errDuplicateTx          = errors.New("duplicate tx")
-	errTxTooLarge           = errors.New("tx too large")
-	errMempoolFull          = errors.New("mempool is full")
-	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
+	ErrDuplicateTx          = errors.New("duplicate tx")
+	ErrTxTooLarge           = errors.New("tx too large")
+	ErrMempoolFull          = errors.New("mempool is full")
+	ErrConflictsWithOtherTx = errors.New("tx conflicts with other tx")
 )
 
 // Mempool contains transactions that have not yet been put into a block.
 type Mempool interface {
 	Add(tx *txs.Tx) error
-	Has(txID ids.ID) bool
-	Get(txID ids.ID) *txs.Tx
-	Remove(txs []*txs.Tx)
+	Get(txID ids.ID) (*txs.Tx, bool)
+	// Remove [txs] and any conflicts of [txs] from the mempool.
+	Remove(txs ...*txs.Tx)
 
-	// Peek returns the first tx in the mempool whose size is <= [maxTxSize].
-	Peek(maxTxSize int) *txs.Tx
+	// Peek returns the oldest tx in the mempool.
+	Peek() (tx *txs.Tx, exists bool)
+
+	// Iterate over transactions from oldest to newest until the function
+	// returns false or there are no more transactions.
+	Iterate(f func(tx *txs.Tx) bool)
 
 	// RequestBuildBlock notifies the consensus engine that a block should be
 	// built if there is at least one transaction in the mempool.
@@ -59,22 +63,22 @@ type Mempool interface {
 	// unissued. This allows previously dropped txs to be possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
+
+	// Len returns the number of txs in the mempool.
+	Len() int
 }
 
 type mempool struct {
-	bytesAvailableMetric prometheus.Gauge
-	bytesAvailable       int
-
-	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
-	numTxs      prometheus.Gauge
+	lock           sync.RWMutex
+	unissuedTxs    linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
+	bytesAvailable int
+	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> Verification error
 
 	toEngine chan<- common.Message
 
-	// Key: Tx ID
-	// Value: Verification error
-	droppedTxIDs *cache.LRU[ids.ID, error]
-
-	consumedUTXOs set.Set[ids.ID]
+	numTxs               prometheus.Gauge
+	bytesAvailableMetric prometheus.Gauge
 }
 
 func New(
@@ -82,47 +86,46 @@ func New(
 	registerer prometheus.Registerer,
 	toEngine chan<- common.Message,
 ) (Mempool, error) {
-	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "bytes_available",
-		Help:      "Number of bytes of space currently available in the mempool",
-	})
-	if err := registerer.Register(bytesAvailableMetric); err != nil {
-		return nil, err
+	m := &mempool{
+		unissuedTxs:    linkedhashmap.New[ids.ID, *txs.Tx](),
+		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
+		bytesAvailable: maxMempoolSize,
+		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		toEngine:       toEngine,
+		numTxs: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "count",
+			Help:      "Number of transactions in the mempool",
+		}),
+		bytesAvailableMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "bytes_available",
+			Help:      "Number of bytes of space currently available in the mempool",
+		}),
 	}
+	m.bytesAvailableMetric.Set(maxMempoolSize)
 
-	numTxsMetric := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "count",
-		Help:      "Number of transactions in the mempool",
-	})
-	if err := registerer.Register(numTxsMetric); err != nil {
-		return nil, err
-	}
-
-	bytesAvailableMetric.Set(maxMempoolSize)
-	return &mempool{
-		bytesAvailableMetric: bytesAvailableMetric,
-		bytesAvailable:       maxMempoolSize,
-		unissuedTxs:          linkedhashmap.New[ids.ID, *txs.Tx](),
-		numTxs:               numTxsMetric,
-		toEngine:             toEngine,
-		droppedTxIDs:         &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
-		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
-	}, nil
+	err := utils.Err(
+		registerer.Register(m.numTxs),
+		registerer.Register(m.bytesAvailableMetric),
+	)
+	return m, err
 }
 
 func (m *mempool) Add(tx *txs.Tx) error {
-	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
-	if m.Has(txID) {
-		return fmt.Errorf("%w: %s", errDuplicateTx, txID)
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if _, ok := m.unissuedTxs.Get(txID); ok {
+		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
 	txSize := len(tx.Bytes())
 	if txSize > MaxTxSize {
 		return fmt.Errorf("%w: %s size (%d) > max size (%d)",
-			errTxTooLarge,
+			ErrTxTooLarge,
 			txID,
 			txSize,
 			MaxTxSize,
@@ -130,7 +133,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 	if txSize > m.bytesAvailable {
 		return fmt.Errorf("%w: %s size (%d) > available space (%d)",
-			errMempoolFull,
+			ErrMempoolFull,
 			txID,
 			txSize,
 			m.bytesAvailable,
@@ -138,8 +141,8 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 
 	inputs := tx.Unsigned.InputIDs()
-	if m.consumedUTXOs.Overlaps(inputs) {
-		return fmt.Errorf("%w: %s", errConflictsWithOtherTx, txID)
+	if m.consumedUTXOs.HasOverlap(inputs) {
+		return fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
 	}
 
 	m.bytesAvailable -= txSize
@@ -149,49 +152,58 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	m.numTxs.Inc()
 
 	// Mark these UTXOs as consumed in the mempool
-	m.consumedUTXOs.Union(inputs)
+	m.consumedUTXOs.Put(txID, inputs)
 
-	// An explicitly added tx must not be marked as dropped.
+	// An added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
 	return nil
 }
 
-func (m *mempool) Has(txID ids.ID) bool {
-	return m.Get(txID) != nil
+func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+	tx, ok := m.unissuedTxs.Get(txID)
+	return tx, ok
 }
 
-func (m *mempool) Get(txID ids.ID) *txs.Tx {
-	tx, _ := m.unissuedTxs.Get(txID)
-	return tx
-}
+func (m *mempool) Remove(txs ...*txs.Tx) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-func (m *mempool) Remove(txsToRemove []*txs.Tx) {
-	for _, tx := range txsToRemove {
+	for _, tx := range txs {
 		txID := tx.ID()
-		if !m.unissuedTxs.Delete(txID) {
+		// If the transaction is in the mempool, remove it.
+		if _, ok := m.consumedUTXOs.DeleteKey(txID); ok {
+			m.unissuedTxs.Delete(txID)
+			m.bytesAvailable += len(tx.Bytes())
 			continue
 		}
 
-		m.bytesAvailable += len(tx.Bytes())
-		m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
-
-		m.numTxs.Dec()
-
+		// If the transaction isn't in the mempool, remove any conflicts it has.
 		inputs := tx.Unsigned.InputIDs()
-		m.consumedUTXOs.Difference(inputs)
-	}
-}
-
-func (m *mempool) Peek(maxTxSize int) *txs.Tx {
-	txIter := m.unissuedTxs.NewIterator()
-	for txIter.Next() {
-		tx := txIter.Value()
-		txSize := len(tx.Bytes())
-		if txSize <= maxTxSize {
-			return tx
+		for _, removed := range m.consumedUTXOs.DeleteOverlapping(inputs) {
+			tx, _ := m.unissuedTxs.Get(removed.Key)
+			m.unissuedTxs.Delete(removed.Key)
+			m.bytesAvailable += len(tx.Bytes())
 		}
 	}
-	return nil
+	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
+	m.numTxs.Set(float64(m.unissuedTxs.Len()))
+}
+
+func (m *mempool) Peek() (*txs.Tx, bool) {
+	_, tx, exists := m.unissuedTxs.Oldest()
+	return tx, exists
+}
+
+func (m *mempool) Iterate(f func(*txs.Tx) bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	it := m.unissuedTxs.NewIterator()
+	for it.Next() {
+		if !f(it.Value()) {
+			return
+		}
+	}
 }
 
 func (m *mempool) RequestBuildBlock() {
@@ -206,10 +218,28 @@ func (m *mempool) RequestBuildBlock() {
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
+	if errors.Is(reason, ErrMempoolFull) {
+		return
+	}
+
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	if _, ok := m.unissuedTxs.Get(txID); ok {
+		return
+	}
+
 	m.droppedTxIDs.Put(txID, reason)
 }
 
 func (m *mempool) GetDropReason(txID ids.ID) error {
 	err, _ := m.droppedTxIDs.Get(txID)
 	return err
+}
+
+func (m *mempool) Len() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.unissuedTxs.Len()
 }

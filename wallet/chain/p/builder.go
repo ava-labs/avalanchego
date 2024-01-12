@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -311,7 +311,7 @@ func (b *builder) NewBaseTx(
 	outputs = append(outputs, changeOutputs...)
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort the outputs
 
-	return &txs.CreateSubnetTx{
+	tx := &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -320,7 +320,8 @@ func (b *builder) NewBaseTx(
 			Memo:         ops.Memo(),
 		}},
 		Owner: &secp256k1fx.OutputOwners{},
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewAddValidatorTx(
@@ -343,7 +344,7 @@ func (b *builder) NewAddValidatorTx(
 	}
 
 	utils.Sort(rewardsOwner.Addrs)
-	return &txs.AddValidatorTx{
+	tx := &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -355,7 +356,8 @@ func (b *builder) NewAddValidatorTx(
 		StakeOuts:        stakeOutputs,
 		RewardsOwner:     rewardsOwner,
 		DelegationShares: shares,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
@@ -377,7 +379,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	return &txs.AddSubnetValidatorTx{
+	tx := &txs.AddSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -387,7 +389,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 		}},
 		SubnetValidator: *vdr,
 		SubnetAuth:      subnetAuth,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
@@ -410,7 +413,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, err
 	}
 
-	return &txs.RemoveSubnetValidatorTx{
+	tx := &txs.RemoveSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -421,7 +424,8 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		Subnet:     subnetID,
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewAddDelegatorTx(
@@ -443,7 +447,7 @@ func (b *builder) NewAddDelegatorTx(
 	}
 
 	utils.Sort(rewardsOwner.Addrs)
-	return &txs.AddDelegatorTx{
+	tx := &txs.AddDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -454,7 +458,8 @@ func (b *builder) NewAddDelegatorTx(
 		Validator:              *vdr,
 		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewCreateChainTx(
@@ -481,7 +486,7 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	utils.Sort(fxIDs)
-	return &txs.CreateChainTx{
+	tx := &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -495,7 +500,8 @@ func (b *builder) NewCreateChainTx(
 		FxIDs:       fxIDs,
 		GenesisData: genesis,
 		SubnetAuth:  subnetAuth,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewCreateSubnetTx(
@@ -513,7 +519,7 @@ func (b *builder) NewCreateSubnetTx(
 	}
 
 	utils.Sort(owner.Addrs)
-	return &txs.CreateSubnetTx{
+	tx := &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -522,7 +528,8 @@ func (b *builder) NewCreateSubnetTx(
 			Memo:         ops.Memo(),
 		}},
 		Owner: owner,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewImportTx(
@@ -618,7 +625,7 @@ func (b *builder) NewImportTx(
 	}
 
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort imported outputs
-	return &txs.ImportTx{
+	tx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -628,7 +635,8 @@ func (b *builder) NewImportTx(
 		}},
 		SourceChain:    sourceChainID,
 		ImportedInputs: importedInputs,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewExportTx(
@@ -656,7 +664,7 @@ func (b *builder) NewExportTx(
 	}
 
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort exported outputs
-	return &txs.ExportTx{
+	tx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -666,7 +674,8 @@ func (b *builder) NewExportTx(
 		}},
 		DestinationChain: chainID,
 		ExportedOutputs:  outputs,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewTransformSubnetTx(
@@ -702,7 +711,7 @@ func (b *builder) NewTransformSubnetTx(
 		return nil, err
 	}
 
-	return &txs.TransformSubnetTx{
+	tx := &txs.TransformSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -725,7 +734,8 @@ func (b *builder) NewTransformSubnetTx(
 		MaxValidatorWeightFactor: maxValidatorWeightFactor,
 		UptimeRequirement:        uptimeRequirement,
 		SubnetAuth:               subnetAuth,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewAddPermissionlessValidatorTx(
@@ -755,7 +765,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 
 	utils.Sort(validationRewardsOwner.Addrs)
 	utils.Sort(delegationRewardsOwner.Addrs)
-	return &txs.AddPermissionlessValidatorTx{
+	tx := &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -770,7 +780,8 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		ValidatorRewardsOwner: validationRewardsOwner,
 		DelegatorRewardsOwner: delegationRewardsOwner,
 		DelegationShares:      shares,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewAddPermissionlessDelegatorTx(
@@ -796,7 +807,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	}
 
 	utils.Sort(rewardsOwner.Addrs)
-	return &txs.AddPermissionlessDelegatorTx{
+	tx := &txs.AddPermissionlessDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -808,7 +819,8 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		Subnet:                 vdr.Subnet,
 		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) getBalance(
@@ -1116,4 +1128,14 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 	return &secp256k1fx.Input{
 		SigIndices: inputSigIndices,
 	}, nil
+}
+
+func (b *builder) initCtx(tx txs.UnsignedTx) error {
+	ctx, err := newSnowContext(b.backend)
+	if err != nil {
+		return err
+	}
+
+	tx.InitCtx(ctx)
+	return nil
 }

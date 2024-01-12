@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -112,7 +112,9 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
-		vdrs,
+		&config.Config{
+			Validators: vdrs,
+		},
 		execConfig,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,

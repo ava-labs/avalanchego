@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	_ Diff = (*diff)(nil)
+	_ Diff     = (*diff)(nil)
+	_ Versions = stateGetter{}
 
 	ErrMissingParentState = errors.New("missing parent state")
 )
@@ -59,6 +60,20 @@ func NewDiff(
 		lastAccepted:  parentState.GetLastAccepted(),
 		timestamp:     parentState.GetTimestamp(),
 	}, nil
+}
+
+type stateGetter struct {
+	state Chain
+}
+
+func (s stateGetter) GetState(ids.ID) (Chain, bool) {
+	return s.state, true
+}
+
+func NewDiffOn(parentState Chain) (Diff, error) {
+	return NewDiff(ids.Empty, stateGetter{
+		state: parentState,
+	})
 }
 
 func (d *diff) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {

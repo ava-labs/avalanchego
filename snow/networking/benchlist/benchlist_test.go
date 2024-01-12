@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -20,7 +20,8 @@ var minimumFailingDuration = 5 * time.Minute
 func TestBenchlistAdd(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -51,20 +52,14 @@ func TestBenchlistAdd(t *testing.T) {
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
-	defer b.timer.Stop()
 	now := time.Now()
 	b.clock.Set(now)
 
 	// Nobody should be benched at the start
 	b.lock.Lock()
-	require.False(b.isBenched(vdrID0))
-	require.False(b.isBenched(vdrID1))
-	require.False(b.isBenched(vdrID2))
-	require.False(b.isBenched(vdrID3))
-	require.False(b.isBenched(vdrID4))
+	require.Empty(b.benchlistSet)
 	require.Empty(b.failureStreaks)
 	require.Zero(b.benchedHeap.Len())
-	require.Empty(b.benchlistSet)
 	b.lock.Unlock()
 
 	// Register [threshold - 1] failures in a row for vdr0
@@ -73,9 +68,8 @@ func TestBenchlistAdd(t *testing.T) {
 	}
 
 	// Still shouldn't be benched due to not enough consecutive failure
-	require.False(b.isBenched(vdrID0))
-	require.Zero(b.benchedHeap.Len())
 	require.Empty(b.benchlistSet)
+	require.Zero(b.benchedHeap.Len())
 	require.Len(b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID0]
 	require.Equal(threshold-1, fs.consecutive)
@@ -87,9 +81,8 @@ func TestBenchlistAdd(t *testing.T) {
 	// Still shouldn't be benched because not enough time (any in this case)
 	// has passed since the first failure
 	b.lock.Lock()
-	require.False(b.isBenched(vdrID0))
-	require.Zero(b.benchedHeap.Len())
 	require.Empty(b.benchlistSet)
+	require.Zero(b.benchedHeap.Len())
 	b.lock.Unlock()
 
 	// Move the time up
@@ -108,9 +101,9 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// Now this validator should be benched
 	b.lock.Lock()
-	require.True(b.isBenched(vdrID0))
-	require.Equal(b.benchedHeap.Len(), 1)
-	require.Equal(b.benchlistSet.Len(), 1)
+	require.Contains(b.benchlistSet, vdrID0)
+	require.Equal(1, b.benchedHeap.Len())
+	require.Equal(1, b.benchlistSet.Len())
 
 	nodeID, benchedUntil, ok := b.benchedHeap.Peek()
 	require.True(ok)
@@ -133,10 +126,9 @@ func TestBenchlistAdd(t *testing.T) {
 	// vdr1 shouldn't be benched
 	// The response should have cleared its consecutive failures
 	b.lock.Lock()
-	require.True(b.isBenched(vdrID0))
-	require.False(b.isBenched(vdrID1))
-	require.Equal(b.benchedHeap.Len(), 1)
-	require.Equal(b.benchlistSet.Len(), 1)
+	require.Contains(b.benchlistSet, vdrID0)
+	require.Equal(1, b.benchedHeap.Len())
+	require.Equal(1, b.benchlistSet.Len())
 	require.Empty(b.failureStreaks)
 	b.lock.Unlock()
 
@@ -153,7 +145,8 @@ func TestBenchlistAdd(t *testing.T) {
 func TestBenchlistMaxStake(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -183,7 +176,6 @@ func TestBenchlistMaxStake(t *testing.T) {
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
-	defer b.timer.Stop()
 	now := time.Now()
 	b.clock.Set(now)
 
@@ -209,11 +201,10 @@ func TestBenchlistMaxStake(t *testing.T) {
 	// Benching vdr2 (weight 1000) would cause the amount benched
 	// to exceed the maximum
 	b.lock.Lock()
-	require.True(b.isBenched(vdrID0))
-	require.True(b.isBenched(vdrID1))
-	require.False(b.isBenched(vdrID2))
-	require.Equal(b.benchedHeap.Len(), 2)
-	require.Equal(b.benchlistSet.Len(), 2)
+	require.Contains(b.benchlistSet, vdrID0)
+	require.Contains(b.benchlistSet, vdrID1)
+	require.Equal(2, b.benchedHeap.Len())
+	require.Equal(2, b.benchlistSet.Len())
 	require.Len(b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID2]
 	fs.consecutive = threshold
@@ -236,9 +227,9 @@ func TestBenchlistMaxStake(t *testing.T) {
 
 	// vdr4 should be benched now
 	b.lock.Lock()
-	require.True(b.isBenched(vdrID0))
-	require.True(b.isBenched(vdrID1))
-	require.True(b.isBenched(vdrID4))
+	require.Contains(b.benchlistSet, vdrID0)
+	require.Contains(b.benchlistSet, vdrID1)
+	require.Contains(b.benchlistSet, vdrID4)
 	require.Equal(3, b.benchedHeap.Len())
 	require.Equal(3, b.benchlistSet.Len())
 	require.Contains(b.benchlistSet, vdrID0)
@@ -254,10 +245,9 @@ func TestBenchlistMaxStake(t *testing.T) {
 	}
 
 	b.lock.Lock()
-	require.True(b.isBenched(vdrID0))
-	require.True(b.isBenched(vdrID1))
-	require.True(b.isBenched(vdrID4))
-	require.False(b.isBenched(vdrID2))
+	require.Contains(b.benchlistSet, vdrID0)
+	require.Contains(b.benchlistSet, vdrID1)
+	require.Contains(b.benchlistSet, vdrID4)
 	require.Equal(3, b.benchedHeap.Len())
 	require.Equal(3, b.benchlistSet.Len())
 	require.Len(b.failureStreaks, 1)
@@ -269,7 +259,8 @@ func TestBenchlistMaxStake(t *testing.T) {
 func TestBenchlistRemove(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -307,7 +298,6 @@ func TestBenchlistRemove(t *testing.T) {
 	)
 	require.NoError(err)
 	b := benchIntf.(*benchlist)
-	defer b.timer.Stop()
 	now := time.Now()
 	b.lock.Lock()
 	b.clock.Set(now)
@@ -332,9 +322,9 @@ func TestBenchlistRemove(t *testing.T) {
 
 	// All 3 should be benched
 	b.lock.Lock()
-	require.True(b.isBenched(vdrID0))
-	require.True(b.isBenched(vdrID1))
-	require.True(b.isBenched(vdrID2))
+	require.Contains(b.benchlistSet, vdrID0)
+	require.Contains(b.benchlistSet, vdrID1)
+	require.Contains(b.benchlistSet, vdrID2)
 	require.Equal(3, b.benchedHeap.Len())
 	require.Equal(3, b.benchlistSet.Len())
 	require.Empty(b.failureStreaks)

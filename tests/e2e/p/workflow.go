@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -68,9 +68,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 				require.GreaterOrEqual(pBalance, minBalance)
 			})
-			// create validator data
-			validatorStartTimeDiff := 30 * time.Second
-			vdrStartTime := time.Now().Add(validatorStartTimeDiff)
 
 			// Use a random node ID to ensure that repeated test runs
 			// will succeed against a network that persists across runs.
@@ -79,8 +76,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			vdr := &txs.Validator{
 				NodeID: validatorID,
-				Start:  uint64(vdrStartTime.Unix()),
-				End:    uint64(vdrStartTime.Add(72 * time.Hour).Unix()),
+				End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
 				Wght:   minValStake,
 			}
 			rewardOwner := &secp256k1fx.OutputOwners{

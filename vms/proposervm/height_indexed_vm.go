@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -136,7 +136,7 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 		zap.Uint64("height", height),
 	)
 
-	if vm.numHistoricalBlocks == 0 {
+	if vm.NumHistoricalBlocks == 0 {
 		return nil
 	}
 
@@ -145,13 +145,13 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 	// is why <= is used rather than <. This prevents the user from only storing
 	// the last accepted block, which can never be safe due to the non-atomic
 	// commits between the proposervm database and the innerVM's database.
-	if blocksSinceFork <= vm.numHistoricalBlocks {
+	if blocksSinceFork <= vm.NumHistoricalBlocks {
 		return nil
 	}
 
 	// Note: heightToDelete is >= forkHeight, so it is guaranteed not to
 	// underflow.
-	heightToDelete := height - vm.numHistoricalBlocks - 1
+	heightToDelete := height - vm.NumHistoricalBlocks - 1
 	blockToDelete, err := vm.State.GetBlockIDAtHeight(heightToDelete)
 	if err == database.ErrNotFound {
 		// Block may have already been deleted. This can happen due to a
@@ -180,7 +180,7 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 
 // TODO: Support async deletion of old blocks.
 func (vm *VM) pruneOldBlocks() error {
-	if vm.numHistoricalBlocks == 0 {
+	if vm.NumHistoricalBlocks == 0 {
 		return nil
 	}
 
@@ -194,7 +194,7 @@ func (vm *VM) pruneOldBlocks() error {
 	//
 	// Note: vm.lastAcceptedHeight is guaranteed to be >= height, so the
 	// subtraction can never underflow.
-	for vm.lastAcceptedHeight-height > vm.numHistoricalBlocks {
+	for vm.lastAcceptedHeight-height > vm.NumHistoricalBlocks {
 		blockToDelete, err := vm.State.GetBlockIDAtHeight(height)
 		if err != nil {
 			return err

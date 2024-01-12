@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -79,8 +79,12 @@ var (
 		ConsensusGossipOnAcceptValidatorSizeKey:            acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
+
+		SnowRogueCommitThresholdKey:    fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
+		SnowVirtuousCommitThresholdKey: fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
 	}
 
+	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
 	errAuthPasswordTooWeak                    = errors.New("API auth password is not strong enough")
@@ -105,17 +109,11 @@ var (
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	p := snowball.Parameters{
-		K:               v.GetInt(SnowSampleSizeKey),
-		AlphaPreference: v.GetInt(SnowPreferenceQuorumSizeKey),
-		AlphaConfidence: v.GetInt(SnowConfidenceQuorumSizeKey),
-		// During the X-chain linearization we require BetaVirtuous and
-		// BetaRogue to be equal. Therefore we use the more conservative
-		// BetaRogue value for both BetaVirtuous and BetaRogue.
-		//
-		// TODO: After the X-chain linearization use the
-		// SnowVirtuousCommitThresholdKey as before.
-		BetaVirtuous:          v.GetInt(SnowRogueCommitThresholdKey),
-		BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
+		K:                     v.GetInt(SnowSampleSizeKey),
+		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
+		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
+		BetaVirtuous:          v.GetInt(SnowCommitThresholdKey),
+		BetaRogue:             v.GetInt(SnowCommitThresholdKey),
 		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
 		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
 		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
@@ -124,6 +122,10 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 	if v.IsSet(SnowQuorumSizeKey) {
 		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
 		p.AlphaConfidence = p.AlphaPreference
+	}
+	if v.IsSet(SnowRogueCommitThresholdKey) {
+		p.BetaVirtuous = v.GetInt(SnowRogueCommitThresholdKey)
+		p.BetaRogue = v.GetInt(SnowRogueCommitThresholdKey)
 	}
 	return p
 }
@@ -346,6 +348,25 @@ func getNetworkConfig(
 		allowPrivateIPs = v.GetBool(NetworkAllowPrivateIPsKey)
 	}
 
+	var supportedACPs set.Set[uint32]
+	for _, acp := range v.GetIntSlice(ACPSupportKey) {
+		if acp < 0 || acp > math.MaxInt32 {
+			return network.Config{}, fmt.Errorf("invalid ACP: %d", acp)
+		}
+		supportedACPs.Add(uint32(acp))
+	}
+
+	var objectedACPs set.Set[uint32]
+	for _, acp := range v.GetIntSlice(ACPObjectKey) {
+		if acp < 0 || acp > math.MaxInt32 {
+			return network.Config{}, fmt.Errorf("invalid ACP: %d", acp)
+		}
+		objectedACPs.Add(uint32(acp))
+	}
+	if supportedACPs.Overlaps(objectedACPs) {
+		return network.Config{}, errConflictingACPOpinion
+	}
+
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
 			MaxInboundConnsPerSec: maxInboundConnsPerSec,
@@ -424,6 +445,9 @@ func getNetworkConfig(
 		AllowPrivateIPs:              allowPrivateIPs,
 		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),
 		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
+
+		SupportedACPs: supportedACPs,
+		ObjectedACPs:  objectedACPs,
 
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),

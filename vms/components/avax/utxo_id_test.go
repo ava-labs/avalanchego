@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -6,6 +6,7 @@ package avax
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +24,7 @@ func TestUTXOIDVerifyNil(t *testing.T) {
 func TestUTXOID(t *testing.T) {
 	require := require.New(t)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
@@ -50,56 +51,43 @@ func TestUTXOID(t *testing.T) {
 	require.Equal(utxoID.InputID(), newUTXOID.InputID())
 }
 
-func TestUTXOIDLess(t *testing.T) {
+func TestUTXOIDCompare(t *testing.T) {
 	type test struct {
 		name     string
 		id1      UTXOID
 		id2      UTXOID
-		expected bool
+		expected int
 	}
 	tests := []*test{
 		{
 			name:     "same",
 			id1:      UTXOID{},
 			id2:      UTXOID{},
-			expected: false,
+			expected: 0,
 		},
 		{
-			name: "first id smaller",
+			name: "id smaller",
 			id1:  UTXOID{},
 			id2: UTXOID{
 				TxID: ids.ID{1},
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
-			name: "first id larger",
-			id1: UTXOID{
-				TxID: ids.ID{1},
-			},
-			id2:      UTXOID{},
-			expected: false,
-		},
-		{
-			name: "first index smaller",
+			name: "index smaller",
 			id1:  UTXOID{},
 			id2: UTXOID{
 				OutputIndex: 1,
 			},
-			expected: true,
-		},
-		{
-			name: "first index larger",
-			id1: UTXOID{
-				OutputIndex: 1,
-			},
-			id2:      UTXOID{},
-			expected: false,
+			expected: -1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.id1.Less(&tt.id2))
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.id1.Compare(&tt.id2))
+			require.Equal(-tt.expected, tt.id2.Compare(&tt.id1))
 		})
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -12,32 +12,23 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-// TODO can we handle sorting where the Less function relies on a codec?
+// TODO can we handle sorting where the Compare function relies on a codec?
 
 type Sortable[T any] interface {
-	Less(T) bool
+	Compare(T) int
 }
 
 // Sorts the elements of [s].
 func Sort[T Sortable[T]](s []T) {
-	slices.SortFunc(s, T.Less)
+	slices.SortFunc(s, T.Compare)
 }
 
 // Sorts the elements of [s] based on their hashes.
 func SortByHash[T ~[]byte](s []T) {
-	slices.SortFunc(s, func(i, j T) bool {
+	slices.SortFunc(s, func(i, j T) int {
 		iHash := hashing.ComputeHash256(i)
 		jHash := hashing.ComputeHash256(j)
-		return bytes.Compare(iHash, jHash) == -1
-	})
-}
-
-// Sorts a 2D byte slice.
-// Each byte slice is not sorted internally; the byte slices are sorted relative
-// to one another.
-func SortBytes[T ~[]byte](s []T) {
-	slices.SortFunc(s, func(i, j T) bool {
-		return bytes.Compare(i, j) == -1
+		return bytes.Compare(iHash, jHash)
 	})
 }
 
@@ -54,7 +45,7 @@ func IsSortedBytes[T ~[]byte](s []T) bool {
 // Returns true iff the elements in [s] are unique and sorted.
 func IsSortedAndUnique[T Sortable[T]](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
-		if !s[i].Less(s[i+1]) {
+		if s[i].Compare(s[i+1]) >= 0 {
 			return false
 		}
 	}
@@ -86,4 +77,22 @@ func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 		}
 	}
 	return true
+}
+
+// Compare returns
+//
+//	-1 if x is less than y,
+//	 0 if x equals y,
+//	 1 if x is greater than y.
+//
+// TODO: Remove after updating to go1.21.
+func Compare[T constraints.Ordered](x, y T) int {
+	switch {
+	case x < y:
+		return -1
+	case x > y:
+		return 1
+	default:
+		return 0
+	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -91,16 +91,11 @@ func (utxo *UTXOID) Verify() error {
 	}
 }
 
-func (utxo *UTXOID) Less(other *UTXOID) bool {
+func (utxo *UTXOID) Compare(other *UTXOID) int {
 	utxoID, utxoIndex := utxo.InputSource()
 	otherID, otherIndex := other.InputSource()
-
-	switch bytes.Compare(utxoID[:], otherID[:]) {
-	case -1:
-		return true
-	case 0:
-		return utxoIndex < otherIndex
-	default:
-		return false
+	if txIDComp := bytes.Compare(utxoID[:], otherID[:]); txIDComp != 0 {
+		return txIDComp
 	}
+	return utils.Compare(utxoIndex, otherIndex)
 }

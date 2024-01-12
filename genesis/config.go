@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -53,9 +53,11 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	return ua, err
 }
 
-func (a Allocation) Less(other Allocation) bool {
-	return a.InitialAmount < other.InitialAmount ||
-		(a.InitialAmount == other.InitialAmount && a.AVAXAddr.Less(other.AVAXAddr))
+func (a Allocation) Compare(other Allocation) int {
+	if amountCmp := utils.Compare(a.InitialAmount, other.InitialAmount); amountCmp != 0 {
+		return amountCmp
+	}
+	return a.AVAXAddr.Compare(other.AVAXAddr)
 }
 
 type Staker struct {

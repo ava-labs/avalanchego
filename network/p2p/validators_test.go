@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -179,7 +179,9 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			network := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
+			require.NoError(err)
+
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
@@ -187,7 +189,7 @@ func TestValidatorsSample(t *testing.T) {
 			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
 				v.lastUpdated = call.time
-				sampled := v.Sample(context.Background(), call.limit)
+				sampled := v.Sample(ctx, call.limit)
 				require.LessOrEqual(len(sampled), call.limit)
 				require.Subset(call.expected, sampled)
 			}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -81,8 +81,9 @@ func TestWriteValidatorMetadata(t *testing.T) {
 
 	primaryDB := memdb.New()
 	subnetDB := memdb.New()
+
 	// write empty uptimes
-	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
 
 	// load uptime
 	nodeID := ids.GenerateTestNodeID()
@@ -96,7 +97,7 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	state.LoadValidatorMetadata(nodeID, subnetID, testUptimeReward)
 
 	// write state, should not reflect to DB yet
-	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
 	require.False(primaryDB.Has(testUptimeReward.txID[:]))
 	require.False(subnetDB.Has(testUptimeReward.txID[:]))
 
@@ -112,7 +113,7 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	require.NoError(state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated))
 
 	// write uptimes, should reflect to subnet DB
-	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB, CodecVersion1))
 	require.False(primaryDB.Has(testUptimeReward.txID[:]))
 	require.True(subnetDB.Has(testUptimeReward.txID[:]))
 }
@@ -252,7 +253,7 @@ func TestParseValidatorMetadata(t *testing.T) {
 			name: "invalid codec version",
 			bytes: []byte{
 				// codec version
-				0x00, 0x01,
+				0x00, 0x02,
 				// up duration
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
 				// last updated

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -36,7 +36,7 @@ func TestBoundedBy(t *testing.T) {
 		End:    bEndTime,
 		Wght:   defaultWeight,
 	}
-	require.False(BoundedBy(a.StartTime(), b.EndTime(), b.StartTime(), b.EndTime()))
+	require.False(BoundedBy(a.StartTime(), a.EndTime(), b.StartTime(), b.EndTime()))
 	require.False(BoundedBy(b.StartTime(), b.EndTime(), a.StartTime(), a.EndTime()))
 
 	// case 2: a starts, b starts, a finishes, b finishes

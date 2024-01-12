@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -271,8 +271,8 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg Message) {
 	switch msg.Op() {
-	case message.AppRequestOp, message.AppRequestFailedOp, message.AppResponseOp, message.AppGossipOp,
-		message.CrossChainAppRequestOp, message.CrossChainAppRequestFailedOp, message.CrossChainAppResponseOp:
+	case message.AppRequestOp, message.AppErrorOp, message.AppResponseOp, message.AppGossipOp,
+		message.CrossChainAppRequestOp, message.CrossChainAppErrorOp, message.CrossChainAppResponseOp:
 		h.asyncMessageQueue.Push(ctx, msg)
 	default:
 		h.syncMessageQueue.Push(ctx, msg)
@@ -842,8 +842,18 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	case *p2p.AppResponse:
 		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
-	case *message.AppRequestFailed:
-		return engine.AppRequestFailed(ctx, nodeID, m.RequestID)
+	case *p2p.AppError:
+		err := &common.AppError{
+			Code:    m.ErrorCode,
+			Message: m.ErrorMessage,
+		}
+
+		return engine.AppRequestFailed(
+			ctx,
+			nodeID,
+			m.RequestId,
+			err,
+		)
 
 	case *p2p.AppGossip:
 		return engine.AppGossip(ctx, nodeID, m.AppBytes)
@@ -866,10 +876,16 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 
 	case *message.CrossChainAppRequestFailed:
+		err := &common.AppError{
+			Code:    m.ErrorCode,
+			Message: m.ErrorMessage,
+		}
+
 		return engine.CrossChainAppRequestFailed(
 			ctx,
 			m.SourceChainID,
 			m.RequestID,
+			err,
 		)
 
 	default:

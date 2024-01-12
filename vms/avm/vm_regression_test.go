@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -26,7 +26,9 @@ func TestVerifyFxUsage(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
 	})
+	env.vm.ctx.Lock.Unlock()
 	defer func() {
+		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
 	}()
@@ -34,7 +36,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
@@ -66,13 +68,13 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		},
 	}}
-	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
+			BlockchainID: env.vm.ctx.XChainID,
 		}},
 		Ops: []*txs.Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
@@ -95,7 +97,7 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	spendTx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
+		BlockchainID: env.vm.ctx.XChainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        createAssetTx.ID(),

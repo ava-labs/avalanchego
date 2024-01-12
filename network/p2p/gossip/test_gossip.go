@@ -1,44 +1,53 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
-	_ Gossipable   = (*testTx)(nil)
-	_ Set[*testTx] = (*testSet)(nil)
+	_ Gossipable          = (*testTx)(nil)
+	_ Set[*testTx]        = (*testSet)(nil)
+	_ Marshaller[*testTx] = (*testMarshaller)(nil)
 )
 
 type testTx struct {
 	id ids.ID
 }
 
-func (t *testTx) GetID() ids.ID {
+func (t *testTx) GossipID() ids.ID {
 	return t.id
 }
 
-func (t *testTx) Marshal() ([]byte, error) {
-	return t.id[:], nil
+type testMarshaller struct{}
+
+func (testMarshaller) MarshalGossip(tx *testTx) ([]byte, error) {
+	return tx.id[:], nil
 }
 
-func (t *testTx) Unmarshal(bytes []byte) error {
-	t.id = ids.ID{}
-	copy(t.id[:], bytes)
-	return nil
+func (testMarshaller) UnmarshalGossip(bytes []byte) (*testTx, error) {
+	id, err := ids.ToID(bytes)
+	return &testTx{
+		id: id,
+	}, err
 }
 
 type testSet struct {
-	set   set.Set[*testTx]
+	txs   map[ids.ID]*testTx
 	bloom *BloomFilter
 	onAdd func(tx *testTx)
 }
 
-func (t testSet) Add(gossipable *testTx) error {
-	t.set.Add(gossipable)
+func (t *testSet) Add(gossipable *testTx) error {
+	if _, ok := t.txs[gossipable.id]; ok {
+		return fmt.Errorf("%s already present", gossipable.id)
+	}
+
+	t.txs[gossipable.id] = gossipable
 	t.bloom.Add(gossipable)
 	if t.onAdd != nil {
 		t.onAdd(gossipable)
@@ -47,15 +56,14 @@ func (t testSet) Add(gossipable *testTx) error {
 	return nil
 }
 
-func (t testSet) Iterate(f func(gossipable *testTx) bool) {
-	for tx := range t.set {
+func (t *testSet) Iterate(f func(gossipable *testTx) bool) {
+	for _, tx := range t.txs {
 		if !f(tx) {
 			return
 		}
 	}
 }
 
-func (t testSet) GetFilter() ([]byte, []byte, error) {
-	bloom, err := t.bloom.Bloom.MarshalBinary()
-	return bloom, t.bloom.Salt[:], err
+func (t *testSet) GetFilter() ([]byte, []byte) {
+	return t.bloom.Marshal()
 }

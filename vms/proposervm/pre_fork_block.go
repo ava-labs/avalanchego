@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -97,7 +97,7 @@ func (b *preForkBlock) getInnerBlk() snowman.Block {
 
 func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
-	if !parentTimestamp.Before(b.vm.activationTime) {
+	if !parentTimestamp.Before(b.vm.ActivationTime) {
 		if err := verifyIsOracleBlock(ctx, b.Block); err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 			currentPChainHeight,
 		)
 	}
-	if childPChainHeight < b.vm.minimumPChainHeight {
+	if childPChainHeight < b.vm.MinimumPChainHeight {
 		return errPChainHeightTooLow
 	}
 
@@ -150,7 +150,7 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 	// if the *preForkBlock is the last *preForkBlock before activation takes effect
 	// (its timestamp is at or after the activation time)
 	parentTimestamp := b.Timestamp()
-	if parentTimestamp.Before(b.vm.activationTime) {
+	if parentTimestamp.Before(b.vm.ActivationTime) {
 		return errProposersNotActivated
 	}
 
@@ -181,7 +181,7 @@ func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) erro
 
 func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 	parentTimestamp := b.Timestamp()
-	if parentTimestamp.Before(b.vm.activationTime) {
+	if parentTimestamp.Before(b.vm.ActivationTime) {
 		// The chain hasn't forked yet
 		innerBlock, err := b.vm.ChainVM.BuildBlock(ctx)
 		if err != nil {
@@ -210,7 +210,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the minimum height
-	pChainHeight, err := b.vm.optimalPChainHeight(ctx, b.vm.minimumPChainHeight)
+	pChainHeight, err := b.vm.optimalPChainHeight(ctx, b.vm.MinimumPChainHeight)
 	if err != nil {
 		b.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),

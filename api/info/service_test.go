@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -21,24 +21,20 @@ var errTest = errors.New("non-nil error")
 type getVMsTest struct {
 	info          *Info
 	ctrl          *gomock.Controller
-	mockLog       *logging.MockLogger
 	mockVMManager *vms.MockManager
 }
 
 func initGetVMsTest(t *testing.T) *getVMsTest {
 	ctrl := gomock.NewController(t)
-
-	service := Info{}
-	mockLog := logging.NewMockLogger(ctrl)
 	mockVMManager := vms.NewMockManager(ctrl)
-
-	service.log = mockLog
-	service.VMManager = mockVMManager
-
 	return &getVMsTest{
-		info:          &service,
+		info: &Info{
+			Parameters: Parameters{
+				VMManager: mockVMManager,
+			},
+			log: logging.NoLog{},
+		},
 		ctrl:          ctrl,
-		mockLog:       mockLog,
 		mockVMManager: mockVMManager,
 	}
 }
@@ -62,7 +58,6 @@ func TestGetVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
@@ -76,7 +71,6 @@ func TestGetVMsSuccess(t *testing.T) {
 func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
@@ -93,7 +87,6 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 	vmIDs := []ids.ID{id1, id2}
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)

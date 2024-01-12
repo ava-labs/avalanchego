@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	_ Sender = (*SenderTest)(nil)
+	_ Sender    = (*SenderTest)(nil)
+	_ AppSender = (*FakeSender)(nil)
 
 	errAccept                = errors.New("unexpectedly called Accept")
 	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
@@ -357,4 +358,65 @@ func (s *SenderTest) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[
 		require.FailNow(s.T, errSendAppGossipSpecific.Error())
 	}
 	return errSendAppGossipSpecific
+}
+
+// FakeSender is used for testing
+type FakeSender struct {
+	SentAppRequest, SentAppResponse,
+	SentAppGossip, SentAppGossipSpecific,
+	SentCrossChainAppRequest, SentCrossChainAppResponse chan []byte
+}
+
+func (f FakeSender) SendAppRequest(_ context.Context, _ set.Set[ids.NodeID], _ uint32, bytes []byte) error {
+	if f.SentAppRequest == nil {
+		return nil
+	}
+
+	f.SentAppRequest <- bytes
+	return nil
+}
+
+func (f FakeSender) SendAppResponse(_ context.Context, _ ids.NodeID, _ uint32, bytes []byte) error {
+	if f.SentAppResponse == nil {
+		return nil
+	}
+
+	f.SentAppResponse <- bytes
+	return nil
+}
+
+func (f FakeSender) SendAppGossip(_ context.Context, bytes []byte) error {
+	if f.SentAppGossip == nil {
+		return nil
+	}
+
+	f.SentAppGossip <- bytes
+	return nil
+}
+
+func (f FakeSender) SendAppGossipSpecific(_ context.Context, _ set.Set[ids.NodeID], bytes []byte) error {
+	if f.SentAppGossipSpecific == nil {
+		return nil
+	}
+
+	f.SentAppGossipSpecific <- bytes
+	return nil
+}
+
+func (f FakeSender) SendCrossChainAppRequest(_ context.Context, _ ids.ID, _ uint32, bytes []byte) error {
+	if f.SentCrossChainAppRequest == nil {
+		return nil
+	}
+
+	f.SentCrossChainAppRequest <- bytes
+	return nil
+}
+
+func (f FakeSender) SendCrossChainAppResponse(_ context.Context, _ ids.ID, _ uint32, bytes []byte) error {
+	if f.SentCrossChainAppResponse == nil {
+		return nil
+	}
+
+	f.SentCrossChainAppResponse <- bytes
+	return nil
 }

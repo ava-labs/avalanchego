@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -102,14 +102,17 @@ func Test_Completion(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+
 	emptyRoot, err := emptyDB.GetMerkleRoot(context.Background())
 	require.NoError(err)
+
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
 		Client:                newCallthroughSyncClient(ctrl, emptyDB),
@@ -120,8 +123,10 @@ func Test_Completion(t *testing.T) {
 	})
 	require.NoError(err)
 	require.NotNil(syncer)
+
 	require.NoError(syncer.Start(context.Background()))
 	require.NoError(syncer.Wait(context.Background()))
+
 	syncer.workLock.Lock()
 	require.Zero(syncer.unprocessedWork.Len())
 	require.Equal(1, syncer.processedWork.Len())
@@ -332,25 +337,26 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(db.Put([]byte{0x11}, []byte{1}))
 	require.NoError(db.Put([]byte{0x11, 0x11}, []byte{2}))
 
-	syncRoot, err := db.GetMerkleRoot(context.Background())
+	targetRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
+
 	proof, err := db.GetProof(context.Background(), []byte{0x11, 0x11})
 	require.NoError(err)
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
 		Client:                NewMockClient(ctrl),
-		TargetRoot:            syncRoot,
+		TargetRoot:            targetRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
-	require.NoError(db.Put([]byte{0x12}, []byte{4}))
+	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
 
 	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x11, 0x11}, maybe.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
-	require.Equal(maybe.Some([]byte{0x12}), nextKey)
+	require.Equal(maybe.Some([]byte{0x11, 0x15}), nextKey)
 }
 
 func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
@@ -365,27 +371,28 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x11}, []byte{1}))
 	require.NoError(db.Put([]byte{0x12}, []byte{2}))
-	require.NoError(db.Put([]byte{0x11, 0x11}, []byte{3}))
+	require.NoError(db.Put([]byte{0x12, 0xA0}, []byte{4}))
 
-	syncRoot, err := db.GetMerkleRoot(context.Background())
+	targetRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	proof, err := db.GetProof(context.Background(), []byte{0x11, 0x11})
+
+	proof, err := db.GetProof(context.Background(), []byte{0x12})
 	require.NoError(err)
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
 		Client:                NewMockClient(ctrl),
-		TargetRoot:            syncRoot,
+		TargetRoot:            targetRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 		BranchFactor:          merkledb.BranchFactor16,
 	})
 	require.NoError(err)
-	require.NoError(db.Delete([]byte{0x12}))
+	require.NoError(db.Delete([]byte{0x12, 0xA0}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x11, 0x11}, maybe.Some([]byte{0x20}), proof.Path)
+	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x12}, maybe.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
-	require.Equal(maybe.Some([]byte{0x12}), nextKey)
+	require.Equal(maybe.Some([]byte{0x12, 0xA0}), nextKey)
 }
 
 func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
@@ -696,11 +703,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 		}
 
 		// Sort in ascending order by key prefix.
-		serializedPathLess := func(i, j keyAndID) bool {
-			return i.key.Less(j.key)
+		serializedPathCompare := func(i, j keyAndID) int {
+			return i.key.Compare(j.key)
 		}
-		slices.SortFunc(remoteKeyIDs, serializedPathLess)
-		slices.SortFunc(localKeyIDs, serializedPathLess)
+		slices.SortFunc(remoteKeyIDs, serializedPathCompare)
+		slices.SortFunc(localKeyIDs, serializedPathCompare)
 
 		// Filter out keys that are before the last received key
 		findBounds := func(keyIDs []keyAndID) (int, int) {
@@ -738,7 +745,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {
 			// See if the keys are different.
 			smaller, bigger := remoteKeyIDs[i], localKeyIDs[i]
-			if serializedPathLess(localKeyIDs[i], remoteKeyIDs[i]) {
+			if serializedPathCompare(localKeyIDs[i], remoteKeyIDs[i]) == -1 {
 				smaller, bigger = localKeyIDs[i], remoteKeyIDs[i]
 			}
 
@@ -1194,8 +1201,6 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		}
 		i++
 	}
-	slices.SortFunc(allKeys, func(a, b []byte) bool {
-		return bytes.Compare(a, b) < 0
-	})
+	slices.SortFunc(allKeys, bytes.Compare)
 	return db, allKeys, batch.Write()
 }

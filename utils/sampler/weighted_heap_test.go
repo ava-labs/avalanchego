@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -23,57 +23,44 @@ func TestWeightedHeapInitialize(t *testing.T) {
 	}
 }
 
-func TestWeightedHeapElementLess(t *testing.T) {
+func TestWeightedHeapElementCompare(t *testing.T) {
 	type test struct {
 		name     string
 		elt1     weightedHeapElement
 		elt2     weightedHeapElement
-		expected bool
+		expected int
 	}
 	tests := []test{
 		{
 			name:     "all same",
 			elt1:     weightedHeapElement{},
 			elt2:     weightedHeapElement{},
-			expected: false,
+			expected: 0,
 		},
 		{
-			name: "first lower weight",
+			name: "lower weight",
 			elt1: weightedHeapElement{},
 			elt2: weightedHeapElement{
 				weight: 1,
 			},
-			expected: false,
+			expected: 1,
 		},
 		{
-			name: "first higher weight",
-			elt1: weightedHeapElement{
-				weight: 1,
-			},
-			elt2:     weightedHeapElement{},
-			expected: true,
-		},
-		{
-			name: "first higher index",
+			name: "higher index",
 			elt1: weightedHeapElement{
 				index: 1,
 			},
 			elt2:     weightedHeapElement{},
-			expected: false,
-		},
-		{
-			name: "second higher index",
-			elt1: weightedHeapElement{},
-			elt2: weightedHeapElement{
-				index: 1,
-			},
-			expected: true,
+			expected: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.elt1.Less(tt.elt2))
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.elt1.Compare(tt.elt2))
+			require.Equal(-tt.expected, tt.elt2.Compare(tt.elt1))
 		})
 	}
 }

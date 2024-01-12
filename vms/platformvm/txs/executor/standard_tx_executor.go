@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -24,8 +24,9 @@ import (
 var (
 	_ txs.Visitor = (*StandardTxExecutor)(nil)
 
-	errEmptyNodeID              = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
 )
 
 type StandardTxExecutor struct {
@@ -253,7 +254,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
@@ -290,13 +291,11 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -321,16 +320,13 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -344,16 +340,13 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -444,13 +437,11 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -478,16 +469,13 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	if err := e.putStaker(tx); err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
+	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -511,7 +499,6 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -539,9 +526,78 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
+	txID := e.Tx.ID()
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
+// Creates the staker as defined in [stakerTx] and adds it to [e.State].
+func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
+	var (
+		chainTime = e.State.GetTimestamp()
+		txID      = e.Tx.ID()
+		staker    *state.Staker
+		err       error
+	)
+
+	if !e.Config.IsDurangoActivated(chainTime) {
+		// Pre-Durango, stakers set a future [StartTime] and are added to the
+		// pending staker set. They are promoted to the current staker set once
+		// the chain time reaches [StartTime].
+		scheduledStakerTx, ok := stakerTx.(txs.ScheduledStaker)
+		if !ok {
+			return fmt.Errorf("%w: %T", errMissingStartTimePreDurango, stakerTx)
+		}
+		staker, err = state.NewPendingStaker(txID, scheduledStakerTx)
+	} else {
+		// Only calculate the potentialReward for permissionless stakers.
+		// Recall that we only need to check if this is a permissioned
+		// validator as there are no permissioned delegators
+		var potentialReward uint64
+		if !stakerTx.CurrentPriority().IsPermissionedValidator() {
+			subnetID := stakerTx.SubnetID()
+			currentSupply, err := e.State.GetCurrentSupply(subnetID)
+			if err != nil {
+				return err
+			}
+
+			rewards, err := GetRewardsCalculator(e.Backend, e.State, subnetID)
+			if err != nil {
+				return err
+			}
+
+			// Post-Durango, stakers are immediately added to the current staker
+			// set. Their [StartTime] is the current chain time.
+			stakeDuration := stakerTx.EndTime().Sub(chainTime)
+			potentialReward = rewards.Calculate(
+				stakeDuration,
+				stakerTx.Weight(),
+				currentSupply,
+			)
+
+			e.State.SetCurrentSupply(subnetID, currentSupply+potentialReward)
+		}
+
+		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+	}
+	if err != nil {
+		return err
+	}
+
+	switch priority := staker.Priority; {
+	case priority.IsCurrentValidator():
+		e.State.PutCurrentValidator(staker)
+	case priority.IsCurrentDelegator():
+		e.State.PutCurrentDelegator(staker)
+	case priority.IsPendingValidator():
+		e.State.PutPendingValidator(staker)
+	case priority.IsPendingDelegator():
+		e.State.PutPendingDelegator(staker)
+	default:
+		return fmt.Errorf("staker %s, unexpected priority %d", staker.TxID, priority)
+	}
 	return nil
 }
