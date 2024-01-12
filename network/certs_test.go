@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	_ "embed"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,10 +18,41 @@ import (
 )
 
 var (
+	//go:embed test_cert_1.crt
+	testCertBytes1 []byte
+	//go:embed test_key_1.key
+	testKeyBytes1 []byte
+	//go:embed test_cert_2.crt
+	testCertBytes2 []byte
+	//go:embed test_key_2.key
+	testKeyBytes2 []byte
+	//go:embed test_cert_3.crt
+	testCertBytes3 []byte
+	//go:embed test_key_3.key
+	testKeyBytes3 []byte
+
 	certLock   sync.Mutex
 	tlsCerts   []*tls.Certificate
 	tlsConfigs []*tls.Config
 )
+
+func init() {
+	cert1, err := staking.LoadTLSCertFromBytes(testKeyBytes1, testCertBytes1)
+	if err != nil {
+		panic(err)
+	}
+	cert2, err := staking.LoadTLSCertFromBytes(testKeyBytes2, testCertBytes2)
+	if err != nil {
+		panic(err)
+	}
+	cert3, err := staking.LoadTLSCertFromBytes(testKeyBytes3, testCertBytes3)
+	if err != nil {
+		panic(err)
+	}
+	tlsCerts = []*tls.Certificate{
+		cert1, cert2, cert3,
+	}
+}
 
 func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config) {
 	certLock.Lock()
@@ -28,9 +61,11 @@ func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config)
 	for len(tlsCerts) <= index {
 		cert, err := staking.NewTLSCert()
 		require.NoError(t, err)
-		tlsConfig := peer.TLSConfig(*cert, nil)
-
 		tlsCerts = append(tlsCerts, cert)
+	}
+	for len(tlsConfigs) <= index {
+		cert := tlsCerts[len(tlsConfigs)]
+		tlsConfig := peer.TLSConfig(*cert, nil)
 		tlsConfigs = append(tlsConfigs, tlsConfig)
 	}
 

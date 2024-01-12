@@ -151,11 +151,7 @@ type PullGossiper[T Gossipable] struct {
 }
 
 func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
-	bloom, salt, err := p.set.GetFilter()
-	if err != nil {
-		return err
-	}
-
+	bloom, salt := p.set.GetFilter()
 	request := &sdk.PullGossipRequest{
 		Filter: bloom,
 		Salt:   salt,

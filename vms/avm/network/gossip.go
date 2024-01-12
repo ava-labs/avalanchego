@@ -23,6 +23,10 @@ var (
 	_ gossip.Marshaller[*txs.Tx] = (*txParser)(nil)
 )
 
+// bloomChurnMultiplier is the number used to multiply the size of the mempool
+// to determine how large of a bloom filter to create.
+const bloomChurnMultiplier = 3
+
 // txGossipHandler is the handler called when serving gossip messages
 type txGossipHandler struct {
 	p2p.NoOpHandler
@@ -64,27 +68,25 @@ func newGossipMempool(
 	log logging.Logger,
 	txVerifier TxVerifier,
 	parser txs.Parser,
-	maxExpectedElements int,
-	falsePositiveProbability,
-	maxFalsePositiveProbability float64,
+	minTargetElements int,
+	targetFalsePositiveProbability,
+	resetFalsePositiveProbability float64,
 ) (*gossipMempool, error) {
-	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
+	bloom, err := gossip.NewBloomFilter(minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
-		Mempool:                     mempool,
-		log:                         log,
-		txVerifier:                  txVerifier,
-		parser:                      parser,
-		maxFalsePositiveProbability: maxFalsePositiveProbability,
-		bloom:                       bloom,
+		Mempool:    mempool,
+		log:        log,
+		txVerifier: txVerifier,
+		parser:     parser,
+		bloom:      bloom,
 	}, err
 }
 
 type gossipMempool struct {
 	mempool.Mempool
-	log                         logging.Logger
-	txVerifier                  TxVerifier
-	parser                      txs.Parser
-	maxFalsePositiveProbability float64
+	log        logging.Logger
+	txVerifier TxVerifier
+	parser     txs.Parser
 
 	lock  sync.RWMutex
 	bloom *gossip.BloomFilter
@@ -127,7 +129,7 @@ func (g *gossipMempool) AddVerified(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.maxFalsePositiveProbability)
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
 	if err != nil {
 		return err
 	}
@@ -148,7 +150,7 @@ func (g *gossipMempool) Iterate(f func(*txs.Tx) bool) {
 	g.Mempool.Iterate(f)
 }
 
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {
+func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
