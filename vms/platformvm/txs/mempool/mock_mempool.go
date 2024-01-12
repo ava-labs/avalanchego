@@ -90,6 +90,20 @@ func (mr *MockMempoolMockRecorder) Iterate(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Iterate", reflect.TypeOf((*MockMempool)(nil).Iterate), arg0)
 }
 
+// Len mocks base method.
+func (m *MockMempool) Len() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Len")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// Len indicates an expected call of Len.
+func (mr *MockMempoolMockRecorder) Len() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Len", reflect.TypeOf((*MockMempool)(nil).Len))
+}
+
 // MarkDropped mocks base method.
 func (m *MockMempool) MarkDropped(arg0 ids.ID, arg1 error) {
 	m.ctrl.T.Helper()

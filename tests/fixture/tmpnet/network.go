@@ -299,7 +299,7 @@ func (n *Network) Stop(ctx context.Context) error {
 
 	// Initiate stop on all nodes
 	for _, node := range nodes {
-		if err := node.InitiateStop(); err != nil {
+		if err := node.InitiateStop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
