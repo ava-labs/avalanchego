@@ -4,6 +4,8 @@
 package timestampvm
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 )
@@ -20,7 +22,7 @@ var (
 
 func init() {
 	// Create default codec and manager
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Now())
 	Codec = codec.NewDefaultManager()
 
 	// Register codec to manager with CodecVersion

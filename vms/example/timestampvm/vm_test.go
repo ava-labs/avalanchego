@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
 var blockchainID = ids.ID{1, 2, 3}
@@ -22,7 +23,7 @@ func TestGenesis(t *testing.T) {
 	require := require.New(t)
 	ctx := context.TODO()
 	// Initialize the vm
-	vm, _, _, err := newTestVM()
+	vm, _, _, err := newTestVM(t)
 	require.NoError(err)
 	// Verify that the db is initialized
 	ok, err := vm.state.IsInitialized()
@@ -49,7 +50,7 @@ func TestHappyPath(t *testing.T) {
 	ctx := context.TODO()
 
 	// Initialize the vm
-	vm, snowCtx, msgChan, err := newTestVM()
+	vm, snowCtx, msgChan, err := newTestVM(t)
 	require.NoError(err)
 
 	lastAcceptedID, err := vm.LastAccepted(ctx)
@@ -140,7 +141,7 @@ func TestService(t *testing.T) {
 	// Initialize the vm
 	require := require.New(t)
 	// Initialize the vm
-	vm, _, _, err := newTestVM()
+	vm, _, _, err := newTestVM(t)
 	require.NoError(err)
 	service := Service{vm}
 	require.NoError(service.GetBlock(nil, &GetBlockArgs{}, &GetBlockReply{}))
@@ -151,7 +152,7 @@ func TestSetState(t *testing.T) {
 	require := require.New(t)
 	ctx := context.TODO()
 	// Initialize the vm
-	vm, _, _, err := newTestVM()
+	vm, _, _, err := newTestVM(t)
 	require.NoError(err)
 	// bootstrapping
 	require.NoError(vm.SetState(ctx, snow.Bootstrapping))
@@ -165,11 +166,10 @@ func TestSetState(t *testing.T) {
 	require.ErrorIs(err, snow.ErrUnknownState)
 }
 
-func newTestVM() (*VM, *snow.Context, chan common.Message, error) {
+func newTestVM(t *testing.T) (*VM, *snow.Context, chan common.Message, error) {
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
-	snowCtx := snow.DefaultContextTest()
-	snowCtx.ChainID = blockchainID
+	snowCtx := snowtest.Context(t, blockchainID)
 	err := vm.Initialize(context.TODO(), snowCtx, memdb.New(), []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil, nil)
 	return vm, snowCtx, msgChan, err
 }
