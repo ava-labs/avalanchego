@@ -35,11 +35,11 @@ import (
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/ethdb"
-	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 )
 
 func TestEmptyIterator(t *testing.T) {
@@ -571,6 +571,10 @@ func (l *loggingDb) NewBatchWithSize(size int) ethdb.Batch {
 
 func (l *loggingDb) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	return l.backend.NewIterator(prefix, start)
+}
+
+func (l *loggingDb) NewSnapshot() (ethdb.Snapshot, error) {
+	return l.backend.NewSnapshot()
 }
 
 func (l *loggingDb) Stat(property string) (string, error) {

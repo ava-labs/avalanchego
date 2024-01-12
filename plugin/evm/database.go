@@ -4,11 +4,17 @@
 package evm
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
-var _ ethdb.Database = &Database{}
+var (
+	_ ethdb.KeyValueStore = &Database{}
+
+	ErrSnapshotNotSupported = errors.New("snapshot is not supported")
+)
 
 // Database implements ethdb.Database
 type Database struct{ database.Database }
@@ -22,6 +28,10 @@ func (db Database) NewBatch() ethdb.Batch { return Batch{db.Database.NewBatch()}
 // NewBatchWithSize implements ethdb.Database
 // TODO: propagate size through avalanchego Database interface
 func (db Database) NewBatchWithSize(size int) ethdb.Batch { return Batch{db.Database.NewBatch()} }
+
+func (db Database) NewSnapshot() (ethdb.Snapshot, error) {
+	return nil, ErrSnapshotNotSupported
+}
 
 // NewIterator implements ethdb.Database
 //

@@ -15,11 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -154,7 +155,7 @@ func newAtomicTrie(
 	}
 
 	trieDB := trie.NewDatabaseWithConfig(
-		Database{atomicTrieDB},
+		rawdb.NewDatabase(Database{atomicTrieDB}),
 		&trie.Config{
 			Cache: 64, // Allocate 64MB of memory for clean cache
 		},

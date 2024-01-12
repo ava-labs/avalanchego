@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/handlers"
@@ -150,7 +149,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 func TestAtomicSyncer(t *testing.T) {
 	rand.Seed(1)
 	targetHeight := 10 * uint64(commitInterval)
-	serverTrieDB := trie.NewDatabase(memorydb.New())
+	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
 	root, _, _ := syncutils.GenerateTrie(t, serverTrieDB, int(targetHeight), atomicKeyLength)
 
 	testAtomicSyncer(t, serverTrieDB, targetHeight, root, nil, int64(targetHeight))
@@ -159,7 +158,7 @@ func TestAtomicSyncer(t *testing.T) {
 func TestAtomicSyncerResume(t *testing.T) {
 	rand.Seed(1)
 	targetHeight := 10 * uint64(commitInterval)
-	serverTrieDB := trie.NewDatabase(memorydb.New())
+	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
 	numTrieKeys := int(targetHeight) - 1 // no atomic ops for genesis
 	root, _, _ := syncutils.GenerateTrie(t, serverTrieDB, numTrieKeys, atomicKeyLength)
 
@@ -176,7 +175,7 @@ func TestAtomicSyncerResume(t *testing.T) {
 func TestAtomicSyncerResumeNewRootCheckpoint(t *testing.T) {
 	rand.Seed(1)
 	targetHeight1 := 10 * uint64(commitInterval)
-	serverTrieDB := trie.NewDatabase(memorydb.New())
+	serverTrieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
 	numTrieKeys1 := int(targetHeight1) - 1 // no atomic ops for genesis
 	root1, _, _ := syncutils.GenerateTrie(t, serverTrieDB, numTrieKeys1, atomicKeyLength)
 
