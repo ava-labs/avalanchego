@@ -535,8 +535,16 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 			return err
 		}
 
+		if _, err := fmt.Fprintf(w, " created subnet %s with ID %d\n", subnet.Name, subnet.SubnetID); err != nil {
+			return err
+		}
+
 		// Persist the subnet configuration
 		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(w, " wrote configuration for subnet %s\n", subnet.Name); err != nil {
 			return err
 		}
 
@@ -556,6 +564,9 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	}
 
 	// Reconfigure nodes for the new subnets and their chains
+	if _, err := fmt.Fprintf(w, " reconfiguring nodes to track the new subnet(s)\n"); err != nil {
+		return err
+	}
 	for _, node := range n.Nodes {
 		if err := n.EnsureNodeConfig(node); err != nil {
 			return err
@@ -569,7 +580,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 
 	// Add each node as a subnet validator
 	for _, subnet := range createdSubnets {
-		if err := subnet.AddValidators(ctx, n.Nodes); err != nil {
+		if err := subnet.AddValidators(ctx, w, n.Nodes); err != nil {
 			return err
 		}
 	}
@@ -582,12 +593,15 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		}
 
 		// It should now be safe to create chains for the subnet
-		if err := subnet.CreateChains(ctx, n.Nodes[0].URI); err != nil {
+		if err := subnet.CreateChains(ctx, w, n.Nodes[0].URI); err != nil {
 			return err
 		}
 
 		// Persist the chain configuration
 		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %s\n", subnet.Name); err != nil {
 			return err
 		}
 	}

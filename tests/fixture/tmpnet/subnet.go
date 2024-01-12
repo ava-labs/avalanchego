@@ -119,7 +119,7 @@ func (s *Subnet) Create(ctx context.Context, uri string) error {
 	return nil
 }
 
-func (s *Subnet) CreateChains(ctx context.Context, uri string) error {
+func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) error {
 	wallet, err := s.GetWallet(ctx, uri)
 	if err != nil {
 		return err
@@ -144,12 +144,16 @@ func (s *Subnet) CreateChains(ctx context.Context, uri string) error {
 			return fmt.Errorf("failed to create chain: %w", err)
 		}
 		chain.ChainID = createChainTx.ID()
+
+		if _, err := fmt.Fprintf(w, " created chain with ID %s for VM %s on subnet %s\n", chain.ChainID, chain.VMName, s.Name); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // Add validators to the subnet
-func (s *Subnet) AddValidators(ctx context.Context, nodes []*Node) error {
+func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes []*Node) error {
 	apiURI := nodes[0].URI
 
 	wallet, err := s.GetWallet(ctx, apiURI)
@@ -189,6 +193,10 @@ func (s *Subnet) AddValidators(ctx context.Context, nodes []*Node) error {
 			common.WithContext(ctx),
 		)
 		if err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(w, " added %s as validator for subnet %s\n", node.NodeID, s.Name); err != nil {
 			return err
 		}
 
@@ -244,6 +252,10 @@ func waitForActiveValidators(
 ) error {
 	ticker := time.NewTicker(DefaultPollingInterval)
 	defer ticker.Stop()
+
+	if _, err := fmt.Fprintf(w, " waiting for validators for subnet %s to become active\n", subnet.Name); err != nil {
+		return err
+	}
 
 	if _, err := fmt.Fprintf(w, " "); err != nil {
 		return err
