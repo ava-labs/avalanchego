@@ -473,7 +473,6 @@ func (b *builder) NewCreateSubnetTx(
 			b.state,
 			keys,
 			0,
-			utx,
 			feeCalc,
 			changeAddr,
 		)

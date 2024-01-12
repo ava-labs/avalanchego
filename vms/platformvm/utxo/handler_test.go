@@ -5,6 +5,7 @@ package utxo
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -41,11 +42,11 @@ func (*dummyUnsignedTx) Visit(txs.Visitor) error {
 
 func TestVerifyFinanceTx(t *testing.T) {
 	fx := &secp256k1fx.Fx{}
-
 	require.NoError(t, fx.InitializeVM(&secp256k1fx.TestVM{}))
 	require.NoError(t, fx.Bootstrapped())
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
+	keys := secp256k1.TestKeys()
 
 	h := &handler{
 		ctx: ctx,
@@ -70,12 +71,28 @@ func TestVerifyFinanceTx(t *testing.T) {
 		},
 	}
 
+	bigUnlockedUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: rand.Uint32(), // #nosec G404
+		},
+		Asset: avax.Asset{ID: ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 100 * units.Avax,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				Threshold: 1,
+			},
+		},
+	}
+	bigUnlockedUTXOID := bigUnlockedUTXO.InputID()
+
 	tests := []struct {
 		description   string
 		utxoReaderF   func(ctrl *gomock.Controller) avax.UTXOReader
-		keys          []*secp256k1.PrivateKey
 		amountToStake uint64
-		uTxF          func() txs.UnsignedTx
+		uTxF          func(t *testing.T) txs.UnsignedTx
 		feeCalcF      func() *fees.Calculator
 		changeAddr    ids.ShortID
 
@@ -83,15 +100,65 @@ func TestVerifyFinanceTx(t *testing.T) {
 		checksF     func(*testing.T, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
 	}{
 		{
+			description: "simple tx no stake outputs",
+			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().UTXOIDs(gomock.Any(), gomock.Any(), gomock.Any()).Return([]ids.ID{bigUnlockedUTXOID}, nil).AnyTimes()
+				s.EXPECT().GetUTXO(bigUnlockedUTXOID).Return(bigUnlockedUTXO, nil).AnyTimes()
+				return s
+			},
+
+			amountToStake: 0,
+			uTxF: func(t *testing.T) txs.UnsignedTx {
+				uTx := &txs.CreateChainTx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    ctx.NetworkID,
+							BlockchainID: ctx.ChainID,
+							Ins:          make([]*avax.TransferableInput, 0),
+							Outs:         make([]*avax.TransferableOutput, 0),
+							Memo:         []byte{'a', 'b', 'c'},
+						},
+					},
+					SubnetID:   ids.GenerateTestID(),
+					ChainName:  "testChain",
+					VMID:       ids.GenerateTestID(),
+					SubnetAuth: &secp256k1fx.Input{},
+				}
+
+				bytes, err := txs.Codec.Marshal(txs.CodecVersion, uTx)
+				require.NoError(t, err)
+
+				uTx.SetBytes(bytes)
+				return uTx
+			},
+			feeCalcF: func() *fees.Calculator {
+				fm := commonfees.NewManager(cfg.DefaultUnitFees)
+				feesCalc := fees.Calculator{
+					FeeManager:  fm,
+					Config:      cfg,
+					ChainTime:   time.Time{},
+					Credentials: []verify.Verifiable{},
+				}
+				return &feesCalc
+			},
+			expectedErr: nil,
+			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				require.Equal(t, 2538*units.MicroAvax, calc.Fee)
+				// require.Empty(t, ins)
+				// require.Empty(t, outs)
+				require.Empty(t, staked)
+			},
+		},
+		{
 			description: "no inputs, no outputs, no fee",
 			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().UTXOIDs(gomock.Any(), gomock.Any(), gomock.Any()).Return([]ids.ID{}, nil).AnyTimes()
 				return s
 			},
-			keys:          secp256k1.TestKeys(),
 			amountToStake: 0,
-			uTxF: func() txs.UnsignedTx {
+			uTxF: func(t *testing.T) txs.UnsignedTx {
 				unsignedTx := dummyUnsignedTx{
 					BaseTx: txs.BaseTx{},
 				}
@@ -120,19 +187,23 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
+			r := require.New(t)
 			ctrl := gomock.NewController(t)
 
+			uTx := test.uTxF(t)
 			feeCalc := test.feeCalcF()
+
+			// init fee calc with the uTx data
+			r.NoError(uTx.Visit(feeCalc))
 
 			ins, outs, staked, _, err := h.FinanceTx(
 				test.utxoReaderF(ctrl),
-				test.keys,
+				keys,
 				test.amountToStake,
-				test.uTxF(),
 				feeCalc,
 				test.changeAddr,
 			)
-			require.ErrorIs(t, err, test.expectedErr)
+			r.ErrorIs(err, test.expectedErr)
 			test.checksF(t, feeCalc, ins, outs, staked)
 		})
 	}

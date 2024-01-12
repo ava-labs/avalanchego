@@ -74,7 +74,6 @@ type Spender interface {
 		utxoReader avax.UTXOReader,
 		keys []*secp256k1.PrivateKey,
 		amount uint64,
-		uTx txs.UnsignedTx,
 		feeCalc *fees.Calculator,
 		changeAddr ids.ShortID,
 	) (
@@ -410,7 +409,6 @@ func (h *handler) FinanceTx(
 	utxoReader avax.UTXOReader,
 	keys []*secp256k1.PrivateKey,
 	amount uint64,
-	uTx txs.UnsignedTx,
 	feeCalc *fees.Calculator,
 	changeAddr ids.ShortID,
 ) (
@@ -578,12 +576,22 @@ func (h *handler) FinanceTx(
 			// happen
 			continue
 		}
+		avaxIn := &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			In:     in,
+		}
 
 		// The remaining value is initially the full value of the input
 		remainingValue := in.Amount()
 
-		if err := uTx.Visit(feeCalc); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
+		// update fees to target given the extra input added
+		insDimensions, err := fees.GetInputsDimensions(avaxIn)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
+		}
+		if err := feeCalc.ProcessFees(insDimensions); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		targetFee = feeCalc.Fee
 
@@ -604,15 +612,12 @@ func (h *handler) FinanceTx(
 		remainingValue -= amountToStake
 
 		// Add the input to the consumed inputs
-		ins = append(ins, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
-			In:     in,
-		})
+		ins = append(ins, avaxIn)
 
 		if amountToStake > 0 {
 			// Some of this input was put for staking
-			stakedOuts = append(stakedOuts, &avax.TransferableOutput{
+
+			stakedOut := &avax.TransferableOutput{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountToStake,
@@ -622,7 +627,19 @@ func (h *handler) FinanceTx(
 						Addrs:     []ids.ShortID{changeAddr},
 					},
 				},
-			})
+			}
+
+			// update fees to target given the extra input added
+			outDimensions, err := fees.GetOutputsDimensions(stakedOut)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
+			}
+			if err := feeCalc.ProcessFees(outDimensions); err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
+			}
+			targetFee = feeCalc.Fee
+
+			stakedOuts = append(stakedOuts, stakedOut)
 		}
 
 		if remainingValue > 0 {
