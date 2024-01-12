@@ -1079,7 +1079,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		if ipLen := len(claimedIPPort.IpAddr); ipLen != net.IPv6len {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.HandshakeOp),
+				zap.Stringer("messageOp", message.PeerListOp),
 				zap.String("field", "IP"),
 				zap.Int("ipLen", ipLen),
 			)
