@@ -21,6 +21,18 @@ type (
 	Dimensions [FeeDimensions]uint64
 )
 
+func Add(lhs, rhs Dimensions) (Dimensions, error) {
+	var res Dimensions
+	for i := 0; i < FeeDimensions; i++ {
+		v, err := math.Add64(lhs[i], rhs[i])
+		if err != nil {
+			return res, err
+		}
+		res[i] = v
+	}
+	return res, nil
+}
+
 type Manager struct {
 	// Avax denominated unit fees for all fee dimensions
 	unitFees Dimensions

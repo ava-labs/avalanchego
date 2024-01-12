@@ -125,7 +125,7 @@ func TestUTXOsAreAdditiveInSize(t *testing.T) {
 	uTx := &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    rand.Uint32(),
+				NetworkID:    rand.Uint32(), //#nosec G404
 				BlockchainID: ids.GenerateTestID(),
 				Memo:         []byte{'a', 'b', 'c'},
 				Ins:          make([]*avax.TransferableInput, 0),

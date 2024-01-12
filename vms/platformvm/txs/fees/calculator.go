@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -46,13 +47,12 @@ func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -61,13 +61,12 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
@@ -80,13 +79,12 @@ func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -95,13 +93,12 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
@@ -110,13 +107,12 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
@@ -133,13 +129,12 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
@@ -148,13 +143,12 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
@@ -163,13 +157,12 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
@@ -186,13 +179,12 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
@@ -209,13 +201,12 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
@@ -224,13 +215,12 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 		return nil
 	}
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
@@ -243,13 +233,12 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, tx.Outs, ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
@@ -262,18 +251,67 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	consumedUnits, err := commonConsumedUnits(tx, fc.Credentials, outs, tx.Ins)
+	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
 
-	fc.Fee, err = processFees(fc.Config, fc.ChainTime, fc.FeeManager, consumedUnits)
-	return err
+	return fc.processFees(consumedUnits)
 }
 
-func commonConsumedUnits(
+func GetInputsDimensions(in *avax.TransferableInput) (fees.Dimensions, error) {
+	return getInputsDimensions(true, []*avax.TransferableInput{in})
+}
+
+func getInputsDimensions(evaluteBandwitdh bool, ins []*avax.TransferableInput) (fees.Dimensions, error) {
+	var consumedUnits fees.Dimensions
+
+	for _, in := range ins {
+		cost, err := in.In.Cost()
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
+		}
+
+		inSize, err := txs.Codec.Size(txs.CodecVersion, in)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
+		}
+		uInSize := uint64(inSize)
+
+		if evaluteBandwitdh {
+			consumedUnits[fees.Bandwidth] += uInSize - codec.CodecVersionSize
+		}
+		consumedUnits[fees.UTXORead] += cost + uInSize // inputs are read
+		consumedUnits[fees.UTXOWrite] += uInSize       // inputs are deleted
+	}
+	return consumedUnits, nil
+}
+
+func GetOutputsDimensions(out *avax.TransferableOutput) (fees.Dimensions, error) {
+	return getOutputsDimensions(true, []*avax.TransferableOutput{out})
+}
+
+func getOutputsDimensions(evaluteBandwitdh bool, outs []*avax.TransferableOutput) (fees.Dimensions, error) {
+	var consumedUnits fees.Dimensions
+
+	for _, out := range outs {
+		outSize, err := txs.Codec.Size(txs.CodecVersion, out)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
+		}
+		uOutSize := uint64(outSize)
+
+		if evaluteBandwitdh {
+			consumedUnits[fees.Bandwidth] += uOutSize - codec.CodecVersionSize
+		}
+		consumedUnits[fees.UTXOWrite] += uOutSize
+	}
+
+	return consumedUnits, nil
+}
+
+func (fc *Calculator) commonConsumedUnits(
 	uTx txs.UnsignedTx,
-	credentials []verify.Verifiable,
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
 ) (fees.Dimensions, error) {
@@ -283,54 +321,44 @@ func commonConsumedUnits(
 	if err != nil {
 		return consumedUnits, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	credsSize, err := txs.Codec.Size(txs.CodecVersion, credentials)
+	credsSize, err := txs.Codec.Size(txs.CodecVersion, fc.Credentials)
 	if err != nil {
 		return consumedUnits, fmt.Errorf("failed retrieving size of credentials: %w", err)
 	}
 	consumedUnits[fees.Bandwidth] = uint64(uTxSize + credsSize)
 
-	var (
-		insCost  uint64
-		insSize  uint64
-		outsSize uint64
-	)
-	for _, in := range allIns {
-		cost, err := in.In.Cost()
-		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
-		}
-		insCost += cost
-
-		inSize, err := txs.Codec.Size(txs.CodecVersion, in)
-		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
-		}
-		insSize += uint64(inSize)
+	inputDimensions, err := getInputsDimensions(false, allIns)
+	if err != nil {
+		return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
+	}
+	consumedUnits, err = fees.Add(consumedUnits, inputDimensions)
+	if err != nil {
+		return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
 	}
 
-	for _, out := range allOuts {
-		outSize, err := txs.Codec.Size(txs.CodecVersion, out)
-		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
-		}
-		outsSize += uint64(outSize)
+	outputDimensions, err := getOutputsDimensions(false, allOuts)
+	if err != nil {
+		return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
+	}
+	consumedUnits, err = fees.Add(consumedUnits, outputDimensions)
+	if err != nil {
+		return consumedUnits, fmt.Errorf("failed adding outputs: %w", err)
 	}
 
-	consumedUnits[fees.UTXORead] = insCost + insSize   // inputs are read
-	consumedUnits[fees.UTXOWrite] = insSize + outsSize // inputs are deleted, outputs are created
 	return consumedUnits, nil
 }
 
-func processFees(cfg *config.Config, chainTime time.Time, fc *fees.Manager, consumedUnits fees.Dimensions) (uint64, error) {
-	boundBreached, dimension := fc.CumulateUnits(consumedUnits, cfg.BlockMaxConsumedUnits(chainTime))
+func (fc *Calculator) processFees(consumedUnits fees.Dimensions) error {
+	boundBreached, dimension := fc.FeeManager.CumulateUnits(consumedUnits, fc.Config.BlockMaxConsumedUnits(fc.ChainTime))
 	if boundBreached {
-		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
+		return fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}
 
-	fee, err := fc.CalculateFee(consumedUnits)
+	fee, err := fc.FeeManager.CalculateFee(consumedUnits)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
+		return fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	return fee, nil
+	fc.Fee = fee
+	return nil
 }
