@@ -177,7 +177,7 @@ func (b *testBackend) StateAtBlock(ctx context.Context, block *types.Block, reex
 }
 
 func (b *testBackend) StateAtNextBlock(ctx context.Context, parent, nextBlock *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, StateReleaseFunc, error) {
-	statedb, release, err := b.StateAtBlock(ctx, parent, reexec, nil, true, false)
+	statedb, release, err := b.StateAtBlock(ctx, parent, reexec, base, readOnly, preferDisk)
 	if err != nil {
 		return nil, nil, err
 	}
