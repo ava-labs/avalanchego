@@ -14,6 +14,8 @@ use thiserror::Error;
 pub mod cached;
 pub mod compact;
 pub mod disk_address;
+#[cfg(test)]
+pub mod plainmem;
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
