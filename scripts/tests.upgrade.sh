@@ -16,8 +16,9 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.10.18-rc.18 disallows the usage of the 0 port in signed IPs.
-DEFAULT_VERSION="1.10.18-rc.18"
+# v1.10.17 includes the AWM activation on the C-Chain local network
+# and the inclusion of BLS Public Keys in the network genesis.
+DEFAULT_VERSION="1.10.17"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
