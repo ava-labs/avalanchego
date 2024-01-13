@@ -16,7 +16,7 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.10.18-rc.18 includes disallowing the usage of the 0 port in signed IPs.
+# v1.10.18-rc.18 disallows the usage of the 0 port in signed IPs.
 DEFAULT_VERSION="1.10.18-rc.18"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
