@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -64,6 +65,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -89,6 +91,13 @@ import (
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+)
+
+const (
+	stakingPortName = constants.AppName + "-staking"
+	httpPortName    = constants.AppName + "-http"
+
+	ipResolutionTimeout = 30 * time.Second
 )
 
 var (
@@ -156,7 +165,7 @@ func New(
 	}
 
 	n.initMetrics()
-
+	n.initNAT()
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return nil, fmt.Errorf("couldn't initialize API server: %w", err)
 	}
@@ -193,6 +202,7 @@ func New(
 
 	n.vdrs = validators.NewManager()
 	if !n.Config.SybilProtectionEnabled {
+		logger.Warn("sybil control is not enforced")
 		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
 	}
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
@@ -265,6 +275,10 @@ type Node struct {
 
 	// Storage for this node
 	DB database.Database
+
+	router     nat.Router
+	portMapper *nat.Mapper
+	ipUpdater  dynamicip.Updater
 
 	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
@@ -380,8 +394,6 @@ type Node struct {
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking() error {
-	currentIPPort := n.Config.IPPort.IPPort()
-
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
 	// host will avoid the need for a firewall exception on recent MacOS:
 	//
@@ -399,8 +411,7 @@ func (n *Node) initNetworking() error {
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(currentIPPort.Port), 10))
-
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(n.Config.ListenPort), 10))
 	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
 		return err
@@ -408,23 +419,67 @@ func (n *Node) initNetworking() error {
 	// Wrap listener so it will only accept a certain number of incoming connections per second
 	listener = throttling.NewThrottledListener(listener, n.Config.NetworkConfig.ThrottlerConfig.MaxInboundConnsPerSec)
 
-	ipPort, err := ips.ToIPPort(listener.Addr().String())
+	// Record the bound address to enable inclusion in process context file.
+	n.stakingAddress = listener.Addr().String()
+	ipPort, err := ips.ToIPPort(n.stakingAddress)
 	if err != nil {
-		n.Log.Info("initializing networking",
-			zap.Stringer("currentNodeIP", currentIPPort),
-		)
-	} else {
-		ipPort = ips.IPPort{
-			IP:   currentIPPort.IP,
-			Port: ipPort.Port,
+		return err
+	}
+
+	var dynamicIP ips.DynamicIPPort
+	switch {
+	case n.Config.PublicIP != "":
+		// Use the specified public IP.
+		ipPort.IP = net.ParseIP(n.Config.PublicIP)
+		if ipPort.IP == nil {
+			return fmt.Errorf("invalid IP Address: %s", n.Config.PublicIP)
 		}
-		n.Log.Info("initializing networking",
-			zap.Stringer("currentNodeIP", ipPort),
+		dynamicIP = ips.NewDynamicIPPort(ipPort.IP, ipPort.Port)
+		n.ipUpdater = dynamicip.NewNoUpdater()
+	case n.Config.PublicIPResolutionService != "":
+		// Use dynamic IP resolution.
+		resolver, err := dynamicip.NewResolver(n.Config.PublicIPResolutionService)
+		if err != nil {
+			return fmt.Errorf("couldn't create IP resolver: %w", err)
+		}
+
+		// Use that to resolve our public IP.
+		ctx, cancel := context.WithTimeout(context.Background(), ipResolutionTimeout)
+		ipPort.IP, err = resolver.Resolve(ctx)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("couldn't resolve public IP: %w", err)
+		}
+		dynamicIP = ips.NewDynamicIPPort(ipPort.IP, ipPort.Port)
+		n.ipUpdater = dynamicip.NewUpdater(dynamicIP, resolver, n.Config.PublicIPResolutionFreq)
+	default:
+		ipPort.IP, err = n.router.ExternalIP()
+		if err != nil {
+			return fmt.Errorf("public IP / IP resolution service not given and failed to resolve IP with NAT: %w", err)
+		}
+		dynamicIP = ips.NewDynamicIPPort(ipPort.IP, ipPort.Port)
+		n.ipUpdater = dynamicip.NewNoUpdater()
+	}
+
+	if ipPort.IP.IsLoopback() || ipPort.IP.IsPrivate() {
+		n.Log.Warn("P2P IP is private, you will not be publicly discoverable",
+			zap.Stringer("ip", ipPort),
 		)
 	}
 
-	// Record the bound address to enable inclusion in process context file.
-	n.stakingAddress = listener.Addr().String()
+	// Regularly update our public IP and port mappings.
+	n.portMapper.Map(
+		ipPort.Port,
+		ipPort.Port,
+		stakingPortName,
+		dynamicIP,
+		n.Config.PublicIPResolutionFreq,
+	)
+	go n.ipUpdater.Dispatch(n.Log)
+
+	n.Log.Info("initializing networking",
+		zap.Stringer("ip", ipPort),
+	)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -543,7 +598,7 @@ func (n *Node) initNetworking() error {
 	// add node configs to network config
 	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
-	n.Config.NetworkConfig.MyIPPort = n.Config.IPPort
+	n.Config.NetworkConfig.MyIPPort = dynamicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
@@ -861,14 +916,74 @@ func (n *Node) initMetrics() {
 	n.MetricsGatherer = metrics.NewMultiGatherer()
 }
 
+func (n *Node) initNAT() {
+	n.Log.Info("initializing NAT")
+
+	if n.Config.PublicIP == "" && n.Config.PublicIPResolutionService == "" {
+		n.router = nat.GetRouter()
+		if !n.router.SupportsNAT() {
+			n.Log.Warn("UPnP and NAT-PMP router attach failed, " +
+				"you may not be listening publicly. " +
+				"Please confirm the settings in your router")
+		}
+	} else {
+		n.router = nat.NewNoRouter()
+	}
+
+	n.portMapper = nat.NewPortMapper(n.Log, n.router)
+}
+
 // initAPIServer initializes the server that handles HTTP calls
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
+
+	// An empty host is treated as a wildcard to match all addresses, so it is
+	// considered public.
+	hostIsPublic := n.Config.HTTPHost == ""
+	if !hostIsPublic {
+		ip, err := ips.Lookup(n.Config.HTTPHost)
+		if err != nil {
+			n.Log.Fatal("failed to lookup HTTP host",
+				zap.String("host", n.Config.HTTPHost),
+				zap.Error(err),
+			)
+			return err
+		}
+		hostIsPublic = !ip.IsLoopback() && !ip.IsPrivate()
+
+		n.Log.Debug("finished HTTP host lookup",
+			zap.String("host", n.Config.HTTPHost),
+			zap.Stringer("ip", ip),
+			zap.Bool("isPublic", hostIsPublic),
+		)
+	}
 
 	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
+	}
+
+	addr := listener.Addr().String()
+	ipPort, err := ips.ToIPPort(addr)
+	if err != nil {
+		return err
+	}
+
+	// Don't open the HTTP port if the HTTP server is private
+	if hostIsPublic {
+		n.Log.Warn("HTTP server is binding to a potentially public host. "+
+			"You may be vulnerable to a DoS attack if your HTTP port is publicly accessible",
+			zap.String("host", n.Config.HTTPHost),
+		)
+
+		n.portMapper.Map(
+			ipPort.Port,
+			ipPort.Port,
+			httpPortName,
+			nil,
+			n.Config.PublicIPResolutionFreq,
+		)
 	}
 
 	protocol := "http"
@@ -1585,6 +1700,8 @@ func (n *Node) shutdown() {
 			zap.Error(err),
 		)
 	}
+	n.portMapper.UnmapAllPorts()
+	n.ipUpdater.Stop()
 	if err := n.indexer.Close(); err != nil {
 		n.Log.Debug("error closing tx indexer",
 			zap.Error(err),

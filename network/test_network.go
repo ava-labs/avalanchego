@@ -66,7 +66,7 @@ func (l *noopListener) Close() error {
 func (*noopListener) Addr() net.Addr {
 	return &net.TCPAddr{
 		IP:   net.IPv4zero,
-		Port: 0,
+		Port: 1,
 	}
 }
 
@@ -225,7 +225,7 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.DiskTracker(),
 	)
 
-	networkConfig.MyIPPort = ips.NewDynamicIPPort(net.IPv4zero, 0)
+	networkConfig.MyIPPort = ips.NewDynamicIPPort(net.IPv4zero, 1)
 
 	networkConfig.GossipTracker, err = peer.NewGossipTracker(metrics, "")
 	if err != nil {

@@ -500,6 +500,13 @@ func (p *peer) writeMessages() {
 		)
 		return
 	}
+	if mySignedIP.Port == 0 {
+		p.Log.Error("signed IP has invalid port",
+			zap.Stringer("nodeID", p.id),
+			zap.Uint16("port", mySignedIP.Port),
+		)
+		return
+	}
 
 	myVersion := p.VersionCompatibility.Version()
 	legacyApplication := &version.Application{
@@ -996,6 +1003,16 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		p.StartClose()
 		return
 	}
+	if msg.IpPort == 0 {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.HandshakeOp),
+			zap.String("field", "Port"),
+			zap.Uint32("port", msg.IpPort),
+		)
+		p.StartClose()
+		return
+	}
 
 	p.ip = &SignedIP{
 		UnsignedIP: UnsignedIP{
@@ -1085,6 +1102,16 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			)
 			p.StartClose()
 			return
+		}
+		if claimedIPPort.IpPort == 0 {
+			p.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.PeerListOp),
+				zap.String("field", "Port"),
+				zap.Uint32("port", claimedIPPort.IpPort),
+			)
+			// TODO: After v1.11.x is activated, close the peer here.
+			continue
 		}
 
 		txID, err := ids.ToID(claimedIPPort.TxId)

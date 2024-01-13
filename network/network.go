@@ -1068,6 +1068,10 @@ func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.C
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
 func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
+	n.peerConfig.Log.Verbo("attempting to dial node",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("ip", ip.ip),
+	)
 	go func() {
 		n.metrics.numTracked.Inc()
 		defer n.metrics.numTracked.Dec()
@@ -1141,7 +1145,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 				n.peerConfig.Log.Verbo("skipping connection dial",
 					zap.String("reason", "outbound connections to private IPs are prohibited"),
 					zap.Stringer("nodeID", nodeID),
-					zap.Stringer("peerIP", ip.ip.IP),
+					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
 				)
 				continue
@@ -1151,7 +1155,8 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to reach peer, attempting again",
-					zap.Stringer("peerIP", ip.ip.IP),
+					zap.Stringer("nodeID", nodeID),
+					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
 				)
 				continue
@@ -1159,14 +1164,16 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 
 			n.peerConfig.Log.Verbo("starting to upgrade connection",
 				zap.String("direction", "outbound"),
-				zap.Stringer("peerIP", ip.ip.IP),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("peerIP", ip.ip),
 			)
 
 			err = n.upgrade(conn, n.clientUpgrader)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to upgrade, attempting again",
-					zap.Stringer("peerIP", ip.ip.IP),
+					zap.Stringer("nodeID", nodeID),
+					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
 				)
 				continue
