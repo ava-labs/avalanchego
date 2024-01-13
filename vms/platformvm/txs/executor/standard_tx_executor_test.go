@@ -1024,6 +1024,7 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
+// Memo field is empty as required post Durango activation
 func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *txs.Tx) {
 	t.Helper()
 
@@ -1066,7 +1067,6 @@ func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *tx
 						},
 					},
 				},
-				Memo: []byte("hi"),
 			},
 		},
 		Subnet: ids.GenerateTestID(),
@@ -1134,6 +1134,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
@@ -1196,6 +1197,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				e := &StandardTxExecutor{
@@ -1227,6 +1229,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
 
 				// Set dependency expectations.
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1255,6 +1258,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1281,6 +1285,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 				e := &StandardTxExecutor{
@@ -1308,6 +1313,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
@@ -1337,6 +1343,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
@@ -1379,6 +1386,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 }
 
 // Returns a TransformSubnetTx that passes syntactic verification.
+// Memo field is empty as required post Durango activation
 func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 	t.Helper()
 
@@ -1421,7 +1429,6 @@ func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 						},
 					},
 				},
-				Memo: []byte("hi"),
 			},
 		},
 		Subnet:                   ids.GenerateTestID(),
@@ -1527,6 +1534,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
 				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1554,6 +1562,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1581,6 +1590,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				subnetOwner := fx.NewMockOwner(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
@@ -1615,6 +1625,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)

@@ -4,12 +4,14 @@
 package executor
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -263,4 +265,21 @@ func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*txs.TransformSub
 	}
 
 	return transformSubnet, nil
+}
+
+func verifyMemoFieldLength(baseTx *txs.BaseTx, isDurangoActive bool) error {
+	if !isDurangoActive {
+		return nil // field already validated during in SyntacticVerify
+	}
+
+	if len(baseTx.Memo) != 0 {
+		return fmt.Errorf(
+			"%w: %d > %d",
+			avax.ErrMemoTooLarge,
+			len(baseTx.Memo),
+			0,
+		)
+	}
+
+	return nil
 }
