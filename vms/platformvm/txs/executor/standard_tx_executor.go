@@ -58,7 +58,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		timestamp       = e.State.GetTimestamp()
 		isDurangoActive = e.Config.IsDurangoActivated(timestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -109,7 +109,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		timestamp       = e.State.GetTimestamp()
 		isDurangoActive = e.Config.IsDurangoActivated(timestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -149,7 +149,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -235,7 +235,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -420,7 +420,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -554,7 +554,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		currentTimestamp = e.State.GetTimestamp()
 		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(tx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 

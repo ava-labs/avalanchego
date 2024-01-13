@@ -104,7 +104,7 @@ func verifyAddValidatorTx(
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, err
 	}
 
@@ -200,7 +200,7 @@ func verifyAddSubnetValidatorTx(
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -296,7 +296,7 @@ func verifyRemoveSubnetValidatorTx(
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, false, err
 	}
 
@@ -369,7 +369,7 @@ func verifyAddDelegatorTx(
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, err
 	}
 
@@ -485,7 +485,7 @@ func verifyAddPermissionlessValidatorTx(
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -609,7 +609,7 @@ func verifyAddPermissionlessDelegatorTx(
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
@@ -765,7 +765,7 @@ func verifyTransferSubnetOwnershipTx(
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
 	)
-	if err := verifyMemoFieldLength(&tx.BaseTx, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
