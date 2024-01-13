@@ -16,3 +16,7 @@ type Config struct {
 	// Time of the Durango network upgrade
 	DurangoTime time.Time
 }
+
+func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.DurangoTime)
+}

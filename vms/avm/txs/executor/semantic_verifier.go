@@ -31,6 +31,14 @@ type SemanticVerifier struct {
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
+	var (
+		timestamp       = v.State.GetTimestamp()
+		isDurangoActive = v.Config.IsDurangoActivated(timestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
 	for i, in := range tx.Ins {
 		// Note: Verification of the length of [t.tx.Creds] happens during
 		// syntactic verification, which happens before semantic verification.
