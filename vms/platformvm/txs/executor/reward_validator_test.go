@@ -234,8 +234,8 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := defaultValidateStartTime.Unix() + 1
+	vdrEndTime := defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix()
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -286,7 +286,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	env.state.AddTx(vdrTx, status.Committed)
 	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
-	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
+	env.state.SetTimestamp(time.Unix(delEndTime, 0))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -358,8 +358,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := defaultValidateStartTime.Unix() + 1
+	vdrEndTime := defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix()
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -393,7 +393,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
 		addValTx,
-		time.Unix(int64(vdrStartTime), 0),
+		time.Unix(vdrStartTime, 0),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
@@ -403,7 +403,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		time.Unix(int64(delStartTime), 0),
+		time.Unix(delStartTime, 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -412,7 +412,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	env.state.AddTx(vdrTx, status.Committed)
 	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
-	env.state.SetTimestamp(time.Unix(int64(vdrEndTime), 0))
+	env.state.SetTimestamp(time.Unix(vdrEndTime, 0))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -577,8 +577,8 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := defaultValidateStartTime.Unix() + 1
+	vdrEndTime := defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix()
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -622,7 +622,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		time.Unix(int64(delStartTime), 0),
+		time.Unix(delStartTime, 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -631,7 +631,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	env.state.AddTx(vdrTx, status.Committed)
 	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
-	env.state.SetTimestamp(time.Unix(int64(vdrEndTime), 0))
+	env.state.SetTimestamp(time.Unix(vdrEndTime, 0))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -742,8 +742,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := defaultValidateStartTime.Unix() + 1
+	vdrEndTime := defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix()
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
@@ -793,7 +793,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	env.state.AddTx(vdrTx, status.Committed)
 	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
-	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
+	env.state.SetTimestamp(time.Unix(delEndTime, 0))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 

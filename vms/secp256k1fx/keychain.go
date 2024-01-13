@@ -121,7 +121,8 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 	return nil, nil, fmt.Errorf("can't spend UTXO because it is unexpected type %T", out)
 }
 
-// Match attempts to match a list of addresses up to the provided threshold
+// Match attempts to match a list of addresses up to the provided threshold.
+// Assumes [time] is a Unix time > 0.
 func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*secp256k1.PrivateKey, bool) {
 	if time < owners.Locktime {
 		return nil, nil, false

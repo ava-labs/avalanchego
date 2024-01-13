@@ -356,8 +356,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
 			GenesisValidator: api.GenesisValidator{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				StartTime: json.Int64(defaultValidateStartTime.Unix()),
+				EndTime:   json.Int64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
 			RewardOwner: &api.Owner{

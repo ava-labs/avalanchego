@@ -22,7 +22,7 @@ var _ UnsignedTx = (*AdvanceTimeTx)(nil)
 // - proposed timestamp <= [time for next staker set change]
 type AdvanceTimeTx struct {
 	// Unix time this block proposes increasing the timestamp to
-	Time uint64 `serialize:"true" json:"time"`
+	Time int64 `serialize:"true" json:"time"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data
 }
@@ -39,7 +39,7 @@ func (*AdvanceTimeTx) InitCtx(*snow.Context) {}
 
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *AdvanceTimeTx) Timestamp() time.Time {
-	return time.Unix(int64(tx.Time), 0)
+	return time.Unix(tx.Time, 0)
 }
 
 func (*AdvanceTimeTx) InputIDs() set.Set[ids.ID] {

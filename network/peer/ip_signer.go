@@ -65,7 +65,7 @@ func (s *IPSigner) GetSignedIP() (*SignedIP, error) {
 	// We should now sign our new IP at the current timestamp.
 	unsignedIP := UnsignedIP{
 		IPPort:    ip,
-		Timestamp: s.clock.Unix(),
+		Timestamp: int64(s.clock.Unix()),
 	}
 	signedIP, err := unsignedIP.Sign(s.signer)
 	if err != nil {

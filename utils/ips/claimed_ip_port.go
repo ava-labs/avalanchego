@@ -26,7 +26,7 @@ type ClaimedIPPort struct {
 	// The peer's claimed IP and port.
 	IPPort IPPort
 	// The time the peer claimed to own this IP and port.
-	Timestamp uint64
+	Timestamp int64
 	// [Cert]'s signature over the IPPort and timestamp.
 	// This is used in the networking library to ensure that this IPPort was
 	// actually claimed by the peer in question, and not by a malicious peer

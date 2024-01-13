@@ -110,7 +110,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: nodeID,
-						End:    uint64(endTime.Unix()),
+						End:    endTime.Unix(),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -140,7 +140,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: nodeID,
-						End:    uint64(endTime.Unix()),
+						End:    endTime.Unix(),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,

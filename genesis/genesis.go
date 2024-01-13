@@ -133,7 +133,7 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 		return errNoSupply
 	}
 
-	startTime := time.Unix(int64(config.StartTime), 0)
+	startTime := time.Unix(config.StartTime, 0)
 	if time.Since(startTime) < 0 {
 		return fmt.Errorf(
 			"%w: %s",
@@ -335,7 +335,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
-	genesisTime := time.Unix(int64(config.StartTime), 0)
+	genesisTime := time.Unix(config.StartTime, 0)
 	initialSupply, err := config.InitialSupply()
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't calculate the initial supply: %w", err)
@@ -420,8 +420,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
 			api.GenesisPermissionlessValidator{
 				GenesisValidator: api.GenesisValidator{
-					StartTime: json.Uint64(genesisTime.Unix()),
-					EndTime:   json.Uint64(endStakingTime.Unix()),
+					StartTime: json.Int64(genesisTime.Unix()),
+					EndTime:   json.Int64(endStakingTime.Unix()),
 					NodeID:    staker.NodeID,
 				},
 				RewardOwner: &api.Owner{

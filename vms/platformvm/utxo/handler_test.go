@@ -358,7 +358,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			utxos: []*avax.UTXO{{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &stakeable.LockOut{
-					Locktime: uint64(now.Unix()) + 1,
+					Locktime: uint64(now.Unix() + 1),
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt: 1,
 					},
@@ -367,7 +367,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			ins: []*avax.TransferableInput{{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				In: &stakeable.LockIn{
-					Locktime: uint64(now.Unix()) + 1,
+					Locktime: uint64(now.Unix() + 1),
 					TransferableIn: &secp256k1fx.TransferInput{
 						Amt: 1,
 					},
@@ -385,7 +385,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			utxos: []*avax.UTXO{{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &stakeable.LockOut{
-					Locktime: uint64(now.Unix()) + 1,
+					Locktime: uint64(now.Unix() + 1),
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt: 1,
 					},
@@ -394,7 +394,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			ins: []*avax.TransferableInput{{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				In: &stakeable.LockIn{
-					Locktime: uint64(now.Unix()) + 1,
+					Locktime: uint64(now.Unix() + 1),
 					TransferableIn: &secp256k1fx.TransferInput{
 						Amt: 1,
 					},
@@ -415,7 +415,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 					Out: &stakeable.LockOut{
-						Locktime: uint64(now.Unix()) + 1,
+						Locktime: uint64(now.Unix() + 1),
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
 						},
@@ -432,7 +432,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 					In: &stakeable.LockIn{
-						Locktime: uint64(now.Unix()) + 1,
+						Locktime: uint64(now.Unix() + 1),
 						TransferableIn: &secp256k1fx.TransferInput{
 							Amt: 1,
 						},
@@ -449,7 +449,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 					Out: &stakeable.LockOut{
-						Locktime: uint64(now.Unix()) + 1,
+						Locktime: uint64(now.Unix() + 1),
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
 						},
@@ -471,7 +471,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 					Out: &stakeable.LockOut{
-						Locktime: uint64(now.Unix()) + 1,
+						Locktime: uint64(now.Unix() + 1),
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
 						},
@@ -488,7 +488,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 					In: &stakeable.LockIn{
-						Locktime: uint64(now.Unix()) + 1,
+						Locktime: uint64(now.Unix() + 1),
 						TransferableIn: &secp256k1fx.TransferInput{
 							Amt: 1,
 						},
@@ -505,7 +505,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 					Out: &stakeable.LockOut{
-						Locktime: uint64(now.Unix()) + 1,
+						Locktime: uint64(now.Unix() + 1),
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 2,
 						},
@@ -527,7 +527,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 					Out: &stakeable.LockOut{
-						Locktime: uint64(now.Unix()) - 1,
+						Locktime: uint64(now.Unix() - 1),
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
 						},
@@ -1056,7 +1056,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				{
 					Asset: avax.Asset{ID: customAssetID},
 					Out: &stakeable.LockOut{
-						Locktime: uint64(now.Unix()) - 1,
+						Locktime: uint64(now.Unix() - 1),
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
 						},

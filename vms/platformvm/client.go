@@ -94,9 +94,9 @@ type Client interface {
 		changeAddr ids.ShortID,
 		rewardAddress ids.ShortID,
 		nodeID ids.NodeID,
-		stakeAmount,
+		stakeAmount uint64,
 		startTime,
-		endTime uint64,
+		endTime int64,
 		delegationFeeRate float32,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -112,9 +112,9 @@ type Client interface {
 		changeAddr ids.ShortID,
 		rewardAddress ids.ShortID,
 		nodeID ids.NodeID,
-		stakeAmount,
+		stakeAmount uint64,
 		startTime,
-		endTime uint64,
+		endTime int64,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// AddSubnetValidator issues a transaction to add validator [nodeID] to subnet
@@ -129,9 +129,9 @@ type Client interface {
 		changeAddr ids.ShortID,
 		subnetID ids.ID,
 		nodeID ids.NodeID,
-		stakeAmount,
+		stakeAmount uint64,
 		startTime,
-		endTime uint64,
+		endTime int64,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateSubnet issues a transaction to create [subnet] and returns the txID
@@ -241,8 +241,8 @@ type Client interface {
 		ctx context.Context,
 		subnetID ids.ID,
 		nodeID ids.NodeID,
-		startTime uint64,
-		endTime uint64,
+		startTime int64,
+		endTime int64,
 		options ...rpc.Option,
 	) (uint64, error)
 	// GetRewardUTXOs returns the reward UTXOs for a transaction
@@ -479,9 +479,9 @@ func (c *client) AddValidator(
 	changeAddr ids.ShortID,
 	rewardAddress ids.ShortID,
 	nodeID ids.NodeID,
-	stakeAmount,
+	stakeAmount uint64,
 	startTime,
-	endTime uint64,
+	endTime int64,
 	delegationFeeRate float32,
 	options ...rpc.Option,
 ) (ids.ID, error) {
@@ -497,8 +497,8 @@ func (c *client) AddValidator(
 			NodeID:      nodeID,
 			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
-			StartTime:   json.Uint64(startTime),
-			EndTime:     json.Uint64(endTime),
+			StartTime:   json.Int64(startTime),
+			EndTime:     json.Int64(endTime),
 		},
 		RewardAddress:     rewardAddress.String(),
 		DelegationFeeRate: json.Float32(delegationFeeRate),
@@ -513,9 +513,9 @@ func (c *client) AddDelegator(
 	changeAddr ids.ShortID,
 	rewardAddress ids.ShortID,
 	nodeID ids.NodeID,
-	stakeAmount,
+	stakeAmount uint64,
 	startTime,
-	endTime uint64,
+	endTime int64,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
@@ -530,8 +530,8 @@ func (c *client) AddDelegator(
 			NodeID:      nodeID,
 			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
-			StartTime:   json.Uint64(startTime),
-			EndTime:     json.Uint64(endTime),
+			StartTime:   json.Int64(startTime),
+			EndTime:     json.Int64(endTime),
 		},
 		RewardAddress: rewardAddress.String(),
 	}, res, options...)
@@ -545,9 +545,9 @@ func (c *client) AddSubnetValidator(
 	changeAddr ids.ShortID,
 	subnetID ids.ID,
 	nodeID ids.NodeID,
-	stakeAmount,
+	stakeAmount uint64,
 	startTime,
-	endTime uint64,
+	endTime int64,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
@@ -562,8 +562,8 @@ func (c *client) AddSubnetValidator(
 			NodeID:      nodeID,
 			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
-			StartTime:   json.Uint64(startTime),
-			EndTime:     json.Uint64(endTime),
+			StartTime:   json.Int64(startTime),
+			EndTime:     json.Int64(endTime),
 		},
 		SubnetID: subnetID.String(),
 	}, res, options...)
@@ -821,13 +821,13 @@ func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...
 	return uint64(amount), err
 }
 
-func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
+func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime int64, options ...rpc.Option) (uint64, error) {
 	res := &GetMaxStakeAmountReply{}
 	err := c.requester.SendRequest(ctx, "platform.getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
 		NodeID:    nodeID,
-		StartTime: json.Uint64(startTime),
-		EndTime:   json.Uint64(endTime),
+		StartTime: json.Int64(startTime),
+		EndTime:   json.Int64(endTime),
 	}, res, options...)
 	return uint64(res.Amount), err
 }

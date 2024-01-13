@@ -511,7 +511,7 @@ func (p *peer) writeMessages() {
 
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
-		p.Clock.Unix(),
+		int64(p.Clock.Unix()),
 		mySignedIP.IPPort,
 		legacyApplication.String(),
 		myVersion.Name,
@@ -1003,7 +1003,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 				IP:   msg.IpAddr,
 				Port: uint16(msg.IpPort),
 			},
-			Timestamp: msg.IpSigningTime,
+			Timestamp: int64(msg.IpSigningTime),
 		},
 		Signature: msg.Sig,
 	}
@@ -1099,13 +1099,25 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			return
 		}
 
+		// Timestamp should be expressible as an int64
+		if claimedIPPort.Timestamp > uint64(math.MaxInt64) {
+			p.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.PeerListOp),
+				zap.String("field", "timestamp"),
+				zap.Uint64("timestamp", claimedIPPort.Timestamp),
+			)
+			p.StartClose()
+			return
+		}
+
 		discoveredIPs[i] = &ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
 				IP:   claimedIPPort.IpAddr,
 				Port: uint16(claimedIPPort.IpPort),
 			},
-			Timestamp: claimedIPPort.Timestamp,
+			Timestamp: int64(claimedIPPort.Timestamp),
 			Signature: claimedIPPort.Signature,
 			TxID:      txID,
 		}

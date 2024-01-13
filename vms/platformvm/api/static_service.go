@@ -83,8 +83,8 @@ func (utxo UTXO) Compare(other UTXO) int {
 // [Uptime] is the observed uptime of this staker
 type Staker struct {
 	TxID      ids.ID      `json:"txID"`
-	StartTime json.Uint64 `json:"startTime"`
-	EndTime   json.Uint64 `json:"endTime"`
+	StartTime json.Int64  `json:"startTime"`
+	EndTime   json.Int64  `json:"endTime"`
 	Weight    json.Uint64 `json:"weight"`
 	NodeID    ids.NodeID  `json:"nodeID"`
 
@@ -289,7 +289,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		if weight == 0 {
 			return errValidatorHasNoWeight
 		}
-		if uint64(vdr.EndTime) <= uint64(args.Time) {
+		if vdr.EndTime <= json.Int64(args.Time) {
 			return errValidatorAlreadyExited
 		}
 
@@ -318,8 +318,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			}}
 			validator = txs.Validator{
 				NodeID: vdr.NodeID,
-				Start:  uint64(args.Time),
-				End:    uint64(vdr.EndTime),
+				Start:  int64(args.Time),
+				End:    int64(vdr.EndTime),
 				Wght:   weight,
 			}
 			tx *txs.Tx
@@ -384,7 +384,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,
-		Timestamp:     uint64(args.Time),
+		Timestamp:     int64(args.Time),
 		InitialSupply: uint64(args.InitialSupply),
 		Message:       args.Message,
 	}

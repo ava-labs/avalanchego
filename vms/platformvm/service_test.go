@@ -284,8 +284,8 @@ func TestGetTx(t *testing.T) {
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+					service.vm.clock.Time().Add(txexecutor.SyncBound).Unix(),
+					service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix(),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
@@ -499,8 +499,8 @@ func TestGetStake(t *testing.T) {
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		uint64(delegatorStartTime.Unix()),
-		uint64(delegatorEndTime.Unix()),
+		delegatorStartTime.Unix(),
+		delegatorEndTime.Unix(),
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -550,10 +550,10 @@ func TestGetStake(t *testing.T) {
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
-	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
+	pendingStakerEndTime := defaultGenesisTime.Add(defaultMinStakingDuration).Unix()
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
 		stakeAmount,
-		uint64(defaultGenesisTime.Unix()),
+		defaultGenesisTime.Unix(),
 		pendingStakerEndTime,
 		pendingStakerNodeID,
 		ids.GenerateTestShortID(),
@@ -637,8 +637,8 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		uint64(delegatorStartTime.Unix()),
-		uint64(delegatorEndTime.Unix()),
+		delegatorStartTime.Unix(),
+		delegatorEndTime.Unix(),
 		validatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},

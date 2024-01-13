@@ -76,8 +76,8 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		SubnetValidator: SubnetValidator{
 			Validator: Validator{
 				NodeID: ctx.NodeID,
-				Start:  uint64(clk.Time().Unix()),
-				End:    uint64(clk.Time().Add(time.Hour).Unix()),
+				Start:  clk.Time().Unix(),
+				End:    clk.Time().Add(time.Hour).Unix(),
 				Wght:   validatorWeight,
 			},
 			Subnet: subnetID,
@@ -187,8 +187,8 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		SubnetValidator: SubnetValidator{
 			Validator: Validator{
 				NodeID: ctx.NodeID,
-				Start:  uint64(clk.Time().Unix()),
-				End:    uint64(clk.Time().Add(time.Hour).Unix()),
+				Start:  clk.Time().Unix(),
+				End:    clk.Time().Add(time.Hour).Unix(),
 				Wght:   validatorWeight,
 			},
 			Subnet: subnetID,

@@ -34,7 +34,7 @@ func TestLockOutVerify(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:     "invalid locktime",
+			name:     "zero locktime",
 			locktime: 0,
 			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
 				return nil
@@ -92,7 +92,7 @@ func TestLockInVerify(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:     "invalid locktime",
+			name:     "zero locktime",
 			locktime: 0,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
 				return nil

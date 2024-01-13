@@ -20,14 +20,14 @@ var _ OutboundMsgBuilder = (*outMsgBuilder)(nil)
 type OutboundMsgBuilder interface {
 	Handshake(
 		networkID uint32,
-		myTime uint64,
+		myTime int64,
 		ip ips.IPPort,
 		myVersion string,
 		client string,
 		major uint32,
 		minor uint32,
 		patch uint32,
-		ipSigningTime uint64,
+		ipSigningTime int64,
 		sig []byte,
 		trackedSubnets []ids.ID,
 		supportedACPs []uint32,
@@ -232,14 +232,14 @@ func (b *outMsgBuilder) Pong(
 
 func (b *outMsgBuilder) Handshake(
 	networkID uint32,
-	myTime uint64,
+	myTime int64,
 	ip ips.IPPort,
 	myVersion string,
 	client string,
 	major uint32,
 	minor uint32,
 	patch uint32,
-	ipSigningTime uint64,
+	ipSigningTime int64,
 	sig []byte,
 	trackedSubnets []ids.ID,
 	supportedACPs []uint32,
@@ -252,11 +252,11 @@ func (b *outMsgBuilder) Handshake(
 			Message: &p2p.Message_Handshake{
 				Handshake: &p2p.Handshake{
 					NetworkId:      networkID,
-					MyTime:         myTime,
+					MyTime:         uint64(myTime),
 					IpAddr:         ip.IP.To16(),
 					IpPort:         uint32(ip.Port),
 					MyVersion:      myVersion,
-					IpSigningTime:  ipSigningTime,
+					IpSigningTime:  uint64(ipSigningTime),
 					Sig:            sig,
 					TrackedSubnets: subnetIDBytes,
 					Client: &p2p.Client{
@@ -282,7 +282,7 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 			X509Certificate: p.Cert.Raw,
 			IpAddr:          p.IPPort.IP.To16(),
 			IpPort:          uint32(p.IPPort.Port),
-			Timestamp:       p.Timestamp,
+			Timestamp:       uint64(p.Timestamp),
 			Signature:       p.Signature,
 			TxId:            p.TxID[:],
 		}

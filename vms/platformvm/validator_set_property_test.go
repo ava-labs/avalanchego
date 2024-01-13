@@ -282,8 +282,8 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 	addr := keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		vm.Config.MinValidatorStake,
-		uint64(data.startTime.Unix()),
-		uint64(data.endTime.Unix()),
+		data.startTime.Unix(),
+		data.endTime.Unix(),
 		data.nodeID,
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
@@ -322,8 +322,8 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		}},
 		Validator: txs.Validator{
 			NodeID: data.nodeID,
-			Start:  uint64(data.startTime.Unix()),
-			End:    uint64(data.endTime.Unix()),
+			Start:  data.startTime.Unix(),
+			End:    data.endTime.Unix(),
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,
@@ -359,8 +359,8 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.
 	addr := keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.Config.MinValidatorStake,
-		uint64(data.startTime.Unix()),
-		uint64(data.endTime.Unix()),
+		data.startTime.Unix(),
+		data.endTime.Unix(),
 		data.nodeID,
 		addr,
 		reward.PercentDenominator,
@@ -840,8 +840,8 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	endTime := mockable.MaxTime
 	genesisValidator := api.GenesisPermissionlessValidator{
 		GenesisValidator: api.GenesisValidator{
-			StartTime: json.Uint64(starTime.Unix()),
-			EndTime:   json.Uint64(endTime.Unix()),
+			StartTime: json.Int64(starTime.Unix()),
+			EndTime:   json.Int64(endTime.Unix()),
 			NodeID:    nodeID,
 		},
 		RewardOwner: &api.Owner{

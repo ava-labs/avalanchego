@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						End:    uint64(alphaValidatorsEndTime.Unix()),
+						End:    alphaValidatorsEndTime.Unix(),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -155,7 +155,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						End:    uint64(betaValidatorEndTime.Unix()),
+						End:    betaValidatorEndTime.Unix(),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						End:    uint64(gammaDelegatorEndTime.Unix()),
+						End:    gammaDelegatorEndTime.Unix(),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -211,7 +211,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						End:    uint64(deltaDelegatorEndTime.Unix()),
+						End:    deltaDelegatorEndTime.Unix(),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,

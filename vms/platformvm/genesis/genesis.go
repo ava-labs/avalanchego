@@ -19,7 +19,7 @@ type Genesis struct {
 	UTXOs         []*UTXO   `serialize:"true"`
 	Validators    []*txs.Tx `serialize:"true"`
 	Chains        []*txs.Tx `serialize:"true"`
-	Timestamp     uint64    `serialize:"true"`
+	Timestamp     int64     `serialize:"true"`
 	InitialSupply uint64    `serialize:"true"`
 	Message       string    `serialize:"true"`
 }

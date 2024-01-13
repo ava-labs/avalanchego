@@ -18,7 +18,7 @@ import (
 // validator.
 type UnsignedIP struct {
 	ips.IPPort
-	Timestamp uint64
+	Timestamp int64
 }
 
 // Sign this IP with the provided signer and return the signed IP.
@@ -39,7 +39,7 @@ func (ip *UnsignedIP) bytes() []byte {
 		Bytes: make([]byte, wrappers.IPLen+wrappers.LongLen),
 	}
 	ips.PackIP(&p, ip.IPPort)
-	p.PackLong(ip.Timestamp)
+	p.PackLong(uint64(ip.Timestamp))
 	return p.Bytes
 }
 

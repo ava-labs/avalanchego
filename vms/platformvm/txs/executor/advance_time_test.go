@@ -377,8 +377,8 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			for _, staker := range test.subnetStakers {
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 					10, // Weight
-					uint64(staker.startTime.Unix()),
-					uint64(staker.endTime.Unix()),
+					staker.startTime.Unix(),
+					staker.endTime.Unix(),
 					staker.nodeID, // validator ID
 					subnetID,      // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -472,11 +472,11 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-		1,                                  // Weight
-		uint64(subnetVdr1StartTime.Unix()), // Start time
-		uint64(subnetVdr1EndTime.Unix()),   // end time
-		subnetValidatorNodeID,              // Node ID
-		subnetID,                           // Subnet ID
+		1,                          // Weight
+		subnetVdr1StartTime.Unix(), // Start time
+		subnetVdr1EndTime.Unix(),   // end time
+		subnetValidatorNodeID,      // Node ID
+		subnetID,                   // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
 	)
@@ -502,8 +502,8 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetVdr2NodeID := genesisNodeIDs[1]
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
-		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
-		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
+		subnetVdr1EndTime.Add(time.Second).Unix(),                                // Start time
+		subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix(), // end time
 		subnetVdr2NodeID, // Node ID
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]}, // Keys
@@ -579,11 +579,11 @@ func TestTrackedSubnet(t *testing.T) {
 			subnetVdr1StartTime := defaultValidateStartTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultValidateStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-				1,                                  // Weight
-				uint64(subnetVdr1StartTime.Unix()), // Start time
-				uint64(subnetVdr1EndTime.Unix()),   // end time
-				subnetValidatorNodeID,              // Node ID
-				subnetID,                           // Subnet ID
+				1,                          // Weight
+				subnetVdr1StartTime.Unix(), // Start time
+				subnetVdr1EndTime.Unix(),   // end time
+				subnetValidatorNodeID,      // Node ID
+				subnetID,                   // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
 			)
@@ -684,8 +684,8 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
 		env.config.MinDelegatorStake,
-		uint64(pendingDelegatorStartTime.Unix()),
-		uint64(pendingDelegatorEndTime.Unix()),
+		pendingDelegatorStartTime.Unix(),
+		pendingDelegatorEndTime.Unix(),
 		nodeID,
 		preFundedKeys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{
@@ -784,8 +784,8 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
 		env.config.MinDelegatorStake,
-		uint64(pendingDelegatorStartTime.Unix()),
-		uint64(pendingDelegatorEndTime.Unix()),
+		pendingDelegatorStartTime.Unix(),
+		pendingDelegatorEndTime.Unix(),
 		nodeID,
 		preFundedKeys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
@@ -931,8 +931,8 @@ func addPendingValidator(
 ) (*txs.Tx, error) {
 	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		startTime.Unix(),
+		endTime.Unix(),
 		nodeID,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,

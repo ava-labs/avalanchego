@@ -60,8 +60,8 @@ func main() {
 	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(startTime.Unix()),
-			End:    uint64(startTime.Add(duration).Unix()),
+			Start:  startTime.Unix(),
+			End:    startTime.Add(duration).Unix(),
 			Wght:   weight,
 		}},
 		nodePOP,

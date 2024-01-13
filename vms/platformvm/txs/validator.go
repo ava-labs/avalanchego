@@ -21,10 +21,10 @@ type Validator struct {
 	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 
 	// Unix time this validator starts validating
-	Start uint64 `serialize:"true" json:"start"`
+	Start int64 `serialize:"true" json:"start"`
 
 	// Unix time this validator stops validating
-	End uint64 `serialize:"true" json:"end"`
+	End int64 `serialize:"true" json:"end"`
 
 	// Weight of this validator used when sampling
 	Wght uint64 `serialize:"true" json:"weight"`
@@ -32,12 +32,12 @@ type Validator struct {
 
 // StartTime is the time that this validator will enter the validator set
 func (v *Validator) StartTime() time.Time {
-	return time.Unix(int64(v.Start), 0)
+	return time.Unix(v.Start, 0)
 }
 
 // EndTime is the time that this validator will leave the validator set
 func (v *Validator) EndTime() time.Time {
-	return time.Unix(int64(v.End), 0)
+	return time.Unix(v.End, 0)
 }
 
 // Weight is this validator's weight when sampling

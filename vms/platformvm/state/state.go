@@ -1310,7 +1310,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
-	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
+	s.SetTimestamp(time.Unix(genesis.Timestamp, 0))
 	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
 	s.AddStatelessBlock(genesisBlk)
 
@@ -1475,7 +1475,7 @@ func (s *state) loadCurrentValidators() error {
 			//
 			// Note: We do not populate [LastUpdated] since it is expected to
 			// always be present on disk.
-			metadata.StakerStartTime = uint64(scheduledStakerTx.StartTime().Unix())
+			metadata.StakerStartTime = scheduledStakerTx.StartTime().Unix()
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
@@ -1484,7 +1484,7 @@ func (s *state) loadCurrentValidators() error {
 		staker, err := NewCurrentStaker(
 			txID,
 			stakerTx,
-			time.Unix(int64(metadata.StakerStartTime), 0),
+			time.Unix(metadata.StakerStartTime, 0),
 			metadata.PotentialReward)
 		if err != nil {
 			return err
@@ -1523,7 +1523,7 @@ func (s *state) loadCurrentValidators() error {
 		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
 			// Populate [StakerStartTime] and [LastUpdated] using the tx as a
 			// default in the event they are not stored in the database.
-			startTime := uint64(scheduledStakerTx.StartTime().Unix())
+			startTime := scheduledStakerTx.StartTime().Unix()
 			metadata.StakerStartTime = startTime
 			metadata.LastUpdated = startTime
 		}
@@ -1534,7 +1534,7 @@ func (s *state) loadCurrentValidators() error {
 		staker, err := NewCurrentStaker(
 			txID,
 			stakerTx,
-			time.Unix(int64(metadata.StakerStartTime), 0),
+			time.Unix(metadata.StakerStartTime, 0),
 			metadata.PotentialReward,
 		)
 		if err != nil {
@@ -1579,7 +1579,7 @@ func (s *state) loadCurrentValidators() error {
 				// Populate [StakerStartTime] using the tx as a default in the
 				// event it was added pre-durango and is not stored in the
 				// database.
-				metadata.StakerStartTime = uint64(scheduledStakerTx.StartTime().Unix())
+				metadata.StakerStartTime = scheduledStakerTx.StartTime().Unix()
 			}
 			err = parseDelegatorMetadata(metadataBytes, metadata)
 			if err != nil {
@@ -1589,7 +1589,7 @@ func (s *state) loadCurrentValidators() error {
 			staker, err := NewCurrentStaker(
 				txID,
 				stakerTx,
-				time.Unix(int64(metadata.StakerStartTime), 0),
+				time.Unix(metadata.StakerStartTime, 0),
 				metadata.PotentialReward,
 			)
 			if err != nil {
@@ -2029,7 +2029,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 				//
 				// Invariant: It's impossible for a delegator to have been
 				// rewarded in the same block that the validator was added.
-				startTime := uint64(staker.StartTime.Unix())
+				startTime := staker.StartTime.Unix()
 				metadata := &validatorMetadata{
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
@@ -2184,7 +2184,7 @@ func writeCurrentDelegatorDiff(
 		metadata := &delegatorMetadata{
 			txID:            staker.TxID,
 			PotentialReward: staker.PotentialReward,
-			StakerStartTime: uint64(staker.StartTime.Unix()),
+			StakerStartTime: staker.StartTime.Unix(),
 		}
 		if err := writeDelegatorMetadata(currentDelegatorList, metadata, codecVersion); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)

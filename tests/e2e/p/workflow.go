@@ -76,7 +76,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			vdr := &txs.Validator{
 				NodeID: validatorID,
-				End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
+				End:    time.Now().Add(72 * time.Hour).Unix(),
 				Wght:   minValStake,
 			}
 			rewardOwner := &secp256k1fx.OutputOwners{

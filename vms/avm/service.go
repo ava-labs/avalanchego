@@ -633,9 +633,11 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
 
-	now := s.vm.clock.Unix()
-	assetIDs := set.Set[ids.ID]{}       // IDs of assets the address has a non-zero balance of
-	balances := make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
+	var (
+		now      = s.vm.clock.Unix()
+		assetIDs = set.Set[ids.ID]{}       // IDs of assets the address has a non-zero balance of
+		balances = make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
+	)
 	for _, utxo := range utxos {
 		// TODO make this not specific to *secp256k1fx.TransferOutput
 		transferable, ok := utxo.Out.(*secp256k1fx.TransferOutput)

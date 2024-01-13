@@ -103,7 +103,7 @@ func NewTestGenesis(
 				},
 			},
 		},
-		StartTime:                  uint64(now.Unix()),
+		StartTime:                  now.Unix(),
 		InitialStakedFunds:         []string{stakeAddress},
 		InitialStakeDuration:       365 * 24 * 60 * 60, // 1 year
 		InitialStakeDurationOffset: 90 * 60,            // 90 minutes

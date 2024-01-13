@@ -85,8 +85,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		}},
 		Validator: Validator{
 			NodeID: ctx.NodeID,
-			Start:  uint64(clk.Time().Unix()),
-			End:    uint64(clk.Time().Add(time.Hour).Unix()),
+			Start:  clk.Time().Unix(),
+			End:    clk.Time().Add(time.Hour).Unix(),
 			Wght:   validatorWeight,
 		},
 		StakeOuts: stakes,
@@ -184,8 +184,8 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 		}},
 		Validator: Validator{
 			NodeID: ctx.NodeID,
-			Start:  uint64(clk.Time().Unix()),
-			End:    uint64(clk.Time().Add(time.Hour).Unix()),
+			Start:  clk.Time().Unix(),
+			End:    clk.Time().Add(time.Hour).Unix(),
 			Wght:   validatorWeight,
 		},
 		StakeOuts: stakes,

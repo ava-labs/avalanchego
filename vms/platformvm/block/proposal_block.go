@@ -18,7 +18,7 @@ var (
 )
 
 type BanffProposalBlock struct {
-	Time                 uint64    `serialize:"true" json:"time"`
+	Time                 int64     `serialize:"true" json:"time"`
 	Transactions         []*txs.Tx `serialize:"true" json:"txs"`
 	ApricotProposalBlock `serialize:"true"`
 }
@@ -43,7 +43,7 @@ func (b *BanffProposalBlock) InitCtx(ctx *snow.Context) {
 }
 
 func (b *BanffProposalBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+	return time.Unix(b.Time, 0)
 }
 
 func (b *BanffProposalBlock) Txs() []*txs.Tx {
@@ -67,7 +67,7 @@ func NewBanffProposalBlock(
 ) (*BanffProposalBlock, error) {
 	blk := &BanffProposalBlock{
 		Transactions: decisionTxs,
-		Time:         uint64(timestamp.Unix()),
+		Time:         timestamp.Unix(),
 		ApricotProposalBlock: ApricotProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID: parentID,
