@@ -25,6 +25,8 @@ type UnsignedTx interface {
 	Outputs() []*avax.TransferableOutput
 
 	// Attempts to verify this transaction without any provided state.
+	// Note that some other syntactic checks may depend on state so they
+	// are not carried out in this method
 	SyntacticVerify(ctx *snow.Context) error
 
 	// Visit calls [visitor] with this transaction's concrete type
