@@ -8,6 +8,8 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
 // Represents peer-to-peer messages.
 // Only one type can be non-null.
 message Message {
+  reserved 33; // Until after durango activation.
+  reserved 36; // Next unused field number.
   // NOTES
   // Use "oneof" for each message type and set rest to null if not used.
   // That is because when the compression is enabled, we don't want to include uncompressed fields.
@@ -57,7 +59,6 @@ message Message {
     AppRequest app_request = 30;
     AppResponse app_response = 31;
     AppGossip app_gossip = 32;
-    // 33 is reserved until after durango activates.
     AppError app_error = 34;
   }
 }
