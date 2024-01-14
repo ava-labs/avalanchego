@@ -78,7 +78,6 @@ func New(config node.Config) (App, error) {
 	}
 
 	return &app{
-		config:     config,
 		node:       n,
 		log:        log,
 		logFactory: logFactory,
@@ -123,7 +122,6 @@ func Run(app App) int {
 
 // app is a wrapper around a node that runs in this process
 type app struct {
-	config     node.Config
 	node       *node.Node
 	log        logging.Logger
 	logFactory logging.Factory
