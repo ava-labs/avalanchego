@@ -427,6 +427,8 @@ func getNetworkConfig(
 			PeerListNonValidatorGossipSize: v.GetUint32(NetworkPeerListNonValidatorGossipSizeKey),
 			PeerListPeersGossipSize:        v.GetUint32(NetworkPeerListPeersGossipSizeKey),
 			PeerListGossipFreq:             v.GetDuration(NetworkPeerListGossipFreqKey),
+			PeerListPullGossipFreq:         v.GetDuration(NetworkPeerListPullGossipFreqKey),
+			PeerListBloomResetFreq:         v.GetDuration(NetworkPeerListBloomResetFreqKey),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -462,6 +464,10 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
 	case config.PeerListGossipFreq < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
+	case config.PeerListPullGossipFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListPullGossipFreqKey)
+	case config.PeerListBloomResetFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListBloomResetFreqKey)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.CPUThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
 		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.DiskThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:

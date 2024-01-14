@@ -232,6 +232,21 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetAncestors(arg0, arg1, arg2, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAncestors", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetAncestors), arg0, arg1, arg2, arg3, arg4)
 }
 
+// GetPeerList mocks base method.
+func (m *MockOutboundMsgBuilder) GetPeerList(arg0, arg1 []byte) (OutboundMessage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPeerList", arg0, arg1)
+	ret0, _ := ret[0].(OutboundMessage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPeerList indicates an expected call of GetPeerList.
+func (mr *MockOutboundMsgBuilderMockRecorder) GetPeerList(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPeerList", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetPeerList), arg0, arg1)
+}
+
 // GetStateSummaryFrontier mocks base method.
 func (m *MockOutboundMsgBuilder) GetStateSummaryFrontier(arg0 ids.ID, arg1 uint32, arg2 time.Duration) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
@@ -248,22 +263,22 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 }
 
 // Handshake mocks base method.
-func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Handshake(arg0 uint32, arg1 uint64, arg2 ips.IPPort, arg3, arg4 string, arg5, arg6, arg7 uint32, arg8 uint64, arg9 []byte, arg10 []ids.ID, arg11, arg12 []uint32, arg13, arg14 []byte) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Handshake", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
+	ret := m.ctrl.Call(m, "Handshake", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Handshake indicates an expected call of Handshake.
-func (mr *MockOutboundMsgBuilderMockRecorder) Handshake(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12 interface{}) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Handshake(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Handshake), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Handshake), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
 }
 
 // PeerList mocks base method.
-func (m *MockOutboundMsgBuilder) PeerList(arg0 []ips.ClaimedIPPort, arg1 bool) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) PeerList(arg0 []*ips.ClaimedIPPort, arg1 bool) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PeerList", arg0, arg1)
 	ret0, _ := ret[0].(OutboundMessage)
@@ -275,21 +290,6 @@ func (m *MockOutboundMsgBuilder) PeerList(arg0 []ips.ClaimedIPPort, arg1 bool) (
 func (mr *MockOutboundMsgBuilderMockRecorder) PeerList(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeerList", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PeerList), arg0, arg1)
-}
-
-// PeerListAck mocks base method.
-func (m *MockOutboundMsgBuilder) PeerListAck(arg0 []*p2p.PeerAck) (OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PeerListAck", arg0)
-	ret0, _ := ret[0].(OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PeerListAck indicates an expected call of PeerListAck.
-func (mr *MockOutboundMsgBuilderMockRecorder) PeerListAck(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeerListAck", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PeerListAck), arg0)
 }
 
 // Ping mocks base method.
