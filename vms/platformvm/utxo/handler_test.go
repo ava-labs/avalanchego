@@ -74,10 +74,10 @@ func TestVerifyFinanceTx(t *testing.T) {
 	var (
 		amountToStake = units.MilliAvax
 
-		bigUtxoTxID   = ids.GenerateTestID()
+		bigUtxoTxID   = ids.ID{0x0, 0x1}
 		bigUtxoKey    = keys[0]
 		bigUtxoAddr   = bigUtxoKey.PublicKey().Address()
-		bigUtxoAmount = 6 * units.MilliAvax
+		bigUtxoAmount = 10 * units.MilliAvax
 		bigUtxo       = &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        bigUtxoTxID,
@@ -95,7 +95,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 		}
 		bigUtxoID = bigUtxo.InputID()
 
-		smallUtxoTxID   = ids.GenerateTestID()
+		smallUtxoTxID   = ids.ID{0x0, 0x2}
 		smallUtxoKey    = keys[1]
 		smallUtxoAddr   = smallUtxoKey.PublicKey().Address()
 		smallUtxoAmount = 2 * units.MilliAvax
@@ -116,7 +116,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 		}
 		smallUtxoID = smallUtxo.InputID()
 
-		lockedUtxoTxID   = ids.GenerateTestID()
+		lockedUtxoTxID   = ids.ID{'c'}
 		lockedUtxoKey    = keys[2]
 		lockedUtxoAddr   = lockedUtxoKey.PublicKey().Address()
 		lockedUtxoAmount = amountToStake
@@ -140,6 +140,31 @@ func TestVerifyFinanceTx(t *testing.T) {
 			},
 		}
 		lockedUtxoID = lockedUtxo.InputID()
+
+		bigLockedUtxoTxID   = ids.ID{'d'}
+		bigLockedUtxoKey    = keys[2]
+		bigLockedUtxoAddr   = bigLockedUtxoKey.PublicKey().Address()
+		bigLockedUtxoAmount = amountToStake * 10
+
+		bigLockedUtxo = &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        bigLockedUtxoTxID,
+				OutputIndex: 0,
+			},
+			Asset: avax.Asset{ID: ctx.AVAXAssetID},
+			Out: &stakeable.LockOut{
+				Locktime: uint64(time.Now().Add(time.Hour).Unix()),
+				TransferableOut: &secp256k1fx.TransferOutput{
+					Amt: bigLockedUtxoAmount,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Addrs:     []ids.ShortID{bigLockedUtxoAddr},
+						Threshold: 1,
+					},
+				},
+			},
+		}
+		bigLockedUtxoID = bigLockedUtxo.InputID()
 	)
 
 	// this UTXOs ordering ensures that smallUtxo will be picked first,
@@ -159,6 +184,83 @@ func TestVerifyFinanceTx(t *testing.T) {
 		expectedErr error
 		checksF     func(*testing.T, txs.UnsignedTx, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
 	}{
+		{
+			description: "Tx, stake outputs, single locked UTXO and multiple UTXOs",
+			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().UTXOIDs(smallUtxoAddr.Bytes(), gomock.Any(), gomock.Any()).Return([]ids.ID{smallUtxoID}, nil).AnyTimes()
+				s.EXPECT().GetUTXO(smallUtxoID).Return(smallUtxo, nil).AnyTimes()
+
+				s.EXPECT().UTXOIDs(bigUtxoAddr.Bytes(), gomock.Any(), gomock.Any()).Return([]ids.ID{bigUtxoID}, nil).AnyTimes()
+				s.EXPECT().GetUTXO(bigUtxoID).Return(bigUtxo, nil).AnyTimes()
+
+				s.EXPECT().UTXOIDs(bigLockedUtxoAddr.Bytes(), gomock.Any(), gomock.Any()).Return([]ids.ID{bigLockedUtxoID}, nil).AnyTimes()
+				s.EXPECT().GetUTXO(bigLockedUtxoID).Return(bigLockedUtxo, nil).AnyTimes()
+
+				return s
+			},
+			keysF: func() []*secp256k1.PrivateKey {
+				return []*secp256k1.PrivateKey{smallUtxoKey, bigUtxoKey, bigLockedUtxoKey}
+			},
+
+			amountToStake: units.MilliAvax,
+			uTxF: func(t *testing.T) txs.UnsignedTx {
+				uTx := &txs.AddValidatorTx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    ctx.NetworkID,
+							BlockchainID: ctx.ChainID,
+							Ins:          make([]*avax.TransferableInput, 0),
+							Outs:         make([]*avax.TransferableOutput, 0),
+							Memo:         []byte{'a', 'b', 'c'},
+						},
+					},
+					Validator: txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  0,
+						End:    uint64(time.Now().Unix()),
+						Wght:   amountToStake,
+					},
+					StakeOuts: make([]*avax.TransferableOutput, 0),
+					RewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
+				}
+
+				bytes, err := txs.Codec.Marshal(txs.CodecVersion, uTx)
+				require.NoError(t, err)
+
+				uTx.SetBytes(bytes)
+				return uTx
+			},
+			expectedErr: nil,
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				r := require.New(t)
+				expectedFee := 8911 * units.MicroAvax
+
+				// complete uTx with the utxos
+				addVal, ok := uTx.(*txs.AddValidatorTx)
+				r.True(ok)
+
+				addVal.Ins = ins
+				addVal.Outs = outs
+				addVal.StakeOuts = staked
+
+				r.NoError(uTx.Visit(calc))
+				r.Equal(expectedFee, calc.Fee)
+
+				r.Len(ins, 3)
+				r.Len(staked, 1)
+				r.Len(outs, 2)
+
+				r.Equal(amountToStake, staked[0].Out.Amount())
+				r.Equal(amountToStake, ins[0].In.Amount()-outs[1].Out.Amount())
+				r.Equal(expectedFee, ins[1].In.Amount()+ins[2].In.Amount()-outs[0].Out.Amount())
+			},
+		},
 		{
 			description: "Tx, stake outputs, single locked and unlocked UTXOs",
 			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
@@ -225,11 +327,14 @@ func TestVerifyFinanceTx(t *testing.T) {
 				r.Len(ins, 2)
 				r.Len(staked, 1)
 				r.Len(outs, 1)
-				r.Equal(expectedFee, ins[1].In.Amount()-outs[0].Out.Amount())
+
+				r.Equal(amountToStake, staked[0].Out.Amount())
+				r.Equal(amountToStake, ins[1].In.Amount())
+				r.Equal(expectedFee, ins[0].In.Amount()-outs[0].Out.Amount())
 			},
 		},
 		{
-			description: "Tx, stake outputs,, multiple UTXOs",
+			description: "Tx, stake outputs, multiple UTXOs",
 			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().UTXOIDs(smallUtxoAddr.Bytes(), gomock.Any(), gomock.Any()).Return([]ids.ID{smallUtxoID}, nil).AnyTimes()
@@ -296,7 +401,9 @@ func TestVerifyFinanceTx(t *testing.T) {
 				r.Len(ins, 2)
 				r.Len(staked, 1)
 				r.Len(outs, 1)
-				r.Equal(expectedFee, ins[0].In.Amount()+ins[1].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
+
+				r.Equal(amountToStake, staked[0].Out.Amount())
+				r.Equal(expectedFee, ins[0].In.Amount()+ins[1].In.Amount()-amountToStake-outs[0].Out.Amount())
 			},
 		},
 		{
@@ -363,7 +470,9 @@ func TestVerifyFinanceTx(t *testing.T) {
 				r.Len(ins, 1)
 				r.Len(staked, 1)
 				r.Len(outs, 1)
-				r.Equal(expectedFee, ins[0].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
+
+				r.Equal(amountToStake, staked[0].Out.Amount())
+				r.Equal(expectedFee, ins[0].In.Amount()-amountToStake-outs[0].Out.Amount())
 			},
 		},
 		{
