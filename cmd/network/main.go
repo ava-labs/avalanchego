@@ -16,12 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
@@ -30,9 +31,11 @@ import (
 )
 
 // TODO
+// - add nodeID and weight to output
 // - add mapping from query to response type to support more query types
-// - add ability to specify parameters to query type
-// - improve Chits String() function (may need an intermediate type since it currently uses proto)
+// - add example of how to use this with App-specific query/response (pipeline from peer to desired result) (use ./peer | ./decode or xargs ./decode or something to pass JSON to AppSpecific message decoder from coreth)
+// - add ability to specify parameters to query type (use JSON unmarshal)
+// - improve Chits String() function (use proto JSON function)
 
 func main() {
 	if err := run(); err != nil {
@@ -54,9 +57,28 @@ func run() error {
 	return queryPeers(context.Background(), v)
 }
 
-func getPeers(ctx context.Context, v *viper.Viper) ([]ips.IPPort, error) {
-	var ipsSlice []ips.IPPort
+type peer struct {
+	nodeID ids.NodeID
+	ip     ips.IPPort
+	weight uint64
+}
 
+func getPeers(ctx context.Context, v *viper.Viper) ([]peer, error) {
+	var (
+		ipsSlice   []ips.IPPort
+		uri        = v.GetString(UriKey)
+		infoClient = info.NewClient(uri)
+		peers      []peer
+	)
+
+	peersInfo, err := infoClient.Peers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	peerMap := bimap.New[ids.NodeID, string]() // NodeID <-> PublicIP string
+	for _, peer := range peersInfo {
+		peerMap.Put(peer.ID, peer.PublicIP)
+	}
 	switch {
 	case v.IsSet(IPPortKey):
 		ipStrSlice := v.GetStringSlice(IPPortKey)
@@ -68,15 +90,10 @@ func getPeers(ctx context.Context, v *viper.Viper) ([]ips.IPPort, error) {
 			}
 			ipsSlice = append(ipsSlice, ip)
 		}
+
 	default:
-		uri := v.GetString(UriKey)
-		infoClient := info.NewClient(uri)
-		peers, err := infoClient.Peers(ctx)
-		if err != nil {
-			return nil, err
-		}
 		ipsSlice = make([]ips.IPPort, 0, len(peers))
-		for _, peerInfo := range peers {
+		for _, peerInfo := range peersInfo {
 			ip, err := ips.ToIPPort(peerInfo.PublicIP)
 			if err != nil {
 				return nil, err
@@ -88,6 +105,10 @@ func getPeers(ctx context.Context, v *viper.Viper) ([]ips.IPPort, error) {
 	if limit := v.GetInt(PeerLimitKey); limit > 0 && len(ipsSlice) > limit {
 		ipsSlice = ipsSlice[:limit]
 	}
+
+	pChainClient := platformvm.NewClient(uri)
+	pChainClient.GetCurrentValidators(ctx, ids.Empty)
+
 	return ipsSlice, nil
 }
 
@@ -245,11 +266,13 @@ func queryPeers(ctx context.Context, v *viper.Viper) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
-	if err := csvWriter.Write([]string{"NodeIP", "Chits"}); err != nil {
+	if err := csvWriter.Write([]string{"NodeID", "Weight", "NodeIP", "Chits"}); err != nil {
 		return err
 	}
 	for i, chits := range chitResponses {
 		csvWriter.Write([]string{
+			"", // TODO
+			"",
 			peerIPs[i].String(),
 			fmt.Sprintf("%v", chits),
 		})
