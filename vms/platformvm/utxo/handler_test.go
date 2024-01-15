@@ -128,8 +128,6 @@ func TestVerifyFinanceTx(t *testing.T) {
 		keysF         func() []*secp256k1.PrivateKey
 		amountToStake uint64
 		uTxF          func(t *testing.T) txs.UnsignedTx
-		feeCalcF      func() *fees.Calculator
-		changeAddr    ids.ShortID
 
 		expectedErr error
 		checksF     func(*testing.T, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
@@ -182,16 +180,6 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				uTx.SetBytes(bytes)
 				return uTx
-			},
-			feeCalcF: func() *fees.Calculator {
-				fm := commonfees.NewManager(cfg.DefaultUnitFees)
-				feesCalc := fees.Calculator{
-					FeeManager:  fm,
-					Config:      cfg,
-					ChainTime:   time.Time{},
-					Credentials: []verify.Verifiable{},
-				}
-				return &feesCalc
 			},
 			expectedErr: nil,
 			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
@@ -247,16 +235,6 @@ func TestVerifyFinanceTx(t *testing.T) {
 				uTx.SetBytes(bytes)
 				return uTx
 			},
-			feeCalcF: func() *fees.Calculator {
-				fm := commonfees.NewManager(cfg.DefaultUnitFees)
-				feesCalc := fees.Calculator{
-					FeeManager:  fm,
-					Config:      cfg,
-					ChainTime:   time.Time{},
-					Credentials: []verify.Verifiable{},
-				}
-				return &feesCalc
-			},
 			expectedErr: nil,
 			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				expectedFee := 3341 * units.MicroAvax
@@ -301,16 +279,6 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				uTx.SetBytes(bytes)
 				return uTx
-			},
-			feeCalcF: func() *fees.Calculator {
-				fm := commonfees.NewManager(cfg.DefaultUnitFees)
-				feesCalc := fees.Calculator{
-					FeeManager:  fm,
-					Config:      cfg,
-					ChainTime:   time.Time{},
-					Credentials: []verify.Verifiable{},
-				}
-				return &feesCalc
 			},
 			expectedErr: nil,
 			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
@@ -361,16 +329,6 @@ func TestVerifyFinanceTx(t *testing.T) {
 				uTx.SetBytes(bytes)
 				return uTx
 			},
-			feeCalcF: func() *fees.Calculator {
-				fm := commonfees.NewManager(cfg.DefaultUnitFees)
-				feesCalc := fees.Calculator{
-					FeeManager:  fm,
-					Config:      cfg,
-					ChainTime:   time.Time{},
-					Credentials: []verify.Verifiable{},
-				}
-				return &feesCalc
-			},
 			expectedErr: nil,
 			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				expectedFee := 5552 * units.MicroAvax
@@ -398,16 +356,6 @@ func TestVerifyFinanceTx(t *testing.T) {
 				unsignedTx.SetBytes([]byte{0})
 				return &unsignedTx
 			},
-			feeCalcF: func() *fees.Calculator {
-				fm := commonfees.NewManager(cfg.DefaultUnitFees)
-				feesCalc := fees.Calculator{
-					FeeManager:  fm,
-					Config:      cfg,
-					ChainTime:   time.Time{},
-					Credentials: []verify.Verifiable{},
-				}
-				return &feesCalc
-			},
 			expectedErr: nil,
 			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				require.Zero(t, calc.Fee)
@@ -424,7 +372,14 @@ func TestVerifyFinanceTx(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			uTx := test.uTxF(t)
-			feeCalc := test.feeCalcF()
+
+			fm := commonfees.NewManager(cfg.DefaultUnitFees)
+			feeCalc := &fees.Calculator{
+				FeeManager:  fm,
+				Config:      cfg,
+				ChainTime:   time.Time{},
+				Credentials: []verify.Verifiable{},
+			}
 
 			// init fee calc with the uTx data
 			r.NoError(uTx.Visit(feeCalc))
@@ -434,7 +389,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 				test.keysF(),
 				test.amountToStake,
 				feeCalc,
-				test.changeAddr,
+				ids.GenerateTestShortID(),
 			)
 			r.ErrorIs(err, test.expectedErr)
 			test.checksF(t, feeCalc, ins, outs, staked)
