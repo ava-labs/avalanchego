@@ -485,6 +485,14 @@ func (h *handler) FinanceTx(
 			)
 			continue
 		}
+		input := &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			In: &stakeable.LockIn{
+				Locktime:       out.Locktime,
+				TransferableIn: in,
+			},
+		}
 
 		// The remaining value is initially the full value of the input
 		remainingValue := in.Amount()
@@ -498,17 +506,9 @@ func (h *handler) FinanceTx(
 		remainingValue -= amountToStake
 
 		// Add the input to the consumed inputs
-		ins = append(ins, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
-			In: &stakeable.LockIn{
-				Locktime:       out.Locktime,
-				TransferableIn: in,
-			},
-		})
+		ins = append(ins, input)
 
-		// Add the output to the staked outputs
-		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
+		stakedOut := &avax.TransferableOutput{
 			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 			Out: &stakeable.LockOut{
 				Locktime: out.Locktime,
@@ -517,12 +517,15 @@ func (h *handler) FinanceTx(
 					OutputOwners: inner.OutputOwners,
 				},
 			},
-		})
+		}
+
+		// Add the output to the staked outputs
+		stakedOuts = append(stakedOuts, stakedOut)
 
 		if remainingValue > 0 {
 			// This input provided more value than was needed to be locked.
 			// Some of it must be returned
-			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
+			changeOut := &avax.TransferableOutput{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &stakeable.LockOut{
 					Locktime: out.Locktime,
@@ -531,7 +534,8 @@ func (h *handler) FinanceTx(
 						OutputOwners: inner.OutputOwners,
 					},
 				},
-			})
+			}
+			returnedOuts = append(returnedOuts, changeOut)
 		}
 
 		// Add the signers needed for this input to the set of signers
