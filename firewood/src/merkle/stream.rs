@@ -102,23 +102,11 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
                         )
                         .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
-                    let mut visited_node_path = visited_node_path
+                    let visited_node_path = visited_node_path
                         .into_iter()
                         .map(|(node, pos)| merkle.get_node(node).map(|node| (node, pos)))
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(|e| api::Error::InternalError(Box::new(e)))?;
-
-                    let last_visited_node_not_branch = visited_node_path
-                        .last()
-                        .map(|(node, _)| {
-                            matches!(node.inner(), NodeType::Leaf(_) | NodeType::Extension(_))
-                        })
-                        .unwrap_or_default();
-
-                    // we only want branch in the visited node-path to start
-                    if last_visited_node_not_branch {
-                        visited_node_path.pop();
-                    }
 
                     (found_node, visited_node_path)
                 };
@@ -141,6 +129,13 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
                     self.key_state = IteratorState::Iterating { visited_node_path };
 
                     return Poll::Ready(next_result);
+                }
+
+                let found_key = nibble_iter_from_parents(&visited_node_path);
+                let found_key = key_from_nibble_iter(found_key);
+
+                if found_key > *key {
+                    visited_node_path.pop();
                 }
 
                 self.key_state = IteratorState::Iterating { visited_node_path };
@@ -750,7 +745,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_at_key_greater_than_all_others() {
+    async fn start_at_key_greater_than_all_others_leaf() {
+        let key = vec![0x00];
+        let greater_key = vec![0xff];
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+        merkle.insert(key.clone(), key, root).unwrap();
+        let stream = merkle.iter_from(root, greater_key.into_boxed_slice());
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn start_at_key_greater_than_all_others_branch() {
         let greatest = 0xff;
         let children = (0..=0xf)
             .map(|val| (val << 4) + val) // 0x00, 0x11, ... 0xff
