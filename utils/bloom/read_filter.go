@@ -8,6 +8,23 @@ import (
 	"fmt"
 )
 
+var (
+	EmptyFilter = &ReadFilter{
+		hashSeeds: make([]uint64, minHashes),
+		entries:   make([]byte, minEntries),
+	}
+	FullFilter = &ReadFilter{
+		hashSeeds: make([]uint64, minHashes),
+		entries:   make([]byte, minEntries),
+	}
+)
+
+func init() {
+	for i := range FullFilter.entries {
+		FullFilter.entries[i] = 0xFF
+	}
+}
+
 type ReadFilter struct {
 	hashSeeds []uint64
 	entries   []byte

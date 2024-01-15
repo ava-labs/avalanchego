@@ -36,10 +36,15 @@ type Bootstrapper struct {
 	IP ips.IPDesc `json:"ip"`
 }
 
+// GetBootstrappers returns all default bootstrappers for the provided network.
+func GetBootstrappers(networkID uint32) []Bootstrapper {
+	networkName := constants.NetworkIDToNetworkName[networkID]
+	return bootstrappersPerNetwork[networkName]
+}
+
 // SampleBootstrappers returns the some beacons this node should connect to
 func SampleBootstrappers(networkID uint32, count int) []Bootstrapper {
-	networkName := constants.NetworkIDToNetworkName[networkID]
-	bootstrappers := bootstrappersPerNetwork[networkName]
+	bootstrappers := GetBootstrappers(networkID)
 	count = math.Min(count, len(bootstrappers))
 
 	s := sampler.NewUniform()
