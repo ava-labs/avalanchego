@@ -357,11 +357,42 @@ func (b *builder) NewExportTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn, err := math.Add64(amount, b.cfg.TxFee)
-	if err != nil {
-		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
+	var (
+		chainTime = b.state.GetTimestamp()
+		ins       []*avax.TransferableInput
+		outs      []*avax.TransferableOutput
+		signers   [][]*secp256k1.PrivateKey
+		err       error
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.ExportTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		var toBurn uint64
+		toBurn, err = math.Add64(amount, b.cfg.TxFee)
+		if err != nil {
+			return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
+		}
+		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, toBurn, changeAddr)
 	}
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -408,9 +439,38 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	timestamp := b.state.GetTimestamp()
-	createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, createBlockchainTxFee, changeAddr)
+	var (
+		chainTime = b.state.GetTimestamp()
+		ins       []*avax.TransferableInput
+		outs      []*avax.TransferableOutput
+		signers   [][]*secp256k1.PrivateKey
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.CreateChainTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		timestamp := b.state.GetTimestamp()
+		createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
+		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, createBlockchainTxFee, changeAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -458,10 +518,10 @@ func (b *builder) NewCreateSubnetTx(
 	if b.cfg.IsEForkActivated(chainTime) {
 		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
 		feeCalc := &fees.Calculator{
-			FeeManager: feesMan,
-			Config:     b.cfg,
-			ChainTime:  b.state.GetTimestamp(),
-			// Credentials: ,
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -526,13 +586,44 @@ func (b *builder) NewAddValidatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	var (
+		chainTime  = b.state.GetTimestamp()
+		ins        []*avax.TransferableInput
+		outs       []*avax.TransferableOutput
+		stakedOuts []*avax.TransferableOutput
+		signers    [][]*secp256k1.PrivateKey
+		err        error
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.AddValidatorTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		ins, outs, stakedOuts, signers, err = b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
 	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = unstakedOuts
+	utx.BaseTx.Outs = outs
 	utx.StakeOuts = stakedOuts
 
 	// 3. Sign the tx
@@ -572,13 +663,44 @@ func (b *builder) NewAddDelegatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	var (
+		chainTime  = b.state.GetTimestamp()
+		ins        []*avax.TransferableInput
+		outs       []*avax.TransferableOutput
+		stakedOuts []*avax.TransferableOutput
+		signers    [][]*secp256k1.PrivateKey
+		err        error
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.AddDelegatorTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		ins, outs, stakedOuts, signers, err = b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
 	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = unstakedOuts
+	utx.BaseTx.Outs = outs
 	utx.StakeOuts = stakedOuts
 
 	// 3. Sign the tx
@@ -621,7 +743,36 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	var (
+		chainTime = b.state.GetTimestamp()
+		ins       []*avax.TransferableInput
+		outs      []*avax.TransferableOutput
+		signers   [][]*secp256k1.PrivateKey
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.AddSubnetValidatorTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -660,7 +811,36 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	var (
+		chainTime = b.state.GetTimestamp()
+		ins       []*avax.TransferableInput
+		outs      []*avax.TransferableOutput
+		signers   [][]*secp256k1.PrivateKey
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -722,7 +902,36 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	var (
+		chainTime = b.state.GetTimestamp()
+		ins       []*avax.TransferableInput
+		outs      []*avax.TransferableOutput
+		signers   [][]*secp256k1.PrivateKey
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.TransferSubnetOwnershipTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -754,11 +963,42 @@ func (b *builder) NewBaseTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toBurn, err := math.Add64(amount, b.cfg.TxFee)
-	if err != nil {
-		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
+	var (
+		chainTime = b.state.GetTimestamp()
+		ins       []*avax.TransferableInput
+		outs      []*avax.TransferableOutput
+		signers   [][]*secp256k1.PrivateKey
+		err       error
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.BaseTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		var toBurn uint64
+		toBurn, err = math.Add64(amount, b.cfg.TxFee)
+		if err != nil {
+			return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
+		}
+		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, toBurn, changeAddr)
 	}
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
