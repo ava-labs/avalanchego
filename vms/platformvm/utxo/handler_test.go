@@ -75,7 +75,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 		amountToStake = units.MilliAvax
 
 		bigUtxoTxID   = ids.GenerateTestID()
-		bigUtxoKey    = keys[1]
+		bigUtxoKey    = keys[0]
 		bigUtxoAddr   = bigUtxoKey.PublicKey().Address()
 		bigUtxoAmount = 6 * units.MilliAvax
 		bigUtxo       = &avax.UTXO{
@@ -96,7 +96,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 		bigUtxoID = bigUtxo.InputID()
 
 		smallUtxoTxID   = ids.GenerateTestID()
-		smallUtxoKey    = keys[2]
+		smallUtxoKey    = keys[1]
 		smallUtxoAddr   = smallUtxoKey.PublicKey().Address()
 		smallUtxoAmount = 2 * units.MilliAvax
 		smallUtxo       = &avax.UTXO{
@@ -117,7 +117,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 		smallUtxoID = smallUtxo.InputID()
 
 		lockedUtxoTxID   = ids.GenerateTestID()
-		lockedUtxoKey    = keys[0]
+		lockedUtxoKey    = keys[2]
 		lockedUtxoAddr   = lockedUtxoKey.PublicKey().Address()
 		lockedUtxoAmount = amountToStake
 
