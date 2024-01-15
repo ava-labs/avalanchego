@@ -143,6 +143,12 @@ There are several examples, in the examples directory, that simulate real world
 use-cases. Try running them via the command-line, via `cargo run --release
 --example simple`.
 
+## Logging
+
+If you want logging, enable the `logging` feature flag, and then set RUST\_LOG accordingly.
+See the documentation for [env\_logger](https://docs.rs/env_logger/latest/env_logger/) for specifics.
+We currently have very few logging statements, but this is useful for print-style debugging.
+
 ## Release
 
 See the [release documentation](./RELEASE.md) for detailed information on how to release Firewood.

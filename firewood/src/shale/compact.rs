@@ -13,6 +13,8 @@ use std::io::{Cursor, Write};
 use std::num::NonZeroUsize;
 use std::sync::RwLock;
 
+use crate::logger::trace;
+
 #[derive(Debug)]
 pub struct CompactHeader {
     payload_size: u64,
@@ -583,6 +585,8 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
         let size = item.serialized_len() + extra;
         #[allow(clippy::unwrap_used)]
         let addr = self.inner.write().unwrap().alloc(size)?;
+
+        trace!("{self:p} put_item at {addr} size {size}");
 
         #[allow(clippy::unwrap_used)]
         let obj = {

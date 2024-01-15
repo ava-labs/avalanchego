@@ -465,6 +465,11 @@ impl Db {
             let _ = tokio::fs::remove_dir_all(db_path.as_ref()).await;
         }
 
+        #[cfg(feature = "logger")]
+        // initialize the logger, but ignore if this fails. This could fail because the calling
+        // library already initialized the logger or if you're opening a second database
+        let _ = env_logger::try_init();
+
         block_in_place(|| Db::new_internal(db_path, cfg.clone()))
             .map_err(|e| api::Error::InternalError(Box::new(e)))
     }

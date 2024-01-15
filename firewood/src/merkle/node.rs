@@ -1,6 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::logger::trace;
 use crate::{
     merkle::from_nibbles,
     shale::{disk_address::DiskAddress, CachedStore, ShaleError, ShaleStore, Storable},
@@ -360,7 +361,7 @@ mod type_id {
 use type_id::NodeTypeId;
 
 impl Storable for Node {
-    fn deserialize<T: CachedStore>(mut offset: usize, mem: &T) -> Result<Self, ShaleError> {
+    fn deserialize<T: CachedStore>(offset: usize, mem: &T) -> Result<Self, ShaleError> {
         let meta_raw =
             mem.get_view(offset, Meta::SIZE as u64)
                 .ok_or(ShaleError::InvalidCacheView {
@@ -368,7 +369,9 @@ impl Storable for Node {
                     size: Meta::SIZE as u64,
                 })?;
 
-        offset += Meta::SIZE;
+        trace!("[{mem:p}] Deserializing node at {offset}");
+
+        let offset = offset + Meta::SIZE;
 
         #[allow(clippy::indexing_slicing)]
         let attrs = NodeAttributes::from_bits_retain(meta_raw.as_deref()[TRIE_HASH_LEN]);
@@ -458,6 +461,7 @@ impl Storable for Node {
     }
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+        trace!("[{self:p}] Serializing node");
         let mut cur = Cursor::new(to);
 
         let mut attrs = match self.root_hash.get() {
