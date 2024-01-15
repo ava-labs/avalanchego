@@ -32,15 +32,18 @@ type OutboundMsgBuilder interface {
 		trackedSubnets []ids.ID,
 		supportedACPs []uint32,
 		objectedACPs []uint32,
+		knownPeersFilter []byte,
+		knownPeersSalt []byte,
+	) (OutboundMessage, error)
+
+	GetPeerList(
+		knownPeersFilter []byte,
+		knownPeersSalt []byte,
 	) (OutboundMessage, error)
 
 	PeerList(
-		peers []ips.ClaimedIPPort,
+		peers []*ips.ClaimedIPPort,
 		bypassThrottling bool,
-	) (OutboundMessage, error)
-
-	PeerListAck(
-		peerAcks []*p2p.PeerAck,
 	) (OutboundMessage, error)
 
 	Ping(
@@ -244,6 +247,8 @@ func (b *outMsgBuilder) Handshake(
 	trackedSubnets []ids.ID,
 	supportedACPs []uint32,
 	objectedACPs []uint32,
+	knownPeersFilter []byte,
+	knownPeersSalt []byte,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
@@ -267,6 +272,10 @@ func (b *outMsgBuilder) Handshake(
 					},
 					SupportedAcps: supportedACPs,
 					ObjectedAcps:  objectedACPs,
+					KnownPeers: &p2p.BloomFilter{
+						Filter: knownPeersFilter,
+						Salt:   knownPeersSalt,
+					},
 				},
 			},
 		},
@@ -275,7 +284,27 @@ func (b *outMsgBuilder) Handshake(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) GetPeerList(
+	knownPeersFilter []byte,
+	knownPeersSalt []byte,
+) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_GetPeerList{
+				GetPeerList: &p2p.GetPeerList{
+					KnownPeers: &p2p.BloomFilter{
+						Filter: knownPeersFilter,
+						Salt:   knownPeersSalt,
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	claimIPPorts := make([]*p2p.ClaimedIpPort, len(peers))
 	for i, p := range peers {
 		claimIPPorts[i] = &p2p.ClaimedIpPort{
@@ -284,33 +313,19 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 			IpPort:          uint32(p.IPPort.Port),
 			Timestamp:       p.Timestamp,
 			Signature:       p.Signature,
-			TxId:            p.TxID[:],
+			TxId:            ids.Empty[:],
 		}
 	}
 	return b.builder.createOutbound(
 		&p2p.Message{
-			Message: &p2p.Message_PeerList{
-				PeerList: &p2p.PeerList{
+			Message: &p2p.Message_PeerList_{
+				PeerList_: &p2p.PeerList{
 					ClaimedIpPorts: claimIPPorts,
 				},
 			},
 		},
 		b.compressionType,
 		bypassThrottling,
-	)
-}
-
-func (b *outMsgBuilder) PeerListAck(peerAcks []*p2p.PeerAck) (OutboundMessage, error) {
-	return b.builder.createOutbound(
-		&p2p.Message{
-			Message: &p2p.Message_PeerListAck{
-				PeerListAck: &p2p.PeerListAck{
-					PeerAcks: peerAcks,
-				},
-			},
-		},
-		compression.TypeNone,
-		false,
 	)
 }
 
