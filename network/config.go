@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -73,6 +72,14 @@ type PeerListGossipConfig struct {
 	// PeerListGossipFreq is the frequency that this node will attempt to gossip
 	// signed IPs to its peers.
 	PeerListGossipFreq time.Duration `json:"peerListGossipFreq"`
+
+	// PeerListPullGossipFreq is the frequency that this node will attempt to
+	// request signed IPs from its peers.
+	PeerListPullGossipFreq time.Duration `json:"peerListPullGossipFreq"`
+
+	// PeerListBloomResetFreq is how frequently this node will recalculate the
+	// IP tracker's bloom filter.
+	PeerListBloomResetFreq time.Duration `json:"peerListBloomResetFreq"`
 }
 
 type TimeoutConfig struct {
@@ -182,7 +189,4 @@ type Config struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	DiskTargeter tracker.Targeter `json:"-"`
-
-	// Tracks which validators have been sent to which peers
-	GossipTracker peer.GossipTracker `json:"-"`
 }

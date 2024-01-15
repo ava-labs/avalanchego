@@ -66,7 +66,7 @@ func (l *noopListener) Close() error {
 func (*noopListener) Addr() net.Addr {
 	return &net.TCPAddr{
 		IP:   net.IPv4zero,
-		Port: 0,
+		Port: 1,
 	}
 }
 
@@ -156,6 +156,8 @@ func NewTestNetwork(
 			PeerListNonValidatorGossipSize: constants.DefaultNetworkPeerListNonValidatorGossipSize,
 			PeerListPeersGossipSize:        constants.DefaultNetworkPeerListPeersGossipSize,
 			PeerListGossipFreq:             constants.DefaultNetworkPeerListGossipFreq,
+			PeerListPullGossipFreq:         constants.DefaultNetworkPeerListPullGossipFreq,
+			PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
 		},
 
 		DelayConfig: DelayConfig{
@@ -186,9 +188,8 @@ func NewTestNetwork(
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
-	beacons := validators.NewManager()
 	networkConfig.Validators = currentValidators
-	networkConfig.Beacons = beacons
+	networkConfig.Beacons = validators.NewManager()
 	// This never actually does anything because we never initialize the P-chain
 	networkConfig.UptimeCalculator = uptime.NoOpCalculator
 
@@ -225,12 +226,7 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.DiskTracker(),
 	)
 
-	networkConfig.MyIPPort = ips.NewDynamicIPPort(net.IPv4zero, 0)
-
-	networkConfig.GossipTracker, err = peer.NewGossipTracker(metrics, "")
-	if err != nil {
-		return nil, err
-	}
+	networkConfig.MyIPPort = ips.NewDynamicIPPort(net.IPv4zero, 1)
 
 	return NewNetwork(
 		&networkConfig,
