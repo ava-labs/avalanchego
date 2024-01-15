@@ -130,7 +130,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 		uTxF          func(t *testing.T) txs.UnsignedTx
 
 		expectedErr error
-		checksF     func(*testing.T, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
+		checksF     func(*testing.T, txs.UnsignedTx, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
 	}{
 		{
 			description: "Tx, stake outputs,, multiple UTXOs",
@@ -182,12 +182,25 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				r := require.New(t)
 				expectedFee := 5879 * units.MicroAvax
-				require.Len(t, ins, 2)
-				require.Len(t, staked, 1)
-				require.Len(t, outs, 1)
-				require.Equal(t, expectedFee, ins[0].In.Amount()+ins[1].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
+
+				// complete uTx with the utxos
+				addVal, ok := uTx.(*txs.AddValidatorTx)
+				r.True(ok)
+
+				addVal.Ins = ins
+				addVal.Outs = outs
+				addVal.StakeOuts = staked
+
+				r.NoError(uTx.Visit(calc))
+				r.Equal(expectedFee, calc.Fee)
+
+				r.Len(ins, 2)
+				r.Len(staked, 1)
+				r.Len(outs, 1)
+				r.Equal(expectedFee, ins[0].In.Amount()+ins[1].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
 			},
 		},
 		{
@@ -236,12 +249,25 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				r := require.New(t)
 				expectedFee := 3341 * units.MicroAvax
-				require.Len(t, ins, 1)
-				require.Len(t, staked, 1)
-				require.Len(t, outs, 1)
-				require.Equal(t, expectedFee, ins[0].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
+
+				// complete uTx with the utxos
+				addVal, ok := uTx.(*txs.AddValidatorTx)
+				r.True(ok)
+
+				addVal.Ins = ins
+				addVal.Outs = outs
+				addVal.StakeOuts = staked
+
+				r.NoError(uTx.Visit(calc))
+				r.Equal(expectedFee, calc.Fee)
+
+				r.Len(ins, 1)
+				r.Len(staked, 1)
+				r.Len(outs, 1)
+				r.Equal(expectedFee, ins[0].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
 			},
 		},
 		{
@@ -281,12 +307,24 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				r := require.New(t)
 				expectedFee := 3014 * units.MicroAvax
-				require.Len(t, ins, 1)
-				require.Len(t, outs, 1)
-				require.Equal(t, expectedFee, ins[0].In.Amount()-outs[0].Out.Amount())
-				require.Empty(t, staked)
+
+				// complete uTx with the utxos
+				addVal, ok := uTx.(*txs.CreateChainTx)
+				r.True(ok)
+
+				addVal.Ins = ins
+				addVal.Outs = outs
+
+				r.NoError(uTx.Visit(calc))
+				r.Equal(expectedFee, calc.Fee)
+
+				r.Len(ins, 1)
+				r.Len(outs, 1)
+				r.Equal(expectedFee, ins[0].In.Amount()-outs[0].Out.Amount())
+				r.Empty(staked)
 			},
 		},
 		{
@@ -330,12 +368,24 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				r := require.New(t)
 				expectedFee := 5552 * units.MicroAvax
-				require.Len(t, ins, 2)
-				require.Len(t, outs, 1)
-				require.Equal(t, expectedFee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
-				require.Empty(t, staked)
+
+				// complete uTx with the utxos
+				addVal, ok := uTx.(*txs.CreateChainTx)
+				r.True(ok)
+
+				addVal.Ins = ins
+				addVal.Outs = outs
+
+				r.NoError(uTx.Visit(calc))
+				r.Equal(expectedFee, calc.Fee)
+
+				r.Len(ins, 2)
+				r.Len(outs, 1)
+				r.Equal(expectedFee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
+				r.Empty(staked)
 			},
 		},
 		{
@@ -357,11 +407,15 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return &unsignedTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
-				require.Zero(t, calc.Fee)
-				require.Empty(t, ins)
-				require.Empty(t, outs)
-				require.Empty(t, staked)
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				r := require.New(t)
+
+				r.NoError(uTx.Visit(calc))
+				r.Zero(calc.Fee)
+
+				r.Empty(ins)
+				r.Empty(outs)
+				r.Empty(staked)
 			},
 		},
 	}
@@ -392,7 +446,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 				ids.GenerateTestShortID(),
 			)
 			r.ErrorIs(err, test.expectedErr)
-			test.checksF(t, feeCalc, ins, outs, staked)
+			test.checksF(t, uTx, feeCalc, ins, outs, staked)
 		})
 	}
 }
