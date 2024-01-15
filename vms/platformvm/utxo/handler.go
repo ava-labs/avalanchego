@@ -497,6 +497,16 @@ func (h *handler) FinanceTx(
 		// The remaining value is initially the full value of the input
 		remainingValue := in.Amount()
 
+		// update fees to target given the extra input added
+		insDimensions, err := fees.GetInputsDimensions(input)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
+		}
+		if err := feeCalc.ProcessFees(insDimensions); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
+		}
+		targetFee += feeCalc.Fee
+
 		// Stake any value that should be staked
 		amountToStake := math.Min(
 			amount-amountStaked, // Amount we still need to stake
@@ -519,6 +529,16 @@ func (h *handler) FinanceTx(
 			},
 		}
 
+		// update fees to target given the staked output added
+		outDimensions, err := fees.GetOutputsDimensions(stakedOut)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
+		}
+		if err := feeCalc.ProcessFees(outDimensions); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+		}
+		targetFee += feeCalc.Fee
+
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, stakedOut)
 
@@ -535,6 +555,17 @@ func (h *handler) FinanceTx(
 					},
 				},
 			}
+
+			// update fees to target given the change output added
+			outDimensions, err := fees.GetOutputsDimensions(changeOut)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
+			}
+			if err := feeCalc.ProcessFees(outDimensions); err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+			}
+			targetFee += feeCalc.Fee
+
 			returnedOuts = append(returnedOuts, changeOut)
 		}
 
