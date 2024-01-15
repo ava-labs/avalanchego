@@ -94,6 +94,8 @@ const (
 	NetworkPeerListNonValidatorGossipSizeKey           = "network-peer-list-non-validator-gossip-size"
 	NetworkPeerListPeersGossipSizeKey                  = "network-peer-list-peers-gossip-size"
 	NetworkPeerListGossipFreqKey                       = "network-peer-list-gossip-frequency"
+	NetworkPeerListPullGossipFreqKey                   = "network-peer-list-pull-gossip-frequency"
+	NetworkPeerListBloomResetFreqKey                   = "network-peer-list-bloom-reset-frequency"
 	NetworkInitialReconnectDelayKey                    = "network-initial-reconnect-delay"
 	NetworkReadHandshakeTimeoutKey                     = "network-read-handshake-timeout"
 	NetworkPingTimeoutKey                              = "network-ping-timeout"
