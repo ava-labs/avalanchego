@@ -646,7 +646,7 @@ func (h *handler) FinanceTx(
 			changeOut := &avax.TransferableOutput{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					// Amt: remainingValue, // SET IT AFTER CONSIDERING IT'S OWN FEE
+					// Amt: remainingValue, // SET IT AFTER CONSIDERING ITS OWN FEES
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -663,17 +663,19 @@ func (h *handler) FinanceTx(
 			if err := feeCalc.ProcessFees(outDimensions); err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
-			targetFee += feeCalc.Fee
 
 			if remainingValue > feeCalc.Fee {
+				targetFee += feeCalc.Fee
 				amountBurned += feeCalc.Fee
-				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingValue - feeCalc.Fee
+				remainingValue -= feeCalc.Fee
+
+				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingValue
 				// This input had extra value, so some of it must be returned
 				returnedOuts = append(returnedOuts, changeOut)
 			}
 
-			// This UTXO has not enough value to cover for its own taxes.
-			// Let's fully consume it and move to the next UTXO to pay for it
+			// If this UTXO has not enough value to cover for its own taxes,
+			// we fully consume it (no output) and move to the next UTXO to pay for it.
 		}
 
 		// Add the signers needed for this input to the set of signers
