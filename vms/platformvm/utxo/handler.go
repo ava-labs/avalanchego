@@ -616,7 +616,6 @@ func (h *handler) FinanceTx(
 
 		if amountToStake > 0 {
 			// Some of this input was put for staking
-
 			stakedOut := &avax.TransferableOutput{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
@@ -638,6 +637,13 @@ func (h *handler) FinanceTx(
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
 			targetFee += feeCalc.Fee
+
+			amountToBurn := math.Min(
+				targetFee-amountBurned, // Amount we still need to burn
+				remainingValue,         // Amount available to burn
+			)
+			amountBurned += amountToBurn
+			remainingValue -= amountToBurn
 
 			stakedOuts = append(stakedOuts, stakedOut)
 		}

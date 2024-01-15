@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -114,11 +115,16 @@ func TestVerifyFinanceTx(t *testing.T) {
 		smallUtxoID = smallUtxo.InputID()
 	)
 
+	// this UTXOs ordering ensures that smallUtxo will be picked first,
+	// even if bigUtxo would be enough finance the whole tx
 	require.True(t, smallUtxoID.Compare(bigUtxoID) < 0)
 
 	tests := []struct {
-		description   string
-		utxoReaderF   func(ctrl *gomock.Controller) avax.UTXOReader
+		description string
+		utxoReaderF func(ctrl *gomock.Controller) avax.UTXOReader
+
+		// keysF simplifies the utxoReade mock setup. We just specify here
+		// the only keys referenced by the test scenario
 		keysF         func() []*secp256k1.PrivateKey
 		amountToStake uint64
 		uTxF          func(t *testing.T) txs.UnsignedTx
@@ -128,6 +134,138 @@ func TestVerifyFinanceTx(t *testing.T) {
 		expectedErr error
 		checksF     func(*testing.T, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
 	}{
+		{
+			description: "Tx, stake outputs,, multiple UTXOs",
+			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().UTXOIDs(smallUtxoAddr.Bytes(), gomock.Any(), gomock.Any()).Return([]ids.ID{smallUtxoID}, nil).AnyTimes()
+				s.EXPECT().GetUTXO(smallUtxoID).Return(smallUtxo, nil).AnyTimes()
+
+				s.EXPECT().UTXOIDs(bigUtxoAddr.Bytes(), gomock.Any(), gomock.Any()).Return([]ids.ID{bigUtxoID}, nil).AnyTimes()
+				s.EXPECT().GetUTXO(bigUtxoID).Return(bigUtxo, nil).AnyTimes()
+
+				return s
+			},
+			keysF: func() []*secp256k1.PrivateKey {
+				return []*secp256k1.PrivateKey{smallUtxoKey, bigUtxoKey}
+			},
+
+			amountToStake: units.MilliAvax,
+			uTxF: func(t *testing.T) txs.UnsignedTx {
+				uTx := &txs.AddValidatorTx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    ctx.NetworkID,
+							BlockchainID: ctx.ChainID,
+							Ins:          make([]*avax.TransferableInput, 0),
+							Outs:         make([]*avax.TransferableOutput, 0),
+							Memo:         []byte{'a', 'b', 'c'},
+						},
+					},
+					Validator: txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  0,
+						End:    uint64(time.Now().Unix()),
+						Wght:   units.MilliAvax,
+					},
+					StakeOuts: make([]*avax.TransferableOutput, 0),
+					RewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
+				}
+
+				bytes, err := txs.Codec.Marshal(txs.CodecVersion, uTx)
+				require.NoError(t, err)
+
+				uTx.SetBytes(bytes)
+				return uTx
+			},
+			feeCalcF: func() *fees.Calculator {
+				fm := commonfees.NewManager(cfg.DefaultUnitFees)
+				feesCalc := fees.Calculator{
+					FeeManager:  fm,
+					Config:      cfg,
+					ChainTime:   time.Time{},
+					Credentials: []verify.Verifiable{},
+				}
+				return &feesCalc
+			},
+			expectedErr: nil,
+			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				expectedFee := 5879 * units.MicroAvax
+				require.Len(t, ins, 2)
+				require.Len(t, staked, 1)
+				require.Len(t, outs, 1)
+				require.Equal(t, expectedFee, ins[0].In.Amount()+ins[1].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
+			},
+		},
+		{
+			description: "Tx, stake outputs, single UTXO",
+			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().UTXOIDs(bigUtxoAddr.Bytes(), gomock.Any(), gomock.Any()).Return([]ids.ID{bigUtxoID}, nil).AnyTimes()
+				s.EXPECT().GetUTXO(bigUtxoID).Return(bigUtxo, nil).AnyTimes()
+				return s
+			},
+			keysF: func() []*secp256k1.PrivateKey {
+				return []*secp256k1.PrivateKey{bigUtxoKey}
+			},
+
+			amountToStake: units.MilliAvax,
+			uTxF: func(t *testing.T) txs.UnsignedTx {
+				uTx := &txs.AddValidatorTx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    ctx.NetworkID,
+							BlockchainID: ctx.ChainID,
+							Ins:          make([]*avax.TransferableInput, 0),
+							Outs:         make([]*avax.TransferableOutput, 0),
+							Memo:         []byte{'a', 'b', 'c'},
+						},
+					},
+					Validator: txs.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Start:  0,
+						End:    uint64(time.Now().Unix()),
+						Wght:   units.MilliAvax,
+					},
+					StakeOuts: make([]*avax.TransferableOutput, 0),
+					RewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
+				}
+
+				bytes, err := txs.Codec.Marshal(txs.CodecVersion, uTx)
+				require.NoError(t, err)
+
+				uTx.SetBytes(bytes)
+				return uTx
+			},
+			feeCalcF: func() *fees.Calculator {
+				fm := commonfees.NewManager(cfg.DefaultUnitFees)
+				feesCalc := fees.Calculator{
+					FeeManager:  fm,
+					Config:      cfg,
+					ChainTime:   time.Time{},
+					Credentials: []verify.Verifiable{},
+				}
+				return &feesCalc
+			},
+			expectedErr: nil,
+			checksF: func(t *testing.T, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+				expectedFee := 3341 * units.MicroAvax
+				require.Len(t, ins, 1)
+				require.Len(t, staked, 1)
+				require.Len(t, outs, 1)
+				require.Equal(t, expectedFee, ins[0].In.Amount()-staked[0].Out.Amount()-outs[0].Out.Amount())
+			},
+		},
 		{
 			description: "Tx, no stake outputs, single UTXO",
 			utxoReaderF: func(ctrl *gomock.Controller) avax.UTXOReader {
