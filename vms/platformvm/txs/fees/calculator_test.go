@@ -117,6 +117,34 @@ func TestPartiallyFulledTransactionsSizes(t *testing.T) {
 	require.Equal(t, uTxSize, 443)
 }
 
+func TestAddAndRemoveFees(t *testing.T) {
+	r := require.New(t)
+
+	cfg := &config.Config{
+		FeeConfig: feeTestsDefaultCfg,
+	}
+
+	fc := &Calculator{
+		FeeManager: fees.NewManager(cfg.DefaultUnitFees),
+		Config:     cfg,
+	}
+
+	units := fees.Dimensions{
+		1,
+		2,
+		3,
+		4,
+	}
+
+	r.NoError(fc.AddFeesFor(units))
+	r.Equal(units, fc.FeeManager.GetCumulatedUnits())
+	r.NotZero(fc.Fee)
+
+	r.NoError(fc.RemoveFeesFor(units))
+	r.Zero(fc.FeeManager.GetCumulatedUnits())
+	r.Zero(fc.Fee)
+}
+
 func TestUTXOsAreAdditiveInSize(t *testing.T) {
 	// Show that including utxos of size [S] into a tx of size [T]
 	// result in a tx of size [S+T-CodecVersion]
