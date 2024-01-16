@@ -73,7 +73,7 @@ type VMClient interface {
 	// Creates the HTTP handlers for custom VM network calls.
 	//
 	// Note: RPC Chain VM Factory will start a new instance of the VM in a
-	// seperate process which will populate the static handlers. After this
+	// separate process which will populate the static handlers. After this
 	// process is created other processes will be created to populate blockchains,
 	// but they will not have the static handlers be called again.
 	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
@@ -464,7 +464,7 @@ type VMServer interface {
 	// Creates the HTTP handlers for custom VM network calls.
 	//
 	// Note: RPC Chain VM Factory will start a new instance of the VM in a
-	// seperate process which will populate the static handlers. After this
+	// separate process which will populate the static handlers. After this
 	// process is created other processes will be created to populate blockchains,
 	// but they will not have the static handlers be called again.
 	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
