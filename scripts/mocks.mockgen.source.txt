@@ -1,0 +1,2 @@
+snow/validators/manager.go=SetCallbackListener=snow/validators/mock_manager.go
+vms/platformvm/txs/staker_tx.go=ValidatorTx,DelegatorTx,StakerTx,PermissionlessStaker=vms/platformvm/txs/mock_staker_tx.go
