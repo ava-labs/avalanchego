@@ -6,11 +6,12 @@ package gossip
 import (
 	"crypto/rand"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type bloomFilterMetrics struct {

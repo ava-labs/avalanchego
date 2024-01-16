@@ -10,9 +10,10 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
