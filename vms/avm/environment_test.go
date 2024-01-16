@@ -5,10 +5,11 @@ package avm
 
 import (
 	"context"
-	stdjson "encoding/json"
 	"math/rand"
 	"testing"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/stretchr/testify/require"
 
@@ -109,73 +110,17 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	require := require.New(tb)
 
 	var (
-		assetName    = "AVAX"
-		genesisBytes []byte
+		genesisArgs *BuildGenesisArgs
+		assetName   = "AVAX"
 	)
-
 	if c.isCustomFeeAsset {
+		genesisArgs = makeCustomAssetGenesis(tb)
 		assetName = feeAssetName
-
-		addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
-		require.NoError(err)
-
-		addr1Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[1].Bytes())
-		require.NoError(err)
-
-		addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
-		require.NoError(err)
-
-		genesisData := map[string]AssetDefinition{
-			"asset1": {
-				Name:   feeAssetName,
-				Symbol: "TST",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr2Str,
-						},
-					},
-				},
-			},
-			"asset2": {
-				Name:   otherAssetName,
-				Symbol: "OTH",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr2Str,
-						},
-					},
-				},
-			},
-		}
-
-		encodedGenesisBytes, err := BuildGenesis(0, genesisData, formatting.Hex)
-		require.NoError(err)
-
-		genesisBytes, err = formatting.Decode(formatting.Hex, encodedGenesisBytes)
-		require.NoError(err)
 	} else {
-		genesisBytes = buildGenesisTest(tb)
+		genesisArgs = makeDefaultGenesis(tb)
 	}
+
+	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
 
 	ctx := snowtest.Context(tb, snowtest.XChainID)
 
@@ -316,6 +261,80 @@ func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 
 // buildGenesisTest is the common Genesis builder for most tests
 func buildGenesisTest(tb testing.TB) []byte {
+	defaultArgs := makeDefaultGenesis(tb)
+	return buildGenesisTestWithArgs(tb, defaultArgs)
+}
+
+// buildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
+func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
+	require := require.New(tb)
+
+	ss := CreateStaticService()
+
+	reply := BuildGenesisReply{}
+	require.NoError(ss.BuildGenesis(nil, args, &reply))
+
+	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
+	require.NoError(err)
+	return b
+}
+
+func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser, assetName string) *txs.Tx {
+	require := require.New(tb)
+
+	createTx := getCreateTxFromGenesisTest(tb, genesisBytes, assetName)
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        createTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: createTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
+					},
+				},
+			}},
+		},
+	}}
+	require.NoError(tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	return tx
+}
+
+// Sample from a set of addresses and return them raw and formatted as strings.
+// The size of the sample is between 1 and len(addrs)
+// If len(addrs) == 0, returns nil
+func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+	require := require.New(tb)
+
+	sampledAddrs := []ids.ShortID{}
+	sampledAddrsStr := []string{}
+
+	sampler := sampler.NewUniform()
+	sampler.Initialize(uint64(len(addrs)))
+
+	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
+	indices, err := sampler.Sample(numAddrs)
+	require.NoError(err)
+	for _, index := range indices {
+		addr := addrs[index]
+		addrStr, err := addressFormatter.FormatLocalAddress(addr)
+		require.NoError(err)
+
+		sampledAddrs = append(sampledAddrs, addr)
+		sampledAddrsStr = append(sampledAddrsStr, addrStr)
+	}
+	return sampledAddrs, sampledAddrsStr
+}
+
+func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
 	require := require.New(tb)
 
 	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
@@ -327,9 +346,9 @@ func buildGenesisTest(tb testing.TB) []byte {
 	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
 	require.NoError(err)
 
-	encodedGenesisBytes, err := BuildGenesis(
-		0,
-		map[string]AssetDefinition{
+	return &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
 			"asset1": {
 				Name:   "AVAX",
 				Symbol: "SYMB",
@@ -402,68 +421,66 @@ func buildGenesisTest(tb testing.TB) []byte {
 				},
 			},
 		},
-		formatting.Hex,
-	)
-
-	genesisBytes, err := formatting.Decode(formatting.Hex, encodedGenesisBytes)
-	require.NoError(err)
-
-	return genesisBytes
+	}
 }
 
-func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser, assetName string) *txs.Tx {
+func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
 	require := require.New(tb)
 
-	createTx := getCreateTxFromGenesisTest(tb, genesisBytes, assetName)
-	tx := &txs.Tx{Unsigned: &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        createTx.ID(),
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: createTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: startBalance,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
+	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
+	require.NoError(err)
+
+	addr1Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[1].Bytes())
+	require.NoError(err)
+
+	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
+	require.NoError(err)
+
+	return &BuildGenesisArgs{
+		Encoding: formatting.Hex,
+		GenesisData: map[string]AssetDefinition{
+			"asset1": {
+				Name:   feeAssetName,
+				Symbol: "TST",
+				InitialState: map[string][]interface{}{
+					"fixedCap": {
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr0Str,
+						},
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr1Str,
+						},
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr2Str,
 						},
 					},
 				},
-			}},
+			},
+			"asset2": {
+				Name:   otherAssetName,
+				Symbol: "OTH",
+				InitialState: map[string][]interface{}{
+					"fixedCap": {
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr0Str,
+						},
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr1Str,
+						},
+						Holder{
+							Amount:  json.Uint64(startBalance),
+							Address: addr2Str,
+						},
+					},
+				},
+			},
 		},
-	}}
-	require.NoError(tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-	return tx
-}
-
-// Sample from a set of addresses and return them raw and formatted as strings.
-// The size of the sample is between 1 and len(addrs)
-// If len(addrs) == 0, returns nil
-func sampleAddrs(tb testing.TB, addressFormatter avax.AddressManager, addrs []ids.ShortID) ([]ids.ShortID, []string) {
-	require := require.New(tb)
-
-	sampledAddrs := []ids.ShortID{}
-	sampledAddrsStr := []string{}
-
-	sampler := sampler.NewUniform()
-	sampler.Initialize(uint64(len(addrs)))
-
-	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
-	indices, err := sampler.Sample(numAddrs)
-	require.NoError(err)
-	for _, index := range indices {
-		addr := addrs[index]
-		addrStr, err := addressFormatter.FormatLocalAddress(addr)
-		require.NoError(err)
-
-		sampledAddrs = append(sampledAddrs, addr)
-		sampledAddrsStr = append(sampledAddrsStr, addrStr)
 	}
-	return sampledAddrs, sampledAddrsStr
 }
 
 // issueAndAccept expects the context lock not to be held

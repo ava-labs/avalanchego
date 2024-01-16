@@ -4,7 +4,6 @@
 package genesis
 
 import (
-	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +12,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	_ "embed"
 
 	"github.com/stretchr/testify/require"
 

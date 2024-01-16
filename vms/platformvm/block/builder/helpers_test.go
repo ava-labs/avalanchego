@@ -378,20 +378,22 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 		}
 	}
 
-	_, encodedGenesisBytes, err := api.BuildGenesis(
-		ctx.AVAXAssetID,
-		json.Uint32(constants.UnitTestID),
-		genesisUTXOs,
-		genesisValidators,
-		nil,
-		json.Uint64(defaultGenesisTime.Unix()),
-		json.Uint64(360*units.MegaAvax),
-		"",
-		formatting.Hex,
-	)
-	require.NoError(err)
+	buildGenesisArgs := api.BuildGenesisArgs{
+		NetworkID:     json.Uint32(constants.UnitTestID),
+		AvaxAssetID:   ctx.AVAXAssetID,
+		UTXOs:         genesisUTXOs,
+		Validators:    genesisValidators,
+		Chains:        nil,
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		InitialSupply: json.Uint64(360 * units.MegaAvax),
+		Encoding:      formatting.Hex,
+	}
 
-	genesisBytes, err := formatting.Decode(formatting.Hex, encodedGenesisBytes)
+	buildGenesisResponse := api.BuildGenesisReply{}
+	platformvmSS := api.StaticService{}
+	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
+
+	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
 	require.NoError(err)
 
 	return genesisBytes

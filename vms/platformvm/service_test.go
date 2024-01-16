@@ -5,13 +5,14 @@ package platformvm
 
 import (
 	"context"
-	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/rand"
 	"testing"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/stretchr/testify/require"
 
@@ -32,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -396,12 +396,9 @@ func TestGetBalance(t *testing.T) {
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	for idx, utxo := range genesis.UTXOs {
-		address, err := address.FormatBech32(constants.UnitTestHRP, utxo.ID[:])
-		require.NoError(err)
-
 		request := GetBalanceRequest{
 			Addresses: []string{
-				fmt.Sprintf("P-%s", address),
+				fmt.Sprintf("P-%s", utxo.Address),
 			},
 		}
 		reply := GetBalanceResponse{}
@@ -433,8 +430,7 @@ func TestGetStake(t *testing.T) {
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	addrsStrs := []string{}
-	for i, tx := range genesis.Validators {
-		rewardAddress, err := address.FormatBech32(constants.UnitTestHRP, validator.ID().Bytes())
+	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
 		addrsStrs = append(addrsStrs, addr)
 
