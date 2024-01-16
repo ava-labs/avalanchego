@@ -151,10 +151,6 @@ message CreateHandlersResponse {
   repeated Handler handlers = 1;
 }
 
-message CreateStaticHandlersResponse {
-  repeated Handler handlers = 1;
-}
-
 message Handler {
   string prefix = 1;
   // server_addr is the address of the gRPC server which serves the
