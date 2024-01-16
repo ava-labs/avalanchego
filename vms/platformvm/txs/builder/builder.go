@@ -249,11 +249,14 @@ func (b *builder) NewImportTx(
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
 
-	importedInputs := []*avax.TransferableInput{}
-	signers := [][]*secp256k1.PrivateKey{}
+	var (
+		importedInputs = []*avax.TransferableInput{}
+		signers        = [][]*secp256k1.PrivateKey{}
+		outs           = []*avax.TransferableOutput{}
 
-	importedAmounts := make(map[ids.ID]uint64)
-	now := b.clk.Unix()
+		importedAmounts = make(map[ids.ID]uint64)
+		now             = b.clk.Unix()
+	)
 	for _, utxo := range atomicUTXOs {
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
 		if err != nil {
@@ -275,32 +278,21 @@ func (b *builder) NewImportTx(
 		})
 		signers = append(signers, utxoSigners)
 	}
-	avax.SortTransferableInputsWithSigners(importedInputs, signers)
-
 	if len(importedAmounts) == 0 {
 		return nil, ErrNoFunds // No imported UTXOs were spendable
 	}
 
-	importedAVAX := importedAmounts[b.ctx.AVAXAssetID]
+	// Sort and add imported txs to utx. Imported txs must not be
+	// changed here in after
+	avax.SortTransferableInputsWithSigners(importedInputs, signers)
+	utx.ImportedInputs = importedInputs
 
-	ins := []*avax.TransferableInput{}
-	outs := []*avax.TransferableOutput{}
-	switch {
-	case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
-		var baseSigners [][]*secp256k1.PrivateKey
-		ins, outs, _, baseSigners, err = b.Spend(b.state, keys, 0, b.cfg.TxFee-importedAVAX, changeAddr)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-		}
-		signers = append(baseSigners, signers...)
-		delete(importedAmounts, b.ctx.AVAXAssetID)
-	case importedAVAX == b.cfg.TxFee:
-		delete(importedAmounts, b.ctx.AVAXAssetID)
-	default:
-		importedAmounts[b.ctx.AVAXAssetID] -= b.cfg.TxFee
-	}
-
+	// add non avax-denominated outputs. Avax-denominated utxos
+	// are used to pay fees whose amount is calculated later on
 	for assetID, amount := range importedAmounts {
+		if assetID == b.ctx.AVAXAssetID {
+			continue
+		}
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -312,13 +304,123 @@ func (b *builder) NewImportTx(
 				},
 			},
 		})
+		delete(importedAmounts, assetID)
+	}
+
+	var (
+		ins []*avax.TransferableInput
+
+		importedAVAX = importedAmounts[b.ctx.AVAXAssetID] // the only entry left in importedAmounts
+		chainTime    = b.state.GetTimestamp()
+	)
+	if b.cfg.IsEForkActivated(chainTime) {
+		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
+		utx.BaseTx.Outs = outs
+		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+		feeCalc := &fees.Calculator{
+			FeeManager:  feesMan,
+			Config:      b.cfg,
+			ChainTime:   b.state.GetTimestamp(),
+			Credentials: txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.ImportTx(utx); err != nil {
+			return nil, err
+		}
+
+		if feeCalc.Fee >= importedAVAX {
+			// all imported avax will be burned to pay taxes.
+			// Fees are scaled back accordingly.
+			feeCalc.Fee -= importedAVAX
+		} else {
+			// imported inputs may be enough to pay taxes by themselves
+			changeOut := &avax.TransferableOutput{
+				Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					// Amt: importedAVAX, // SET IT AFTER CONSIDERING ITS OWN FEES
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{to},
+					},
+				},
+			}
+
+			// update fees to target given the extra input added
+			outDimensions, err := fees.GetOutputsDimensions(changeOut)
+			if err != nil {
+				return nil, fmt.Errorf("failed calculating output size: %w", err)
+			}
+			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+				return nil, fmt.Errorf("account for output fees: %w", err)
+			}
+
+			if feeCalc.Fee >= importedAVAX {
+				// imported avax are not enough to pay fees
+				// Drop the changeOut and finance the tx
+				if err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+					return nil, fmt.Errorf("failed reverting change output: %w", err)
+				}
+				feeCalc.Fee -= importedAVAX
+
+				var (
+					financeOut    []*avax.TransferableOutput
+					financeSigner [][]*secp256k1.PrivateKey
+				)
+				ins, financeOut, _, financeSigner, err = b.FinanceTx(
+					b.state,
+					keys,
+					0,
+					feeCalc,
+					changeAddr,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+				}
+				outs = append(financeOut, outs...)
+				signers = append(financeSigner, signers...)
+			} else {
+				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
+				outs = append(outs, changeOut)
+			}
+		}
+	} else {
+		switch {
+		case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
+			var (
+				baseOuts    []*avax.TransferableOutput
+				baseSigners [][]*secp256k1.PrivateKey
+			)
+			ins, baseOuts, _, baseSigners, err = b.Spend(b.state, keys, 0, b.cfg.TxFee-importedAVAX, changeAddr)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+			}
+			outs = append(baseOuts, outs...)
+			signers = append(baseSigners, signers...)
+			delete(importedAmounts, b.ctx.AVAXAssetID)
+		case importedAVAX == b.cfg.TxFee:
+			delete(importedAmounts, b.ctx.AVAXAssetID)
+		default:
+			importedAVAX -= b.cfg.TxFee
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: importedAVAX,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{to},
+					},
+				},
+			})
+		}
 	}
 
 	avax.SortTransferableOutputs(outs, txs.Codec) // sort imported outputs
 
 	utx.BaseTx.Ins = ins
 	utx.BaseTx.Outs = outs
-	utx.ImportedInputs = importedInputs
 
 	// 3. Sign the tx
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

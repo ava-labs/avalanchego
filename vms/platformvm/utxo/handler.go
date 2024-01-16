@@ -502,7 +502,7 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.ProcessFees(insDimensions); err != nil {
+		if err := feeCalc.AddFeesFor(insDimensions); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		targetFee += feeCalc.Fee
@@ -534,7 +534,7 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
 		}
-		if err := feeCalc.ProcessFees(outDimensions); err != nil {
+		if err := feeCalc.AddFeesFor(outDimensions); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 		}
 		targetFee += feeCalc.Fee
@@ -561,7 +561,7 @@ func (h *handler) FinanceTx(
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
 			}
-			if err := feeCalc.ProcessFees(outDimensions); err != nil {
+			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
 			targetFee += feeCalc.Fee
@@ -625,7 +625,7 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.ProcessFees(insDimensions); err != nil {
+		if err := feeCalc.AddFeesFor(insDimensions); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		targetFee += feeCalc.Fee
@@ -668,7 +668,7 @@ func (h *handler) FinanceTx(
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
 			}
-			if err := feeCalc.ProcessFees(outDimensions); err != nil {
+			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
 			targetFee += feeCalc.Fee
@@ -701,7 +701,7 @@ func (h *handler) FinanceTx(
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
 			}
-			if err := feeCalc.ProcessFees(outDimensions); err != nil {
+			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
 

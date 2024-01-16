@@ -3,7 +3,11 @@
 
 package fees
 
-import "github.com/ava-labs/avalanchego/utils/math"
+import (
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/utils/math"
+)
 
 // Fees are not dynamic yet. We'll add mechanism for fee updating iterativelly
 
@@ -48,6 +52,7 @@ func NewManager(unitFees Dimensions) *Manager {
 	}
 }
 
+// CalculateFee must be a stateless method
 func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	fee := uint64(0)
 
@@ -88,6 +93,22 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 		m.cumulatedUnits[i] = consumed
 	}
 	return false, 0
+}
+
+// Sometimes, e.g. while building a tx, we'd like freedom to speculatively add units
+// and to remove them later on. [RemoveUnits] grants this freedom
+func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
+	var revertedUnits Dimensions
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		prev, err := math.Sub(m.cumulatedUnits[i], unitsToRm[i])
+		if err != nil {
+			return fmt.Errorf("%w: dimension %d", err, i)
+		}
+		revertedUnits[i] = prev
+	}
+
+	m.cumulatedUnits = revertedUnits
+	return nil
 }
 
 func (m *Manager) GetCumulatedUnits() Dimensions {
