@@ -102,7 +102,7 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
+	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 1)
 	tls := tlsCert.PrivateKey.(crypto.Signer)
 
 	peer := Start(
