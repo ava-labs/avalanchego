@@ -7,12 +7,15 @@ import (
 	"crypto/rand"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -34,19 +37,77 @@ const (
 
 var _ validators.SetCallbackListener = (*ipTracker)(nil)
 
-func newIPTracker(log logging.Logger) (*ipTracker, error) {
+func newIPTracker(
+	log logging.Logger,
+	namespace string,
+	registerer prometheus.Registerer,
+) (*ipTracker, error) {
 	tracker := &ipTracker{
-		log:                    log,
+		log: log,
+		numValidatorIPs: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "validator_ips",
+			Help:      "Number of known validator IPs",
+		}),
+		numGossipable: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "gossipable_ips",
+			Help:      "Number of IPs this node is willing to gossip",
+		}),
+		bloomCount: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "ip_bloom_count",
+			Help:      "Number of IP entries added to the bloom",
+		}),
+		bloomNumHashes: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "ip_bloom_hashes",
+			Help:      "Number of hashes in the IP bloom",
+		}),
+		bloomNumEntries: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "ip_bloom_entries",
+			Help:      "Number of entry slots in the IP bloom",
+		}),
+		bloomMaxCount: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "ip_bloom_max_count",
+			Help:      "Maximum number of IP entries that can be added to the bloom before resetting",
+		}),
+		bloomResetCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "ip_bloom_reset_count",
+			Help:      "Number times the IP bloom has been reset",
+		}),
 		connected:              make(map[ids.NodeID]*ips.ClaimedIPPort),
 		mostRecentValidatorIPs: make(map[ids.NodeID]*ips.ClaimedIPPort),
 		gossipableIndicies:     make(map[ids.NodeID]int),
 		bloomAdditions:         make(map[ids.NodeID]int),
 	}
+	err := utils.Err(
+		registerer.Register(tracker.numValidatorIPs),
+		registerer.Register(tracker.numGossipable),
+		registerer.Register(tracker.bloomCount),
+		registerer.Register(tracker.bloomNumHashes),
+		registerer.Register(tracker.bloomNumEntries),
+		registerer.Register(tracker.bloomMaxCount),
+		registerer.Register(tracker.bloomResetCount),
+	)
+	if err != nil {
+		return nil, err
+	}
 	return tracker, tracker.resetBloom()
 }
 
 type ipTracker struct {
-	log logging.Logger
+	log             logging.Logger
+	numValidatorIPs prometheus.Gauge
+	numGossipable   prometheus.Gauge
+	bloomCount      prometheus.Gauge
+	bloomNumHashes  prometheus.Gauge
+	bloomNumEntries prometheus.Gauge
+	bloomMaxCount   prometheus.Gauge
+	bloomResetCount prometheus.Counter
 
 	lock sync.RWMutex
 	// Manually tracked nodes are always treated like validators
@@ -220,12 +281,16 @@ func (i *ipTracker) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	}
 
 	delete(i.mostRecentValidatorIPs, nodeID)
+	i.numValidatorIPs.Set(float64(len(i.mostRecentValidatorIPs)))
+
 	i.validators.Remove(nodeID)
 	i.removeGossipableIP(nodeID)
 }
 
 func (i *ipTracker) updateMostRecentValidatorIP(ip *ips.ClaimedIPPort) {
 	i.mostRecentValidatorIPs[ip.NodeID] = ip
+	i.numValidatorIPs.Set(float64(len(i.mostRecentValidatorIPs)))
+
 	oldCount := i.bloomAdditions[ip.NodeID]
 	if oldCount >= maxIPEntriesPerValidator {
 		return
@@ -250,11 +315,13 @@ func (i *ipTracker) updateMostRecentValidatorIP(ip *ips.ClaimedIPPort) {
 
 	i.bloomAdditions[ip.NodeID] = oldCount + 1
 	bloom.Add(i.bloom, ip.GossipID[:], i.bloomSalt)
+	i.bloomCount.Inc()
 }
 
 func (i *ipTracker) addGossipableIP(ip *ips.ClaimedIPPort) {
 	i.gossipableIndicies[ip.NodeID] = len(i.gossipableIPs)
 	i.gossipableIPs = append(i.gossipableIPs, ip)
+	i.numGossipable.Inc()
 }
 
 func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
@@ -273,6 +340,7 @@ func (i *ipTracker) removeGossipableIP(nodeID ids.NodeID) {
 	delete(i.gossipableIndicies, nodeID)
 	i.gossipableIPs[newNumGossipable] = nil
 	i.gossipableIPs = i.gossipableIPs[:newNumGossipable]
+	i.numGossipable.Dec()
 }
 
 // GetGossipableIPs returns the latest IPs of connected validators. The returned
@@ -360,5 +428,10 @@ func (i *ipTracker) resetBloom() error {
 		bloom.Add(newFilter, ip.GossipID[:], newSalt)
 		i.bloomAdditions[nodeID] = 1
 	}
+	i.bloomCount.Set(float64(len(i.mostRecentValidatorIPs)))
+	i.bloomNumHashes.Set(float64(numHashes))
+	i.bloomNumEntries.Set(float64(numEntries))
+	i.bloomMaxCount.Set(float64(i.maxBloomCount))
+	i.bloomResetCount.Inc()
 	return nil
 }
