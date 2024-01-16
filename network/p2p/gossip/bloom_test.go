@@ -79,7 +79,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			bloom, err := NewBloomFilter(prometheus.NewRegistry(), tt.minTargetElements, tt.targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
+			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", tt.minTargetElements, tt.targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
 			require.NoError(err)
 
 			var resetCount uint64

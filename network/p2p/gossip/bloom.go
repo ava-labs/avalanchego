@@ -43,6 +43,7 @@ func newBloomFilterMetrics(
 // other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
 	registerer prometheus.Registerer,
+	namespace string,
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
@@ -56,7 +57,7 @@ func NewBloomFilter(
 		return nil, err
 	}
 
-	metrics, err := newBloomFilterMetrics(registerer, "bloom_filter")
+	metrics, err := newBloomFilterMetrics(registerer, namespace)
 	if err != nil {
 		return nil, err
 	}
