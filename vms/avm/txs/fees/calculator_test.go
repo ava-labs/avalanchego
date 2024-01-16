@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package executor
+package fees
 
 import (
 	"reflect"
@@ -57,7 +57,7 @@ type feeTests struct {
 	description      string
 	cfgAndChainTimeF func() (*config.Config, time.Time)
 	expectedError    error
-	checksF          func(*testing.T, *FeeCalculator)
+	checksF          func(*testing.T, *Calculator)
 }
 
 func TestBaseTxFees(t *testing.T) {
@@ -88,7 +88,7 @@ func TestBaseTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -105,16 +105,16 @@ func TestBaseTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 2922*units.MicroAvax, fc.Fee)
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 2920*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						224,
 						1090,
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -132,7 +132,7 @@ func TestBaseTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -140,12 +140,12 @@ func TestBaseTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Codec:      codec,
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Codec:       codec,
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -174,7 +174,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+							Addrs:     []ids.ShortID{feeTestKeys[0].PublicKey().Address()},
 						},
 					},
 				},
@@ -200,7 +200,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.CreateAssetTxFee, fc.Fee)
 			},
 		},
@@ -217,16 +217,16 @@ func TestCreateAssetTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 2987*units.MicroAvax, fc.Fee)
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 2985*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						289,
 						1090,
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -239,12 +239,12 @@ func TestCreateAssetTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[0] = uint64(len(sTx.Bytes())) - 1
+				cfg.DefaultBlockMaxConsumedUnits[0] = 289 - 1
 
 				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -252,12 +252,12 @@ func TestCreateAssetTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Codec:      codec,
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Codec:       codec,
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -312,7 +312,7 @@ func TestOperationTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -329,16 +329,16 @@ func TestOperationTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3043*units.MicroAvax, fc.Fee)
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3041*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						345,
 						1090,
 						172,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -356,7 +356,7 @@ func TestOperationTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -364,12 +364,12 @@ func TestOperationTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Codec:      codec,
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Codec:       codec,
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -420,7 +420,7 @@ func TestImportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -437,16 +437,16 @@ func TestImportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3046*units.MicroAvax, fc.Fee)
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 5494*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
-						1090,
-						172,
+						348,
+						2180,
+						262,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -464,7 +464,7 @@ func TestImportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -472,12 +472,12 @@ func TestImportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Codec:      codec,
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Codec:       codec,
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -518,7 +518,7 @@ func TestExportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
+			checksF: func(t *testing.T, fc *Calculator) {
 				require.Equal(t, fc.Config.TxFee, fc.Fee)
 			},
 		},
@@ -535,16 +535,16 @@ func TestExportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: nil,
-			checksF: func(t *testing.T, fc *FeeCalculator) {
-				require.Equal(t, 3038*units.MicroAvax, fc.Fee)
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3282*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
-						uint64(len(sTx.Bytes())),
+						340,
 						1090,
-						172,
+						254,
 						0,
 					},
-					fc.feeManager.GetCumulatedUnits(),
+					fc.FeeManager.GetCumulatedUnits(),
 				)
 			},
 		},
@@ -562,7 +562,7 @@ func TestExportTxFees(t *testing.T) {
 				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *FeeCalculator) {},
+			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -570,12 +570,12 @@ func TestExportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
-			fc := &FeeCalculator{
-				feeManager: fees.NewManager(cfg.DefaultUnitFees),
-				Codec:      codec,
-				Config:     cfg,
-				ChainTime:  chainTime,
-				Tx:         sTx,
+			fc := &Calculator{
+				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
+				Codec:       codec,
+				Config:      cfg,
+				ChainTime:   chainTime,
+				Credentials: sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
