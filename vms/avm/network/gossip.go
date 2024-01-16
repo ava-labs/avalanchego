@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -65,6 +66,7 @@ func (g *txParser) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 
 func newGossipMempool(
 	mempool mempool.Mempool,
+	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
 	parser txs.Parser,
@@ -72,7 +74,7 @@ func newGossipMempool(
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
 ) (*gossipMempool, error) {
-	bloom, err := gossip.NewBloomFilter(minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
+	bloom, err := gossip.NewBloomFilter(registerer, minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
 		Mempool:    mempool,
 		log:        log,

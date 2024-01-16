@@ -11,7 +11,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
@@ -20,7 +21,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 		minTargetElements              int
 		targetFalsePositiveProbability float64
 		resetFalsePositiveProbability  float64
-		reset                          bool
+		resetCount                     uint64
 		add                            []*testTx
 		expected                       []*testTx
 	}{
@@ -29,7 +30,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			minTargetElements:              1,
 			targetFalsePositiveProbability: 0.01,
 			resetFalsePositiveProbability:  1,
-			reset:                          false, // maxCount = 9223372036854775807
+			resetCount:                     0, // maxCount = 9223372036854775807
 			add: []*testTx{
 				{id: ids.ID{0}},
 				{id: ids.ID{1}},
@@ -46,7 +47,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			minTargetElements:              1,
 			targetFalsePositiveProbability: 0.01,
 			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
-			reset:                          true,
+			resetCount:                     1,
 			add: []*testTx{
 				{id: ids.ID{0}},
 				{id: ids.ID{1}},
@@ -56,35 +57,41 @@ func TestBloomFilterRefresh(t *testing.T) {
 				{id: ids.ID{2}},
 			},
 		},
+		{
+			name:                           "multiple refresh",
+			minTargetElements:              1,
+			targetFalsePositiveProbability: 0.01,
+			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
+			resetCount:                     2,
+			add: []*testTx{
+				{id: ids.ID{0}},
+				{id: ids.ID{1}},
+				{id: ids.ID{2}},
+				{id: ids.ID{3}},
+				{id: ids.ID{4}},
+			},
+			expected: []*testTx{
+				{id: ids.ID{4}},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			numHashes, numEntries := bloom.OptimalParameters(
-				tt.minTargetElements,
-				tt.targetFalsePositiveProbability,
-			)
-			b, err := bloom.New(numHashes, numEntries)
+			bloom, err := NewBloomFilter(prometheus.NewRegistry(), tt.minTargetElements, tt.targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
 			require.NoError(err)
-			bloom := BloomFilter{
-				bloom:                          b,
-				maxCount:                       bloom.EstimateCount(numHashes, numEntries, tt.resetFalsePositiveProbability),
-				minTargetElements:              tt.minTargetElements,
-				targetFalsePositiveProbability: tt.targetFalsePositiveProbability,
-				resetFalsePositiveProbability:  tt.resetFalsePositiveProbability,
-			}
 
-			var didReset bool
+			var resetCount uint64
 			for _, item := range tt.add {
 				bloomBytes, saltBytes := bloom.Marshal()
 				initialBloomBytes := slices.Clone(bloomBytes)
 				initialSaltBytes := slices.Clone(saltBytes)
 
-				reset, err := ResetBloomFilterIfNeeded(&bloom, len(tt.add))
+				reset, err := ResetBloomFilterIfNeeded(bloom, len(tt.add))
 				require.NoError(err)
 				if reset {
-					didReset = reset
+					resetCount++
 				}
 				bloom.Add(item)
 
@@ -92,7 +99,8 @@ func TestBloomFilterRefresh(t *testing.T) {
 				require.Equal(initialSaltBytes, saltBytes)
 			}
 
-			require.Equal(tt.reset, didReset)
+			require.Equal(tt.resetCount, resetCount)
+			require.Equal(float64(tt.resetCount), testutil.ToFloat64(bloom.metrics.resetCount))
 			for _, expected := range tt.expected {
 				require.True(bloom.Has(expected))
 			}

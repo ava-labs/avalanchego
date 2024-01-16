@@ -7,9 +7,33 @@ import (
 	"crypto/rand"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+type bloomFilterMetrics struct {
+	resetCount prometheus.Counter
+}
+
+// newBloomFilterMetrics returns a common set of metrics
+func newBloomFilterMetrics(
+	registerer prometheus.Registerer,
+	namespace string,
+) (bloomFilterMetrics, error) {
+	m := bloomFilterMetrics{
+		resetCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reset_count",
+			Help:      "reset count of bloom filter (n)",
+		}),
+	}
+	err := utils.Err(
+		registerer.Register(m.resetCount),
+	)
+	return m, err
+}
 
 // NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
 // anticipated at any moment, and a false positive probability of [targetFalsePositiveProbability]. If the
@@ -18,6 +42,7 @@ import (
 // Invariant: The returned bloom filter is not safe to reset concurrently with
 // other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
+	registerer prometheus.Registerer,
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
@@ -31,11 +56,18 @@ func NewBloomFilter(
 		return nil, err
 	}
 
+	metrics, err := newBloomFilterMetrics(registerer, "bloom_filter")
+	if err != nil {
+		return nil, err
+	}
+
 	salt, err := randomSalt()
 	return &BloomFilter{
 		minTargetElements:              minTargetElements,
 		targetFalsePositiveProbability: targetFalsePositiveProbability,
 		resetFalsePositiveProbability:  resetFalsePositiveProbability,
+
+		metrics: metrics,
 
 		maxCount: bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability),
 		bloom:    b,
@@ -47,6 +79,8 @@ type BloomFilter struct {
 	minTargetElements              int
 	targetFalsePositiveProbability float64
 	resetFalsePositiveProbability  float64
+
+	metrics bloomFilterMetrics
 
 	maxCount int
 	bloom    *bloom.Filter
@@ -103,6 +137,8 @@ func ResetBloomFilterIfNeeded(
 	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, bloomFilter.resetFalsePositiveProbability)
 	bloomFilter.bloom = newBloom
 	bloomFilter.salt = salt
+
+	bloomFilter.metrics.resetCount.Inc()
 	return true, nil
 }
 
