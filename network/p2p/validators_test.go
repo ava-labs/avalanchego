@@ -158,7 +158,7 @@ func TestValidatorsSample(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockValidators := validators.NewMockState(ctrl)
 
-			calls := make([]*gomock.Call, 0)
+			calls := make([]any, 0)
 			for _, call := range tt.calls {
 				calls = append(calls, mockValidators.EXPECT().
 					GetCurrentHeight(gomock.Any()).Return(call.height, call.getCurrentHeightErr))
