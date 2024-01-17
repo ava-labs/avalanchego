@@ -41,6 +41,7 @@ The plugin version is updated to `31` all plugins must update to be compatible.
 - Fixed `platformvm.SetPreference` to correctly reset the block building timer
 - Fixed early bootstrapping termination
 - Fixed duplicated transaction initialization in the X-chain and P-chain
+- Fixed IP gossip when using dynamically allocated staking ports
 - Updated `golang.org/x/exp` dependency to fix downstream compilation errors
 - Updated `golang.org/x/crypto` dependency to address `CVE-2023-48795`
 - Updated minimum golang version to address `CVE-2023-39326`
