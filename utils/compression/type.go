@@ -35,8 +35,6 @@ func TypeFromString(s string) (Type, error) {
 	switch s {
 	case TypeNone.String():
 		return TypeNone, nil
-	case TypeGzip.String():
-		return TypeGzip, nil
 	case TypeZstd.String():
 		return TypeZstd, nil
 	default:

@@ -12,7 +12,7 @@ import (
 func TestTypeString(t *testing.T) {
 	require := require.New(t)
 
-	for _, compressionType := range []Type{TypeNone, TypeGzip, TypeZstd} {
+	for _, compressionType := range []Type{TypeNone, TypeZstd} {
 		s := compressionType.String()
 		parsedType, err := TypeFromString(s)
 		require.NoError(err)
@@ -20,6 +20,9 @@ func TestTypeString(t *testing.T) {
 	}
 
 	_, err := TypeFromString("unknown")
+	require.ErrorIs(err, errUnknownCompressionType)
+
+	_, err = TypeFromString(TypeGzip.String())
 	require.ErrorIs(err, errUnknownCompressionType)
 }
 
