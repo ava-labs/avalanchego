@@ -15,43 +15,6 @@ import (
 
 const pruneCommitPeriod = 1024
 
-// shouldHeightIndexBeRepaired checks if index needs repairing and stores a
-// checkpoint if repairing is needed.
-//
-// vm.ctx.Lock should be held
-func (vm *VM) shouldHeightIndexBeRepaired(ctx context.Context) (bool, error) {
-	_, err := vm.State.GetCheckpoint()
-	if err != database.ErrNotFound {
-		return true, err
-	}
-
-	// no checkpoint. Either index is complete or repair was never attempted.
-	// index is complete iff lastAcceptedBlock is indexed
-	latestProBlkID, err := vm.State.GetLastAccepted()
-	if err == database.ErrNotFound {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-
-	lastAcceptedBlk, err := vm.getPostForkBlock(ctx, latestProBlkID)
-	if err != nil {
-		// Could not retrieve last accepted block.
-		return false, err
-	}
-
-	_, err = vm.State.GetBlockIDAtHeight(lastAcceptedBlk.Height())
-	if err != database.ErrNotFound {
-		return false, err
-	}
-
-	// Index needs repairing. Mark the checkpoint so that, in case new blocks
-	// are accepted after the lock is released here but before indexing has
-	// started, we do not miss rebuilding the full index.
-	return true, vm.State.SetCheckpoint(latestProBlkID)
-}
-
 // vm.ctx.Lock should be held
 func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	// The indexer will only report that the index has been repaired if the
