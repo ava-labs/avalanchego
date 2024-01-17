@@ -17,8 +17,6 @@ const pruneCommitPeriod = 1024
 
 // vm.ctx.Lock should be held
 func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
-	// The indexer will only report that the index has been repaired if the
-	// underlying VM supports indexing.
 	switch forkHeight, err := vm.State.GetForkHeight(); err {
 	case nil:
 		if height < forkHeight {
