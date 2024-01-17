@@ -19,7 +19,7 @@ import (
 
 // MockTransferableOut is a mock of TransferableOut interface.
 type MockTransferableOut struct {
-	verify.IsState	
+	verify.IsState
 
 	ctrl     *gomock.Controller
 	recorder *MockTransferableOutMockRecorder
