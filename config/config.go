@@ -58,16 +58,20 @@ const (
 	ipcDeprecationMsg                    = "IPC API is deprecated"
 	keystoreDeprecationMsg               = "keystore API is deprecated"
 	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
+	peerListPushGossipDeprecationMsg     = "push-based peer list gossip is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{
-		IpcAPIEnabledKey:      ipcDeprecationMsg,
-		IpcsChainIDsKey:       ipcDeprecationMsg,
-		IpcsPathKey:           ipcDeprecationMsg,
+	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
+	deprecatedKeys                = map[string]string{
+		IpcAPIEnabledKey: ipcDeprecationMsg,
+		IpcsChainIDsKey:  ipcDeprecationMsg,
+		IpcsPathKey:      ipcDeprecationMsg,
+
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
+
 		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
@@ -75,8 +79,13 @@ var (
 		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
 
-		SnowRogueCommitThresholdKey:    fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
-		SnowVirtuousCommitThresholdKey: fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
+		NetworkPeerListValidatorGossipSizeKey:    peerListPushGossipDeprecationMsg,
+		NetworkPeerListNonValidatorGossipSizeKey: peerListPushGossipDeprecationMsg,
+		NetworkPeerListPeersGossipSizeKey:        peerListPushGossipDeprecationMsg,
+		NetworkPeerListGossipFreqKey:             peerListPushGossipDeprecationMsg,
+
+		SnowRogueCommitThresholdKey:    commitThresholdDeprecationMsg,
+		SnowVirtuousCommitThresholdKey: commitThresholdDeprecationMsg,
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
