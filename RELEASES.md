@@ -53,6 +53,8 @@ The plugin version is updated to `31` all plugins must update to be compatible.
     - `network-peer-list-non-validator-gossip-size`
     - `network-peer-list-peers-gossip-size`
     - `network-peer-list-gossip-frequency`
+- Removed:
+  - `gzip` as an option for `network-compression-type`
 
 ### Fixes
 
