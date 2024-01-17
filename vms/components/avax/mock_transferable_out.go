@@ -13,11 +13,14 @@ import (
 	reflect "reflect"
 
 	snow "github.com/ava-labs/avalanchego/snow"
+	verify "github.com/ava-labs/avalanchego/vms/components/verify"
 	gomock "go.uber.org/mock/gomock"
 )
 
 // MockTransferableOut is a mock of TransferableOut interface.
 type MockTransferableOut struct {
+	verify.IsState	
+
 	ctrl     *gomock.Controller
 	recorder *MockTransferableOutMockRecorder
 }

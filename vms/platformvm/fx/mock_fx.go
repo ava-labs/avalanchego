@@ -13,6 +13,7 @@ import (
 	reflect "reflect"
 
 	snow "github.com/ava-labs/avalanchego/snow"
+	verify "github.com/ava-labs/avalanchego/vms/components/verify"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -126,6 +127,8 @@ func (mr *MockFxMockRecorder) VerifyTransfer(arg0, arg1, arg2, arg3 any) *gomock
 
 // MockOwner is a mock of Owner interface.
 type MockOwner struct {
+	verify.IsNotState
+
 	ctrl     *gomock.Controller
 	recorder *MockOwnerMockRecorder
 }
