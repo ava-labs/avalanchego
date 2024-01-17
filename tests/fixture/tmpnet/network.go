@@ -493,11 +493,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		}
 		subnetIDs = append(subnetIDs, subnet.SubnetID.String())
 	}
-	subnetIDsValue := ""
-	if len(subnetIDs) > 0 {
-		subnetIDsValue = strings.Join(subnetIDs, ",")
-	}
-	flags[config.TrackSubnetsKey] = subnetIDsValue
+	flags[config.TrackSubnetsKey] = strings.Join(subnetIDs, ",")
 
 	return nil
 }

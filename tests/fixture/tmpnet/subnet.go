@@ -29,7 +29,7 @@ const defaultSubnetDirName = "subnets"
 
 type Chain struct {
 	// Set statically
-	VMName  string
+	VMID    ids.ID
 	Config  string
 	Genesis []byte
 
@@ -131,17 +131,12 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 	}
 
 	for _, chain := range s.Chains {
-		vmID, err := GetVMID(chain.VMName)
-		if err != nil {
-			return fmt.Errorf("failed to derive VM ID from its name: %w", err)
-		}
-
 		createChainTx, err := pWallet.IssueCreateChainTx(
 			s.SubnetID,
 			chain.Genesis,
-			vmID,
+			chain.VMID,
 			nil,
-			chain.VMName,
+			"",
 			common.WithContext(ctx),
 		)
 		if err != nil {
@@ -149,7 +144,7 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 		}
 		chain.ChainID = createChainTx.ID()
 
-		if _, err := fmt.Fprintf(w, " created chain %q for VM %q on subnet %q\n", chain.ChainID, chain.VMName, s.Name); err != nil {
+		if _, err := fmt.Fprintf(w, " created chain %q for VM %q on subnet %q\n", chain.ChainID, chain.VMID, s.Name); err != nil {
 			return err
 		}
 	}
