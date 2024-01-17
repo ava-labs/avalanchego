@@ -153,3 +153,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/ava-labs/coreth => github.com/ava-labs/subnet-evm/coreth v0.0.0-20240117212300-26605dff00ad
