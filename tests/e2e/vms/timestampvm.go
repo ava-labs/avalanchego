@@ -29,7 +29,7 @@ var (
 		Name: tsvmSubnetName,
 		Chains: []*tmpnet.Chain{
 			{
-				VMName:  "timestamp",
+				VMID:    timestampvm.VMID,
 				Genesis: genesisBytes,
 				Config:  "{}",
 			},

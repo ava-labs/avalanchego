@@ -33,6 +33,8 @@ const (
 )
 
 var (
+	VMID ids.ID
+
 	errNoPendingBlocks = errors.New("there is no block to propose")
 	errBadGenesisBytes = errors.New("genesis data should be bytes (max length 32)")
 	Version            = &version.Semantic{
@@ -43,6 +45,14 @@ var (
 
 	_ block.ChainVM = (*VM)(nil)
 )
+
+func init() {
+	var err error
+	VMID, err = ids.FromString("tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH")
+	if err != nil {
+		panic(err)
+	}
+}
 
 // VM implements the snowman.VM interface
 // Each block in this chain contains a Unix timestamp
