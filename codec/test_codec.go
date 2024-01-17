@@ -15,6 +15,7 @@ import (
 var (
 	Tests = []func(c GeneralCodec, t testing.TB){
 		TestStruct,
+		TestPartiallyFilledStruct,
 		TestRegisterStructTwice,
 		TestUInt32,
 		TestUIntPtr,
@@ -130,6 +131,31 @@ type myStruct struct {
 	Int64        int64                       `serialize:"true"`
 	Bool         bool                        `serialize:"true"`
 	String       string                      `serialize:"true"`
+}
+
+func TestPartiallyFilledStruct(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	// a nil point cannot be marshalled but we can get its size
+	var nilStruct *myStruct
+	_, err := manager.Marshal(0, nilStruct)
+	require.ErrorIs(err, ErrMarshalNil)
+
+	bytesLen, err := manager.Size(0, nilStruct)
+	require.NoError(err)
+	require.Equal(CodecVersionSize, bytesLen)
+
+	// empty struct cannot be marshalled but we can get its size
+	emptyStruct := &myStruct{}
+	_, err = manager.Marshal(0, nilStruct)
+	require.ErrorIs(err, ErrMarshalNil)
+
+	bytesLen, err = manager.Size(0, emptyStruct)
+	require.NoError(err)
+	require.Equal(119, bytesLen)
 }
 
 // Test marshaling/unmarshaling a complicated struct
