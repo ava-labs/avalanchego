@@ -24,7 +24,6 @@ type blockMetrics struct {
 	accept,
 	reject,
 	// Height metrics
-	verifyHeightIndex,
 	getBlockIDAtHeight,
 	// Block verification with context metrics
 	shouldVerifyWithContext,
@@ -69,7 +68,6 @@ func (m *blockMetrics) Initialize(
 	m.shouldVerifyWithContext = newAverager(namespace, "should_verify_with_context", reg, &errs)
 	m.verifyWithContext = newAverager(namespace, "verify_with_context", reg, &errs)
 	m.verifyWithContextErr = newAverager(namespace, "verify_with_context_err", reg, &errs)
-	m.verifyHeightIndex = newAverager(namespace, "verify_height_index", reg, &errs)
 	m.getBlockIDAtHeight = newAverager(namespace, "get_block_id_at_height", reg, &errs)
 
 	if supportsBlockBuildingWithContext {

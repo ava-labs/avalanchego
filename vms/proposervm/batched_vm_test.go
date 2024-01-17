@@ -1032,9 +1032,6 @@ func initTestRemoteProposerVM(
 			return nil, errUnknownBlock
 		}
 	}
-	coreVM.VerifyHeightIndexF = func(context.Context) error {
-		return nil
-	}
 
 	proVM := New(
 		coreVM,

@@ -150,14 +150,6 @@ func (vm *blockVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return lastAcceptedID, err
 }
 
-func (vm *blockVM) VerifyHeightIndex(ctx context.Context) error {
-	start := vm.clock.Time()
-	err := vm.ChainVM.VerifyHeightIndex(ctx)
-	end := vm.clock.Time()
-	vm.blockMetrics.verifyHeightIndex.Observe(float64(end.Sub(start)))
-	return err
-}
-
 func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	start := vm.clock.Time()
 	blockID, err := vm.ChainVM.GetBlockIDAtHeight(ctx, height)

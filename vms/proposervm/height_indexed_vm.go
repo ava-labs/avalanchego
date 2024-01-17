@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 const pruneCommitPeriod = 1024
@@ -54,19 +53,7 @@ func (vm *VM) shouldHeightIndexBeRepaired(ctx context.Context) (bool, error) {
 }
 
 // vm.ctx.Lock should be held
-func (vm *VM) VerifyHeightIndex(context.Context) error {
-	if !vm.hIndexer.IsRepaired() {
-		return block.ErrIndexIncomplete
-	}
-	return nil
-}
-
-// vm.ctx.Lock should be held
 func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
-	if !vm.hIndexer.IsRepaired() {
-		return ids.Empty, block.ErrIndexIncomplete
-	}
-
 	// The indexer will only report that the index has been repaired if the
 	// underlying VM supports indexing.
 	switch forkHeight, err := vm.State.GetForkHeight(); err {
@@ -83,31 +70,6 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	default:
 		return ids.Empty, err
 	}
-}
-
-// As postFork blocks/options are accepted, height index is updated even if its
-// repairing is ongoing. vm.ctx.Lock should be held
-func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	_, err := vm.State.GetCheckpoint()
-	switch err {
-	case nil:
-		// Index rebuilding is ongoing. We can update the index with the current
-		// block.
-
-	case database.ErrNotFound:
-		// No checkpoint means indexing has either not started or is already
-		// done.
-		if !vm.hIndexer.IsRepaired() {
-			return nil
-		}
-
-		// Indexing must have finished. We can update the index with the current
-		// block.
-
-	default:
-		return fmt.Errorf("failed to load index checkpoint: %w", err)
-	}
-	return vm.storeHeightEntry(height, blkID)
 }
 
 func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {

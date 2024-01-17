@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -90,7 +89,6 @@ type VM struct {
 	ssVM           block.StateSyncableVM
 
 	state.State
-	hIndexer indexer.HeightIndexer
 
 	proposer.Windower
 	tree.Tree
@@ -192,10 +190,6 @@ func (vm *VM) Initialize(
 	}
 	vm.innerBlkCache = innerBlkCache
 
-	indexerDB := versiondb.New(vm.db)
-	indexerState := state.New(indexerDB)
-	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
-
 	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
 	vm.toScheduler = vmToEngine
@@ -225,7 +219,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repair(detachedCtx); err != nil {
+	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
 		return err
 	}
 
@@ -434,104 +428,6 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 		return vm.ChainVM.LastAccepted(ctx)
 	}
 	return lastAccepted, err
-}
-
-// repair makes sure that vm and innerVM chains are in sync.
-// Moreover it fixes vm's height index if defined.
-func (vm *VM) repair(ctx context.Context) error {
-	switch err := vm.ChainVM.VerifyHeightIndex(ctx); err {
-	case nil:
-		// InnerVM height index is complete. We can immediately verify
-		// and repair this VM height index.
-		shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
-		if err != nil {
-			return err
-		}
-		if !shouldRepair {
-			vm.ctx.Log.Info("block height index was successfully verified")
-			vm.hIndexer.MarkRepaired(true)
-			return vm.repairAcceptedChainByHeight(ctx)
-		}
-	case block.ErrIndexIncomplete:
-	default:
-		return err
-	}
-
-	if vm.NumHistoricalBlocks != 0 {
-		vm.ctx.Log.Fatal("block height index must be valid when pruning historical blocks")
-		return errHeightIndexInvalidWhilePruning
-	}
-
-	// innerVM height index is incomplete. Sync vm and innerVM chains first.
-	if err := vm.repairAcceptedChainByIteration(ctx); err != nil {
-		return err
-	}
-
-	// asynchronously rebuild height index, if needed
-	go func() {
-		// Poll until the underlying chain's index is complete or shutdown is
-		// called.
-		ticker := time.NewTicker(checkIndexedFrequency)
-		defer ticker.Stop()
-		for {
-			// The underlying VM expects the lock to be held here.
-			vm.ctx.Lock.Lock()
-			err := vm.ChainVM.VerifyHeightIndex(ctx)
-			vm.ctx.Lock.Unlock()
-
-			if err == nil {
-				// innerVM indexing complete. Let's re-index this VM
-				break
-			}
-			if err != block.ErrIndexIncomplete {
-				vm.ctx.Log.Error("block height indexing failed",
-					zap.Error(err),
-				)
-				return
-			}
-
-			// innerVM index is incomplete. Wait for completion and retry
-			select {
-			case <-vm.context.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-
-		vm.ctx.Lock.Lock()
-		shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
-		vm.ctx.Lock.Unlock()
-
-		if err != nil {
-			vm.ctx.Log.Error("could not verify height indexing status",
-				zap.Error(err),
-			)
-			return
-		}
-		if !shouldRepair {
-			vm.ctx.Log.Info("block height indexing is already complete")
-			vm.hIndexer.MarkRepaired(true)
-			return
-		}
-
-		err = vm.hIndexer.RepairHeightIndex(vm.context)
-		if err == nil {
-			vm.ctx.Log.Info("block height indexing finished")
-			return
-		}
-
-		// Note that we don't check if `err` is `context.Canceled` here because
-		// repairing the height index may have returned a non-standard error
-		// due to the chain shutting down.
-		if vm.context.Err() == nil {
-			// The context wasn't closed, so the chain hasn't been shutdown.
-			// This must have been an unexpected error.
-			vm.ctx.Log.Error("block height indexing failed",
-				zap.Error(err),
-			)
-		}
-	}()
-	return nil
 }
 
 func (vm *VM) repairAcceptedChainByIteration(ctx context.Context) error {
@@ -845,7 +741,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
 		return err
 	}
-	if err := vm.updateHeightIndex(height, blkID); err != nil {
+	if err := vm.storeHeightEntry(height, blkID); err != nil {
 		return err
 	}
 	return vm.db.Commit()
