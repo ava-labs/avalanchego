@@ -7,5 +7,5 @@ vms/avm/txs/tx.go==vms/avm/txs/mock_unsigned_tx.go
 vms/platformvm/block/executor/manager.go==vms/platformvm/block/executor/mock_manager.go
 vms/platformvm/txs/staker_tx.go=ValidatorTx,DelegatorTx,StakerTx,PermissionlessStaker=vms/platformvm/txs/mock_staker_tx.go
 vms/platformvm/txs/unsigned_tx.go==vms/platformvm/txs/mock_unsigned_tx.go
-x/merkledb/db.go==x/merkledb/mock_db.go
+x/merkledb/db.go=ChangeProofer,RangeProofer,Clearer,Prefetcher=x/merkledb/mock_db.go
 x/sync/network_client.go==x/sync/mock_network_client.go
