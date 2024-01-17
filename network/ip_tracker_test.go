@@ -6,6 +6,9 @@ package network
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,7 +18,7 @@ import (
 )
 
 func newTestIPTracker(t *testing.T) *ipTracker {
-	tracker, err := newIPTracker(logging.NoLog{})
+	tracker, err := newIPTracker(logging.NoLog{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 	return tracker
 }
@@ -39,6 +42,14 @@ func requireEqual(t *testing.T, expected, actual *ipTracker) {
 	require.Equal(expected.gossipableIPs, actual.gossipableIPs)
 	require.Equal(expected.bloomAdditions, actual.bloomAdditions)
 	require.Equal(expected.maxBloomCount, actual.maxBloomCount)
+}
+
+func requireMetricsConsistent(t *testing.T, tracker *ipTracker) {
+	require := require.New(t)
+	require.Equal(float64(len(tracker.mostRecentValidatorIPs)), testutil.ToFloat64(tracker.numValidatorIPs))
+	require.Equal(float64(len(tracker.gossipableIPs)), testutil.ToFloat64(tracker.numGossipable))
+	require.Equal(float64(tracker.bloom.Count()), testutil.ToFloat64(tracker.bloomCount))
+	require.Equal(float64(tracker.maxBloomCount), testutil.ToFloat64(tracker.bloomMaxCount))
 }
 
 func TestIPTracker_ManuallyTrack(t *testing.T) {
@@ -118,6 +129,7 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			test.initialState.ManuallyTrack(test.nodeID)
 			requireEqual(t, test.expectedState, test.initialState)
+			requireMetricsConsistent(t, test.initialState)
 		})
 	}
 }
@@ -235,6 +247,7 @@ func TestIPTracker_AddIP(t *testing.T) {
 			updated := test.initialState.AddIP(test.ip)
 			require.Equal(t, test.expectedUpdated, updated)
 			requireEqual(t, test.expectedState, test.initialState)
+			requireMetricsConsistent(t, test.initialState)
 		})
 	}
 }
@@ -344,6 +357,7 @@ func TestIPTracker_Connected(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			test.initialState.Connected(test.ip)
 			requireEqual(t, test.expectedState, test.initialState)
+			requireMetricsConsistent(t, test.initialState)
 		})
 	}
 }
@@ -416,6 +430,7 @@ func TestIPTracker_Disconnected(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			test.initialState.Disconnected(test.nodeID)
 			requireEqual(t, test.expectedState, test.initialState)
+			requireMetricsConsistent(t, test.initialState)
 		})
 	}
 }
@@ -477,6 +492,7 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			test.initialState.OnValidatorAdded(test.nodeID, nil, ids.Empty, 0)
 			requireEqual(t, test.expectedState, test.initialState)
+			requireMetricsConsistent(t, test.initialState)
 		})
 	}
 }
@@ -577,6 +593,7 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			test.initialState.OnValidatorRemoved(test.nodeID, 0)
 			requireEqual(t, test.expectedState, test.initialState)
+			requireMetricsConsistent(t, test.initialState)
 		})
 	}
 }
@@ -637,9 +654,11 @@ func TestIPTracker_BloomGrowsWithValidatorSet(t *testing.T) {
 	for i := 0; i < 2048; i++ {
 		tracker.onValidatorAdded(ids.GenerateTestNodeID())
 	}
+	requireMetricsConsistent(t, tracker)
 
 	require.NoError(tracker.ResetBloom())
 	require.Greater(tracker.maxBloomCount, initialMaxBloomCount)
+	requireMetricsConsistent(t, tracker)
 }
 
 func TestIPTracker_BloomResetsDynamically(t *testing.T) {
@@ -652,6 +671,7 @@ func TestIPTracker_BloomResetsDynamically(t *testing.T) {
 	tracker.maxBloomCount = 1
 	tracker.Connected(otherIP)
 	tracker.onValidatorAdded(otherIP.NodeID)
+	requireMetricsConsistent(t, tracker)
 
 	bloomBytes, salt := tracker.Bloom()
 	readFilter, err := bloom.Parse(bloomBytes)
@@ -673,6 +693,7 @@ func TestIPTracker_PreventBloomFilterAddition(t *testing.T) {
 	require.True(tracker.AddIP(newerIP))
 	require.True(tracker.AddIP(newestIP))
 	require.Equal(maxIPEntriesPerValidator, tracker.bloomAdditions[ip.NodeID])
+	requireMetricsConsistent(t, tracker)
 }
 
 func TestIPTracker_ShouldVerifyIP(t *testing.T) {
