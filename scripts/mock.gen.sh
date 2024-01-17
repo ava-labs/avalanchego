@@ -14,6 +14,14 @@ then
   go install -v go.uber.org/mock/mockgen@v0.4.0
 fi
 
+mockgenVersion=$(mockgen --version)
+if [ "$mockgenVersion" != "v0.4.0" ]
+then 
+  echo "Invalid mockgen version detected. Install v0.4.0."
+  echo "go install -v go.uber.org/mock/mockgen@v0.4.0"
+  exit 255
+fi
+
 source ./scripts/constants.sh
 
 outputted_files=()
