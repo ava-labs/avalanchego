@@ -11,7 +11,15 @@ The plugin version is updated to `31` all plugins must update to be compatible.
 - Added `info.acps` API
 - Added `supportedACPs` and `objectedACPs` for each peer returned by `info.peers`
 - Added `txs` field to `BanffProposalBlock`'s json format
-- Renamed metrics related to message handling
+- Added metrics:
+  - `avalanche_network_validator_ips`
+  - `avalanche_network_gossipable_ips`
+  - `avalanche_network_ip_bloom_count`
+  - `avalanche_network_ip_bloom_entries`
+  - `avalanche_network_ip_bloom_hashes`
+  - `avalanche_network_ip_bloom_max_count`
+  - `avalanche_network_ip_bloom_reset_count`
+- Renamed metrics related to message handling:
   - `version` -> `handshake`
   - `appRequestFailed` -> `appError`
   - `crossChainAppRequestFailed` -> `crossChainAppError`
@@ -59,6 +67,7 @@ The plugin version is updated to `31` all plugins must update to be compatible.
 - Fixed `merkledb` deletion of the empty key
 - Fixed `merkledb` race condition when interacting with invalidated or closed trie views
 - Fixed `json.Marshal` for `wallet` transactions
+- Fixed duplicate outbound dialer for manually tracked nodes in the p2p network
 
 ### What's Changed
 
