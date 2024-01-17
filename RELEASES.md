@@ -41,6 +41,10 @@ The plugin version is updated to `31` all plugins must update to be compatible.
 - Deprecated:
     - `snow-virtuous-commit-threshold`
     - `snow-rogue-commit-threshold`
+    - `network-peer-list-validator-gossip-size`
+    - `network-peer-list-non-validator-gossip-size`
+    - `network-peer-list-peers-gossip-size`
+    - `network-peer-list-gossip-frequency`
 
 ### Fixes
 
