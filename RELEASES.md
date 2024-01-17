@@ -24,6 +24,9 @@ The plugin version is updated to `31` all plugins must update to be compatible.
 - Added:
   - `--acp-support`
   - `--acp-object`
+  - `snow-commit-threshold`
+  - `network-peer-list-pull-gossip-frequency`
+  - `network-peer-list-bloom-reset-frequency`
   - `network` to the X-chain and P-chain configs including:
     - `max-validator-set-staleness`
     - `target-gossip-size`
@@ -35,6 +38,9 @@ The plugin version is updated to `31` all plugins must update to be compatible.
     - `expected-bloom-filter-false-positive-probability`
     - `max-bloom-filter-false-positive-probability`
     - `legacy-push-gossip-cache-size`
+- Deprecated:
+    - `snow-virtuous-commit-threshold`
+    - `snow-rogue-commit-threshold`
 
 ### Fixes
 
