@@ -36,7 +36,7 @@ The plugin version is unchanged at `30` and is compatible with versions `v1.10.1
 ### Fixes
 
 - Fixed `duplicated operation on provided value` error when executing atomic operations after state syncing the C-chain
-- Removed useage of atomic trie after commitment
+- Removed usage of atomic trie after commitment
 - Fixed atomic trie root overwrite during state sync
 - Prevented closure of `stdout` and `stderr` when shutting down the logger
 
