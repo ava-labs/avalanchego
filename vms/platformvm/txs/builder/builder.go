@@ -348,7 +348,7 @@ func (b *builder) NewImportTx(
 			}
 
 			// update fees to target given the extra input added
-			outDimensions, err := fees.GetOutputsDimensions(changeOut)
+			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
 			if err != nil {
 				return nil, fmt.Errorf("failed calculating output size: %w", err)
 			}

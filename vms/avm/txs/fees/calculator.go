@@ -115,49 +115,6 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	return fc.AddFeesFor(consumedUnits)
 }
 
-func getInputsDimensions(evaluteBandwitdh bool, c codec.Manager, ins []*avax.TransferableInput) (fees.Dimensions, error) {
-	var consumedUnits fees.Dimensions
-
-	for _, in := range ins {
-		cost, err := in.In.Cost()
-		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving cost of input %s: %w", in.ID, err)
-		}
-
-		inSize, err := c.Size(txs.CodecVersion, in)
-		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving size of input %s: %w", in.ID, err)
-		}
-		uInSize := uint64(inSize)
-
-		if evaluteBandwitdh {
-			consumedUnits[fees.Bandwidth] += uInSize - codec.CodecVersionSize
-		}
-		consumedUnits[fees.UTXORead] += cost + uInSize // inputs are read
-		consumedUnits[fees.UTXOWrite] += uInSize       // inputs are deleted
-	}
-	return consumedUnits, nil
-}
-
-func getOutputsDimensions(evaluteBandwitdh bool, c codec.Manager, outs []*avax.TransferableOutput) (fees.Dimensions, error) {
-	var consumedUnits fees.Dimensions
-
-	for _, out := range outs {
-		outSize, err := c.Size(txs.CodecVersion, out)
-		if err != nil {
-			return consumedUnits, fmt.Errorf("failed retrieving size of output %s: %w", out.ID, err)
-		}
-		uOutSize := uint64(outSize)
-
-		if evaluteBandwitdh {
-			consumedUnits[fees.Bandwidth] += uOutSize - codec.CodecVersionSize
-		}
-		consumedUnits[fees.UTXOWrite] += uOutSize
-	}
-
-	return consumedUnits, nil
-}
-
 func (fc *Calculator) commonConsumedUnits(
 	uTx txs.UnsignedTx,
 	allOuts []*avax.TransferableOutput,
@@ -175,19 +132,21 @@ func (fc *Calculator) commonConsumedUnits(
 	}
 	consumedUnits[fees.Bandwidth] = uint64(uTxSize + credsSize)
 
-	inputDimensions, err := getInputsDimensions(false, fc.Codec, allIns)
+	inputDimensions, err := fees.GetInputsDimensions(fc.Codec, txs.CodecVersion, allIns)
 	if err != nil {
 		return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
 	}
+	inputDimensions[fees.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
 	consumedUnits, err = fees.Add(consumedUnits, inputDimensions)
 	if err != nil {
 		return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
 	}
 
-	outputDimensions, err := getOutputsDimensions(false, fc.Codec, allOuts)
+	outputDimensions, err := fees.GetOutputsDimensions(fc.Codec, txs.CodecVersion, allOuts)
 	if err != nil {
 		return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
 	}
+	outputDimensions[fees.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
 	consumedUnits, err = fees.Add(consumedUnits, outputDimensions)
 	if err != nil {
 		return consumedUnits, fmt.Errorf("failed adding outputs: %w", err)
