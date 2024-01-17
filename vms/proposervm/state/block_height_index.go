@@ -44,8 +44,6 @@ type HeightIndexWriter interface {
 // for height indexing. We store checkpoints to be able to duly resume
 // long-running re-indexing ops.
 type HeightIndexBatchSupport interface {
-	versiondb.Commitable
-
 	GetCheckpoint() (ids.ID, error)
 	SetCheckpoint(blkID ids.ID) error
 	DeleteCheckpoint() error
