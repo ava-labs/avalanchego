@@ -145,7 +145,9 @@ func TestManagerVerifyTx(t *testing.T) {
 					Unsigned: unsigned,
 				}
 			},
-			managerF: func(*gomock.Controller) *manager {
+			managerF: func(ctrl *gomock.Controller) *manager {
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Time{})
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
@@ -154,6 +156,7 @@ func TestManagerVerifyTx(t *testing.T) {
 							EForkTime:   mockable.MaxTime,
 						},
 					},
+					state: state,
 				}
 			},
 			expectedErr: errTestSyntacticVerifyFail,
@@ -176,7 +179,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 
 				return &manager{
 					backend: &executor.Backend{
@@ -212,7 +215,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 
 				return &manager{
 					backend: &executor.Backend{
@@ -248,7 +251,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 
 				return &manager{
 					backend: &executor.Backend{

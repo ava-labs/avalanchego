@@ -148,8 +148,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
-		Backend: m.backend,
-		Tx:      tx,
+		Backend:      m.backend,
+		BlkTimestamp: m.state.GetTimestamp(),
+		Tx:           tx,
 	})
 	if err != nil {
 		return err

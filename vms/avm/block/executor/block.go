@@ -77,8 +77,9 @@ func (b *Block) Verify(context.Context) error {
 	// before performing any possible DB reads.
 	for _, tx := range txs {
 		err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
-			Backend: b.manager.backend,
-			Tx:      tx,
+			Backend:      b.manager.backend,
+			BlkTimestamp: newChainTime,
+			Tx:           tx,
 		})
 		if err != nil {
 			txID := tx.ID()
