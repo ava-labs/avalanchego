@@ -556,6 +556,15 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	t.Ctx.Lock.Lock()
 	defer t.Ctx.Lock.Unlock()
 
+	t.Ctx.Log.Verbo("running health check",
+		zap.Uint32("requestID", t.requestID),
+		zap.Int("gossipCounter", t.gossipCounter),
+		zap.Stringer("polls", t.polls),
+		zap.Reflect("outstandingBlockRequests", t.blkReqs),
+		zap.Stringer("blockedJobs", &t.blocked),
+		zap.Int("pendingBuildBlocks", t.pendingBuildBlocks),
+	)
+
 	consensusIntf, consensusErr := t.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := t.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
