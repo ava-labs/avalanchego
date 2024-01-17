@@ -123,8 +123,7 @@ func (m *MockNetworkClient) RequestAny(arg0 context.Context, arg1 *version.Appli
 }
 
 // RequestAny indicates an expected call of RequestAny.
-<<<<<<< HEAD
-func (mr *MockNetworkClientMockRecorder) RequestAny(ctx, minVersion, request any) *gomock.Call {
+func (mr *MockNetworkClientMockRecorder) RequestAny(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestAny", reflect.TypeOf((*MockNetworkClient)(nil).RequestAny), ctx, minVersion, request)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestAny", reflect.TypeOf((*MockNetworkClient)(nil).RequestAny), arg0, arg1, arg2)
 }
