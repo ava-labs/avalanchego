@@ -11,7 +11,7 @@ if ! command -v mockgen &> /dev/null
 then
   echo "mockgen not found, installing..."
   # https://github.com/uber-go/mock
-  go install -v go.uber.org/mock/mockgen@v0.2.0
+  go install -v go.uber.org/mock/mockgen@v0.4.0
 fi
 
 source ./scripts/constants.sh
@@ -24,6 +24,22 @@ do
   package_name=$(basename $(dirname $output_path))
   echo "Generating ${output_path}..."
   mockgen -package=${package_name} -destination=${output_path} ${src_import_path} ${interface_name}
+  
+done < "$input"
+
+# tuples of (source import path, comma-separated interface names to exclude, output file path)
+input="scripts/mocks.mockgen.source.txt"
+while IFS= read -r line
+do
+  IFS='=' read source_path exclude_interfaces output_path <<< "${line}"
+  package_name=$(basename $(dirname $output_path))
+  echo "Generating ${output_path}..."
+
+  mockgen \
+    -source=${source_path} \
+    -destination=${output_path} \
+    -package=${package_name} \
+    -exclude_interfaces=${exclude_interfaces}
   
 done < "$input"
 

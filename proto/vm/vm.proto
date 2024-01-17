@@ -21,13 +21,6 @@ service VM {
   rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
   // Creates the HTTP handlers for custom chain network calls.
   rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
-  // Creates the HTTP handlers for custom VM network calls.
-  //
-  // Note: RPC Chain VM Factory will start a new instance of the VM in a
-  // seperate process which will populate the static handlers. After this
-  // process is created other processes will be created to populate blockchains,
-  // but they will not have the static handlers be called again.
-  rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
   // Attempt to create a new block from data contained in the VM.
@@ -155,10 +148,6 @@ message SetStateResponse {
 }
 
 message CreateHandlersResponse {
-  repeated Handler handlers = 1;
-}
-
-message CreateStaticHandlersResponse {
   repeated Handler handlers = 1;
 }
 
