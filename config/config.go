@@ -346,6 +346,9 @@ func getNetworkConfig(
 	if err != nil {
 		return network.Config{}, err
 	}
+	if compressionType == compression.TypeGzip {
+		return network.Config{}, errors.New("gzip compression is not supported, use zstd or no compression.")
+	}
 
 	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
 	if v.IsSet(NetworkAllowPrivateIPsKey) {
