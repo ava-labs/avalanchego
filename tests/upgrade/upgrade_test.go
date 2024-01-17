@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -46,7 +47,8 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("can upgrade versions", func() {
-		network := e2e.StartNetwork(avalancheGoExecPath, e2e.DefaultNetworkDir)
+		network := &tmpnet.Network{}
+		e2e.StartNetwork(network, e2e.DefaultNetworkDir, avalancheGoExecPath, "" /* pluginDir */)
 
 		ginkgo.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
 		for _, node := range network.Nodes {
