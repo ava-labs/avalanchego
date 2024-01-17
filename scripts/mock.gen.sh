@@ -39,9 +39,7 @@ do
     -source=${source_path} \
     -destination=${output_path} \
     -package=${package_name} \
-    -exclude_interfaces=${exclude_interfaces} \
-    -write_generate_directive=false \
-    -write_package_comment=false
+    -exclude_interfaces=${exclude_interfaces}
   
 done < "$input"
 
