@@ -112,10 +112,6 @@ func (*VM) Version(context.Context) (string, error) {
 	return Version.String(), nil
 }
 
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	return nil, nil
-}
-
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")

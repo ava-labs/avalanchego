@@ -123,9 +123,6 @@ func sendRangeProofRequest(
 		},
 	).AnyTimes()
 
-	// Handle bandwidth tracking calls from client.
-	networkClient.EXPECT().TrackBandwidth(gomock.Any(), gomock.Any()).AnyTimes()
-
 	// The server should expect to "send" a response to the client.
 	sender.EXPECT().SendAppResponse(
 		gomock.Any(), // ctx
