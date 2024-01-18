@@ -38,7 +38,7 @@ github.com/ava-labs/avalanchego/vms/proposervm/scheduler=Scheduler=vms/proposerv
 github.com/ava-labs/avalanchego/vms/proposervm/state=State=vms/proposervm/state/mock_state.go
 github.com/ava-labs/avalanchego/vms/proposervm=PostForkBlock=vms/proposervm/mock_post_fork_block.go
 github.com/ava-labs/avalanchego/vms/registry=VMGetter=vms/registry/mock_vm_getter.go
-github.com/ava-labs/avalanchego/vms/registry=VMRegisterer=vms/registry/mock_vm_registerer.go
 github.com/ava-labs/avalanchego/vms/registry=VMRegistry=vms/registry/mock_vm_registry.go
 github.com/ava-labs/avalanchego/vms=Factory,Manager=vms/mock_manager.go
 github.com/ava-labs/avalanchego/x/sync=Client=x/sync/mock_client.go
+github.com/ava-labs/avalanchego/x/sync=NetworkClient=x/sync/mock_network_client.go

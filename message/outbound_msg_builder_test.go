@@ -29,7 +29,6 @@ func Test_newOutboundBuilder(t *testing.T) {
 
 	for _, compressionType := range []compression.Type{
 		compression.TypeNone,
-		compression.TypeGzip,
 		compression.TypeZstd,
 	} {
 		t.Run(compressionType.String(), func(t *testing.T) {

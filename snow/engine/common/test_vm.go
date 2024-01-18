@@ -23,7 +23,6 @@ var (
 	errSetState                   = errors.New("unexpectedly called SetState")
 	errShutdown                   = errors.New("unexpectedly called Shutdown")
 	errCreateHandlers             = errors.New("unexpectedly called CreateHandlers")
-	errCreateStaticHandlers       = errors.New("unexpectedly called CreateStaticHandlers")
 	errHealthCheck                = errors.New("unexpectedly called HealthCheck")
 	errConnected                  = errors.New("unexpectedly called Connected")
 	errDisconnected               = errors.New("unexpectedly called Disconnected")
@@ -44,7 +43,7 @@ type TestVM struct {
 	T *testing.T
 
 	CantInitialize, CantSetState,
-	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
+	CantShutdown, CantCreateHandlers,
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
@@ -53,7 +52,6 @@ type TestVM struct {
 	SetStateF                   func(ctx context.Context, state snow.State) error
 	ShutdownF                   func(context.Context) error
 	CreateHandlersF             func(context.Context) (map[string]http.Handler, error)
-	CreateStaticHandlersF       func(context.Context) (map[string]http.Handler, error)
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthCheckF                func(context.Context) (interface{}, error)
@@ -72,7 +70,6 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantSetState = cant
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
-	vm.CantCreateStaticHandlers = cant
 	vm.CantHealthCheck = cant
 	vm.CantAppRequest = cant
 	vm.CantAppRequestFailed = cant
@@ -148,16 +145,6 @@ func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]http.Handler, 
 	}
 	if vm.CantCreateHandlers && vm.T != nil {
 		require.FailNow(vm.T, errCreateHandlers.Error())
-	}
-	return nil, nil
-}
-
-func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	if vm.CreateStaticHandlersF != nil {
-		return vm.CreateStaticHandlersF(ctx)
-	}
-	if vm.CantCreateStaticHandlers && vm.T != nil {
-		require.FailNow(vm.T, errCreateStaticHandlers.Error())
 	}
 	return nil, nil
 }
