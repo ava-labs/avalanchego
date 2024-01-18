@@ -475,6 +475,34 @@ func (mr *MockChainMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), arg0)
 }
 
+// UpdateCurrentDelegator mocks base method.
+func (m *MockChain) UpdateCurrentDelegator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentDelegator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentDelegator indicates an expected call of UpdateCurrentDelegator.
+func (mr *MockChainMockRecorder) UpdateCurrentDelegator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentDelegator", reflect.TypeOf((*MockChain)(nil).UpdateCurrentDelegator), arg0)
+}
+
+// UpdateCurrentValidator mocks base method.
+func (m *MockChain) UpdateCurrentValidator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentValidator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
+func (mr *MockChainMockRecorder) UpdateCurrentValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockChain)(nil).UpdateCurrentValidator), arg0)
+}
+
 // MockDiff is a mock of Diff interface.
 type MockDiff struct {
 	ctrl     *gomock.Controller
@@ -935,6 +963,34 @@ func (m *MockDiff) SetTimestamp(arg0 time.Time) {
 func (mr *MockDiffMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), arg0)
+}
+
+// UpdateCurrentDelegator mocks base method.
+func (m *MockDiff) UpdateCurrentDelegator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentDelegator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentDelegator indicates an expected call of UpdateCurrentDelegator.
+func (mr *MockDiffMockRecorder) UpdateCurrentDelegator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentDelegator", reflect.TypeOf((*MockDiff)(nil).UpdateCurrentDelegator), arg0)
+}
+
+// UpdateCurrentValidator mocks base method.
+func (m *MockDiff) UpdateCurrentValidator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentValidator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
+func (mr *MockDiffMockRecorder) UpdateCurrentValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockDiff)(nil).UpdateCurrentValidator), arg0)
 }
 
 // MockState is a mock of State interface.
@@ -1694,6 +1750,34 @@ func (m *MockState) UTXOIDs(arg0 []byte, arg1 ids.ID, arg2 int) ([]ids.ID, error
 func (mr *MockStateMockRecorder) UTXOIDs(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*MockState)(nil).UTXOIDs), arg0, arg1, arg2)
+}
+
+// UpdateCurrentDelegator mocks base method.
+func (m *MockState) UpdateCurrentDelegator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentDelegator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentDelegator indicates an expected call of UpdateCurrentDelegator.
+func (mr *MockStateMockRecorder) UpdateCurrentDelegator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentDelegator", reflect.TypeOf((*MockState)(nil).UpdateCurrentDelegator), arg0)
+}
+
+// UpdateCurrentValidator mocks base method.
+func (m *MockState) UpdateCurrentValidator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentValidator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
+func (mr *MockStateMockRecorder) UpdateCurrentValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockState)(nil).UpdateCurrentValidator), arg0)
 }
 
 // MockVersions is a mock of Versions interface.

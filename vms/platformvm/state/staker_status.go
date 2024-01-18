@@ -3,10 +3,15 @@
 
 package state
 
+import "errors"
+
+var ErrUnknownStakerStatus = errors.New("unknown staker status")
+
 const (
-	unmodified diffValidatorStatus = iota
+	unmodified diffStakerStatus = iota
 	added
+	updated
 	deleted
 )
 
-type diffValidatorStatus uint8
+type diffStakerStatus uint8

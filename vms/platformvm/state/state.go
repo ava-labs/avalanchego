@@ -715,6 +715,10 @@ func (s *state) PutCurrentValidator(staker *Staker) {
 	s.currentStakers.PutValidator(staker)
 }
 
+func (s *state) UpdateCurrentValidator(staker *Staker) error {
+	return s.currentStakers.UpdateValidator(staker)
+}
+
 func (s *state) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 }
@@ -725,6 +729,10 @@ func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) 
 
 func (s *state) PutCurrentDelegator(staker *Staker) {
 	s.currentStakers.PutDelegator(staker)
+}
+
+func (s *state) UpdateCurrentDelegator(staker *Staker) error {
+	return s.currentStakers.UpdateDelegator(staker)
 }
 
 func (s *state) DeleteCurrentDelegator(staker *Staker) {
@@ -1387,8 +1395,8 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 func (s *state) load() error {
 	return utils.Err(
 		s.loadMetadata(),
-		s.loadCurrentValidators(),
-		s.loadPendingValidators(),
+		s.loadCurrentStakers(),
+		s.loadPendingStakers(),
 		s.initValidatorSets(),
 	)
 }
@@ -1444,7 +1452,7 @@ func (s *state) loadMetadata() error {
 	return nil
 }
 
-func (s *state) loadCurrentValidators() error {
+func (s *state) loadCurrentStakers() error {
 	s.currentStakers = newBaseStakers()
 
 	validatorIt := s.currentValidatorList.NewIterator()
@@ -1481,14 +1489,18 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
+		startTime := time.Unix(int64(metadata.StakerStartTime), 0)
 		staker, err := NewCurrentStaker(
 			txID,
 			stakerTx,
-			time.Unix(int64(metadata.StakerStartTime), 0),
+			startTime,
 			metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
+		ShiftStakerAheadInPlace(staker, startTime)
+		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1531,15 +1543,20 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
+		startTime := time.Unix(int64(metadata.StakerStartTime), 0)
 		staker, err := NewCurrentStaker(
 			txID,
 			stakerTx,
-			time.Unix(int64(metadata.StakerStartTime), 0),
+			startTime,
 			metadata.PotentialReward,
 		)
 		if err != nil {
 			return err
 		}
+		ShiftStakerAheadInPlace(staker, startTime)
+		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
@@ -1586,21 +1603,27 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
+			startTime := time.Unix(int64(metadata.StakerStartTime), 0)
 			staker, err := NewCurrentStaker(
 				txID,
 				stakerTx,
-				time.Unix(int64(metadata.StakerStartTime), 0),
+				startTime,
 				metadata.PotentialReward,
 			)
 			if err != nil {
 				return err
 			}
 
+			ShiftStakerAheadInPlace(staker, startTime)
+			UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
+			IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1614,7 +1637,7 @@ func (s *state) loadCurrentValidators() error {
 	)
 }
 
-func (s *state) loadPendingValidators() error {
+func (s *state) loadPendingStakers() error {
 	s.pendingStakers = newBaseStakers()
 
 	validatorIt := s.pendingValidatorList.NewIterator()
@@ -1681,10 +1704,11 @@ func (s *state) loadPendingValidators() error {
 			}
 
 			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1713,15 +1737,11 @@ func (s *state) initValidatorSets() error {
 				return err
 			}
 
-			delegatorIterator := NewTreeIterator(validator.delegators)
-			for delegatorIterator.Next() {
-				delegatorStaker := delegatorIterator.Value()
+			for _, delegatorStaker := range validator.delegators {
 				if err := s.validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
-					delegatorIterator.Release()
 					return err
 				}
 			}
-			delegatorIterator.Release()
 		}
 	}
 
@@ -2001,18 +2021,19 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 		for nodeID, validatorDiff := range validatorDiffs {
 			// Copy [nodeID] so it doesn't get overwritten next iteration.
 			nodeID := nodeID
+			validator := validatorDiff.validator.staker
+			weightDiff := &ValidatorWeightDiff{}
 
-			weightDiff := &ValidatorWeightDiff{
-				Decrease: validatorDiff.validatorStatus == deleted,
-			}
-			switch validatorDiff.validatorStatus {
+			switch validatorDiff.validator.status {
 			case added:
-				staker := validatorDiff.validator
-				weightDiff.Amount = staker.Weight
+				weightDiff = &ValidatorWeightDiff{
+					Decrease: false,
+					Amount:   validator.Weight,
+				}
 
 				// Invariant: Only the Primary Network contains non-nil public
 				// keys.
-				if staker.PublicKey != nil {
+				if validator.PublicKey != nil {
 					// Record that the public key for the validator is being
 					// added. This means the prior value for the public key was
 					// nil.
@@ -2029,35 +2050,42 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 				//
 				// Invariant: It's impossible for a delegator to have been
 				// rewarded in the same block that the validator was added.
-				startTime := uint64(staker.StartTime.Unix())
+				startTime := uint64(validator.StartTime.Unix())
 				metadata := &validatorMetadata{
-					txID:        staker.TxID,
-					lastUpdated: staker.StartTime,
+					txID:        validator.TxID,
+					lastUpdated: validator.StartTime,
 
 					UpDuration:               0,
 					LastUpdated:              startTime,
 					StakerStartTime:          startTime,
-					PotentialReward:          staker.PotentialReward,
+					PotentialReward:          validator.PotentialReward,
 					PotentialDelegateeReward: 0,
+
+					// a staker update may change its times and weight wrt those
+					// specified in the tx creating the staker. We store these data
+					// to properly reconstruct staker data.
+					StakerStakingPeriod: int64(validator.EndTime.Sub(validator.StartTime)),
+					UpdatedWeight:       validator.Weight,
 				}
 
 				metadataBytes, err := MetadataCodec.Marshal(codecVersion, metadata)
 				if err != nil {
-					return fmt.Errorf("failed to serialize current validator: %w", err)
+					return fmt.Errorf("failed to serialize validator metadata: %w", err)
 				}
-
-				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
-					return fmt.Errorf("failed to write current validator to list: %w", err)
+				if err = validatorDB.Put(validator.TxID[:], metadataBytes); err != nil {
+					return fmt.Errorf("failed to write validator metadata to list: %w", err)
 				}
-
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+
 			case deleted:
-				staker := validatorDiff.validator
-				weightDiff.Amount = staker.Weight
+				weightDiff = &ValidatorWeightDiff{
+					Decrease: true,
+					Amount:   validator.Weight,
+				}
 
 				// Invariant: Only the Primary Network contains non-nil public
 				// keys.
-				if staker.PublicKey != nil {
+				if validator.PublicKey != nil {
 					// Record that the public key for the validator is being
 					// removed. This means we must record the prior value of the
 					// public key.
@@ -2067,7 +2095,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
-						bls.SerializePublicKey(staker.PublicKey),
+						bls.SerializePublicKey(validator.PublicKey),
 					)
 					if err != nil {
 						return err
@@ -2077,17 +2105,66 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 					// rollbacks.
 					//
 					// Note: We store the compressed public key here.
-					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
+					pkBytes := bls.PublicKeyToBytes(validator.PublicKey)
 					if err := nestedPKDiffDB.Put(nodeID.Bytes(), pkBytes); err != nil {
 						return err
 					}
 				}
 
-				if err := validatorDB.Delete(staker.TxID[:]); err != nil {
+				if err := validatorDB.Delete(validator.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+			case updated:
+				// load current metadata and duly update them, following validator update
+				metadataBytes, err := validatorDB.Get(validator.TxID[:])
+				if err != nil {
+					return fmt.Errorf("failed to get metadata of updated validator: %w", err)
+				}
+
+				metadata := &validatorMetadata{
+					txID: validator.TxID,
+				}
+				if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
+					return err
+				}
+
+				// build weight diff by comparing current weight with previously stored one
+				switch {
+				case validator.Weight > metadata.UpdatedWeight:
+					if err := weightDiff.Add(false, validator.Weight-metadata.UpdatedWeight); err != nil {
+						return fmt.Errorf("failed to increase node weight diff: %w", err)
+					}
+				case validator.Weight < metadata.UpdatedWeight:
+					if err := weightDiff.Add(true, metadata.UpdatedWeight-validator.Weight); err != nil {
+						return fmt.Errorf("failed to decrease node weight diff: %w", err)
+					}
+				default:
+					// no weight changes, nothing to do
+				}
+
+				metadata.lastUpdated = validator.StartTime
+				metadata.StakerStartTime = uint64(validator.StartTime.Unix())
+				metadata.StakerStakingPeriod = int64(validator.EndTime.Sub(validator.StartTime))
+				metadata.LastUpdated = metadata.StakerStartTime
+				metadata.UpdatedWeight = validator.Weight
+
+				metadataBytes, err = MetadataCodec.Marshal(CodecVersion1, metadata)
+				if err != nil {
+					return fmt.Errorf("failed to serialize validator metadata: %w", err)
+				}
+				if err = validatorDB.Put(validator.TxID[:], metadataBytes); err != nil {
+					return fmt.Errorf("failed to write validator metadata to list: %w", err)
+				}
+				if err := s.validatorState.UpdateValidatorMetadata(nodeID, subnetID, metadata); err != nil {
+					return fmt.Errorf("failed updating validator metadata: %w", err)
+				}
+
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -2130,8 +2207,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 			if weightDiff.Decrease {
 				err = s.validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
 			} else {
-				if validatorDiff.validatorStatus == added {
-					staker := validatorDiff.validator
+				if validatorDiff.validator.status == added {
+					staker := validatorDiff.validator.staker
 					err = s.validators.AddStaker(
 						subnetID,
 						nodeID,
@@ -2172,32 +2249,85 @@ func writeCurrentDelegatorDiff(
 	validatorDiff *diffValidator,
 	codecVersion uint16,
 ) error {
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
+	for _, ds := range validatorDiff.delegators {
+		delegator := ds.staker
+		switch ds.status {
+		case added:
+			if err := weightDiff.Add(false, delegator.Weight); err != nil {
+				return fmt.Errorf("failed to increase node weight diff: %w", err)
+			}
 
-		if err := weightDiff.Add(false, staker.Weight); err != nil {
-			return fmt.Errorf("failed to increase node weight diff: %w", err)
-		}
+			// Let's start using V1 as soon as we deploy code. No need to
+			// wait till Continuous staking fork activation to do that.
+			metadata := &delegatorMetadata{
+				PotentialReward:     delegator.PotentialReward,
+				StakerStartTime:     uint64(delegator.StartTime.Unix()),
+				StakerStakingPeriod: int64(delegator.EndTime.Sub(delegator.StartTime)),
+				UpdatedWeight:       delegator.Weight,
+			}
+			metadataBytes, err := MetadataCodec.Marshal(CodecVersion1, metadata)
+			if err != nil {
+				return fmt.Errorf("failed marshalling delegators metadata: %w", err)
+			}
+			err = currentDelegatorList.Put(delegator.TxID[:], metadataBytes)
+			if err != nil {
+				return fmt.Errorf("failed to write current delegator to list: %w", err)
+			}
+		case deleted:
+			if err := weightDiff.Add(true, delegator.Weight); err != nil {
+				return fmt.Errorf("failed to decrease node weight diff: %w", err)
+			}
 
-		metadata := &delegatorMetadata{
-			txID:            staker.TxID,
-			PotentialReward: staker.PotentialReward,
-			StakerStartTime: uint64(staker.StartTime.Unix()),
-		}
-		if err := writeDelegatorMetadata(currentDelegatorList, metadata, codecVersion); err != nil {
-			return fmt.Errorf("failed to write current delegator to list: %w", err)
-		}
-	}
+			metadata := &delegatorMetadata{
+				txID:            delegator.TxID,
+				PotentialReward: delegator.PotentialReward,
+				StakerStartTime: uint64(delegator.StartTime.Unix()),
+			}
+			if err := writeDelegatorMetadata(currentDelegatorList, metadata, codecVersion); err != nil {
+				return fmt.Errorf("failed to write current delegator to list: %w", err)
+			}
+		case updated:
+			// load current metadata and duly update them, following staker update
+			metadataBytes, err := currentDelegatorList.Get(delegator.TxID[:])
+			if err != nil {
+				return fmt.Errorf("failed to get metadata of updated delegator: %w", err)
+			}
 
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := weightDiff.Add(true, staker.Weight); err != nil {
-			return fmt.Errorf("failed to decrease node weight diff: %w", err)
-		}
+			metadata := &delegatorMetadata{}
+			if err := parseDelegatorMetadata(metadataBytes, metadata); err != nil {
+				return err
+			}
 
-		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete current staker: %w", err)
+			switch {
+			case delegator.Weight > metadata.UpdatedWeight:
+				if err := weightDiff.Add(false, delegator.Weight-metadata.UpdatedWeight); err != nil {
+					return fmt.Errorf("failed to increase node weight diff: %w", err)
+				}
+			case delegator.Weight < metadata.UpdatedWeight:
+				if err := weightDiff.Add(true, metadata.UpdatedWeight-delegator.Weight); err != nil {
+					return fmt.Errorf("failed to decrease node weight diff: %w", err)
+				}
+			default:
+				// no weight changes, nothing to do
+			}
+
+			metadata.StakerStartTime = uint64(delegator.StartTime.Unix())
+			metadata.StakerStakingPeriod = int64(delegator.EndTime.Sub(delegator.StartTime))
+			metadata.UpdatedWeight = delegator.Weight
+
+			metadataBytes, err = MetadataCodec.Marshal(CodecVersion1, metadata)
+			if err != nil {
+				return fmt.Errorf("failed to serialize delegator metadata: %w", err)
+			}
+
+			if err = currentDelegatorList.Put(delegator.TxID[:], metadataBytes); err != nil {
+				return fmt.Errorf("failed to write delegator metadata to list: %w", err)
+			}
+
+		case unmodified:
+			// nothing to do
+		default:
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil
@@ -2233,32 +2363,38 @@ func writePendingDiff(
 	pendingDelegatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	switch validatorDiff.validatorStatus {
+	switch validatorDiff.validator.status {
 	case added:
-		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
+		err := pendingValidatorList.Put(validatorDiff.validator.staker.TxID[:], nil)
 		if err != nil {
 			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
 	case deleted:
-		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
+		err := pendingValidatorList.Delete(validatorDiff.validator.staker.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
+	case updated, unmodified:
+		// nothing to do
+	default:
+		return ErrUnknownStakerStatus
 	}
 
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
-
-		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
-			return fmt.Errorf("failed to write pending delegator to list: %w", err)
-		}
-	}
-
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete pending delegator: %w", err)
+	for _, ds := range validatorDiff.delegators {
+		delegator := ds.staker
+		switch ds.status {
+		case added:
+			if err := pendingDelegatorList.Put(delegator.TxID[:], nil); err != nil {
+				return fmt.Errorf("failed to write pending delegator to list: %w", err)
+			}
+		case deleted:
+			if err := pendingDelegatorList.Delete(delegator.TxID[:]); err != nil {
+				return fmt.Errorf("failed to delete pending delegator: %w", err)
+			}
+		case updated, unmodified:
+			// nothing to do
+		default:
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil

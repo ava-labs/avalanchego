@@ -42,10 +42,16 @@ func TestParseDelegatorMetadata(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
 				// staker start time
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc8,
+				// staker staking period
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x15,
+				// staker updated weight
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x8a, 0xf8,
 			},
 			expected: &delegatorMetadata{
-				PotentialReward: 123,
-				StakerStartTime: 456,
+				PotentialReward:     123,
+				StakerStartTime:     456,
+				StakerStakingPeriod: 789,
+				UpdatedWeight:       101112,
 			},
 			expectedErr: nil,
 		},
@@ -114,8 +120,10 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 			name:    CodecVersion1Tag,
 			version: CodecVersion1,
 			metadata: &delegatorMetadata{
-				PotentialReward: 123,
-				StakerStartTime: 456,
+				PotentialReward:     123,
+				StakerStartTime:     456,
+				StakerStakingPeriod: 789,
+				UpdatedWeight:       101112,
 			},
 			expected: []byte{
 				// codec version
@@ -124,6 +132,10 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b,
 				// staker start time
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc8,
+				// staker staking period
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x15,
+				// staker updated weight
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x8a, 0xf8,
 			},
 		},
 	}

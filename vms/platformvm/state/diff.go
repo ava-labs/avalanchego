@@ -20,7 +20,8 @@ var (
 	_ Diff     = (*diff)(nil)
 	_ Versions = stateGetter{}
 
-	ErrMissingParentState = errors.New("missing parent state")
+	ErrMissingParentState    = errors.New("missing parent state")
+	ErrUpdatingPendingStaker = errors.New("trying to update pending staker")
 )
 
 type Diff interface {
@@ -38,10 +39,10 @@ type diff struct {
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
 
-	currentStakerDiffs diffStakers
+	currentStakerDiffs *diffStakers
 	// map of subnetID -> nodeID -> total accrued delegatee rewards
 	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64
-	pendingStakerDiffs       diffStakers
+	pendingStakerDiffs       *diffStakers
 
 	addedSubnets []*txs.Tx
 	// Subnet ID --> Owner of the subnet
@@ -68,10 +69,12 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:      parentID,
-		stateVersions: stateVersions,
-		timestamp:     parentState.GetTimestamp(),
-		subnetOwners:  make(map[ids.ID]fx.Owner),
+		parentID:           parentID,
+		stateVersions:      stateVersions,
+		timestamp:          parentState.GetTimestamp(),
+		currentStakerDiffs: newDiffStakers(),
+		pendingStakerDiffs: newDiffStakers(),
+		subnetOwners:       make(map[ids.ID]fx.Owner),
 	}, nil
 }
 
@@ -126,7 +129,7 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// validator.
 	newValidator, status := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
 	switch status {
-	case added:
+	case added, updated:
 		return newValidator, nil
 	case deleted:
 		return nil, database.ErrNotFound
@@ -169,6 +172,10 @@ func (d *diff) PutCurrentValidator(staker *Staker) {
 	d.currentStakerDiffs.PutValidator(staker)
 }
 
+func (d *diff) UpdateCurrentValidator(staker *Staker) error {
+	return d.currentStakerDiffs.UpdateValidator(staker)
+}
+
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
 	d.currentStakerDiffs.DeleteValidator(staker)
 }
@@ -189,6 +196,10 @@ func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 
 func (d *diff) PutCurrentDelegator(staker *Staker) {
 	d.currentStakerDiffs.PutDelegator(staker)
+}
+
+func (d *diff) UpdateCurrentDelegator(staker *Staker) error {
+	return d.currentStakerDiffs.UpdateDelegator(staker)
 }
 
 func (d *diff) DeleteCurrentDelegator(staker *Staker) {
@@ -406,21 +417,39 @@ func (d *diff) Apply(baseState Chain) error {
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			switch validatorDiff.validatorStatus {
+			switch validatorDiff.validator.status {
 			case added:
-				baseState.PutCurrentValidator(validatorDiff.validator)
+				baseState.PutCurrentValidator(validatorDiff.validator.staker)
+			case updated:
+				err := baseState.UpdateCurrentValidator(validatorDiff.validator.staker)
+				if err != nil {
+					return err
+				}
 			case deleted:
-				baseState.DeleteCurrentValidator(validatorDiff.validator)
+				baseState.DeleteCurrentValidator(validatorDiff.validator.staker)
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutCurrentDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeleteCurrentDelegator(delegator)
+			for _, ds := range validatorDiff.delegators {
+				delegator := ds.staker
+				switch ds.status {
+				case added:
+					baseState.PutCurrentDelegator(delegator)
+				case updated:
+					err := baseState.UpdateCurrentDelegator(delegator)
+					if err != nil {
+						return err
+					}
+				case deleted:
+					baseState.DeleteCurrentDelegator(delegator)
+				case unmodified:
+					// nothing to do
+				default:
+					return ErrUnknownStakerStatus
+				}
 			}
 		}
 	}
@@ -433,21 +462,33 @@ func (d *diff) Apply(baseState Chain) error {
 	}
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			switch validatorDiff.validatorStatus {
+			switch validatorDiff.validator.status {
 			case added:
-				baseState.PutPendingValidator(validatorDiff.validator)
+				baseState.PutPendingValidator(validatorDiff.validator.staker)
+			case updated:
+				return ErrUpdatingPendingStaker
 			case deleted:
-				baseState.DeletePendingValidator(validatorDiff.validator)
+				baseState.DeletePendingValidator(validatorDiff.validator.staker)
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutPendingDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeletePendingDelegator(delegator)
+			for _, ds := range validatorDiff.delegators {
+				delegator := ds.staker
+				switch ds.status {
+				case added:
+					baseState.PutPendingDelegator(delegator)
+				case updated:
+					return ErrUpdatingPendingStaker
+				case deleted:
+					baseState.DeletePendingDelegator(delegator)
+				case unmodified:
+					// nothing to do
+				default:
+					return ErrUnknownStakerStatus
+				}
 			}
 		}
 	}

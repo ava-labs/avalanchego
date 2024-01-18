@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/commands"
@@ -26,14 +27,21 @@ import (
 var (
 	_ Versions         = (*sysUnderTest)(nil)
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
+	_ commands.Command = (*shiftCurrentValidatorCommand)(nil)
+	_ commands.Command = (*updateStakingPeriodCurrentValidatorCommand)(nil)
+	_ commands.Command = (*increaseWeightCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
 	_ commands.Command = (*putCurrentDelegatorCommand)(nil)
+	_ commands.Command = (*shiftCurrentDelegatorCommand)(nil)
+	_ commands.Command = (*updateStakingPeriodCurrentDelegatorCommand)(nil)
+	_ commands.Command = (*increaseWeightCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyAndCommitBottomDiffCommand)(nil)
 	_ commands.Command = (*rebuildStateCommand)(nil)
 
 	commandsCtx = snowtest.Context(&testing.T{}, snowtest.PChainID)
+	extraWeight = uint64(100)
 )
 
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
@@ -55,7 +63,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1688641048828490074)
+	// parameters := gopter.DefaultTestParametersWithSeed(1688718809015601261)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -119,9 +127,15 @@ var stakersCommands = &commands.ProtoCommands{
 	GenCommandFunc: func(state commands.State) gopter.Gen {
 		return gen.OneGenOf(
 			genPutCurrentValidatorCommand,
+			genShiftCurrentValidatorCommand,
+			genUpdateStakingPeriodCurrentValidatorCommand,
+			genIncreaseWeightCurrentValidatorCommand,
 			genDeleteCurrentValidatorCommand,
 
 			genPutCurrentDelegatorCommand,
+			genShiftCurrentDelegatorCommand,
+			genUpdateStakingPeriodCurrentDelegatorCommand,
+			genIncreaseWeightCurrentDelegatorCommand,
 			genDeleteCurrentDelegatorCommand,
 
 			genAddTopDiffCommand,
@@ -218,6 +232,402 @@ var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(comman
 			err: nil,
 		}
 		return cmd
+	},
+)
+
+// ShiftCurrentValidator section
+type shiftCurrentValidatorCommand struct {
+	err error
+}
+
+func (cmd *shiftCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
+	err := shiftCurrentValidatorInSystem(sys)
+	if err != nil {
+		cmd.err = err
+	}
+	return sys
+}
+
+func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. query the staker
+	// 3. shift staker times and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a staker, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority.IsCurrentValidator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	chain = sys.getTopChainState()
+
+	// 3. query the staker
+	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	// 4. shift staker times and update the staker
+	updatedStaker := *staker
+	ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
+	return chain.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (cmd *shiftCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := shiftCurrentValidatorInModel(model)
+	if err != nil {
+		cmd.err = err
+	}
+	return cmdState
+}
+
+func shiftCurrentValidatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority.IsCurrentValidator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedStaker := *staker
+	ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
+	return model.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (*shiftCurrentValidatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (cmd *shiftCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
+}
+
+func (*shiftCurrentValidatorCommand) String() string {
+	return "\nshiftCurrentValidatorCommand"
+}
+
+var genShiftCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &shiftCurrentValidatorCommand{}
+	},
+)
+
+// updateStakingPeriodCurrentValidator section
+type updateStakingPeriodCurrentValidatorCommand struct {
+	err error
+}
+
+func (cmd *updateStakingPeriodCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
+	err := updateStakingPeriodCurrentValidatorInSystem(sys)
+	if err != nil {
+		cmd.err = err
+	}
+	return sys
+}
+
+func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. query the staker
+	// 3. modify staker period and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a staker, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority.IsCurrentValidator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	chain = sys.getTopChainState()
+
+	// 2. query the staker
+	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	// 3. modify staker period and update the staker
+	updatedStaker := *staker
+	stakingPeriod := staker.EndTime.Sub(staker.StartTime)
+	if stakingPeriod%2 == 0 {
+		stakingPeriod -= 30 * time.Minute
+	} else {
+		stakingPeriod = 3*stakingPeriod + 1
+	}
+	UpdateStakingPeriodInPlace(&updatedStaker, stakingPeriod)
+	return chain.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (cmd *updateStakingPeriodCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := updateStakingPeriodCurrentValidatorInModel(model)
+	if err != nil {
+		cmd.err = err
+	}
+	return cmdState
+}
+
+func updateStakingPeriodCurrentValidatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority.IsCurrentValidator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedStaker := *staker
+	stakingPeriod := staker.EndTime.Sub(staker.StartTime)
+	if stakingPeriod%2 == 0 {
+		stakingPeriod -= 30 * time.Minute
+	} else {
+		stakingPeriod = 3*stakingPeriod + 1
+	}
+	UpdateStakingPeriodInPlace(&updatedStaker, stakingPeriod)
+	return model.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (*updateStakingPeriodCurrentValidatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (cmd *updateStakingPeriodCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
+}
+
+func (*updateStakingPeriodCurrentValidatorCommand) String() string {
+	return "\nupdateStakingPeriodCurrentValidatorCommand"
+}
+
+var genUpdateStakingPeriodCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &updateStakingPeriodCurrentValidatorCommand{}
+	},
+)
+
+// increaseWeightCurrentValidator section
+type increaseWeightCurrentValidatorCommand struct {
+	err error
+}
+
+func (cmd *increaseWeightCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
+	err := increaseWeightCurrentValidatorInSystem(sys)
+	if err != nil {
+		cmd.err = err
+	}
+	return sys
+}
+
+func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. query the staker
+	// 3. increase staker weight and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a staker, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority.IsCurrentValidator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	chain = sys.getTopChainState()
+
+	// 2. query the staker
+	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	// 3. increase staker weight and update the staker
+	updatedStaker := *staker
+	IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight+extraWeight)
+	return chain.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (cmd *increaseWeightCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := increaseWeightCurrentValidatorInModel(model)
+	if err != nil {
+		cmd.err = err
+	}
+	return cmdState
+}
+
+func increaseWeightCurrentValidatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority.IsCurrentValidator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedStaker := *staker
+	IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight+extraWeight)
+	return model.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (*increaseWeightCurrentValidatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (cmd *increaseWeightCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
+}
+
+func (*increaseWeightCurrentValidatorCommand) String() string {
+	return "\nincreaseWeightCurrentValidatorCommand"
+}
+
+var genIncreaseWeightCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &increaseWeightCurrentValidatorCommand{}
 	},
 )
 
@@ -533,6 +943,381 @@ var genPutCurrentDelegatorCommand = addPermissionlessDelegatorTxGenerator(comman
 			sTx: sTx,
 		}
 		return cmd
+	},
+)
+
+// UpdateCurrentDelegator section
+type updateStakingPeriodCurrentDelegatorCommand struct {
+	err error
+}
+
+func (cmd *updateStakingPeriodCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
+	err := updateStakingPeriodCurrentDelegatorInSystem(sys)
+	if err != nil {
+		cmd.err = err
+		return sys
+	}
+	return sys
+}
+
+func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. update staking period and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a delegator, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority.IsCurrentDelegator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	chain = sys.getTopChainState()
+
+	// 3. update delegator staking period and update the staker
+	updatedDelegator := *delegator
+	stakingPeriod := delegator.EndTime.Sub(delegator.StartTime)
+	if stakingPeriod%2 == 0 {
+		stakingPeriod -= 30 * time.Minute
+	} else {
+		stakingPeriod = 3*stakingPeriod + 1
+	}
+	UpdateStakingPeriodInPlace(&updatedDelegator, stakingPeriod)
+	return chain.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (cmd *updateStakingPeriodCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := updateStakingPeriodCurrentDelegatorInModel(model)
+	if err != nil {
+		cmd.err = err
+	}
+	return cmdState
+}
+
+func updateStakingPeriodCurrentDelegatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority.IsCurrentDelegator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedDelegator := *delegator
+	stakingPeriod := delegator.EndTime.Sub(delegator.StartTime)
+	if stakingPeriod%2 == 0 {
+		stakingPeriod -= 30 * time.Minute
+	} else {
+		stakingPeriod = 3*stakingPeriod + 1
+	}
+	UpdateStakingPeriodInPlace(&updatedDelegator, stakingPeriod)
+	return model.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (*updateStakingPeriodCurrentDelegatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (cmd *updateStakingPeriodCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
+}
+
+func (*updateStakingPeriodCurrentDelegatorCommand) String() string {
+	return "\nupdateStakingPeriodCurrentDelegatorCommand"
+}
+
+var genUpdateStakingPeriodCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &updateStakingPeriodCurrentDelegatorCommand{}
+	},
+)
+
+// UpdateCurrentDelegator section
+type shiftCurrentDelegatorCommand struct {
+	err error
+}
+
+func (cmd *shiftCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
+	err := shiftCurrentDelegatorInSystem(sys)
+	if err != nil {
+		cmd.err = err
+	}
+	return sys
+}
+
+func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. Shift staker times and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a delegator, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority.IsCurrentDelegator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	chain = sys.getTopChainState()
+
+	// 2. Shift delegator times and update the staker
+	updatedDelegator := *delegator
+	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.EndTime)
+	return chain.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (cmd *shiftCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := shiftCurrentDelegatorInModel(model)
+	if err != nil {
+		cmd.err = err
+	}
+	return cmdState
+}
+
+func shiftCurrentDelegatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority.IsCurrentDelegator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedDelegator := *delegator
+	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.EndTime)
+	return model.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (*shiftCurrentDelegatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (cmd *shiftCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
+}
+
+func (*shiftCurrentDelegatorCommand) String() string {
+	return "\nshiftCurrentDelegator"
+}
+
+var genShiftCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &shiftCurrentDelegatorCommand{}
+	},
+)
+
+// IncreaseWeightCurrentDelegator section
+type increaseWeightCurrentDelegatorCommand struct {
+	err error
+}
+
+func (cmd *increaseWeightCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
+	err := increaseWeightCurrentDelegatorInSystem(sys)
+	if err != nil {
+		cmd.err = err
+	}
+	return sys
+}
+
+func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. increase delegator weight and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a delegator, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority.IsCurrentDelegator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	chain = sys.getTopChainState()
+
+	// 2. increase delegator weight and update the staker
+	updatedDelegator := *delegator
+	IncreaseStakerWeightInPlace(&updatedDelegator, updatedDelegator.Weight+extraWeight)
+	return chain.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (cmd *increaseWeightCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := increaseWeightCurrentDelegatorInModel(model)
+	if err != nil {
+		cmd.err = err
+	}
+	return cmdState
+}
+
+func increaseWeightCurrentDelegatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority.IsCurrentDelegator() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedDelegator := *delegator
+	IncreaseStakerWeightInPlace(&updatedDelegator, updatedDelegator.Weight+extraWeight)
+	return model.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (*increaseWeightCurrentDelegatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (cmd *increaseWeightCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
+}
+
+func (*increaseWeightCurrentDelegatorCommand) String() string {
+	return "\nincreaseWeightCurrentDelegator"
+}
+
+var genIncreaseWeightCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &increaseWeightCurrentDelegatorCommand{}
 	},
 )
 

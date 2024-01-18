@@ -74,6 +74,19 @@ func (m *stakersStorageModel) PutCurrentValidator(staker *Staker) {
 	putValidator(staker, m.currentValidators)
 }
 
+func (m *stakersStorageModel) UpdateCurrentValidator(staker *Staker) error {
+	key := subnetNodeKey{
+		subnetID: staker.SubnetID,
+		nodeID:   staker.NodeID,
+	}
+	if _, found := m.currentValidators[key]; !found {
+		return ErrUpdatingUnknownOrDeletedStaker
+	}
+
+	m.currentValidators[key] = staker
+	return nil
+}
+
 func (m *stakersStorageModel) PutPendingValidator(staker *Staker) {
 	putValidator(staker, m.pendingValidators)
 }
@@ -152,6 +165,23 @@ func putDelegator(staker *Staker, domain map[subnetNodeKey]map[ids.ID]*Staker) {
 		domain[key] = dels
 	}
 	dels[staker.TxID] = staker
+}
+
+func (m *stakersStorageModel) UpdateCurrentDelegator(staker *Staker) error {
+	key := subnetNodeKey{
+		subnetID: staker.SubnetID,
+		nodeID:   staker.NodeID,
+	}
+
+	dels, found := m.currentDelegators[key]
+	if !found {
+		return ErrUpdatingUnknownOrDeletedStaker
+	}
+	if _, found := dels[staker.TxID]; !found {
+		return ErrUpdatingUnknownOrDeletedStaker
+	}
+	dels[staker.TxID] = staker
+	return nil
 }
 
 func (m *stakersStorageModel) DeleteCurrentDelegator(staker *Staker) {
