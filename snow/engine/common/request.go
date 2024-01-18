@@ -3,9 +3,17 @@
 
 package common
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 type Request struct {
 	NodeID    ids.NodeID
 	RequestID uint32
+}
+
+func (r Request) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("%s:%d", r.NodeID, r.RequestID)), nil
 }

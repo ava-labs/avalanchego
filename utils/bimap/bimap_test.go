@@ -4,6 +4,7 @@
 package bimap
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -325,4 +326,31 @@ func TestBiMapLen(t *testing.T) {
 
 	m.DeleteKey(1)
 	require.Zero(m.Len())
+}
+
+func TestBiMapJSON(t *testing.T) {
+	require := require.New(t)
+
+	expectedMap := New[int, int]()
+	expectedMap.Put(1, 2)
+	expectedMap.Put(2, 3)
+
+	jsonBytes, err := json.Marshal(expectedMap)
+	require.NoError(err)
+
+	expectedJSONBytes := []byte(`{"1":2,"2":3}`)
+	require.Equal(expectedJSONBytes, jsonBytes)
+
+	var unmarshalledMap BiMap[int, int]
+	require.NoError(json.Unmarshal(jsonBytes, &unmarshalledMap))
+	require.Equal(expectedMap, &unmarshalledMap)
+}
+
+func TestBiMapInvalidJSON(t *testing.T) {
+	require := require.New(t)
+
+	invalidJSONBytes := []byte(`{"1":2,"2":2}`)
+	var unmarshalledMap BiMap[int, int]
+	err := json.Unmarshal(invalidJSONBytes, &unmarshalledMap)
+	require.ErrorIs(err, errNotBijective)
 }

@@ -4,7 +4,6 @@
 package config
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -12,7 +11,6 @@ import (
 	"fmt"
 	"io/fs"
 	"math"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
-	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
@@ -40,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
@@ -58,21 +54,24 @@ const (
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
-	ipResolutionTimeout  = 30 * time.Second
 
 	ipcDeprecationMsg                    = "IPC API is deprecated"
 	keystoreDeprecationMsg               = "keystore API is deprecated"
 	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
+	peerListPushGossipDeprecationMsg     = "push-based peer list gossip is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{
-		IpcAPIEnabledKey:      ipcDeprecationMsg,
-		IpcsChainIDsKey:       ipcDeprecationMsg,
-		IpcsPathKey:           ipcDeprecationMsg,
+	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
+	deprecatedKeys                = map[string]string{
+		IpcAPIEnabledKey: ipcDeprecationMsg,
+		IpcsChainIDsKey:  ipcDeprecationMsg,
+		IpcsPathKey:      ipcDeprecationMsg,
+
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
+
 		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierNonValidatorSizeKey: acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipAcceptedFrontierPeerSizeKey:         acceptedFrontierGossipDeprecationMsg,
@@ -80,8 +79,13 @@ var (
 		ConsensusGossipOnAcceptNonValidatorSizeKey:         acceptedFrontierGossipDeprecationMsg,
 		ConsensusGossipOnAcceptPeerSizeKey:                 acceptedFrontierGossipDeprecationMsg,
 
-		SnowRogueCommitThresholdKey:    fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
-		SnowVirtuousCommitThresholdKey: fmt.Sprintf("use --%s instead", SnowCommitThresholdKey),
+		NetworkPeerListValidatorGossipSizeKey:    peerListPushGossipDeprecationMsg,
+		NetworkPeerListNonValidatorGossipSizeKey: peerListPushGossipDeprecationMsg,
+		NetworkPeerListPeersGossipSizeKey:        peerListPushGossipDeprecationMsg,
+		NetworkPeerListGossipFreqKey:             peerListPushGossipDeprecationMsg,
+
+		SnowRogueCommitThresholdKey:    commitThresholdDeprecationMsg,
+		SnowVirtuousCommitThresholdKey: commitThresholdDeprecationMsg,
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
@@ -105,6 +109,7 @@ var (
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
+	errGzipDeprecatedMsg                      = errors.New("gzip compression is not supported, use zstd or no compression")
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -342,6 +347,9 @@ func getNetworkConfig(
 	if err != nil {
 		return network.Config{}, err
 	}
+	if compressionType == compression.TypeGzip {
+		return network.Config{}, errGzipDeprecatedMsg
+	}
 
 	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
 	if v.IsSet(NetworkAllowPrivateIPsKey) {
@@ -432,6 +440,8 @@ func getNetworkConfig(
 			PeerListNonValidatorGossipSize: v.GetUint32(NetworkPeerListNonValidatorGossipSizeKey),
 			PeerListPeersGossipSize:        v.GetUint32(NetworkPeerListPeersGossipSizeKey),
 			PeerListGossipFreq:             v.GetDuration(NetworkPeerListGossipFreqKey),
+			PeerListPullGossipFreq:         v.GetDuration(NetworkPeerListPullGossipFreqKey),
+			PeerListBloomResetFreq:         v.GetDuration(NetworkPeerListBloomResetFreqKey),
 		},
 
 		DelayConfig: network.DelayConfig{
@@ -467,6 +477,10 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
 	case config.PeerListGossipFreq < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
+	case config.PeerListPullGossipFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListPullGossipFreqKey)
+	case config.PeerListBloomResetFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListBloomResetFreqKey)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.CPUThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
 		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.DiskThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
@@ -617,64 +631,19 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 }
 
 func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
-	ipResolutionService := v.GetString(PublicIPResolutionServiceKey)
-	ipResolutionFreq := v.GetDuration(PublicIPResolutionFreqKey)
-	if ipResolutionFreq <= 0 {
+	ipConfig := node.IPConfig{
+		PublicIP:                  v.GetString(PublicIPKey),
+		PublicIPResolutionService: v.GetString(PublicIPResolutionServiceKey),
+		PublicIPResolutionFreq:    v.GetDuration(PublicIPResolutionFreqKey),
+		ListenHost:                v.GetString(StakingHostKey),
+		ListenPort:                uint16(v.GetUint(StakingPortKey)),
+	}
+	if ipConfig.PublicIPResolutionFreq <= 0 {
 		return node.IPConfig{}, fmt.Errorf("%q must be > 0", PublicIPResolutionFreqKey)
 	}
-
-	stakingPort := uint16(v.GetUint(StakingPortKey))
-	publicIP := v.GetString(PublicIPKey)
-	if publicIP != "" && ipResolutionService != "" {
+	if ipConfig.PublicIP != "" && ipConfig.PublicIPResolutionService != "" {
 		return node.IPConfig{}, fmt.Errorf("only one of --%s and --%s can be given", PublicIPKey, PublicIPResolutionServiceKey)
 	}
-
-	// Define default configuration
-	ipConfig := node.IPConfig{
-		IPUpdater:        dynamicip.NewNoUpdater(),
-		IPResolutionFreq: ipResolutionFreq,
-		Nat:              nat.NewNoRouter(),
-		ListenHost:       v.GetString(StakingHostKey),
-	}
-
-	if publicIP != "" {
-		// User specified a specific public IP to use.
-		ip := net.ParseIP(publicIP)
-		if ip == nil {
-			return node.IPConfig{}, fmt.Errorf("invalid IP Address %s", publicIP)
-		}
-		ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
-		return ipConfig, nil
-	}
-	if ipResolutionService != "" {
-		// User specified to use dynamic IP resolution.
-		resolver, err := dynamicip.NewResolver(ipResolutionService)
-		if err != nil {
-			return node.IPConfig{}, fmt.Errorf("couldn't create IP resolver: %w", err)
-		}
-
-		// Use that to resolve our public IP.
-		ctx, cancel := context.WithTimeout(context.Background(), ipResolutionTimeout)
-		defer cancel()
-		ip, err := resolver.Resolve(ctx)
-		if err != nil {
-			return node.IPConfig{}, fmt.Errorf("couldn't resolve public IP: %w", err)
-		}
-		ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
-		ipConfig.IPUpdater = dynamicip.NewUpdater(ipConfig.IPPort, resolver, ipResolutionFreq)
-		return ipConfig, nil
-	}
-
-	// User didn't specify a public IP to use, and they didn't specify a public IP resolution
-	// service to use. Try to resolve public IP with NAT traversal.
-	nat := nat.GetRouter()
-	ip, err := nat.ExternalIP()
-	if err != nil {
-		return node.IPConfig{}, fmt.Errorf("public IP / IP resolution service not given and failed to resolve IP with NAT: %w", err)
-	}
-	ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
-	ipConfig.Nat = nat
-	ipConfig.AttemptedNATTraversal = true
 	return ipConfig, nil
 }
 

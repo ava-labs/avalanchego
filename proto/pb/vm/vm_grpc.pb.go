@@ -24,7 +24,6 @@ const (
 	VM_SetState_FullMethodName                   = "/vm.VM/SetState"
 	VM_Shutdown_FullMethodName                   = "/vm.VM/Shutdown"
 	VM_CreateHandlers_FullMethodName             = "/vm.VM/CreateHandlers"
-	VM_CreateStaticHandlers_FullMethodName       = "/vm.VM/CreateStaticHandlers"
 	VM_Connected_FullMethodName                  = "/vm.VM/Connected"
 	VM_Disconnected_FullMethodName               = "/vm.VM/Disconnected"
 	VM_BuildBlock_FullMethodName                 = "/vm.VM/BuildBlock"
@@ -70,13 +69,6 @@ type VMClient interface {
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Creates the HTTP handlers for custom chain network calls.
 	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
-	// Creates the HTTP handlers for custom VM network calls.
-	//
-	// Note: RPC Chain VM Factory will start a new instance of the VM in a
-	// seperate process which will populate the static handlers. After this
-	// process is created other processes will be created to populate blockchains,
-	// but they will not have the static handlers be called again.
-	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
 	Connected(ctx context.Context, in *ConnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Disconnected(ctx context.Context, in *DisconnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
@@ -171,15 +163,6 @@ func (c *vMClient) Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc
 func (c *vMClient) CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error) {
 	out := new(CreateHandlersResponse)
 	err := c.cc.Invoke(ctx, VM_CreateHandlers_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error) {
-	out := new(CreateStaticHandlersResponse)
-	err := c.cc.Invoke(ctx, VM_CreateStaticHandlers_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -461,13 +444,6 @@ type VMServer interface {
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Creates the HTTP handlers for custom chain network calls.
 	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
-	// Creates the HTTP handlers for custom VM network calls.
-	//
-	// Note: RPC Chain VM Factory will start a new instance of the VM in a
-	// seperate process which will populate the static handlers. After this
-	// process is created other processes will be created to populate blockchains,
-	// but they will not have the static handlers be called again.
-	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
 	Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error)
 	Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
@@ -540,9 +516,6 @@ func (UnimplementedVMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb
 }
 func (UnimplementedVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHandlers not implemented")
-}
-func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticHandlers not implemented")
 }
 func (UnimplementedVMServer) Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Connected not implemented")
@@ -712,24 +685,6 @@ func _VM_CreateHandlers_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VMServer).CreateHandlers(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).CreateStaticHandlers(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: VM_CreateStaticHandlers_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1278,10 +1233,6 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateHandlers",
 			Handler:    _VM_CreateHandlers_Handler,
-		},
-		{
-			MethodName: "CreateStaticHandlers",
-			Handler:    _VM_CreateStaticHandlers_Handler,
 		},
 		{
 			MethodName: "Connected",
