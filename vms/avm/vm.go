@@ -362,17 +362,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}, err
 }
 
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	codec := json.NewCodec()
-	server.RegisterCodec(codec, "application/json")
-	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	staticService := CreateStaticService()
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(staticService, "avm")
-}
-
 /*
  ******************************************************************************
  ********************************** Chain VM **********************************
