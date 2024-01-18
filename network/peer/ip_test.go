@@ -27,21 +27,19 @@ func TestSignedIpVerify(t *testing.T) {
 	require.NoError(t, staking.ValidateCertificate(cert2))
 
 	now := time.Now()
-	inOneMinute := now.Add(time.Minute)
 
 	type test struct {
 		name         string
 		signer       crypto.Signer
 		expectedCert *staking.Certificate
 		ip           UnsignedIP
-		now          time.Time
-		maxTimeAhead time.Duration
+		maxTimestamp time.Time
 		expectedErr  error
 	}
 
 	tests := []test{
 		{
-			name:         "valid (now before signature time)",
+			name:         "valid (before max time)",
 			signer:       tlsCert1.PrivateKey.(crypto.Signer),
 			expectedCert: cert1,
 			ip: UnsignedIP{
@@ -51,12 +49,11 @@ func TestSignedIpVerify(t *testing.T) {
 				},
 				Timestamp: uint64(now.Unix()) - 1,
 			},
-			now:          now,
-			maxTimeAhead: 0,
+			maxTimestamp: now,
 			expectedErr:  nil,
 		},
 		{
-			name:         "valid (now at signature time)",
+			name:         "valid (at max time)",
 			signer:       tlsCert1.PrivateKey.(crypto.Signer),
 			expectedCert: cert1,
 			ip: UnsignedIP{
@@ -66,23 +63,7 @@ func TestSignedIpVerify(t *testing.T) {
 				},
 				Timestamp: uint64(now.Unix()),
 			},
-			now:          now,
-			maxTimeAhead: 0,
-			expectedErr:  nil,
-		},
-		{
-			name:         "valid (now a little after of signature time)",
-			signer:       tlsCert1.PrivateKey.(crypto.Signer),
-			expectedCert: cert1,
-			ip: UnsignedIP{
-				IPPort: ips.IPPort{
-					IP:   net.IPv4(1, 2, 3, 4),
-					Port: 1,
-				},
-				Timestamp: uint64(inOneMinute.Unix()),
-			},
-			now:          now,
-			maxTimeAhead: time.Minute,
+			maxTimestamp: now,
 			expectedErr:  nil,
 		},
 		{
@@ -94,10 +75,9 @@ func TestSignedIpVerify(t *testing.T) {
 					IP:   net.IPv4(1, 2, 3, 4),
 					Port: 1,
 				},
-				Timestamp: uint64(inOneMinute.Unix()) + 1,
+				Timestamp: uint64(now.Unix()) + 1,
 			},
-			now:          now,
-			maxTimeAhead: time.Minute,
+			maxTimestamp: now,
 			expectedErr:  errTimestampTooFarInFuture,
 		},
 		{
@@ -109,10 +89,9 @@ func TestSignedIpVerify(t *testing.T) {
 					IP:   net.IPv4(1, 2, 3, 4),
 					Port: 1,
 				},
-				Timestamp: uint64(inOneMinute.Unix()),
+				Timestamp: uint64(now.Unix()),
 			},
-			now:          now,
-			maxTimeAhead: time.Minute,
+			maxTimestamp: now,
 			expectedErr:  errInvalidSignature,
 		},
 	}
@@ -122,7 +101,7 @@ func TestSignedIpVerify(t *testing.T) {
 			signedIP, err := tt.ip.Sign(tt.signer)
 			require.NoError(t, err)
 
-			err = signedIP.Verify(tt.expectedCert, tt.now, tt.maxTimeAhead)
+			err = signedIP.Verify(tt.expectedCert, tt.maxTimestamp)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

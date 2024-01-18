@@ -58,20 +58,15 @@ type SignedIP struct {
 }
 
 // Returns nil if:
-// * [ip.Signature] is a valid signature over [ip.UnsignedIP] from
-// the provided [cert].
-// * [ip.Timestamp] is not more than [maxTimeAhead] ahead of [now].
+// * [ip.Signature] is a valid signature over [ip.UnsignedIP] from [cert].
+// * [ip.Timestamp] is not after [maxTimestamp].
 func (ip *SignedIP) Verify(
 	cert *staking.Certificate,
-	now time.Time,
-	maxTimeAhead time.Duration,
+	maxTimestamp time.Time,
 ) error {
-	nowUnix := uint64(now.Unix())
-	// Note that it is expected that the [ip.Timestamp] can be in the past. We
-	// are just verifying that the claimed signing time isn't too far in the
-	// future here.
-	if ip.Timestamp > nowUnix && ip.Timestamp-nowUnix > uint64(maxTimeAhead.Seconds()) {
-		return fmt.Errorf("%w: timestamp %d more than %s ahead", errTimestampTooFarInFuture, ip.Timestamp, maxTimeAhead)
+	maxUnixTimestamp := uint64(maxTimestamp.Unix())
+	if ip.Timestamp > maxUnixTimestamp {
+		return fmt.Errorf("%w: timestamp %d > maxTimestamp %d", errTimestampTooFarInFuture, ip.Timestamp, maxUnixTimestamp)
 	}
 
 	if err := staking.CheckSignature(
