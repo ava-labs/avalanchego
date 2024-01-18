@@ -462,11 +462,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						FeeConfig: config.FeeConfig{
-							AddSubnetValidatorFee: 1,
-						},
-						DurangoTime: activeForkTime, // activate latest fork,
-						EForkTime:   mockable.MaxTime,
+						AddSubnetValidatorFee: 1,
+						DurangoTime:           activeForkTime, // activate latest fork,
+						EForkTime:             mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -511,12 +509,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						FeeConfig: config.FeeConfig{
-							AddSubnetValidatorFee: 1,
-						},
-						CortinaTime: activeForkTime,
-						DurangoTime: mockable.MaxTime,
-						EForkTime:   mockable.MaxTime,
+						AddSubnetValidatorFee: 1,
+						CortinaTime:           activeForkTime,
+						DurangoTime:           mockable.MaxTime,
+						EForkTime:             mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -566,11 +562,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						FeeConfig: config.FeeConfig{
-							AddSubnetValidatorFee: 1,
-						},
-						DurangoTime: activeForkTime, // activate latest fork,
-						EForkTime:   mockable.MaxTime,
+						AddSubnetValidatorFee: 1,
+						DurangoTime:           activeForkTime, // activate latest fork,
+						EForkTime:             mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,

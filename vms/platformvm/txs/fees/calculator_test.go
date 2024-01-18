@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	feeTestsDefaultCfg = config.FeeConfig{
+	feeTestsDefaultCfg = config.Config{
 		DefaultUnitFees: fees.Dimensions{
 			1 * units.MicroAvax,
 			2 * units.MicroAvax,
@@ -120,13 +120,9 @@ func TestPartiallyFulledTransactionsSizes(t *testing.T) {
 func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
-	cfg := &config.Config{
-		FeeConfig: feeTestsDefaultCfg,
-	}
-
 	fc := &Calculator{
-		FeeManager: fees.NewManager(cfg.DefaultUnitFees),
-		Config:     cfg,
+		FeeManager: fees.NewManager(feeTestsDefaultCfg.DefaultUnitFees),
+		Config:     &feeTestsDefaultCfg,
 	}
 
 	units := fees.Dimensions{
@@ -253,13 +249,11 @@ func TestAddValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -272,13 +266,11 @@ func TestAddValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -300,14 +292,12 @@ func TestAddValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[0] = 741 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -361,13 +351,11 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -380,13 +368,11 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -408,14 +394,12 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -470,13 +454,11 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -489,13 +471,11 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -517,14 +497,12 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -573,13 +551,11 @@ func TestCreateChainTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -592,13 +568,11 @@ func TestCreateChainTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -620,14 +594,12 @@ func TestCreateChainTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -674,13 +646,11 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -693,13 +663,11 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -721,14 +689,12 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -774,13 +740,11 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -793,13 +757,11 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -821,14 +783,12 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -886,13 +846,11 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -905,13 +863,11 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -933,14 +889,12 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -994,13 +948,11 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1013,13 +965,11 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1041,14 +991,12 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1111,13 +1059,11 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1130,13 +1076,11 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1158,14 +1102,12 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1223,13 +1165,11 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1242,13 +1182,11 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1270,14 +1208,12 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1318,13 +1254,11 @@ func TestBaseTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1337,13 +1271,11 @@ func TestBaseTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1365,14 +1297,12 @@ func TestBaseTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1427,13 +1357,11 @@ func TestImportTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1446,13 +1374,11 @@ func TestImportTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1474,14 +1400,12 @@ func TestImportTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1526,13 +1450,11 @@ func TestExportTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(-1 * time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1545,13 +1467,11 @@ func TestExportTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
@@ -1573,14 +1493,12 @@ func TestExportTxFees(t *testing.T) {
 				eForkTime := time.Now().Truncate(time.Second)
 				chainTime := eForkTime.Add(time.Second)
 
-				cfg := &config.Config{
-					FeeConfig:   feeTestsDefaultCfg,
-					DurangoTime: durangoTime,
-					EForkTime:   eForkTime,
-				}
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EForkTime = eForkTime
 				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
-				return cfg, chainTime
+				return &cfg, chainTime
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},

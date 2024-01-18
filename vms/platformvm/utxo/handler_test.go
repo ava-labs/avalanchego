@@ -55,19 +55,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		FeeConfig: config.FeeConfig{
-			DefaultUnitFees: commonfees.Dimensions{
-				1 * units.MicroAvax,
-				2 * units.MicroAvax,
-				3 * units.MicroAvax,
-				4 * units.MicroAvax,
-			},
-			DefaultBlockMaxConsumedUnits: commonfees.Dimensions{
-				math.MaxUint64,
-				math.MaxUint64,
-				math.MaxUint64,
-				math.MaxUint64,
-			},
+		DefaultUnitFees: commonfees.Dimensions{
+			1 * units.MicroAvax,
+			2 * units.MicroAvax,
+			3 * units.MicroAvax,
+			4 * units.MicroAvax,
+		},
+		DefaultBlockMaxConsumedUnits: commonfees.Dimensions{
+			math.MaxUint64,
+			math.MaxUint64,
+			math.MaxUint64,
+			math.MaxUint64,
 		},
 	}
 
