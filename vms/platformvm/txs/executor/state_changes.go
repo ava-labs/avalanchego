@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -55,6 +56,30 @@ func VerifyNewChainTime(
 		)
 	}
 	return nil
+}
+
+func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, error) {
+	var (
+		timestamp  = clk.Time()
+		parentTime = state.GetTimestamp()
+	)
+	if parentTime.After(timestamp) {
+		timestamp = parentTime
+	}
+	// [timestamp] = max(now, parentTime)
+
+	nextStakerChangeTime, err := GetNextStakerChangeTime(state)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("failed getting next staker change time: %w", err)
+	}
+
+	// timeWasCapped means that [timestamp] was reduced to [nextStakerChangeTime]
+	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
+	if timeWasCapped {
+		timestamp = nextStakerChangeTime
+	}
+	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
+	return timestamp, timeWasCapped, nil
 }
 
 // AdvanceTimeTo applies all state changes to [parentState] resulting from
