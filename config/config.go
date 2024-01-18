@@ -109,6 +109,7 @@ var (
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
+	errGzipDeprecatedMsg                      = errors.New("gzip compression is not supported, use zstd or no compression")
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -345,6 +346,9 @@ func getNetworkConfig(
 	compressionType, err := compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
 	if err != nil {
 		return network.Config{}, err
+	}
+	if compressionType == compression.TypeGzip {
+		return network.Config{}, errGzipDeprecatedMsg
 	}
 
 	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
