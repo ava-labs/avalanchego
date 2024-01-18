@@ -63,6 +63,7 @@ func (f *Filter) Add(hash uint64) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	_ = 1 % f.numBits // hint to the compiler that numBits is not 0
 	for _, seed := range f.hashSeeds {
 		hash = bits.RotateLeft64(hash, hashRotation) ^ seed
 		index := hash % f.numBits
@@ -119,6 +120,7 @@ func newHashSeeds(count int) ([]uint64, error) {
 func contains(hashSeeds []uint64, entries []byte, hash uint64) bool {
 	var (
 		numBits          = bitsPerByte * uint64(len(entries))
+		_                = 1 % numBits // hint to the compiler that numBits is not 0
 		accumulator byte = 1
 	)
 	for seedIndex := 0; seedIndex < len(hashSeeds) && accumulator != 0; seedIndex++ {
