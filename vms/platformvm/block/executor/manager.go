@@ -151,6 +151,8 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	})
 	// We ignore [errFutureStakeTime] here because the time will be advanced
 	// when this transaction is issued.
+	//
+	// TODO: Remove this check post-Durango.
 	if errors.Is(err, executor.ErrFutureStakeTime) {
 		return nil
 	}
