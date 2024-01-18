@@ -124,14 +124,14 @@ func (c *genericCodec) size(
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
 		if value.IsNil() {
-			return 0, true, nil // can't marshal nil, we return zero size
+			return 0, false, nil // can't marshal nil, we return zero size
 		}
 
 		return c.size(value.Elem(), typeStack)
 
 	case reflect.Interface:
 		if value.IsNil() {
-			return 0, true, nil // can't marshal nil, we return zero size
+			return 0, false, nil // can't marshal nil, we return zero size
 		}
 
 		underlyingValue := value.Interface()
