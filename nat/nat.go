@@ -53,8 +53,8 @@ type Mapper struct {
 }
 
 // NewPortMapper returns an initialized mapper
-func NewPortMapper(log logging.Logger, r Router) Mapper {
-	return Mapper{
+func NewPortMapper(log logging.Logger, r Router) *Mapper {
+	return &Mapper{
 		log:    log,
 		r:      r,
 		closer: make(chan struct{}),

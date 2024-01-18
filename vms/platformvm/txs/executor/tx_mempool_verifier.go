@@ -115,11 +115,7 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 	}
 
 	_, err = AdvanceTimeTo(v.Backend, state, nextBlkTime)
-	if err != nil {
-		return nil, err
-	}
-
-	return state, nil
+	return state, err
 }
 
 func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, error) {

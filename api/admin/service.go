@@ -334,7 +334,7 @@ func (a *Admin) LoadVMs(r *http.Request, _ *struct{}, reply *LoadVMsReply) error
 	defer a.lock.Unlock()
 
 	ctx := r.Context()
-	loadedVMs, failedVMs, err := a.VMRegistry.ReloadWithReadLock(ctx)
+	loadedVMs, failedVMs, err := a.VMRegistry.Reload(ctx)
 	if err != nil {
 		return err
 	}

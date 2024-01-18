@@ -78,14 +78,13 @@ func AdvanceTimeTo(
 		return false, err
 	}
 
-	changed := false
-
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return false, err
 	}
 	defer pendingStakerIterator.Release()
 
+	var changed bool
 	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
@@ -171,7 +170,6 @@ func AdvanceTimeTo(
 	}
 
 	parentState.SetTimestamp(newChainTime)
-
 	return changed, nil
 }
 

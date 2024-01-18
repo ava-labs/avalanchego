@@ -296,8 +296,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	_, err = AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
-	if err != nil {
+	if _, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime); err != nil {
 		return err
 	}
 

@@ -347,7 +347,7 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	if _, err = txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp); err != nil {
+	if _, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp); err != nil {
 		return nil, err
 	}
 
