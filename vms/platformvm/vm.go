@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -506,18 +505,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return map[string]http.Handler{
 		"": server,
 	}, err
-}
-
-// CreateStaticHandlers returns a map where:
-// * keys are API endpoint extensions
-// * values are API handlers
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(&api.StaticService{}, "platform")
 }
 
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
