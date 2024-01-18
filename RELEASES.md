@@ -23,6 +23,7 @@ The plugin version is updated to `31` all plugins must update to be compatible.
   - `version` -> `handshake`
   - `appRequestFailed` -> `appError`
   - `crossChainAppRequestFailed` -> `crossChainAppError`
+- Removed `gzip` compression time metrics
 - Converted p2p SDK metrics to use vectors rather than independent metrics
 - Converted client name reported over the p2p network from `avalanche` to `avalanchego`
 
