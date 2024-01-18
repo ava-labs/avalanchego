@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -101,7 +101,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 	)
 	for ; blocksIndex < len(blks); blocksIndex++ {
 		blkBytes := blks[blocksIndex]
-		statelessBlock, err := statelessblock.Parse(blkBytes)
+		statelessBlock, err := statelessblock.Parse(blkBytes, vm.DurangoTime)
 		if err != nil {
 			break
 		}

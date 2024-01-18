@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -33,9 +34,12 @@ func (v testVerifier) VerifyTx(*txs.Tx) error {
 func TestMarshaller(t *testing.T) {
 	require := require.New(t)
 
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	marhsaller := txParser{
@@ -62,7 +66,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics, toEngine)
 	require.NoError(err)
 
-	parser, err := txs.NewParser(nil)
+	parser, err := txs.NewParser(time.Time{}, nil)
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(
@@ -98,7 +102,7 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics, toEngine)
 	require.NoError(err)
 
-	parser, err := txs.NewParser(nil)
+	parser, err := txs.NewParser(time.Time{}, nil)
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -14,14 +14,7 @@ var _ Sortable[sortable] = sortable(0)
 type sortable int
 
 func (s sortable) Compare(other sortable) int {
-	switch {
-	case s < other:
-		return -1
-	case s > other:
-		return 1
-	default:
-		return 0
-	}
+	return Compare(s, other)
 }
 
 func TestSortSliceSortable(t *testing.T) {

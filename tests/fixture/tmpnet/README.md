@@ -30,9 +30,11 @@ the following non-test files:
 | flags.go          | FlagsMap    | Simplifies configuration of avalanchego flags  |
 | genesis.go        |             | Creates test genesis                           |
 | network.go        | Network     | Orchestrates and configures temporary networks |
+| network_config.go | Network     | Reads and writes network configuration         |
 | node.go           | Node        | Orchestrates and configures nodes              |
 | node_config.go    | Node        | Reads and writes node configuration            |
 | node_process.go   | NodeProcess | Orchestrates node processes                    |
+| subnet.go         | Subnet      | Orchestrates subnets                           |
 | utils.go          |             | Defines shared utility functions               |
 
 ## Usage
@@ -73,59 +75,41 @@ network.
 A temporary network can be managed in code:
 
 ```golang
-network, _ := tmpnet.StartNetwork(
-    ctx,                                           // Context used to limit duration of waiting for network health
-    ginkgo.GinkgoWriter,                           // Writer to report progress of network start
-    "",                                            // Use default root dir (~/.tmpnet)
-    &tmpnet.Network{
-        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
-            ExecPath: "/path/to/avalanchego",      // Defining the avalanchego exec path is required
+network := &tmpnet.Network{                   // Configure non-default values for the new network
+    DefaultFlags: tmpnet.FlagsMap{
+        config.LogLevelKey: "INFO",           // Change one of the network's defaults
+    },
+    Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
+        {
+            Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
+            Chains: []*tmpnet.Chain{
+                {
+                    VMName: "xsvm",           // Name of the VM the chain will run, will be used to derive the name of the VM binary
+                    Genesis: <genesis bytes>, // Genesis bytes used to initialize the custom chain
+                    PreFundedKey: <key>,      // (Optional) A private key that is funded in the genesis bytes
+                },
+            },
         },
     },
-    5,                                             // Number of initial validating nodes
-    50,                                            // Number of pre-funded keys to create
+}
+
+_ := tmpnet.StartNewNetwork(              // Start the network
+    ctx,                                  // Context used to limit duration of waiting for network health
+    ginkgo.GinkgoWriter,                  // Writer to report progress of initialization
+    network,
+    "",                                   // Empty string uses the default network path (~/tmpnet/networks)
+    "/path/to/avalanchego",               // The path to the binary that nodes will execute
+    "/path/to/plugins",                   // The path nodes will use for plugin binaries (suggested value ~/.avalanchego/plugins)
+    5,                                    // Number of initial validating nodes
 )
 
-uris := network.GetURIs()
+uris := network.GetNodeURIs()
 
 // Use URIs to interact with the network
 
 // Stop all nodes in the network
-network.Stop()
+network.Stop(context.Background())
 ```
-
-If non-default node behavior is required, the `Network` instance
-supplied to `StartNetwork()` can be initialized with explicit node
-configuration and by supplying a nodeCount argument of `0`:
-
-```golang
-network, _ := tmpnet.StartNetwork(
-    ctx,
-    ginkgo.GinkgoWriter,
-    "",
-    &tmpnet.Network{
-        NodeRuntimeConfig: tmpnet.NodeRuntimeConfig{
-            ExecPath: "/path/to/avalanchego",
-        },
-        Nodes: []*Node{
-            {                                                       // node1 configuration is customized
-                Flags: FlagsMap{                                    // Any and all node flags can be configured here
-                    config.DataDirKey: "/custom/path/to/node/data",
-                }
-            },
-        },
-        {},                                                         // node2 uses default configuration
-        {},                                                         // node3 uses default configuration
-        {},                                                         // node4 uses default configuration
-        {},                                                         // node5 uses default configuration
-    },
-    0,                                                              // Node count must be zero when setting node config
-    50,
-)
-```
-
-Further examples of code-based usage are located in the [e2e
-tests](../../e2e/e2e_test.go).
 
 ## Networking configuration
 
@@ -159,20 +143,25 @@ HOME
             │   │   └── ...
             │   └── process.json                         // Node process details (PID, API URI, staking address)
             ├── chains
-            │   └── C
-            │       └── config.json                      // C-Chain config for all nodes
-            ├── defaults.json                            // Default flags and configuration for network
+            │   ├── C
+            │   │   └── config.json                      // C-Chain config for all nodes
+            │   └── raZ51bwfepaSaZ1MNSRNYNs3ZPfj...U7pa3
+            │       └── config.json                      // Custom chain configuration for all nodes
+            ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
-            └── network.env                              // Sets network dir env var to simplify network usage
+            ├── network.env                              // Sets network dir env var to simplify network usage
+            └── subnets                                  // Parent directory for subnet definitions
+                ├─ subnet-a.json                         // Configuration for subnet-a and its chain(s)
+                └─ subnet-b.json                         // Configuration for subnet-b and its chain(s)
 ```
 
-### Default flags and configuration
+### Common networking configuration
 
-The default avalanchego node flags (e.g. `--staking-port=`) and
-default configuration like the avalanchego path are stored at
-`[network-dir]/defaults.json`. The value for a given defaulted flag
-will be set on initial and subsequently added nodes that do not supply
-values for a given defaulted flag.
+Network configuration such as default flags (e.g. `--log-level=`),
+runtime defaults (e.g. avalanchego path) and pre-funded private keys
+are stored at `[network-dir]/config.json`. A given default will only
+be applied to a new node on its addition to the network if the node
+does not explicitly set a given value.
 
 ### Genesis
 
@@ -182,17 +171,19 @@ content will be generated with reasonable defaults if not
 supplied. Each node in the network can override the default by setting
 an explicit value for `--genesis-file` or `--genesis-file-content`.
 
-### C-Chain config
+### Chain configuration
 
-The C-Chain config for a temporary network is stored at
-`[network-dir]/chains/C/config.json` and referenced by default by all
-nodes in the network. The C-Chain config will be generated with
-reasonable defaults if not supplied. Each node in the network can
-override the default by setting an explicit value for
-`--chain-config-dir` and ensuring the C-Chain config file exists at
-`[chain-config-dir]/C/config.json`.
+The chain configuration for a temporary network is stored at
+`[network-dir]/chains/[chain alias or ID]/config.json` and referenced
+by all nodes in the network. The C-Chain config will be generated with
+reasonable defaults if not supplied. X-Chain and P-Chain will use
+implicit defaults. The configuration for custom chains can be provided
+with subnet configuration and will be writen to the appropriate path.
 
-TODO(marun) Enable configuration of X-Chain and P-Chain.
+Each node in the network can override network-level chain
+configuration by setting `--chain-config-dir` to an explicit value and
+ensuring that configuration files for all chains exist at
+`[custom-chain-config-dir]/[chain alias or ID]/config.json`.
 
 ### Network env
 

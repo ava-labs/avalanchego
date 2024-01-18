@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -99,8 +99,8 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 	}
 	tests := []test{
 		{
-			name:    "v0",
-			version: v0,
+			name:    CodecVersion0Tag,
+			version: CodecVersion0,
 			metadata: &delegatorMetadata{
 				PotentialReward: 123,
 				StakerStartTime: 456,
@@ -111,8 +111,8 @@ func TestWriteDelegatorMetadata(t *testing.T) {
 			},
 		},
 		{
-			name:    "v1",
-			version: v1,
+			name:    CodecVersion1Tag,
+			version: CodecVersion1,
 			metadata: &delegatorMetadata{
 				PotentialReward: 123,
 				StakerStartTime: 456,

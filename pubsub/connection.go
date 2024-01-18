@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package pubsub
@@ -14,7 +14,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/pubsub/bloom"
 )
 
 var (
@@ -190,7 +190,7 @@ func (c *connection) handleNewBloom(cmd *NewBloom) error {
 	if !cmd.IsParamsValid() {
 		return ErrInvalidFilterParam
 	}
-	filter, err := bloom.New(uint64(cmd.MaxElements), float64(cmd.CollisionProb), MaxBytes)
+	filter, err := bloom.New(int(cmd.MaxElements), float64(cmd.CollisionProb), MaxBytes)
 	if err != nil {
 		return fmt.Errorf("bloom filter creation failed %w", err)
 	}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -14,7 +14,7 @@ type Type byte
 
 const (
 	TypeNone Type = iota + 1
-	TypeGzip
+	TypeGzip      // Remove once v1.11.x is out.
 	TypeZstd
 )
 

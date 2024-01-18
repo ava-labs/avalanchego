@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +83,15 @@ func NewNode(dataDir string) *Node {
 	}
 }
 
+// Initializes the specified number of nodes.
+func NewNodes(count int) []*Node {
+	nodes := make([]*Node, count)
+	for i := range nodes {
+		nodes[i] = NewNode("")
+	}
+	return nodes
+}
+
 // Reads a node's configuration from the specified directory.
 func ReadNode(dataDir string) (*Node, error) {
 	node := NewNode(dataDir)
@@ -89,7 +99,7 @@ func ReadNode(dataDir string) (*Node, error) {
 }
 
 // Reads nodes from the specified network directory.
-func ReadNodes(networkDir string) ([]*Node, error) {
+func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
@@ -109,6 +119,10 @@ func ReadNodes(networkDir string) ([]*Node, error) {
 			continue
 		} else if err != nil {
 			return nil, err
+		}
+
+		if !includeEphemeral && node.IsEphemeral {
+			continue
 		}
 
 		nodes = append(nodes, node)
@@ -137,7 +151,10 @@ func (n *Node) Start(w io.Writer) error {
 	return n.getRuntime().Start(w)
 }
 
-func (n *Node) InitiateStop() error {
+func (n *Node) InitiateStop(ctx context.Context) error {
+	if err := n.SaveMetricsSnapshot(ctx); err != nil {
+		return err
+	}
 	return n.getRuntime().InitiateStop()
 }
 
@@ -153,9 +170,32 @@ func (n *Node) getDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
+// Writes the current state of the metrics endpoint to disk
+func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
+	if len(n.URI) == 0 {
+		// No URI to request metrics from
+		return nil
+	}
+	uri := n.URI + "/ext/metrics"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return n.writeMetricsSnapshot(body)
+}
+
 // Initiates node shutdown and waits for the node to stop.
 func (n *Node) Stop(ctx context.Context) error {
-	if err := n.InitiateStop(); err != nil {
+	if err := n.InitiateStop(ctx); err != nil {
 		return err
 	}
 	return n.WaitForStopped(ctx)

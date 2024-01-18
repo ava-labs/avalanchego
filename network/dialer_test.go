@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -33,7 +33,7 @@ func (d *testDialer) NewListener() (ips.DynamicIPPort, *testListener) {
 	// Uses a private IP to easily enable testing AllowPrivateIPs
 	ip := ips.NewDynamicIPPort(
 		net.IPv4(10, 0, 0, 0),
-		uint16(len(d.listeners)),
+		uint16(len(d.listeners)+1),
 	)
 	staticIP := ip.IPPort()
 	listener := newTestListener(staticIP)
@@ -55,22 +55,22 @@ func (d *testDialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) 
 		Conn: serverConn,
 		localAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 0,
+			Port: 1,
 		},
 		remoteAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 1,
+			Port: 2,
 		},
 	}
 	client := &testConn{
 		Conn: clientConn,
 		localAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 2,
+			Port: 3,
 		},
 		remoteAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 3,
+			Port: 4,
 		},
 	}
 	select {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -100,16 +101,20 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	}
 
 	blkWrapper := blockWrapper{}
-	parsedVersion, err := c.Unmarshal(blkWrapperBytes, &blkWrapper)
+	parsedVersion, err := Codec.Unmarshal(blkWrapperBytes, &blkWrapper)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}
-	if parsedVersion != version {
+	if parsedVersion != CodecVersion {
 		return nil, choices.Unknown, errBlockWrongVersion
 	}
 
 	// The key was in the database
-	blk, err := block.Parse(blkWrapper.Block)
+	//
+	// Invariant: Blocks stored on disk were previously accepted by this node.
+	// Because the durango activation relaxes TLS cert parsing rules, we assume
+	// it is always activated here.
+	blk, err := block.Parse(blkWrapper.Block, version.DefaultUpgradeTime)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}
@@ -126,7 +131,7 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 		block:  blk,
 	}
 
-	bytes, err := c.Marshal(version, &blkWrapper)
+	bytes, err := Codec.Marshal(CodecVersion, &blkWrapper)
 	if err != nil {
 		return err
 	}

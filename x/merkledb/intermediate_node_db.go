@@ -1,10 +1,12 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
 
 import (
 	"sync"
+
+	"github.com/ava-labs/avalanchego/cache"
 
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -22,12 +24,16 @@ type intermediateNodeDB struct {
 	// Keys written to [baseDB] are prefixed with [intermediateNodePrefix].
 	baseDB database.Database
 
-	// If a value is nil, the corresponding key isn't in the trie.
+	// The write buffer contains nodes that have been changed but have not been written to disk.
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
 	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
-	nodeCache onEvictCache[Key, *node]
+	writeBuffer onEvictCache[Key, *node]
+
+	// If a value is nil, the corresponding key isn't in the trie.
+	nodeCache cache.Cacher[Key, *node]
+
 	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
@@ -38,7 +44,8 @@ func newIntermediateNodeDB(
 	db database.Database,
 	bufferPool *sync.Pool,
 	metrics merkleMetrics,
-	size int,
+	cacheSize int,
+	writeBufferSize int,
 	evictionBatchSize int,
 	tokenSize int,
 ) *intermediateNodeDB {
@@ -48,19 +55,20 @@ func newIntermediateNodeDB(
 		bufferPool:        bufferPool,
 		evictionBatchSize: evictionBatchSize,
 		tokenSize:         tokenSize,
+		nodeCache:         cache.NewSizedLRU(cacheSize, cacheEntrySize),
 	}
-	result.nodeCache = newOnEvictCache(
-		size,
+	result.writeBuffer = newOnEvictCache(
+		writeBufferSize,
 		cacheEntrySize,
 		result.onEviction,
 	)
+
 	return result
 }
 
 // A non-nil error is considered fatal and closes [db.baseDB].
 func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
-
 	totalSize := cacheEntrySize(key, n)
 	if err := db.addToBatch(writeBatch, key, n); err != nil {
 		_ = db.baseDB.Close()
@@ -73,7 +81,7 @@ func (db *intermediateNodeDB) onEviction(key Key, n *node) error {
 	// node, because each time this method is called we do a disk write.
 	// Evicts a total number of bytes, rather than a number of nodes
 	for totalSize < db.evictionBatchSize {
-		key, n, exists := db.nodeCache.removeOldest()
+		key, n, exists := db.writeBuffer.removeOldest()
 		if !exists {
 			// The cache is empty.
 			break
@@ -111,6 +119,15 @@ func (db *intermediateNodeDB) Get(key Key) (*node, error) {
 	}
 	db.metrics.IntermediateNodeCacheMiss()
 
+	if cachedValue, isCached := db.writeBuffer.Get(key); isCached {
+		db.metrics.IntermediateNodeCacheHit()
+		if cachedValue == nil {
+			return nil, database.ErrNotFound
+		}
+		return cachedValue, nil
+	}
+	db.metrics.IntermediateNodeCacheMiss()
+
 	dbKey := db.constructDBKey(key)
 	db.metrics.DatabaseNodeRead()
 	nodeBytes, err := db.baseDB.Get(dbKey)
@@ -136,24 +153,29 @@ func (db *intermediateNodeDB) constructDBKey(key Key) []byte {
 }
 
 func (db *intermediateNodeDB) Put(key Key, n *node) error {
-	return db.nodeCache.Put(key, n)
+	db.nodeCache.Put(key, n)
+	return db.writeBuffer.Put(key, n)
 }
 
 func (db *intermediateNodeDB) Flush() error {
-	return db.nodeCache.Flush()
+	db.nodeCache.Flush()
+	return db.writeBuffer.Flush()
 }
 
 func (db *intermediateNodeDB) Delete(key Key) error {
-	return db.nodeCache.Put(key, nil)
+	db.nodeCache.Put(key, nil)
+	return db.writeBuffer.Put(key, nil)
 }
 
 func (db *intermediateNodeDB) Clear() error {
-	// Reset the cache. Note we don't flush because that would cause us to
+	db.nodeCache.Flush()
+
+	// Reset the buffer. Note we don't flush because that would cause us to
 	// persist intermediate nodes we're about to delete.
-	db.nodeCache = newOnEvictCache(
-		db.nodeCache.maxSize,
-		db.nodeCache.size,
-		db.nodeCache.onEviction,
+	db.writeBuffer = newOnEvictCache(
+		db.writeBuffer.maxSize,
+		db.writeBuffer.size,
+		db.writeBuffer.onEviction,
 	)
 	return database.AtomicClearPrefix(db.baseDB, db.baseDB, intermediateNodePrefix)
 }

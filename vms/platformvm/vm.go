@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -33,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -90,8 +91,11 @@ type VM struct {
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
 
-	startShutdown context.CancelFunc
-	awaitShutdown sync.WaitGroup
+	// Cancelled on shutdown
+	onShutdownCtx context.Context
+	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
+	onShutdownCtxCancel context.CancelFunc
+	awaitShutdown       sync.WaitGroup
 
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
@@ -132,7 +136,8 @@ func (vm *VM) Initialize(
 	vm.ctx = chainCtx
 	vm.db = db
 
-	vm.codecRegistry = linearcodec.NewDefault()
+	// Note: this codec is never used to serialize anything
+	vm.codecRegistry = linearcodec.NewDefault(time.Time{})
 	vm.fx = &secp256k1fx.Fx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
@@ -212,12 +217,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize network: %w", err)
 	}
 
-	vmCtx, cancel := context.WithCancel(context.Background())
-	vm.startShutdown = cancel
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	vm.awaitShutdown.Add(1)
 	go func() {
 		defer vm.awaitShutdown.Done()
-		vm.Network.Gossip(vmCtx)
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.Network.Gossip(vm.onShutdownCtx)
 	}()
 
 	vm.Builder = blockbuilder.New(
@@ -243,6 +249,10 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	// Incrementing [awaitShutdown] would cause a deadlock since
+	// [periodicallyPruneMempool] grabs the context lock.
+	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
+
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
 		return fmt.Errorf(
@@ -266,6 +276,49 @@ func (vm *VM) Initialize(
 
 		vm.pruned.Set(true)
 	}()
+
+	return nil
+}
+
+func (vm *VM) periodicallyPruneMempool(frequency time.Duration) {
+	ticker := time.NewTicker(frequency)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-vm.onShutdownCtx.Done():
+			return
+		case <-ticker.C:
+			if err := vm.pruneMempool(); err != nil {
+				vm.ctx.Log.Debug("pruning mempool failed",
+					zap.Error(err),
+				)
+			}
+		}
+	}
+}
+
+func (vm *VM) pruneMempool() error {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	// Packing all of the transactions in order performs additional checks that
+	// the MempoolTxVerifier doesn't include. So, evicting transactions from
+	// here is expected to happen occasionally.
+	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range blockTxs {
+		if err := vm.Builder.Add(tx); err != nil {
+			vm.ctx.Log.Debug(
+				"failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Error(err),
+			)
+		}
+	}
 
 	return nil
 }
@@ -375,7 +428,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
-	vm.startShutdown()
+	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
 	vm.Builder.ShutdownBlockTimer()
@@ -455,18 +508,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return map[string]http.Handler{
 		"": server,
 	}, err
-}
-
-// CreateStaticHandlers returns a map where:
-// * keys are API endpoint extensions
-// * values are API handlers
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(&api.StaticService{}, "platform")
 }
 
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {

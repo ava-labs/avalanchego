@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -67,7 +67,7 @@ func TestNewImportTx(t *testing.T) {
 					},
 				},
 			}
-			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 			require.NoError(t, err)
 
 			inputID := utxo.InputID()
@@ -182,19 +182,15 @@ func TestNewImportTx(t *testing.T) {
 
 			require.Equal(env.config.TxFee, totalIn-totalOut)
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			fakedState.SetTimestamp(tt.timestamp)
+			stateDiff.SetTimestamp(tt.timestamp)
 
-			fakedParent := ids.GenerateTestID()
-			env.SetState(fakedParent, fakedState)
-
-			verifier := MempoolTxVerifier{
-				Backend:       &env.backend,
-				ParentID:      fakedParent,
-				StateVersions: env,
-				Tx:            tx,
+			verifier := StandardTxExecutor{
+				Backend: &env.backend,
+				State:   stateDiff,
+				Tx:      tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&verifier))
 		})

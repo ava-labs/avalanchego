@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -201,7 +201,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
-	txBytes, err := Codec.Marshal(Version, stx)
+	txBytes, err := Codec.Marshal(CodecVersion, stx)
 	require.NoError(err)
 
 	parsedTx, err := Parse(Codec, txBytes)

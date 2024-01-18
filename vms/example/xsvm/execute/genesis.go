@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package execute
@@ -36,7 +36,7 @@ func Genesis(db database.KeyValueReaderWriterDeleter, chainID ids.ID, g *genesis
 		return err
 	}
 
-	blkBytes, err := block.Codec.Marshal(block.Version, blk)
+	blkBytes, err := block.Codec.Marshal(block.CodecVersion, blk)
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -283,17 +283,9 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	changes, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
-	if err != nil {
-		return err
-	}
-
-	// Update the state if this tx is committed
-	e.OnCommitState.SetTimestamp(newChainTime)
-	changes.Apply(e.OnCommitState)
-
 	// Note that state doesn't change if this proposal is aborted
-	return nil
+	_, err = AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
+	return err
 }
 
 func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {

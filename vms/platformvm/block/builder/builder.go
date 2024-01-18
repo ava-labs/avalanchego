@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -60,6 +60,13 @@ type Builder interface {
 
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
+
+	// PackBlockTxs returns an array of txs that can fit into a valid block of
+	// size [targetBlockSize]. The returned txs are all verified against the
+	// preferred state.
+	//
+	// Note: This function does not call the consensus engine.
+	PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -232,6 +239,24 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
+func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
+	preferredID := b.blkManager.Preferred()
+	preferredState, ok := b.blkManager.GetState(preferredID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
+	}
+
+	return packBlockTxs(
+		preferredID,
+		preferredState,
+		b.Mempool,
+		b.txExecutorBackend,
+		b.blkManager,
+		b.txExecutorBackend.Clk.Time(),
+		targetBlockSize,
+	)
+}
+
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
 func buildBlock(
 	builder *builder,
@@ -264,6 +289,7 @@ func buildBlock(
 				builder.txExecutorBackend,
 				builder.blkManager,
 				timestamp,
+				targetBlockSize,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to pack block txs: %w", err)
@@ -286,6 +312,7 @@ func buildBlock(
 		builder.txExecutorBackend,
 		builder.blkManager,
 		timestamp,
+		targetBlockSize,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
@@ -313,23 +340,20 @@ func packBlockTxs(
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
+	remainingSize int,
 ) ([]*txs.Tx, error) {
 	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
 		return nil, err
 	}
 
-	changes, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp)
-	if err != nil {
+	if _, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp); err != nil {
 		return nil, err
 	}
-	changes.Apply(stateDiff)
-	stateDiff.SetTimestamp(timestamp)
 
 	var (
-		blockTxs      []*txs.Tx
-		inputs        set.Set[ids.ID]
-		remainingSize = targetBlockSize
+		blockTxs []*txs.Tx
+		inputs   set.Set[ids.ID]
 	)
 
 	for {

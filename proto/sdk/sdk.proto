@@ -5,8 +5,10 @@ package sdk;
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sdk";
 
 message PullGossipRequest {
-  bytes filter = 1;
+  // TODO: Remove reservation after v1.11.x activates.
+  reserved 1;
   bytes salt = 2;
+  bytes filter = 3;
 }
 
 message PullGossipResponse {

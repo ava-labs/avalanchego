@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nat
@@ -53,8 +53,8 @@ type Mapper struct {
 }
 
 // NewPortMapper returns an initialized mapper
-func NewPortMapper(log logging.Logger, r Router) Mapper {
-	return Mapper{
+func NewPortMapper(log logging.Logger, r Router) *Mapper {
+	return &Mapper{
 		log:    log,
 		r:      r,
 		closer: make(chan struct{}),

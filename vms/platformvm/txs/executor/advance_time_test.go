@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -878,7 +878,7 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(chainTime.Add(time.Second))
 	require.NoError(err)
 
-	bytes, err := txs.Codec.Marshal(txs.Version, tx)
+	bytes, err := txs.Codec.Marshal(txs.CodecVersion, tx)
 	require.NoError(err)
 
 	var unmarshaledTx txs.Tx
