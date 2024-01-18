@@ -20,6 +20,7 @@ The plugin version is updated to `31` all plugins must update to be compatible.
   - `avalanche_network_ip_bloom_max_count`
   - `avalanche_network_ip_bloom_reset_count`
 - Added metrics related to `get_peer_list` message handling
+- Added p2p SDK metrics to  the P-chain and X-chain
 - Renamed metrics related to message handling:
   - `version` -> `handshake`
   - `appRequestFailed` -> `appError`
