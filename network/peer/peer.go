@@ -1102,8 +1102,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	peerIPs := p.Network.Peers(p.id, knownPeers, salt)
 
-	// We bypass throttling here to ensure that the peerlist message is
-	// acknowledged timely.
+	// We bypass throttling here to ensure that the handshake message is
+	// acknowledged correctly.
 	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error("failed to create peer list handshake message",
