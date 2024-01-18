@@ -1172,13 +1172,6 @@ func (n *Node) initVMs() error {
 		vdrs = validators.NewManager()
 	}
 
-	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
-		APIServer:    n.APIServer,
-		Log:          n.Log,
-		VMFactoryLog: n.VMFactoryLog,
-		VMManager:    n.VMManager,
-	})
-
 	durangoTime := version.GetDurangoTime(n.Config.NetworkID)
 	eForkTime := version.GetEForkTime(n.Config.NetworkID)
 	if err := txs.InitCodec(durangoTime); err != nil {
@@ -1193,7 +1186,7 @@ func (n *Node) initVMs() error {
 
 	// Register the VMs that Avalanche supports
 	err := utils.Err(
-		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
+		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                    n.chainManager,
 				Validators:                vdrs,
@@ -1229,7 +1222,7 @@ func (n *Node) initVMs() error {
 				UseCurrentHeight:  n.Config.UseCurrentHeight,
 			},
 		}),
-		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{
+		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
@@ -1237,7 +1230,7 @@ func (n *Node) initVMs() error {
 				EForkTime:        eForkTime,
 			},
 		}),
-		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
 		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
@@ -1258,7 +1251,7 @@ func (n *Node) initVMs() error {
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
 		}),
-		VMRegisterer: vmRegisterer,
+		VMManager: n.VMManager,
 	})
 
 	// register any vms that need to be installed as plugins from disk
