@@ -137,12 +137,10 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	changes, err := executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
+	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
 		return err
 	}
-	changes.Apply(stateDiff)
-	stateDiff.SetTimestamp(nextBlkTime)
 
 	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend: m.txExecutorBackend,
