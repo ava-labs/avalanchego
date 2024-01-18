@@ -34,7 +34,17 @@ import (
 var (
 	_ smblock.ChainVM                      = (*VM)(nil)
 	_ smblock.BuildBlockWithContextChainVM = (*VM)(nil)
+
+	VMID ids.ID
 )
+
+func init() {
+	var err error
+	VMID, err = ids.FromString("v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH")
+	if err != nil {
+		panic(err)
+	}
+}
 
 type VM struct {
 	common.AppHandler
