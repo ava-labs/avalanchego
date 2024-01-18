@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
@@ -97,4 +99,16 @@ func (n *Node) Write() error {
 		return nil
 	}
 	return n.writeConfig()
+}
+
+func (n *Node) writeMetricsSnapshot(data []byte) error {
+	metricsDir := filepath.Join(n.getDataDir(), "metrics")
+	if err := os.MkdirAll(metricsDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create metrics dir: %w", err)
+	}
+	// Create a compatible filesystem from the current timestamp
+	ts := time.Now().UTC().Format(time.RFC3339)
+	ts = strings.ReplaceAll(strings.ReplaceAll(ts, ":", ""), "-", "")
+	metricsPath := filepath.Join(metricsDir, ts)
+	return os.WriteFile(metricsPath, data, perms.ReadWrite)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -35,10 +35,7 @@ func TestInvalidGenesis(t *testing.T) {
 	vm := &VM{}
 	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
+	defer ctx.Lock.Unlock()
 
 	err := vm.Initialize(
 		context.Background(),

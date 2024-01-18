@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -324,7 +324,7 @@ func InboundAppResponse(
 
 func encodeIDs(ids []ids.ID, result [][]byte) {
 	for i, id := range ids {
-		copy := id
-		result[i] = copy[:]
+		id := id
+		result[i] = id[:]
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -53,6 +53,6 @@ type Config struct {
 	// Calculates uptime of peers
 	UptimeCalculator uptime.Calculator
 
-	// Signs my IP so I can send my signed IP address in the Version message
+	// Signs my IP so I can send my signed IP address in the Handshake message
 	IPSigner *IPSigner
 }

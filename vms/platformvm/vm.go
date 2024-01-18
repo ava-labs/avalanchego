@@ -1,12 +1,16 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -31,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -88,6 +91,12 @@ type VM struct {
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
 
+	// Cancelled on shutdown
+	onShutdownCtx context.Context
+	// Call [onShutdownCtxCancel] to cancel [onShutdownCtx] during Shutdown()
+	onShutdownCtxCancel context.CancelFunc
+	awaitShutdown       sync.WaitGroup
+
 	// TODO: Remove after v1.11.x is activated
 	pruned utils.Atomic[bool]
 }
@@ -127,7 +136,8 @@ func (vm *VM) Initialize(
 	vm.ctx = chainCtx
 	vm.db = db
 
-	vm.codecRegistry = linearcodec.NewDefault()
+	// Note: this codec is never used to serialize anything
+	vm.codecRegistry = linearcodec.NewDefault(time.Time{})
 	vm.fx = &secp256k1fx.Fx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
@@ -189,13 +199,33 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		validatorManager,
 	)
-	vm.Network = network.New(
-		txExecutorBackend.Ctx,
-		vm.manager,
+
+	txVerifier := network.NewLockedTxVerifier(&txExecutorBackend.Ctx.Lock, vm.manager)
+	vm.Network, err = network.New(
+		chainCtx.Log,
+		chainCtx.NodeID,
+		chainCtx.SubnetID,
+		chainCtx.ValidatorState,
+		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		registerer,
+		execConfig.Network,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize network: %w", err)
+	}
+
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
+	vm.awaitShutdown.Add(1)
+	go func() {
+		defer vm.awaitShutdown.Done()
+
+		// Invariant: Gossip must never grab the context lock.
+		vm.Network.Gossip(vm.onShutdownCtx)
+	}()
+
 	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
@@ -218,6 +248,10 @@ func (vm *VM) Initialize(
 	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
 		return err
 	}
+
+	// Incrementing [awaitShutdown] would cause a deadlock since
+	// [periodicallyPruneMempool] grabs the context lock.
+	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
 
 	shouldPrune, err := vm.state.ShouldPrune()
 	if err != nil {
@@ -242,6 +276,46 @@ func (vm *VM) Initialize(
 
 		vm.pruned.Set(true)
 	}()
+
+	return nil
+}
+
+func (vm *VM) periodicallyPruneMempool(frequency time.Duration) {
+	ticker := time.NewTicker(frequency)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-vm.onShutdownCtx.Done():
+			return
+		case <-ticker.C:
+			if err := vm.pruneMempool(); err != nil {
+				vm.ctx.Log.Debug("pruning mempool failed",
+					zap.Error(err),
+				)
+			}
+		}
+	}
+}
+
+func (vm *VM) pruneMempool() error {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range blockTxs {
+		if err := vm.Builder.Add(tx); err != nil {
+			vm.ctx.Log.Debug(
+				"failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Error(err),
+			)
+		}
+	}
 
 	return nil
 }
@@ -351,6 +425,9 @@ func (vm *VM) Shutdown(context.Context) error {
 		return nil
 	}
 
+	vm.onShutdownCtxCancel()
+	vm.awaitShutdown.Wait()
+
 	vm.Builder.ShutdownBlockTimer()
 
 	if vm.bootstrapped.Get() {
@@ -430,18 +507,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}, err
 }
 
-// CreateStaticHandlers returns a map where:
-// * keys are API endpoint extensions
-// * values are API handlers
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(&api.StaticService{}, "platform")
-}
-
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
 	return vm.uptimeManager.Connect(nodeID, constants.PrimaryNetworkID)
 }
@@ -479,4 +544,17 @@ func (vm *VM) VerifyHeightIndex(_ context.Context) error {
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return vm.state.GetBlockIDAtHeight(height)
+}
+
+func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
+	err := vm.Network.IssueTx(ctx, tx)
+	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
+		vm.ctx.Log.Debug("failed to add tx to mempool",
+			zap.Stringer("txID", tx.ID()),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	return nil
 }

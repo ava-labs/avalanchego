@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -164,7 +164,7 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 		0x44, 0x55, 0x66, 0x77,
 	}
 	var unsignedSimpleTransferSubnetOwnershipTx UnsignedTx = simpleTransferSubnetOwnershipTx
-	unsignedSimpleTransferSubnetOwnershipTxBytes, err := Codec.Marshal(Version, &unsignedSimpleTransferSubnetOwnershipTx)
+	unsignedSimpleTransferSubnetOwnershipTxBytes, err := Codec.Marshal(CodecVersion, &unsignedSimpleTransferSubnetOwnershipTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedSimpleTransferSubnetOwnershipTxBytes, unsignedSimpleTransferSubnetOwnershipTxBytes)
 
@@ -438,7 +438,7 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 		0x44, 0x55, 0x66, 0x77,
 	}
 	var unsignedComplexTransferSubnetOwnershipTx UnsignedTx = complexTransferSubnetOwnershipTx
-	unsignedComplexTransferSubnetOwnershipTxBytes, err := Codec.Marshal(Version, &unsignedComplexTransferSubnetOwnershipTx)
+	unsignedComplexTransferSubnetOwnershipTxBytes, err := Codec.Marshal(CodecVersion, &unsignedComplexTransferSubnetOwnershipTx)
 	require.NoError(err)
 	require.Equal(expectedUnsignedComplexTransferSubnetOwnershipTxBytes, unsignedComplexTransferSubnetOwnershipTxBytes)
 

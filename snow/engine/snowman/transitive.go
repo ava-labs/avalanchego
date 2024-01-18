@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -555,6 +555,15 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	t.Ctx.Lock.Lock()
 	defer t.Ctx.Lock.Unlock()
+
+	t.Ctx.Log.Verbo("running health check",
+		zap.Uint32("requestID", t.requestID),
+		zap.Int("gossipCounter", t.gossipCounter),
+		zap.Stringer("polls", t.polls),
+		zap.Reflect("outstandingBlockRequests", t.blkReqs),
+		zap.Stringer("blockedJobs", &t.blocked),
+		zap.Int("pendingBuildBlocks", t.pendingBuildBlocks),
+	)
 
 	consensusIntf, consensusErr := t.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := t.VM.HealthCheck(ctx)

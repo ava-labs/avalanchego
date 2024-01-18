@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -289,6 +289,10 @@ func (b *Block) Reject(context.Context) error {
 			)
 		}
 	}
+
+	// If we added transactions to the mempool, we should be willing to build a
+	// block.
+	b.manager.mempool.RequestBuildBlock()
 
 	b.rejected = true
 	return nil

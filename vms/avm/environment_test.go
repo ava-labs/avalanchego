@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -7,6 +7,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	stdjson "encoding/json"
 
@@ -157,9 +158,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		Config: vmStaticConfig,
 	}
 
-	vmDynamicConfig := Config{
-		IndexTransactions: true,
-	}
+	vmDynamicConfig := DefaultConfig
+	vmDynamicConfig.IndexTransactions = true
 	if c.vmDynamicConfig != nil {
 		vmDynamicConfig = *c.vmDynamicConfig
 	}
@@ -229,9 +229,12 @@ func setup(tb testing.TB, c *envConfig) *environment {
 func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
 	require := require.New(tb)
 
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	cm := parser.GenesisCodec()

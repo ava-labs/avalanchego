@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -19,9 +19,6 @@ type Config struct {
 
 	// Minimal P-chain height referenced upon block building
 	MinimumPChainHeight uint64
-
-	// Durango fork activation time
-	DurangoTime time.Time
 
 	// Configurable minimal delay among blocks issued consecutively
 	MinBlkDelay time.Duration

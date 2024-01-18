@@ -1,9 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
 
 import (
+	"testing"
+
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -13,9 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-func DefaultConfig() Config {
+func DefaultConfig(t testing.TB) Config {
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
 	return Config{
-		Ctx:                 snowtest.ConsensusContext(),
+		Ctx:                 snowtest.ConsensusContext(ctx),
 		VM:                  &block.TestVM{},
 		Sender:              &common.SenderTest{},
 		Validators:          validators.NewManager(),

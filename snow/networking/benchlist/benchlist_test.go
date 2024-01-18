@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
@@ -20,7 +20,8 @@ var minimumFailingDuration = 5 * time.Minute
 func TestBenchlistAdd(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snowtest.ConsensusContext()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -144,7 +145,8 @@ func TestBenchlistAdd(t *testing.T) {
 func TestBenchlistMaxStake(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snowtest.ConsensusContext()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -257,7 +259,8 @@ func TestBenchlistMaxStake(t *testing.T) {
 func TestBenchlistRemove(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snowtest.ConsensusContext()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	vdrs := validators.NewManager()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()

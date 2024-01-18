@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -32,13 +32,14 @@ import (
 
 func newDefaultDBConfig() merkledb.Config {
 	return merkledb.Config{
-		EvictionBatchSize:         100,
-		HistoryLength:             defaultRequestKeyLimit,
-		ValueNodeCacheSize:        defaultRequestKeyLimit,
-		IntermediateNodeCacheSize: defaultRequestKeyLimit,
-		Reg:                       prometheus.NewRegistry(),
-		Tracer:                    trace.Noop,
-		BranchFactor:              merkledb.BranchFactor16,
+		IntermediateWriteBatchSize:  100,
+		HistoryLength:               defaultRequestKeyLimit,
+		ValueNodeCacheSize:          defaultRequestKeyLimit,
+		IntermediateWriteBufferSize: defaultRequestKeyLimit,
+		IntermediateNodeCacheSize:   defaultRequestKeyLimit,
+		Reg:                         prometheus.NewRegistry(),
+		Tracer:                      trace.Noop,
+		BranchFactor:                merkledb.BranchFactor16,
 	}
 }
 
@@ -121,9 +122,6 @@ func sendRangeProofRequest(
 			return serverNodeID, serverResponse, nil
 		},
 	).AnyTimes()
-
-	// Handle bandwidth tracking calls from client.
-	networkClient.EXPECT().TrackBandwidth(gomock.Any(), gomock.Any()).AnyTimes()
 
 	// The server should expect to "send" a response to the client.
 	sender.EXPECT().SendAppResponse(

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -64,23 +64,6 @@ type VM interface {
 
 	// Version returns the version of the VM.
 	Version(context.Context) (string, error)
-
-	// Creates the HTTP handlers for custom VM network calls.
-	//
-	// This exposes handlers that the outside world can use to communicate with
-	// a static reference to the VM. Each handler has the path:
-	// [Address of node]/ext/VM/[VM ID]/[extension]
-	//
-	// Returns a mapping from [extension]s to HTTP handlers.
-	//
-	// For example, it might make sense to have an extension for creating
-	// genesis bytes this VM can interpret.
-	//
-	// Note: If this method is called, no other method will be called on this VM.
-	// Each registered VM will have a single instance created to handle static
-	// APIs. This instance will be handled separately from instances created to
-	// service an instance of a chain.
-	CreateStaticHandlers(context.Context) (map[string]http.Handler, error)
 
 	// Creates the HTTP handlers for custom chain network calls.
 	//

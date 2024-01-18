@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -6,39 +6,54 @@ package gossip
 import (
 	"testing"
 
-	bloomfilter "github.com/holiman/bloomfilter/v2"
-
 	"github.com/stretchr/testify/require"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
 	tests := []struct {
-		name                     string
-		falsePositiveProbability float64
-		add                      []*testTx
-		expected                 []*testTx
+		name                           string
+		minTargetElements              int
+		targetFalsePositiveProbability float64
+		resetFalsePositiveProbability  float64
+		reset                          bool
+		add                            []*testTx
+		expected                       []*testTx
 	}{
 		{
-			name:                     "no refresh",
-			falsePositiveProbability: 1,
+			name:                           "no refresh",
+			minTargetElements:              1,
+			targetFalsePositiveProbability: 0.01,
+			resetFalsePositiveProbability:  1,
+			reset:                          false, // maxCount = 9223372036854775807
 			add: []*testTx{
 				{id: ids.ID{0}},
+				{id: ids.ID{1}},
+				{id: ids.ID{2}},
 			},
 			expected: []*testTx{
 				{id: ids.ID{0}},
+				{id: ids.ID{1}},
+				{id: ids.ID{2}},
 			},
 		},
 		{
-			name:                     "refresh",
-			falsePositiveProbability: 0.1,
+			name:                           "refresh",
+			minTargetElements:              1,
+			targetFalsePositiveProbability: 0.01,
+			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
+			reset:                          true,
 			add: []*testTx{
 				{id: ids.ID{0}},
 				{id: ids.ID{1}},
+				{id: ids.ID{2}},
 			},
 			expected: []*testTx{
-				{id: ids.ID{1}},
+				{id: ids.ID{2}},
 			},
 		},
 	}
@@ -46,20 +61,38 @@ func TestBloomFilterRefresh(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			b, err := bloomfilter.New(10, 1)
+			numHashes, numEntries := bloom.OptimalParameters(
+				tt.minTargetElements,
+				tt.targetFalsePositiveProbability,
+			)
+			b, err := bloom.New(numHashes, numEntries)
 			require.NoError(err)
 			bloom := BloomFilter{
-				Bloom: b,
+				bloom:                          b,
+				maxCount:                       bloom.EstimateCount(numHashes, numEntries, tt.resetFalsePositiveProbability),
+				minTargetElements:              tt.minTargetElements,
+				targetFalsePositiveProbability: tt.targetFalsePositiveProbability,
+				resetFalsePositiveProbability:  tt.resetFalsePositiveProbability,
 			}
 
+			var didReset bool
 			for _, item := range tt.add {
-				_, err = ResetBloomFilterIfNeeded(&bloom, tt.falsePositiveProbability)
+				bloomBytes, saltBytes := bloom.Marshal()
+				initialBloomBytes := slices.Clone(bloomBytes)
+				initialSaltBytes := slices.Clone(saltBytes)
+
+				reset, err := ResetBloomFilterIfNeeded(&bloom, len(tt.add))
 				require.NoError(err)
+				if reset {
+					didReset = reset
+				}
 				bloom.Add(item)
+
+				require.Equal(initialBloomBytes, bloomBytes)
+				require.Equal(initialSaltBytes, saltBytes)
 			}
 
-			require.Equal(uint64(len(tt.expected)), bloom.Bloom.N())
-
+			require.Equal(tt.reset, didReset)
 			for _, expected := range tt.expected {
 				require.True(bloom.Has(expected))
 			}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -73,7 +73,7 @@ func (v statelessVertex) ChainID() ids.ID {
 }
 
 func (v statelessVertex) StopVertex() bool {
-	return v.innerStatelessVertex.Version == codecVersionWithStopVtx
+	return v.innerStatelessVertex.Version == CodecVersionWithStopVtx
 }
 
 func (v statelessVertex) Height() uint64 {
@@ -94,15 +94,15 @@ func (v statelessVertex) Txs() [][]byte {
 
 type innerStatelessVertex struct {
 	Version   uint16   `json:"version"`
-	ChainID   ids.ID   `json:"chainID"             serializeV0:"true" serializeV1:"true"`
-	Height    uint64   `json:"height"              serializeV0:"true" serializeV1:"true"`
-	Epoch     uint32   `json:"epoch"               serializeV0:"true"`
-	ParentIDs []ids.ID `json:"parentIDs" len:"128" serializeV0:"true" serializeV1:"true"`
-	Txs       [][]byte `json:"txs"       len:"128" serializeV0:"true"`
+	ChainID   ids.ID   `json:"chainID"   serializeV0:"true" serializeV1:"true"`
+	Height    uint64   `json:"height"    serializeV0:"true" serializeV1:"true"`
+	Epoch     uint32   `json:"epoch"     serializeV0:"true"`
+	ParentIDs []ids.ID `json:"parentIDs" serializeV0:"true" serializeV1:"true"`
+	Txs       [][]byte `json:"txs"       serializeV0:"true"`
 }
 
 func (v innerStatelessVertex) Verify() error {
-	if v.Version == codecVersionWithStopVtx {
+	if v.Version == CodecVersionWithStopVtx {
 		return v.verifyStopVertex()
 	}
 	return v.verify()
@@ -110,7 +110,7 @@ func (v innerStatelessVertex) Verify() error {
 
 func (v innerStatelessVertex) verify() error {
 	switch {
-	case v.Version != codecVersion:
+	case v.Version != CodecVersion:
 		return errBadVersion
 	case v.Epoch != 0:
 		return errBadEpoch
@@ -131,7 +131,7 @@ func (v innerStatelessVertex) verify() error {
 
 func (v innerStatelessVertex) verifyStopVertex() error {
 	switch {
-	case v.Version != codecVersionWithStopVtx:
+	case v.Version != CodecVersionWithStopVtx:
 		return errBadVersion
 	case v.Epoch != 0:
 		return errBadEpoch

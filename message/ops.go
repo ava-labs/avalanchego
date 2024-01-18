@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -21,9 +21,9 @@ const (
 	// Handshake:
 	PingOp Op = iota
 	PongOp
-	VersionOp
+	HandshakeOp
+	GetPeerListOp
 	PeerListOp
-	PeerListAckOp
 	// State sync:
 	GetStateSummaryFrontierOp
 	GetStateSummaryFrontierFailedOp
@@ -71,9 +71,9 @@ var (
 	HandshakeOps = []Op{
 		PingOp,
 		PongOp,
-		VersionOp,
+		HandshakeOp,
+		GetPeerListOp,
 		PeerListOp,
-		PeerListAckOp,
 	}
 
 	// List of all consensus request message types
@@ -209,12 +209,12 @@ func (op Op) String() string {
 		return "ping"
 	case PongOp:
 		return "pong"
-	case VersionOp:
-		return "version"
+	case HandshakeOp:
+		return "handshake"
+	case GetPeerListOp:
+		return "get_peerlist"
 	case PeerListOp:
 		return "peerlist"
-	case PeerListAckOp:
-		return "peerlist_ack"
 	// State sync
 	case GetStateSummaryFrontierOp:
 		return "get_state_summary_frontier"
@@ -303,12 +303,12 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.Ping, nil
 	case *p2p.Message_Pong:
 		return msg.Pong, nil
-	case *p2p.Message_Version:
-		return msg.Version, nil
-	case *p2p.Message_PeerList:
-		return msg.PeerList, nil
-	case *p2p.Message_PeerListAck:
-		return msg.PeerListAck, nil
+	case *p2p.Message_Handshake:
+		return msg.Handshake, nil
+	case *p2p.Message_GetPeerList:
+		return msg.GetPeerList, nil
+	case *p2p.Message_PeerList_:
+		return msg.PeerList_, nil
 	// State sync:
 	case *p2p.Message_GetStateSummaryFrontier:
 		return msg.GetStateSummaryFrontier, nil
@@ -362,12 +362,12 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return PingOp, nil
 	case *p2p.Message_Pong:
 		return PongOp, nil
-	case *p2p.Message_Version:
-		return VersionOp, nil
-	case *p2p.Message_PeerList:
+	case *p2p.Message_Handshake:
+		return HandshakeOp, nil
+	case *p2p.Message_GetPeerList:
+		return GetPeerListOp, nil
+	case *p2p.Message_PeerList_:
 		return PeerListOp, nil
-	case *p2p.Message_PeerListAck:
-		return PeerListAckOp, nil
 	case *p2p.Message_GetStateSummaryFrontier:
 		return GetStateSummaryFrontierOp, nil
 	case *p2p.Message_StateSummaryFrontier_:

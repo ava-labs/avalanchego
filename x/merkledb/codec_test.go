@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -247,9 +247,22 @@ func TestCodecDecodeKeyLengthOverflowRegression(t *testing.T) {
 
 func TestUintSize(t *testing.T) {
 	c := codec.(*codecImpl)
-	for i := uint64(0); i < math.MaxInt16; i++ {
-		expectedSize := c.uintSize(i)
-		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), i)
-		require.Equal(t, expectedSize, actualSize, i)
+
+	// Test lower bound
+	expectedSize := c.uintSize(0)
+	actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), 0)
+	require.Equal(t, expectedSize, actualSize)
+
+	// Test upper bound
+	expectedSize = c.uintSize(math.MaxUint64)
+	actualSize = binary.PutUvarint(make([]byte, binary.MaxVarintLen64), math.MaxUint64)
+	require.Equal(t, expectedSize, actualSize)
+
+	// Test powers of 2
+	for power := 0; power < 64; power++ {
+		n := uint64(1) << uint(power)
+		expectedSize := c.uintSize(n)
+		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), n)
+		require.Equal(t, expectedSize, actualSize, power)
 	}
 }

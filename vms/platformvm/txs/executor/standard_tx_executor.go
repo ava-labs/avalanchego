@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -254,7 +254,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}

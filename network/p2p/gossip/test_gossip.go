@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
@@ -64,7 +64,6 @@ func (t *testSet) Iterate(f func(gossipable *testTx) bool) {
 	}
 }
 
-func (t *testSet) GetFilter() ([]byte, []byte, error) {
-	bloom, err := t.bloom.Bloom.MarshalBinary()
-	return bloom, t.bloom.Salt[:], err
+func (t *testSet) GetFilter() ([]byte, []byte) {
+	return t.bloom.Marshal()
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
@@ -67,7 +66,7 @@ func (l *noopListener) Close() error {
 func (*noopListener) Addr() net.Addr {
 	return &net.TCPAddr{
 		IP:   net.IPv4zero,
-		Port: 0,
+		Port: 1,
 	}
 }
 
@@ -157,6 +156,8 @@ func NewTestNetwork(
 			PeerListNonValidatorGossipSize: constants.DefaultNetworkPeerListNonValidatorGossipSize,
 			PeerListPeersGossipSize:        constants.DefaultNetworkPeerListPeersGossipSize,
 			PeerListGossipFreq:             constants.DefaultNetworkPeerListGossipFreq,
+			PeerListPullGossipFreq:         constants.DefaultNetworkPeerListPullGossipFreq,
+			PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
 		},
 
 		DelayConfig: DelayConfig{
@@ -187,10 +188,8 @@ func NewTestNetwork(
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
-	ctx := snowtest.ConsensusContext()
-	beacons := validators.NewManager()
 	networkConfig.Validators = currentValidators
-	networkConfig.Beacons = beacons
+	networkConfig.Beacons = validators.NewManager()
 	// This never actually does anything because we never initialize the P-chain
 	networkConfig.UptimeCalculator = uptime.NoOpCalculator
 
@@ -207,7 +206,7 @@ func NewTestNetwork(
 		return nil, err
 	}
 	networkConfig.CPUTargeter = tracker.NewTargeter(
-		ctx.Log,
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           float64(runtime.NumCPU()),
 			MaxNonVdrUsage:     .8 * float64(runtime.NumCPU()),
@@ -217,7 +216,7 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.CPUTracker(),
 	)
 	networkConfig.DiskTargeter = tracker.NewTargeter(
-		ctx.Log,
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           1000 * units.GiB,
 			MaxNonVdrUsage:     1000 * units.GiB,
@@ -227,12 +226,7 @@ func NewTestNetwork(
 		networkConfig.ResourceTracker.DiskTracker(),
 	)
 
-	networkConfig.MyIPPort = ips.NewDynamicIPPort(net.IPv4zero, 0)
-
-	networkConfig.GossipTracker, err = peer.NewGossipTracker(metrics, "")
-	if err != nil {
-		return nil, err
-	}
+	networkConfig.MyIPPort = ips.NewDynamicIPPort(net.IPv4zero, 1)
 
 	return NewNetwork(
 		&networkConfig,

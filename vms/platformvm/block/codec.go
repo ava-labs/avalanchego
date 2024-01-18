@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -13,23 +14,25 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-// Version is the current default codec version
-const Version = txs.Version
+const CodecVersion = txs.CodecVersion
 
-// GenesisCode allows blocks of larger than usual size to be parsed.
-// While this gives flexibility in accommodating large genesis blocks
-// it must not be used to parse new, unverified blocks which instead
-// must be processed by Codec
 var (
-	Codec        codec.Manager
+	// GenesisCodec allows blocks of larger than usual size to be parsed.
+	// While this gives flexibility in accommodating large genesis blocks
+	// it must not be used to parse new, unverified blocks which instead
+	// must be processed by Codec
 	GenesisCodec codec.Manager
+
+	Codec codec.Manager
 )
 
-func init() {
-	c := linearcodec.NewDefault()
-	Codec = codec.NewDefaultManager()
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	GenesisCodec = codec.NewManager(math.MaxInt32)
+// TODO: Remove after v1.11.x has activated
+//
+// Invariant: InitCodec, Codec, and GenesisCodec must not be accessed
+// concurrently
+func InitCodec(durangoTime time.Time) error {
+	c := linearcodec.NewDefault(durangoTime)
+	gc := linearcodec.NewDefault(time.Time{})
 
 	errs := wrappers.Errs{}
 	for _, c := range []linearcodec.Codec{c, gc} {
@@ -40,12 +43,25 @@ func init() {
 			txs.RegisterDUnsignedTxsTypes(c),
 		)
 	}
+
+	newCodec := codec.NewDefaultManager()
+	newGenesisCodec := codec.NewManager(math.MaxInt32)
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
-		GenesisCodec.RegisterCodec(Version, gc),
+		newCodec.RegisterCodec(CodecVersion, c),
+		newGenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
-		panic(errs.Err)
+		return errs.Err
+	}
+
+	Codec = newCodec
+	GenesisCodec = newGenesisCodec
+	return nil
+}
+
+func init() {
+	if err := InitCodec(time.Time{}); err != nil {
+		panic(err)
 	}
 }
 

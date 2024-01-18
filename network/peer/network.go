@@ -1,11 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -19,15 +19,9 @@ type Network interface {
 	// connection is no longer desired and should be terminated.
 	AllowConnection(peerID ids.NodeID) bool
 
-	// Track allows the peer to notify the network of a potential new peer to
-	// connect to, given the [ips] of the peers it sent us during the peer
-	// handshake.
-	//
-	// Returns which IPs should not be gossipped to this node again.
-	Track(peerID ids.NodeID, ips []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error)
-
-	// MarkTracked stops sending gossip about [ips] to [peerID].
-	MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error
+	// Track allows the peer to notify the network of potential new peers to
+	// connect to.
+	Track(ips []*ips.ClaimedIPPort) error
 
 	// Disconnected is called when the peer finishes shutting down. It is not
 	// guaranteed that [Connected] was called for the provided peer. However, it
@@ -35,6 +29,13 @@ type Network interface {
 	// for a given [Peer] object.
 	Disconnected(peerID ids.NodeID)
 
-	// Peers returns peers that [peerID] might not know about.
-	Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error)
+	// KnownPeers returns the bloom filter of the known peers.
+	KnownPeers() (bloomFilter []byte, salt []byte)
+
+	// Peers returns peers that are not known.
+	Peers(
+		peerID ids.NodeID,
+		knownPeers *bloom.ReadFilter,
+		peerSalt []byte,
+	) []*ips.ClaimedIPPort
 }

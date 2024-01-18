@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -14,10 +14,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
 var (
@@ -37,13 +36,13 @@ var (
 )
 
 type ContextEnabledVMMock struct {
-	*mocks.MockChainVM
-	*mocks.MockBuildBlockWithContextChainVM
+	*block.MockChainVM
+	*block.MockBuildBlockWithContextChainVM
 }
 
 type ContextEnabledBlockMock struct {
 	*snowman.MockBlock
-	*mocks.MockWithVerifyContext
+	*block.MockWithVerifyContext
 }
 
 func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
@@ -52,14 +51,14 @@ func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM
 	// create mock
 	ctrl := gomock.NewController(t)
 	ctxVM := ContextEnabledVMMock{
-		MockChainVM:                      mocks.NewMockChainVM(ctrl),
-		MockBuildBlockWithContextChainVM: mocks.NewMockBuildBlockWithContextChainVM(ctrl),
+		MockChainVM:                      block.NewMockChainVM(ctrl),
+		MockBuildBlockWithContextChainVM: block.NewMockBuildBlockWithContextChainVM(ctrl),
 	}
 
 	if loadExpectations {
 		ctxBlock := ContextEnabledBlockMock{
 			MockBlock:             snowman.NewMockBlock(ctrl),
-			MockWithVerifyContext: mocks.NewMockWithVerifyContext(ctrl),
+			MockWithVerifyContext: block.NewMockWithVerifyContext(ctrl),
 		}
 		gomock.InOrder(
 			// Initialize
@@ -98,7 +97,7 @@ func TestContextVMSummary(t *testing.T) {
 	vm, stopper := buildClientHelper(require, testKey)
 	defer stopper.Stop(context.Background())
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 
 	require.NoError(vm.Initialize(context.Background(), ctx, memdb.New(), nil, nil, nil, nil, nil, nil))
 

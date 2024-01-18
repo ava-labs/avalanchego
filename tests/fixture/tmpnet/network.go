@@ -1,11 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
@@ -22,182 +23,95 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
+// The Network type is defined in this file (orchestration) and
+// network_config.go (reading/writing configuration).
+
 const (
+	// Constants defining the names of shell variables whose value can
+	// configure network orchestration.
+	NetworkDirEnvName = "TMPNET_NETWORK_DIR"
+	RootDirEnvName    = "TMPNET_ROOT_DIR"
+
 	// This interval was chosen to avoid spamming node APIs during
 	// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
 	// increase the time for a network's nodes to be seen as healthy.
 	networkHealthCheckInterval = 200 * time.Millisecond
 
-	defaultEphemeralDirName = "ephemeral"
+	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 )
 
-var (
-	errInvalidNodeCount      = errors.New("failed to populate network config: non-zero node count is only valid for a network without nodes")
-	errInvalidKeyCount       = errors.New("failed to populate network config: non-zero key count is only valid for a network without keys")
-	errNetworkDirNotSet      = errors.New("network directory not set - has Create() been called?")
-	errInvalidNetworkDir     = errors.New("failed to write network: invalid network directory")
-	errMissingBootstrapNodes = errors.New("failed to add node due to missing bootstrap nodes")
-)
+// HardhatKey is a legacy used for hardhat testing in subnet-evm
+// TODO(marun) Remove when no longer needed.
+var HardhatKey *secp256k1.PrivateKey
 
-// Default root dir for storing networks and their configuration.
-func GetDefaultRootDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
+func init() {
+	hardhatKeyBytes, err := hex.DecodeString(HardHatKeyStr)
+	if err != nil {
+		panic(err)
+	}
+	HardhatKey, err = secp256k1.ToPrivateKey(hardhatKeyBytes)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// Collects the configuration for running a temporary avalanchego network
+type Network struct {
+	// Path where network configuration and data is stored
+	Dir string
+
+	// Configuration common across nodes
+	Genesis      *genesis.UnparsedConfig
+	ChainConfigs map[string]FlagsMap
+
+	// Default configuration to use when creating new nodes
+	DefaultFlags         FlagsMap
+	DefaultRuntimeConfig NodeRuntimeConfig
+
+	// Keys pre-funded in the genesis on both the X-Chain and the C-Chain
+	PreFundedKeys []*secp256k1.PrivateKey
+
+	// Nodes that constitute the network
+	Nodes []*Node
+
+	// Subnets that have been enabled on the network
+	Subnets []*Subnet
+}
+
+// Ensure a real and absolute network dir so that node
+// configuration that embeds the network path will continue to
+// work regardless of symlink and working directory changes.
+func toCanonicalDir(dir string) (string, error) {
+	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
+	return filepath.EvalSymlinks(absDir)
 }
 
-// Find the next available network ID by attempting to create a
-// directory numbered from 1000 until creation succeeds. Returns the
-// network id and the full path of the created directory.
-func FindNextNetworkID(rootDir string) (uint32, string, error) {
-	var (
-		networkID uint32 = 1000
-		dirPath   string
-	)
-	for {
-		_, reserved := constants.NetworkIDToNetworkName[networkID]
-		if reserved {
-			networkID++
-			continue
-		}
-
-		dirPath = filepath.Join(rootDir, strconv.FormatUint(uint64(networkID), 10))
-		err := os.Mkdir(dirPath, perms.ReadWriteExecute)
-		if err == nil {
-			return networkID, dirPath, nil
-		}
-
-		if !errors.Is(err, fs.ErrExist) {
-			return 0, "", fmt.Errorf("failed to create network directory: %w", err)
-		}
-
-		// Directory already exists, keep iterating
-		networkID++
-	}
-}
-
-// Defines the configuration required for a tempoary network
-type Network struct {
-	NodeRuntimeConfig
-
-	Genesis       *genesis.UnparsedConfig
-	CChainConfig  FlagsMap
-	DefaultFlags  FlagsMap
-	PreFundedKeys []*secp256k1.PrivateKey
-
-	// Nodes comprising the network
-	Nodes []*Node
-
-	// Path where network configuration will be stored
-	Dir string
-}
-
-// Adds a backend-agnostic ephemeral node to the network
-func (n *Network) AddEphemeralNode(ctx context.Context, w io.Writer, flags FlagsMap) (*Node, error) {
-	if flags == nil {
-		flags = FlagsMap{}
-	}
-	return n.AddNode(ctx, w, &Node{
-		Flags: flags,
-	}, true /* isEphemeral */)
-}
-
-// Starts a new network stored under the provided root dir. Required
-// configuration will be defaulted if not provided.
-func StartNetwork(
+func StartNewNetwork(
 	ctx context.Context,
 	w io.Writer,
-	rootDir string,
 	network *Network,
+	rootNetworkDir string,
+	avalancheGoExecPath string,
+	pluginDir string,
 	nodeCount int,
-	keyCount int,
-) (*Network, error) {
-	if _, err := fmt.Fprintf(w, "Preparing configuration for new temporary network with %s\n", network.AvalancheGoPath); err != nil {
-		return nil, err
+) error {
+	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir, nodeCount); err != nil {
+		return err
 	}
-
-	if len(rootDir) == 0 {
-		// Use the default root dir
-		var err error
-		rootDir, err = GetDefaultRootDir()
-		if err != nil {
-			return nil, err
-		}
+	if err := network.Create(rootNetworkDir); err != nil {
+		return err
 	}
-
-	// Ensure creation of the root dir
-	if err := os.MkdirAll(rootDir, perms.ReadWriteExecute); err != nil {
-		return nil, fmt.Errorf("failed to create root network dir: %w", err)
-	}
-
-	// Determine the network path and ID
-	var (
-		networkDir string
-		networkID  uint32
-	)
-	if network.Genesis != nil && network.Genesis.NetworkID > 0 {
-		// Use the network ID defined in the provided genesis
-		networkID = network.Genesis.NetworkID
-	}
-	if networkID > 0 {
-		// Use a directory with a random suffix
-		var err error
-		networkDir, err = os.MkdirTemp(rootDir, fmt.Sprintf("%d.", network.Genesis.NetworkID))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create network dir: %w", err)
-		}
-	} else {
-		// Find the next available network ID based on the contents of the root dir
-		var err error
-		networkID, networkDir, err = FindNextNetworkID(rootDir)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Setting the network dir before populating config ensures the
-	// nodes know where to write their configuration.
-	network.Dir = networkDir
-
-	if err := network.PopulateNetworkConfig(networkID, nodeCount, keyCount); err != nil {
-		return nil, err
-	}
-
-	if err := network.WriteAll(); err != nil {
-		return nil, err
-	}
-	if _, err := fmt.Fprintf(w, "Starting network %d @ %s\n", network.Genesis.NetworkID, network.Dir); err != nil {
-		return nil, err
-	}
-	if err := network.Start(w); err != nil {
-		return nil, err
-	}
-	if _, err := fmt.Fprintf(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
-		return nil, err
-	}
-	if err := network.WaitForHealthy(ctx, w); err != nil {
-		return nil, err
-	}
-	if _, err := fmt.Fprintf(w, "\nStarted network %d @ %s\n", network.Genesis.NetworkID, network.Dir); err != nil {
-		return nil, err
-	}
-	return network, nil
+	return network.Start(ctx, w)
 }
 
-// Read a network from the provided directory.
-func ReadNetwork(dir string) (*Network, error) {
-	network := &Network{Dir: dir}
-	if err := network.ReadAll(); err != nil {
-		return nil, fmt.Errorf("failed to read network: %w", err)
-	}
-	return network, nil
-}
-
-// Stop the nodes of the network configured in the provided directory.
+// Stops the nodes of the network configured in the provided directory.
 func StopNetwork(ctx context.Context, dir string) error {
 	network, err := ReadNetwork(dir)
 	if err != nil {
@@ -206,160 +120,243 @@ func StopNetwork(ctx context.Context, dir string) error {
 	return network.Stop(ctx)
 }
 
-// Ensure the network has the configuration it needs to start.
-func (n *Network) PopulateNetworkConfig(networkID uint32, nodeCount int, keyCount int) error {
-	if len(n.Nodes) > 0 && nodeCount > 0 {
-		return errInvalidNodeCount
+// Restarts the nodes of the network configured in the provided directory.
+func RestartNetwork(ctx context.Context, w io.Writer, dir string) error {
+	network, err := ReadNetwork(dir)
+	if err != nil {
+		return err
 	}
-	if len(n.PreFundedKeys) > 0 && keyCount > 0 {
-		return errInvalidKeyCount
+	return network.Restart(ctx, w)
+}
+
+// Reads a network from the provided directory.
+func ReadNetwork(dir string) (*Network, error) {
+	canonicalDir, err := toCanonicalDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	network := &Network{
+		Dir: canonicalDir,
+	}
+	if err := network.Read(); err != nil {
+		return nil, fmt.Errorf("failed to read network: %w", err)
+	}
+	return network, nil
+}
+
+// Initializes a new network with default configuration.
+func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, pluginDir string, nodeCount int) error {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new network with %s\n", avalancheGoPath); err != nil {
+		return err
 	}
 
-	if nodeCount > 0 {
-		// Add the specified number of nodes
-		nodes := make([]*Node, 0, nodeCount)
-		for i := 0; i < nodeCount; i++ {
-			nodes = append(nodes, NewNode(""))
+	// Ensure default flags
+	if n.DefaultFlags == nil {
+		n.DefaultFlags = FlagsMap{}
+	}
+	n.DefaultFlags.SetDefaults(DefaultFlags())
+
+	// Only configure the plugin dir with a non-empty value to ensure
+	// the use of the default value (`[datadir]/plugins`) when
+	// no plugin dir is configured.
+	if len(pluginDir) > 0 {
+		if _, ok := n.DefaultFlags[config.PluginDirKey]; !ok {
+			n.DefaultFlags[config.PluginDirKey] = pluginDir
 		}
-		n.Nodes = nodes
 	}
 
-	// Ensure each node has keys and an associated node ID. This
-	// ensures the availability of node IDs and proofs of possession
-	// for genesis generation.
-	for _, node := range n.Nodes {
-		if err := node.EnsureKeys(); err != nil {
-			return err
-		}
-	}
-
-	if keyCount > 0 {
-		keys, err := NewPrivateKeys(keyCount)
+	// Ensure pre-funded keys
+	if len(n.PreFundedKeys) == 0 {
+		keys, err := NewPrivateKeys(DefaultPreFundedKeyCount)
 		if err != nil {
 			return err
 		}
 		n.PreFundedKeys = keys
 	}
 
+	// Ensure primary chains are configured
+	if n.ChainConfigs == nil {
+		n.ChainConfigs = map[string]FlagsMap{}
+	}
+	defaultChainConfigs := DefaultChainConfigs()
+	for alias, chainConfig := range defaultChainConfigs {
+		if _, ok := n.ChainConfigs[alias]; !ok {
+			n.ChainConfigs[alias] = FlagsMap{}
+		}
+		n.ChainConfigs[alias].SetDefaults(chainConfig)
+	}
+
+	// Ensure runtime is configured
+	if len(n.DefaultRuntimeConfig.AvalancheGoPath) == 0 {
+		n.DefaultRuntimeConfig.AvalancheGoPath = avalancheGoPath
+	}
+
+	// Ensure nodes are created
+	if len(n.Nodes) == 0 {
+		n.Nodes = NewNodes(nodeCount)
+	}
+
+	// Ensure nodes are configured
+	for i := range n.Nodes {
+		if err := n.EnsureNodeConfig(n.Nodes[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Creates the network on disk, choosing its network id and generating its genesis in the process.
+func (n *Network) Create(rootDir string) error {
+	if len(rootDir) == 0 {
+		// Use the default root dir
+		var err error
+		rootDir, err = getDefaultRootDir()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Ensure creation of the root dir
+	if err := os.MkdirAll(rootDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create root network dir: %w", err)
+	}
+
+	// Determine the network path and ID
+	var (
+		networkDir string
+		networkID  uint32
+	)
+	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
+		// Use the network ID defined in the provided genesis
+		networkID = n.Genesis.NetworkID
+	}
+	if networkID > 0 {
+		// Use a directory with a random suffix
+		var err error
+		networkDir, err = os.MkdirTemp(rootDir, fmt.Sprintf("%d.", n.Genesis.NetworkID))
+		if err != nil {
+			return fmt.Errorf("failed to create network dir: %w", err)
+		}
+	} else {
+		// Find the next available network ID based on the contents of the root dir
+		var err error
+		networkID, networkDir, err = findNextNetworkID(rootDir)
+		if err != nil {
+			return err
+		}
+	}
+	canonicalDir, err := toCanonicalDir(networkDir)
+	if err != nil {
+		return err
+	}
+	n.Dir = canonicalDir
+
+	pluginDir, err := n.DefaultFlags.GetStringVal(config.PluginDirKey)
+	if err != nil {
+		return err
+	}
+	if len(pluginDir) > 0 {
+		// Ensure the existence of the plugin directory or nodes won't be able to start.
+		if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
+			return fmt.Errorf("failed to create plugin dir: %w", err)
+		}
+	}
+
 	if n.Genesis == nil {
-		genesis, err := NewTestGenesis(networkID, n.Nodes, n.PreFundedKeys)
+		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
+		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
+		// keys exposed by a network. Since allocation will not be exclusive, a test using a
+		// legacy key is unlikely to be a good candidate for parallel execution.
+		keysToFund := []*secp256k1.PrivateKey{
+			genesis.VMRQKey,
+			genesis.EWOQKey,
+			HardhatKey,
+		}
+		keysToFund = append(keysToFund, n.PreFundedKeys...)
+
+		genesis, err := NewTestGenesis(networkID, n.Nodes, keysToFund)
 		if err != nil {
 			return err
 		}
 		n.Genesis = genesis
 	}
 
-	if n.CChainConfig == nil {
-		n.CChainConfig = DefaultCChainConfig()
-	}
-
-	// Default flags need to be set in advance of node config
-	// population to ensure correct node configuration.
-	if n.DefaultFlags == nil {
-		n.DefaultFlags = DefaultFlags()
-	}
-
 	for _, node := range n.Nodes {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
-		if err := n.PopulateNodeConfig(node, n.Dir); err != nil {
-			return err
+		if err := n.EnsureNodeConfig(node); err != nil {
+			return nil
 		}
-	}
-
-	return nil
-}
-
-// Ensure the provided node has the configuration it needs to start. If the data dir is
-// not set, it will be defaulted to [nodeParentDir]/[node ID]. Requires that the
-// network has valid genesis data.
-func (n *Network) PopulateNodeConfig(node *Node, nodeParentDir string) error {
-	flags := node.Flags
-
-	// Set values common to all nodes
-	flags.SetDefaults(n.DefaultFlags)
-	flags.SetDefaults(FlagsMap{
-		config.GenesisFileKey:    n.GetGenesisPath(),
-		config.ChainConfigDirKey: n.GetChainConfigDir(),
-	})
-
-	// Convert the network id to a string to ensure consistency in JSON round-tripping.
-	flags[config.NetworkNameKey] = strconv.FormatUint(uint64(n.Genesis.NetworkID), 10)
-
-	// Ensure keys are added if necessary
-	if err := node.EnsureKeys(); err != nil {
-		return err
-	}
-
-	// Ensure the node is configured with a runtime config
-	if node.RuntimeConfig == nil {
-		node.RuntimeConfig = &NodeRuntimeConfig{
-			AvalancheGoPath: n.AvalancheGoPath,
-		}
-	}
-
-	// Ensure the node's data dir is configured
-	dataDir := node.getDataDir()
-	if len(dataDir) == 0 {
-		// NodeID will have been set by EnsureKeys
-		dataDir = filepath.Join(nodeParentDir, node.NodeID.String())
-		flags[config.DataDirKey] = dataDir
-	}
-
-	return nil
-}
-
-// Starts a network for the first time
-func (n *Network) Start(w io.Writer) error {
-	if len(n.Dir) == 0 {
-		return errNetworkDirNotSet
 	}
 
 	// Ensure configuration on disk is current
-	if err := n.WriteAll(); err != nil {
+	return n.Write()
+}
+
+// Starts all nodes in the network
+func (n *Network) Start(ctx context.Context, w io.Writer) error {
+	if _, err := fmt.Fprintf(w, "Starting network %d @ %s\n", n.Genesis.NetworkID, n.Dir); err != nil {
 		return err
 	}
 
-	// Accumulate bootstrap nodes such that each subsequently started
-	// node bootstraps from the nodes previously started.
-	//
-	// e.g.
-	// 1st node: no bootstrap nodes
-	// 2nd node: 1st node
-	// 3rd node: 1st and 2nd nodes
-	// ...
-	//
-	bootstrapIDs := make([]string, 0, len(n.Nodes))
-	bootstrapIPs := make([]string, 0, len(n.Nodes))
-
-	// Configure networking and start each node
+	// Configure the networking for each node and start
 	for _, node := range n.Nodes {
-		// Update network configuration
-		node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
-
-		// Write configuration to disk in preparation for node start
-		if err := node.Write(); err != nil {
+		if err := n.StartNode(ctx, w, node); err != nil {
 			return err
 		}
+	}
 
-		// Start waits for the process context to be written which
-		// indicates that the node will be accepting connections on
-		// its staking port. The network will start faster with this
-		// synchronization due to the avoidance of exponential backoff
-		// if a node tries to connect to a beacon that is not ready.
-		if err := node.Start(w); err != nil {
-			return err
-		}
-
-		// Collect bootstrap nodes for subsequently started nodes to use
-		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
-		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
+	if _, err := fmt.Fprintf(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
+		return err
+	}
+	if err := n.WaitForHealthy(ctx, w); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "\nStarted network %d @ %s\n", n.Genesis.NetworkID, n.Dir); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// Wait until all nodes in the network are healthy.
+func (n *Network) AddEphemeralNode(ctx context.Context, w io.Writer, flags FlagsMap) (*Node, error) {
+	node := NewNode("")
+	node.Flags = flags
+	node.IsEphemeral = true
+	if err := n.StartNode(ctx, w, node); err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+// Starts the provided node after configuring it for the network.
+func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error {
+	if err := n.EnsureNodeConfig(node); err != nil {
+		return err
+	}
+
+	bootstrapIPs, bootstrapIDs, err := n.getBootstrapIPsAndIDs(node)
+	if err != nil {
+		return err
+	}
+	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
+
+	if err := node.Write(); err != nil {
+		return err
+	}
+
+	if err := node.Start(w); err != nil {
+		// Attempt to stop an unhealthy node to provide some assurance to the caller
+		// that an error condition will not result in a lingering process.
+		err = errors.Join(err, node.Stop(ctx))
+		return err
+	}
+
+	return nil
+}
+
+// Waits until all nodes in the network are healthy.
 func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
 	defer ticker.Stop()
@@ -394,291 +391,256 @@ func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-// Retrieve API URIs for all running primary validator nodes. URIs for
-// ephemeral nodes are not returned.
-func (n *Network) GetURIs() []NodeURI {
-	uris := make([]NodeURI, 0, len(n.Nodes))
-	for _, node := range n.Nodes {
-		// Only append URIs that are not empty. A node may have an
-		// empty URI if it was not running at the time
-		// node.ReadProcessContext() was called.
-		if len(node.URI) > 0 {
-			uris = append(uris, NodeURI{
-				NodeID: node.NodeID,
-				URI:    node.URI,
-			})
-		}
-	}
-	return uris
-}
-
-// Stop all nodes in the network.
+// Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
+	// Target all nodes, including the ephemeral ones
+	nodes, err := ReadNodes(n.Dir, true /* includeEphemeral */)
+	if err != nil {
+		return err
+	}
+
 	var errs []error
-	// Assume the nodes are loaded and the pids are current
-	for _, node := range n.Nodes {
-		if err := node.Stop(ctx); err != nil {
+
+	// Initiate stop on all nodes
+	for _, node := range nodes {
+		if err := node.InitiateStop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
+
+	// Wait for stop to complete on all nodes
+	for _, node := range nodes {
+		if err := node.WaitForStopped(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to wait for node %s to stop: %w", node.NodeID, err))
+		}
+	}
+
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to stop network:\n%w", errors.Join(errs...))
 	}
 	return nil
 }
 
-func (n *Network) GetGenesisPath() string {
-	return filepath.Join(n.Dir, "genesis.json")
-}
-
-func (n *Network) ReadGenesis() error {
-	bytes, err := os.ReadFile(n.GetGenesisPath())
-	if err != nil {
-		return fmt.Errorf("failed to read genesis: %w", err)
-	}
-	genesis := genesis.UnparsedConfig{}
-	if err := json.Unmarshal(bytes, &genesis); err != nil {
-		return fmt.Errorf("failed to unmarshal genesis: %w", err)
-	}
-	n.Genesis = &genesis
-	return nil
-}
-
-func (n *Network) WriteGenesis() error {
-	bytes, err := DefaultJSONMarshal(n.Genesis)
-	if err != nil {
-		return fmt.Errorf("failed to marshal genesis: %w", err)
-	}
-	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write genesis: %w", err)
-	}
-	return nil
-}
-
-func (n *Network) GetChainConfigDir() string {
-	return filepath.Join(n.Dir, "chains")
-}
-
-func (n *Network) GetCChainConfigPath() string {
-	return filepath.Join(n.GetChainConfigDir(), "C", "config.json")
-}
-
-func (n *Network) ReadCChainConfig() error {
-	chainConfig, err := ReadFlagsMap(n.GetCChainConfigPath(), "C-Chain config")
-	if err != nil {
+// Restarts all non-ephemeral nodes in the network.
+func (n *Network) Restart(ctx context.Context, w io.Writer) error {
+	if _, err := fmt.Fprintf(w, " restarting network\n"); err != nil {
 		return err
 	}
-	n.CChainConfig = *chainConfig
-	return nil
-}
-
-func (n *Network) WriteCChainConfig() error {
-	path := n.GetCChainConfigPath()
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create C-Chain config dir: %w", err)
-	}
-	return n.CChainConfig.Write(path, "C-Chain config")
-}
-
-// Used to marshal/unmarshal persistent network defaults.
-type networkDefaults struct {
-	Flags           FlagsMap
-	AvalancheGoPath string
-	PreFundedKeys   []*secp256k1.PrivateKey
-}
-
-func (n *Network) GetDefaultsPath() string {
-	return filepath.Join(n.Dir, "defaults.json")
-}
-
-func (n *Network) ReadDefaults() error {
-	bytes, err := os.ReadFile(n.GetDefaultsPath())
-	if err != nil {
-		return fmt.Errorf("failed to read defaults: %w", err)
-	}
-	defaults := networkDefaults{}
-	if err := json.Unmarshal(bytes, &defaults); err != nil {
-		return fmt.Errorf("failed to unmarshal defaults: %w", err)
-	}
-	n.DefaultFlags = defaults.Flags
-	n.AvalancheGoPath = defaults.AvalancheGoPath
-	n.PreFundedKeys = defaults.PreFundedKeys
-	return nil
-}
-
-func (n *Network) WriteDefaults() error {
-	defaults := networkDefaults{
-		Flags:           n.DefaultFlags,
-		AvalancheGoPath: n.AvalancheGoPath,
-		PreFundedKeys:   n.PreFundedKeys,
-	}
-	bytes, err := DefaultJSONMarshal(defaults)
-	if err != nil {
-		return fmt.Errorf("failed to marshal defaults: %w", err)
-	}
-	if err := os.WriteFile(n.GetDefaultsPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write defaults: %w", err)
-	}
-	return nil
-}
-
-func (n *Network) EnvFilePath() string {
-	return filepath.Join(n.Dir, "network.env")
-}
-
-func (n *Network) EnvFileContents() string {
-	return fmt.Sprintf("export %s=%s", NetworkDirEnvName, n.Dir)
-}
-
-// Write an env file that sets the network dir env when sourced.
-func (n *Network) WriteEnvFile() error {
-	if err := os.WriteFile(n.EnvFilePath(), []byte(n.EnvFileContents()), perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write network env file: %w", err)
-	}
-	return nil
-}
-
-func (n *Network) WriteNodes() error {
 	for _, node := range n.Nodes {
-		if err := node.Write(); err != nil {
+		if err := node.Stop(ctx); err != nil {
+			return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
+		}
+		if err := n.StartNode(ctx, w, node); err != nil {
+			return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
+		}
+		if _, err := fmt.Fprintf(w, " waiting for node %s to report healthy\n", node.NodeID); err != nil {
+			return err
+		}
+		if err := WaitForHealthy(ctx, node); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Write network configuration to disk.
-func (n *Network) WriteAll() error {
-	if len(n.Dir) == 0 {
-		return errInvalidNetworkDir
-	}
-	if err := n.WriteGenesis(); err != nil {
-		return err
-	}
-	if err := n.WriteCChainConfig(); err != nil {
-		return err
-	}
-	if err := n.WriteDefaults(); err != nil {
-		return err
-	}
-	if err := n.WriteEnvFile(); err != nil {
-		return err
-	}
-	return n.WriteNodes()
-}
+// Ensures the provided node has the configuration it needs to start. If the data dir is not
+// set, it will be defaulted to [nodeParentDir]/[node ID]. For a not-yet-created network,
+// no action will be taken.
+// TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
+func (n *Network) EnsureNodeConfig(node *Node) error {
+	flags := node.Flags
 
-// Read network configuration from disk.
-func (n *Network) ReadConfig() error {
-	if err := n.ReadGenesis(); err != nil {
+	// Set the network name if available
+	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
+		// Convert the network id to a string to ensure consistency in JSON round-tripping.
+		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(n.Genesis.NetworkID), 10)
+	}
+
+	if err := node.EnsureKeys(); err != nil {
 		return err
 	}
-	if err := n.ReadCChainConfig(); err != nil {
-		return err
-	}
-	return n.ReadDefaults()
-}
 
-// Read node configuration and process context from disk.
-func (n *Network) ReadNodes() error {
-	nodes := []*Node{}
+	flags.SetDefaults(n.DefaultFlags)
 
-	// Node configuration / process context is stored in child directories
-	entries, err := os.ReadDir(n.Dir)
-	if err != nil {
-		return fmt.Errorf("failed to read network path: %w", err)
+	// Set fields including the network path
+	if len(n.Dir) > 0 {
+		node.Flags.SetDefaults(FlagsMap{
+			config.GenesisFileKey:    n.getGenesisPath(),
+			config.ChainConfigDirKey: n.getChainConfigDir(),
+		})
+
+		// Ensure the node's data dir is configured
+		dataDir := node.getDataDir()
+		if len(dataDir) == 0 {
+			// NodeID will have been set by EnsureKeys
+			dataDir = filepath.Join(n.Dir, node.NodeID.String())
+			flags[config.DataDirKey] = dataDir
+		}
 	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
+
+	// Ensure the node runtime is configured
+	if node.RuntimeConfig == nil {
+		node.RuntimeConfig = &NodeRuntimeConfig{
+			AvalancheGoPath: n.DefaultRuntimeConfig.AvalancheGoPath,
+		}
+	}
+
+	// Ensure available subnets are tracked
+	subnetIDs := make([]string, 0, len(n.Subnets))
+	for _, subnet := range n.Subnets {
+		if subnet.SubnetID == ids.Empty {
 			continue
 		}
-
-		nodeDir := filepath.Join(n.Dir, entry.Name())
-		node, err := ReadNode(nodeDir)
-		if errors.Is(err, os.ErrNotExist) {
-			// If no config file exists, assume this is not the path of a node
-			continue
-		} else if err != nil {
-			return err
-		}
-
-		nodes = append(nodes, node)
+		subnetIDs = append(subnetIDs, subnet.SubnetID.String())
 	}
-
-	n.Nodes = nodes
+	flags[config.TrackSubnetsKey] = strings.Join(subnetIDs, ",")
 
 	return nil
 }
 
-// Read network and node configuration from disk.
-func (n *Network) ReadAll() error {
-	if err := n.ReadConfig(); err != nil {
+func (n *Network) GetSubnet(name string) *Subnet {
+	for _, subnet := range n.Subnets {
+		if subnet.Name == name {
+			return subnet
+		}
+	}
+	return nil
+}
+
+// Ensure that each subnet on the network is created and that it is validated by all non-ephemeral nodes.
+func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
+	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
+	for _, subnet := range n.Subnets {
+		if _, err := fmt.Fprintf(w, "Creating subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+		if subnet.SubnetID != ids.Empty {
+			// The subnet already exists
+			continue
+		}
+
+		if subnet.OwningKey == nil {
+			// Allocate a pre-funded key and remove it from the network so it won't be used for
+			// other purposes
+			if len(n.PreFundedKeys) == 0 {
+				return fmt.Errorf("no pre-funded keys available to create subnet %q", subnet.Name)
+			}
+			subnet.OwningKey = n.PreFundedKeys[len(n.PreFundedKeys)-1]
+			n.PreFundedKeys = n.PreFundedKeys[:len(n.PreFundedKeys)-1]
+		}
+
+		// Create the subnet on the network
+		if err := subnet.Create(ctx, n.Nodes[0].URI); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(w, " created subnet %q as %q\n", subnet.Name, subnet.SubnetID); err != nil {
+			return err
+		}
+
+		// Persist the subnet configuration
+		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(w, " wrote configuration for subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+
+		createdSubnets = append(createdSubnets, subnet)
+	}
+
+	if len(createdSubnets) == 0 {
+		return nil
+	}
+
+	// Ensure the in-memory subnet state
+	n.Subnets = append(n.Subnets, createdSubnets...)
+
+	// Ensure the pre-funded key changes are persisted to disk
+	if err := n.Write(); err != nil {
 		return err
 	}
-	return n.ReadNodes()
-}
 
-func (n *Network) AddNode(ctx context.Context, w io.Writer, node *Node, isEphemeral bool) (*Node, error) {
-	// Assume network configuration has been written to disk and is current in memory
-
-	if node == nil {
-		// Set an empty data dir so that PopulateNodeConfig will know
-		// to set the default of `[network dir]/[node id]`.
-		node = NewNode("")
+	// Reconfigure nodes for the new subnets and their chains
+	if _, err := fmt.Fprintf(w, "Configured nodes to track new subnet(s). Restart is required.\n"); err != nil {
+		return err
 	}
-
-	// Default to a data dir of [network-dir]/[node-ID]
-	nodeParentDir := n.Dir
-	if isEphemeral {
-		// For an ephemeral node, default to a data dir of [network-dir]/[ephemeral-dir]/[node-ID]
-		// to provide a clear separation between nodes that are expected to expose stable API
-		// endpoints and those that will live for only a short time (e.g. a node started by a test
-		// and stopped on teardown).
-		//
-		// The data for an ephemeral node is still stored in the file tree rooted at the network
-		// dir to ensure that recursively archiving the network dir in CI will collect all node
-		// data used for a test run.
-		nodeParentDir = filepath.Join(n.Dir, defaultEphemeralDirName)
-	}
-
-	if err := n.PopulateNodeConfig(node, nodeParentDir); err != nil {
-		return nil, err
-	}
-
-	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs()
-	if err != nil {
-		return nil, err
-	}
-	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
-
-	if err := node.Write(); err != nil {
-		return nil, err
-	}
-
-	err = node.Start(w)
-	if err != nil {
-		// Attempt to stop an unhealthy node to provide some assurance to the caller
-		// that an error condition will not result in a lingering process.
-		stopErr := node.Stop(ctx)
-		if stopErr != nil {
-			err = errors.Join(err, stopErr)
+	for _, node := range n.Nodes {
+		if err := n.EnsureNodeConfig(node); err != nil {
+			return err
 		}
-		return nil, err
 	}
 
-	return node, nil
+	// Restart nodes to allow new configuration to take effect
+	if err := n.Restart(ctx, w); err != nil {
+		return err
+	}
+
+	// Add each node as a subnet validator
+	for _, subnet := range createdSubnets {
+		if _, err := fmt.Fprintf(w, "Adding validators for subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+		if err := subnet.AddValidators(ctx, w, n.Nodes); err != nil {
+			return err
+		}
+	}
+
+	// Wait for nodes to become subnet validators
+	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
+	for _, subnet := range createdSubnets {
+		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
+			return err
+		}
+
+		// It should now be safe to create chains for the subnet
+		if err := subnet.CreateChains(ctx, w, n.Nodes[0].URI); err != nil {
+			return err
+		}
+
+		// Persist the chain configuration
+		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (n *Network) GetBootstrapIPsAndIDs() ([]string, []string, error) {
-	// Collect staking addresses of running nodes for use in bootstrapping a node
-	if err := n.ReadNodes(); err != nil {
-		return nil, nil, fmt.Errorf("failed to read network nodes: %w", err)
+func (n *Network) GetURIForNodeID(nodeID ids.NodeID) (string, error) {
+	for _, node := range n.Nodes {
+		if node.NodeID == nodeID {
+			return node.URI, nil
+		}
+	}
+	return "", fmt.Errorf("%s is not known to the network", nodeID)
+}
+
+func (n *Network) GetNodeURIs() []NodeURI {
+	return GetNodeURIs(n.Nodes)
+}
+
+// Retrieves bootstrap IPs and IDs for all nodes except the skipped one (this supports
+// collecting the bootstrap details for restarting a node).
+func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
+	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
+	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read network's nodes: %w", err)
 	}
 	var (
-		bootstrapIPs = make([]string, 0, len(n.Nodes))
-		bootstrapIDs = make([]string, 0, len(n.Nodes))
+		bootstrapIPs = make([]string, 0, len(nodes))
+		bootstrapIDs = make([]string, 0, len(nodes))
 	)
-	for _, node := range n.Nodes {
+	for _, node := range nodes {
+		if skippedNode != nil && node.NodeID == skippedNode.NodeID {
+			continue
+		}
+
 		if len(node.StakingAddress) == 0 {
 			// Node is not running
 			continue
@@ -688,9 +650,45 @@ func (n *Network) GetBootstrapIPsAndIDs() ([]string, []string, error) {
 		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
 	}
 
-	if len(bootstrapIDs) == 0 {
-		return nil, nil, errMissingBootstrapNodes
-	}
-
 	return bootstrapIPs, bootstrapIDs, nil
+}
+
+// Retrieves the default root dir for storing networks and their
+// configuration.
+func getDefaultRootDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
+}
+
+// Finds the next available network ID by attempting to create a
+// directory numbered from 1000 until creation succeeds. Returns the
+// network id and the full path of the created directory.
+func findNextNetworkID(rootDir string) (uint32, string, error) {
+	var (
+		networkID uint32 = 1000
+		dirPath   string
+	)
+	for {
+		_, reserved := constants.NetworkIDToNetworkName[networkID]
+		if reserved {
+			networkID++
+			continue
+		}
+
+		dirPath = filepath.Join(rootDir, strconv.FormatUint(uint64(networkID), 10))
+		err := os.Mkdir(dirPath, perms.ReadWriteExecute)
+		if err == nil {
+			return networkID, dirPath, nil
+		}
+
+		if !errors.Is(err, fs.ErrExist) {
+			return 0, "", fmt.Errorf("failed to create network directory: %w", err)
+		}
+
+		// Directory already exists, keep iterating
+		networkID++
+	}
 }

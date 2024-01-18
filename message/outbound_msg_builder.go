@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -18,7 +18,7 @@ var _ OutboundMsgBuilder = (*outMsgBuilder)(nil)
 // with a reference count of 1. Once the reference count hits 0, the message
 // bytes should no longer be accessed.
 type OutboundMsgBuilder interface {
-	Version(
+	Handshake(
 		networkID uint32,
 		myTime uint64,
 		ip ips.IPPort,
@@ -27,20 +27,23 @@ type OutboundMsgBuilder interface {
 		major uint32,
 		minor uint32,
 		patch uint32,
-		myVersionTime uint64,
+		ipSigningTime uint64,
 		sig []byte,
 		trackedSubnets []ids.ID,
 		supportedACPs []uint32,
 		objectedACPs []uint32,
+		knownPeersFilter []byte,
+		knownPeersSalt []byte,
+	) (OutboundMessage, error)
+
+	GetPeerList(
+		knownPeersFilter []byte,
+		knownPeersSalt []byte,
 	) (OutboundMessage, error)
 
 	PeerList(
-		peers []ips.ClaimedIPPort,
+		peers []*ips.ClaimedIPPort,
 		bypassThrottling bool,
-	) (OutboundMessage, error)
-
-	PeerListAck(
-		peerAcks []*p2p.PeerAck,
 	) (OutboundMessage, error)
 
 	Ping(
@@ -230,7 +233,7 @@ func (b *outMsgBuilder) Pong(
 	)
 }
 
-func (b *outMsgBuilder) Version(
+func (b *outMsgBuilder) Handshake(
 	networkID uint32,
 	myTime uint64,
 	ip ips.IPPort,
@@ -239,24 +242,26 @@ func (b *outMsgBuilder) Version(
 	major uint32,
 	minor uint32,
 	patch uint32,
-	myVersionTime uint64,
+	ipSigningTime uint64,
 	sig []byte,
 	trackedSubnets []ids.ID,
 	supportedACPs []uint32,
 	objectedACPs []uint32,
+	knownPeersFilter []byte,
+	knownPeersSalt []byte,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
-			Message: &p2p.Message_Version{
-				Version: &p2p.Version{
+			Message: &p2p.Message_Handshake{
+				Handshake: &p2p.Handshake{
 					NetworkId:      networkID,
 					MyTime:         myTime,
 					IpAddr:         ip.IP.To16(),
 					IpPort:         uint32(ip.Port),
 					MyVersion:      myVersion,
-					MyVersionTime:  myVersionTime,
+					IpSigningTime:  ipSigningTime,
 					Sig:            sig,
 					TrackedSubnets: subnetIDBytes,
 					Client: &p2p.Client{
@@ -267,6 +272,10 @@ func (b *outMsgBuilder) Version(
 					},
 					SupportedAcps: supportedACPs,
 					ObjectedAcps:  objectedACPs,
+					KnownPeers: &p2p.BloomFilter{
+						Filter: knownPeersFilter,
+						Salt:   knownPeersSalt,
+					},
 				},
 			},
 		},
@@ -275,7 +284,27 @@ func (b *outMsgBuilder) Version(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) GetPeerList(
+	knownPeersFilter []byte,
+	knownPeersSalt []byte,
+) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_GetPeerList{
+				GetPeerList: &p2p.GetPeerList{
+					KnownPeers: &p2p.BloomFilter{
+						Filter: knownPeersFilter,
+						Salt:   knownPeersSalt,
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	claimIPPorts := make([]*p2p.ClaimedIpPort, len(peers))
 	for i, p := range peers {
 		claimIPPorts[i] = &p2p.ClaimedIpPort{
@@ -284,33 +313,19 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 			IpPort:          uint32(p.IPPort.Port),
 			Timestamp:       p.Timestamp,
 			Signature:       p.Signature,
-			TxId:            p.TxID[:],
+			TxId:            ids.Empty[:],
 		}
 	}
 	return b.builder.createOutbound(
 		&p2p.Message{
-			Message: &p2p.Message_PeerList{
-				PeerList: &p2p.PeerList{
+			Message: &p2p.Message_PeerList_{
+				PeerList_: &p2p.PeerList{
 					ClaimedIpPorts: claimIPPorts,
 				},
 			},
 		},
 		b.compressionType,
 		bypassThrottling,
-	)
-}
-
-func (b *outMsgBuilder) PeerListAck(peerAcks []*p2p.PeerAck) (OutboundMessage, error) {
-	return b.builder.createOutbound(
-		&p2p.Message{
-			Message: &p2p.Message_PeerListAck{
-				PeerListAck: &p2p.PeerListAck{
-					PeerAcks: peerAcks,
-				},
-			},
-		},
-		compression.TypeNone,
-		false,
 	)
 }
 

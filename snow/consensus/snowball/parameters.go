@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -39,7 +39,7 @@ var (
 		K:                     20,
 		AlphaPreference:       15,
 		AlphaConfidence:       15,
-		BetaVirtuous:          15,
+		BetaVirtuous:          20,
 		BetaRogue:             20,
 		ConcurrentRepolls:     4,
 		OptimalProcessing:     10,

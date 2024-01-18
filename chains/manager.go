@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
@@ -773,7 +773,6 @@ func (m *manager) createAvalancheChain(
 			ActivationTime:      m.ApricotPhase4Time,
 			DurangoTime:         version.GetDurangoTime(m.NetworkID),
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
-			DurangoTime:         version.GetDurangoTime(ctx.NetworkID),
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.stakingSigner,
@@ -1120,7 +1119,6 @@ func (m *manager) createSnowmanChain(
 			ActivationTime:      m.ApricotPhase4Time,
 			DurangoTime:         version.GetDurangoTime(m.NetworkID),
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
-			DurangoTime:         version.GetDurangoTime(ctx.NetworkID),
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.stakingSigner,

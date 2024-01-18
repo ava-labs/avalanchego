@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package consistent
@@ -181,7 +181,7 @@ func TestGetMapsToClockwiseNode(t *testing.T) {
 			ring, hasher := setupTest(t, 1)
 
 			// setup expected calls
-			calls := make([]*gomock.Call, len(test.ringNodes)+1)
+			calls := make([]any, len(test.ringNodes)+1)
 
 			for i, key := range test.ringNodes {
 				calls[i] = hasher.EXPECT().Hash(getHashKey(key.ConsistentHashKey(), 0)).Return(key.hash).Times(1)

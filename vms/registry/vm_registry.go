@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package registry
@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
 var _ VMRegistry = (*vmRegistry)(nil)
@@ -16,15 +17,12 @@ var _ VMRegistry = (*vmRegistry)(nil)
 type VMRegistry interface {
 	// Reload installs all non-installed vms on the node.
 	Reload(ctx context.Context) ([]ids.ID, map[ids.ID]error, error)
-	// ReloadWithReadLock installs all non-installed vms on the node assuming
-	// the http read lock is currently held.
-	ReloadWithReadLock(ctx context.Context) ([]ids.ID, map[ids.ID]error, error)
 }
 
 // VMRegistryConfig defines configurations for VMRegistry
 type VMRegistryConfig struct {
-	VMGetter     VMGetter
-	VMRegisterer VMRegisterer
+	VMGetter  VMGetter
+	VMManager vms.Manager
 }
 
 type vmRegistry struct {
@@ -39,16 +37,6 @@ func NewVMRegistry(config VMRegistryConfig) VMRegistry {
 }
 
 func (r *vmRegistry) Reload(ctx context.Context) ([]ids.ID, map[ids.ID]error, error) {
-	return r.reload(ctx, r.config.VMRegisterer)
-}
-
-func (r *vmRegistry) ReloadWithReadLock(ctx context.Context) ([]ids.ID, map[ids.ID]error, error) {
-	return r.reload(ctx, readRegisterer{
-		registerer: r.config.VMRegisterer,
-	})
-}
-
-func (r *vmRegistry) reload(ctx context.Context, registerer registerer) ([]ids.ID, map[ids.ID]error, error) {
 	_, unregisteredVMs, err := r.config.VMGetter.Get()
 	if err != nil {
 		return nil, nil, err
@@ -58,7 +46,7 @@ func (r *vmRegistry) reload(ctx context.Context, registerer registerer) ([]ids.I
 	failedVMs := make(map[ids.ID]error)
 
 	for vmID, factory := range unregisteredVMs {
-		if err := registerer.Register(ctx, vmID, factory); err != nil {
+		if err := r.config.VMManager.RegisterFactory(ctx, vmID, factory); err != nil {
 			failedVMs[vmID] = err
 			continue
 		}
