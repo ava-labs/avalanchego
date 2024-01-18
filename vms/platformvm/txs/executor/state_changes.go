@@ -82,6 +82,8 @@ func NextBlockTime(state state.Chain, clk *mockable.Clock) (time.Time, bool, err
 	return timestamp, timeWasCapped, nil
 }
 
+// AdvanceTimeTo applies all state changes to [parentState] resulting from
+// advancing the chain time to [newChainTime].
 // Returns true iff the validator set changed.
 func AdvanceTimeTo(
 	backend *Backend,
