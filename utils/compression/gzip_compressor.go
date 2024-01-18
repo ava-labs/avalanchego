@@ -21,6 +21,7 @@ var (
 	ErrMsgTooLarge              = errors.New("msg too large to be compressed")
 )
 
+// TODO: Remove once v1.11.x is out.
 type gzipCompressor struct {
 	maxSize        int64
 	gzipWriterPool sync.Pool

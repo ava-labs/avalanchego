@@ -5,6 +5,7 @@ package tmpnet
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
@@ -21,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
 // The Network type is defined in this file (orchestration) and
@@ -36,7 +39,25 @@ const (
 	// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
 	// increase the time for a network's nodes to be seen as healthy.
 	networkHealthCheckInterval = 200 * time.Millisecond
+
+	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 )
+
+// HardhatKey is a legacy used for hardhat testing in subnet-evm
+// TODO(marun) Remove when no longer needed.
+var HardhatKey *secp256k1.PrivateKey
+
+func init() {
+	hardhatKeyBytes, err := hex.DecodeString(HardHatKeyStr)
+	if err != nil {
+		panic(err)
+	}
+	HardhatKey, err = secp256k1.ToPrivateKey(hardhatKeyBytes)
+	if err != nil {
+		panic(err)
+	}
+}
 
 // Collects the configuration for running a temporary avalanchego network
 type Network struct {
@@ -56,6 +77,9 @@ type Network struct {
 
 	// Nodes that constitute the network
 	Nodes []*Node
+
+	// Subnets that have been enabled on the network
+	Subnets []*Subnet
 }
 
 // Ensure a real and absolute network dir so that node
@@ -69,35 +93,22 @@ func toCanonicalDir(dir string) (string, error) {
 	return filepath.EvalSymlinks(absDir)
 }
 
-// Initializes a new network with default configuration.
-func NewDefaultNetwork(w io.Writer, avalancheGoPath string, nodeCount int) (*Network, error) {
-	if _, err := fmt.Fprintf(w, "Preparing configuration for new network with %s\n", avalancheGoPath); err != nil {
-		return nil, err
+func StartNewNetwork(
+	ctx context.Context,
+	w io.Writer,
+	network *Network,
+	rootNetworkDir string,
+	avalancheGoExecPath string,
+	pluginDir string,
+	nodeCount int,
+) error {
+	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir, nodeCount); err != nil {
+		return err
 	}
-
-	keys, err := NewPrivateKeys(DefaultPreFundedKeyCount)
-	if err != nil {
-		return nil, err
+	if err := network.Create(rootNetworkDir); err != nil {
+		return err
 	}
-
-	network := &Network{
-		DefaultFlags: DefaultFlags(),
-		DefaultRuntimeConfig: NodeRuntimeConfig{
-			AvalancheGoPath: avalancheGoPath,
-		},
-		PreFundedKeys: keys,
-		ChainConfigs:  DefaultChainConfigs(),
-	}
-
-	network.Nodes = make([]*Node, nodeCount)
-	for i := range network.Nodes {
-		network.Nodes[i] = NewNode("")
-		if err := network.EnsureNodeConfig(network.Nodes[i]); err != nil {
-			return nil, err
-		}
-	}
-
-	return network, nil
+	return network.Start(ctx, w)
 }
 
 // Stops the nodes of the network configured in the provided directory.
@@ -107,6 +118,15 @@ func StopNetwork(ctx context.Context, dir string) error {
 		return err
 	}
 	return network.Stop(ctx)
+}
+
+// Restarts the nodes of the network configured in the provided directory.
+func RestartNetwork(ctx context.Context, w io.Writer, dir string) error {
+	network, err := ReadNetwork(dir)
+	if err != nil {
+		return err
+	}
+	return network.Restart(ctx, w)
 }
 
 // Reads a network from the provided directory.
@@ -122,6 +142,68 @@ func ReadNetwork(dir string) (*Network, error) {
 		return nil, fmt.Errorf("failed to read network: %w", err)
 	}
 	return network, nil
+}
+
+// Initializes a new network with default configuration.
+func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, pluginDir string, nodeCount int) error {
+	if _, err := fmt.Fprintf(w, "Preparing configuration for new network with %s\n", avalancheGoPath); err != nil {
+		return err
+	}
+
+	// Ensure default flags
+	if n.DefaultFlags == nil {
+		n.DefaultFlags = FlagsMap{}
+	}
+	n.DefaultFlags.SetDefaults(DefaultFlags())
+
+	// Only configure the plugin dir with a non-empty value to ensure
+	// the use of the default value (`[datadir]/plugins`) when
+	// no plugin dir is configured.
+	if len(pluginDir) > 0 {
+		if _, ok := n.DefaultFlags[config.PluginDirKey]; !ok {
+			n.DefaultFlags[config.PluginDirKey] = pluginDir
+		}
+	}
+
+	// Ensure pre-funded keys
+	if len(n.PreFundedKeys) == 0 {
+		keys, err := NewPrivateKeys(DefaultPreFundedKeyCount)
+		if err != nil {
+			return err
+		}
+		n.PreFundedKeys = keys
+	}
+
+	// Ensure primary chains are configured
+	if n.ChainConfigs == nil {
+		n.ChainConfigs = map[string]FlagsMap{}
+	}
+	defaultChainConfigs := DefaultChainConfigs()
+	for alias, chainConfig := range defaultChainConfigs {
+		if _, ok := n.ChainConfigs[alias]; !ok {
+			n.ChainConfigs[alias] = FlagsMap{}
+		}
+		n.ChainConfigs[alias].SetDefaults(chainConfig)
+	}
+
+	// Ensure runtime is configured
+	if len(n.DefaultRuntimeConfig.AvalancheGoPath) == 0 {
+		n.DefaultRuntimeConfig.AvalancheGoPath = avalancheGoPath
+	}
+
+	// Ensure nodes are created
+	if len(n.Nodes) == 0 {
+		n.Nodes = NewNodes(nodeCount)
+	}
+
+	// Ensure nodes are configured
+	for i := range n.Nodes {
+		if err := n.EnsureNodeConfig(n.Nodes[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Creates the network on disk, choosing its network id and generating its genesis in the process.
@@ -170,8 +252,30 @@ func (n *Network) Create(rootDir string) error {
 	}
 	n.Dir = canonicalDir
 
+	pluginDir, err := n.DefaultFlags.GetStringVal(config.PluginDirKey)
+	if err != nil {
+		return err
+	}
+	if len(pluginDir) > 0 {
+		// Ensure the existence of the plugin directory or nodes won't be able to start.
+		if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
+			return fmt.Errorf("failed to create plugin dir: %w", err)
+		}
+	}
+
 	if n.Genesis == nil {
-		genesis, err := NewTestGenesis(networkID, n.Nodes, n.PreFundedKeys)
+		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
+		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
+		// keys exposed by a network. Since allocation will not be exclusive, a test using a
+		// legacy key is unlikely to be a good candidate for parallel execution.
+		keysToFund := []*secp256k1.PrivateKey{
+			genesis.VMRQKey,
+			genesis.EWOQKey,
+			HardhatKey,
+		}
+		keysToFund = append(keysToFund, n.PreFundedKeys...)
+
+		genesis, err := NewTestGenesis(networkID, n.Nodes, keysToFund)
 		if err != nil {
 			return err
 		}
@@ -317,6 +421,28 @@ func (n *Network) Stop(ctx context.Context) error {
 	return nil
 }
 
+// Restarts all non-ephemeral nodes in the network.
+func (n *Network) Restart(ctx context.Context, w io.Writer) error {
+	if _, err := fmt.Fprintf(w, " restarting network\n"); err != nil {
+		return err
+	}
+	for _, node := range n.Nodes {
+		if err := node.Stop(ctx); err != nil {
+			return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
+		}
+		if err := n.StartNode(ctx, w, node); err != nil {
+			return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
+		}
+		if _, err := fmt.Fprintf(w, " waiting for node %s to report healthy\n", node.NodeID); err != nil {
+			return err
+		}
+		if err := WaitForHealthy(ctx, node); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Ensures the provided node has the configuration it needs to start. If the data dir is not
 // set, it will be defaulted to [nodeParentDir]/[node ID]. For a not-yet-created network,
 // no action will be taken.
@@ -359,7 +485,139 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		}
 	}
 
+	// Ensure available subnets are tracked
+	subnetIDs := make([]string, 0, len(n.Subnets))
+	for _, subnet := range n.Subnets {
+		if subnet.SubnetID == ids.Empty {
+			continue
+		}
+		subnetIDs = append(subnetIDs, subnet.SubnetID.String())
+	}
+	flags[config.TrackSubnetsKey] = strings.Join(subnetIDs, ",")
+
 	return nil
+}
+
+func (n *Network) GetSubnet(name string) *Subnet {
+	for _, subnet := range n.Subnets {
+		if subnet.Name == name {
+			return subnet
+		}
+	}
+	return nil
+}
+
+// Ensure that each subnet on the network is created and that it is validated by all non-ephemeral nodes.
+func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
+	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
+	for _, subnet := range n.Subnets {
+		if _, err := fmt.Fprintf(w, "Creating subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+		if subnet.SubnetID != ids.Empty {
+			// The subnet already exists
+			continue
+		}
+
+		if subnet.OwningKey == nil {
+			// Allocate a pre-funded key and remove it from the network so it won't be used for
+			// other purposes
+			if len(n.PreFundedKeys) == 0 {
+				return fmt.Errorf("no pre-funded keys available to create subnet %q", subnet.Name)
+			}
+			subnet.OwningKey = n.PreFundedKeys[len(n.PreFundedKeys)-1]
+			n.PreFundedKeys = n.PreFundedKeys[:len(n.PreFundedKeys)-1]
+		}
+
+		// Create the subnet on the network
+		if err := subnet.Create(ctx, n.Nodes[0].URI); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(w, " created subnet %q as %q\n", subnet.Name, subnet.SubnetID); err != nil {
+			return err
+		}
+
+		// Persist the subnet configuration
+		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(w, " wrote configuration for subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+
+		createdSubnets = append(createdSubnets, subnet)
+	}
+
+	if len(createdSubnets) == 0 {
+		return nil
+	}
+
+	// Ensure the in-memory subnet state
+	n.Subnets = append(n.Subnets, createdSubnets...)
+
+	// Ensure the pre-funded key changes are persisted to disk
+	if err := n.Write(); err != nil {
+		return err
+	}
+
+	// Reconfigure nodes for the new subnets and their chains
+	if _, err := fmt.Fprintf(w, "Configured nodes to track new subnet(s). Restart is required.\n"); err != nil {
+		return err
+	}
+	for _, node := range n.Nodes {
+		if err := n.EnsureNodeConfig(node); err != nil {
+			return err
+		}
+	}
+
+	// Restart nodes to allow new configuration to take effect
+	if err := n.Restart(ctx, w); err != nil {
+		return err
+	}
+
+	// Add each node as a subnet validator
+	for _, subnet := range createdSubnets {
+		if _, err := fmt.Fprintf(w, "Adding validators for subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+		if err := subnet.AddValidators(ctx, w, n.Nodes); err != nil {
+			return err
+		}
+	}
+
+	// Wait for nodes to become subnet validators
+	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
+	for _, subnet := range createdSubnets {
+		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
+			return err
+		}
+
+		// It should now be safe to create chains for the subnet
+		if err := subnet.CreateChains(ctx, w, n.Nodes[0].URI); err != nil {
+			return err
+		}
+
+		// Persist the chain configuration
+		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %q\n", subnet.Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (n *Network) GetURIForNodeID(nodeID ids.NodeID) (string, error) {
+	for _, node := range n.Nodes {
+		if node.NodeID == nodeID {
+			return node.URI, nil
+		}
+	}
+	return "", fmt.Errorf("%s is not known to the network", nodeID)
 }
 
 func (n *Network) GetNodeURIs() []NodeURI {
