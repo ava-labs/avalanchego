@@ -13,8 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/golang/mock/gomock"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 var testPeerVersion = version.CurrentApp
@@ -24,8 +25,9 @@ func TestAppRequestOnShutdown(t *testing.T) {
 		net    NetworkClient
 		wg     sync.WaitGroup
 		called bool
+		err    error
 	)
-
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -48,18 +50,19 @@ func TestAppRequestOnShutdown(t *testing.T) {
 		},
 	)
 
-	net = NewNetworkClient(sender, ids.EmptyNodeID, 1, logging.NoLog{})
+	net, err = NewNetworkClient(sender, ids.EmptyNodeID, 1, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 	nodeID := ids.GenerateTestNodeID()
-	require.NoError(t, net.Connected(context.Background(), nodeID, testPeerVersion))
+	require.NoError(net.Connected(context.Background(), nodeID, testPeerVersion))
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		requestBytes := []byte("message")
-		responseBytes, _, err := net.RequestAny(context.Background(), testPeerVersion, requestBytes)
-		require.Error(t, err, ErrRequestFailed)
-		require.Nil(t, responseBytes)
+		_, responseBytes, err := net.RequestAny(context.Background(), testPeerVersion, requestBytes)
+		require.Error(err, errRequestFailed)
+		require.Nil(responseBytes)
 	}()
 	wg.Wait()
-	require.True(t, called)
+	require.True(called)
 }

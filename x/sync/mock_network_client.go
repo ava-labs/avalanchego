@@ -127,3 +127,15 @@ func (mr *MockNetworkClientMockRecorder) RequestAny(arg0, arg1, arg2 any) *gomoc
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestAny", reflect.TypeOf((*MockNetworkClient)(nil).RequestAny), arg0, arg1, arg2)
 }
+
+// Shutdown mocks base method.
+func (m *MockNetworkClient) Shutdown() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Shutdown")
+}
+
+// Shutdown indicates an expected call of Shutdown.
+func (mr *MockNetworkClientMockRecorder) Shutdown() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockNetworkClient)(nil).Shutdown))
+}
