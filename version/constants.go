@@ -15,9 +15,10 @@ import (
 
 const (
 	Client = "avalanchego"
-	// RPCChainVMProtocol should be bumped anytime changes are made which require
-	// the plugin vm to upgrade to latest avalanchego release to be compatible.
-	RPCChainVMProtocol uint = 30
+	// RPCChainVMProtocol should be bumped anytime changes are made which
+	// require the plugin vm to upgrade to latest avalanchego release to be
+	// compatible.
+	RPCChainVMProtocol uint = 31
 )
 
 // These are globals that describe network upgrades and node versions
@@ -25,7 +26,7 @@ var (
 	Current = &Semantic{
 		Major: 1,
 		Minor: 10,
-		Patch: 17,
+		Patch: 18,
 	}
 	CurrentApp = &Application{
 		Name:  Client,

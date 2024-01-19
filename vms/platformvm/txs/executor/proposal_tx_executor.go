@@ -296,14 +296,9 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	changes, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
-	if err != nil {
+	if _, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime); err != nil {
 		return err
 	}
-
-	// Update the state if this tx is committed
-	e.OnCommitState.SetTimestamp(newChainTime)
-	changes.Apply(e.OnCommitState)
 
 	e.PrefersCommit = !newChainTime.After(now.Add(SyncBound))
 
