@@ -55,8 +55,8 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	var (
-		timestamp       = e.State.GetTimestamp()
-		isDurangoActive = e.Config.IsDurangoActivated(timestamp)
+		currentTimestamp = e.State.GetTimestamp()
+		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
@@ -68,7 +68,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(timestamp)
+	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(currentTimestamp)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -106,15 +106,15 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	var (
-		timestamp       = e.State.GetTimestamp()
-		isDurangoActive = e.Config.IsDurangoActivated(timestamp)
+		currentTimestamp = e.State.GetTimestamp()
+		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
 
 	// Verify the flowcheck
-	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(timestamp)
+	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(currentTimestamp)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -550,7 +550,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*isDurangoActive*/); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
 		return err
 	}
 

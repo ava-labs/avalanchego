@@ -761,7 +761,7 @@ func verifyTransferSubnetOwnershipTx(
 		return err
 	}
 
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*isDurangoActive*/); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
 		return err
 	}
 
