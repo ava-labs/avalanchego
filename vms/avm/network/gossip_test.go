@@ -71,6 +71,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 
 	mempool, err := newGossipMempool(
 		baseMempool,
+		metrics,
 		logging.NoLog{},
 		testVerifier{},
 		parser,
@@ -107,6 +108,7 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 
 	mempool, err := newGossipMempool(
 		baseMempool,
+		metrics,
 		logging.NoLog{},
 		testVerifier{
 			err: errTest, // We shouldn't be attempting to verify the tx in this flow

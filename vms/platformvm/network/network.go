@@ -97,6 +97,7 @@ func New(
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		registerer,
 		log,
 		txVerifier,
 		config.ExpectedBloomFilterElements,
