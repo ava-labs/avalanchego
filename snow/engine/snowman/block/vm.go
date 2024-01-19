@@ -5,18 +5,11 @@ package block
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
-
-// ErrIndexIncomplete is used to indicate that the VM is currently repairing its
-// index.
-//
-// TODO: Remove after v1.11.x activates.
-var ErrIndexIncomplete = errors.New("query failed because height index is incomplete")
 
 // ChainVM defines the required functionality of a Snowman VM.
 //
