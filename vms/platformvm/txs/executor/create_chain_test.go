@@ -27,9 +27,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
@@ -62,9 +60,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
@@ -104,9 +100,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
@@ -138,9 +132,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
@@ -198,9 +190,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 			env.config.ApricotPhase3Time = ap3Time
 
-			defer func() {
-				require.NoError(shutdownEnvironment(env))
-			}()
 			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
 			require.NoError(err)
 

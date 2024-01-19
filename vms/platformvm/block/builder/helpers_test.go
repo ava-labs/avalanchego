@@ -211,6 +211,24 @@ func newEnvironment(t *testing.T) *environment {
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
 
+	t.Cleanup(func() {
+		res.ctx.Lock.Lock()
+		defer res.ctx.Lock.Unlock()
+
+		res.Builder.ShutdownBlockTimer()
+
+		if res.isBootstrapped.Get() {
+			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+
+			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+
+			require.NoError(res.state.Commit())
+		}
+
+		require.NoError(res.state.Close())
+		require.NoError(res.baseDB.Close())
+	})
+
 	return res
 }
 
@@ -397,24 +415,4 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 	require.NoError(err)
 
 	return genesisBytes
-}
-
-func shutdownEnvironment(env *environment) error {
-	env.Builder.ShutdownBlockTimer()
-
-	if env.isBootstrapped.Get() {
-		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
-			return err
-		}
-		if err := env.state.Commit(); err != nil {
-			return err
-		}
-	}
-
-	return utils.Err(
-		env.state.Close(),
-		env.baseDB.Close(),
-	)
 }
