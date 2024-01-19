@@ -223,6 +223,9 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	}
 
 	t.Cleanup(func() {
+		res.ctx.Lock.Lock()
+		defer res.ctx.Lock.Unlock()
+
 		if res.mockedState != nil {
 			// state is mocked, nothing to do here
 			return

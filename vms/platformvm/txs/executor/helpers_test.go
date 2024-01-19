@@ -177,6 +177,9 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	addSubnet(t, env, txBuilder)
 
 	t.Cleanup(func() {
+		env.ctx.Lock.Lock()
+		defer env.ctx.Lock.Unlock()
+
 		require := require.New(t)
 
 		if env.isBootstrapped.Get() {

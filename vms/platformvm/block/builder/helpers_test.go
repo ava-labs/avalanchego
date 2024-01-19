@@ -212,6 +212,9 @@ func newEnvironment(t *testing.T) *environment {
 	addSubnet(t, res)
 
 	t.Cleanup(func() {
+		res.ctx.Lock.Lock()
+		defer res.ctx.Lock.Unlock()
+
 		res.Builder.ShutdownBlockTimer()
 
 		if res.isBootstrapped.Get() {
