@@ -19,7 +19,7 @@ var (
 	heightPrefix   = []byte("height")
 	metadataPrefix = []byte("metadata")
 
-	forkKey       = []byte("fork")
+	forkKey = []byte("fork")
 )
 
 type HeightIndexGetter interface {
