@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 // This tests that the math performed during TransformSubnetTx execution can
@@ -952,1024 +953,636 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	}
 }
 
-func TestDurangoStandardTxExecutorAddValidatorTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
-
-	var (
-		nodeID    = ids.GenerateTestNodeID()
-		chainTime = env.state.GetTimestamp()
-		endTime   = chainTime.Add(defaultMaxStakingDuration)
-	)
-
-	// Build the AddValidatorTx
-	ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.AddPrimaryNetworkValidatorFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	utx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'}, // non-empty memo must err
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  0,
-			End:    uint64(endTime.Unix()),
-			Wght:   env.config.MinValidatorStake,
-		},
-		StakeOuts: stakedOuts,
-		RewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.ShortEmpty},
-		},
-		DelegationShares: reward.PercentDenominator,
+// Verifies that the Memo field is required to be empty post-Durango
+func TestDurangoMemoField(t *testing.T) {
+	type test struct {
+		name      string
+		setupTest func(*environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice)
 	}
-	addValTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
+	tests := []test{
+		{
+			name: "AddValidatorTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.AddPrimaryNetworkValidatorFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	err = addValTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addValTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
+				var (
+					nodeID    = ids.GenerateTestNodeID()
+					chainTime = env.state.GetTimestamp()
+					endTime   = chainTime.Add(defaultMaxStakingDuration)
+				)
 
-	// empty memo won't err
-	utx.Memo = []byte{}
-	addValTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
 
-	require.NoError(addValTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addValTx,
-	}))
-
-	// Check that a current validator is added
-	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-
-	require.Equal(addValTx.ID(), val.TxID)
-	require.Equal(chainTime, val.StartTime)
-	require.Equal(endTime, val.EndTime)
-}
-
-func TestDurangoStandardTxExecutorAddPermissionlessValidatorTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	var (
-		nodeID    = ids.GenerateTestNodeID()
-		chainTime = env.state.GetTimestamp()
-		endTime   = chainTime.Add(defaultMaxStakingDuration)
-	)
-
-	// Build the AddValidatorTx
-	ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.AddPrimaryNetworkValidatorFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	sk, err := bls.NewSecretKey()
-	require.NoError(err)
-
-	utx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			End:    uint64(endTime.Unix()),
-			Wght:   env.config.MinValidatorStake,
-		},
-		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk),
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.ShortEmpty,
+				tx := &txs.AddValidatorTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  0,
+						End:    uint64(endTime.Unix()),
+						Wght:   env.config.MinValidatorStake,
+					},
+					StakeOuts: stakedOuts,
+					RewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+					DelegationShares: reward.PercentDenominator,
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.ShortEmpty,
+		{
+			name: "AddSubnetValidatorTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
+
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.TxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
+
+				subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
+				require.NoError(t, err)
+				signers = append(signers, subnetSigners)
+
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
+
+				tx := &txs.AddSubnetValidatorTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					SubnetValidator: txs.SubnetValidator{
+						Validator: txs.Validator{
+							NodeID: primaryValidator.NodeID,
+							End:    uint64(primaryValidator.EndTime.Unix()),
+							Wght:   defaultMinValidatorStake,
+						},
+						Subnet: testSubnet1.TxID,
+					},
+					SubnetAuth: subnetAuth,
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
-		DelegationShares: reward.PercentDenominator,
-	}
-	addValTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+		{
+			name: "AddDelegatorTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
+				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.AddPrimaryNetworkDelegatorFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	err = addValTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addValTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
 
-	// empty memo won't err
-	utx.Memo = []byte{}
-	addValTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(addValTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addValTx,
-	}))
-
-	// Check that a current validator is added
-	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-
-	require.Equal(addValTx.ID(), val.TxID)
-	require.Equal(chainTime, val.StartTime)
-	require.Equal(endTime, val.EndTime)
-}
-
-func TestDurangoStandardTxExecutorAddDelegator(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// retrieve a primary network validator to test delegators
-	var primaryNetworkVal *state.Staker
-	it, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
-	for it.Next() {
-		staker := it.Value()
-		if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
-			continue
-		}
-		primaryNetworkVal = staker
-		break
-	}
-	it.Release()
-
-	var (
-		chainTime = env.state.GetTimestamp()
-		endTime   = primaryNetworkVal.EndTime
-	)
-
-	// Build the AddDelegatorTx
-	ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.AddPrimaryNetworkDelegatorFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	utx := &txs.AddDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		Validator: txs.Validator{
-			NodeID: primaryNetworkVal.NodeID,
-			End:    uint64(endTime.Unix()),
-			Wght:   defaultMinValidatorStake,
-		},
-		StakeOuts: stakedOuts,
-		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.ShortEmpty},
-		},
-	}
-	addDelTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	err = addDelTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addDelTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-	// empty memo won't err
-	utx.Memo = []byte{}
-	addDelTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(addDelTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addDelTx,
-	}))
-
-	// Check that a current validator is added
-	it, err = onAcceptState.GetCurrentDelegatorIterator(primaryNetworkVal.SubnetID, primaryNetworkVal.NodeID)
-	require.NoError(err)
-
-	var retrievedDel *state.Staker
-	for it.Next() {
-		if it.Value().Priority != txs.PrimaryNetworkDelegatorCurrentPriority {
-			continue
-		}
-		retrievedDel = it.Value()
-	}
-	it.Release()
-
-	require.Equal(addDelTx.ID(), retrievedDel.TxID)
-	require.Equal(chainTime, retrievedDel.StartTime)
-	require.Equal(endTime, retrievedDel.EndTime)
-}
-
-func TestDurangoStandardTxExecutorAddPermissionlessDelegatorTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// retrieve a primary network validator to test delegators
-	var primaryNetworkVal *state.Staker
-	it, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
-	for it.Next() {
-		staker := it.Value()
-		if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
-			continue
-		}
-		primaryNetworkVal = staker
-		break
-	}
-	it.Release()
-
-	var (
-		chainTime = env.state.GetTimestamp()
-		endTime   = primaryNetworkVal.EndTime
-	)
-
-	// Build the AddDelegatorTx
-	ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.AddPrimaryNetworkDelegatorFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	utx := &txs.AddPermissionlessDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		Validator: txs.Validator{
-			NodeID: primaryNetworkVal.NodeID,
-			End:    uint64(endTime.Unix()),
-			Wght:   defaultMinValidatorStake,
-		},
-		StakeOuts: stakedOuts,
-		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.ShortEmpty},
-		},
-	}
-	addDelTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	err = addDelTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addDelTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-	// empty memo won't err
-	utx.Memo = []byte{}
-	addDelTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(addDelTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addDelTx,
-	}))
-
-	// Check that a current validator is added
-	it, err = onAcceptState.GetCurrentDelegatorIterator(primaryNetworkVal.SubnetID, primaryNetworkVal.NodeID)
-	require.NoError(err)
-
-	var retrievedDel *state.Staker
-	for it.Next() {
-		if it.Value().Priority != txs.PrimaryNetworkDelegatorCurrentPriority {
-			continue
-		}
-		retrievedDel = it.Value()
-	}
-	it.Release()
-
-	require.Equal(addDelTx.ID(), retrievedDel.TxID)
-	require.Equal(chainTime, retrievedDel.StartTime)
-	require.Equal(endTime, retrievedDel.EndTime)
-}
-
-func TestDurangoStandardTxExecutorAddSubnetValidator(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// retrieve a primary network validator to test subnet validators
-	var primaryNetworkVal *state.Staker
-	it, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
-	for it.Next() {
-		staker := it.Value()
-		if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
-			continue
-		}
-		primaryNetworkVal = staker
-		break
-	}
-	it.Release()
-
-	var (
-		chainTime = env.state.GetTimestamp()
-		endTime   = primaryNetworkVal.EndTime
-	)
-
-	// Build the AddSubnetValidatorTx
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.TxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
-	require.NoError(err)
-	signers = append(signers, subnetSigners)
-
-	// Create the tx
-	utx := &txs.AddSubnetValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		SubnetValidator: txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: primaryNetworkVal.NodeID,
-				End:    uint64(endTime.Unix()),
-				Wght:   defaultMinValidatorStake,
+				tx := &txs.AddDelegatorTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Validator: txs.Validator{
+						NodeID: primaryValidator.NodeID,
+						End:    uint64(primaryValidator.EndTime.Unix()),
+						Wght:   defaultMinValidatorStake,
+					},
+					StakeOuts: stakedOuts,
+					DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
-			Subnet: testSubnet1.TxID,
 		},
-		SubnetAuth: subnetAuth,
-	}
+		{
+			name: "CreateChainTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				chainTime := env.state.GetTimestamp()
+				createBlockchainTxFee := env.config.GetCreateBlockchainTxFee(chainTime)
 
-	addSubnetVal, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					createBlockchainTxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
+				subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
+				require.NoError(t, err)
+				signers = append(signers, subnetSigners)
 
-	err = addSubnetVal.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addSubnetVal,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
 
-	// empty memo won't err
-	utx.Memo = []byte{}
-	addSubnetVal, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(addSubnetVal.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addSubnetVal,
-	}))
-
-	// Check that a current subnet validator is added
-	val, err := onAcceptState.GetCurrentValidator(utx.Subnet, utx.Validator.NodeID)
-	require.NoError(err)
-
-	require.Equal(addSubnetVal.ID(), val.TxID)
-	require.Equal(chainTime, val.StartTime)
-	require.Equal(endTime, val.EndTime)
-}
-
-func TestDurangoStandardTxExecutorRemoveSubnetValidatorTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// retrieve a primary network validator to test subnet validators
-	var primaryNetworkVal *state.Staker
-	it, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
-	for it.Next() {
-		staker := it.Value()
-		if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
-			continue
-		}
-		primaryNetworkVal = staker
-		break
-	}
-	it.Release()
-
-	// add subnet validator
-	endTime := primaryNetworkVal.EndTime
-	subnetValTx, err := env.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		0,
-		uint64(endTime.Unix()),
-		primaryNetworkVal.NodeID,
-		testSubnet1.ID(),
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	require.NoError(err)
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	require.NoError(subnetValTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      subnetValTx,
-	}))
-
-	// Build the RemoveSubnetValidatorTx
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.TxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
-	require.NoError(err)
-	signers = append(signers, subnetSigners)
-
-	// Create the tx
-	utx := &txs.RemoveSubnetValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		Subnet:     testSubnet1.ID(),
-		NodeID:     primaryNetworkVal.NodeID,
-		SubnetAuth: subnetAuth,
-	}
-	removeSubnetVal, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	err = removeSubnetVal.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      removeSubnetVal,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-	// empty memo won't err
-	utx.Memo = []byte{}
-	removeSubnetVal, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(removeSubnetVal.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      removeSubnetVal,
-	}))
-
-	// Check that a current subnet validator is added
-	_, err = onAcceptState.GetCurrentValidator(utx.Subnet, utx.NodeID)
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestDurangoStandardTxExecutorTransformSubnetTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// Build the TransformSubnetTx
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.TxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
-	require.NoError(err)
-	signers = append(signers, subnetSigners)
-
-	// Create the tx
-	utx := &txs.TransformSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		Subnet:                   testSubnet1.TxID,
-		AssetID:                  ids.GenerateTestID(),
-		InitialSupply:            10,
-		MaximumSupply:            10,
-		MinConsumptionRate:       0,
-		MaxConsumptionRate:       reward.PercentDenominator,
-		MinValidatorStake:        2,
-		MaxValidatorStake:        10,
-		MinStakeDuration:         1,
-		MaxStakeDuration:         2,
-		MinDelegationFee:         reward.PercentDenominator,
-		MinDelegatorStake:        1,
-		MaxValidatorWeightFactor: 1,
-		UptimeRequirement:        reward.PercentDenominator,
-		SubnetAuth:               subnetAuth,
-	}
-	transformSubnetTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	err = transformSubnetTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      transformSubnetTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-	// empty memo won't err
-	utx.Memo = []byte{}
-	transformSubnetTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(transformSubnetTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      transformSubnetTx,
-	}))
-}
-
-func TestDurangoStandardTxExecutorTransferSubnetOwnershipTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// Build the TransformSubnetTx
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.TxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
-	require.NoError(err)
-	signers = append(signers, subnetSigners)
-
-	// Create the tx
-	utx := &txs.TransferSubnetOwnershipTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		Subnet:     testSubnet1.TxID,
-		SubnetAuth: subnetAuth,
-		Owner: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.ShortEmpty},
+				tx := &txs.CreateChainTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					SubnetID:    testSubnet1.TxID,
+					ChainName:   "aaa",
+					VMID:        ids.GenerateTestID(),
+					FxIDs:       []ids.ID{},
+					GenesisData: []byte{},
+					SubnetAuth:  subnetAuth,
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
 		},
-	}
-	transferSubnetTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+		{
+			name: "CreateSubnetTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				chainTime := env.state.GetTimestamp()
+				createSubnetTxFee := env.config.GetCreateSubnetTxFee(chainTime)
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					createSubnetTxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	err = transferSubnetTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      transferSubnetTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
 
-	// empty memo won't err
-	utx.Memo = []byte{}
-	transferSubnetTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(transferSubnetTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      transferSubnetTx,
-	}))
-}
-
-func TestDurangoStandardTxExecutorCreateChainTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	chainTime := env.state.GetTimestamp()
-	createBlockchainTxFee := env.config.GetCreateBlockchainTxFee(chainTime)
-
-	// Build the CreateChainTx
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		createBlockchainTxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
-	require.NoError(err)
-	signers = append(signers, subnetSigners)
-
-	utx := &txs.CreateChainTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'}, // non-empty memo must err
-		}},
-		SubnetID:    testSubnet1.TxID,
-		ChainName:   "aaa",
-		VMID:        ids.GenerateTestID(),
-		FxIDs:       []ids.ID{},
-		GenesisData: []byte{},
-		SubnetAuth:  subnetAuth,
-	}
-	createChainTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	err = createChainTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      createChainTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-	// empty memo won't err
-	utx.Memo = []byte{}
-	createChainTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(createChainTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      createChainTx,
-	}))
-}
-
-func TestDurangoStandardTxExecutorCreateSubnetTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	chainTime := env.state.GetTimestamp()
-	createSubnetTxFee := env.config.GetCreateSubnetTxFee(chainTime)
-
-	// Build the CreateSubnetTx
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		createSubnetTxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	utx := &txs.CreateSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'}, // non-empty memo must err
-		}},
-		Owner: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.ShortEmpty},
+				tx := &txs.CreateSubnetTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
 		},
-	}
+		{
+			name: "ImportTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				// Skip shared memory checks
+				env.backend.Bootstrapped.Set(false)
 
-	createSubnetTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+				utxoID := avax.UTXOID{
+					TxID:        ids.Empty.Prefix(1),
+					OutputIndex: 1,
+				}
+				amount := uint64(50000)
+				recipientKey := preFundedKeys[1]
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
+				utxo := &avax.UTXO{
+					UTXOID: utxoID,
+					Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: amount,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+						},
+					},
+				}
 
-	err = createSubnetTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      createSubnetTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
+				signers := [][]*secp256k1.PrivateKey{{recipientKey}}
 
-	// empty memo won't err
-	utx.Memo = []byte{}
-	createSubnetTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
 
-	require.NoError(createSubnetTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      createSubnetTx,
-	}))
-}
-
-func TestDurangoStandardTxExecutorBaseTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// Build the BaseTx
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		defaultMinValidatorStake,
-		env.config.TxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	utx := &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'}, // non-empty memo must err
+				tx := &txs.ImportTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+					}},
+					SourceChain: env.ctx.XChainID,
+					ImportedInputs: []*avax.TransferableInput{
+						{
+							UTXOID: utxo.UTXOID,
+							Asset:  utxo.Asset,
+							In: &secp256k1fx.TransferInput{
+								Amt: env.config.TxFee,
+							},
+						},
+					},
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
 		},
-	}
+		{
+			name: "ExportTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				amount := units.Avax
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					amount,
+					env.config.TxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	baseTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
+				tx := &txs.ExportTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					DestinationChain: env.ctx.XChainID,
+					ExportedOutputs: []*avax.TransferableOutput{{
+						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: amount,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+							},
+						},
+					}},
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
+		},
+		{
+			name: "RemoveSubnetValidatorTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
 
-	err = baseTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      baseTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
+				endTime := primaryValidator.EndTime
+				subnetValTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+					defaultWeight,
+					0,
+					uint64(endTime.Unix()),
+					primaryValidator.NodeID,
+					testSubnet1.ID(),
+					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	// empty memo won't err
-	utx.Memo = []byte{}
-	baseTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
 
-	require.NoError(baseTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      baseTx,
-	}))
-}
+				require.NoError(t, subnetValTx.Unsigned.Visit(&StandardTxExecutor{
+					Backend: &env.backend,
+					State:   onAcceptState,
+					Tx:      subnetValTx,
+				}))
 
-func TestDurangoStandardTxExecutorImportTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.TxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	env.backend.Bootstrapped.Set(false) // skip shared memory checks
+				subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
+				require.NoError(t, err)
+				signers = append(signers, subnetSigners)
 
-	// Provide the avm UTXO
-	utxoID := avax.UTXOID{
-		TxID:        ids.Empty.Prefix(1),
-		OutputIndex: 1,
-	}
-	amount := uint64(50000)
-	recipientKey := preFundedKeys[1]
+				tx := &txs.RemoveSubnetValidatorTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Subnet:     testSubnet1.ID(),
+					NodeID:     primaryValidator.NodeID,
+					SubnetAuth: subnetAuth,
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
+		},
+		{
+			name: "TransformSubnetTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.TxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
 
-	utxo := &avax.UTXO{
-		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: amount,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+				subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
+				require.NoError(t, err)
+				signers = append(signers, subnetSigners)
+
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
+
+				tx := &txs.TransformSubnetTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Subnet:                   testSubnet1.TxID,
+					AssetID:                  ids.GenerateTestID(),
+					InitialSupply:            10,
+					MaximumSupply:            10,
+					MinConsumptionRate:       0,
+					MaxConsumptionRate:       reward.PercentDenominator,
+					MinValidatorStake:        2,
+					MaxValidatorStake:        10,
+					MinStakeDuration:         1,
+					MaxStakeDuration:         2,
+					MinDelegationFee:         reward.PercentDenominator,
+					MinDelegatorStake:        1,
+					MaxValidatorWeightFactor: 1,
+					UptimeRequirement:        reward.PercentDenominator,
+					SubnetAuth:               subnetAuth,
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
+		},
+		{
+			name: "AddPermissionlessValidatorTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.AddPrimaryNetworkValidatorFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
+
+				sk, err := bls.NewSecretKey()
+				require.NoError(t, err)
+
+				var (
+					nodeID    = ids.GenerateTestNodeID()
+					chainTime = env.state.GetTimestamp()
+					endTime   = chainTime.Add(defaultMaxStakingDuration)
+				)
+
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
+
+				tx := &txs.AddPermissionlessValidatorTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						End:    uint64(endTime.Unix()),
+						Wght:   env.config.MinValidatorStake,
+					},
+					Subnet:    constants.PrimaryNetworkID,
+					Signer:    signer.NewProofOfPossession(sk),
+					StakeOuts: stakedOuts,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							ids.ShortEmpty,
+						},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							ids.ShortEmpty,
+						},
+					},
+					DelegationShares: reward.PercentDenominator,
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
+		},
+		{
+			name: "AddPermissionlessDelegatorTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
+
+				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.AddPrimaryNetworkDelegatorFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
+
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
+
+				tx := &txs.AddPermissionlessDelegatorTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Validator: txs.Validator{
+						NodeID: primaryValidator.NodeID,
+						End:    uint64(primaryValidator.EndTime.Unix()),
+						Wght:   defaultMinValidatorStake,
+					},
+					StakeOuts: stakedOuts,
+					DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
+		},
+		{
+			name: "TransferSubnetOwnershipTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.TxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
+
+				subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
+				require.NoError(t, err)
+				signers = append(signers, subnetSigners)
+
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
+
+				tx := &txs.TransferSubnetOwnershipTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Subnet:     testSubnet1.TxID,
+					SubnetAuth: subnetAuth,
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+				}
+				return tx, signers, onAcceptState, &tx.Memo
+			},
+		},
+		{
+			name: "BaseTx",
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.TxFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
+
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+				require.NoError(t, err)
+
+				tx := &txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					},
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 	}
 
-	utx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Memo:         []byte{'a', 'b', 'c'},
-		}},
-		SourceChain: env.ctx.XChainID,
-		ImportedInputs: []*avax.TransferableInput{
-			{
-				UTXOID: utxo.UTXOID,
-				Asset:  utxo.Asset,
-				In: &secp256k1fx.TransferInput{
-					Amt: env.config.TxFee,
-				},
-			},
-		},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
+
+			utx, signers, onAcceptState, memo := tt.setupTest(env)
+
+			// Populated memo field should error
+			*memo = []byte{'m', 'e', 'm', 'o'}
+			tx, err := txs.NewSigned(utx, txs.Codec, signers)
+			require.NoError(err)
+
+			err = tx.Unsigned.Visit(&StandardTxExecutor{
+				Backend: &env.backend,
+				State:   onAcceptState,
+				Tx:      tx,
+			})
+			require.ErrorIs(err, avax.ErrMemoTooLarge)
+
+			// Empty memo field should not error
+			*memo = []byte{}
+			tx, err = txs.NewSigned(utx, txs.Codec, signers)
+			require.NoError(err)
+
+			require.NoError(tx.Unsigned.Visit(&StandardTxExecutor{
+				Backend: &env.backend,
+				State:   onAcceptState,
+				Tx:      tx,
+			}))
+		})
 	}
-	exportTx, err := txs.NewSigned(utx, txs.Codec, [][]*secp256k1.PrivateKey{{recipientKey}})
-	require.NoError(err)
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	err = exportTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      exportTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-	// empty memo won't err
-	utx.Memo = []byte{}
-	exportTx, err = txs.NewSigned(utx, txs.Codec, [][]*secp256k1.PrivateKey{{recipientKey}})
-	require.NoError(err)
-
-	require.NoError(exportTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      exportTx,
-	}))
-}
-
-func TestDurangoStandardTxExecutorExportTx(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
-
-	// Build the ExportTx
-	amount := units.Avax
-	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		amount,
-		env.config.TxFee,
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-
-	utx := &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         []byte{'a', 'b', 'c'}, // non-empty memo must err
-		}},
-		DestinationChain: env.ctx.XChainID,
-		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
-			Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amount,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				},
-			},
-		}},
-	}
-	exportTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	err = exportTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      exportTx,
-	})
-	require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-	// empty memo won't err
-	utx.Memo = []byte{}
-	exportTx, err = txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-
-	require.NoError(exportTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      exportTx,
-	}))
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
