@@ -83,7 +83,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", tt.minTargetElements, tt.targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
 			require.NoError(err)
 
-			var resetCount uint64 = 1
+			var resetCount uint64
 			for _, item := range tt.add {
 				bloomBytes, saltBytes := bloom.Marshal()
 				initialBloomBytes := slices.Clone(bloomBytes)
@@ -101,7 +101,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			}
 
 			require.Equal(tt.resetCount, resetCount)
-			require.Equal(float64(tt.resetCount), testutil.ToFloat64(bloom.metrics.ResetCount))
+			require.Equal(float64(tt.resetCount+1), testutil.ToFloat64(bloom.metrics.ResetCount))
 			for _, expected := range tt.expected {
 				require.True(bloom.Has(expected))
 			}
