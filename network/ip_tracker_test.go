@@ -48,8 +48,8 @@ func requireMetricsConsistent(t *testing.T, tracker *ipTracker) {
 	require := require.New(t)
 	require.Equal(float64(len(tracker.mostRecentValidatorIPs)), testutil.ToFloat64(tracker.numValidatorIPs))
 	require.Equal(float64(len(tracker.gossipableIPs)), testutil.ToFloat64(tracker.numGossipable))
-	require.Equal(float64(tracker.bloom.Count()), testutil.ToFloat64(tracker.bloomCount))
-	require.Equal(float64(tracker.maxBloomCount), testutil.ToFloat64(tracker.bloomMaxCount))
+	require.Equal(float64(tracker.bloom.Count()), testutil.ToFloat64(tracker.bloomMetrics.Count))
+	require.Equal(float64(tracker.maxBloomCount), testutil.ToFloat64(tracker.bloomMetrics.MaxCount))
 }
 
 func TestIPTracker_ManuallyTrack(t *testing.T) {
