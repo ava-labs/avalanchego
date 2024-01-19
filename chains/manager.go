@@ -99,6 +99,12 @@ var (
 	errNoPrimaryNetworkConfig  = errors.New("no subnet config for primary network found")
 	errPartialSyncAsAValidator = errors.New("partial sync should not be configured for a validator")
 
+	fxs = map[ids.ID]fx.Factory{
+		secp256k1fx.ID: &secp256k1fx.Factory{},
+		nftfx.ID:       &nftfx.Factory{},
+		propertyfx.ID:  &propertyfx.Factory{},
+	}
+
 	_ Manager = (*manager)(nil)
 )
 
@@ -262,7 +268,6 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]handler.Handler
-	fxs    map[ids.ID]fx.Factory
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
@@ -271,17 +276,12 @@ type manager struct {
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
 	return &manager{
-		Aliaser:       ids.NewAliaser(),
-		ManagerConfig: *config,
-		stakingSigner: config.StakingTLSCert.PrivateKey.(crypto.Signer),
-		stakingCert:   staking.CertificateFromX509(config.StakingTLSCert.Leaf),
-		subnets:       make(map[ids.ID]subnets.Subnet),
-		chains:        make(map[ids.ID]handler.Handler),
-		fxs: map[ids.ID]fx.Factory{
-			secp256k1fx.ID: &secp256k1fx.Factory{},
-			nftfx.ID:       &nftfx.Factory{},
-			propertyfx.ID:  &propertyfx.Factory{},
-		},
+		Aliaser:                ids.NewAliaser(),
+		ManagerConfig:          *config,
+		stakingSigner:          config.StakingTLSCert.PrivateKey.(crypto.Signer),
+		stakingCert:            staking.CertificateFromX509(config.StakingTLSCert.Leaf),
+		subnets:                make(map[ids.ID]subnets.Subnet),
+		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
@@ -520,14 +520,14 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 	// TODO: Shutdown VM if an error occurs
 
-	fxs := make([]*common.Fx, len(chainParams.FxIDs))
+	chainFxs := make([]*common.Fx, len(chainParams.FxIDs))
 	for i, fxID := range chainParams.FxIDs {
-		fxFactory, ok := m.fxs[fxID]
+		fxFactory, ok := fxs[fxID]
 		if !ok {
 			return nil, fmt.Errorf("fx %s not found", fxID)
 		}
 
-		fxs[i] = &common.Fx{
+		chainFxs[i] = &common.Fx{
 			ID: fxID,
 			Fx: fxFactory.New(),
 		}
@@ -541,7 +541,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			chainParams.GenesisData,
 			m.Validators,
 			vm,
-			fxs,
+			chainFxs,
 			sb,
 		)
 		if err != nil {
@@ -559,7 +559,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			m.Validators,
 			beacons,
 			vm,
-			fxs,
+			chainFxs,
 			sb,
 		)
 		if err != nil {
