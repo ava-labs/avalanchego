@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -42,7 +43,8 @@ func newIPTracker(
 	namespace string,
 	registerer prometheus.Registerer,
 ) (*ipTracker, error) {
-	bloomMetrics, err := bloom.NewMetrics(namespace+"_ip_bloom", registerer)
+	bloomNamespace := metric.AppendNamespace(namespace, "ip_bloom")
+	bloomMetrics, err := bloom.NewMetrics(bloomNamespace, registerer)
 	if err != nil {
 		return nil, err
 	}
