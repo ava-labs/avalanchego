@@ -8,6 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/fx"
 )
 
+const Name = "secp256k1fx"
+
 var (
 	_ fx.Factory = (*Factory)(nil)
 
