@@ -60,7 +60,7 @@ func TestAppRequestOnShutdown(t *testing.T) {
 		defer wg.Done()
 		requestBytes := []byte("message")
 		_, responseBytes, err := net.RequestAny(context.Background(), testPeerVersion, requestBytes)
-		require.Error(err, errRequestFailed)
+		require.ErrorIs(err, errRequestFailed)
 		require.Nil(responseBytes)
 	}()
 	wg.Wait()
