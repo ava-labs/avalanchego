@@ -60,8 +60,6 @@ var (
 	fujiXChainID    ids.ID
 
 	dbPrefix = []byte("proposervm")
-
-	errHeightIndexInvalidWhilePruning = errors.New("height index invalid while pruning old blocks")
 )
 
 func init() {

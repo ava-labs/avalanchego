@@ -20,7 +20,6 @@ var (
 	metadataPrefix = []byte("metadata")
 
 	forkKey       = []byte("fork")
-	checkpointKey = []byte("checkpoint")
 )
 
 type HeightIndexGetter interface {
