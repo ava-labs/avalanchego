@@ -9,32 +9,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
-
-type bloomFilterMetrics struct {
-	resetCount prometheus.Counter
-}
-
-// newBloomFilterMetrics returns a common set of metrics
-func newBloomFilterMetrics(
-	registerer prometheus.Registerer,
-	namespace string,
-) (bloomFilterMetrics, error) {
-	m := bloomFilterMetrics{
-		resetCount: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "reset_count",
-			Help:      "reset count of bloom filter (n)",
-		}),
-	}
-	err := utils.Err(
-		registerer.Register(m.resetCount),
-	)
-	return m, err
-}
 
 // NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
 // anticipated at any moment, and a false positive probability of [targetFalsePositiveProbability]. If the
@@ -49,32 +26,24 @@ func NewBloomFilter(
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
 ) (*BloomFilter, error) {
-	numHashes, numEntries := bloom.OptimalParameters(
-		minTargetElements,
-		targetFalsePositiveProbability,
-	)
-	b, err := bloom.New(numHashes, numEntries)
+	metrics, err := bloom.NewMetrics(namespace, registerer)
 	if err != nil {
 		return nil, err
 	}
-
-	metrics, err := newBloomFilterMetrics(registerer, namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	salt, err := randomSalt()
-	return &BloomFilter{
+	filter := &BloomFilter{
 		minTargetElements:              minTargetElements,
 		targetFalsePositiveProbability: targetFalsePositiveProbability,
 		resetFalsePositiveProbability:  resetFalsePositiveProbability,
 
 		metrics: metrics,
-
-		maxCount: bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability),
-		bloom:    b,
-		salt:     salt,
-	}, err
+	}
+	err = resetBloomFilter(
+		filter,
+		minTargetElements,
+		targetFalsePositiveProbability,
+		resetFalsePositiveProbability,
+	)
+	return filter, err
 }
 
 type BloomFilter struct {
@@ -82,7 +51,7 @@ type BloomFilter struct {
 	targetFalsePositiveProbability float64
 	resetFalsePositiveProbability  float64
 
-	metrics bloomFilterMetrics
+	metrics *bloom.Metrics
 
 	maxCount int
 	bloom    *bloom.Filter
@@ -95,6 +64,7 @@ type BloomFilter struct {
 func (b *BloomFilter) Add(gossipable Gossipable) {
 	h := gossipable.GossipID()
 	bloom.Add(b.bloom, h[:], b.salt[:])
+	b.metrics.Count.Inc()
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
@@ -124,28 +94,39 @@ func ResetBloomFilterIfNeeded(
 		return false, nil
 	}
 
-	numHashes, numEntries := bloom.OptimalParameters(
-		math.Max(bloomFilter.minTargetElements, targetElements),
+	targetElements = math.Max(bloomFilter.minTargetElements, targetElements)
+	err := resetBloomFilter(
+		bloomFilter,
+		targetElements,
 		bloomFilter.targetFalsePositiveProbability,
+		bloomFilter.resetFalsePositiveProbability,
+	)
+	return err == nil, err
+}
+
+func resetBloomFilter(
+	bloomFilter *BloomFilter,
+	targetElements int,
+	targetFalsePositiveProbability,
+	resetFalsePositiveProbability float64,
+) error {
+	numHashes, numEntries := bloom.OptimalParameters(
+		targetElements,
+		targetFalsePositiveProbability,
 	)
 	newBloom, err := bloom.New(numHashes, numEntries)
 	if err != nil {
-		return false, err
+		return err
 	}
-	salt, err := randomSalt()
-	if err != nil {
-		return false, err
+	var newSalt ids.ID
+	if _, err := rand.Read(newSalt[:]); err != nil {
+		return err
 	}
-	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, bloomFilter.resetFalsePositiveProbability)
+
+	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability)
 	bloomFilter.bloom = newBloom
-	bloomFilter.salt = salt
+	bloomFilter.salt = newSalt
 
-	bloomFilter.metrics.resetCount.Inc()
-	return true, nil
-}
-
-func randomSalt() (ids.ID, error) {
-	salt := ids.ID{}
-	_, err := rand.Read(salt[:])
-	return salt, err
+	bloomFilter.metrics.Reset(newBloom, bloomFilter.maxCount)
+	return nil
 }
