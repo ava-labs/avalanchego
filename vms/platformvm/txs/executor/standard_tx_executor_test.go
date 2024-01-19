@@ -1865,6 +1865,79 @@ func TestDurangoStandardTxExecutorBaseTx(t *testing.T) {
 	}))
 }
 
+func TestDurangoStandardTxExecutorImportTx(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+		env.ctx.Lock.Unlock()
+	}()
+
+	env.backend.Bootstrapped.Set(false) // skip shared memory checks
+
+	// Provide the avm UTXO
+	utxoID := avax.UTXOID{
+		TxID:        ids.Empty.Prefix(1),
+		OutputIndex: 1,
+	}
+	amount := uint64(50000)
+	recipientKey := preFundedKeys[1]
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+			},
+		},
+	}
+
+	utx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Memo:         []byte{'a', 'b', 'c'},
+		}},
+		SourceChain: env.ctx.XChainID,
+		ImportedInputs: []*avax.TransferableInput{
+			{
+				UTXOID: utxo.UTXOID,
+				Asset:  utxo.Asset,
+				In: &secp256k1fx.TransferInput{
+					Amt: env.config.TxFee,
+				},
+			},
+		},
+	}
+	exportTx, err := txs.NewSigned(utx, txs.Codec, [][]*secp256k1.PrivateKey{{recipientKey}})
+	require.NoError(err)
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	err = exportTx.Unsigned.Visit(&StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      exportTx,
+	})
+	require.ErrorIs(err, avax.ErrMemoTooLarge)
+
+	// empty memo won't err
+	utx.Memo = []byte{}
+	exportTx, err = txs.NewSigned(utx, txs.Codec, [][]*secp256k1.PrivateKey{{recipientKey}})
+	require.NoError(err)
+
+	require.NoError(exportTx.Unsigned.Visit(&StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      exportTx,
+	}))
+}
+
 func TestDurangoStandardTxExecutorExportTx(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
