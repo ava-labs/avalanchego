@@ -68,7 +68,7 @@ func (t *BaseTx) Verify(ctx *snow.Context) error {
 
 func VerifyMemoFieldLength(memo types.JSONByteSlice, isDurangoActive bool) error {
 	if !isDurangoActive {
-		return nil // field already validated during in SyntacticVerify
+		return nil //  already validated in SyntacticVerify
 	}
 
 	if len(memo) != 0 {
