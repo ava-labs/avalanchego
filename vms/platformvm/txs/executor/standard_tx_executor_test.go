@@ -953,48 +953,17 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	}
 }
 
-func setMemo(tx txs.UnsignedTx, memo types.JSONByteSlice) {
-	switch castTx := tx.(type) {
-	case *txs.AddValidatorTx:
-		castTx.Memo = memo
-	case *txs.AddSubnetValidatorTx:
-		castTx.Memo = memo
-	case *txs.AddDelegatorTx:
-		castTx.Memo = memo
-	case *txs.CreateChainTx:
-		castTx.Memo = memo
-	case *txs.CreateSubnetTx:
-		castTx.Memo = memo
-	case *txs.ImportTx:
-		castTx.Memo = memo
-	case *txs.ExportTx:
-		castTx.Memo = memo
-	case *txs.RemoveSubnetValidatorTx:
-		castTx.Memo = memo
-	case *txs.TransformSubnetTx:
-		castTx.Memo = memo
-	case *txs.AddPermissionlessValidatorTx:
-		castTx.Memo = memo
-	case *txs.AddPermissionlessDelegatorTx:
-		castTx.Memo = memo
-	case *txs.TransferSubnetOwnershipTx:
-		castTx.Memo = memo
-	case *txs.BaseTx:
-		castTx.Memo = memo
-	}
-}
-
 // Verifies that the Memo field is required to be empty post-Durango
-func TestDurangoStandardTxExecutor(t *testing.T) {
+func TestDurangoMemoField(t *testing.T) {
 	type test struct {
 		name      string
-		setupTest func(*environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff)
+		setupTest func(*environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice)
 	}
 
 	tests := []test{
 		{
 			name: "AddValidatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
 					env.state,
 					preFundedKeys,
@@ -1013,7 +982,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.AddValidatorTx{
+				tx := &txs.AddValidatorTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1033,12 +1002,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 					DelegationShares: reward.PercentDenominator,
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "AddSubnetValidatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(t, err)
@@ -1068,13 +1038,12 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.AddSubnetValidatorTx{
+				tx := &txs.AddSubnetValidatorTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
 						Ins:          ins,
 						Outs:         unstakedOuts,
-						Memo:         []byte{'a', 'b', 'c'},
 					}},
 					SubnetValidator: txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -1085,12 +1054,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 						Subnet: testSubnet1.TxID,
 					},
 					SubnetAuth: subnetAuth,
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "AddDelegatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(t, err)
@@ -1116,13 +1086,12 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.AddDelegatorTx{
+				tx := &txs.AddDelegatorTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
 						Ins:          ins,
 						Outs:         unstakedOuts,
-						Memo:         []byte{'a', 'b', 'c'},
 					}},
 					Validator: txs.Validator{
 						NodeID: primaryValidator.NodeID,
@@ -1135,12 +1104,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "CreateChainTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				chainTime := env.state.GetTimestamp()
 				createBlockchainTxFee := env.config.GetCreateBlockchainTxFee(chainTime)
 
@@ -1160,13 +1130,12 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.CreateChainTx{
+				tx := &txs.CreateChainTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
 						Ins:          ins,
 						Outs:         unstakedOuts,
-						Memo:         []byte{'a', 'b', 'c'},
 					}},
 					SubnetID:    testSubnet1.TxID,
 					ChainName:   "aaa",
@@ -1174,12 +1143,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 					FxIDs:       []ids.ID{},
 					GenesisData: []byte{},
 					SubnetAuth:  subnetAuth,
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "CreateSubnetTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				chainTime := env.state.GetTimestamp()
 				createSubnetTxFee := env.config.GetCreateSubnetTxFee(chainTime)
 
@@ -1195,7 +1165,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.CreateSubnetTx{
+				tx := &txs.CreateSubnetTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1206,12 +1176,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "ImportTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				// Skip shared memory checks
 				env.backend.Bootstrapped.Set(false)
 
@@ -1239,7 +1210,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.ImportTx{
+				tx := &txs.ImportTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1254,12 +1225,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 							},
 						},
 					},
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "ExportTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				amount := units.Avax
 				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 					env.state,
@@ -1273,7 +1245,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.ExportTx{
+				tx := &txs.ExportTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1292,12 +1264,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 							},
 						},
 					}},
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "RemoveSubnetValidatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(t, err)
@@ -1345,7 +1318,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				require.NoError(t, err)
 				signers = append(signers, subnetSigners)
 
-				return &txs.RemoveSubnetValidatorTx{
+				tx := &txs.RemoveSubnetValidatorTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1355,12 +1328,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 					Subnet:     testSubnet1.ID(),
 					NodeID:     primaryValidator.NodeID,
 					SubnetAuth: subnetAuth,
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "TransformSubnetTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 					env.state,
 					preFundedKeys,
@@ -1377,7 +1351,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.TransformSubnetTx{
+				tx := &txs.TransformSubnetTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1399,12 +1373,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 					MaxValidatorWeightFactor: 1,
 					UptimeRequirement:        reward.PercentDenominator,
 					SubnetAuth:               subnetAuth,
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "AddPermissionlessValidatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
 					env.state,
 					preFundedKeys,
@@ -1426,13 +1401,12 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.AddPermissionlessValidatorTx{
+				tx := &txs.AddPermissionlessValidatorTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
 						Ins:          ins,
 						Outs:         unstakedOuts,
-						Memo:         []byte{'a', 'b', 'c'},
 					}},
 					Validator: txs.Validator{
 						NodeID: nodeID,
@@ -1457,12 +1431,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 						},
 					},
 					DelegationShares: reward.PercentDenominator,
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "AddPermissionlessDelegatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(t, err)
@@ -1488,7 +1463,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.AddPermissionlessDelegatorTx{
+				tx := &txs.AddPermissionlessDelegatorTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1506,12 +1481,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "TransferSubnetOwnershipTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 					env.state,
 					preFundedKeys,
@@ -1528,13 +1504,12 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.TransferSubnetOwnershipTx{
+				tx := &txs.TransferSubnetOwnershipTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
 						Ins:          ins,
 						Outs:         unstakedOuts,
-						Memo:         []byte{'a', 'b', 'c'},
 					}},
 					Subnet:     testSubnet1.TxID,
 					SubnetAuth: subnetAuth,
@@ -1542,12 +1517,13 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 		{
 			name: "BaseTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff) {
+			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
 				ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 					env.state,
 					preFundedKeys,
@@ -1560,14 +1536,15 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(t, err)
 
-				return &txs.BaseTx{
+				tx := &txs.BaseTx{
 					BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
 						Ins:          ins,
 						Outs:         unstakedOuts,
 					},
-				}, signers, onAcceptState
+				}
+				return tx, signers, onAcceptState, &tx.Memo
 			},
 		},
 	}
@@ -1580,10 +1557,10 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			utx, signers, onAcceptState := tt.setupTest(env)
+			utx, signers, onAcceptState, memo := tt.setupTest(env)
 
 			// Populated memo field should error
-			setMemo(utx, []byte{'m', 'e', 'm', 'o'})
+			*memo = []byte{'m', 'e', 'm', 'o'}
 			tx, err := txs.NewSigned(utx, txs.Codec, signers)
 			require.NoError(err)
 
@@ -1595,7 +1572,7 @@ func TestDurangoStandardTxExecutor(t *testing.T) {
 			require.ErrorIs(err, avax.ErrMemoTooLarge)
 
 			// Empty memo field should not error
-			setMemo(utx, []byte{})
+			*memo = []byte{}
 			tx, err = txs.NewSigned(utx, txs.Codec, signers)
 			require.NoError(err)
 
