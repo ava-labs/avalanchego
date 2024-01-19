@@ -101,10 +101,7 @@ func ResetBloomFilterIfNeeded(
 		bloomFilter.targetFalsePositiveProbability,
 		bloomFilter.resetFalsePositiveProbability,
 	)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return err == nil, err
 }
 
 func resetBloomFilter(
