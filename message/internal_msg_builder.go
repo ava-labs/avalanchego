@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 //nolint:stylecheck // proto generates interfaces that fail linting
 package message
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,54 +16,74 @@ import (
 
 var (
 	disconnected  = &Disconnected{}
-	timeout       = &Timeout{}
 	gossipRequest = &GossipRequest{}
+	timeout       = &Timeout{}
 
+	_ fmt.Stringer    = (*GetStateSummaryFrontierFailed)(nil)
 	_ chainIDGetter   = (*GetStateSummaryFrontierFailed)(nil)
 	_ requestIDGetter = (*GetStateSummaryFrontierFailed)(nil)
 
+	_ fmt.Stringer    = (*GetAcceptedStateSummaryFailed)(nil)
 	_ chainIDGetter   = (*GetAcceptedStateSummaryFailed)(nil)
 	_ requestIDGetter = (*GetAcceptedStateSummaryFailed)(nil)
 
+	_ fmt.Stringer     = (*GetAcceptedFrontierFailed)(nil)
 	_ chainIDGetter    = (*GetAcceptedFrontierFailed)(nil)
 	_ requestIDGetter  = (*GetAcceptedFrontierFailed)(nil)
 	_ engineTypeGetter = (*GetAcceptedFrontierFailed)(nil)
 
+	_ fmt.Stringer     = (*GetAcceptedFailed)(nil)
 	_ chainIDGetter    = (*GetAcceptedFailed)(nil)
 	_ requestIDGetter  = (*GetAcceptedFailed)(nil)
 	_ engineTypeGetter = (*GetAcceptedFailed)(nil)
 
+	_ fmt.Stringer     = (*GetAncestorsFailed)(nil)
 	_ chainIDGetter    = (*GetAncestorsFailed)(nil)
 	_ requestIDGetter  = (*GetAncestorsFailed)(nil)
 	_ engineTypeGetter = (*GetAncestorsFailed)(nil)
 
+	_ fmt.Stringer     = (*GetFailed)(nil)
 	_ chainIDGetter    = (*GetFailed)(nil)
 	_ requestIDGetter  = (*GetFailed)(nil)
 	_ engineTypeGetter = (*GetFailed)(nil)
 
+	_ fmt.Stringer     = (*QueryFailed)(nil)
 	_ chainIDGetter    = (*QueryFailed)(nil)
 	_ requestIDGetter  = (*QueryFailed)(nil)
 	_ engineTypeGetter = (*QueryFailed)(nil)
 
-	_ chainIDGetter   = (*AppRequestFailed)(nil)
-	_ requestIDGetter = (*AppRequestFailed)(nil)
-
+	_ fmt.Stringer        = (*CrossChainAppRequest)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppRequest)(nil)
 	_ chainIDGetter       = (*CrossChainAppRequest)(nil)
 	_ requestIDGetter     = (*CrossChainAppRequest)(nil)
 
+	_ fmt.Stringer        = (*CrossChainAppRequestFailed)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppRequestFailed)(nil)
 	_ chainIDGetter       = (*CrossChainAppRequestFailed)(nil)
 	_ requestIDGetter     = (*CrossChainAppRequestFailed)(nil)
 
+	_ fmt.Stringer        = (*CrossChainAppResponse)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppResponse)(nil)
 	_ chainIDGetter       = (*CrossChainAppResponse)(nil)
 	_ requestIDGetter     = (*CrossChainAppResponse)(nil)
+
+	_ fmt.Stringer = (*Disconnected)(nil)
+
+	_ fmt.Stringer = (*GossipRequest)(nil)
+
+	_ fmt.Stringer = (*Timeout)(nil)
 )
 
 type GetStateSummaryFrontierFailed struct {
 	ChainID   ids.ID `json:"chain_id,omitempty"`
 	RequestID uint32 `json:"request_id,omitempty"`
+}
+
+func (m *GetStateSummaryFrontierFailed) String() string {
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
+	)
 }
 
 func (m *GetStateSummaryFrontierFailed) GetChainId() []byte {
@@ -94,6 +115,13 @@ type GetAcceptedStateSummaryFailed struct {
 	RequestID uint32 `json:"request_id,omitempty"`
 }
 
+func (m *GetAcceptedStateSummaryFailed) String() string {
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
+	)
+}
+
 func (m *GetAcceptedStateSummaryFailed) GetChainId() []byte {
 	return m.ChainID[:]
 }
@@ -122,6 +150,13 @@ type GetAcceptedFrontierFailed struct {
 	ChainID    ids.ID         `json:"chain_id,omitempty"`
 	RequestID  uint32         `json:"request_id,omitempty"`
 	EngineType p2p.EngineType `json:"engine_type,omitempty"`
+}
+
+func (m *GetAcceptedFrontierFailed) String() string {
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
 }
 
 func (m *GetAcceptedFrontierFailed) GetChainId() []byte {
@@ -160,6 +195,13 @@ type GetAcceptedFailed struct {
 	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
+func (m *GetAcceptedFailed) String() string {
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
+}
+
 func (m *GetAcceptedFailed) GetChainId() []byte {
 	return m.ChainID[:]
 }
@@ -194,6 +236,13 @@ type GetAncestorsFailed struct {
 	ChainID    ids.ID         `json:"chain_id,omitempty"`
 	RequestID  uint32         `json:"request_id,omitempty"`
 	EngineType p2p.EngineType `json:"engine_type,omitempty"`
+}
+
+func (m *GetAncestorsFailed) String() string {
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
 }
 
 func (m *GetAncestorsFailed) GetChainId() []byte {
@@ -232,6 +281,13 @@ type GetFailed struct {
 	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
+func (m *GetFailed) String() string {
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
+}
+
 func (m *GetFailed) GetChainId() []byte {
 	return m.ChainID[:]
 }
@@ -268,6 +324,13 @@ type QueryFailed struct {
 	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
+func (m *QueryFailed) String() string {
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
+}
+
 func (m *QueryFailed) GetChainId() []byte {
 	return m.ChainID[:]
 }
@@ -298,40 +361,18 @@ func InternalQueryFailed(
 	}
 }
 
-type AppRequestFailed struct {
-	ChainID   ids.ID `json:"chain_id,omitempty"`
-	RequestID uint32 `json:"request_id,omitempty"`
-}
-
-func (m *AppRequestFailed) GetChainId() []byte {
-	return m.ChainID[:]
-}
-
-func (m *AppRequestFailed) GetRequestId() uint32 {
-	return m.RequestID
-}
-
-func InternalAppRequestFailed(
-	nodeID ids.NodeID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AppRequestFailedOp,
-		message: &AppRequestFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
-
 type CrossChainAppRequest struct {
 	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
 	RequestID          uint32 `json:"request_id,omitempty"`
 	Message            []byte `json:"message,omitempty"`
+}
+
+func (m *CrossChainAppRequest) String() string {
+	return fmt.Sprintf(
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: 0x%x",
+		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message,
+	)
 }
 
 func (m *CrossChainAppRequest) GetSourceChainID() ids.ID {
@@ -371,6 +412,15 @@ type CrossChainAppRequestFailed struct {
 	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
 	RequestID          uint32 `json:"request_id,omitempty"`
+	ErrorCode          int32  `json:"error_code,omitempty"`
+	ErrorMessage       string `json:"error_message,omitempty"`
+}
+
+func (m *CrossChainAppRequestFailed) String() string {
+	return fmt.Sprintf(
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d",
+		m.SourceChainID, m.DestinationChainID, m.RequestID,
+	)
 }
 
 func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID {
@@ -385,19 +435,23 @@ func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func InternalCrossChainAppRequestFailed(
+func InternalCrossChainAppError(
 	nodeID ids.NodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
+	errorCode int32,
+	errorMessage string,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
-		op:     CrossChainAppRequestFailedOp,
+		op:     CrossChainAppErrorOp,
 		message: &CrossChainAppRequestFailed{
 			SourceChainID:      sourceChainID,
 			DestinationChainID: destinationChainID,
 			RequestID:          requestID,
+			ErrorCode:          errorCode,
+			ErrorMessage:       errorMessage,
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -408,6 +462,13 @@ type CrossChainAppResponse struct {
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
 	RequestID          uint32 `json:"request_id,omitempty"`
 	Message            []byte `json:"message,omitempty"`
+}
+
+func (m *CrossChainAppResponse) String() string {
+	return fmt.Sprintf(
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: 0x%x",
+		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message,
+	)
 }
 
 func (m *CrossChainAppResponse) GetSourceChainID() ids.ID {
@@ -446,6 +507,13 @@ type Connected struct {
 	NodeVersion *version.Application `json:"node_version,omitempty"`
 }
 
+func (m *Connected) String() string {
+	return fmt.Sprintf(
+		"NodeVersion: %s",
+		m.NodeVersion,
+	)
+}
+
 func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -463,6 +531,13 @@ type ConnectedSubnet struct {
 	SubnetID ids.ID `json:"subnet_id,omitempty"`
 }
 
+func (m *ConnectedSubnet) String() string {
+	return fmt.Sprintf(
+		"SubnetID: %s",
+		m.SubnetID,
+	)
+}
+
 // InternalConnectedSubnet returns a message that indicates the node with [nodeID] is
 // connected to the subnet with the given [subnetID].
 func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage {
@@ -478,6 +553,10 @@ func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage 
 
 type Disconnected struct{}
 
+func (Disconnected) String() string {
+	return ""
+}
+
 func InternalDisconnected(nodeID ids.NodeID) InboundMessage {
 	return &inboundMessage{
 		nodeID:     nodeID,
@@ -489,6 +568,13 @@ func InternalDisconnected(nodeID ids.NodeID) InboundMessage {
 
 type VMMessage struct {
 	Notification uint32 `json:"notification,omitempty"`
+}
+
+func (m *VMMessage) String() string {
+	return fmt.Sprintf(
+		"Notification: %d",
+		m.Notification,
+	)
 }
 
 func InternalVMMessage(
@@ -507,6 +593,10 @@ func InternalVMMessage(
 
 type GossipRequest struct{}
 
+func (GossipRequest) String() string {
+	return ""
+}
+
 func InternalGossipRequest(
 	nodeID ids.NodeID,
 ) InboundMessage {
@@ -519,6 +609,10 @@ func InternalGossipRequest(
 }
 
 type Timeout struct{}
+
+func (Timeout) String() string {
+	return ""
+}
 
 func InternalTimeout(nodeID ids.NodeID) InboundMessage {
 	return &inboundMessage{

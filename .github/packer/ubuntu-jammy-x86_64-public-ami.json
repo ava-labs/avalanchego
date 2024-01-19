@@ -1,0 +1,60 @@
+{
+  "variables": {
+    "version": "jammy-22.04",
+    "tag": "{{env `TAG`}}",
+    "skip_create_ami": "{{env `SKIP_CREATE_AMI`}}"
+  },
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "region": "us-east-1",
+      "skip_create_ami": "{{ user `skip_create_ami` }}",
+      "ami_name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag` }}-{{timestamp}}",
+      "source_ami_filter": {
+        "filters": {
+          "virtualization-type": "hvm",
+          "name": "ubuntu/images/*ubuntu-{{ user `version` }}-*-server-*",
+          "root-device-type": "ebs",
+          "architecture": "x86_64"
+        },
+        "most_recent": true,
+        "owners": [
+          "099720109477"
+        ]
+      },
+      "ssh_username": "ubuntu",
+      "instance_type": "c5.large",
+      "ami_groups": "all",
+      "tags": {
+        "Name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag` }}-{{ isotime | clean_resource_name }}",
+        "Release": "{{ user `version` }}",
+        "Base_AMI_Name": "{{ .SourceAMIName }}"
+      }
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+        "inline": [
+        "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
+        "wait_apt=$(ps aux | grep apt | wc -l)",
+        "while [ \"$wait_apt\" -gt \"1\" ]; do echo \"waiting for apt to be ready....\"; wait_apt=$(ps aux | grep apt | wc -l); sleep 5; done",
+        "sudo apt-get -y update",
+        "sudo apt-get install -y python3-boto3 golang"
+        ]
+    },
+    {
+      "type": "ansible",
+      "playbook_file": ".github/packer/create_public_ami.yml",
+      "roles_path": ".github/packer/roles/",
+      "use_proxy": false,
+      "extra_arguments": ["-e", "component=public-ami build=packer os_release=jammy tag={{ user `tag` }}"]
+    },
+    {
+      "type": "shell",
+      "script": ".github/packer/clean-public-ami.sh",
+      "execute_command": "sudo bash -x {{.Path}}"
+    }
+  ]
+}
+

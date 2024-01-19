@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/slices"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -21,7 +23,9 @@ var (
 		{
 			name: "generic with replacer and best",
 			sampler: &weightedWithoutReplacementGeneric{
-				u: &uniformReplacer{},
+				u: &uniformReplacer{
+					rng: globalRNG,
+				},
 				w: &weightedBest{
 					samplers: []Weighted{
 						&weightedArray{},
@@ -85,88 +89,84 @@ func WeightedWithoutReplacementInitializeOverflowTest(
 	s WeightedWithoutReplacement,
 ) {
 	err := s.Initialize([]uint64{1, math.MaxUint64})
-	require.Error(t, err, "should have reported an overflow error")
+	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
 func WeightedWithoutReplacementOutOfRangeTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require := require.New(t)
 
-	_, err = s.Sample(2)
-	require.Error(t, err, "should have reported an out of range error")
+	require.NoError(s.Initialize([]uint64{1}))
+
+	_, err := s.Sample(2)
+	require.ErrorIs(err, ErrOutOfRange)
 }
 
 func WeightedWithoutReplacementEmptyWithoutWeightTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize(nil)
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize(nil))
 
 	indices, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Len(t, indices, 0, "shouldn't have selected any elements")
+	require.NoError(err)
+	require.Empty(indices)
 }
 
 func WeightedWithoutReplacementEmptyTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1}))
 
 	indices, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Len(t, indices, 0, "shouldn't have selected any elements")
+	require.NoError(err)
+	require.Empty(indices)
 }
 
 func WeightedWithoutReplacementSingletonTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1}))
 
 	indices, err := s.Sample(1)
-	require.NoError(t, err)
-	require.Equal(t, []int{0}, indices, "should have selected the first element")
+	require.NoError(err)
+	require.Equal([]int{0}, indices)
 }
 
 func WeightedWithoutReplacementWithZeroTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{0, 1})
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{0, 1}))
 
 	indices, err := s.Sample(1)
-	require.NoError(t, err)
-	require.Equal(
-		t,
-		[]int{1},
-		indices,
-		"should have selected the second element",
-	)
+	require.NoError(err)
+	require.Equal([]int{1}, indices)
 }
 
 func WeightedWithoutReplacementDistributionTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1, 1, 2})
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1, 1, 2}))
 
 	indices, err := s.Sample(4)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	slices.Sort(indices)
-	require.Equal(
-		t,
-		[]int{0, 1, 2, 2},
-		indices,
-		"should have selected all the elements",
-	)
+	require.Equal([]int{0, 1, 2, 2}, indices)
 }

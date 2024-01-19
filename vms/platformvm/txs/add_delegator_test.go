@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -23,8 +23,7 @@ var preFundedKeys = secp256k1.TestKeys()
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snow.DefaultContextTest()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -34,10 +33,12 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
-	require.ErrorIs(addDelegatorTx.SyntacticVerify(ctx), ErrNilTx)
+	err = addDelegatorTx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	inputs := []*avax.TransferableInput{{
@@ -98,7 +99,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: signed tx not initialized
 	stx = &Tx{Unsigned: addDelegatorTx}
-	require.ErrorIs(stx.SyntacticVerify(ctx), errSignedTxNotInitialized)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, errSignedTxNotInitialized)
 
 	// Case: valid tx
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
@@ -111,7 +113,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, avax.ErrWrongNetworkID)
 	addDelegatorTx.NetworkID--
 
 	// Case: delegator weight is not equal to total stake weight
@@ -119,15 +121,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	addDelegatorTx.Wght = 2 * validatorWeight
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
 	require.NoError(err)
-	require.ErrorIs(stx.SyntacticVerify(ctx), errDelegatorWeightMismatch)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, errDelegatorWeightMismatch)
 	addDelegatorTx.Wght = validatorWeight
 }
 
 func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snow.DefaultContextTest()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -196,7 +198,9 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
 	require.NoError(err)
-	require.Error(stx.SyntacticVerify(ctx))
+
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, errStakeMustBeAVAX)
 }
 
 func TestAddDelegatorTxNotValidatorTx(t *testing.T) {

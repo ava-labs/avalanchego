@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -11,7 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestBuildInvalid(t *testing.T) {
+func TestBuildDuplicateTxs(t *testing.T) {
+	require := require.New(t)
+
 	chainID := ids.ID{1}
 	height := uint64(2)
 	parentIDs := []ids.ID{{4}, {5}}
@@ -22,10 +24,12 @@ func TestBuildInvalid(t *testing.T) {
 		parentIDs,
 		txs,
 	)
-	require.Error(t, err, "build should have errored because restrictions were provided in epoch 0")
+	require.ErrorIs(err, errInvalidTxs)
 }
 
 func TestBuildValid(t *testing.T) {
+	require := require.New(t)
+
 	chainID := ids.ID{1}
 	height := uint64(2)
 	parentIDs := []ids.ID{{4}, {5}}
@@ -36,9 +40,9 @@ func TestBuildValid(t *testing.T) {
 		parentIDs,
 		txs,
 	)
-	require.NoError(t, err)
-	require.Equal(t, chainID, vtx.ChainID())
-	require.Equal(t, height, vtx.Height())
-	require.Equal(t, parentIDs, vtx.ParentIDs())
-	require.Equal(t, txs, vtx.Txs())
+	require.NoError(err)
+	require.Equal(chainID, vtx.ChainID())
+	require.Equal(height, vtx.Height())
+	require.Equal(parentIDs, vtx.ParentIDs())
+	require.Equal(txs, vtx.Txs())
 }

@@ -1,9 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -18,9 +20,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+var errMissingUTXO = errors.New("missing utxo")
 
 type WalletService struct {
 	vm         *VM
@@ -28,24 +33,70 @@ type WalletService struct {
 }
 
 func (w *WalletService) decided(txID ids.ID) {
-	w.pendingTxs.Delete(txID)
+	if !w.pendingTxs.Delete(txID) {
+		return
+	}
+
+	w.vm.ctx.Log.Info("tx decided over wallet API",
+		zap.Stringer("txID", txID),
+	)
+	for {
+		txID, tx, ok := w.pendingTxs.Oldest()
+		if !ok {
+			return
+		}
+
+		err := w.vm.network.IssueVerifiedTx(context.TODO(), tx)
+		if err == nil {
+			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
+				zap.Stringer("txID", txID),
+			)
+			return
+		}
+		if errors.Is(err, mempool.ErrDuplicateTx) {
+			return
+		}
+
+		w.pendingTxs.Delete(txID)
+		w.vm.ctx.Log.Warn("dropping tx issued over wallet API",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+	}
 }
 
-func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
-	tx, err := w.vm.parser.ParseTx(txBytes)
-	if err != nil {
-		return ids.ID{}, err
+func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
+	txID := tx.ID()
+	w.vm.ctx.Log.Info("issuing tx over wallet API",
+		zap.Stringer("txID", txID),
+	)
+
+	if _, ok := w.pendingTxs.Get(txID); ok {
+		w.vm.ctx.Log.Warn("issuing duplicate tx over wallet API",
+			zap.Stringer("txID", txID),
+		)
+		return txID, nil
 	}
 
-	txID, err := w.vm.IssueTx(txBytes)
-	if err != nil {
-		return ids.ID{}, err
+	if w.pendingTxs.Len() == 0 {
+		if err := w.vm.network.IssueVerifiedTx(context.TODO(), tx); err == nil {
+			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
+				zap.Stringer("txID", txID),
+			)
+		} else if !errors.Is(err, mempool.ErrDuplicateTx) {
+			w.vm.ctx.Log.Warn("failed to issue tx over wallet API",
+				zap.Stringer("txID", txID),
+				zap.Error(err),
+			)
+			return ids.Empty, err
+		}
+	} else {
+		w.vm.ctx.Log.Info("enqueueing tx over wallet API",
+			zap.Stringer("txID", txID),
+		)
 	}
 
-	if _, ok := w.pendingTxs.Get(txID); !ok {
-		w.pendingTxs.Put(txID, tx)
-	}
-
+	w.pendingTxs.Put(txID, tx)
 	return txID, nil
 }
 
@@ -90,7 +141,16 @@ func (w *WalletService) IssueTx(_ *http.Request, args *api.FormattedTx, reply *a
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	txID, err := w.issue(txBytes)
+
+	tx, err := w.vm.parser.ParseTx(txBytes)
+	if err != nil {
+		return err
+	}
+
+	w.vm.ctx.Lock.Lock()
+	defer w.vm.ctx.Lock.Unlock()
+
+	txID, err := w.issue(tx)
 	reply.TxID = txID
 	return err
 }
@@ -127,6 +187,9 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 	if err != nil {
 		return fmt.Errorf("couldn't parse 'From' addresses: %w", err)
 	}
+
+	w.vm.ctx.Lock.Lock()
+	defer w.vm.ctx.Lock.Unlock()
 
 	// Load user's UTXOs/keys
 	utxos, kc, err := w.vm.LoadUser(args.Username, args.Password, fromAddrs)
@@ -233,7 +296,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 	codec := w.vm.parser.Codec()
 	avax.SortTransferableOutputs(outs, codec)
 
-	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.vm.ctx.NetworkID,
 		BlockchainID: w.vm.ctx.ChainID,
 		Outs:         outs,
@@ -244,7 +307,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		return err
 	}
 
-	txID, err := w.issue(tx.Bytes())
+	txID, err := w.issue(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

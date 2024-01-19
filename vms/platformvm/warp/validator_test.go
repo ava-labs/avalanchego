@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -6,11 +6,12 @@ package warp
 import (
 	"context"
 	"math"
+	"strconv"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -134,7 +135,6 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
 
@@ -146,7 +146,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Equal(tt.expectedWeight, weight)
 
 			// These are pointers so have to test equality like this
-			require.Equal(len(tt.expectedVdrs), len(vdrs))
+			require.Len(vdrs, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := vdrs[i]
 				expectedPKBytes := bls.PublicKeyToBytes(expectedVdr.PublicKey)
@@ -166,7 +166,7 @@ func TestFilterValidators(t *testing.T) {
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
-		PublicKeyBytes: bls.PublicKeyToBytes(pk0),
+		PublicKeyBytes: bls.SerializePublicKey(pk0),
 		Weight:         1,
 	}
 
@@ -175,7 +175,7 @@ func TestFilterValidators(t *testing.T) {
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
-		PublicKeyBytes: bls.PublicKeyToBytes(pk1),
+		PublicKeyBytes: bls.SerializePublicKey(pk1),
 		Weight:         2,
 	}
 
@@ -244,9 +244,10 @@ func TestFilterValidators(t *testing.T) {
 
 			vdrs, err := FilterValidators(tt.indices, tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedVdrs, vdrs)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedVdrs, vdrs)
 		})
 	}
 }
@@ -298,8 +299,47 @@ func TestSumWeight(t *testing.T) {
 
 			sum, err := SumWeight(tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedSum, sum)
+			if tt.expectedErr != nil {
+				return
+			}
+			require.Equal(tt.expectedSum, sum)
+		})
+	}
+}
+
+func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
+	pChainHeight := uint64(1)
+	subnetID := ids.GenerateTestID()
+	numNodes := 10_000
+	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
+	for i := 0; i < numNodes; i++ {
+		nodeID := ids.GenerateTestNodeID()
+		blsPrivateKey, err := bls.NewSecretKey()
+		require.NoError(b, err)
+		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
+		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: blsPublicKey,
+			Weight:    20,
+		})
+	}
+
+	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
+		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+		for i := 0; i < size; i++ {
+			validator := getValidatorOutputs[i]
+			getValidatorsOutput[validator.NodeID] = validator
+		}
+		validatorState := &validators.TestState{
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return getValidatorsOutput, nil
+			},
+		}
+
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
+				require.NoError(b, err)
 			}
 		})
 	}

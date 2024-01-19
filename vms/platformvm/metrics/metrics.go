@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -10,9 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/metric"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
 var _ Metrics = (*metrics)(nil)
@@ -25,7 +24,7 @@ type Metrics interface {
 	// Mark that an option vote that we initially preferred was rejected.
 	MarkOptionVoteLost()
 	// Mark that the given block was accepted.
-	MarkAccepted(blocks.Block) error
+	MarkAccepted(block.Block) error
 	// Mark that a validator set was created.
 	IncValidatorSetsCreated()
 	// Mark that a validator set was cached.
@@ -43,35 +42,15 @@ type Metrics interface {
 	SetTimeUntilUnstake(time.Duration)
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
-	// Mark that this node is connected to this percent of a subnet's stake.
-	SetSubnetPercentConnected(subnetID ids.ID, percent float64)
-	// Mark that this node is connected to this percent of the Primary Network's
-	// stake.
-	SetPercentConnected(percent float64)
 }
 
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	trackedSubnets set.Set[ids.ID],
 ) (Metrics, error) {
 	blockMetrics, err := newBlockMetrics(namespace, registerer)
 	m := &metrics{
 		blockMetrics: blockMetrics,
-
-		percentConnected: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "percent_connected",
-			Help:      "Percent of connected stake",
-		}),
-		subnetPercentConnected: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "percent_connected_subnet",
-				Help:      "Percent of connected subnet weight",
-			},
-			[]string{"subnetID"},
-		),
 		timeUntilUnstake: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "time_until_unstake",
@@ -131,12 +110,9 @@ func New(
 
 	errs := wrappers.Errs{Err: err}
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
+	errs.Add(err)
 	m.APIInterceptor = apiRequestMetrics
 	errs.Add(
-		err,
-
-		registerer.Register(m.percentConnected),
-		registerer.Register(m.subnetPercentConnected),
 		registerer.Register(m.timeUntilUnstake),
 		registerer.Register(m.timeUntilSubnetUnstake),
 		registerer.Register(m.localStake),
@@ -151,11 +127,6 @@ func New(
 		registerer.Register(m.validatorSetsDuration),
 	)
 
-	// init subnet tracker metrics with tracked subnets
-	for subnetID := range trackedSubnets {
-		// initialize to 0
-		m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
-	}
 	return m, errs.Err
 }
 
@@ -164,8 +135,6 @@ type metrics struct {
 
 	blockMetrics *blockMetrics
 
-	percentConnected       prometheus.Gauge
-	subnetPercentConnected *prometheus.GaugeVec
 	timeUntilUnstake       prometheus.Gauge
 	timeUntilSubnetUnstake *prometheus.GaugeVec
 	localStake             prometheus.Gauge
@@ -187,7 +156,7 @@ func (m *metrics) MarkOptionVoteLost() {
 	m.numVotesLost.Inc()
 }
 
-func (m *metrics) MarkAccepted(b blocks.Block) error {
+func (m *metrics) MarkAccepted(b block.Block) error {
 	return b.Visit(m.blockMetrics)
 }
 
@@ -221,12 +190,4 @@ func (m *metrics) SetTimeUntilUnstake(timeUntilUnstake time.Duration) {
 
 func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration) {
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
-}
-
-func (m *metrics) SetSubnetPercentConnected(subnetID ids.ID, percent float64) {
-	m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(percent)
-}
-
-func (m *metrics) SetPercentConnected(percent float64) {
-	m.percentConnected.Set(percent)
 }

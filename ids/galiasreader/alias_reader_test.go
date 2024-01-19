@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package galiasreader
@@ -19,9 +19,7 @@ func TestInterface(t *testing.T) {
 
 	for _, test := range ids.AliasTests {
 		listener, err := grpcutils.NewListener()
-		if err != nil {
-			t.Fatalf("Failed to create listener: %s", err)
-		}
+		require.NoError(err)
 		serverCloser := grpcutils.ServerCloser{}
 		w := ids.NewAliaser()
 

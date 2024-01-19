@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -81,6 +81,7 @@ func NewMessageMetrics(
 
 type Metrics struct {
 	Log            logging.Logger
+	ClockSkew      metric.Averager
 	FailedToParse  prometheus.Counter
 	MessageMetrics map[message.Op]*MessageMetrics
 }
@@ -107,6 +108,14 @@ func NewMetrics(
 	for _, op := range message.ExternalOps {
 		m.MessageMetrics[op] = NewMessageMetrics(op, namespace, registerer, &errs)
 	}
+
+	m.ClockSkew = metric.NewAveragerWithErrs(
+		namespace,
+		"clock_skew",
+		"clock skew during peer handshake",
+		registerer,
+		&errs,
+	)
 	return m, errs.Err
 }
 

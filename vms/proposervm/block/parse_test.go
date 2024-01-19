@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 )
@@ -27,7 +28,7 @@ func TestParse(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	cert := tlsCert.Leaf
+	cert := staking.CertificateFromX509(tlsCert.Leaf)
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
 	builtBlock, err := Build(
@@ -42,14 +43,19 @@ func TestParse(t *testing.T) {
 	require.NoError(err)
 
 	builtBlockBytes := builtBlock.Bytes()
+	durangoTimes := []time.Time{
+		timestamp.Add(time.Second),  // Durango not activated yet
+		timestamp.Add(-time.Second), // Durango activated
+	}
+	for _, durangoTime := range durangoTimes {
+		parsedBlockIntf, err := Parse(builtBlockBytes, durangoTime)
+		require.NoError(err)
 
-	parsedBlockIntf, err := Parse(builtBlockBytes)
-	require.NoError(err)
+		parsedBlock, ok := parsedBlockIntf.(SignedBlock)
+		require.True(ok)
 
-	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
-	require.True(ok)
-
-	equal(require, chainID, builtBlock, parsedBlock)
+		equal(require, chainID, builtBlock, parsedBlock)
+	}
 }
 
 func TestParseDuplicateExtension(t *testing.T) {
@@ -59,8 +65,16 @@ func TestParseDuplicateExtension(t *testing.T) {
 	blockBytes, err := hex.DecodeString(blockHex)
 	require.NoError(err)
 
-	_, err = Parse(blockBytes)
-	require.Error(err) // Do not check for errDuplicateExtension to support g1.19
+	// Note: The above blockHex specifies 123 as the block's timestamp.
+	timestamp := time.Unix(123, 0)
+	durangoNotYetActivatedTime := timestamp.Add(time.Second)
+	durangoAlreadyActivatedTime := timestamp.Add(-time.Second)
+
+	_, err = Parse(blockBytes, durangoNotYetActivatedTime)
+	require.ErrorIs(err, errInvalidCertificate)
+
+	_, err = Parse(blockBytes, durangoAlreadyActivatedTime)
+	require.NoError(err)
 }
 
 func TestParseHeader(t *testing.T) {
@@ -96,7 +110,7 @@ func TestParseOption(t *testing.T) {
 
 	builtOptionBytes := builtOption.Bytes()
 
-	parsedOption, err := Parse(builtOptionBytes)
+	parsedOption, err := Parse(builtOptionBytes, time.Time{})
 	require.NoError(err)
 
 	equalOption(require, builtOption, parsedOption)
@@ -114,14 +128,19 @@ func TestParseUnsigned(t *testing.T) {
 	require.NoError(err)
 
 	builtBlockBytes := builtBlock.Bytes()
+	durangoTimes := []time.Time{
+		timestamp.Add(time.Second),  // Durango not activated yet
+		timestamp.Add(-time.Second), // Durango activated
+	}
+	for _, durangoTime := range durangoTimes {
+		parsedBlockIntf, err := Parse(builtBlockBytes, durangoTime)
+		require.NoError(err)
 
-	parsedBlockIntf, err := Parse(builtBlockBytes)
-	require.NoError(err)
+		parsedBlock, ok := parsedBlockIntf.(SignedBlock)
+		require.True(ok)
 
-	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
-	require.True(ok)
-
-	equal(require, ids.Empty, builtBlock, parsedBlock)
+		equal(require, ids.Empty, builtBlock, parsedBlock)
+	}
 }
 
 func TestParseGibberish(t *testing.T) {
@@ -129,6 +148,6 @@ func TestParseGibberish(t *testing.T) {
 
 	bytes := []byte{0, 1, 2, 3, 4, 5}
 
-	_, err := Parse(bytes)
-	require.Error(err)
+	_, err := Parse(bytes, time.Time{})
+	require.ErrorIs(err, codec.ErrUnknownVersion)
 }

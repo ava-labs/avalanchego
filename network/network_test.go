@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"net"
 	"sync"
 	"testing"
@@ -25,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -32,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -51,6 +54,8 @@ var (
 		PeerListNonValidatorGossipSize: 100,
 		PeerListPeersGossipSize:        100,
 		PeerListGossipFreq:             time.Second,
+		PeerListPullGossipFreq:         time.Second,
+		PeerListBloomResetFreq:         constants.DefaultNetworkPeerListBloomResetFreq,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
 		PingPongTimeout:      30 * time.Second,
@@ -112,7 +117,7 @@ var (
 
 		CompressionType: constants.DefaultNetworkCompressionType,
 
-		UptimeCalculator:  uptime.NewManager(uptime.NewTestState()),
+		UptimeCalculator:  uptime.NewManager(uptime.NewTestState(), &mockable.Clock{}),
 		UptimeMetricFreq:  30 * time.Second,
 		UptimeRequirement: .8,
 
@@ -132,12 +137,13 @@ func init() {
 
 func newDefaultTargeter(t tracker.Tracker) tracker.Targeter {
 	return tracker.NewTargeter(
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           10,
 			MaxNonVdrUsage:     10,
 			MaxNonVdrNodeUsage: 10,
 		},
-		validators.NewSet(),
+		validators.NewManager(),
 		t,
 	)
 }
@@ -194,13 +200,13 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *sync.WaitGroup) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
 
 	var (
-		networks = make([]Network, len(configs))
+		networks = make([]*network, len(configs))
 
 		globalLock     sync.Mutex
 		numConnected   int
@@ -211,32 +217,16 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
-		g, err := peer.NewGossipTracker(registry, "foobar")
-		require.NoError(err)
-
-		log := logging.NoLog{}
-		gossipTrackerCallback := peer.GossipTrackerCallback{
-			Log:           log,
-			GossipTracker: g,
-		}
-
-		beacons := validators.NewSet()
-		err = beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1)
-		require.NoError(err)
-
-		primaryVdrs := validators.NewSet()
-		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
-		for _, nodeID := range nodeIDs {
-			err := primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1)
-			require.NoError(err)
-		}
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
 		vdrs := validators.NewManager()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+		for _, nodeID := range nodeIDs {
+			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
+		}
 
 		config := config
 
-		config.GossipTracker = g
 		config.Beacons = beacons
 		config.Validators = vdrs
 
@@ -245,7 +235,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			config,
 			msgCreator,
 			registry,
-			log,
+			logging.NoLog{},
 			listeners[i],
 			dialer,
 			&testHandler{
@@ -278,7 +268,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			},
 		)
 		require.NoError(err)
-		networks[i] = net
+		networks[i] = net.(*network)
 	}
 
 	wg := sync.WaitGroup{}
@@ -292,8 +282,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		go func(net Network) {
 			defer wg.Done()
 
-			err := net.Dispatch()
-			require.NoError(err)
+			require.NoError(net.Dispatch())
 		}(net)
 	}
 
@@ -320,13 +309,13 @@ func TestSend(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 		},
 	)
@@ -337,10 +326,9 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	toSend := set.Set[ids.NodeID]{}
-	toSend.Add(nodeIDs[1])
+	toSend := set.Of(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
-	require.EqualValues(toSend, sentTo)
+	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
@@ -359,13 +347,13 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 		},
 	)
@@ -376,9 +364,8 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	toSend := set.NewSet[ids.NodeID](3)
+	toSend := set.Of(nodeIDs...)
 	validNodeID := nodeIDs[1]
-	toSend.Add(nodeIDs...)
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
 	require.Contains(sentTo, validNodeID)
@@ -405,26 +392,334 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
-	network := networks[0].(*network)
+	network := networks[0]
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	err := validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
-	_, err = network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
-		Cert: tlsCert.Leaf,
-		IPPort: ips.IPPort{
-			IP:   net.IPv4(123, 132, 123, 123),
-			Port: 10000,
-		},
-		Timestamp: 1000,
-		Signature: nil,
-	}})
+	err := network.Track([]*ips.ClaimedIPPort{
+		ips.NewClaimedIPPort(
+			staking.CertificateFromX509(tlsCert.Leaf),
+			ips.IPPort{
+				IP:   net.IPv4(123, 132, 123, 123),
+				Port: 10000,
+			},
+			1000, // timestamp
+			nil,  // signature
+		),
+	})
 	// The signature is wrong so this peer tracking info isn't useful.
-	require.Error(err)
+	require.ErrorIs(err, rsa.ErrVerification)
 
 	network.peersLock.RLock()
 	require.Empty(network.trackedIPs)
 	network.peersLock.RUnlock()
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
+
+func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
+	require := require.New(t)
+
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+
+	networks := make([]Network, len(configs))
+	for i, config := range configs {
+		msgCreator := newMessageCreator(t)
+		registry := prometheus.NewRegistry()
+
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+
+		vdrs := validators.NewManager()
+		for _, nodeID := range nodeIDs {
+			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
+		}
+
+		config := config
+
+		config.Beacons = beacons
+		config.Validators = vdrs
+		config.AllowPrivateIPs = false
+
+		net, err := NewNetwork(
+			config,
+			msgCreator,
+			registry,
+			logging.NoLog{},
+			listeners[i],
+			dialer,
+			&testHandler{
+				InboundHandler: nil,
+				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
+					require.FailNow("unexpectedly connected to a peer")
+				},
+				DisconnectedF: nil,
+			},
+		)
+		require.NoError(err)
+		networks[i] = net
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(networks))
+	for i, net := range networks {
+		if i != 0 {
+			config := configs[0]
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+		}
+
+		go func(net Network) {
+			defer wg.Done()
+
+			require.NoError(net.Dispatch())
+		}(net)
+	}
+
+	network := networks[1].(*network)
+	require.Eventually(
+		func() bool {
+			network.peersLock.RLock()
+			defer network.peersLock.RUnlock()
+
+			nodeID := nodeIDs[0]
+			require.Contains(network.trackedIPs, nodeID)
+			ip := network.trackedIPs[nodeID]
+			return ip.getDelay() != 0
+		},
+		10*time.Second,
+		50*time.Millisecond,
+	)
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
+
+func TestDialDeletesNonValidators(t *testing.T) {
+	require := require.New(t)
+
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+
+	vdrs := validators.NewManager()
+	for _, nodeID := range nodeIDs {
+		require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
+	}
+
+	networks := make([]Network, len(configs))
+	for i, config := range configs {
+		msgCreator := newMessageCreator(t)
+		registry := prometheus.NewRegistry()
+
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+
+		config := config
+
+		config.Beacons = beacons
+		config.Validators = vdrs
+		config.AllowPrivateIPs = false
+
+		net, err := NewNetwork(
+			config,
+			msgCreator,
+			registry,
+			logging.NoLog{},
+			listeners[i],
+			dialer,
+			&testHandler{
+				InboundHandler: nil,
+				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
+					require.FailNow("unexpectedly connected to a peer")
+				},
+				DisconnectedF: nil,
+			},
+		)
+		require.NoError(err)
+		networks[i] = net
+	}
+
+	config := configs[0]
+	signer := peer.NewIPSigner(config.MyIPPort, config.TLSKey)
+	ip, err := signer.GetSignedIP()
+	require.NoError(err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(networks))
+	for i, net := range networks {
+		if i != 0 {
+			err := net.Track([]*ips.ClaimedIPPort{
+				ips.NewClaimedIPPort(
+					staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
+					ip.IPPort,
+					ip.Timestamp,
+					ip.Signature,
+				),
+			})
+			require.NoError(err)
+		}
+
+		go func(net Network) {
+			defer wg.Done()
+
+			require.NoError(net.Dispatch())
+		}(net)
+	}
+
+	// Give the dialer time to run one iteration. This is racy, but should ony
+	// be possible to flake as a false negative (test passes when it shouldn't).
+	time.Sleep(50 * time.Millisecond)
+
+	network := networks[1].(*network)
+	require.NoError(vdrs.RemoveWeight(constants.PrimaryNetworkID, nodeIDs[0], 1))
+	require.Eventually(
+		func() bool {
+			network.peersLock.RLock()
+			defer network.peersLock.RUnlock()
+
+			nodeID := nodeIDs[0]
+			_, ok := network.trackedIPs[nodeID]
+			return !ok
+		},
+		10*time.Second,
+		50*time.Millisecond,
+	)
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
+
+// Test that cancelling the context passed into dial
+// causes dial to return immediately.
+func TestDialContext(t *testing.T) {
+	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+
+	dialer := newTestDialer()
+	network := networks[0]
+	network.dialer = dialer
+
+	var (
+		neverDialedNodeID = ids.GenerateTestNodeID()
+		dialedNodeID      = ids.GenerateTestNodeID()
+
+		dynamicNeverDialedIP, neverDialedListener = dialer.NewListener()
+		dynamicDialedIP, dialedListener           = dialer.NewListener()
+
+		neverDialedIP = &trackedIP{
+			ip: dynamicNeverDialedIP.IPPort(),
+		}
+		dialedIP = &trackedIP{
+			ip: dynamicDialedIP.IPPort(),
+		}
+	)
+
+	network.ManuallyTrack(neverDialedNodeID, neverDialedIP.ip)
+	network.ManuallyTrack(dialedNodeID, dialedIP.ip)
+
+	// Sanity check that when a non-cancelled context is given,
+	// we actually dial the peer.
+	network.dial(dialedNodeID, dialedIP)
+
+	gotDialedIPConn := make(chan struct{})
+	go func() {
+		_, _ = dialedListener.Accept()
+		close(gotDialedIPConn)
+	}()
+	<-gotDialedIPConn
+
+	// Asset that when [n.onCloseCtx] is cancelled, dial returns immediately.
+	// That is, [neverDialedListener] doesn't accept a connection.
+	network.onCloseCtxCancel()
+	network.dial(neverDialedNodeID, neverDialedIP)
+
+	gotNeverDialedIPConn := make(chan struct{})
+	go func() {
+		_, _ = neverDialedListener.Accept()
+		close(gotNeverDialedIPConn)
+	}()
+
+	select {
+	case <-gotNeverDialedIPConn:
+		require.FailNow(t, "unexpectedly connected to peer")
+	default:
+	}
+
+	network.StartClose()
+	wg.Wait()
+}
+
+func TestAllowConnectionAsAValidator(t *testing.T) {
+	require := require.New(t)
+
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+
+	networks := make([]Network, len(configs))
+	for i, config := range configs {
+		msgCreator := newMessageCreator(t)
+		registry := prometheus.NewRegistry()
+
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+
+		vdrs := validators.NewManager()
+		require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+
+		config := config
+
+		config.Beacons = beacons
+		config.Validators = vdrs
+		config.RequireValidatorToConnect = true
+
+		net, err := NewNetwork(
+			config,
+			msgCreator,
+			registry,
+			logging.NoLog{},
+			listeners[i],
+			dialer,
+			&testHandler{
+				InboundHandler: nil,
+				ConnectedF:     nil,
+				DisconnectedF:  nil,
+			},
+		)
+		require.NoError(err)
+		networks[i] = net
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(networks))
+	for i, net := range networks {
+		if i != 0 {
+			config := configs[0]
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
+		}
+
+		go func(net Network) {
+			defer wg.Done()
+
+			require.NoError(net.Dispatch())
+		}(net)
+	}
+
+	network := networks[1].(*network)
+	require.Eventually(
+		func() bool {
+			network.peersLock.RLock()
+			defer network.peersLock.RUnlock()
+
+			nodeID := nodeIDs[0]
+			_, contains := network.connectedPeers.GetByID(nodeID)
+			return contains
+		},
+		10*time.Second,
+		50*time.Millisecond,
+	)
 
 	for _, net := range networks {
 		net.StartClose()

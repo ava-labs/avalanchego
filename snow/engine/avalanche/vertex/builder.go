@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -8,15 +8,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // Builder builds a vertex given a set of parentIDs and transactions.
 type Builder interface {
-	// Build a new vertex from the contents of a vertex
-	BuildVtx(ctx context.Context, parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error)
 	// Build a new stop vertex from the parents
 	BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanche.Vertex, error)
 }
@@ -65,10 +62,10 @@ func buildVtx(
 	utils.Sort(parentIDs)
 	utils.SortByHash(txs)
 
-	codecVer := codecVersion
+	codecVer := CodecVersion
 	if stopVertex {
 		// use new codec version for the "StopVertex"
-		codecVer = codecVersionWithStopVtx
+		codecVer = CodecVersionWithStopVtx
 	}
 
 	innerVtx := innerStatelessVertex{
@@ -83,7 +80,7 @@ func buildVtx(
 		return nil, err
 	}
 
-	vtxBytes, err := c.Marshal(innerVtx.Version, innerVtx)
+	vtxBytes, err := Codec.Marshal(innerVtx.Version, innerVtx)
 	vtx := statelessVertex{
 		innerStatelessVertex: innerVtx,
 		id:                   hashing.ComputeHash256Array(vtxBytes),

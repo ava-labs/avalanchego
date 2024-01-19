@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 // Format modes available
@@ -59,7 +59,7 @@ func ToFormat(h string, fd uintptr) (Format, error) {
 	case "JSON":
 		return JSON, nil
 	case "AUTO":
-		if !terminal.IsTerminal(int(fd)) {
+		if !term.IsTerminal(int(fd)) {
 			return Plain, nil
 		}
 		return Colors, nil

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -6,6 +6,8 @@ package common
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 var _ Timer = (*TimerTest)(nil)
@@ -28,6 +30,6 @@ func (t *TimerTest) RegisterTimeout(delay time.Duration) {
 	if t.RegisterTimeoutF != nil {
 		t.RegisterTimeoutF(delay)
 	} else if t.CantRegisterTimout && t.T != nil {
-		t.T.Fatalf("Unexpectedly called RegisterTimeout")
+		require.FailNow(t.T, "Unexpectedly called RegisterTimeout")
 	}
 }

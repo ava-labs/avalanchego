@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -19,9 +19,11 @@ import (
 )
 
 var (
-	_ DelegatorTx = (*AddDelegatorTx)(nil)
+	_ DelegatorTx     = (*AddDelegatorTx)(nil)
+	_ ScheduledStaker = (*AddDelegatorTx)(nil)
 
 	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
+	errStakeMustBeAVAX         = errors.New("stake must be AVAX")
 )
 
 // AddDelegatorTx is an unsigned addDelegatorTx
@@ -105,7 +107,7 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 		assetID := out.AssetID()
 		if assetID != ctx.AVAXAssetID {
-			return fmt.Errorf("stake output must be AVAX but is %q", assetID)
+			return fmt.Errorf("%w but is %q", errStakeMustBeAVAX, assetID)
 		}
 	}
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -30,11 +30,9 @@ func TestOptionalGathererDuplicated(t *testing.T) {
 	g := NewOptionalGatherer()
 	og := NewOptionalGatherer()
 
+	require.NoError(g.Register(og))
 	err := g.Register(og)
-	require.NoError(err)
-
-	err = g.Register(og)
-	require.Equal(errDuplicatedRegister, err)
+	require.ErrorIs(err, errReregisterGatherer)
 }
 
 func TestOptionalGathererAddedError(t *testing.T) {
@@ -46,8 +44,7 @@ func TestOptionalGathererAddedError(t *testing.T) {
 		err: errTest,
 	}
 
-	err := g.Register(tg)
-	require.NoError(err)
+	require.NoError(g.Register(tg))
 
 	mfs, err := g.Gather()
 	require.ErrorIs(err, errTest)
@@ -65,8 +62,7 @@ func TestMultiGathererAdded(t *testing.T) {
 		}},
 	}
 
-	err := g.Register(tg)
-	require.NoError(err)
+	require.NoError(g.Register(tg))
 
 	mfs, err := g.Gather()
 	require.NoError(err)

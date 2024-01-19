@@ -1,29 +1,26 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ips
 
 import (
-	"crypto/x509"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Can't import these from wrappers package due to circular import.
 const (
-	intLen  = 4
-	longLen = 8
-	ipLen   = 18
-	idLen   = 32
 	// Certificate length, signature length, IP, timestamp, tx ID
-	baseIPCertDescLen = 2*intLen + ipLen + longLen + idLen
+	baseIPCertDescLen = 2*wrappers.IntLen + IPPortLen + wrappers.LongLen + ids.IDLen
+	preimageLen       = ids.IDLen + wrappers.LongLen
 )
 
 // A self contained proof that a peer is claiming ownership of an IPPort at a
 // given time.
 type ClaimedIPPort struct {
 	// The peer's certificate.
-	Cert *x509.Certificate
+	Cert *staking.Certificate
 	// The peer's claimed IP and port.
 	IPPort IPPort
 	// The time the peer claimed to own this IP and port.
@@ -33,12 +30,36 @@ type ClaimedIPPort struct {
 	// actually claimed by the peer in question, and not by a malicious peer
 	// trying to get us to dial bogus IPPorts.
 	Signature []byte
-	// The txID that added this peer into the validator set
-	TxID ids.ID
+	// NodeID derived from the peer certificate.
+	NodeID ids.NodeID
+	// GossipID derived from the nodeID and timestamp.
+	GossipID ids.ID
 }
 
-// Returns the length of the byte representation of this ClaimedIPPort.
-func (i *ClaimedIPPort) BytesLen() int {
-	// See wrappers.PackPeerTrackInfo.
+func NewClaimedIPPort(
+	cert *staking.Certificate,
+	ipPort IPPort,
+	timestamp uint64,
+	signature []byte,
+) *ClaimedIPPort {
+	ip := &ClaimedIPPort{
+		Cert:      cert,
+		IPPort:    ipPort,
+		Timestamp: timestamp,
+		Signature: signature,
+		NodeID:    ids.NodeIDFromCert(cert),
+	}
+
+	packer := wrappers.Packer{
+		Bytes: make([]byte, preimageLen),
+	}
+	packer.PackFixedBytes(ip.NodeID[:])
+	packer.PackLong(timestamp)
+	ip.GossipID = hashing.ComputeHash256Array(packer.Bytes)
+	return ip
+}
+
+// Returns the approximate size of the binary representation of this ClaimedIPPort.
+func (i *ClaimedIPPort) Size() int {
 	return baseIPCertDescLen + len(i.Cert.Raw) + len(i.Signature)
 }

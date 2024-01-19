@@ -1,4 +1,6 @@
-set -o pipefail
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 ###
 # cleanup removes the docker instance and the network

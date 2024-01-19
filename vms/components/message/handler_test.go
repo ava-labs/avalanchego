@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -27,8 +27,7 @@ func TestHandleTx(t *testing.T) {
 	handler := CounterHandler{}
 	msg := Tx{}
 
-	err := msg.Handle(&handler, ids.EmptyNodeID, 0)
-	require.NoError(err)
+	require.NoError(msg.Handle(&handler, ids.EmptyNodeID, 0))
 	require.Equal(1, handler.Tx)
 }
 
@@ -37,6 +36,5 @@ func TestNoopHandler(t *testing.T) {
 		Log: logging.NoLog{},
 	}
 
-	err := handler.HandleTx(ids.EmptyNodeID, 0, nil)
-	require.NoError(t, err)
+	require.NoError(t, handler.HandleTx(ids.EmptyNodeID, 0, nil))
 }

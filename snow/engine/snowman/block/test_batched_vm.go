@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -63,7 +65,7 @@ func (vm *TestBatchedVM) GetAncestors(
 		)
 	}
 	if vm.CantGetAncestors && vm.T != nil {
-		vm.T.Fatal(errGetAncestor)
+		require.FailNow(vm.T, errGetAncestor.Error())
 	}
 	return nil, errGetAncestor
 }
@@ -76,7 +78,7 @@ func (vm *TestBatchedVM) BatchedParseBlock(
 		return vm.BatchedParseBlockF(ctx, blks)
 	}
 	if vm.CantBatchParseBlock && vm.T != nil {
-		vm.T.Fatal(errBatchedParseBlock)
+		require.FailNow(vm.T, errBatchedParseBlock.Error())
 	}
 	return nil, errBatchedParseBlock
 }

@@ -7,13 +7,6 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Direct
 
 # Where AvalancheGo binary goes
 avalanchego_path="$AVALANCHE_PATH/build/avalanchego"
-plugin_dir=${PLUGIN_DIR:-$HOME/.avalanchego/plugins}
-evm_path=${EVM_PATH:-$plugin_dir/evm}
-coreth_version=${CORETH_VERSION:-'v0.12.0-rc.2'}
-
-# Set the PATHS
-GOPATH="$(go env GOPATH)"
-coreth_path=${CORETH_PATH:-"$GOPATH/pkg/mod/github.com/ava-labs/coreth@$coreth_version"}
 
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
@@ -39,7 +32,10 @@ fi
 #
 # We use "export" here instead of just setting a bash variable because we need
 # to pass this flag to all child processes spawned by the shell.
-export CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 # While CGO_ENABLED doesn't need to be explicitly set, it produces a much more
 # clear error due to the default value change in go1.20.
 export CGO_ENABLED=1
+
+# Disable version control fallbacks
+export GOPROXY="https://proxy.golang.org"

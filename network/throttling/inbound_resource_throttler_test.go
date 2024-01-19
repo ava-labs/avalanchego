@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -23,8 +23,6 @@ import (
 
 func TestNewSystemThrottler(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 	reg := prometheus.NewRegistry()
 	clock := mockable.Clock{}
@@ -40,18 +38,16 @@ func TestNewSystemThrottler(t *testing.T) {
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttlerIntf, err := NewSystemThrottler("", reg, config, cpuTracker, targeter)
 	require.NoError(err)
-	throttler, ok := throttlerIntf.(*systemThrottler)
-	require.True(ok)
-	require.EqualValues(clock, config.Clock)
-	require.EqualValues(time.Second, config.MaxRecheckDelay)
-	require.EqualValues(cpuTracker, throttler.tracker)
-	require.EqualValues(targeter, throttler.targeter)
+	require.IsType(&systemThrottler{}, throttlerIntf)
+	throttler := throttlerIntf.(*systemThrottler)
+	require.Equal(clock, config.Clock)
+	require.Equal(time.Second, config.MaxRecheckDelay)
+	require.Equal(cpuTracker, throttler.tracker)
+	require.Equal(targeter, throttler.targeter)
 }
 
 func TestSystemThrottler(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	// Setup
@@ -135,7 +131,6 @@ func TestSystemThrottler(t *testing.T) {
 func TestSystemThrottlerContextCancel(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Setup
 	mockTracker := tracker.NewMockTracker(ctrl)

@@ -1,25 +1,24 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
 
 import (
-	"bytes"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestUTXOVerifyNil(t *testing.T) {
 	utxo := (*UTXO)(nil)
-
-	if err := utxo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to a nil utxo")
-	}
+	err := utxo.Verify()
+	require.ErrorIs(t, err, errNilUTXO)
 }
 
 func TestUTXOVerifyEmpty(t *testing.T) {
@@ -27,28 +26,22 @@ func TestUTXOVerifyEmpty(t *testing.T) {
 		UTXOID: UTXOID{TxID: ids.Empty},
 		Asset:  Asset{ID: ids.Empty},
 	}
-
-	if err := utxo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to an empty utxo")
-	}
+	err := utxo.Verify()
+	require.ErrorIs(t, err, errEmptyUTXO)
 }
 
 func TestUTXOSerialize(t *testing.T) {
-	c := linearcodec.NewDefault()
+	require := require.New(t)
+
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		manager.RegisterCodec(codecVersion, c),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(c.RegisterType(&secp256k1fx.MintOutput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.Input{}))
+	require.NoError(c.RegisterType(&secp256k1fx.TransferInput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.Credential{}))
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	expected := []byte{
 		// Codec version
@@ -116,13 +109,6 @@ func TestUTXOSerialize(t *testing.T) {
 	}
 
 	utxoBytes, err := manager.Marshal(codecVersion, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(utxoBytes, expected) {
-		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
-			expected,
-			utxoBytes,
-		)
-	}
+	require.NoError(err)
+	require.Equal(expected, utxoBytes)
 }

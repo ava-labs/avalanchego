@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -20,7 +20,6 @@ import (
 type loadVMsTest struct {
 	admin          *Admin
 	ctrl           *gomock.Controller
-	mockLog        *logging.MockLogger
 	mockVMManager  *vms.MockManager
 	mockVMRegistry *registry.MockVMRegistry
 }
@@ -28,18 +27,16 @@ type loadVMsTest struct {
 func initLoadVMsTest(t *testing.T) *loadVMsTest {
 	ctrl := gomock.NewController(t)
 
-	mockLog := logging.NewMockLogger(ctrl)
 	mockVMRegistry := registry.NewMockVMRegistry(ctrl)
 	mockVMManager := vms.NewMockManager(ctrl)
 
 	return &loadVMsTest{
 		admin: &Admin{Config: Config{
-			Log:        mockLog,
+			Log:        logging.NoLog{},
 			VMRegistry: mockVMRegistry,
 			VMManager:  mockVMManager,
 		}},
 		ctrl:           ctrl,
-		mockLog:        mockLog,
 		mockVMManager:  mockVMManager,
 		mockVMRegistry: mockVMRegistry,
 	}
@@ -47,8 +44,9 @@ func initLoadVMsTest(t *testing.T) *loadVMsTest {
 
 // Tests behavior for LoadVMs if everything succeeds.
 func TestLoadVMsSuccess(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
@@ -66,38 +64,35 @@ func TestLoadVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	// execute test
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-
-	require.Equal(t, expectedVMRegistry, reply.NewVMs)
-	require.Equal(t, err, nil)
+	require.NoError(resources.admin.LoadVMs(&http.Request{}, nil, &reply))
+	require.Equal(expectedVMRegistry, reply.NewVMs)
 }
 
 // Tests behavior for LoadVMs if we fail to reload vms.
 func TestLoadVMsReloadFails(t *testing.T) {
-	resources := initLoadVMsTest(t)
-	defer resources.ctrl.Finish()
+	require := require.New(t)
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
+	resources := initLoadVMsTest(t)
+
 	// Reload fails
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(nil, nil, errTest)
+	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(nil, nil, errTest)
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-
-	require.Equal(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }
 
 // Tests behavior for LoadVMs if we fail to fetch our aliases
 func TestLoadVMsGetAliasesFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
@@ -108,13 +103,11 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	// every vm is at least aliased to itself.
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-
-	require.Equal(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }

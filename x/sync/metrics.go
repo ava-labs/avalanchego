@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -8,12 +8,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
-	_ SyncMetrics = &mockMetrics{}
-	_ SyncMetrics = &metrics{}
+	_ SyncMetrics = (*mockMetrics)(nil)
+	_ SyncMetrics = (*metrics)(nil)
 )
 
 type SyncMetrics interface {
@@ -74,13 +74,12 @@ func NewMetrics(namespace string, reg prometheus.Registerer) (SyncMetrics, error
 			Help:      "cumulative amount of proof requests that were successful",
 		}),
 	}
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		reg.Register(m.requestsFailed),
 		reg.Register(m.requestsMade),
 		reg.Register(m.requestsSucceeded),
 	)
-	return &m, errs.Err
+	return &m, err
 }
 
 func (m *metrics) RequestFailed() {

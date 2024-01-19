@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -16,8 +16,6 @@ var ErrNotOracle = errors.New("block isn't an oracle")
 // This ordering does not need to be deterministically created from the chain
 // state.
 type OracleBlock interface {
-	Block
-
 	// Options returns the possible children of this block in the order this
 	// validator prefers the blocks.
 	// Options is guaranteed to only be called on a verified block.

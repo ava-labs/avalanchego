@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -78,7 +78,7 @@ func (tx *ImportTx) SyntacticVerify(ctx *snow.Context) error {
 			return fmt.Errorf("input failed verification: %w", err)
 		}
 	}
-	if !utils.IsSortedAndUniqueSortable(tx.ImportedInputs) {
+	if !utils.IsSortedAndUnique(tx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -17,8 +17,10 @@ var (
 	errMaxMessageLengthExceeded = errors.New("maximum message length exceeded")
 )
 
-// Used to mask the most significant bit to indicate that the message format
-// uses protocol buffers.
+// Used to mask the most significant bit that was used to indicate that the
+// message format uses protocol buffers.
+//
+// TODO: Once the v1.11 is activated, this mask should be removed.
 const bitmaskCodec = uint32(1 << 31)
 
 // Assumes the specified [msgLen] will never >= 1<<31.
@@ -34,16 +36,8 @@ func writeMsgLen(msgLen uint32, maxMsgLen uint32) ([wrappers.IntLen]byte, error)
 		return [wrappers.IntLen]byte{}, fmt.Errorf("%w; the message length %d exceeds the specified limit %d", errMaxMessageLengthExceeded, msgLen, maxMsgLen)
 	}
 
-	x := msgLen
-
-	// Mask the most significant bit to denote it's using proto. This bit isn't
-	// read anymore, because all the messages use proto. However, it is set for
-	// backwards compatibility.
-	// TODO: Once the v1.10 is activated, this mask should be removed.
-	x |= bitmaskCodec
-
 	b := [wrappers.IntLen]byte{}
-	binary.BigEndian.PutUint32(b[:], x)
+	binary.BigEndian.PutUint32(b[:], msgLen)
 
 	return b, nil
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -135,18 +135,16 @@ func InboundGetAcceptedFrontier(
 func InboundAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	containerIDs []ids.ID,
+	containerID ids.ID,
 	nodeID ids.NodeID,
 ) InboundMessage {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     AcceptedFrontierOp,
 		message: &p2p.AcceptedFrontier{
-			ChainId:      chainID[:],
-			RequestId:    requestID,
-			ContainerIds: containerIDBytes,
+			ChainId:     chainID[:],
+			RequestId:   requestID,
+			ContainerId: containerID[:],
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -201,6 +199,7 @@ func InboundPushQuery(
 	requestID uint32,
 	deadline time.Duration,
 	container []byte,
+	requestedHeight uint64,
 	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
@@ -208,11 +207,12 @@ func InboundPushQuery(
 		nodeID: nodeID,
 		op:     PushQueryOp,
 		message: &p2p.PushQuery{
-			ChainId:    chainID[:],
-			RequestId:  requestID,
-			Deadline:   uint64(deadline),
-			Container:  container,
-			EngineType: engineType,
+			ChainId:         chainID[:],
+			RequestId:       requestID,
+			Deadline:        uint64(deadline),
+			Container:       container,
+			RequestedHeight: requestedHeight,
+			EngineType:      engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -223,6 +223,7 @@ func InboundPullQuery(
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
+	requestedHeight uint64,
 	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
@@ -230,11 +231,12 @@ func InboundPullQuery(
 		nodeID: nodeID,
 		op:     PullQueryOp,
 		message: &p2p.PullQuery{
-			ChainId:     chainID[:],
-			RequestId:   requestID,
-			Deadline:    uint64(deadline),
-			ContainerId: containerID[:],
-			EngineType:  engineType,
+			ChainId:         chainID[:],
+			RequestId:       requestID,
+			Deadline:        uint64(deadline),
+			ContainerId:     containerID[:],
+			RequestedHeight: requestedHeight,
+			EngineType:      engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -243,22 +245,20 @@ func InboundPullQuery(
 func InboundChits(
 	chainID ids.ID,
 	requestID uint32,
-	preferredContainerIDs []ids.ID,
-	acceptedContainerIDs []ids.ID,
+	preferredID ids.ID,
+	preferredIDAtHeight ids.ID,
+	acceptedID ids.ID,
 	nodeID ids.NodeID,
 ) InboundMessage {
-	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
-	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
-	acceptedContainerIDBytes := make([][]byte, len(acceptedContainerIDs))
-	encodeIDs(acceptedContainerIDs, acceptedContainerIDBytes)
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     ChitsOp,
 		message: &p2p.Chits{
-			ChainId:               chainID[:],
-			RequestId:             requestID,
-			PreferredContainerIds: preferredContainerIDBytes,
-			AcceptedContainerIds:  acceptedContainerIDBytes,
+			ChainId:             chainID[:],
+			RequestId:           requestID,
+			PreferredId:         preferredID[:],
+			PreferredIdAtHeight: preferredIDAtHeight[:],
+			AcceptedId:          acceptedID[:],
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -284,6 +284,26 @@ func InboundAppRequest(
 	}
 }
 
+func InboundAppError(
+	nodeID ids.NodeID,
+	chainID ids.ID,
+	requestID uint32,
+	errorCode int32,
+	errorMessage string,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     AppErrorOp,
+		message: &p2p.AppError{
+			ChainId:      chainID[:],
+			RequestId:    requestID,
+			ErrorCode:    errorCode,
+			ErrorMessage: errorMessage,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
 func InboundAppResponse(
 	chainID ids.ID,
 	requestID uint32,
@@ -304,7 +324,7 @@ func InboundAppResponse(
 
 func encodeIDs(ids []ids.ID, result [][]byte) {
 	for i, id := range ids {
-		copy := id
-		result[i] = copy[:]
+		id := id
+		result[i] = id[:]
 	}
 }

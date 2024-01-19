@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dialer
@@ -64,7 +64,7 @@ func TestDialerCancelDial(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = dialer.Dial(ctx, myIP)
-	require.Error(err)
+	require.ErrorIs(err, context.Canceled)
 
 	// Make an outgoing connection with a non-cancelled context
 	conn, err := dialer.Dial(context.Background(), myIP)

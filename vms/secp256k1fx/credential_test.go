@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -15,20 +16,19 @@ import (
 )
 
 func TestCredentialVerify(t *testing.T) {
-	require := require.New(t)
 	cred := Credential{}
-	require.NoError(cred.Verify())
+	require.NoError(t, cred.Verify())
 }
 
 func TestCredentialVerifyNil(t *testing.T) {
-	require := require.New(t)
 	cred := (*Credential)(nil)
-	require.ErrorIs(cred.Verify(), ErrNilCredential)
+	err := cred.Verify()
+	require.ErrorIs(t, err, ErrNilCredential)
 }
 
 func TestCredentialSerialize(t *testing.T) {
 	require := require.New(t)
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(0, c))
 
@@ -90,8 +90,7 @@ func TestCredentialSerialize(t *testing.T) {
 }
 
 func TestCredentialNotState(t *testing.T) {
-	require := require.New(t)
 	intf := interface{}(&Credential{})
 	_, ok := intf.(verify.State)
-	require.False(ok)
+	require.False(t, ok)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
 
@@ -23,7 +23,7 @@ type Metrics interface {
 
 	// MarkBlockAccepted updates all metrics relating to the acceptance of a
 	// block, including the underlying acceptance of the contained transactions.
-	MarkBlockAccepted(b blocks.Block) error
+	MarkBlockAccepted(b block.Block) error
 	// MarkTxAccepted updates all metrics relating to the acceptance of a
 	// transaction.
 	//
@@ -53,7 +53,7 @@ func (m *metrics) IncTxRefreshMisses() {
 	m.numTxRefreshMisses.Inc()
 }
 
-func (m *metrics) MarkBlockAccepted(b blocks.Block) error {
+func (m *metrics) MarkBlockAccepted(b block.Block) error {
 	for _, tx := range b.Txs() {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
 			return err

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -40,11 +40,6 @@ func (v *Validator) EndTime() time.Time {
 	return time.Unix(int64(v.End), 0)
 }
 
-// Duration is the amount of time that this validator will be in the validator set
-func (v *Validator) Duration() time.Duration {
-	return v.EndTime().Sub(v.StartTime())
-}
-
 // Weight is this validator's weight when sampling
 func (v *Validator) Weight() uint64 {
 	return v.Wght
@@ -60,9 +55,8 @@ func (v *Validator) Verify() error {
 	}
 }
 
-// BoundedBy returns true iff the period that [validator] validates is a
-// (non-strict) subset of the time that [other] validates.
-// Namely, startTime <= v.StartTime() <= v.EndTime() <= endTime
-func (v *Validator) BoundedBy(startTime, endTime time.Time) bool {
-	return !v.StartTime().Before(startTime) && !v.EndTime().After(endTime)
+// BoundedBy returns true iff staker start and end are a
+// (non-strict) subset of the provided time bound
+func BoundedBy(stakerStart, stakerEnd, lowerBound, upperBound time.Time) bool {
+	return !stakerStart.Before(lowerBound) && !stakerEnd.After(upperBound) && !stakerEnd.Before(stakerStart)
 }

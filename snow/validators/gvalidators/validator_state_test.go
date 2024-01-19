@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -30,6 +30,8 @@ type testState struct {
 }
 
 func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
+	require := require.New(t)
+
 	t.Helper()
 
 	state := &testState{
@@ -37,9 +39,7 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	}
 
 	listener, err := grpcutils.NewListener()
-	if err != nil {
-		t.Fatalf("Failed to create listener: %s", err)
-	}
+	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
@@ -49,9 +49,7 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	go grpcutils.Serve(listener, server)
 
 	conn, err := grpcutils.Dial(listener.Addr().String())
-	if err != nil {
-		t.Fatalf("Failed to dial: %s", err)
-	}
+	require.NoError(err)
 
 	state.client = NewClient(pb.NewValidatorStateClient(conn))
 	state.closeFn = func() {
@@ -65,7 +63,6 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 func TestGetMinimumHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -82,13 +79,13 @@ func TestGetMinimumHeight(t *testing.T) {
 	state.server.EXPECT().GetMinimumHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetMinimumHeight(context.Background())
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetCurrentHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -105,13 +102,13 @@ func TestGetCurrentHeight(t *testing.T) {
 	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetCurrentHeight(context.Background())
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetSubnetID(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -129,13 +126,13 @@ func TestGetSubnetID(t *testing.T) {
 	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, errCustom)
 
 	_, err = state.client.GetSubnetID(context.Background(), chainID)
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetValidatorSet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -180,7 +177,21 @@ func TestGetValidatorSet(t *testing.T) {
 	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(expectedVdrs, errCustom)
 
 	_, err = state.client.GetValidatorSet(context.Background(), height, subnetID)
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
+}
+
+func TestPublicKeyDeserialize(t *testing.T) {
+	require := require.New(t)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	pk := bls.PublicFromSecretKey(sk)
+
+	pkBytes := bls.SerializePublicKey(pk)
+	pkDe := bls.DeserializePublicKey(pkBytes)
+	require.NotNil(pkDe)
+	require.Equal(pk, pkDe)
 }
 
 // BenchmarkGetValidatorSet measures the time it takes complete a gRPC client
@@ -199,7 +210,6 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetVal
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
 	defer func() {
-		ctrl.Finish()
 		state.closeFn()
 	}()
 

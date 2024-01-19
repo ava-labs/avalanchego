@@ -1,9 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package grpcutils
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -55,14 +57,12 @@ func TestWaitForReady(t *testing.T) {
 		Serve(listener, server)
 	}()
 
-	// The default includes grpc.WaitForReady(true).
+	// The default is WaitForReady = true.
 	conn, err := Dial(listener.Addr().String())
 	require.NoError(err)
 
 	db := rpcdb.NewClient(pb.NewDatabaseClient(conn))
-
-	err = db.Put([]byte("foo"), []byte("bar"))
-	require.NoError(err)
+	require.NoError(db.Put([]byte("foo"), []byte("bar")))
 
 	noWaitListener, err := NewListener()
 	require.NoError(err)
@@ -84,4 +84,22 @@ func TestWaitForReady(t *testing.T) {
 	status, ok := status.FromError(err)
 	require.True(ok)
 	require.Equal(codes.Unavailable, status.Code())
+}
+
+func TestWaitForReadyCallOption(t *testing.T) {
+	require := require.New(t)
+
+	listener, err := NewListener()
+	require.NoError(err)
+	conn, err := Dial(listener.Addr().String())
+	require.NoError(err)
+	// close listener causes RPC to fail fast.
+	_ = listener.Close()
+
+	db := pb.NewDatabaseClient(conn)
+	_, err = db.Put(context.Background(), &pb.PutRequest{Key: []byte("foo"), Value: []byte("bar")}, grpc.WaitForReady(false))
+	s, ok := status.FromError(err)
+	fmt.Printf("status: %v\n", s)
+	require.True(ok)
+	require.Equal(codes.Unavailable, s.Code())
 }

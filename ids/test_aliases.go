@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -17,13 +17,13 @@ var AliasTests = []func(require *require.Assertions, r AliaserReader, w AliaserW
 
 func AliaserLookupErrorTest(require *require.Assertions, r AliaserReader, _ AliaserWriter) {
 	_, err := r.Lookup("Batman")
-	require.Error(err, "expected an error due to missing alias")
+	// TODO: require error to be errNoIDWithAlias
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func AliaserLookupTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id := ID{'K', 'a', 't', 'e', ' ', 'K', 'a', 'n', 'e'}
-	err := w.Alias(id, "Batwoman")
-	require.NoError(err)
+	require.NoError(w.Alias(id, "Batwoman"))
 
 	res, err := r.Lookup("Batwoman")
 	require.NoError(err)
@@ -40,11 +40,9 @@ func AliaserAliasesEmptyTest(require *require.Assertions, r AliaserReader, _ Ali
 
 func AliaserAliasesTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	err := w.Alias(id, "Batman")
-	require.NoError(err)
 
-	err = w.Alias(id, "Dark Knight")
-	require.NoError(err)
+	require.NoError(w.Alias(id, "Batman"))
+	require.NoError(w.Alias(id, "Dark Knight"))
 
 	aliases, err := r.Aliases(id)
 	require.NoError(err)
@@ -56,14 +54,13 @@ func AliaserAliasesTest(require *require.Assertions, r AliaserReader, w AliaserW
 func AliaserPrimaryAliasTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id1 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
 	id2 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	err := w.Alias(id2, "Batman")
-	require.NoError(err)
 
-	err = w.Alias(id2, "Dark Knight")
-	require.NoError(err)
+	require.NoError(w.Alias(id2, "Batman"))
+	require.NoError(w.Alias(id2, "Dark Knight"))
 
-	_, err = r.PrimaryAlias(id1)
-	require.Error(err)
+	_, err := r.PrimaryAlias(id1)
+	// TODO: require error to be errNoAliasForID
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 
 	expected := "Batman"
 	res, err := r.PrimaryAlias(id2)
@@ -74,33 +71,28 @@ func AliaserPrimaryAliasTest(require *require.Assertions, r AliaserReader, w Ali
 func AliaserAliasClashTest(require *require.Assertions, _ AliaserReader, w AliaserWriter) {
 	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	id2 := ID{'D', 'i', 'c', 'k', ' ', 'G', 'r', 'a', 'y', 's', 'o', 'n'}
-	err := w.Alias(id1, "Batman")
-	require.NoError(err)
 
-	err = w.Alias(id2, "Batman")
-	require.Error(err)
+	require.NoError(w.Alias(id1, "Batman"))
+
+	err := w.Alias(id2, "Batman")
+	// TODO: require error to be errAliasAlreadyMapped
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func AliaserRemoveAliasTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	id2 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
-	err := w.Alias(id1, "Batman")
-	require.NoError(err)
 
-	err = w.Alias(id1, "Dark Knight")
-	require.NoError(err)
+	require.NoError(w.Alias(id1, "Batman"))
+	require.NoError(w.Alias(id1, "Dark Knight"))
 
 	w.RemoveAliases(id1)
 
-	_, err = r.PrimaryAlias(id1)
-	require.Error(err)
+	_, err := r.PrimaryAlias(id1)
+	// TODO: require error to be errNoAliasForID
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 
-	err = w.Alias(id2, "Batman")
-	require.NoError(err)
-
-	err = w.Alias(id2, "Dark Knight")
-	require.NoError(err)
-
-	err = w.Alias(id1, "Dark Night Rises")
-	require.NoError(err)
+	require.NoError(w.Alias(id2, "Batman"))
+	require.NoError(w.Alias(id2, "Dark Knight"))
+	require.NoError(w.Alias(id1, "Dark Night Rises"))
 }

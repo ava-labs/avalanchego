@@ -1,163 +1,129 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNnarySnowball(t *testing.T) {
+	require := require.New(t)
+
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 	sb.Add(Green)
 
-	if pref := sb.Preference(); Red != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Blue)
-
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Blue, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Red)
+	require.Equal(Blue, sb.Preference())
+	require.False(sb.Finalized())
 
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	sb.RecordPollPreference(Red)
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
+
+	sb.RecordSuccessfulPoll(Red)
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
+
+	sb.RecordPollPreference(Blue)
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Blue)
-
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Blue)
-
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if !sb.Finalized() {
-		t.Fatalf("Should be finalized")
-	}
+	require.Equal(Blue, sb.Preference())
+	require.True(sb.Finalized())
 }
 
 func TestVirtuousNnarySnowball(t *testing.T) {
+	require := require.New(t)
+
 	betaVirtuous := 1
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 
-	if pref := sb.Preference(); Red != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Red)
-
-	if pref := sb.Preference(); Red != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
-	} else if !sb.Finalized() {
-		t.Fatalf("Should be finalized")
-	}
+	require.Equal(Red, sb.Preference())
+	require.True(sb.Finalized())
 }
 
 func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
+	require := require.New(t)
+
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
-	if pref := sb.Preference(); Red != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Blue)
-
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Blue, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordUnsuccessfulPoll()
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Blue, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if !sb.Finalized() {
-		t.Fatalf("Finalized too late")
-	}
+	require.Equal(Blue, sb.Preference())
+	require.True(sb.Finalized())
 
-	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, NumSuccessfulPolls = 3, SF(Confidence = 2, Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
-	if str := sb.String(); str != expected {
-		t.Fatalf("Wrong state. Expected:\n%s\nGot:\n%s", expected, str)
-	}
+	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, PreferenceStrength = 3, SF(Confidence = 2, Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
+	require.Equal(expected, sb.String())
 
 	for i := 0; i < 4; i++ {
 		sb.RecordSuccessfulPoll(Red)
 
-		if pref := sb.Preference(); Blue != pref {
-			t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-		} else if !sb.Finalized() {
-			t.Fatalf("Finalized too late")
-		}
+		require.Equal(Blue, sb.Preference())
+		require.True(sb.Finalized())
 	}
 }
 
 func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
+	require := require.New(t)
+
 	betaVirtuous := 2
 	betaRogue := 2
 
-	sb := nnarySnowball{}
-	sb.Initialize(betaVirtuous, betaRogue, Red)
+	sb := newNnarySnowball(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
-	if pref := sb.Preference(); Red != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
-	} else if sb.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(Red, sb.Preference())
+	require.False(sb.Finalized())
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.nnarySnowflake.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	}
+	require.Equal(Blue, sb.nnarySnowflake.Preference())
 
 	sb.RecordSuccessfulPoll(Red)
 
-	if pref := sb.Preference(); Blue != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if pref := sb.nnarySnowflake.Preference(); Red != pref {
-		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	}
+	require.Equal(Blue, sb.Preference())
+	require.Equal(Red, sb.nnarySnowflake.Preference())
 }

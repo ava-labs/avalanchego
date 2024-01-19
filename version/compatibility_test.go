@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -13,17 +13,20 @@ import (
 
 func TestCompatibility(t *testing.T) {
 	v := &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 4,
 		Patch: 3,
 	}
 	minCompatable := &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 4,
 		Patch: 0,
 	}
 	minCompatableTime := time.Unix(9000, 0)
 	prevMinCompatable := &Application{
+		Name:  Client,
 		Major: 1,
 		Minor: 3,
 		Patch: 0,
@@ -38,74 +41,84 @@ func TestCompatibility(t *testing.T) {
 	require.Equal(t, v, compatibility.Version())
 
 	tests := []struct {
-		peer       *Application
-		time       time.Time
-		compatible bool
+		peer        *Application
+		time        time.Time
+		expectedErr error
 	}{
 		{
 			peer: &Application{
+				Name:  LegacyAppName,
 				Major: 1,
 				Minor: 5,
 				Patch: 0,
 			},
-			time:       minCompatableTime,
-			compatible: true,
+			time: minCompatableTime,
 		},
 		{
 			peer: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 5,
+				Patch: 0,
+			},
+			time: minCompatableTime,
+		},
+		{
+			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 3,
 				Patch: 5,
 			},
-			time:       time.Unix(8500, 0),
-			compatible: true,
+			time: time.Unix(8500, 0),
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 0,
 				Minor: 1,
 				Patch: 0,
 			},
-			time:       minCompatableTime,
-			compatible: false,
+			time:        minCompatableTime,
+			expectedErr: errDifferentMajor,
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 3,
 				Patch: 5,
 			},
-			time:       minCompatableTime,
-			compatible: false,
+			time:        minCompatableTime,
+			expectedErr: errIncompatible,
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 2,
 				Patch: 5,
 			},
-			time:       time.Unix(8500, 0),
-			compatible: false,
+			time:        time.Unix(8500, 0),
+			expectedErr: errIncompatible,
 		},
 		{
 			peer: &Application{
+				Name:  Client,
 				Major: 1,
 				Minor: 1,
 				Patch: 5,
 			},
-			time:       time.Unix(7500, 0),
-			compatible: false,
+			time:        time.Unix(7500, 0),
+			expectedErr: errIncompatible,
 		},
 	}
 	for _, test := range tests {
 		peer := test.peer
 		compatibility.clock.Set(test.time)
 		t.Run(fmt.Sprintf("%s-%s", peer, test.time), func(t *testing.T) {
-			if err := compatibility.Compatible(peer); test.compatible && err != nil {
-				t.Fatalf("incorrectly marked %s as incompatible with %s", peer, err)
-			} else if !test.compatible && err == nil {
-				t.Fatalf("incorrectly marked %s as compatible", peer)
-			}
+			err := compatibility.Compatible(peer)
+			require.ErrorIs(t, err, test.expectedErr)
 		})
 	}
 }

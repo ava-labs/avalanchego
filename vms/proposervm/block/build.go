@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -6,10 +6,10 @@ package block
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/x509"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -31,18 +31,21 @@ func BuildUnsigned(
 		timestamp: timestamp,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &block)
+	bytes, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+
+	// Invariant: The durango timestamp isn't used here because the certificate
+	// is empty.
+	return block, block.initialize(bytes, time.Time{})
 }
 
 func Build(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	cert *x509.Certificate,
+	cert *staking.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
 	key crypto.Signer,
@@ -61,7 +64,7 @@ func Build(
 	}
 	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockIntf)
+	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &blockIntf)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +88,7 @@ func Build(
 		return nil, err
 	}
 
-	block.bytes, err = c.Marshal(codecVersion, &blockIntf)
+	block.bytes, err = Codec.Marshal(CodecVersion, &blockIntf)
 	return block, err
 }
 
@@ -100,7 +103,7 @@ func BuildHeader(
 		Body:   bodyID,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &header)
+	bytes, err := Codec.Marshal(CodecVersion, &header)
 	header.bytes = bytes
 	return &header, err
 }
@@ -117,9 +120,11 @@ func BuildOption(
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &block)
+	bytes, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+
+	// Invariant: The durango timestamp isn't used.
+	return block, block.initialize(bytes, time.Time{})
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -29,47 +29,55 @@ type AtomicTxExecutor struct {
 }
 
 func (*AtomicTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
+}
+
+func (*AtomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
+}
+
+func (*AtomicTxExecutor) BaseTx(*txs.BaseTx) error {
+	return ErrWrongTxType
 }
 
 func (e *AtomicTxExecutor) ImportTx(tx *txs.ImportTx) error {

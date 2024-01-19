@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -13,12 +13,14 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	"golang.org/x/exp/slices"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
-	errDuplicatedPrefix = errors.New("duplicated prefix")
-
 	_ MultiGatherer = (*multiGatherer)(nil)
+
+	errReregisterGatherer = errors.New("attempt to register existing gatherer")
 )
 
 // MultiGatherer extends the Gatherer interface by allowing additional gatherers
@@ -77,8 +79,13 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if _, exists := g.gatherers[namespace]; exists {
-		return errDuplicatedPrefix
+	if existingGatherer, exists := g.gatherers[namespace]; exists {
+		return fmt.Errorf("%w for namespace %q; existing: %#v; new: %#v",
+			errReregisterGatherer,
+			namespace,
+			existingGatherer,
+			gatherer,
+		)
 	}
 
 	g.gatherers[namespace] = gatherer
@@ -86,7 +93,7 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 }
 
 func sortMetrics(m []*dto.MetricFamily) {
-	slices.SortFunc(m, func(i, j *dto.MetricFamily) bool {
-		return *i.Name < *j.Name
+	slices.SortFunc(m, func(i, j *dto.MetricFamily) int {
+		return utils.Compare(*i.Name, *j.Name)
 	})
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -22,17 +22,13 @@ func TestPrimaryAliasOrDefaultTest(t *testing.T) {
 	aliaser := NewAliaser()
 	id1 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
 	id2 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	err := aliaser.Alias(id2, "Batman")
-	require.NoError(err)
+	require.NoError(aliaser.Alias(id2, "Batman"))
 
-	err = aliaser.Alias(id2, "Dark Knight")
-	require.NoError(err)
+	require.NoError(aliaser.Alias(id2, "Dark Knight"))
 
 	res := aliaser.PrimaryAliasOrDefault(id1)
 	require.Equal(res, id1.String())
 
 	expected := "Batman"
-	res = aliaser.PrimaryAliasOrDefault(id2)
-	require.NoError(err)
-	require.Equal(expected, res)
+	require.Equal(expected, aliaser.PrimaryAliasOrDefault(id2))
 }

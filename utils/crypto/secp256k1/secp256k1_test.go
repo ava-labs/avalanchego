@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1
@@ -12,14 +12,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 func TestRecover(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
-	key, err := f.NewPrivateKey()
+	key, err := NewPrivateKey()
 	require.NoError(err)
 
 	msg := []byte{1, 2, 3}
@@ -27,38 +27,40 @@ func TestRecover(t *testing.T) {
 	require.NoError(err)
 
 	pub := key.PublicKey()
-	pubRec, err := f.RecoverPublicKey(msg, sig)
+	pubRec, err := RecoverPublicKey(msg, sig)
 	require.NoError(err)
 
 	require.Equal(pub, pubRec)
+
+	require.True(pub.Verify(msg, sig))
 }
 
 func TestCachedRecover(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{Cache: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
-	key, err := f.NewPrivateKey()
+	key, err := NewPrivateKey()
 	require.NoError(err)
 
 	msg := []byte{1, 2, 3}
 	sig, err := key.Sign(msg)
 	require.NoError(err)
 
-	pub1, err := f.RecoverPublicKey(msg, sig)
+	r := RecoverCache{LRU: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
+	pub1, err := r.RecoverPublicKey(msg, sig)
 	require.NoError(err)
-	pub2, err := f.RecoverPublicKey(msg, sig)
+	pub2, err := r.RecoverPublicKey(msg, sig)
 	require.NoError(err)
 
-	require.Equal(pub1, pub2)
+	require.Equal(key.PublicKey(), pub1)
+	require.Equal(key.PublicKey(), pub2)
 }
 
 func TestExtensive(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
 	hash := hashing.ComputeHash256([]byte{1, 2, 3})
 	for i := 0; i < 1000; i++ {
-		key, err := f.NewPrivateKey()
+		key, err := NewPrivateKey()
 		require.NoError(err)
 
 		_, err = key.SignHash(hash)
@@ -69,13 +71,12 @@ func TestExtensive(t *testing.T) {
 func TestGenRecreate(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
 	for i := 0; i < 1000; i++ {
-		sk, err := f.NewPrivateKey()
+		sk, err := NewPrivateKey()
 		require.NoError(err)
 
 		skBytes := sk.Bytes()
-		recoveredSk, err := f.ToPrivateKey(skBytes)
+		recoveredSk, err := ToPrivateKey(skBytes)
 		require.NoError(err)
 
 		require.Equal(sk.PublicKey(), recoveredSk.PublicKey())
@@ -85,8 +86,7 @@ func TestGenRecreate(t *testing.T) {
 func TestVerifyMutatedSignature(t *testing.T) {
 	require := require.New(t)
 
-	f := Factory{}
-	sk, err := f.NewPrivateKey()
+	sk, err := NewPrivateKey()
 	require.NoError(err)
 
 	msg := []byte{'h', 'e', 'l', 'l', 'o'}
@@ -99,23 +99,21 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	newSBytes := s.Bytes()
 	copy(sig[32:], newSBytes[:])
 
-	_, err = f.RecoverPublicKey(msg, sig)
-	require.Error(err)
+	_, err = RecoverPublicKey(msg, sig)
+	require.ErrorIs(err, errMutatedSig)
 }
 
 func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
 	require := require.New(t)
-	f := Factory{}
 
-	key, err := f.NewPrivateKey()
+	key, err := NewPrivateKey()
 	require.NoError(err)
 
 	keyJSON, err := key.MarshalJSON()
 	require.NoError(err)
 
 	key2 := PrivateKey{}
-	err = key2.UnmarshalJSON(keyJSON)
-	require.NoError(err)
+	require.NoError(key2.UnmarshalJSON(keyJSON))
 	require.Equal(key.PublicKey(), key2.PublicKey())
 }
 
@@ -123,30 +121,47 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 	tests := []struct {
 		label string
 		in    []byte
+		err   error
 	}{
 		{
-			"too short",
-			[]byte(`"`),
+			label: "too short",
+			in:    []byte(`"`),
+			err:   errMissingQuotes,
 		},
 		{
-			"missing start quote",
-			[]byte(`PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			label: "missing start quote",
+			in:    []byte(`PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			err:   errMissingQuotes,
 		},
 		{
-			"missing end quote",
-			[]byte(`"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN`),
+			label: "missing end quote",
+			in:    []byte(`"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN`),
+			err:   errMissingQuotes,
 		},
 		{
-			"incorrect prefix",
-			[]byte(`"PrivateKfy-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			label: "incorrect prefix",
+			in:    []byte(`"PrivateKfy-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			err:   errMissingKeyPrefix,
 		},
 		{
-			`"PrivateKey-"`,
-			[]byte(`"PrivateKey-"`),
+			label: `"PrivateKey-"`,
+			in:    []byte(`"PrivateKey-"`),
+			err:   cb58.ErrBase58Decoding,
 		},
 		{
-			`"PrivateKey-1"`,
-			[]byte(`"PrivateKey-1"`),
+			label: `"PrivateKey-1"`,
+			in:    []byte(`"PrivateKey-1"`),
+			err:   cb58.ErrMissingChecksum,
+		},
+		{
+			label: `"PrivateKey-1"`,
+			in:    []byte(`"PrivateKey-1"`),
+			err:   cb58.ErrMissingChecksum,
+		},
+		{
+			label: `"PrivateKey-1"`,
+			in:    []byte(`"PrivateKey-45PJLL"`),
+			err:   errInvalidPrivateKeyLength,
 		},
 	}
 	for _, tt := range tests {
@@ -155,7 +170,7 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 
 			foo := PrivateKey{}
 			err := foo.UnmarshalJSON(tt.in)
-			require.Error(err)
+			require.ErrorIs(err, tt.err)
 		})
 	}
 }
@@ -220,4 +235,72 @@ func TestSigning(t *testing.T) {
 			require.Equal(tt.sig, bytes)
 		})
 	}
+}
+
+func TestExportedMethods(t *testing.T) {
+	require := require.New(t)
+
+	key := TestKeys()[0]
+
+	pubKey := key.PublicKey()
+	require.Equal("111111111111111111116DBWJs", pubKey.addr.String())
+	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", pubKey.Address().String())
+	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", pubKey.addr.String())
+	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", key.Address().String())
+
+	expectedPubKeyBytes := []byte{
+		0x03, 0x73, 0x93, 0x53, 0x47, 0x88, 0x44, 0x78,
+		0xe4, 0x94, 0x5c, 0xd0, 0xfd, 0x94, 0x8e, 0xcf,
+		0x08, 0x8b, 0x94, 0xdf, 0xc9, 0x20, 0x74, 0xf0,
+		0xfb, 0x03, 0xda, 0x6f, 0x4d, 0xbc, 0x94, 0x35,
+		0x7d,
+	}
+	require.Equal(expectedPubKeyBytes, pubKey.bytes)
+
+	expectedPubKey, err := ToPublicKey(expectedPubKeyBytes)
+	require.NoError(err)
+	require.Equal(expectedPubKey.Address(), pubKey.Address())
+	require.Equal(expectedPubKeyBytes, expectedPubKey.Bytes())
+
+	expectedECDSAParams := struct {
+		X []byte
+		Y []byte
+	}{
+		[]byte{
+			0x73, 0x93, 0x53, 0x47, 0x88, 0x44, 0x78, 0xe4,
+			0x94, 0x5c, 0xd0, 0xfd, 0x94, 0x8e, 0xcf, 0x08,
+			0x8b, 0x94, 0xdf, 0xc9, 0x20, 0x74, 0xf0, 0xfb,
+			0x03, 0xda, 0x6f, 0x4d, 0xbc, 0x94, 0x35, 0x7d,
+		},
+		[]byte{
+			0x78, 0xe7, 0x39, 0x45, 0x6c, 0x3b, 0xdb, 0x9e,
+			0xe9, 0xb2, 0xa9, 0xf2, 0x84, 0xfa, 0x64, 0x32,
+			0xd8, 0x4e, 0xf0, 0xfa, 0x3f, 0x82, 0xf5, 0x56,
+			0x10, 0x40, 0x71, 0x7f, 0x1f, 0x5e, 0x8e, 0x27,
+		},
+	}
+	require.Equal(expectedECDSAParams.X, pubKey.ToECDSA().X.Bytes())
+	require.Equal(expectedECDSAParams.Y, pubKey.ToECDSA().Y.Bytes())
+
+	require.Equal(expectedECDSAParams.X, key.ToECDSA().X.Bytes())
+	require.Equal(expectedECDSAParams.Y, key.ToECDSA().Y.Bytes())
+}
+
+func FuzzVerifySignature(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		privateKey, err := NewPrivateKey()
+		require.NoError(err)
+
+		publicKey := privateKey.PublicKey()
+
+		sig, err := privateKey.Sign(data)
+		require.NoError(err)
+
+		recoveredPublicKey, err := RecoverPublicKey(data, sig)
+		require.NoError(err)
+
+		require.Equal(publicKey, recoveredPublicKey)
+	})
 }

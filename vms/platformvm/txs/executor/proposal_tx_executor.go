@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -32,13 +32,15 @@ const (
 var (
 	_ txs.Visitor = (*ProposalTxExecutor)(nil)
 
-	errChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
-	errInvalidState                  = errors.New("generated output isn't valid state")
-	errShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
-	errWrongTxType                   = errors.New("wrong transaction type")
-	errInvalidID                     = errors.New("invalid ID")
-	errProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
-	errAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
+	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
+	ErrChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
+	ErrInvalidState                  = errors.New("generated output isn't valid state")
+	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
+	ErrWrongTxType                   = errors.New("wrong transaction type")
+	ErrInvalidID                     = errors.New("invalid ID")
+	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
+	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 )
 
 type ProposalTxExecutor struct {
@@ -64,35 +66,43 @@ type ProposalTxExecutor struct {
 }
 
 func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
+}
+
+func (*ProposalTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+	return ErrWrongTxType
+}
+
+func (*ProposalTxExecutor) BaseTx(*txs.BaseTx) error {
+	return ErrWrongTxType
 }
 
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
@@ -103,7 +113,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
+			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.Config.BanffTime,
 		)
@@ -152,7 +162,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
+			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.Config.BanffTime,
 		)
@@ -200,7 +210,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
+			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.Config.BanffTime,
 		)
@@ -254,7 +264,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	if e.Config.IsBanffActivated(newChainTime) {
 		return fmt.Errorf(
 			"%w: proposed timestamp (%s) >= Banff fork time (%s)",
-			errAdvanceTimeTxIssuedAfterBanff,
+			ErrAdvanceTimeTxIssuedAfterBanff,
 			newChainTime,
 			e.Config.BanffTime,
 		)
@@ -264,7 +274,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	if !newChainTime.After(parentChainTime) {
 		return fmt.Errorf(
 			"%w, proposed timestamp (%s), chain time (%s)",
-			errChildBlockNotAfterParent,
+			ErrChildBlockNotAfterParent,
 			parentChainTime,
 			parentChainTime,
 		)
@@ -286,14 +296,9 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	changes, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
-	if err != nil {
+	if _, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime); err != nil {
 		return err
 	}
-
-	// Update the state if this tx is committed
-	e.OnCommitState.SetTimestamp(newChainTime)
-	changes.Apply(e.OnCommitState)
 
 	e.PrefersCommit = !newChainTime.After(now.Add(SyncBound))
 
@@ -306,7 +311,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	case tx == nil:
 		return txs.ErrNilTx
 	case tx.TxID == ids.Empty:
-		return errInvalidID
+		return ErrInvalidID
 	case len(e.Tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
@@ -318,30 +323,34 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	if !currentStakerIterator.Next() {
 		return fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
 	}
-	stakerToRemove := currentStakerIterator.Value()
+	stakerToReward := currentStakerIterator.Value()
 	currentStakerIterator.Release()
 
-	if stakerToRemove.TxID != tx.TxID {
+	if stakerToReward.TxID != tx.TxID {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s. Should be removing %s",
+			"%w: %s != %s",
+			ErrRemoveWrongStaker,
+			stakerToReward.TxID,
 			tx.TxID,
-			stakerToRemove.TxID,
 		)
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
 	currentChainTime := e.OnCommitState.GetTimestamp()
-	if !stakerToRemove.EndTime.Equal(currentChainTime) {
+	if !stakerToReward.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s before their end time %s",
+			"%w: TxID = %s with %s < %s",
+			ErrRemoveStakerTooEarly,
 			tx.TxID,
-			stakerToRemove.EndTime,
+			currentChainTime,
+			stakerToReward.EndTime,
 		)
 	}
 
+	// retrieve primaryNetworkValidator before possibly removing it.
 	primaryNetworkValidator, err := e.OnCommitState.GetCurrentValidator(
 		constants.PrimaryNetworkID,
-		stakerToRemove.NodeID,
+		stakerToReward.NodeID,
 	)
 	if err != nil {
 		// This should never error because the staker set is in memory and
@@ -349,287 +358,298 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	stakerTx, _, err := e.OnCommitState.GetTx(stakerToRemove.TxID)
+	stakerTx, _, err := e.OnCommitState.GetTx(stakerToReward.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
+	// Invariant: A [txs.DelegatorTx] does not also implement the
+	//            [txs.ValidatorTx] interface.
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
-		e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
-		e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
-
-		stake := uStakerTx.Stake()
-		outputs := uStakerTx.Outputs()
-		// Invariant: The staked asset must be equal to the reward asset.
-		stakeAsset := stake[0].Asset
-
-		// Refund the stake here
-		for i, out := range stake {
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(len(outputs) + i),
-				},
-				Asset: out.Asset,
-				Out:   out.Output(),
-			}
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnAbortState.AddUTXO(utxo)
+		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
+			return err
 		}
 
-		offset := 0
-
-		// Provide the reward here
-		if stakerToRemove.PotentialReward > 0 {
-			validationRewardsOwner := uStakerTx.ValidationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(stakerToRemove.PotentialReward, validationRewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
-
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(len(outputs) + len(stake)),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
-
-			offset++
-		}
-
-		// Provide the accrued delegatee rewards from successful delegations here.
-		delegateeReward, err := e.OnCommitState.GetDelegateeReward(
-			stakerToRemove.SubnetID,
-			stakerToRemove.NodeID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
-		}
-
-		if delegateeReward > 0 {
-			delegationRewardsOwner := uStakerTx.DelegationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
-
-			onCommitUtxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(len(outputs) + len(stake) + offset),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-			e.OnCommitState.AddUTXO(onCommitUtxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, onCommitUtxo)
-
-			onAbortUtxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID: tx.TxID,
-					// Note: There is no [offset] if the RewardValidatorTx is
-					// aborted, because the validator reward is not awarded.
-					OutputIndex: uint32(len(outputs) + len(stake)),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-			e.OnAbortState.AddUTXO(onAbortUtxo)
-			e.OnAbortState.AddRewardUTXO(tx.TxID, onAbortUtxo)
-		}
-		// Invariant: A [txs.DelegatorTx] does not also implement the
-		//            [txs.ValidatorTx] interface.
+		// Handle staker lifecycle.
+		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
+		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
 	case txs.DelegatorTx:
-		e.OnCommitState.DeleteCurrentDelegator(stakerToRemove)
-		e.OnAbortState.DeleteCurrentDelegator(stakerToRemove)
-
-		stake := uStakerTx.Stake()
-		outputs := uStakerTx.Outputs()
-		stakeAsset := stake[0].Asset
-
-		// Refund the stake here
-		for i, out := range stake {
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(len(outputs) + i),
-				},
-				Asset: out.Asset,
-				Out:   out.Output(),
-			}
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnAbortState.AddUTXO(utxo)
+		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
+			return err
 		}
 
-		// We're removing a delegator, so we need to fetch the validator they
-		// are delegated to.
-		vdrStaker, err := e.OnCommitState.GetCurrentValidator(
-			stakerToRemove.SubnetID,
-			stakerToRemove.NodeID,
-		)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to get whether %s is a validator: %w",
-				stakerToRemove.NodeID,
-				err,
-			)
-		}
-
-		vdrTxIntf, _, err := e.OnCommitState.GetTx(vdrStaker.TxID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to get whether %s is a validator: %w",
-				stakerToRemove.NodeID,
-				err,
-			)
-		}
-
-		// Invariant: Delegators must only be able to reference validator
-		//            transactions that implement [txs.ValidatorTx]. All
-		//            validator transactions implement this interface except the
-		//            AddSubnetValidatorTx.
-		vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
-		if !ok {
-			return errWrongTxType
-		}
-
-		// Calculate split of reward between delegator/delegatee
-		// The delegator gives stake to the validatee
-		validatorShares := vdrTx.Shares()
-		delegatorShares := reward.PercentDenominator - uint64(validatorShares)                            // parentTx.Shares <= reward.PercentDenominator so no underflow
-		delegatorReward := delegatorShares * (stakerToRemove.PotentialReward / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
-		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := math.Mul64(delegatorShares, stakerToRemove.PotentialReward); err == nil {
-			delegatorReward = optimisticReward / reward.PercentDenominator
-		}
-		delegateeReward := stakerToRemove.PotentialReward - delegatorReward // delegatorReward <= reward so no underflow
-
-		offset := 0
-
-		// Reward the delegator here
-		if delegatorReward > 0 {
-			rewardsOwner := uStakerTx.RewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(delegatorReward, rewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(len(outputs) + len(stake)),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
-
-			offset++
-		}
-
-		// Reward the delegatee here
-		if delegateeReward > 0 {
-			if vdrStaker.StartTime.After(e.Config.CortinaTime) {
-				previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
-					vdrStaker.SubnetID,
-					vdrStaker.NodeID,
-				)
-				if err != nil {
-					return fmt.Errorf("failed to get delegatee reward: %w", err)
-				}
-
-				// Invariant: The rewards calculator can never return a
-				//            [potentialReward] that would overflow the
-				//            accumulated rewards.
-				newDelegateeReward := previousDelegateeReward + delegateeReward
-
-				// For any validators starting after [CortinaTime], we defer rewarding the
-				// [delegateeReward] until their staking period is over.
-				err = e.OnCommitState.SetDelegateeReward(
-					vdrStaker.SubnetID,
-					vdrStaker.NodeID,
-					newDelegateeReward,
-				)
-				if err != nil {
-					return fmt.Errorf("failed to update delegatee reward: %w", err)
-				}
-			} else {
-				// For any validators who started prior to [CortinaTime], we issue the
-				// [delegateeReward] immediately.
-				delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
-				outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-				if err != nil {
-					return fmt.Errorf("failed to create output: %w", err)
-				}
-				out, ok := outIntf.(verify.State)
-				if !ok {
-					return errInvalidState
-				}
-				utxo := &avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        tx.TxID,
-						OutputIndex: uint32(len(outputs) + len(stake) + offset),
-					},
-					Asset: stakeAsset,
-					Out:   out,
-				}
-
-				e.OnCommitState.AddUTXO(utxo)
-				e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
-			}
-		}
+		// Handle staker lifecycle.
+		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
+		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of
 		//            time and the current chain timestamp is == this staker's
 		//            EndTime. This means only permissionless stakers should be
 		//            left in the staker set.
-		return errShouldBePermissionlessStaker
+		return ErrShouldBePermissionlessStaker
 	}
 
 	// If the reward is aborted, then the current supply should be decreased.
-	currentSupply, err := e.OnAbortState.GetCurrentSupply(stakerToRemove.SubnetID)
+	currentSupply, err := e.OnAbortState.GetCurrentSupply(stakerToReward.SubnetID)
 	if err != nil {
 		return err
 	}
-	newSupply, err := math.Sub(currentSupply, stakerToRemove.PotentialReward)
+	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
 	if err != nil {
 		return err
 	}
-	e.OnAbortState.SetCurrentSupply(stakerToRemove.SubnetID, newSupply)
+	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 
-	var expectedUptimePercentage float64
-	if stakerToRemove.SubnetID != constants.PrimaryNetworkID {
-		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToRemove.SubnetID)
-		if err != nil {
-			return err
+	// handle option preference
+	e.PrefersCommit, err = e.shouldBeRewarded(stakerToReward, primaryNetworkValidator)
+	return err
+}
+
+func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
+	var (
+		txID    = validator.TxID
+		stake   = uValidatorTx.Stake()
+		outputs = uValidatorTx.Outputs()
+		// Invariant: The staked asset must be equal to the reward asset.
+		stakeAsset = stake[0].Asset
+	)
+
+	// Refund the stake only when validator is about to leave
+	// the staking set
+	for i, out := range stake {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(outputs) + i),
+			},
+			Asset: out.Asset,
+			Out:   out.Output(),
 		}
-		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnAbortState.AddUTXO(utxo)
+	}
+
+	utxosOffset := 0
+
+	// Provide the reward here
+	reward := validator.PotentialReward
+	if reward > 0 {
+		validationRewardsOwner := uValidatorTx.ValidationRewardsOwner()
+		outIntf, err := e.Fx.CreateOutput(reward, validationRewardsOwner)
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
 		if !ok {
-			return errIsNotTransformSubnetTx
+			return ErrInvalidState
+		}
+
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(outputs) + len(stake)),
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnCommitState.AddRewardUTXO(txID, utxo)
+
+		utxosOffset++
+	}
+
+	// Provide the accrued delegatee rewards from successful delegations here.
+	delegateeReward, err := e.OnCommitState.GetDelegateeReward(
+		validator.SubnetID,
+		validator.NodeID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
+	}
+
+	if delegateeReward == 0 {
+		return nil
+	}
+
+	delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
+	outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+	if err != nil {
+		return fmt.Errorf("failed to create output: %w", err)
+	}
+	out, ok := outIntf.(verify.State)
+	if !ok {
+		return ErrInvalidState
+	}
+
+	onCommitUtxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
+		},
+		Asset: stakeAsset,
+		Out:   out,
+	}
+	e.OnCommitState.AddUTXO(onCommitUtxo)
+	e.OnCommitState.AddRewardUTXO(txID, onCommitUtxo)
+
+	// Note: There is no [offset] if the RewardValidatorTx is
+	// aborted, because the validator reward is not awarded.
+	onAbortUtxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(outputs) + len(stake)),
+		},
+		Asset: stakeAsset,
+		Out:   out,
+	}
+	e.OnAbortState.AddUTXO(onAbortUtxo)
+	e.OnAbortState.AddRewardUTXO(txID, onAbortUtxo)
+	return nil
+}
+
+func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, delegator *state.Staker) error {
+	var (
+		txID    = delegator.TxID
+		stake   = uDelegatorTx.Stake()
+		outputs = uDelegatorTx.Outputs()
+		// Invariant: The staked asset must be equal to the reward asset.
+		stakeAsset = stake[0].Asset
+	)
+
+	// Refund the stake only when delegator is about to leave
+	// the staking set
+	for i, out := range stake {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(outputs) + i),
+			},
+			Asset: out.Asset,
+			Out:   out.Output(),
+		}
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnAbortState.AddUTXO(utxo)
+	}
+
+	// We're (possibly) rewarding a delegator, so we need to fetch
+	// the validator they are delegated to.
+	validator, err := e.OnCommitState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
+	if err != nil {
+		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
+	}
+
+	vdrTxIntf, _, err := e.OnCommitState.GetTx(validator.TxID)
+	if err != nil {
+		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
+	}
+
+	// Invariant: Delegators must only be able to reference validator
+	//            transactions that implement [txs.ValidatorTx]. All
+	//            validator transactions implement this interface except the
+	//            AddSubnetValidatorTx.
+	vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
+	if !ok {
+		return ErrWrongTxType
+	}
+
+	// Calculate split of reward between delegator/delegatee
+	delegateeReward, delegatorReward := reward.Split(delegator.PotentialReward, vdrTx.Shares())
+
+	utxosOffset := 0
+
+	// Reward the delegator here
+	reward := delegatorReward
+	if reward > 0 {
+		rewardsOwner := uDelegatorTx.RewardsOwner()
+		outIntf, err := e.Fx.CreateOutput(reward, rewardsOwner)
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(outputs) + len(stake)),
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnCommitState.AddRewardUTXO(txID, utxo)
+
+		utxosOffset++
+	}
+
+	if delegateeReward == 0 {
+		return nil
+	}
+
+	// Reward the delegatee here
+	if e.Config.IsCortinaActivated(validator.StartTime) {
+		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
+			validator.SubnetID,
+			validator.NodeID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get delegatee reward: %w", err)
+		}
+
+		// Invariant: The rewards calculator can never return a
+		//            [potentialReward] that would overflow the
+		//            accumulated rewards.
+		newDelegateeReward := previousDelegateeReward + delegateeReward
+
+		// For any validators starting after [CortinaTime], we defer rewarding the
+		// [reward] until their staking period is over.
+		err = e.OnCommitState.SetDelegateeReward(
+			validator.SubnetID,
+			validator.NodeID,
+			newDelegateeReward,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update delegatee reward: %w", err)
+		}
+	} else {
+		// For any validators who started prior to [CortinaTime], we issue the
+		// [delegateeReward] immediately.
+		delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
+		outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnCommitState.AddRewardUTXO(txID, utxo)
+	}
+	return nil
+}
+
+func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
+	expectedUptimePercentage := e.Config.UptimePercentage
+	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
+		transformSubnet, err := GetTransformSubnetTx(e.OnCommitState, stakerToReward.SubnetID)
+		if err != nil {
+			return false, fmt.Errorf("failed to calculate uptime: %w", err)
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
-	} else {
-		expectedUptimePercentage = e.Config.UptimePercentage
 	}
 
 	// TODO: calculate subnet uptimes
@@ -639,174 +659,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		primaryNetworkValidator.StartTime,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to calculate uptime: %w", err)
+		return false, fmt.Errorf("failed to calculate uptime: %w", err)
 	}
-
-	e.PrefersCommit = uptime >= expectedUptimePercentage
-	return nil
-}
-
-// GetNextStakerChangeTime returns the next time a staker will be either added
-// or removed to/from the current validator set.
-func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
-	currentStakerIterator, err := state.GetCurrentStakerIterator()
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer currentStakerIterator.Release()
-
-	pendingStakerIterator, err := state.GetPendingStakerIterator()
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer pendingStakerIterator.Release()
-
-	hasCurrentStaker := currentStakerIterator.Next()
-	hasPendingStaker := pendingStakerIterator.Next()
-	switch {
-	case hasCurrentStaker && hasPendingStaker:
-		nextCurrentTime := currentStakerIterator.Value().NextTime
-		nextPendingTime := pendingStakerIterator.Value().NextTime
-		if nextCurrentTime.Before(nextPendingTime) {
-			return nextCurrentTime, nil
-		}
-		return nextPendingTime, nil
-	case hasCurrentStaker:
-		return currentStakerIterator.Value().NextTime, nil
-	case hasPendingStaker:
-		return pendingStakerIterator.Value().NextTime, nil
-	default:
-		return time.Time{}, database.ErrNotFound
-	}
-}
-
-// GetValidator returns information about the given validator, which may be a
-// current validator or pending validator.
-func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state.Staker, error) {
-	validator, err := state.GetCurrentValidator(subnetID, nodeID)
-	if err == nil {
-		// This node is currently validating the subnet.
-		return validator, nil
-	}
-	if err != database.ErrNotFound {
-		// Unexpected error occurred.
-		return nil, err
-	}
-	return state.GetPendingValidator(subnetID, nodeID)
-}
-
-// canDelegate returns true if [delegator] can be added as a delegator of
-// [validator].
-//
-// A [delegator] can be added if:
-// - [delegator]'s start time is not before [validator]'s start time
-// - [delegator]'s end time is not after [validator]'s end time
-// - the maximum total weight on [validator] will not exceed [weightLimit]
-func canDelegate(
-	state state.Chain,
-	validator *state.Staker,
-	weightLimit uint64,
-	delegator *state.Staker,
-) (bool, error) {
-	if delegator.StartTime.Before(validator.StartTime) {
-		return false, nil
-	}
-	if delegator.EndTime.After(validator.EndTime) {
-		return false, nil
-	}
-
-	maxWeight, err := GetMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
-	if err != nil {
-		return false, err
-	}
-	newMaxWeight, err := math.Add64(maxWeight, delegator.Weight)
-	if err != nil {
-		return false, err
-	}
-	return newMaxWeight <= weightLimit, nil
-}
-
-// GetMaxWeight returns the maximum total weight of the [validator], including
-// its own weight, between [startTime] and [endTime].
-// The weight changes are applied in the order they will be applied as chain
-// time advances.
-// Invariant:
-// - [validator.StartTime] <= [startTime] < [endTime] <= [validator.EndTime]
-func GetMaxWeight(
-	chainState state.Chain,
-	validator *state.Staker,
-	startTime time.Time,
-	endTime time.Time,
-) (uint64, error) {
-	currentDelegatorIterator, err := chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-	if err != nil {
-		return 0, err
-	}
-
-	// TODO: We can optimize this by moving the current total weight to be
-	//       stored in the validator state.
-	//
-	// Calculate the current total weight on this validator, including the
-	// weight of the actual validator and the sum of the weights of all of the
-	// currently active delegators.
-	currentWeight := validator.Weight
-	for currentDelegatorIterator.Next() {
-		currentDelegator := currentDelegatorIterator.Value()
-
-		currentWeight, err = math.Add64(currentWeight, currentDelegator.Weight)
-		if err != nil {
-			currentDelegatorIterator.Release()
-			return 0, err
-		}
-	}
-	currentDelegatorIterator.Release()
-
-	currentDelegatorIterator, err = chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-	if err != nil {
-		return 0, err
-	}
-	pendingDelegatorIterator, err := chainState.GetPendingDelegatorIterator(validator.SubnetID, validator.NodeID)
-	if err != nil {
-		currentDelegatorIterator.Release()
-		return 0, err
-	}
-	delegatorChangesIterator := state.NewStakerDiffIterator(currentDelegatorIterator, pendingDelegatorIterator)
-	defer delegatorChangesIterator.Release()
-
-	// Iterate over the future stake weight changes and calculate the maximum
-	// total weight on the validator, only including the points in the time
-	// range [startTime, endTime].
-	var currentMax uint64
-	for delegatorChangesIterator.Next() {
-		delegator, isAdded := delegatorChangesIterator.Value()
-		// [delegator.NextTime] > [endTime]
-		if delegator.NextTime.After(endTime) {
-			// This delegation change (and all following changes) occurs after
-			// [endTime]. Since we're calculating the max amount staked in
-			// [startTime, endTime], we can stop.
-			break
-		}
-
-		// [delegator.NextTime] >= [startTime]
-		if !delegator.NextTime.Before(startTime) {
-			// We have advanced time to be at the inside of the delegation
-			// window. Make sure that the max weight is updated accordingly.
-			currentMax = math.Max(currentMax, currentWeight)
-		}
-
-		var op func(uint64, uint64) (uint64, error)
-		if isAdded {
-			op = math.Add64
-		} else {
-			op = math.Sub[uint64]
-		}
-		currentWeight, err = op(currentWeight, delegator.Weight)
-		if err != nil {
-			return 0, err
-		}
-	}
-	// Because we assume [startTime] < [endTime], we have advanced time to
-	// be at the end of the delegation window. Make sure that the max weight is
-	// updated accordingly.
-	return math.Max(currentMax, currentWeight), nil
+	return uptime >= expectedUptimePercentage, nil
 }

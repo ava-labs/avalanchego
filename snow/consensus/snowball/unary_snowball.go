@@ -1,26 +1,35 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
-import (
-	"fmt"
-)
+import "fmt"
 
 var _ UnarySnowball = (*unarySnowball)(nil)
+
+func newUnarySnowball(beta int) unarySnowball {
+	return unarySnowball{
+		unarySnowflake: newUnarySnowflake(beta),
+	}
+}
 
 // unarySnowball is the implementation of a unary snowball instance
 type unarySnowball struct {
 	// wrap the unary snowflake logic
 	unarySnowflake
 
-	// numSuccessfulPolls tracks the total number of successful network polls
-	numSuccessfulPolls int
+	// preferenceStrength tracks the total number of polls with a preference
+	preferenceStrength int
 }
 
 func (sb *unarySnowball) RecordSuccessfulPoll() {
-	sb.numSuccessfulPolls++
+	sb.preferenceStrength++
 	sb.unarySnowflake.RecordSuccessfulPoll()
+}
+
+func (sb *unarySnowball) RecordPollPreference() {
+	sb.preferenceStrength++
+	sb.unarySnowflake.RecordUnsuccessfulPoll()
 }
 
 func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
@@ -33,7 +42,7 @@ func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 		},
 		preference: choice,
 	}
-	bs.numSuccessfulPolls[choice] = sb.numSuccessfulPolls
+	bs.preferenceStrength[choice] = sb.preferenceStrength
 	return bs
 }
 
@@ -43,7 +52,7 @@ func (sb *unarySnowball) Clone() UnarySnowball {
 }
 
 func (sb *unarySnowball) String() string {
-	return fmt.Sprintf("SB(NumSuccessfulPolls = %d, %s)",
-		sb.numSuccessfulPolls,
+	return fmt.Sprintf("SB(PreferenceStrength = %d, %s)",
+		sb.preferenceStrength,
 		&sb.unarySnowflake)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gruntime
@@ -13,7 +13,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
 )
 
-var _ pb.RuntimeServer = &Server{}
+var _ pb.RuntimeServer = (*Server)(nil)
 
 // Server is a VM runtime initializer controlled by RPC.
 type Server struct {

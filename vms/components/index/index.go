@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package index
@@ -23,10 +23,11 @@ import (
 )
 
 var (
-	idxKey                         = []byte("idx")
-	idxCompleteKey                 = []byte("complete")
-	errIndexingRequiredFromGenesis = errors.New("running would create incomplete index. Allow incomplete indices or re-sync from genesis with indexing enabled")
-	errCausesIncompleteIndex       = errors.New("running would create incomplete index. Allow incomplete indices or enable indexing")
+	ErrIndexingRequiredFromGenesis = errors.New("running would create incomplete index. Allow incomplete indices or re-sync from genesis with indexing enabled")
+	ErrCausesIncompleteIndex       = errors.New("running would create incomplete index. Allow incomplete indices or enable indexing")
+
+	idxKey         = []byte("idx")
+	idxCompleteKey = []byte("complete")
 
 	_ AddressTxsIndexer = (*indexer)(nil)
 	_ AddressTxsIndexer = (*noIndexer)(nil)
@@ -174,7 +175,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 
 // Read returns IDs of transactions that changed [address]'s balance of [assetID],
 // starting at [cursor], in order of transaction acceptance. e.g. if [cursor] == 1, does
-// not return the first transaction that changed the balance. (This is for for pagination.)
+// not return the first transaction that changed the balance. (This is for pagination.)
 // Returns at most [pageSize] elements.
 // See AddressTxsIndexer
 func (i *indexer) Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
@@ -229,7 +230,7 @@ func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowInc
 	if !idxComplete && enableIndexing && !allowIncomplete {
 		// In a previous run, we did not index so it's incomplete.
 		// indexing was disabled before but now we want to index.
-		return errIndexingRequiredFromGenesis
+		return ErrIndexingRequiredFromGenesis
 	} else if !idxComplete {
 		// either indexing is disabled, or incomplete indices are ok, so we don't care that index is incomplete
 		return nil
@@ -237,7 +238,7 @@ func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowInc
 
 	// the index is complete
 	if !enableIndexing && !allowIncomplete { // indexing is disabled this run
-		return errCausesIncompleteIndex
+		return ErrCausesIncompleteIndex
 	} else if !enableIndexing {
 		// running without indexing makes it incomplete
 		return database.PutBool(db, idxCompleteKey, false)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -22,7 +22,7 @@ import (
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -32,10 +32,12 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
-	require.ErrorIs(addSubnetValidatorTx.SyntacticVerify(ctx), ErrNilTx)
+	err = addSubnetValidatorTx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}
@@ -94,16 +96,16 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, avax.ErrWrongNetworkID)
 	addSubnetValidatorTx.NetworkID--
 
-	// Case: Missing Subnet ID
+	// Case: Specifies primary network SubnetID
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.Subnet = ids.Empty
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, errAddPrimaryNetworkValidator)
 	addSubnetValidatorTx.Subnet = subnetID
 
 	// Case: No weight
@@ -112,7 +114,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, ErrWeightTooSmall)
 	addSubnetValidatorTx.Wght = validatorWeight
 
 	// Case: Subnet auth indices not unique
@@ -123,7 +125,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, secp256k1fx.ErrInputIndicesNotSortedUnique)
 	*input = oldInput
 
 	// Case: adding to Primary Network
@@ -138,7 +140,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 func TestAddSubnetValidatorMarshal(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -199,7 +201,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
-	txBytes, err := Codec.Marshal(Version, stx)
+	txBytes, err := Codec.Marshal(CodecVersion, stx)
 	require.NoError(err)
 
 	parsedTx, err := Parse(Codec, txBytes)

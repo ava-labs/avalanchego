@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -42,8 +42,7 @@ func TestFilter(t *testing.T) {
 	addrBytes := addrID[:]
 
 	fp := pubsub.NewFilterParam()
-	err := fp.Add(addrBytes)
-	require.NoError(err)
+	require.NoError(fp.Add(addrBytes))
 
 	parser := NewPubSubFilterer(&tx)
 	fr, _ := parser.Filter([]pubsub.Filter{&mockFilter{addr: addrBytes}})

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -6,6 +6,7 @@ package avax
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -16,18 +17,16 @@ import (
 
 func TestUTXOIDVerifyNil(t *testing.T) {
 	utxoID := (*UTXOID)(nil)
-
-	if err := utxoID.Verify(); err == nil {
-		t.Fatalf("Should have errored due to a nil utxo ID")
-	}
+	err := utxoID.Verify()
+	require.ErrorIs(t, err, errNilUTXOID)
 }
 
 func TestUTXOID(t *testing.T) {
-	c := linearcodec.NewDefault()
+	require := require.New(t)
+
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	utxoID := UTXOID{
 		TxID: ids.ID{
@@ -39,80 +38,56 @@ func TestUTXOID(t *testing.T) {
 		OutputIndex: 0x20212223,
 	}
 
-	if err := utxoID.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(utxoID.Verify())
 
 	bytes, err := manager.Marshal(codecVersion, &utxoID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	newUTXOID := UTXOID{}
-	if _, err := manager.Unmarshal(bytes, &newUTXOID); err != nil {
-		t.Fatal(err)
-	}
+	_, err = manager.Unmarshal(bytes, &newUTXOID)
+	require.NoError(err)
 
-	if err := newUTXOID.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if utxoID.InputID() != newUTXOID.InputID() {
-		t.Fatalf("Parsing returned the wrong UTXO ID")
-	}
+	require.NoError(newUTXOID.Verify())
+	require.Equal(utxoID.InputID(), newUTXOID.InputID())
 }
 
-func TestUTXOIDLess(t *testing.T) {
+func TestUTXOIDCompare(t *testing.T) {
 	type test struct {
 		name     string
 		id1      UTXOID
 		id2      UTXOID
-		expected bool
+		expected int
 	}
-	tests := []test{
+	tests := []*test{
 		{
 			name:     "same",
 			id1:      UTXOID{},
 			id2:      UTXOID{},
-			expected: false,
+			expected: 0,
 		},
 		{
-			name: "first id smaller",
+			name: "id smaller",
 			id1:  UTXOID{},
 			id2: UTXOID{
 				TxID: ids.ID{1},
 			},
-			expected: true,
+			expected: -1,
 		},
 		{
-			name: "first id larger",
-			id1: UTXOID{
-				TxID: ids.ID{1},
-			},
-			id2:      UTXOID{},
-			expected: false,
-		},
-		{
-			name: "first index smaller",
+			name: "index smaller",
 			id1:  UTXOID{},
 			id2: UTXOID{
 				OutputIndex: 1,
 			},
-			expected: true,
-		},
-		{
-			name: "first index larger",
-			id1: UTXOID{
-				OutputIndex: 1,
-			},
-			id2:      UTXOID{},
-			expected: false,
+			expected: -1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			require.Equal(tt.expected, tt.id1.Less(&tt.id2))
+
+			require.Equal(tt.expected, tt.id1.Compare(&tt.id2))
+			require.Equal(-tt.expected, tt.id2.Compare(&tt.id1))
 		})
 	}
 }
@@ -204,12 +179,12 @@ func TestUTXOIDFromString(t *testing.T) {
 
 			retrievedUTXOID, err := UTXOIDFromString(test.expectedStr)
 			require.ErrorIs(err, test.parseErr)
-
-			if err == nil {
-				require.Equal(test.utxoID.InputID(), retrievedUTXOID.InputID())
-				require.Equal(test.utxoID, retrievedUTXOID)
-				require.Equal(test.utxoID.String(), retrievedUTXOID.String())
+			if test.parseErr != nil {
+				return
 			}
+			require.Equal(test.utxoID.InputID(), retrievedUTXOID.InputID())
+			require.Equal(test.utxoID, retrievedUTXOID)
+			require.Equal(test.utxoID.String(), retrievedUTXOID.String())
 		})
 	}
 }

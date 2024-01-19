@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -24,7 +24,7 @@ func (vm *VM) GetAncestors(
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
-	maxBlocksRetrivalTime time.Duration,
+	maxBlocksRetrievalTime time.Duration,
 ) ([][]byte, error) {
 	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
@@ -50,15 +50,13 @@ func (vm *VM) GetAncestors(
 		// is repr. by an int.
 		currentByteLength += wrappers.IntLen + len(blkBytes)
 		elapsedTime := vm.Clock.Time().Sub(startTime)
-		if len(res) > 0 && (currentByteLength >= maxBlocksSize || maxBlocksRetrivalTime <= elapsedTime) {
+		if len(res) > 0 && (currentByteLength >= maxBlocksSize || maxBlocksRetrievalTime <= elapsedTime) {
 			return res, nil // reached maximum size or ran out of time
 		}
 
 		res = append(res, blkBytes)
 		blkID = blk.ParentID()
-		maxBlocksNum--
-
-		if maxBlocksNum <= 0 {
+		if len(res) >= maxBlocksNum {
 			return res, nil
 		}
 	}
@@ -66,7 +64,7 @@ func (vm *VM) GetAncestors(
 	// snowman++ fork may have been hit.
 	preMaxBlocksNum := maxBlocksNum - len(res)
 	preMaxBlocksSize := maxBlocksSize - currentByteLength
-	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - time.Since(startTime)
+	preMaxBlocksRetrivalTime := maxBlocksRetrievalTime - time.Since(startTime)
 	innerBytes, err := vm.batchedVM.GetAncestors(
 		ctx,
 		blkID,
@@ -103,7 +101,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 	)
 	for ; blocksIndex < len(blks); blocksIndex++ {
 		blkBytes := blks[blocksIndex]
-		statelessBlock, err := statelessblock.Parse(blkBytes)
+		statelessBlock, err := statelessblock.Parse(blkBytes, vm.DurangoTime)
 		if err != nil {
 			break
 		}

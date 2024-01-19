@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 DEBIAN_BASE_DIR=$PKG_ROOT/debian
 AVALANCHE_BUILD_BIN_DIR=$DEBIAN_BASE_DIR/usr/local/bin
 TEMPLATE=.github/workflows/debian/template 

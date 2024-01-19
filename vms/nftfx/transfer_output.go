@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -26,6 +26,8 @@ var (
 )
 
 type TransferOutput struct {
+	verify.IsState `json:"-"`
+
 	GroupID                  uint32              `serialize:"true" json:"groupID"`
 	Payload                  types.JSONByteSlice `serialize:"true" json:"payload"`
 	secp256k1fx.OutputOwners `serialize:"true"`
@@ -54,8 +56,4 @@ func (out *TransferOutput) Verify() error {
 	default:
 		return out.OutputOwners.Verify()
 	}
-}
-
-func (out *TransferOutput) VerifyState() error {
-	return out.Verify()
 }

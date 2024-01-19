@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -65,7 +65,7 @@ type TransferableOutput struct {
 	Asset `serialize:"true"`
 	// FxID has serialize false because we don't want this to be encoded in bytes
 	FxID ids.ID          `serialize:"false" json:"fxID"`
-	Out  TransferableOut `serialize:"true" json:"output"`
+	Out  TransferableOut `serialize:"true"  json:"output"`
 }
 
 func (out *TransferableOutput) InitCtx(ctx *snow.Context) {
@@ -142,7 +142,7 @@ type TransferableInput struct {
 	Asset  `serialize:"true"`
 	// FxID has serialize false because we don't want this to be encoded in bytes
 	FxID ids.ID         `serialize:"false" json:"fxID"`
-	In   TransferableIn `serialize:"true" json:"input"`
+	In   TransferableIn `serialize:"true"  json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.
@@ -161,8 +161,8 @@ func (in *TransferableInput) Verify() error {
 	}
 }
 
-func (in *TransferableInput) Less(other *TransferableInput) bool {
-	return in.UTXOID.Less(&other.UTXOID)
+func (in *TransferableInput) Compare(other *TransferableInput) int {
+	return in.UTXOID.Compare(&other.UTXOID)
 }
 
 type innerSortTransferableInputsWithSigners struct {
@@ -233,7 +233,7 @@ func VerifyTx(
 			}
 			fc.Consume(in.AssetID(), in.Input().Amount())
 		}
-		if !utils.IsSortedAndUniqueSortable(ins) {
+		if !utils.IsSortedAndUnique(ins) {
 			return ErrInputsNotSortedUnique
 		}
 	}

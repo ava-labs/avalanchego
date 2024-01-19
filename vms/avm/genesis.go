@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -19,6 +19,6 @@ type GenesisAsset struct {
 	txs.CreateAssetTx `serialize:"true"`
 }
 
-func (g *GenesisAsset) Less(other *GenesisAsset) bool {
-	return g.Alias < other.Alias
+func (g *GenesisAsset) Compare(other *GenesisAsset) int {
+	return utils.Compare(g.Alias, other.Alias)
 }

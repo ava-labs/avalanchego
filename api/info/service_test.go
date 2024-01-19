@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -21,32 +21,29 @@ var errTest = errors.New("non-nil error")
 type getVMsTest struct {
 	info          *Info
 	ctrl          *gomock.Controller
-	mockLog       *logging.MockLogger
 	mockVMManager *vms.MockManager
 }
 
 func initGetVMsTest(t *testing.T) *getVMsTest {
 	ctrl := gomock.NewController(t)
-
-	service := Info{}
-	mockLog := logging.NewMockLogger(ctrl)
 	mockVMManager := vms.NewMockManager(ctrl)
-
-	service.log = mockLog
-	service.VMManager = mockVMManager
-
 	return &getVMsTest{
-		info:          &service,
+		info: &Info{
+			Parameters: Parameters{
+				VMManager: mockVMManager,
+			},
+			log: logging.NoLog{},
+		},
 		ctrl:          ctrl,
-		mockLog:       mockLog,
 		mockVMManager: mockVMManager,
 	}
 }
 
 // Tests GetVMs in the happy-case
 func TestGetVMsSuccess(t *testing.T) {
+	require := require.New(t)
+
 	resources := initGetVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
@@ -61,49 +58,40 @@ func TestGetVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	reply := GetVMsReply{}
-	err := resources.info.GetVMs(nil, nil, &reply)
-
-	require.Equal(t, expectedVMRegistry, reply.VMs)
-	require.Equal(t, err, nil)
+	require.NoError(resources.info.GetVMs(nil, nil, &reply))
+	require.Equal(expectedVMRegistry, reply.VMs)
 }
 
 // Tests GetVMs if we fail to list our vms.
 func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
-	defer resources.ctrl.Finish()
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-
-	require.Equal(t, errTest, err)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Tests GetVMs if we can't get our vm aliases.
 func TestGetVMsGetAliasesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
 	vmIDs := []ids.ID{id1, id2}
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-
-	require.Equal(t, err, errTest)
+	require.ErrorIs(t, err, errTest)
 }

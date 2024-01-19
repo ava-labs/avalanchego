@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+const ShortIDLen = 20
+
 // ShortEmpty is a useful all zero value
 var (
 	ShortEmpty = ShortID{}
@@ -22,7 +24,7 @@ var (
 )
 
 // ShortID wraps a 20 byte hash as an identifier
-type ShortID [20]byte
+type ShortID [ShortIDLen]byte
 
 // ToShortID attempt to convert a byte slice into an id
 func ToShortID(bytes []byte) (ShortID, error) {
@@ -52,7 +54,7 @@ func (id ShortID) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte("\"" + str + "\""), nil
+	return []byte(`"` + str + `"`), nil
 }
 
 func (id *ShortID) UnmarshalJSON(b []byte) error {
@@ -108,8 +110,8 @@ func (id ShortID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-func (id ShortID) Less(other ShortID) bool {
-	return bytes.Compare(id[:], other[:]) == -1
+func (id ShortID) Compare(other ShortID) int {
+	return bytes.Compare(id[:], other[:])
 }
 
 // ShortIDsToStrings converts an array of shortIDs to an array of their string

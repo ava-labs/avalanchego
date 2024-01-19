@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -11,12 +11,14 @@ import (
 )
 
 var (
-	_ verify.State = (*OutputOwners)(nil)
+	_ verify.State = (*TransferOutput)(nil)
 
 	ErrNoValueOutput = errors.New("output has no value")
 )
 
 type TransferOutput struct {
+	verify.IsState `json:"-"`
+
 	Amt uint64 `serialize:"true" json:"amount"`
 
 	OutputOwners `serialize:"true"`
@@ -43,16 +45,12 @@ func (out *TransferOutput) Amount() uint64 {
 func (out *TransferOutput) Verify() error {
 	switch {
 	case out == nil:
-		return errNilOutput
+		return ErrNilOutput
 	case out.Amt == 0:
 		return ErrNoValueOutput
 	default:
 		return out.OutputOwners.Verify()
 	}
-}
-
-func (out *TransferOutput) VerifyState() error {
-	return out.Verify()
 }
 
 func (out *TransferOutput) Owners() interface{} {

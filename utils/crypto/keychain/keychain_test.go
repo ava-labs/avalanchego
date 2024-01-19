@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keychain
@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -19,14 +19,13 @@ var errTest = errors.New("test")
 func TestNewLedgerKeychain(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr := ids.GenerateTestShortID()
 
 	// user request invalid number of addresses to derive
 	ledger := NewMockLedger(ctrl)
 	_, err := NewLedgerKeychain(ledger, 0)
-	require.Equal(err, ErrInvalidNumAddrsToDerive)
+	require.ErrorIs(err, ErrInvalidNumAddrsToDerive)
 
 	// ledger does not return expected number of derived addresses
 	ledger = NewMockLedger(ctrl)
@@ -38,7 +37,7 @@ func TestNewLedgerKeychain(t *testing.T) {
 	ledger = NewMockLedger(ctrl)
 	ledger.EXPECT().Addresses([]uint32{0}).Return([]ids.ShortID{addr}, errTest).Times(1)
 	_, err = NewLedgerKeychain(ledger, 1)
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path
 	ledger = NewMockLedger(ctrl)
@@ -50,7 +49,6 @@ func TestNewLedgerKeychain(t *testing.T) {
 func TestLedgerKeychain_Addresses(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -82,7 +80,6 @@ func TestLedgerKeychain_Addresses(t *testing.T) {
 func TestLedgerKeychain_Get(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -126,7 +123,6 @@ func TestLedgerKeychain_Get(t *testing.T) {
 func TestLedgerSigner_SignHash(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -160,7 +156,7 @@ func TestLedgerSigner_SignHash(t *testing.T) {
 	require.True(b)
 
 	_, err = s.SignHash(toSign)
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path 1 addr
 	ledger = NewMockLedger(ctrl)
@@ -210,7 +206,6 @@ func TestLedgerSigner_SignHash(t *testing.T) {
 func TestNewLedgerKeychainFromIndices(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr := ids.GenerateTestShortID()
 	_ = addr
@@ -218,7 +213,7 @@ func TestNewLedgerKeychainFromIndices(t *testing.T) {
 	// user request invalid number of indices
 	ledger := NewMockLedger(ctrl)
 	_, err := NewLedgerKeychainFromIndices(ledger, []uint32{})
-	require.Equal(err, ErrInvalidIndicesLength)
+	require.ErrorIs(err, ErrInvalidIndicesLength)
 
 	// ledger does not return expected number of derived addresses
 	ledger = NewMockLedger(ctrl)
@@ -230,7 +225,7 @@ func TestNewLedgerKeychainFromIndices(t *testing.T) {
 	ledger = NewMockLedger(ctrl)
 	ledger.EXPECT().Addresses([]uint32{0}).Return([]ids.ShortID{addr}, errTest).Times(1)
 	_, err = NewLedgerKeychainFromIndices(ledger, []uint32{0})
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path
 	ledger = NewMockLedger(ctrl)
@@ -242,7 +237,6 @@ func TestNewLedgerKeychainFromIndices(t *testing.T) {
 func TestLedgerKeychainFromIndices_Addresses(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -302,7 +296,6 @@ func TestLedgerKeychainFromIndices_Addresses(t *testing.T) {
 func TestLedgerKeychainFromIndices_Get(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -348,7 +341,6 @@ func TestLedgerKeychainFromIndices_Get(t *testing.T) {
 func TestLedgerSignerFromIndices_SignHash(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -382,7 +374,7 @@ func TestLedgerSignerFromIndices_SignHash(t *testing.T) {
 	require.True(b)
 
 	_, err = s.SignHash(toSign)
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path 1 addr
 	ledger = NewMockLedger(ctrl)

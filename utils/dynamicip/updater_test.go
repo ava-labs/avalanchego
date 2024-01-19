@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
@@ -44,8 +44,8 @@ func TestNewUpdater(t *testing.T) {
 	)
 
 	// Assert NewUpdater returns expected type
-	updater, ok := updaterIntf.(*updater)
-	require.True(ok)
+	require.IsType(&updater{}, updaterIntf)
+	updater := updaterIntf.(*updater)
 
 	// Assert fields set
 	require.Equal(dynamicIP, updater.dynamicIP)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -38,6 +38,8 @@ type Logger interface {
 
 	// SetLevel that this logger should log to
 	SetLevel(level Level)
+	// Enabled returns true if the given level is at or above this level.
+	Enabled(lvl Level) bool
 
 	// Recovers a panic, logs the error, and rethrows the panic.
 	StopOnPanic()

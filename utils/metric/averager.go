@@ -1,15 +1,18 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metric
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+var ErrFailedRegistering = errors.New("failed registering metric")
 
 type Averager interface {
 	Observe(float64)
@@ -40,10 +43,12 @@ func NewAveragerWithErrs(namespace, name, desc string, reg prometheus.Registerer
 		}),
 	}
 
-	errs.Add(
-		reg.Register(a.count),
-		reg.Register(a.sum),
-	)
+	if err := reg.Register(a.count); err != nil {
+		errs.Add(fmt.Errorf("%w: %w", ErrFailedRegistering, err))
+	}
+	if err := reg.Register(a.sum); err != nil {
+		errs.Add(fmt.Errorf("%w: %w", ErrFailedRegistering, err))
+	}
 	return &a
 }
 

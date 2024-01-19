@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -87,44 +89,48 @@ func TestAllWeighted(t *testing.T) {
 
 func WeightedInitializeOverflowTest(t *testing.T, s Weighted) {
 	err := s.Initialize([]uint64{1, math.MaxUint64})
-	require.Error(t, err, "should have reported an overflow error")
+	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
 func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require := require.New(t)
 
-	_, err = s.Sample(1)
-	require.Error(t, err, "should have reported an out of range error")
+	require.NoError(s.Initialize([]uint64{1}))
+
+	_, err := s.Sample(1)
+	require.ErrorIs(err, ErrOutOfRange)
 }
 
 func WeightedSingletonTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1}))
 
 	index, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Equal(t, 0, index, "should have selected the first element")
+	require.NoError(err)
+	require.Zero(index)
 }
 
 func WeightedWithZeroTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{0, 1})
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{0, 1}))
 
 	index, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Equal(t, 1, index, "should have selected the second element")
+	require.NoError(err)
+	require.Equal(1, index)
 }
 
 func WeightedDistributionTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{1, 1, 2, 3, 4})
-	require.NoError(t, err)
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1, 1, 2, 3, 4}))
 
 	counts := make([]int, 5)
 	for i := uint64(0); i < 11; i++ {
 		index, err := s.Sample(i)
-		require.NoError(t, err)
+		require.NoError(err)
 		counts[index]++
 	}
-	require.Equal(t, []int{1, 1, 2, 3, 4}, counts, "wrong distribution returned")
+	require.Equal([]int{1, 1, 2, 3, 4}, counts)
 }

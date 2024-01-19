@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -16,13 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -34,11 +34,11 @@ var errNoChainProvided = errors.New("argument 'chain' not given")
 type Info struct {
 	Parameters
 	log          logging.Logger
+	validators   validators.Manager
 	myIP         ips.DynamicIPPort
 	networking   network.Network
 	chainManager chains.Manager
 	vmManager    vms.Manager
-	validators   validators.Set
 	benchlist    benchlist.Manager
 }
 
@@ -59,37 +59,33 @@ type Parameters struct {
 	VMManager                     vms.Manager
 }
 
-// NewService returns a new admin API service
 func NewService(
 	parameters Parameters,
 	log logging.Logger,
+	validators validators.Manager,
 	chainManager chains.Manager,
 	vmManager vms.Manager,
 	myIP ips.DynamicIPPort,
 	network network.Network,
-	validators validators.Set,
 	benchlist benchlist.Manager,
-) (*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+) (http.Handler, error) {
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(&Info{
-		Parameters:   parameters,
-		log:          log,
-		chainManager: chainManager,
-		vmManager:    vmManager,
-		myIP:         myIP,
-		networking:   network,
-		validators:   validators,
-		benchlist:    benchlist,
-	}, "info"); err != nil {
-		return nil, err
-	}
-	return &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     newServer,
-	}, nil
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
+	return server, server.RegisterService(
+		&Info{
+			Parameters:   parameters,
+			log:          log,
+			validators:   validators,
+			chainManager: chainManager,
+			vmManager:    vmManager,
+			myIP:         myIP,
+			networking:   network,
+			benchlist:    benchlist,
+		},
+		"info",
+	)
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
@@ -217,7 +213,7 @@ type PeersArgs struct {
 type Peer struct {
 	peer.Info
 
-	Benched []ids.ID `json:"benched"`
+	Benched []string `json:"benched"`
 }
 
 // PeersReply are the results from calling Peers
@@ -238,9 +234,18 @@ func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error 
 	peers := i.networking.PeerInfo(args.NodeIDs)
 	peerInfo := make([]Peer, len(peers))
 	for index, peer := range peers {
+		benchedIDs := i.benchlist.GetBenched(peer.ID)
+		benchedAliases := make([]string, len(benchedIDs))
+		for idx, id := range benchedIDs {
+			alias, err := i.chainManager.PrimaryAlias(id)
+			if err != nil {
+				return fmt.Errorf("failed to get primary alias for chain ID %s: %w", id, err)
+			}
+			benchedAliases[idx] = alias
+		}
 		peerInfo[index] = Peer{
 			Info:    peer,
-			Benched: i.benchlist.GetBenched(peer.ID),
+			Benched: benchedAliases,
 		}
 	}
 
@@ -316,6 +321,64 @@ func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeRespons
 	}
 	reply.WeightedAveragePercentage = json.Float64(result.WeightedAveragePercentage)
 	reply.RewardingStakePercentage = json.Float64(result.RewardingStakePercentage)
+	return nil
+}
+
+type ACP struct {
+	SupportWeight json.Uint64         `json:"supportWeight"`
+	Supporters    set.Set[ids.NodeID] `json:"supporters"`
+	ObjectWeight  json.Uint64         `json:"objectWeight"`
+	Objectors     set.Set[ids.NodeID] `json:"objectors"`
+	AbstainWeight json.Uint64         `json:"abstainWeight"`
+}
+
+type ACPsReply struct {
+	ACPs map[uint32]*ACP `json:"acps"`
+}
+
+func (a *ACPsReply) getACP(acpNum uint32) *ACP {
+	acp, ok := a.ACPs[acpNum]
+	if !ok {
+		acp = &ACP{}
+		a.ACPs[acpNum] = acp
+	}
+	return acp
+}
+
+func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
+	i.log.Debug("API called",
+		zap.String("service", "info"),
+		zap.String("method", "acps"),
+	)
+
+	reply.ACPs = make(map[uint32]*ACP, constants.CurrentACPs.Len())
+	peers := i.networking.PeerInfo(nil)
+	for _, peer := range peers {
+		weight := json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
+		if weight == 0 {
+			continue
+		}
+
+		for acpNum := range peer.SupportedACPs {
+			acp := reply.getACP(acpNum)
+			acp.Supporters.Add(peer.ID)
+			acp.SupportWeight += weight
+		}
+		for acpNum := range peer.ObjectedACPs {
+			acp := reply.getACP(acpNum)
+			acp.Objectors.Add(peer.ID)
+			acp.ObjectWeight += weight
+		}
+	}
+
+	totalWeight, err := i.validators.TotalWeight(constants.PrimaryNetworkID)
+	if err != nil {
+		return err
+	}
+	for acpNum := range constants.CurrentACPs {
+		acp := reply.getACP(acpNum)
+		acp.AbstainWeight = json.Uint64(totalWeight) - acp.SupportWeight - acp.ObjectWeight
+	}
 	return nil
 }
 

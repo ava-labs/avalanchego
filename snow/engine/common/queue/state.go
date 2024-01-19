@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package queue
@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -152,14 +152,12 @@ func (s *state) Clear() error {
 		return err
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	return utils.Err(
 		runJobsIter.Error(),
 		jobsIter.Error(),
 		depsIter.Error(),
 		missJobsIter.Error(),
 	)
-	return errs.Err
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue

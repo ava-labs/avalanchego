@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package getter
@@ -7,110 +7,67 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownVertex = errors.New("unknown vertex")
 
-func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
-	peers := validators.NewSet()
-	peer := ids.GenerateTestNodeID()
-	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
-
-	sender := &common.SenderTest{T: t}
-	sender.Default(true)
-	sender.CantSendGetAcceptedFrontier = false
-
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
-
-	commonConfig := common.Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
-		Beacons:                        peers,
-		SampleK:                        peers.Len(),
-		Alpha:                          peers.Weight()/2 + 1,
-		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
-		AncestorsMaxContainersSent:     2000,
-		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
+func newTest(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.SenderTest) {
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
 
-	return manager, sender, commonConfig
+	sender := &common.SenderTest{
+		T: t,
+	}
+	sender.Default(true)
+
+	bs, err := New(
+		manager,
+		sender,
+		logging.NoLog{},
+		time.Second,
+		2000,
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+
+	return bs, manager, sender
 }
 
 func TestAcceptedFrontier(t *testing.T) {
-	manager, sender, config := testSetup(t)
+	require := require.New(t)
+	bs, manager, sender := newTest(t)
 
-	vtxID0 := ids.GenerateTestID()
-	vtxID1 := ids.GenerateTestID()
-	vtxID2 := ids.GenerateTestID()
-
-	bsIntf, err := New(manager, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
-
+	vtxID := ids.GenerateTestID()
 	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
-			vtxID0,
-			vtxID1,
+			vtxID,
 		}
 	}
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
-
-	if err := bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0); err != nil {
-		t.Fatal(err)
-	}
-
-	acceptedSet := set.Set[ids.ID]{}
-	acceptedSet.Add(accepted...)
-
-	manager.EdgeF = nil
-
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
-	}
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
+	require.Equal(vtxID, accepted)
 }
 
 func TestFilterAccepted(t *testing.T) {
-	manager, sender, config := testSetup(t)
+	require := require.New(t)
+	bs, manager, sender := newTest(t)
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
@@ -125,17 +82,6 @@ func TestFilterAccepted(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	bsIntf, err := New(manager, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
-
-	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
-
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
@@ -145,7 +91,7 @@ func TestFilterAccepted(t *testing.T) {
 		case vtxID2:
 			return nil, errUnknownVertex
 		}
-		t.Fatal(errUnknownVertex)
+		require.FailNow(errUnknownVertex.Error())
 		return nil, errUnknownVertex
 	}
 
@@ -154,22 +100,10 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs); err != nil {
-		t.Fatal(err)
-	}
+	vtxIDs := set.Of(vtxID0, vtxID1, vtxID2)
+	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs))
 
-	acceptedSet := set.Set[ids.ID]{}
-	acceptedSet.Add(accepted...)
-
-	manager.GetVtxF = nil
-
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
-	}
+	require.Contains(accepted, vtxID0)
+	require.Contains(accepted, vtxID1)
+	require.NotContains(accepted, vtxID2)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -12,7 +12,28 @@ import (
 )
 
 // Sender defines how a consensus engine sends messages and requests to other
-// validators
+// validators.
+//
+// Messages can be categorized as either: requests, responses, or gossip. Gossip
+// messages do not include requestIDs, because no response is expected from the
+// peer. However, both requests and responses include requestIDs.
+//
+// It is expected that each [nodeID + requestID + expected response type] that
+// is outstanding at any given time is unique.
+//
+// As an example, it is valid to send `Get(nodeA, request0)` and
+// `PullQuery(nodeA, request0)` because they have different expected response
+// types, `Put` and `Chits`.
+//
+// Additionally, after having sent `Get(nodeA, request0)` and receiving either
+// `Put(nodeA, request0)` or `GetFailed(nodeA, request0)`, it is valid to resend
+// `Get(nodeA, request0)`. Because the initial `Get` request is no longer
+// outstanding.
+//
+// This means that requestIDs can be reused. In practice, requests always have a
+// reasonable maximum timeout, so it is generally safe to assume that by the
+// time the requestID space has been exhausted, the beginning of the requestID
+// space is free of conflicts.
 type Sender interface {
 	snow.Acceptor
 
@@ -62,7 +83,7 @@ type FrontierSender interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerID ids.ID,
 	)
 }
 
@@ -110,14 +131,33 @@ type QuerySender interface {
 	// existence of the specified container.
 	// This is the same as PullQuery, except that this message includes the body
 	// of the container rather than its ID.
-	SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte)
+	SendPushQuery(
+		ctx context.Context,
+		nodeIDs set.Set[ids.NodeID],
+		requestID uint32,
+		container []byte,
+		requestedHeight uint64,
+	)
 
 	// Request from the specified nodes their preferred frontier, given the
 	// existence of the specified container.
-	SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID)
+	SendPullQuery(
+		ctx context.Context,
+		nodeIDs set.Set[ids.NodeID],
+		requestID uint32,
+		containerID ids.ID,
+		requestedHeight uint64,
+	)
 
 	// Send chits to the specified node
-	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID)
+	SendChits(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		requestID uint32,
+		preferredID ids.ID,
+		preferredIDAtHeight ids.ID,
+		acceptedID ids.ID,
+	)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted
@@ -135,15 +175,12 @@ type NetworkAppSender interface {
 	// * An AppResponse from nodeID with ID [requestID]
 	// * An AppRequestFailed from nodeID with ID [requestID]
 	// Exactly one of the above messages will eventually be received per nodeID.
-	// A non-nil error should be considered fatal.
 	SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error
 	// Send an application-level response to a request.
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
-	// A non-nil error should be considered fatal.
 	SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error
 	// Gossip an application-level message.
-	// A non-nil error should be considered fatal.
 	SendAppGossip(ctx context.Context, appGossipBytes []byte) error
 	SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error
 }
@@ -159,7 +196,6 @@ type CrossChainAppSender interface {
 	// * A CrossChainAppRequestFailed from [chainID] with ID [requestID]
 	// Exactly one of the above messages will eventually be received from
 	// [chainID].
-	// A non-nil error should be considered fatal.
 	SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error
 	// SendCrossChainAppResponse sends an application-level response to a
 	// specific chain
@@ -167,7 +203,6 @@ type CrossChainAppSender interface {
 	// This response must be in response to a CrossChainAppRequest that the VM
 	// corresponding to this CrossChainAppSender received from [chainID] with ID
 	// [requestID].
-	// A non-nil error should be considered fatal.
 	SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error
 }
 

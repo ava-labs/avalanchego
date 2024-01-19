@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -6,6 +6,8 @@ package snowman
 import (
 	"context"
 	"errors"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -36,7 +38,7 @@ func (e *EngineTest) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 		return e.GetBlockF(ctx, blkID)
 	}
 	if e.CantGetBlock && e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetBlock")
+		require.FailNow(e.T, errGetBlock.Error())
 	}
 	return nil, errGetBlock
 }

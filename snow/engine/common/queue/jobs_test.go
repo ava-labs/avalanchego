@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package queue
@@ -6,6 +6,7 @@ package queue
 import (
 	"bytes"
 	"context"
+	"math"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -32,7 +33,7 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 		},
 		MissingDependenciesF: func(context.Context) (set.Set[ids.ID], error) {
 			if parentID != ids.Empty && !*parentExecuted {
-				return set.Set[ids.ID]{parentID: struct{}{}}, nil
+				return set.Of(parentID), nil
 			}
 			return set.Set[ids.ID]{}, nil
 		},
@@ -62,12 +63,8 @@ func TestNew(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(parser))
 
 	dbSize, err := database.Size(db)
 	require.NoError(err)
@@ -83,12 +80,8 @@ func TestPushAndExecute(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(parser))
 
 	jobID := ids.GenerateTestID()
 	job := testJob(t, jobID, nil, ids.Empty, nil)
@@ -104,14 +97,11 @@ func TestPushAndExecute(t *testing.T) {
 	require.NoError(err)
 	require.True(has)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(jobs.SetParser(parser))
 
 	has, err = jobs.Has(jobID)
 	require.NoError(err)
@@ -126,7 +116,8 @@ func TestPushAndExecute(t *testing.T) {
 		return job, nil
 	}
 
-	count, err := jobs.ExecuteAll(context.Background(), snow.DefaultConsensusContextTest(), &common.Halter{}, false)
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	count, err := jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	require.NoError(err)
 	require.Equal(1, count)
 
@@ -152,12 +143,8 @@ func TestRemoveDependency(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(parser))
 
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
@@ -196,7 +183,8 @@ func TestRemoveDependency(t *testing.T) {
 		}
 	}
 
-	count, err := jobs.ExecuteAll(context.Background(), snow.DefaultConsensusContextTest(), &common.Halter{}, false)
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	count, err := jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	require.NoError(err)
 	require.Equal(2, count)
 	require.True(executed0)
@@ -218,9 +206,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	jobID := ids.GenerateTestID()
 	job := testJob(t, jobID, nil, ids.Empty, nil)
@@ -233,8 +219,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	require.False(pushed)
 	require.NoError(err)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
@@ -251,9 +236,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := New(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID := ids.GenerateTestID()
@@ -267,8 +250,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	require.False(pushed)
 	require.NoError(err)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
@@ -286,9 +268,7 @@ func TestMissingJobs(t *testing.T) {
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -296,14 +276,12 @@ func TestMissingJobs(t *testing.T) {
 	jobs.AddMissingID(job0ID)
 	jobs.AddMissingID(job1ID)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	numMissingIDs := jobs.NumMissingIDs()
 	require.Equal(2, numMissingIDs)
 
-	missingIDSet := set.Set[ids.ID]{}
-	missingIDSet.Add(jobs.MissingIDs()...)
+	missingIDSet := set.Of(jobs.MissingIDs()...)
 
 	containsJob0ID := missingIDSet.Contains(job0ID)
 	require.True(containsJob0ID)
@@ -313,17 +291,13 @@ func TestMissingJobs(t *testing.T) {
 
 	jobs.RemoveMissingID(job1ID)
 
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
-	missingIDSet = set.Set[ids.ID]{}
-	missingIDSet.Add(jobs.MissingIDs()...)
+	missingIDSet = set.Of(jobs.MissingIDs()...)
 
 	containsJob0ID = missingIDSet.Contains(job0ID)
 	require.True(containsJob0ID)
@@ -339,12 +313,8 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
@@ -387,10 +357,11 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 		}
 	}
 
-	_, err = jobs.ExecuteAll(context.Background(), snow.DefaultConsensusContextTest(), &common.Halter{}, false)
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	_, err = jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	// Assert that the database closed error on job1 causes ExecuteAll
 	// to fail in the middle of execution.
-	require.Error(err)
+	require.ErrorIs(err, database.ErrClosed)
 	require.True(executed0)
 	require.False(executed1)
 
@@ -403,15 +374,11 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	// Create jobs queue from the same database and ensure that the jobs queue
 	// recovers correctly.
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	missingIDs := jobs.MissingIDs()
-	require.Equal(1, len(missingIDs))
+	require.Len(missingIDs, 1)
 
 	require.Equal(missingIDs[0], job0.ID())
 
@@ -423,7 +390,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	require.NoError(err)
 	require.True(hasNext)
 
-	count, err := jobs.ExecuteAll(context.Background(), snow.DefaultConsensusContextTest(), &common.Halter{}, false)
+	count, err := jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	require.NoError(err)
 	require.Equal(2, count)
 	require.True(executed1)
@@ -436,12 +403,8 @@ func TestInitializeNumJobs(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -482,27 +445,20 @@ func TestInitializeNumJobs(t *testing.T) {
 	pushed, err := jobs.Push(context.Background(), job0)
 	require.True(pushed)
 	require.NoError(err)
-	require.EqualValues(1, jobs.state.numJobs)
+	require.Equal(uint64(1), jobs.state.numJobs)
 
 	pushed, err = jobs.Push(context.Background(), job1)
 	require.True(pushed)
 	require.NoError(err)
-	require.EqualValues(2, jobs.state.numJobs)
+	require.Equal(uint64(2), jobs.state.numJobs)
 
-	err = jobs.Commit()
-	require.NoError(err)
-
-	err = database.Clear(jobs.state.metadataDB, jobs.state.metadataDB)
-	require.NoError(err)
-
-	err = jobs.Commit()
-	require.NoError(err)
+	require.NoError(jobs.Commit())
+	require.NoError(database.Clear(jobs.state.metadataDB, math.MaxInt))
+	require.NoError(jobs.Commit())
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.EqualValues(2, jobs.state.numJobs)
+	require.NoError(err)
+	require.Equal(uint64(2), jobs.state.numJobs)
 }
 
 func TestClearAll(t *testing.T) {
@@ -512,12 +468,8 @@ func TestClearAll(t *testing.T) {
 	db := memdb.New()
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := jobs.SetParser(context.Background(), parser); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(jobs.SetParser(context.Background(), parser))
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
 	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)

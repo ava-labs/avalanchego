@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
@@ -17,30 +17,14 @@ var _ Tx = (*TestTx)(nil)
 type TestTx struct {
 	choices.TestDecidable
 
-	DependenciesV    []Tx
+	DependenciesV    set.Set[ids.ID]
 	DependenciesErrV error
-	InputIDsV        []ids.ID
-	HasWhitelistV    bool
-	WhitelistV       set.Set[ids.ID]
-	WhitelistErrV    error
 	VerifyV          error
 	BytesV           []byte
 }
 
-func (t *TestTx) Dependencies() ([]Tx, error) {
+func (t *TestTx) MissingDependencies() (set.Set[ids.ID], error) {
 	return t.DependenciesV, t.DependenciesErrV
-}
-
-func (t *TestTx) InputIDs() []ids.ID {
-	return t.InputIDsV
-}
-
-func (t *TestTx) HasWhitelist() bool {
-	return t.HasWhitelistV
-}
-
-func (t *TestTx) Whitelist(context.Context) (set.Set[ids.ID], error) {
-	return t.WhitelistV, t.WhitelistErrV
 }
 
 func (t *TestTx) Verify(context.Context) error {

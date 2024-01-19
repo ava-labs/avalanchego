@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -52,25 +52,24 @@ func init() {
 }
 
 func TestFxInitialize(t *testing.T) {
-	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
-	require.NoError(fx.Initialize(&vm))
+	require.NoError(t, fx.Initialize(&vm))
 }
 
 func TestFxInitializeInvalid(t *testing.T) {
-	require := require.New(t)
 	fx := Fx{}
-	require.ErrorIs(fx.Initialize(nil), ErrWrongVMType)
+	err := fx.Initialize(nil)
+	require.ErrorIs(t, err, ErrWrongVMType)
 }
 
 func TestFxVerifyTransfer(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -108,7 +107,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 func TestFxVerifyTransferNilTx(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -137,13 +136,14 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(nil, in, cred, out), ErrWrongTxType)
+	err := fx.VerifyTransfer(nil, in, cred, out)
+	require.ErrorIs(err, ErrWrongTxType)
 }
 
 func TestFxVerifyTransferNilOutput(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -163,13 +163,14 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, nil), ErrWrongUTXOType)
+	err := fx.VerifyTransfer(tx, in, cred, nil)
+	require.ErrorIs(err, ErrWrongUTXOType)
 }
 
 func TestFxVerifyTransferNilInput(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -193,13 +194,14 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, nil, cred, out), ErrWrongInputType)
+	err := fx.VerifyTransfer(tx, nil, cred, out)
+	require.ErrorIs(err, ErrWrongInputType)
 }
 
 func TestFxVerifyTransferNilCredential(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -224,13 +226,14 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, nil, out), ErrWrongCredentialType)
+	err := fx.VerifyTransfer(tx, in, nil, out)
+	require.ErrorIs(err, ErrWrongCredentialType)
 }
 
 func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -260,13 +263,14 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errOutputUnoptimized)
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrOutputUnoptimized)
 }
 
 func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -296,13 +300,14 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 		},
 	}
 
-	require.Error(fx.VerifyTransfer(tx, in, cred, out))
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrMismatchedAmounts)
 }
 
 func TestFxVerifyTransferTimelocked(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -332,13 +337,14 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrTimelocked)
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrTimelocked)
 }
 
 func TestFxVerifyTransferTooManySigners(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -369,13 +375,14 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrTooManySigners)
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrTooManySigners)
 }
 
 func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -403,13 +410,14 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 		Sigs: [][secp256k1.SignatureLen]byte{},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrTooFewSigners)
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrTooFewSigners)
 }
 
 func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -440,13 +448,14 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrInputCredentialSignersMismatch)
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrInputCredentialSignersMismatch)
 }
 
 func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -479,13 +488,14 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 
 	require.NoError(fx.VerifyTransfer(tx, in, cred, out))
 	require.NoError(fx.Bootstrapped())
-	require.Error(fx.VerifyTransfer(tx, in, cred, out), errAddrsNotSortedUnique)
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, secp256k1.ErrInvalidSig)
 }
 
 func TestFxVerifyTransferWrongSigner(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -518,13 +528,14 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 
 	require.NoError(fx.VerifyTransfer(tx, in, cred, out))
 	require.NoError(fx.Bootstrapped())
-	require.Error(fx.VerifyTransfer(tx, in, cred, out))
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrWrongSig)
 }
 
 func TestFxVerifyTransferSigIndexOOB(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -557,13 +568,14 @@ func TestFxVerifyTransferSigIndexOOB(t *testing.T) {
 
 	require.NoError(fx.VerifyTransfer(tx, in, cred, out))
 	require.NoError(fx.Bootstrapped())
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrInputOutputIndexOutOfBounds)
+	err := fx.VerifyTransfer(tx, in, cred, out)
+	require.ErrorIs(err, ErrInputOutputIndexOutOfBounds)
 }
 
 func TestFxVerifyOperation(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -615,7 +627,7 @@ func TestFxVerifyOperation(t *testing.T) {
 func TestFxVerifyOperationUnknownTx(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -660,13 +672,14 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(nil, op, cred, utxos), ErrWrongTxType)
+	err := fx.VerifyOperation(nil, op, cred, utxos)
+	require.ErrorIs(err, ErrWrongTxType)
 }
 
 func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -689,13 +702,14 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, nil, cred, utxos), ErrWrongOpType)
+	err := fx.VerifyOperation(tx, nil, cred, utxos)
+	require.ErrorIs(err, ErrWrongOpType)
 }
 
 func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -736,13 +750,14 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, nil, utxos), ErrWrongCredentialType)
+	err := fx.VerifyOperation(tx, op, nil, utxos)
+	require.ErrorIs(err, ErrWrongCredentialType)
 }
 
 func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -788,13 +803,14 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo, utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), ErrWrongNumberOfUTXOs)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, ErrWrongNumberOfUTXOs)
 }
 
 func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -832,13 +848,14 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 	}
 
 	utxos := []interface{}{nil}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), ErrWrongUTXOType)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, ErrWrongUTXOType)
 }
 
 func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -881,13 +898,14 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errOutputUnspendable)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, ErrOutputUnspendable)
 }
 
 func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	require := require.New(t)
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -928,12 +946,13 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), ErrWrongMintCreated)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, ErrWrongMintCreated)
 }
 
 func TestVerifyPermission(t *testing.T) {
 	vm := TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
@@ -962,7 +981,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 0,
 				Addrs:     []ids.ShortID{addr},
 			},
-			errOutputUnoptimized,
+			ErrOutputUnoptimized,
 		},
 		{
 			"threshold 0, no sigs, no addrs",
@@ -995,7 +1014,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 0,
 				Addrs:     []ids.ShortID{addr},
 			},
-			errOutputUnoptimized,
+			ErrOutputUnoptimized,
 		},
 		{
 			"threshold 1, 0 sigs (too few sigs)",
@@ -1028,7 +1047,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
-			errNotSortedUnique,
+			ErrInputIndicesNotSortedUnique,
 		},
 		{
 			"threshold 2, repeated address and repeated sig",
@@ -1039,7 +1058,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr},
 			},
-			errAddrsNotSortedUnique,
+			ErrAddrsNotSortedUnique,
 		},
 		{
 			"threshold 2, 2 sigs",
@@ -1061,7 +1080,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
-			errNotSortedUnique,
+			ErrInputIndicesNotSortedUnique,
 		},
 		{
 			"threshold 1, 1 sig, index out of bounds",

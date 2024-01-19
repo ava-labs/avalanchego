@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -81,15 +81,15 @@ func (s *tracedSender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.
 	s.sender.SendGetAcceptedFrontier(ctx, nodeIDs, requestID)
 }
 
-func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
-	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerIDs)
+	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerID)
 }
 
 func (s *tracedSender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
@@ -157,36 +157,39 @@ func (s *tracedSender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID
 	s.sender.SendPut(ctx, nodeID, requestID, container)
 }
 
-func (s *tracedSender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte) {
+func (s *tracedSender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte, requestedHeight uint64) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendPushQuery", oteltrace.WithAttributes(
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("containerLen", len(container)),
+		attribute.Int64("requestedHeight", int64(requestedHeight)),
 	))
 	defer span.End()
 
-	s.sender.SendPushQuery(ctx, nodeIDs, requestID, container)
+	s.sender.SendPushQuery(ctx, nodeIDs, requestID, container, requestedHeight)
 }
 
-func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
+func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID, requestedHeight uint64) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendPullQuery", oteltrace.WithAttributes(
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Stringer("containerID", containerID),
+		attribute.Int64("requestedHeight", int64(requestedHeight)),
 	))
 	defer span.End()
 
-	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID)
+	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID, requestedHeight)
 }
 
-func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
+func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numVotes", len(votes)),
-		attribute.Int("numAccepted", len(accepted)),
+		attribute.Stringer("preferredID", preferredID),
+		attribute.Stringer("preferredIDAtHeight", preferredIDAtHeight),
+		attribute.Stringer("acceptedID", acceptedID),
 	))
 	defer span.End()
 
-	s.sender.SendChits(ctx, nodeID, requestID, votes, accepted)
+	s.sender.SendChits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
 }
 
 func (s *tracedSender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -42,24 +42,6 @@ func (t *ImportTx) InputIDs() set.Set[ids.ID] {
 		inputs.Add(in.InputID())
 	}
 	return inputs
-}
-
-// ConsumedAssetIDs returns the IDs of the assets this transaction consumes
-func (t *ImportTx) ConsumedAssetIDs() set.Set[ids.ID] {
-	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.ImportedIns {
-		assets.Add(in.AssetID())
-	}
-	return assets
-}
-
-// AssetIDs returns the IDs of the assets this transaction depends on
-func (t *ImportTx) AssetIDs() set.Set[ids.ID] {
-	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.ImportedIns {
-		assets.Add(in.AssetID())
-	}
-	return assets
 }
 
 // NumCredentials returns the number of expected credentials

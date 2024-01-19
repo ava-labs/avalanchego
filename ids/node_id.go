@@ -1,21 +1,27 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
 
 import (
 	"bytes"
-	"crypto/x509"
+	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const NodeIDPrefix = "NodeID-"
+const (
+	NodeIDPrefix = "NodeID-"
+	NodeIDLen    = ShortIDLen
+)
 
 var (
 	EmptyNodeID = NodeID{}
+
+	errShortNodeID = errors.New("insufficient NodeID length")
 
 	_ utils.Sortable[NodeID] = NodeID{}
 )
@@ -31,7 +37,7 @@ func (id NodeID) Bytes() []byte {
 }
 
 func (id NodeID) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + id.String() + "\""), nil
+	return []byte(`"` + id.String() + `"`), nil
 }
 
 func (id NodeID) MarshalText() ([]byte, error) {
@@ -43,7 +49,7 @@ func (id *NodeID) UnmarshalJSON(b []byte) error {
 	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) <= 2+len(NodeIDPrefix) {
-		return fmt.Errorf("expected NodeID length to be > %d", 2+len(NodeIDPrefix))
+		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, 2+len(NodeIDPrefix))
 	}
 
 	lastIndex := len(str) - 1
@@ -60,8 +66,8 @@ func (id *NodeID) UnmarshalText(text []byte) error {
 	return id.UnmarshalJSON(text)
 }
 
-func (id NodeID) Less(other NodeID) bool {
-	return bytes.Compare(id[:], other[:]) == -1
+func (id NodeID) Compare(other NodeID) int {
+	return bytes.Compare(id[:], other[:])
 }
 
 // ToNodeID attempt to convert a byte slice into a node id
@@ -70,7 +76,7 @@ func ToNodeID(bytes []byte) (NodeID, error) {
 	return NodeID(nodeID), err
 }
 
-func NodeIDFromCert(cert *x509.Certificate) NodeID {
+func NodeIDFromCert(cert *staking.Certificate) NodeID {
 	return hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)

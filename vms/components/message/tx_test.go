@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -27,8 +27,8 @@ func TestTx(t *testing.T) {
 	require.NoError(err)
 	require.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*Tx)
-	require.True(ok)
+	require.IsType(&Tx{}, parsedMsgIntf)
+	parsedMsg := parsedMsgIntf.(*Tx)
 
 	require.Equal(tx, parsedMsg.Tx)
 }

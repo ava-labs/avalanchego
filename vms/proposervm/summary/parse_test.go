@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package summary
@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/codec"
 )
 
 func TestParse(t *testing.T) {
@@ -35,5 +37,5 @@ func TestParseGibberish(t *testing.T) {
 	bytes := []byte{0, 1, 2, 3, 4, 5}
 
 	_, err := Parse(bytes)
-	require.Error(err)
+	require.ErrorIs(err, codec.ErrUnknownVersion)
 }

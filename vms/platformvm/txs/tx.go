@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -18,6 +19,8 @@ import (
 )
 
 var (
+	_ gossip.Gossipable = (*Tx)(nil)
+
 	ErrNilSignedTx = errors.New("nil signed tx is not valid")
 
 	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
@@ -31,7 +34,7 @@ type Tx struct {
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 
-	id    ids.ID
+	TxID  ids.ID `json:"id"`
 	bytes []byte
 }
 
@@ -45,12 +48,12 @@ func NewSigned(
 }
 
 func (tx *Tx) Initialize(c codec.Manager) error {
-	signedBytes, err := c.Marshal(Version, tx)
+	signedBytes, err := c.Marshal(CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -63,7 +66,7 @@ func (tx *Tx) Initialize(c codec.Manager) error {
 func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
 	tx.Unsigned.SetBytes(unsignedBytes)
 	tx.bytes = signedBytes
-	tx.id = hashing.ComputeHash256Array(signedBytes)
+	tx.TxID = hashing.ComputeHash256Array(signedBytes)
 }
 
 // Parse signed tx starting from its byte representation.
@@ -75,7 +78,7 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 		return nil, fmt.Errorf("couldn't parse tx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -90,7 +93,11 @@ func (tx *Tx) Bytes() []byte {
 }
 
 func (tx *Tx) ID() ids.ID {
-	return tx.id
+	return tx.TxID
+}
+
+func (tx *Tx) GossipID() ids.ID {
+	return tx.TxID
 }
 
 // UTXOs returns the UTXOs transaction is producing.
@@ -100,7 +107,7 @@ func (tx *Tx) UTXOs() []*avax.UTXO {
 	for i, out := range outs {
 		utxos[i] = &avax.UTXO{
 			UTXOID: avax.UTXOID{
-				TxID:        tx.id,
+				TxID:        tx.TxID,
 				OutputIndex: uint32(i),
 			},
 			Asset: avax.Asset{ID: out.AssetID()},
@@ -114,7 +121,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilSignedTx
-	case tx.id == ids.Empty:
+	case tx.TxID == ids.Empty:
 		return errSignedTxNotInitialized
 	default:
 		return tx.Unsigned.SyntacticVerify(ctx)
@@ -125,7 +132,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 // Note: We explicitly pass the codec in Sign since we may need to sign P-Chain
 // genesis txs whose length exceed the max length of txs.Codec.
 func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
-	unsignedBytes, err := c.Marshal(Version, &tx.Unsigned)
+	unsignedBytes, err := c.Marshal(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -146,7 +153,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(Version, tx)
+	signedBytes, err := c.Marshal(CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

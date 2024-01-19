@@ -1,10 +1,13 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
 
 import (
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -13,24 +16,22 @@ import (
 
 func TestAssetVerifyNil(t *testing.T) {
 	id := (*Asset)(nil)
-	if err := id.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil AssetID")
-	}
+	err := id.Verify()
+	require.ErrorIs(t, err, errNilAssetID)
 }
 
 func TestAssetVerifyEmpty(t *testing.T) {
 	id := Asset{}
-	if err := id.Verify(); err == nil {
-		t.Fatalf("Should have errored due to empty AssetID")
-	}
+	err := id.Verify()
+	require.ErrorIs(t, err, errEmptyAssetID)
 }
 
 func TestAssetID(t *testing.T) {
-	c := linearcodec.NewDefault()
+	require := require.New(t)
+
+	c := linearcodec.NewDefault(time.Time{})
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	id := Asset{
 		ID: ids.ID{
@@ -41,25 +42,16 @@ func TestAssetID(t *testing.T) {
 		},
 	}
 
-	if err := id.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(id.Verify())
 
 	bytes, err := manager.Marshal(codecVersion, &id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	newID := Asset{}
-	if _, err := manager.Unmarshal(bytes, &newID); err != nil {
-		t.Fatal(err)
-	}
+	_, err = manager.Unmarshal(bytes, &newID)
+	require.NoError(err)
 
-	if err := newID.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(newID.Verify())
 
-	if id.AssetID() != newID.AssetID() {
-		t.Fatalf("Parsing returned the wrong Asset ID")
-	}
+	require.Equal(id.AssetID(), newID.AssetID())
 }

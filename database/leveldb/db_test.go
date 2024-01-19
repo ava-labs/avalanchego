@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package leveldb
@@ -18,48 +18,47 @@ func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		folder := t.TempDir()
 		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
-		}
-
-		defer db.Close()
+		require.NoError(t, err)
 
 		test(t, db)
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
 		_ = db.Close()
 	}
 }
 
-func FuzzInterface(f *testing.F) {
-	for _, test := range database.FuzzTests {
-		folder := f.TempDir()
-		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			require.NoError(f, err)
-		}
+func newDB(t testing.TB) database.Database {
+	folder := t.TempDir()
+	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(t, err)
+	return db
+}
 
-		defer db.Close()
+func FuzzKeyValue(f *testing.F) {
+	db := newDB(f)
+	defer db.Close()
 
-		test(f, db)
+	database.FuzzKeyValue(f, db)
+}
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
-		_ = db.Close()
-	}
+func FuzzNewIteratorWithPrefix(f *testing.F) {
+	db := newDB(f)
+	defer db.Close()
+
+	database.FuzzNewIteratorWithPrefix(f, db)
+}
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	db := newDB(f)
+	defer db.Close()
+
+	database.FuzzNewIteratorWithStartAndPrefix(f, db)
 }
 
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bench := range database.Benchmarks {
-			folder := b.TempDir()
-
-			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-			if err != nil {
-				b.Fatal(err)
-			}
+			db := newDB(b)
 
 			bench(b, db, "leveldb", keys, values)
 

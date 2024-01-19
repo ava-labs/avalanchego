@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -11,12 +11,11 @@ import (
 )
 
 // Vertex is a collection of multiple transactions tied to other vertices
+//
+// Note: Verify is not part of this interface because bootstrapping uses IDs to
+// verify the vertex is valid.
 type Vertex interface {
 	choices.Decidable
-	snowstorm.Whitelister
-
-	// Vertex verification should be performed before issuance.
-	Verify(context.Context) error
 
 	// Returns the vertices this vertex depends on
 	Parents() ([]Vertex, error)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bls
@@ -13,7 +13,7 @@ const PublicKeyLen = blst.BLST_P1_COMPRESS_BYTES
 
 var (
 	ErrNoPublicKeys               = errors.New("no public keys")
-	errFailedPublicKeyDecompress  = errors.New("couldn't decompress public key")
+	ErrFailedPublicKeyDecompress  = errors.New("couldn't decompress public key")
 	errInvalidPublicKey           = errors.New("invalid public key")
 	errFailedPublicKeyAggregation = errors.New("couldn't aggregate public keys")
 )
@@ -33,7 +33,7 @@ func PublicKeyToBytes(pk *PublicKey) []byte {
 func PublicKeyFromBytes(pkBytes []byte) (*PublicKey, error) {
 	pk := new(PublicKey).Uncompress(pkBytes)
 	if pk == nil {
-		return nil, errFailedPublicKeyDecompress
+		return nil, ErrFailedPublicKeyDecompress
 	}
 	if !pk.KeyValidate() {
 		return nil, errInvalidPublicKey
@@ -69,4 +69,12 @@ func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
 // Invariant: [pk] and [sig] have both been validated.
 func VerifyProofOfPossession(pk *PublicKey, sig *Signature, msg []byte) bool {
 	return sig.Verify(false, pk, false, msg, ciphersuiteProofOfPossession)
+}
+
+func DeserializePublicKey(pkBytes []byte) *PublicKey {
+	return new(PublicKey).Deserialize(pkBytes)
+}
+
+func SerializePublicKey(key *PublicKey) []byte {
+	return key.Serialize()
 }

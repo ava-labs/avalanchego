@@ -1,27 +1,28 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
+	"math"
 	"strings"
 	"testing"
-
-	stdmath "math"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -32,30 +33,16 @@ var (
 	}
 )
 
-func newContext(t testing.TB) *snow.Context {
-	require := require.New(t)
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.ChainID = ids.GenerateTestID()
-	ctx.XChainID = ctx.ChainID
-	ctx.CChainID = ids.GenerateTestID()
-
-	aliaser := ctx.BCLookup.(ids.Aliaser)
-	require.NoError(aliaser.Alias(ctx.XChainID, "X"))
-	require.NoError(aliaser.Alias(ctx.XChainID, ctx.XChainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-	return ctx
-}
-
 func TestSyntacticVerifierBaseTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -102,7 +89,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -274,7 +261,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -292,7 +279,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
@@ -305,7 +292,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 
 				output1 := output
 				output1.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -322,7 +309,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -350,7 +337,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &txs.BaseTx{BaseTx: baseTx},
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -408,26 +395,27 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -489,7 +477,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -769,7 +757,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -787,7 +775,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
@@ -800,7 +788,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 
 				output1 := output
 				output1.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -817,7 +805,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -959,7 +947,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -1017,26 +1005,27 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierOperationTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -1105,7 +1094,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -1290,7 +1279,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -1308,14 +1297,14 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
 			txFunc: func() *txs.Tx {
 				output := output
 				output.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -1331,7 +1320,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -1448,7 +1437,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -1506,26 +1495,27 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierImportTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -1576,7 +1566,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -1779,7 +1769,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -1797,14 +1787,14 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
 			txFunc: func() *txs.Tx {
 				output := output
 				output.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -1820,7 +1810,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -1848,7 +1838,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -1906,26 +1896,27 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierExportTx(t *testing.T) {
-	ctx := newContext(t)
+	ctx := snowtest.Context(t, snowtest.XChainID)
 
 	fx := &secp256k1fx.Fx{}
-	parser, err := txs.NewParser([]fxs.Fx{
-		fx,
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
 	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
@@ -1976,7 +1967,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 		},
 	}
 	cred := fxs.FxCredential{
-		Verifiable: &secp256k1fx.Credential{},
+		Credential: &secp256k1fx.Credential{},
 	}
 	creds := []*fxs.FxCredential{
 		&cred,
@@ -2191,7 +2182,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 				input1 := input
 				input1.UTXOID.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
-					Amt:   stdmath.MaxUint64,
+					Amt:   math.MaxUint64,
 					Input: inputSigners,
 				}
 
@@ -2209,14 +2200,14 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 					},
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "output overflow",
 			txFunc: func() *txs.Tx {
 				output := output
 				output.Out = &secp256k1fx.TransferOutput{
-					Amt:          stdmath.MaxUint64,
+					Amt:          math.MaxUint64,
 					OutputOwners: outputOwners,
 				}
 
@@ -2232,7 +2223,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 					Creds:    creds,
 				}
 			},
-			err: math.ErrOverflow,
+			err: safemath.ErrOverflow,
 		},
 		{
 			name: "insufficient funds",
@@ -2260,7 +2251,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 				return &txs.Tx{
 					Unsigned: &tx,
 					Creds: []*fxs.FxCredential{{
-						Verifiable: (*secp256k1fx.Credential)(nil),
+						Credential: (*secp256k1fx.Credential)(nil),
 					}},
 				}
 			},
@@ -2318,15 +2309,13 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }

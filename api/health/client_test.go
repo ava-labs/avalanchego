@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -87,7 +87,7 @@ func TestClient(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
 		healthy, err := AwaitHealthy(ctx, c, time.Microsecond, nil)
 		cancel()
-		require.Error(err)
+		require.ErrorIs(err, context.DeadlineExceeded)
 		require.False(healthy)
 	}
 
@@ -95,7 +95,7 @@ func TestClient(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
 		healthy, err := AwaitReady(ctx, c, time.Microsecond, nil)
 		cancel()
-		require.Error(err)
+		require.ErrorIs(err, context.DeadlineExceeded)
 		require.False(healthy)
 	}
 

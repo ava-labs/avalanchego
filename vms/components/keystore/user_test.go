@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,26 +24,24 @@ func TestUserClosedDB(t *testing.T) {
 	db, err := encdb.New([]byte(testPassword), memdb.New())
 	require.NoError(err)
 
-	err = db.Close()
-	require.NoError(err)
+	require.NoError(db.Close())
 
 	u := NewUserFromDB(db)
 
 	_, err = u.GetAddresses()
-	require.Error(err, "closed db should have caused an error")
+	require.ErrorIs(err, database.ErrClosed)
 
 	_, err = u.GetKey(ids.ShortEmpty)
-	require.Error(err, "closed db should have caused an error")
+	require.ErrorIs(err, database.ErrClosed)
 
 	_, err = GetKeychain(u, nil)
-	require.Error(err, "closed db should have caused an error")
+	require.ErrorIs(err, database.ErrClosed)
 
-	factory := secp256k1.Factory{}
-	sk, err := factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
 	err = u.PutKeys(sk)
-	require.Error(err, "closed db should have caused an error")
+	require.ErrorIs(err, database.ErrClosed)
 }
 
 func TestUser(t *testing.T) {
@@ -57,16 +56,13 @@ func TestUser(t *testing.T) {
 	require.NoError(err)
 	require.Empty(addresses, "new user shouldn't have address")
 
-	factory := secp256k1.Factory{}
-	sk, err := factory.NewPrivateKey()
+	sk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	err = u.PutKeys(sk)
-	require.NoError(err)
+	require.NoError(u.PutKeys(sk))
 
 	// Putting the same key multiple times should be a noop
-	err = u.PutKeys(sk)
-	require.NoError(err)
+	require.NoError(u.PutKeys(sk))
 
 	addr := sk.PublicKey().Address()
 

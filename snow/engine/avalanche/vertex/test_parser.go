@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
@@ -32,7 +34,7 @@ func (p *TestParser) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, 
 		return p.ParseVtxF(ctx, b)
 	}
 	if p.CantParseVtx && p.T != nil {
-		p.T.Fatal(errParse)
+		require.FailNow(p.T, errParse.Error())
 	}
 	return nil, errParse
 }

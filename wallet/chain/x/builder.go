@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -25,6 +25,12 @@ import (
 var (
 	errNoChangeAddress   = errors.New("no possible change address")
 	errInsufficientFunds = errors.New("insufficient funds")
+
+	fxIndexToID = map[uint32]ids.ID{
+		0: secp256k1fx.ID,
+		1: nftfx.ID,
+		2: propertyfx.ID,
+	}
 
 	_ Builder = (*builder)(nil)
 )
@@ -213,13 +219,14 @@ func (b *builder) NewBaseTx(
 	outputs = append(outputs, changeOutputs...)
 	avax.SortTransferableOutputs(outputs, Parser.Codec()) // sort the outputs
 
-	return &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    b.backend.NetworkID(),
 		BlockchainID: b.backend.BlockchainID(),
 		Ins:          inputs,
 		Outs:         outputs,
 		Memo:         ops.Memo(),
-	}}, nil
+	}}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewCreateAssetTx(
@@ -243,12 +250,14 @@ func (b *builder) NewCreateAssetTx(
 	for fxIndex, outs := range initialState {
 		state := &txs.InitialState{
 			FxIndex: fxIndex,
+			FxID:    fxIndexToID[fxIndex],
 			Outs:    outs,
 		}
 		state.Sort(codec) // sort the outputs
 		states = append(states, state)
 	}
 
+	utils.Sort(states) // sort the initial states
 	tx := &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -262,8 +271,7 @@ func (b *builder) NewCreateAssetTx(
 		Denomination: denomination,
 		States:       states,
 	}
-	utils.Sort(tx.States) // sort the initial states
-	return tx, nil
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewOperationTx(
@@ -280,7 +288,7 @@ func (b *builder) NewOperationTx(
 	}
 
 	txs.SortOperations(operations, Parser.Codec())
-	return &txs.OperationTx{
+	tx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: b.backend.BlockchainID(),
@@ -289,7 +297,8 @@ func (b *builder) NewOperationTx(
 			Memo:         ops.Memo(),
 		}},
 		Ops: operations,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewOperationTxMintFT(
@@ -380,6 +389,7 @@ func (b *builder) NewImportTx(
 		importedInputs = append(importedInputs, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
+			FxID:   secp256k1fx.ID,
 			In: &secp256k1fx.TransferInput{
 				Amt: out.Amt,
 				Input: secp256k1fx.Input{
@@ -428,6 +438,7 @@ func (b *builder) NewImportTx(
 	for assetID, amount := range importedAmounts {
 		outputs = append(outputs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
+			FxID:  secp256k1fx.ID,
 			Out: &secp256k1fx.TransferOutput{
 				Amt:          amount,
 				OutputOwners: *to,
@@ -436,7 +447,7 @@ func (b *builder) NewImportTx(
 	}
 
 	avax.SortTransferableOutputs(outputs, Parser.Codec())
-	return &txs.ImportTx{
+	tx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: b.backend.BlockchainID(),
@@ -446,7 +457,8 @@ func (b *builder) NewImportTx(
 		}},
 		SourceChain: chainID,
 		ImportedIns: importedInputs,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) NewExportTx(
@@ -473,7 +485,7 @@ func (b *builder) NewExportTx(
 	}
 
 	avax.SortTransferableOutputs(outputs, Parser.Codec())
-	return &txs.ExportTx{
+	tx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: b.backend.BlockchainID(),
@@ -483,7 +495,8 @@ func (b *builder) NewExportTx(
 		}},
 		DestinationChain: chainID,
 		ExportedOuts:     outputs,
-	}, nil
+	}
+	return tx, b.initCtx(tx)
 }
 
 func (b *builder) getBalance(
@@ -578,6 +591,7 @@ func (b *builder) spend(
 		inputs = append(inputs, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
+			FxID:   secp256k1fx.ID,
 			In: &secp256k1fx.TransferInput{
 				Amt: out.Amt,
 				Input: secp256k1fx.Input{
@@ -596,6 +610,7 @@ func (b *builder) spend(
 			// This input had extra value, so some of it must be returned
 			outputs = append(outputs, &avax.TransferableOutput{
 				Asset: utxo.Asset,
+				FxID:  secp256k1fx.ID,
 				Out: &secp256k1fx.TransferOutput{
 					Amt:          remainingAmount,
 					OutputOwners: *changeOwner,
@@ -656,6 +671,7 @@ func (b *builder) mintFTs(
 		operations = append(operations, &txs.Operation{
 			Asset:   utxo.Asset,
 			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID},
+			FxID:    secp256k1fx.ID,
 			Op: &secp256k1fx.MintOperation{
 				MintInput: secp256k1fx.Input{
 					SigIndices: inputSigIndices,
@@ -719,6 +735,7 @@ func (b *builder) mintNFTs(
 			UTXOIDs: []*avax.UTXOID{
 				&utxo.UTXOID,
 			},
+			FxID: nftfx.ID,
 			Op: &nftfx.MintOperation{
 				MintInput: secp256k1fx.Input{
 					SigIndices: inputSigIndices,
@@ -775,6 +792,7 @@ func (b *builder) mintProperty(
 			UTXOIDs: []*avax.UTXOID{
 				&utxo.UTXOID,
 			},
+			FxID: propertyfx.ID,
 			Op: &propertyfx.MintOperation{
 				MintInput: secp256k1fx.Input{
 					SigIndices: inputSigIndices,
@@ -831,6 +849,7 @@ func (b *builder) burnProperty(
 			UTXOIDs: []*avax.UTXOID{
 				&utxo.UTXOID,
 			},
+			FxID: propertyfx.ID,
 			Op: &propertyfx.BurnOperation{
 				Input: secp256k1fx.Input{
 					SigIndices: inputSigIndices,
@@ -846,4 +865,14 @@ func (b *builder) burnProperty(
 		)
 	}
 	return operations, nil
+}
+
+func (b *builder) initCtx(tx txs.UnsignedTx) error {
+	ctx, err := newSnowContext(b.backend)
+	if err != nil {
+		return err
+	}
+
+	tx.InitCtx(ctx)
+	return nil
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package beacon
@@ -16,9 +16,9 @@ import (
 func TestSet(t *testing.T) {
 	require := require.New(t)
 
-	id0 := ids.NodeID{0}
-	id1 := ids.NodeID{1}
-	id2 := ids.NodeID{2}
+	id0 := ids.BuildTestNodeID([]byte{0})
+	id1 := ids.BuildTestNodeID([]byte{1})
+	id2 := ids.BuildTestNodeID([]byte{2})
 
 	ip0 := ips.IPPort{
 		IP:   net.IPv4zero,
@@ -39,70 +39,44 @@ func TestSet(t *testing.T) {
 
 	s := NewSet()
 
-	idsArg := s.IDsArg()
-	require.Equal("", idsArg)
-	ipsArg := s.IPsArg()
-	require.Equal("", ipsArg)
-	len := s.Len()
-	require.Equal(0, len)
+	require.Equal("", s.IDsArg())
+	require.Equal("", s.IPsArg())
+	require.Zero(s.Len())
+
+	require.NoError(s.Add(b0))
+
+	require.Equal("NodeID-111111111111111111116DBWJs", s.IDsArg())
+	require.Equal("0.0.0.0:0", s.IPsArg())
+	require.Equal(1, s.Len())
 
 	err := s.Add(b0)
-	require.NoError(err)
-
-	idsArg = s.IDsArg()
-	require.Equal("NodeID-111111111111111111116DBWJs", idsArg)
-	ipsArg = s.IPsArg()
-	require.Equal("0.0.0.0:0", ipsArg)
-	len = s.Len()
-	require.Equal(1, len)
-
-	err = s.Add(b0)
 	require.ErrorIs(err, errDuplicateID)
 
-	idsArg = s.IDsArg()
-	require.Equal("NodeID-111111111111111111116DBWJs", idsArg)
-	ipsArg = s.IPsArg()
-	require.Equal("0.0.0.0:0", ipsArg)
-	len = s.Len()
-	require.Equal(1, len)
+	require.Equal("NodeID-111111111111111111116DBWJs", s.IDsArg())
+	require.Equal("0.0.0.0:0", s.IPsArg())
+	require.Equal(1, s.Len())
 
-	err = s.Add(b1)
-	require.NoError(err)
+	require.NoError(s.Add(b1))
 
-	idsArg = s.IDsArg()
-	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", idsArg)
-	ipsArg = s.IPsArg()
-	require.Equal("0.0.0.0:0,0.0.0.0:1", ipsArg)
-	len = s.Len()
-	require.Equal(2, len)
+	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", s.IDsArg())
+	require.Equal("0.0.0.0:0,0.0.0.0:1", s.IPsArg())
+	require.Equal(2, s.Len())
 
-	err = s.Add(b2)
-	require.NoError(err)
+	require.NoError(s.Add(b2))
 
-	idsArg = s.IDsArg()
-	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt,NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", idsArg)
-	ipsArg = s.IPsArg()
-	require.Equal("0.0.0.0:0,0.0.0.0:1,0.0.0.0:2", ipsArg)
-	len = s.Len()
-	require.Equal(3, len)
+	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt,NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", s.IDsArg())
+	require.Equal("0.0.0.0:0,0.0.0.0:1,0.0.0.0:2", s.IPsArg())
+	require.Equal(3, s.Len())
 
-	err = s.RemoveByID(b0.ID())
-	require.NoError(err)
+	require.NoError(s.RemoveByID(b0.ID()))
 
-	idsArg = s.IDsArg()
-	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", idsArg)
-	ipsArg = s.IPsArg()
-	require.Equal("0.0.0.0:2,0.0.0.0:1", ipsArg)
-	len = s.Len()
-	require.Equal(2, len)
+	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", s.IDsArg())
+	require.Equal("0.0.0.0:2,0.0.0.0:1", s.IPsArg())
+	require.Equal(2, s.Len())
 
-	err = s.RemoveByIP(b1.IP())
-	require.NoError(err)
+	require.NoError(s.RemoveByIP(b1.IP()))
 
-	idsArg = s.IDsArg()
-	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", idsArg)
-	ipsArg = s.IPsArg()
-	require.Equal("0.0.0.0:2", ipsArg)
-	len = s.Len()
-	require.Equal(1, len)
+	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", s.IDsArg())
+	require.Equal("0.0.0.0:2", s.IPsArg())
+	require.Equal(1, s.Len())
 }

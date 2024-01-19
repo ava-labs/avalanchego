@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -26,6 +26,12 @@ var (
 	ErrWeightOverflow   = errors.New("weight overflowed")
 )
 
+// ValidatorState defines the functions that must be implemented to get
+// the canonical validator set for warp message validation.
+type ValidatorState interface {
+	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+}
+
 type Validator struct {
 	PublicKey      *bls.PublicKey
 	PublicKeyBytes []byte
@@ -33,8 +39,8 @@ type Validator struct {
 	NodeIDs        []ids.NodeID
 }
 
-func (v *Validator) Less(o *Validator) bool {
-	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes) < 0
+func (v *Validator) Compare(o *Validator) int {
+	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes)
 }
 
 // GetCanonicalValidatorSet returns the validator set of [subnetID] at
@@ -42,7 +48,7 @@ func (v *Validator) Less(o *Validator) bool {
 // [subnetID].
 func GetCanonicalValidatorSet(
 	ctx context.Context,
-	pChainState validators.State,
+	pChainState ValidatorState,
 	pChainHeight uint64,
 	subnetID ids.ID,
 ) ([]*Validator, uint64, error) {
@@ -59,14 +65,14 @@ func GetCanonicalValidatorSet(
 	for _, vdr := range vdrSet {
 		totalWeight, err = math.Add64(totalWeight, vdr.Weight)
 		if err != nil {
-			return nil, 0, fmt.Errorf("%w: %v", ErrWeightOverflow, err)
+			return nil, 0, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
 		}
 
 		if vdr.PublicKey == nil {
 			continue
 		}
 
-		pkBytes := bls.PublicKeyToBytes(vdr.PublicKey)
+		pkBytes := bls.SerializePublicKey(vdr.PublicKey)
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
 			uniqueVdr = &Validator{
@@ -124,7 +130,7 @@ func SumWeight(vdrs []*Validator) (uint64, error) {
 	for _, vdr := range vdrs {
 		weight, err = math.Add64(weight, vdr.Weight)
 		if err != nil {
-			return 0, fmt.Errorf("%w: %v", ErrWeightOverflow, err)
+			return 0, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
 		}
 	}
 	return weight, nil

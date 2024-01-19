@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -19,17 +19,16 @@ type weightedHeapElement struct {
 	index            int
 }
 
-func (e weightedHeapElement) Less(other weightedHeapElement) bool {
+// Compare the elements. Weight is in decreasing order. Index is in increasing
+// order.
+func (e weightedHeapElement) Compare(other weightedHeapElement) int {
 	// By accounting for the initial index of the weights, this results in a
 	// stable sort. We do this rather than using `sort.Stable` because of the
 	// reported change in performance of the sort used.
-	if e.weight > other.weight {
-		return true
+	if weightCmp := utils.Compare(other.weight, e.weight); weightCmp != 0 {
+		return weightCmp
 	}
-	if e.weight < other.weight {
-		return false
-	}
-	return e.index < other.index
+	return utils.Compare(e.index, other.index)
 }
 
 // Sampling is performed by executing a search over a tree of elements in the
@@ -81,7 +80,7 @@ func (s *weightedHeap) Initialize(weights []uint64) error {
 
 func (s *weightedHeap) Sample(value uint64) (int, error) {
 	if len(s.heap) == 0 || s.heap[0].cumulativeWeight <= value {
-		return 0, errOutOfRange
+		return 0, ErrOutOfRange
 	}
 
 	index := 0

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metercacher
@@ -33,6 +33,8 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	c.Cacher.Put(key, value)
 	end := c.clock.Time()
 	c.put.Observe(float64(end.Sub(start)))
+	c.len.Set(float64(c.Cacher.Len()))
+	c.portionFilled.Set(c.Cacher.PortionFilled())
 }
 
 func (c *Cache[K, V]) Get(key K) (V, bool) {
@@ -47,4 +49,16 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 	}
 
 	return value, has
+}
+
+func (c *Cache[K, _]) Evict(key K) {
+	c.Cacher.Evict(key)
+	c.len.Set(float64(c.Cacher.Len()))
+	c.portionFilled.Set(c.Cacher.PortionFilled())
+}
+
+func (c *Cache[_, _]) Flush() {
+	c.Cacher.Flush()
+	c.len.Set(float64(c.Cacher.Len()))
+	c.portionFilled.Set(c.Cacher.PortionFilled())
 }

@@ -1,10 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package set
 
 import (
-	"fmt"
+	"encoding/hex"
 	"math/big"
 	"math/bits"
 )
@@ -98,5 +98,5 @@ func BitsFromBytes(bytes []byte) Bits {
 
 // String returns the hex representation of this bitset
 func (b Bits) String() string {
-	return fmt.Sprintf("%x", b.bits.Bytes())
+	return hex.EncodeToString(b.bits.Bytes())
 }

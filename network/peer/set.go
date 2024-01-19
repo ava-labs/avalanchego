@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -120,9 +120,7 @@ func (s *peerSet) Sample(n int, precondition func(Peer) bool) []Peer {
 	}
 
 	sampler := sampler.NewUniform()
-	// It is impossible for the sampler to report an error here. Since
-	// [len(s.peersSlice)] <= MaxInt64.
-	_ = sampler.Initialize(uint64(len(s.peersSlice)))
+	sampler.Initialize(uint64(len(s.peersSlice)))
 
 	peers := make([]Peer, 0, n)
 	for len(peers) < n {

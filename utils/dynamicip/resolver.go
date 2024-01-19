@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -22,6 +23,8 @@ const (
 	IFConfigCoName = "ifconfigco"
 	IFConfigMeName = "ifconfigme"
 )
+
+var errUnknownResolver = errors.New("unknown resolver")
 
 // Resolver resolves our public IP
 type Resolver interface {
@@ -43,6 +46,6 @@ func NewResolver(resolverName string) (Resolver, error) {
 	case IFConfigMeName:
 		return &ifConfigResolver{url: ifConfigMeURL}, nil
 	default:
-		return nil, fmt.Errorf("got unknown resolver: %s", resolverName)
+		return nil, fmt.Errorf("%w: %s", errUnknownResolver, resolverName)
 	}
 }

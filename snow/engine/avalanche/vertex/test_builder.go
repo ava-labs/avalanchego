@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -8,9 +8,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
 var (
@@ -22,7 +23,6 @@ var (
 type TestBuilder struct {
 	T             *testing.T
 	CantBuildVtx  bool
-	BuildVtxF     func(ctx context.Context, parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error)
 	BuildStopVtxF func(ctx context.Context, parentIDs []ids.ID) (avalanche.Vertex, error)
 }
 
@@ -30,22 +30,12 @@ func (b *TestBuilder) Default(cant bool) {
 	b.CantBuildVtx = cant
 }
 
-func (b *TestBuilder) BuildVtx(ctx context.Context, parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-	if b.BuildVtxF != nil {
-		return b.BuildVtxF(ctx, parentIDs, txs)
-	}
-	if b.CantBuildVtx && b.T != nil {
-		b.T.Fatal(errBuild)
-	}
-	return nil, errBuild
-}
-
 func (b *TestBuilder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanche.Vertex, error) {
 	if b.BuildStopVtxF != nil {
 		return b.BuildStopVtxF(ctx, parentIDs)
 	}
 	if b.CantBuildVtx && b.T != nil {
-		b.T.Fatal(errBuild)
+		require.FailNow(b.T, errBuild.Error())
 	}
 	return nil, errBuild
 }

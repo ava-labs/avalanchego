@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package cb58
@@ -6,6 +6,7 @@ package cb58
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/mr-tron/base58/base58"
@@ -13,14 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const (
-	checksumLen = 4
-)
+const checksumLen = 4
 
 var (
+	ErrBase58Decoding   = errors.New("base58 decoding error")
+	ErrMissingChecksum  = errors.New("input string is smaller than the checksum size")
+	ErrBadChecksum      = errors.New("invalid input checksum")
 	errEncodingOverFlow = errors.New("encoding overflow")
-	errMissingChecksum  = errors.New("input string is smaller than the checksum size")
-	errBadChecksum      = errors.New("invalid input checksum")
 )
 
 // Encode [bytes] to a string using cb58 format.
@@ -41,16 +41,16 @@ func Encode(bytes []byte) (string, error) {
 func Decode(str string) ([]byte, error) {
 	decodedBytes, err := base58.Decode(str)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrBase58Decoding, err)
 	}
 	if len(decodedBytes) < checksumLen {
-		return nil, errMissingChecksum
+		return nil, ErrMissingChecksum
 	}
 	// Verify the checksum
 	rawBytes := decodedBytes[:len(decodedBytes)-checksumLen]
 	checksum := decodedBytes[len(decodedBytes)-checksumLen:]
 	if !bytes.Equal(checksum, hashing.Checksum(rawBytes, checksumLen)) {
-		return nil, errBadChecksum
+		return nil, ErrBadChecksum
 	}
 	return rawBytes, nil
 }

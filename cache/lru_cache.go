@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package cache
@@ -18,7 +18,7 @@ var _ Cacher[struct{}, struct{}] = (*LRU[struct{}, struct{}])(nil)
 type LRU[K comparable, V any] struct {
 	lock     sync.Mutex
 	elements linkedhashmap.LinkedHashmap[K, V]
-	// If set to < 0, will be set internally to 1.
+	// If set to <= 0, will be set internally to 1.
 	Size int
 }
 
@@ -50,6 +50,20 @@ func (c *LRU[_, _]) Flush() {
 	c.flush()
 }
 
+func (c *LRU[_, _]) Len() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.len()
+}
+
+func (c *LRU[_, _]) PortionFilled() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.portionFilled()
+}
+
 func (c *LRU[K, V]) put(key K, value V) {
 	c.resize()
 
@@ -79,6 +93,17 @@ func (c *LRU[K, _]) evict(key K) {
 
 func (c *LRU[K, V]) flush() {
 	c.elements = linkedhashmap.New[K, V]()
+}
+
+func (c *LRU[_, _]) len() int {
+	if c.elements == nil {
+		return 0
+	}
+	return c.elements.Len()
+}
+
+func (c *LRU[_, _]) portionFilled() float64 {
+	return float64(c.len()) / float64(c.Size)
 }
 
 // Initializes [c.elements] if it's nil.

@@ -5,7 +5,7 @@
 
 - name: Setup avalanchego repo
   apt_repository:
-    repo: deb https://downloads.avax.network/apt focal main
+    repo: deb https://downloads.avax.network/apt jammy main
     state: present
 
 - name: Setup golang repo
@@ -36,19 +36,12 @@
   user:
     name: "{{ ava_user }}"
     shell: /bin/bash
-    uid: 114
+    uid: "{{ ava_uid }}"
     group: "{{ ava_group }}"
 
 - name: Create avalanche config dir
   file:
     path: /etc/avalanchego
-    owner: "{{ ava_user }}"
-    group: "{{ ava_group }}"
-    state: directory
-
-- name: Create avalanche C config dir
-  file:
-    path: /etc/avalanchego/C
     owner: "{{ ava_user }}"
     group: "{{ ava_group }}"
     state: directory
@@ -81,12 +74,6 @@
   template:
     src: templates/conf.json.j2
     dest: /etc/avalanchego/conf.json
-    mode: 0644
-
-- name: Configure avalanche C Chain
-  template:
-    src: templates/C/config.json.j2
-    dest: /etc/avalanchego/C/config.json
     mode: 0644
 
 - name: Enable Avalanche

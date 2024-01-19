@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 # If this is not a trusted build (Docker Credentials are not set)
 if [[ -z "$DOCKER_USERNAME"  ]]; then

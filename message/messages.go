@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -34,12 +34,13 @@ var (
 
 // InboundMessage represents a set of fields for an inbound message
 type InboundMessage interface {
+	fmt.Stringer
 	// NodeID returns the ID of the node that sent this message
 	NodeID() ids.NodeID
 	// Op returns the op that describes this message type
 	Op() Op
 	// Message returns the message that was sent
-	Message() any
+	Message() fmt.Stringer
 	// Expiration returns the time that the sender will have already timed out
 	// this request
 	Expiration() time.Time
@@ -54,7 +55,7 @@ type InboundMessage interface {
 type inboundMessage struct {
 	nodeID                ids.NodeID
 	op                    Op
-	message               any
+	message               fmt.Stringer
 	expiration            time.Time
 	onFinishedHandling    func()
 	bytesSavedCompression int
@@ -68,7 +69,7 @@ func (m *inboundMessage) Op() Op {
 	return m.op
 }
 
-func (m *inboundMessage) Message() any {
+func (m *inboundMessage) Message() fmt.Stringer {
 	return m.message
 }
 
@@ -84,6 +85,11 @@ func (m *inboundMessage) OnFinishedHandling() {
 
 func (m *inboundMessage) BytesSavedCompression() int {
 	return m.bytesSavedCompression
+}
+
+func (m *inboundMessage) String() string {
+	return fmt.Sprintf("%s Op: %s Message: %s",
+		m.nodeID, m.op, m.message)
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
@@ -128,8 +134,8 @@ func (m *outboundMessage) BytesSavedCompression() int {
 type msgBuilder struct {
 	log logging.Logger
 
+	// TODO: Remove gzip once v1.11.x is out.
 	gzipCompressor            compression.Compressor
-	gzipCompressTimeMetrics   map[Op]metric.Averager
 	gzipDecompressTimeMetrics map[Op]metric.Averager
 
 	zstdCompressor            compression.Compressor
@@ -158,7 +164,6 @@ func newMsgBuilder(
 		log: log,
 
 		gzipCompressor:            gzipCompressor,
-		gzipCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
 		zstdCompressor:            zstdCompressor,
@@ -170,13 +175,6 @@ func newMsgBuilder(
 
 	errs := wrappers.Errs{}
 	for _, op := range ExternalOps {
-		mb.gzipCompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("gzip_%s_compress_time", op),
-			fmt.Sprintf("time (in ns) to compress %s messages with gzip", op),
-			metrics,
-			&errs,
-		)
 		mb.gzipDecompressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("gzip_%s_decompress_time", op),
@@ -230,17 +228,6 @@ func (mb *msgBuilder) marshal(
 	switch compressionType {
 	case compression.TypeNone:
 		return uncompressedMsgBytes, 0, op, nil
-	case compression.TypeGzip:
-		compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		compressedMsg = p2p.Message{
-			Message: &p2p.Message_CompressedGzip{
-				CompressedGzip: compressedBytes,
-			},
-		}
-		opToCompressTimeMetrics = mb.gzipCompressTimeMetrics
 	case compression.TypeZstd:
 		compressedBytes, err := mb.zstdCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
