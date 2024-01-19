@@ -14,9 +14,9 @@ import (
 )
 
 // SignerTests is a list of all signer tests
-var SignerTests = []func(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
-	TestSignerWrongChainID,
-	TestSignerVerifies,
+var SignerTests = map[string]func(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
+	"TestSignerWrongChainID": TestSignerWrongChainID,
+	"TestSignerVerifies":     TestSignerVerifies,
 }
 
 // Test that using a random SourceChainID results in an error
