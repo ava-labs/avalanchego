@@ -625,7 +625,8 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 		},
 		Signature: ip.Signature,
 	}
-	if err := signedIP.Verify(ip.Cert); err != nil {
+	maxTimestamp := n.peerConfig.Clock.Time().Add(n.peerConfig.MaxClockDifference)
+	if err := signedIP.Verify(ip.Cert, maxTimestamp); err != nil {
 		return err
 	}
 
