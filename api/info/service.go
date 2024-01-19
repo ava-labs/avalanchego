@@ -419,7 +419,7 @@ func (i *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) e
 // GetVMsReply contains the response metadata for GetVMs
 type GetVMsReply struct {
 	VMs map[ids.ID][]string `json:"vms"`
-	FXs map[ids.ID]string   `json:"fxs"`
+	Fxs map[ids.ID]string   `json:"fxs"`
 }
 
 // GetVMs lists the virtual machines installed on the node
@@ -436,7 +436,7 @@ func (i *Info) GetVMs(_ *http.Request, _ *struct{}, reply *GetVMsReply) error {
 	}
 
 	reply.VMs, err = ids.GetRelevantAliases(i.VMManager, vmIDs)
-	reply.FXs = map[ids.ID]string{
+	reply.Fxs = map[ids.ID]string{
 		secp256k1fx.ID: secp256k1fx.Name,
 		nftfx.ID:       nftfx.Name,
 		propertyfx.ID:  propertyfx.Name,
