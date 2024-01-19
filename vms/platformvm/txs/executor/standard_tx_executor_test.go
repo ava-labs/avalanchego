@@ -43,9 +43,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	chainTime := env.state.GetTimestamp()
 	startTime := defaultValidateStartTime.Add(1 * time.Second)
@@ -321,9 +319,6 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			require := require.New(t)
 			freshTH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
-			defer func() {
-				require.NoError(shutdownEnvironment(freshTH))
-			}()
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
 				tt.stakeAmount,
@@ -360,9 +355,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	nodeID := genesisNodeIDs[0]
 
@@ -789,9 +782,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
 
@@ -962,10 +953,7 @@ func TestStandardTxExecutorDurangoAddValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		nodeID    = ids.GenerateTestNodeID()
