@@ -1696,7 +1696,7 @@ func TestDurangoStandardTxExecutorCreateChainTx(t *testing.T) {
 	chainTime := env.state.GetTimestamp()
 	createBlockchainTxFee := env.config.GetCreateBlockchainTxFee(chainTime)
 
-	// Build the AddValidatorTx
+	// Build the CreateChainTx
 	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 		env.state,
 		preFundedKeys,
@@ -1762,7 +1762,7 @@ func TestDurangoStandardTxExecutorCreateSubnetTx(t *testing.T) {
 	chainTime := env.state.GetTimestamp()
 	createSubnetTxFee := env.config.GetCreateSubnetTxFee(chainTime)
 
-	// Build the AddValidatorTx
+	// Build the CreateSubnetTx
 	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 		env.state,
 		preFundedKeys,
@@ -1820,7 +1820,7 @@ func TestDurangoStandardTxExecutorBaseTx(t *testing.T) {
 		env.ctx.Lock.Unlock()
 	}()
 
-	// Build the AddValidatorTx
+	// Build the BaseTx
 	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 		env.state,
 		preFundedKeys,
@@ -1874,7 +1874,7 @@ func TestDurangoStandardTxExecutorExportTx(t *testing.T) {
 		env.ctx.Lock.Unlock()
 	}()
 
-	// Build the AddValidatorTx
+	// Build the ExportTx
 	amount := units.Avax
 	ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
 		env.state,
