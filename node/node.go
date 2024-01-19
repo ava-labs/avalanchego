@@ -78,15 +78,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
@@ -1226,9 +1223,6 @@ func (n *Node) initVMs() error {
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
-		n.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
-		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
 	if err != nil {
 		return err

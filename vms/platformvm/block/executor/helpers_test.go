@@ -10,6 +10,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/require"
+
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -220,6 +222,31 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		// whatever we need
 	}
 
+	t.Cleanup(func() {
+		res.ctx.Lock.Lock()
+		defer res.ctx.Lock.Unlock()
+
+		if res.mockedState != nil {
+			// state is mocked, nothing to do here
+			return
+		}
+
+		require := require.New(t)
+
+		if res.isBootstrapped.Get() {
+			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+
+			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+			require.NoError(res.state.Commit())
+		}
+
+		if res.state != nil {
+			require.NoError(res.state.Close())
+		}
+
+		require.NoError(res.baseDB.Close())
+	})
+
 	return res
 }
 
@@ -422,33 +449,6 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	}
 
 	return genesisBytes
-}
-
-func shutdownEnvironment(t *environment) error {
-	if t.mockedState != nil {
-		// state is mocked, nothing to do here
-		return nil
-	}
-
-	if t.isBootstrapped.Get() {
-		validatorIDs := t.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-		if err := t.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
-			return err
-		}
-		if err := t.state.Commit(); err != nil {
-			return err
-		}
-	}
-
-	var err error
-	if t.state != nil {
-		err = t.state.Close()
-	}
-	return utils.Err(
-		err,
-		t.baseDB.Close(),
-	)
 }
 
 func addPendingValidator(
