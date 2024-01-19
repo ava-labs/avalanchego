@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -447,7 +448,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	consensusMetrics := prometheus.NewRegistry()
-	chainNamespace := fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
+	chainNamespace := metric.AppendNamespace(constants.PlatformName, primaryAlias)
 	if err := m.Metrics.Register(chainNamespace, consensusMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
 	}
@@ -456,13 +457,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
 	// there are no conflicts when registering the Snowman consensus metrics.
 	avalancheConsensusMetrics := prometheus.NewRegistry()
-	avalancheDAGNamespace := fmt.Sprintf("%s_avalanche", chainNamespace)
+	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
 	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
 	}
 
 	vmMetrics := metrics.NewOptionalGatherer()
-	vmNamespace := fmt.Sprintf("%s_vm", chainNamespace)
+	vmNamespace := metric.AppendNamespace(chainNamespace, "vm")
 	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
