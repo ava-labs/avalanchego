@@ -113,6 +113,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
