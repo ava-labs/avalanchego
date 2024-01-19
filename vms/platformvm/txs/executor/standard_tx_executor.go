@@ -550,11 +550,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	var (
-		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*isDurangoActive*/); err != nil {
 		return err
 	}
 

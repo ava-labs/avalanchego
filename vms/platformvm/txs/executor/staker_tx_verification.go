@@ -761,11 +761,7 @@ func verifyTransferSubnetOwnershipTx(
 		return err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*isDurangoActive*/); err != nil {
 		return err
 	}
 
