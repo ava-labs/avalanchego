@@ -60,8 +60,7 @@ func NewMetrics(
 	return m, err
 }
 
-// New creates a new bloom filter with the specified values and updates the
-// reported metrics.
+// Reset the metrics to align with the provided bloom filter and max count.
 func (m *Metrics) Reset(newFilter *Filter, maxCount int) {
 	m.Count.Set(float64(newFilter.Count()))
 	m.NumHashes.Set(float64(len(newFilter.hashSeeds)))
