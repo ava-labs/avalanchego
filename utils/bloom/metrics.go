@@ -37,7 +37,7 @@ func NewMetrics(
 		NumEntries: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "entries",
-			Help:      "Number of entry slots in the bloom",
+			Help:      "Number of bytes allocated to slots in the bloom",
 		}),
 		MaxCount: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
