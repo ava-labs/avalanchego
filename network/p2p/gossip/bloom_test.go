@@ -83,7 +83,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", tt.minTargetElements, tt.targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
 			require.NoError(err)
 
-			var resetCount uint64
+			var resetCount uint64 = 1
 			for _, item := range tt.add {
 				bloomBytes, saltBytes := bloom.Marshal()
 				initialBloomBytes := slices.Clone(bloomBytes)
