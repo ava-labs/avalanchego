@@ -192,7 +192,7 @@ func (m *MockChain) GetChainSubnet(arg0 ids.ID) (ids.ID, error) {
 }
 
 // GetChainSubnet indicates an expected call of GetChainSubnet.
-func (mr *MockChainMockRecorder) GetChainSubnet(arg0 interface{}) *gomock.Call {
+func (mr *MockChainMockRecorder) GetChainSubnet(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainSubnet", reflect.TypeOf((*MockChain)(nil).GetChainSubnet), arg0)
 }
@@ -327,7 +327,7 @@ func (m *MockChain) GetStakerRewardAttributes(arg0 ids.ID) (*StakerRewardAttribu
 }
 
 // GetStakerRewardAttributes indicates an expected call of GetStakerRewardAttributes.
-func (mr *MockChainMockRecorder) GetStakerRewardAttributes(arg0 interface{}) *gomock.Call {
+func (mr *MockChainMockRecorder) GetStakerRewardAttributes(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerRewardAttributes", reflect.TypeOf((*MockChain)(nil).GetStakerRewardAttributes), arg0)
 }
@@ -684,7 +684,7 @@ func (m *MockDiff) GetChainSubnet(arg0 ids.ID) (ids.ID, error) {
 }
 
 // GetChainSubnet indicates an expected call of GetChainSubnet.
-func (mr *MockDiffMockRecorder) GetChainSubnet(arg0 interface{}) *gomock.Call {
+func (mr *MockDiffMockRecorder) GetChainSubnet(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainSubnet", reflect.TypeOf((*MockDiff)(nil).GetChainSubnet), arg0)
 }
@@ -819,7 +819,7 @@ func (m *MockDiff) GetStakerRewardAttributes(arg0 ids.ID) (*StakerRewardAttribut
 }
 
 // GetStakerRewardAttributes indicates an expected call of GetStakerRewardAttributes.
-func (mr *MockDiffMockRecorder) GetStakerRewardAttributes(arg0 interface{}) *gomock.Call {
+func (mr *MockDiffMockRecorder) GetStakerRewardAttributes(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerRewardAttributes", reflect.TypeOf((*MockDiff)(nil).GetStakerRewardAttributes), arg0)
 }
@@ -1286,7 +1286,7 @@ func (m *MockState) GetChainSubnet(arg0 ids.ID) (ids.ID, error) {
 }
 
 // GetChainSubnet indicates an expected call of GetChainSubnet.
-func (mr *MockStateMockRecorder) GetChainSubnet(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) GetChainSubnet(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainSubnet", reflect.TypeOf((*MockState)(nil).GetChainSubnet), arg0)
 }
@@ -1465,7 +1465,7 @@ func (m *MockState) GetStakerRewardAttributes(arg0 ids.ID) (*StakerRewardAttribu
 }
 
 // GetStakerRewardAttributes indicates an expected call of GetStakerRewardAttributes.
-func (mr *MockStateMockRecorder) GetStakerRewardAttributes(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) GetStakerRewardAttributes(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStakerRewardAttributes", reflect.TypeOf((*MockState)(nil).GetStakerRewardAttributes), arg0)
 }
