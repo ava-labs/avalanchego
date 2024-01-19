@@ -51,7 +51,8 @@ func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	if !v.txExecutorBackend.Config.IsDurangoActivated(b.Timestamp()) && len(b.Transactions) != 0 {
+	nextChainTime := b.Timestamp()
+	if !v.txExecutorBackend.Config.IsDurangoActivated(nextChainTime) && len(b.Transactions) != 0 {
 		return errBanffProposalBlockWithMultipleTransactions
 	}
 
@@ -65,19 +66,10 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	// Apply the changes, if any, from advancing the chain time.
-	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(
-		v.txExecutorBackend,
-		onDecisionState,
-		nextChainTime,
-	)
-	if err != nil {
+	// Advance the time to [nextChainTime].
+	if _, err := executor.AdvanceTimeTo(v.txExecutorBackend, onDecisionState, nextChainTime); err != nil {
 		return err
 	}
-
-	onDecisionState.SetTimestamp(nextChainTime)
-	changes.Apply(onDecisionState)
 
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
 	if err != nil {
@@ -116,12 +108,11 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
-	// Apply the changes, if any, from advancing the chain time.
-	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(
+	// Advance the time to [b.Timestamp()].
+	changed, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
 		onAcceptState,
-		nextChainTime,
+		b.Timestamp(),
 	)
 	if err != nil {
 		return err
@@ -129,12 +120,9 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 
 	// If this block doesn't perform any changes, then it should never have been
 	// issued.
-	if changes.Len() == 0 && len(b.Transactions) == 0 {
+	if !changed && len(b.Transactions) == 0 {
 		return errBanffStandardBlockWithoutChanges
 	}
-
-	onAcceptState.SetTimestamp(nextChainTime)
-	changes.Apply(onAcceptState)
 
 	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
 }
@@ -219,7 +207,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	if err := v.verifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
+	if err := v.verifyUniqueInputs(parentID, atomicExecutor.Inputs); err != nil {
 		return err
 	}
 
