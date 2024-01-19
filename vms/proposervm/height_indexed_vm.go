@@ -33,7 +33,7 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	}
 }
 
-func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
+func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 	forkHeight, err := vm.State.GetForkHeight()
 	switch err {
 	case nil:

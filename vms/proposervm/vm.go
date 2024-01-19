@@ -671,7 +671,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
 		return err
 	}
-	if err := vm.storeHeightEntry(height, blkID); err != nil {
+	if err := vm.updateHeightIndex(height, blkID); err != nil {
 		return err
 	}
 	return vm.db.Commit()
