@@ -13,8 +13,17 @@ import (
 
 type FlagVars struct {
 	avalancheGoExecPath string
+	pluginDir           string
 	networkDir          string
 	useExistingNetwork  bool
+}
+
+func (v *FlagVars) AvalancheGoExecPath() string {
+	return v.avalancheGoExecPath
+}
+
+func (v *FlagVars) PluginDir() string {
+	return v.pluginDir
 }
 
 func (v *FlagVars) NetworkDir() string {
@@ -25,10 +34,6 @@ func (v *FlagVars) NetworkDir() string {
 		return v.networkDir
 	}
 	return os.Getenv(tmpnet.NetworkDirEnvName)
-}
-
-func (v *FlagVars) AvalancheGoExecPath() string {
-	return v.avalancheGoExecPath
 }
 
 func (v *FlagVars) UseExistingNetwork() bool {
@@ -42,6 +47,12 @@ func RegisterFlags() *FlagVars {
 		"avalanchego-path",
 		os.Getenv(tmpnet.AvalancheGoPathEnvName),
 		fmt.Sprintf("avalanchego executable path (required if not using an existing network). Also possible to configure via the %s env variable.", tmpnet.AvalancheGoPathEnvName),
+	)
+	flag.StringVar(
+		&vars.pluginDir,
+		"plugin-dir",
+		os.ExpandEnv("$HOME/.avalanchego/plugins"),
+		"[optional] the dir containing VM plugins.",
 	)
 	flag.StringVar(
 		&vars.networkDir,
