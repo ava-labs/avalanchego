@@ -36,20 +36,6 @@ func (m *MockState) EXPECT() *MockStateMockRecorder {
 	return m.recorder
 }
 
-// Commit mocks base method.
-func (m *MockState) Commit() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Commit")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Commit indicates an expected call of Commit.
-func (mr *MockStateMockRecorder) Commit() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockState)(nil).Commit))
-}
-
 // DeleteBlock mocks base method.
 func (m *MockState) DeleteBlock(arg0 ids.ID) error {
 	m.ctrl.T.Helper()
@@ -76,20 +62,6 @@ func (m *MockState) DeleteBlockIDAtHeight(arg0 uint64) error {
 func (mr *MockStateMockRecorder) DeleteBlockIDAtHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).DeleteBlockIDAtHeight), arg0)
-}
-
-// DeleteCheckpoint mocks base method.
-func (m *MockState) DeleteCheckpoint() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteCheckpoint")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteCheckpoint indicates an expected call of DeleteCheckpoint.
-func (mr *MockStateMockRecorder) DeleteCheckpoint() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCheckpoint", reflect.TypeOf((*MockState)(nil).DeleteCheckpoint))
 }
 
 // DeleteLastAccepted mocks base method.
@@ -135,21 +107,6 @@ func (m *MockState) GetBlockIDAtHeight(arg0 uint64) (ids.ID, error) {
 func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).GetBlockIDAtHeight), arg0)
-}
-
-// GetCheckpoint mocks base method.
-func (m *MockState) GetCheckpoint() (ids.ID, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCheckpoint")
-	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetCheckpoint indicates an expected call of GetCheckpoint.
-func (mr *MockStateMockRecorder) GetCheckpoint() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCheckpoint", reflect.TypeOf((*MockState)(nil).GetCheckpoint))
 }
 
 // GetForkHeight mocks base method.
@@ -223,20 +180,6 @@ func (m *MockState) SetBlockIDAtHeight(arg0 uint64, arg1 ids.ID) error {
 func (mr *MockStateMockRecorder) SetBlockIDAtHeight(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).SetBlockIDAtHeight), arg0, arg1)
-}
-
-// SetCheckpoint mocks base method.
-func (m *MockState) SetCheckpoint(arg0 ids.ID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetCheckpoint", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetCheckpoint indicates an expected call of SetCheckpoint.
-func (mr *MockStateMockRecorder) SetCheckpoint(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCheckpoint", reflect.TypeOf((*MockState)(nil).SetCheckpoint), arg0)
 }
 
 // SetForkHeight mocks base method.
