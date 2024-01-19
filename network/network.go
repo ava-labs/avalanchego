@@ -273,6 +273,12 @@ func NewNetwork(
 		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),
 	}
 
+	// Invariant: We delay the activation of durango during the TLS handshake to
+	// avoid gossiping any TLS certs that anyone else in the network may
+	// consider invalid. Recall that if a peer gossips an invalid cert, the
+	// connection is terminated.
+	durangoTime := version.GetDurangoTime(config.NetworkID)
+	durangoTimeWithClockSkew := durangoTime.Add(config.MaxClockDifference)
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:               config,
@@ -283,8 +289,8 @@ func NewNetwork(
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
 		dialer:                      dialer,
-		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected),
-		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected),
+		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected, durangoTimeWithClockSkew),
+		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected, durangoTimeWithClockSkew),
 
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,
@@ -619,7 +625,8 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 		},
 		Signature: ip.Signature,
 	}
-	if err := signedIP.Verify(ip.Cert); err != nil {
+	maxTimestamp := n.peerConfig.Clock.Time().Add(n.peerConfig.MaxClockDifference)
+	if err := signedIP.Verify(ip.Cert, maxTimestamp); err != nil {
 		return err
 	}
 
