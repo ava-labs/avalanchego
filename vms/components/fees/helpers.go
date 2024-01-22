@@ -7,7 +7,9 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func GetInputsDimensions(c codec.Manager, v uint16, ins []*avax.TransferableInput) (Dimensions, error) {
@@ -43,5 +45,20 @@ func GetOutputsDimensions(c codec.Manager, v uint16, outs []*avax.TransferableOu
 		consumedUnits[Bandwidth] += uOutSize - codec.CodecVersionSize
 		consumedUnits[UTXOWrite] += uOutSize
 	}
+	return consumedUnits, nil
+}
+
+func GetCredentialsDimensions(c codec.Manager, v uint16, inputSigIndices []uint32) (Dimensions, error) {
+	var consumedUnits Dimensions
+
+	cred := &secp256k1fx.Credential{
+		Sigs: make([][secp256k1.SignatureLen]byte, len(inputSigIndices)),
+	}
+
+	credSize, err := c.Size(v, cred)
+	if err != nil {
+		return consumedUnits, fmt.Errorf("failed retrieving size of credentials: %w", err)
+	}
+	consumedUnits[Bandwidth] += uint64(credSize) - codec.CodecVersionSize
 	return consumedUnits, nil
 }
