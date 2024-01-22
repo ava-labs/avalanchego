@@ -65,3 +65,21 @@ func (t *BaseTx) Verify(ctx *snow.Context) error {
 		return nil
 	}
 }
+
+func VerifyMemoFieldLength(memo types.JSONByteSlice, isDurangoActive bool) error {
+	if !isDurangoActive {
+		// SyntacticVerify validates this field pre-Durango
+		return nil
+	}
+
+	if len(memo) != 0 {
+		return fmt.Errorf(
+			"%w: %d > %d",
+			ErrMemoTooLarge,
+			len(memo),
+			0,
+		)
+	}
+
+	return nil
+}
