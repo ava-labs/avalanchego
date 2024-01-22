@@ -310,18 +310,18 @@ func (b *builder) NewImportTx(
 	var (
 		ins []*avax.TransferableInput
 
-		importedAVAX = importedAmounts[b.ctx.AVAXAssetID] // the only entry left in importedAmounts
-		chainTime    = b.state.GetTimestamp()
+		importedAVAX  = importedAmounts[b.ctx.AVAXAssetID] // the only entry left in importedAmounts
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
+	if isEForkActive {
 		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
 		utx.BaseTx.Outs = outs
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -460,19 +460,19 @@ func (b *builder) NewExportTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime = b.state.GetTimestamp()
-		ins       []*avax.TransferableInput
-		outs      []*avax.TransferableOutput
-		signers   [][]*secp256k1.PrivateKey
-		err       error
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
+		err           error
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -542,18 +542,18 @@ func (b *builder) NewCreateChainTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime = b.state.GetTimestamp()
-		ins       []*avax.TransferableInput
-		outs      []*avax.TransferableOutput
-		signers   [][]*secp256k1.PrivateKey
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -611,19 +611,19 @@ func (b *builder) NewCreateSubnetTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime = b.state.GetTimestamp()
-		ins       []*avax.TransferableInput
-		outs      []*avax.TransferableOutput
-		signers   [][]*secp256k1.PrivateKey
-		err       error
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
+		err           error
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -689,20 +689,20 @@ func (b *builder) NewAddValidatorTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime  = b.state.GetTimestamp()
-		ins        []*avax.TransferableInput
-		outs       []*avax.TransferableOutput
-		stakedOuts []*avax.TransferableOutput
-		signers    [][]*secp256k1.PrivateKey
-		err        error
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		stakedOuts    []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
+		err           error
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -766,20 +766,20 @@ func (b *builder) NewAddDelegatorTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime  = b.state.GetTimestamp()
-		ins        []*avax.TransferableInput
-		outs       []*avax.TransferableOutput
-		stakedOuts []*avax.TransferableOutput
-		signers    [][]*secp256k1.PrivateKey
-		err        error
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		stakedOuts    []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
+		err           error
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -846,18 +846,18 @@ func (b *builder) NewAddSubnetValidatorTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime = b.state.GetTimestamp()
-		ins       []*avax.TransferableInput
-		outs      []*avax.TransferableOutput
-		signers   [][]*secp256k1.PrivateKey
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -914,18 +914,18 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime = b.state.GetTimestamp()
-		ins       []*avax.TransferableInput
-		outs      []*avax.TransferableOutput
-		signers   [][]*secp256k1.PrivateKey
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -1005,18 +1005,18 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime = b.state.GetTimestamp()
-		ins       []*avax.TransferableInput
-		outs      []*avax.TransferableOutput
-		signers   [][]*secp256k1.PrivateKey
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -1066,19 +1066,19 @@ func (b *builder) NewBaseTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
-		chainTime = b.state.GetTimestamp()
-		ins       []*avax.TransferableInput
-		outs      []*avax.TransferableOutput
-		signers   [][]*secp256k1.PrivateKey
-		err       error
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
+		err           error
 	)
-	if b.cfg.IsEForkActivated(chainTime) {
-		feesMan := commonfees.NewManager(b.cfg.DefaultUnitFees)
+	if isEForkActive {
 		feeCalc := &fees.Calculator{
-			FeeManager:  feesMan,
-			Config:      b.cfg,
-			ChainTime:   b.state.GetTimestamp(),
-			Credentials: txs.EmptyCredentials(signers),
+			IsEForkActive:    isEForkActive,
+			FeeManager:       commonfees.NewManager(b.cfg.DefaultUnitFees),
+			ConsumedUnitsCap: b.cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      txs.EmptyCredentials(signers),
 		}
 
 		// feesMan cumulates consumed units. Let's init it with utx filled so far

@@ -164,10 +164,12 @@ func verifyAddValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		FeeManager:  feeManager,
-		Config:      backend.Config,
-		ChainTime:   currentTimestamp,
-		Credentials: sTx.Creds,
+		IsEForkActive:    backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: backend.Config.DefaultBlockMaxConsumedUnits,
+		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return nil, err
@@ -261,10 +263,12 @@ func verifyAddSubnetValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		FeeManager:  feeManager,
-		Config:      backend.Config,
-		ChainTime:   currentTimestamp,
-		Credentials: sTx.Creds,
+		IsEForkActive:    backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: backend.Config.DefaultBlockMaxConsumedUnits,
+		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -340,11 +344,14 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
+	currentTimestamp := chainState.GetTimestamp()
 	feeCalculator := fees.Calculator{
-		FeeManager:  feeManager,
-		Config:      backend.Config,
-		ChainTime:   chainState.GetTimestamp(),
-		Credentials: sTx.Creds,
+		IsEForkActive:    backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: backend.Config.DefaultBlockMaxConsumedUnits,
+		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return nil, false, err
@@ -464,10 +471,12 @@ func verifyAddDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		FeeManager:  feeManager,
-		Config:      backend.Config,
-		ChainTime:   chainState.GetTimestamp(),
-		Credentials: sTx.Creds,
+		IsEForkActive:    backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: backend.Config.DefaultBlockMaxConsumedUnits,
+		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return nil, err
@@ -590,10 +599,12 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		FeeManager:  feeManager,
-		Config:      backend.Config,
-		ChainTime:   currentTimestamp,
-		Credentials: sTx.Creds,
+		IsEForkActive:    backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: backend.Config.DefaultBlockMaxConsumedUnits,
+		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -739,10 +750,12 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		FeeManager:  feeManager,
-		Config:      backend.Config,
-		ChainTime:   currentTimestamp,
-		Credentials: sTx.Creds,
+		IsEForkActive:    backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: backend.Config.DefaultBlockMaxConsumedUnits,
+		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -798,12 +811,16 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
+	currentTimestamp := chainState.GetTimestamp()
 	feeCalculator := fees.Calculator{
-		FeeManager:  feeManager,
-		Config:      backend.Config,
-		ChainTime:   chainState.GetTimestamp(),
-		Credentials: sTx.Creds,
+		IsEForkActive:    backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       feeManager,
+		ConsumedUnitsCap: backend.Config.DefaultBlockMaxConsumedUnits,
+		Credentials:      sTx.Creds,
 	}
+
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
 	}

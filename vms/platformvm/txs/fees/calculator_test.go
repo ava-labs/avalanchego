@@ -121,8 +121,9 @@ func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
 	fc := &Calculator{
-		FeeManager: fees.NewManager(feeTestsDefaultCfg.DefaultUnitFees),
-		Config:     &feeTestsDefaultCfg,
+		IsEForkActive:    true,
+		FeeManager:       fees.NewManager(feeTestsDefaultCfg.DefaultUnitFees),
+		ConsumedUnitsCap: feeTestsDefaultCfg.DefaultBlockMaxConsumedUnits,
 	}
 
 	units := fees.Dimensions{
@@ -309,10 +310,12 @@ func TestAddValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -411,10 +414,12 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -514,10 +519,12 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -611,10 +618,12 @@ func TestCreateChainTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -706,10 +715,12 @@ func TestCreateSubnetTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -800,10 +811,12 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -906,10 +919,12 @@ func TestTransformSubnetTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1008,10 +1023,12 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1119,10 +1136,12 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1225,10 +1244,12 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1314,10 +1335,12 @@ func TestBaseTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1417,10 +1440,12 @@ func TestImportTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)
@@ -1510,10 +1535,12 @@ func TestExportTxFees(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
 			fc := &Calculator{
-				FeeManager:  fees.NewManager(cfg.DefaultUnitFees),
-				Config:      cfg,
-				ChainTime:   chainTime,
-				Credentials: sTx.Creds,
+				IsEForkActive:    cfg.IsEForkActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
 			r.ErrorIs(err, tt.expectedError)

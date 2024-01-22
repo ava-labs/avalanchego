@@ -64,11 +64,17 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+	)
 	feeCalculator := fees.Calculator{
-		FeeManager:  e.BlkFeeManager,
-		Config:      e.Backend.Config,
-		ChainTime:   e.State.GetTimestamp(),
-		Credentials: e.Tx.Creds,
+		IsEForkActive:    cfg.IsEForkActivated(currentTimestamp),
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -111,11 +117,17 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+	)
 	feeCalculator := fees.Calculator{
-		FeeManager:  e.BlkFeeManager,
-		Config:      e.Backend.Config,
-		ChainTime:   e.State.GetTimestamp(),
-		Credentials: e.Tx.Creds,
+		IsEForkActive:    cfg.IsEForkActivated(currentTimestamp),
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -193,11 +205,17 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
+		var (
+			cfg              = e.Backend.Config
+			currentTimestamp = e.State.GetTimestamp()
+		)
 		feeCalculator := fees.Calculator{
-			FeeManager:  e.BlkFeeManager,
-			Config:      e.Backend.Config,
-			ChainTime:   e.State.GetTimestamp(),
-			Credentials: e.Tx.Creds,
+			IsEForkActive:    cfg.IsEForkActivated(currentTimestamp),
+			Config:           cfg,
+			ChainTime:        currentTimestamp,
+			FeeManager:       e.BlkFeeManager,
+			ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+			Credentials:      e.Tx.Creds,
 		}
 		if err := tx.Visit(&feeCalculator); err != nil {
 			return err
@@ -251,11 +269,17 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+	)
 	feeCalculator := fees.Calculator{
-		FeeManager:  e.BlkFeeManager,
-		Config:      e.Backend.Config,
-		ChainTime:   e.State.GetTimestamp(),
-		Credentials: e.Tx.Creds,
+		IsEForkActive:    cfg.IsEForkActivated(currentTimestamp),
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -561,11 +585,17 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+	)
 	feeCalculator := fees.Calculator{
-		FeeManager:  e.BlkFeeManager,
-		Config:      e.Backend.Config,
-		ChainTime:   e.State.GetTimestamp(),
-		Credentials: e.Tx.Creds,
+		IsEForkActive:    cfg.IsEForkActivated(currentTimestamp),
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

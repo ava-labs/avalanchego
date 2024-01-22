@@ -25,9 +25,15 @@ var (
 
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
-	FeeManager *fees.Manager
-	Config     *config.Config
-	ChainTime  time.Time
+	IsEForkActive bool
+
+	// Pre E-fork inputs
+	Config    *config.Config
+	ChainTime time.Time
+
+	// Post E-fork inputs
+	FeeManager       *fees.Manager
+	ConsumedUnitsCap fees.Dimensions
 
 	// inputs, to be filled before visitor methods are called
 	Credentials []verify.Verifiable
@@ -37,7 +43,7 @@ type Calculator struct {
 }
 
 func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
 		return nil
 	}
@@ -55,7 +61,7 @@ func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.AddSubnetValidatorFee
 		return nil
 	}
@@ -69,7 +75,7 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 }
 
 func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
 		return nil
 	}
@@ -87,7 +93,7 @@ func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 }
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
 		return nil
 	}
@@ -101,7 +107,7 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
 		return nil
 	}
@@ -123,7 +129,7 @@ func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -137,7 +143,7 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 }
 
 func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.TransformSubnetTxFee
 		return nil
 	}
@@ -151,7 +157,7 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 }
 
 func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -165,7 +171,7 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 }
 
 func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetValidatorFee
 		} else {
@@ -187,7 +193,7 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 }
 
 func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetDelegatorFee
 		} else {
@@ -209,7 +215,7 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -223,7 +229,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -241,7 +247,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
+	if !fc.IsEForkActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -299,7 +305,7 @@ func (fc *Calculator) commonConsumedUnits(
 }
 
 func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) error {
-	boundBreached, dimension := fc.FeeManager.CumulateUnits(consumedUnits, fc.Config.BlockMaxConsumedUnits(fc.ChainTime))
+	boundBreached, dimension := fc.FeeManager.CumulateUnits(consumedUnits, fc.ConsumedUnitsCap)
 	if boundBreached {
 		return fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}

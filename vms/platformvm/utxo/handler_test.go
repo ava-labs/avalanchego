@@ -632,10 +632,10 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			fm := commonfees.NewManager(cfg.DefaultUnitFees)
 			feeCalc := &fees.Calculator{
-				FeeManager:  fm,
-				Config:      cfg,
-				ChainTime:   time.Time{},
-				Credentials: []verify.Verifiable{},
+				IsEForkActive:    true,
+				FeeManager:       fm,
+				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				Credentials:      []verify.Verifiable{},
 			}
 
 			// init fee calc with the uTx data
