@@ -154,7 +154,7 @@ func (g *GossipEthTxPool) Subscribe(ctx context.Context) {
 					log.Debug("resetting bloom filter", "reason", "reached max filled ratio")
 
 					g.mempool.IteratePending(func(tx *types.Transaction) bool {
-						g.bloom.Add(&GossipEthTx{Tx: pendingTx})
+						g.bloom.Add(&GossipEthTx{Tx: tx})
 						return true
 					})
 				}
