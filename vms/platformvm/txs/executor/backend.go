@@ -16,6 +16,7 @@ import (
 
 type Backend struct {
 	Config       *config.Config
+	ChainCreator ChainCreator
 	Ctx          *snow.Context
 	Clk          *mockable.Clock
 	Fx           fx.Fx

@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -20,22 +19,22 @@ import (
 )
 
 type Service struct {
-	log          logging.Logger
-	chainManager chains.Manager
-	lock         sync.RWMutex
-	ipcs         *ipcs.ChainIPCs
+	log     logging.Logger
+	aliaser ids.Aliaser
+	lock    sync.RWMutex
+	ipcs    *ipcs.ChainIPCs
 }
 
-func NewService(log logging.Logger, chainManager chains.Manager, ipcs *ipcs.ChainIPCs) (http.Handler, error) {
+func NewService(log logging.Logger, aliaser ids.Aliaser, ipcs *ipcs.ChainIPCs) (http.Handler, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	return server, server.RegisterService(
 		&Service{
-			log:          log,
-			chainManager: chainManager,
-			ipcs:         ipcs,
+			log:     log,
+			aliaser: aliaser,
+			ipcs:    ipcs,
 		},
 		"ipcs",
 	)
@@ -59,7 +58,7 @@ func (s *Service) PublishBlockchain(_ *http.Request, args *PublishBlockchainArgs
 		logging.UserString("blockchainID", args.BlockchainID),
 	)
 
-	chainID, err := s.chainManager.Lookup(args.BlockchainID)
+	chainID, err := s.aliaser.Lookup(args.BlockchainID)
 	if err != nil {
 		s.log.Error("chain lookup failed",
 			logging.UserString("blockchainID", args.BlockchainID),
@@ -98,7 +97,7 @@ func (s *Service) UnpublishBlockchain(_ *http.Request, args *UnpublishBlockchain
 		logging.UserString("blockchainID", args.BlockchainID),
 	)
 
-	chainID, err := s.chainManager.Lookup(args.BlockchainID)
+	chainID, err := s.aliaser.Lookup(args.BlockchainID)
 	if err != nil {
 		s.log.Error("chain lookup failed",
 			logging.UserString("blockchainID", args.BlockchainID),

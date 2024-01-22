@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -24,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -364,15 +362,12 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            mockable.MaxTime,
-		DurangoTime:            mockable.MaxTime,
+		MinStakeDuration: defaultMinStakingDuration,
+		MaxStakeDuration: defaultMaxStakingDuration,
+		RewardConfig:     defaultRewardConfig,
+		BanffTime:        latestForkTime,
+		CortinaTime:      mockable.MaxTime,
+		DurangoTime:      mockable.MaxTime,
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

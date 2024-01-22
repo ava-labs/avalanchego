@@ -4,11 +4,11 @@
 package xsvm
 
 import (
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms"
 )
 
-var _ vms.Factory = (*Factory)(nil)
+var _ rpcchainvm.Factory = (*Factory)(nil)
 
 type Factory struct{}
 

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
 )
 
-var _ vms.Factory = (*factory)(nil)
+var _ vms.Factory[*VMClient] = (*factory)(nil)
 
 type factory struct {
 	path           string
@@ -23,7 +23,7 @@ type factory struct {
 	runtimeTracker runtime.Tracker
 }
 
-func NewFactory(path string, processTracker resource.ProcessTracker, runtimeTracker runtime.Tracker) vms.Factory {
+func NewFactory(path string, processTracker resource.ProcessTracker, runtimeTracker runtime.Tracker) vms.Factory[*VMClient] {
 	return &factory{
 		path:           path,
 		processTracker: processTracker,
@@ -31,7 +31,7 @@ func NewFactory(path string, processTracker resource.ProcessTracker, runtimeTrac
 	}
 }
 
-func (f *factory) New(log logging.Logger) (interface{}, error) {
+func (f *factory) New(log logging.Logger) (*VMClient, error) {
 	config := &subprocess.Config{
 		Stderr:           log,
 		Stdout:           log,

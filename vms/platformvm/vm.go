@@ -60,13 +60,25 @@ var (
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
+	_ ChainCreator               = (*VM)(nil)
+	_ txexecutor.ChainCreator    = (*VM)(nil)
 )
+
+type ChainCreator interface {
+	QueueChainCreation(chainID ids.ID, subnetID ids.ID, genesis []byte, vmID ids.ID)
+}
 
 type VM struct {
 	config.Config
 	blockbuilder.Builder
 	network.Network
 	validators.State
+
+	// Initialized from Factory
+	aliaser                ids.Aliaser
+	Validators             validators.Manager
+	UptimeLockedCalculator uptime.LockedCalculator
+	chainManager           *chainManager
 
 	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
@@ -149,6 +161,7 @@ func (vm *VM) Initialize(
 		vm.db,
 		genesisBytes,
 		registerer,
+		vm.Validators,
 		&vm.Config,
 		execConfig,
 		vm.ctx,
@@ -159,7 +172,14 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
+	validatorManager := pvalidators.NewManager(
+		chainCtx.Log,
+		vm.Config,
+		vm.Validators,
+		vm.state,
+		vm.metrics,
+		&vm.clock,
+	)
 	vm.State = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
@@ -178,6 +198,7 @@ func (vm *VM) Initialize(
 
 	txExecutorBackend := &txexecutor.Backend{
 		Config:       &vm.Config,
+		ChainCreator: vm.chainManager,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
@@ -208,7 +229,7 @@ func (vm *VM) Initialize(
 		chainCtx.ValidatorState,
 		txVerifier,
 		mempool,
-		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
+		vm.Config.PartialSyncPrimaryNetwork,
 		appSender,
 		registerer,
 		execConfig.Network,
@@ -362,7 +383,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
-		vm.Config.CreateChain(chain.ID(), tx)
+		vm.QueueChainCreation(chain.ID(), tx.SubnetID, tx.GenesisData, tx.VMID)
 	}
 	return nil
 }
@@ -424,6 +445,8 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown(context.Context) error {
+	vm.chainManager.Shutdown()
+
 	if vm.db == nil {
 		return nil
 	}
@@ -499,6 +522,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
 	service := &Service{
 		vm:          vm,
+		aliaser:     vm.aliaser,
 		addrManager: avax.NewAddressManager(vm.ctx),
 		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
 			Size: stakerAttributesCacheSize,
@@ -560,4 +584,17 @@ func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
 	}
 
 	return nil
+}
+
+func (vm *VM) QueueChainCreation(
+	chainID ids.ID,
+	subnetID ids.ID,
+	genesis []byte,
+	vmID ids.ID,
+) {
+	vm.chainManager.QueueChainCreation(chainID, subnetID, genesis, vmID)
+}
+
+func (vm *VM) IsBootstrapped(id ids.ID) bool {
+	return vm.chainManager.IsBootstrapped(id)
 }

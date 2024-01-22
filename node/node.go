@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -53,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -76,18 +76,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
-	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
-	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 const (
@@ -125,6 +122,7 @@ func New(
 		LogFactory: logFactory,
 		ID:         ids.NodeIDFromCert(stakingCert),
 		Config:     config,
+		aliaser:    ids.NewAliaser(),
 	}
 
 	n.DoneShuttingDown.Add(1)
@@ -145,7 +143,7 @@ func New(
 		return nil, fmt.Errorf("problem creating vm logger: %w", err)
 	}
 
-	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+	n.VMManager = rpcchainvm.NewManager(n.VMFactoryLog, config.VMAliaser)
 
 	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
 		return nil, fmt.Errorf("problem initializing node beacons: %w", err)
@@ -182,7 +180,7 @@ func New(
 	n.initSharedMemory() // Initialize shared memory
 
 	// message.Creator is shared between networking, chainManager and the engine.
-	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
+	// It must be initiated before networking (initNetworking), chain manager (initPlatformChain)
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
 	n.networkNamespace = "network"
@@ -214,7 +212,7 @@ func New(
 	n.initEventDispatchers()
 
 	// Start the Health API
-	// Has to be initialized before chain manager
+	// Has to be initialized before platform chain
 	// [n.Net] must already be set
 	if err := n.initHealthAPI(); err != nil {
 		return nil, fmt.Errorf("couldn't initialize health API: %w", err)
@@ -222,8 +220,8 @@ func New(
 	if err := n.addDefaultVMAliases(); err != nil {
 		return nil, fmt.Errorf("couldn't initialize API aliases: %w", err)
 	}
-	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
-		return nil, fmt.Errorf("couldn't initialize chain manager: %w", err)
+	if err := n.initPlatformChain(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize platform chain: %w", err)
 	}
 	if err := n.initVMs(); err != nil { // Initialize the VM registry.
 		return nil, fmt.Errorf("couldn't initialize VM registry: %w", err)
@@ -253,10 +251,6 @@ func New(
 	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
 	n.initProfiler()
 
-	// Start the Platform chain
-	if err := n.initChains(n.Config.GenesisBytes); err != nil {
-		return nil, fmt.Errorf("couldn't initialize chains: %w", err)
-	}
 	return n, nil
 }
 
@@ -299,7 +293,8 @@ type Node struct {
 	timeoutManager timeout.Manager
 
 	// Manages creation of blockchains and routing messages to them
-	chainManager chains.Manager
+	platformVM *platformvm.VM
+	aliaser    ids.Aliaser
 
 	// Manages validator benching
 	benchlistManager benchlist.Manager
@@ -359,7 +354,7 @@ type Node struct {
 	MetricsRegisterer *prometheus.Registry
 	MetricsGatherer   metrics.MultiGatherer
 
-	VMManager vms.Manager
+	VMManager rpcchainvm.Manager
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
@@ -872,27 +867,7 @@ func (n *Node) initIndexer() error {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
 	}
 
-	// Chain manager will notify indexer when a chain is created
-	n.chainManager.AddRegistrant(n.indexer)
-
 	return nil
-}
-
-// Initializes the Platform chain.
-// Its genesis data specifies the other chains that should be created.
-func (n *Node) initChains(genesisBytes []byte) error {
-	n.Log.Info("initializing chains")
-
-	platformChain := chains.ChainParameters{
-		ID:            constants.PlatformChainID,
-		SubnetID:      constants.PrimaryNetworkID,
-		GenesisData:   genesisBytes, // Specifies other chains to create
-		VMID:          constants.PlatformVMID,
-		CustomBeacons: n.bootstrappers,
-	}
-
-	// Start the chain creator with the Platform Chain
-	return n.chainManager.StartChainCreator(platformChain)
 }
 
 func (n *Node) initMetrics() {
@@ -1053,10 +1028,11 @@ func (n *Node) addDefaultVMAliases() error {
 	return nil
 }
 
-// Create the chainManager and register the following VMs:
-// AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
+// Create the platform chain.
 // Assumes n.DBManager, n.vdrs all initialized (non-nil)
-func (n *Node) initChainManager(avaxAssetID ids.ID) error {
+func (n *Node) initPlatformChain() error {
+	n.Log.Info("initializing chains")
+
 	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.AVMID)
 	if err != nil {
 		return err
@@ -1105,61 +1081,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	n.chainManager = chains.New(&chains.ManagerConfig{
-		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
-		StakingTLSCert:                          n.Config.StakingTLSCert,
-		StakingBLSKey:                           n.Config.StakingSigningKey,
-		Log:                                     n.Log,
-		LogFactory:                              n.LogFactory,
-		VMManager:                               n.VMManager,
-		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
-		TxAcceptorGroup:                         n.TxAcceptorGroup,
-		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
-		DB:                                      n.DB,
-		MsgCreator:                              n.msgCreator,
-		Router:                                  n.Config.ConsensusRouter,
-		Net:                                     n.Net,
-		Validators:                              n.vdrs,
-		PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
-		NodeID:                                  n.ID,
-		NetworkID:                               n.Config.NetworkID,
-		Server:                                  n.APIServer,
-		Keystore:                                n.keystore,
-		AtomicMemory:                            n.sharedMemory,
-		AVAXAssetID:                             avaxAssetID,
-		XChainID:                                xChainID,
-		CChainID:                                cChainID,
-		CriticalChains:                          criticalChains,
-		TimeoutManager:                          n.timeoutManager,
-		Health:                                  n.health,
-		ShutdownNodeFunc:                        n.Shutdown,
-		MeterVMEnabled:                          n.Config.MeterVMEnabled,
-		Metrics:                                 n.MetricsGatherer,
-		SubnetConfigs:                           n.Config.SubnetConfigs,
-		ChainConfigs:                            n.Config.ChainConfigs,
-		FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
-		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
-		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
-		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
-		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
-		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
-		ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
-		ResourceTracker:                         n.resourceTracker,
-		StateSyncBeacons:                        n.Config.StateSyncIDs,
-		TracingEnabled:                          n.Config.TraceConfig.Enabled,
-		Tracer:                                  n.tracer,
-		ChainDataDir:                            n.Config.ChainDataDir,
-	})
-
-	// Notify the API server when new chains are created
-	n.chainManager.AddRegistrant(n.APIServer)
-	return nil
-}
-
-// initVMs initializes the VMs Avalanche supports + any additional vms installed as plugins.
-func (n *Node) initVMs() error {
-	n.Log.Info("initializing VMs")
-
 	vdrs := n.vdrs
 
 	// If sybil protection is disabled, we provide the P-chain its own local
@@ -1176,55 +1097,97 @@ func (n *Node) initVMs() error {
 	if err := block.InitCodec(durangoTime); err != nil {
 		return err
 	}
-	if err := coreth.InitCodec(durangoTime); err != nil {
+	//TODO register coreth codec
+
+	platformvmConfig := config.Config{
+		SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
+		PartialSyncPrimaryNetwork:     n.Config.PartialSyncPrimaryNetwork,
+		TrackedSubnets:                n.Config.TrackedSubnets,
+		TxFee:                         n.Config.TxFee,
+		CreateAssetTxFee:              n.Config.CreateAssetTxFee,
+		CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
+		TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
+		CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
+		AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
+		AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
+		AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
+		AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
+		MinValidatorStake:             n.Config.MinValidatorStake,
+		MaxValidatorStake:             n.Config.MaxValidatorStake,
+		MinDelegatorStake:             n.Config.MinDelegatorStake,
+		MinDelegationFee:              n.Config.MinDelegationFee,
+		UptimePercentage:              n.Config.UptimeRequirement,
+		MinStakeDuration:              n.Config.MinStakeDuration,
+		MaxStakeDuration:              n.Config.MaxStakeDuration,
+		RewardConfig:                  n.Config.RewardConfig,
+		ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
+		ApricotPhase4Time:             version.GetApricotPhase4Time(n.Config.NetworkID),
+		//ApricotPhase4MinPChainHeight:           //TODO
+		ApricotPhase5Time:                       version.GetApricotPhase5Time(n.Config.NetworkID),
+		BanffTime:                               version.GetBanffTime(n.Config.NetworkID),
+		CortinaTime:                             version.GetCortinaTime(n.Config.NetworkID),
+		DurangoTime:                             durangoTime,
+		UseCurrentHeight:                        n.Config.UseCurrentHeight,
+		TracingEnabled:                          n.Config.TraceConfig.Enabled,
+		NetworkID:                               n.Config.NetworkID,
+		AVAXAssetID:                             n.Config.AvaxAssetID,
+		MeterVMEnabled:                          n.Config.MeterVMEnabled,
+		FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
+		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
+		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
+		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
+		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
+		StateSyncBeacons:                        n.Config.StateSyncIDs,
+		ChainDataDir:                            n.Config.ChainDataDir,
+	}
+
+	platformvmFactory := platformvm.NewFactory(
+		platformvmConfig,
+		n.aliaser,
+		n.uptimeCalculator,
+		n.Config.StakingTLSCert,
+		n.Config.StakingSigningKey,
+		n.tracer,
+		n.LogFactory,
+		n.VMManager,
+		n.BlockAcceptorGroup,
+		n.TxAcceptorGroup,
+		n.VertexAcceptorGroup,
+		n.DB,
+		n.msgCreator,
+		n.Config.ConsensusRouter,
+		n.Net,
+		n.bootstrappers,
+		vdrs,
+		n.ID,
+		n.keystore,
+		n.sharedMemory,
+		xChainID,
+		cChainID,
+		criticalChains,
+		n.timeoutManager,
+		n.health,
+		n.Config.SubnetConfigs,
+		n.Config.ChainConfigs,
+		n.Shutdown,
+		n.MetricsGatherer,
+		n.resourceTracker,
+	)
+	vm, err := platformvmFactory.New(n.Log)
+	if err != nil {
 		return err
 	}
 
-	// Register the VMs that Avalanche supports
-	err := utils.Err(
-		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
-			Config: platformconfig.Config{
-				Chains:                        n.chainManager,
-				Validators:                    vdrs,
-				UptimeLockedCalculator:        n.uptimeCalculator,
-				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
-				PartialSyncPrimaryNetwork:     n.Config.PartialSyncPrimaryNetwork,
-				TrackedSubnets:                n.Config.TrackedSubnets,
-				TxFee:                         n.Config.TxFee,
-				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
-				CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
-				TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
-				CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
-				AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
-				AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
-				AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
-				AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-				UptimePercentage:              n.Config.UptimeRequirement,
-				MinValidatorStake:             n.Config.MinValidatorStake,
-				MaxValidatorStake:             n.Config.MaxValidatorStake,
-				MinDelegatorStake:             n.Config.MinDelegatorStake,
-				MinDelegationFee:              n.Config.MinDelegationFee,
-				MinStakeDuration:              n.Config.MinStakeDuration,
-				MaxStakeDuration:              n.Config.MaxStakeDuration,
-				RewardConfig:                  n.Config.RewardConfig,
-				ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
-				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
-				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
-				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
-				DurangoTime:                   durangoTime,
-				UseCurrentHeight:              n.Config.UseCurrentHeight,
-			},
-		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
-			Config: avmconfig.Config{
-				TxFee:            n.Config.TxFee,
-				CreateAssetTxFee: n.Config.CreateAssetTxFee,
-				DurangoTime:      durangoTime,
-			},
-		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
-	)
-	if err != nil {
+	n.platformVM = vm
+	return nil
+}
+
+// initVMs initializes the VMs Avalanche supports + any additional vms installed as plugins.
+func (n *Node) initVMs() error {
+	n.Log.Info("initializing VMs")
+
+	durangoTime := version.GetDurangoTime(n.Config.NetworkID)
+	if err := coreth.InitCodec(durangoTime); err != nil {
 		return err
 	}
 
@@ -1324,14 +1287,14 @@ func (n *Node) initAdminAPI() error {
 	n.Log.Info("initializing admin API")
 	service, err := admin.NewService(
 		admin.Config{
-			Log:          n.Log,
-			ChainManager: n.chainManager,
-			HTTPServer:   n.APIServer,
-			ProfileDir:   n.Config.ProfilerConfig.Dir,
-			LogFactory:   n.LogFactory,
-			NodeConfig:   n.Config,
-			VMManager:    n.VMManager,
-			VMRegistry:   n.VMRegistry,
+			Log:        n.Log,
+			Aliaser:    n.aliaser,
+			HTTPServer: n.APIServer,
+			ProfileDir: n.Config.ProfilerConfig.Dir,
+			LogFactory: n.LogFactory,
+			NodeConfig: n.Config,
+			VMManager:  n.VMManager,
+			VMRegistry: n.VMRegistry,
 		},
 	)
 	if err != nil {
@@ -1395,7 +1358,8 @@ func (n *Node) initInfoAPI() error {
 		},
 		n.Log,
 		n.vdrs,
-		n.chainManager,
+		n.aliaser,
+		n.platformVM,
 		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,
 		n.Net,
@@ -1516,7 +1480,7 @@ func (n *Node) initIPCAPI() error {
 		return nil
 	}
 	n.Log.Warn("initializing deprecated ipc API")
-	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.IPCs)
+	service, err := ipcsapi.NewService(n.Log, n.aliaser, n.IPCs)
 	if err != nil {
 		return err
 	}
@@ -1537,7 +1501,7 @@ func (n *Node) initChainAliases(genesisBytes []byte) error {
 
 	for chainID, aliases := range chainAliases {
 		for _, alias := range aliases {
-			if err := n.chainManager.Alias(chainID, alias); err != nil {
+			if err := n.aliaser.Alias(chainID, alias); err != nil {
 				return err
 			}
 		}
@@ -1545,7 +1509,7 @@ func (n *Node) initChainAliases(genesisBytes []byte) error {
 
 	for chainID, aliases := range n.Config.ChainAliases {
 		for _, alias := range aliases {
-			if err := n.chainManager.Alias(chainID, alias); err != nil {
+			if err := n.aliaser.Alias(chainID, alias); err != nil {
 				return err
 			}
 		}
@@ -1660,8 +1624,8 @@ func (n *Node) shutdown() {
 		}
 	}
 	n.timeoutManager.Stop()
-	if n.chainManager != nil {
-		n.chainManager.Shutdown()
+	if n.platformVM != nil {
+		_ = n.platformVM.Shutdown(context.TODO())
 	}
 	if n.profiler != nil {
 		n.profiler.Shutdown()

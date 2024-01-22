@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -35,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -233,10 +231,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	}
 
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
-		Validators:             validators.NewManager(),
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		TransformSubnetTxFee:   100 * defaultTxFee,
@@ -1126,15 +1121,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstDB := prefixdb.New([]byte{}, db)
 	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
+		MinStakeDuration: defaultMinStakingDuration,
+		MaxStakeDuration: defaultMaxStakingDuration,
+		RewardConfig:     defaultRewardConfig,
+		BanffTime:        latestForkTime,
+		CortinaTime:      latestForkTime,
+		DurangoTime:      latestForkTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1213,15 +1205,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
+		MinStakeDuration: defaultMinStakingDuration,
+		MaxStakeDuration: defaultMaxStakingDuration,
+		RewardConfig:     defaultRewardConfig,
+		BanffTime:        latestForkTime,
+		CortinaTime:      latestForkTime,
+		DurangoTime:      latestForkTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1263,15 +1252,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
+		MinStakeDuration: defaultMinStakingDuration,
+		MaxStakeDuration: defaultMaxStakingDuration,
+		RewardConfig:     defaultRewardConfig,
+		BanffTime:        latestForkTime,
+		CortinaTime:      latestForkTime,
+		DurangoTime:      latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1604,15 +1590,12 @@ func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
+		MinStakeDuration: defaultMinStakingDuration,
+		MaxStakeDuration: defaultMaxStakingDuration,
+		RewardConfig:     defaultRewardConfig,
+		BanffTime:        latestForkTime,
+		CortinaTime:      latestForkTime,
+		DurangoTime:      latestForkTime,
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1768,14 +1751,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstDB := prefixdb.New([]byte{}, db)
 	const firstUptimePercentage = 20 // 20%
 	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       firstUptimePercentage / 100.,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
+		UptimePercentage: firstUptimePercentage / 100.,
+		RewardConfig:     defaultRewardConfig,
+		BanffTime:        latestForkTime,
+		CortinaTime:      latestForkTime,
+		DurangoTime:      latestForkTime,
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1817,13 +1797,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondDB := prefixdb.New([]byte{}, db)
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
 	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       secondUptimePercentage / 100.,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
+		UptimePercentage: secondUptimePercentage / 100.,
+		BanffTime:        latestForkTime,
+		CortinaTime:      latestForkTime,
+		DurangoTime:      latestForkTime,
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1915,14 +1892,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	db := memdb.New()
 
 	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       .2,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
+		UptimePercentage: .2,
+		RewardConfig:     defaultRewardConfig,
+		BanffTime:        latestForkTime,
+		CortinaTime:      latestForkTime,
+		DurangoTime:      latestForkTime,
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

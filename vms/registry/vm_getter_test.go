@@ -16,10 +16,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
-	"github.com/ava-labs/avalanchego/vms"
 )
 
 var (
@@ -110,13 +110,13 @@ func TestGet_Success(t *testing.T) {
 	registeredVMId := ids.GenerateTestID()
 	unregisteredVMId := ids.GenerateTestID()
 
-	registeredVMFactory := vms.NewMockFactory(resources.ctrl)
+	registeredVMFactory := rpcchainvm.NewMockFactory(resources.ctrl)
 
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(twoValidVMs, nil)
 	resources.mockManager.EXPECT().Lookup(registeredVMName).Times(1).Return(registeredVMId, nil)
 	resources.mockManager.EXPECT().GetFactory(registeredVMId).Times(1).Return(registeredVMFactory, nil)
 	resources.mockManager.EXPECT().Lookup(unregisteredVMName).Times(1).Return(unregisteredVMId, nil)
-	resources.mockManager.EXPECT().GetFactory(unregisteredVMId).Times(1).Return(nil, vms.ErrNotFound)
+	resources.mockManager.EXPECT().GetFactory(unregisteredVMId).Times(1).Return(nil, rpcchainvm.ErrNotFound)
 
 	registeredVMs, unregisteredVMs, err := resources.getter.Get()
 
@@ -133,7 +133,7 @@ func TestGet_Success(t *testing.T) {
 type vmGetterTestResources struct {
 	ctrl        *gomock.Controller
 	mockReader  *filesystem.MockReader
-	mockManager *vms.MockManager
+	mockManager *rpcchainvm.MockManager
 	getter      VMGetter
 }
 
@@ -141,7 +141,7 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 	ctrl := gomock.NewController(t)
 
 	mockReader := filesystem.NewMockReader(ctrl)
-	mockManager := vms.NewMockManager(ctrl)
+	mockManager := rpcchainvm.NewMockManager(ctrl)
 	mockRegistry := prometheus.NewRegistry()
 	mockCPUTracker, err := resource.NewManager(
 		logging.NoLog{},

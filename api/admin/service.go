@@ -15,15 +15,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
-	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry"
 )
 
@@ -40,14 +39,14 @@ var (
 )
 
 type Config struct {
-	Log          logging.Logger
-	ProfileDir   string
-	LogFactory   logging.Factory
-	NodeConfig   interface{}
-	ChainManager chains.Manager
-	HTTPServer   server.PathAdderWithReadLock
-	VMRegistry   registry.VMRegistry
-	VMManager    vms.Manager
+	Log        logging.Logger
+	ProfileDir string
+	LogFactory logging.Factory
+	NodeConfig interface{}
+	Aliaser    ids.Aliaser
+	HTTPServer server.PathAdderWithReadLock
+	VMRegistry registry.VMRegistry
+	VMManager  rpcchainvm.Manager
 }
 
 // Admin is the API service for node admin management
@@ -165,7 +164,7 @@ func (a *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, _ *api.EmptyRe
 	if len(args.Alias) > maxAliasLength {
 		return errAliasTooLong
 	}
-	chainID, err := a.ChainManager.Lookup(args.Chain)
+	chainID, err := a.Aliaser.Lookup(args.Chain)
 	if err != nil {
 		return err
 	}
@@ -173,7 +172,7 @@ func (a *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, _ *api.EmptyRe
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if err := a.ChainManager.Alias(chainID, args.Alias); err != nil {
+	if err := a.Aliaser.Alias(chainID, args.Alias); err != nil {
 		return err
 	}
 
@@ -205,7 +204,7 @@ func (a *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs, repl
 		return err
 	}
 
-	reply.Aliases, err = a.ChainManager.Aliases(id)
+	reply.Aliases, err = a.Aliaser.Aliases(id)
 	return err
 }
 

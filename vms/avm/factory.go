@@ -9,12 +9,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 )
 
-var _ vms.Factory = (*Factory)(nil)
+var _ vms.Factory[*VM] = (*Factory)(nil)
 
 type Factory struct {
 	config.Config
 }
 
-func (f *Factory) New(logging.Logger) (interface{}, error) {
+func (f *Factory) New(logging.Logger) (*VM, error) {
 	return &VM{Config: f.Config}, nil
 }

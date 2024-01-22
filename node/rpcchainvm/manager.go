@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vms
+package rpcchainvm
 
 import (
 	"context"
@@ -12,8 +12,9 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 )
 
 var (
@@ -21,11 +22,6 @@ var (
 
 	_ Manager = (*manager)(nil)
 )
-
-// A Factory creates new instances of a VM
-type Factory interface {
-	New(logging.Logger) (interface{}, error)
-}
 
 // Manager tracks a collection of VM factories, their aliases, and their
 // versions.
@@ -43,11 +39,11 @@ type Manager interface {
 
 	// Return a factory that can create new instances of the vm whose ID is
 	// [vmID]
-	GetFactory(vmID ids.ID) (Factory, error)
+	GetFactory(vmID ids.ID) (vms.Factory[*rpcchainvm.VMClient], error)
 
 	// Map [vmID] to [factory]. [factory] creates new instances of the vm whose
 	// ID is [vmID]
-	RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error
+	RegisterFactory(ctx context.Context, vmID ids.ID, factory vms.Factory[*rpcchainvm.VMClient]) error
 
 	// ListFactories returns all the IDs that have had factories registered.
 	ListFactories() ([]ids.ID, error)
@@ -68,7 +64,7 @@ type manager struct {
 
 	// Key: A VM's ID
 	// Value: A factory that creates new instances of that VM
-	factories map[ids.ID]Factory
+	factories map[ids.ID]vms.Factory[*rpcchainvm.VMClient]
 
 	// Key: A VM's ID
 	// Value: version the VM returned
@@ -80,12 +76,12 @@ func NewManager(log logging.Logger, aliaser ids.Aliaser) Manager {
 	return &manager{
 		Aliaser:   aliaser,
 		log:       log,
-		factories: make(map[ids.ID]Factory),
+		factories: make(map[ids.ID]vms.Factory[*rpcchainvm.VMClient]),
 		versions:  make(map[ids.ID]string),
 	}
 }
 
-func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
+func (m *manager) GetFactory(vmID ids.ID) (vms.Factory[*rpcchainvm.VMClient], error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -95,7 +91,7 @@ func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
 	return nil, fmt.Errorf("%q was %w", vmID, ErrNotFound)
 }
 
-func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error {
+func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory vms.Factory[*rpcchainvm.VMClient]) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -113,20 +109,15 @@ func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Fact
 		return err
 	}
 
-	commonVM, ok := vm.(common.VM)
-	if !ok {
-		return nil
-	}
-
-	version, err := commonVM.Version(ctx)
+	version, err := vm.Version(ctx)
 	if err != nil {
 		// Drop the shutdown error to surface the original error
-		_ = commonVM.Shutdown(ctx)
+		_ = vm.Shutdown(ctx)
 		return err
 	}
 
 	m.versions[vmID] = version
-	return commonVM.Shutdown(ctx)
+	return vm.Shutdown(ctx)
 }
 
 func (m *manager) ListFactories() ([]ids.ID, error) {

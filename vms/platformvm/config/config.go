@@ -6,32 +6,13 @@ package config
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Struct collecting all foundational parameters of PlatformVM
 type Config struct {
-	// The node's chain manager
-	Chains chains.Manager
-
-	// Node's validator set maps subnetID -> validators of the subnet
-	//
-	// Invariant: The primary network's validator set should have been added to
-	//            the manager before calling VM.Initialize.
-	// Invariant: The primary network's validator set should be empty before
-	//            calling VM.Initialize.
-	Validators validators.Manager
-
-	// Provides access to the uptime manager as a thread safe data structure
-	UptimeLockedCalculator uptime.LockedCalculator
-
 	// True if the node is being run with staking enabled
 	SybilProtectionEnabled bool
 
@@ -93,8 +74,9 @@ type Config struct {
 	RewardConfig reward.Config
 
 	// Time of the AP3 network upgrade
-	ApricotPhase3Time time.Time
-
+	ApricotPhase3Time            time.Time
+	ApricotPhase4Time            time.Time
+	ApricotPhase4MinPChainHeight uint64
 	// Time of the AP5 network upgrade
 	ApricotPhase5Time time.Time
 
@@ -114,7 +96,23 @@ type Config struct {
 	// This config is particularly useful for triggering proposervm activation
 	// on recently created subnets (without this, users need to wait for
 	// [recentlyAcceptedWindowTTL] to pass for activation to occur).
-	UseCurrentHeight bool
+	UseCurrentHeight        bool
+	TracingEnabled          bool
+	NetworkID               uint32 // ID of the network this node is connected to
+	AVAXAssetID             ids.ID
+	MeterVMEnabled          bool // Should each VM be wrapped with a MeterVM
+	FrontierPollFrequency   time.Duration
+	ConsensusAppConcurrency int
+	// Max Time to spend fetching a container and its
+	// ancestors when responding to a GetAncestors
+	BootstrapMaxTimeGetAncestors time.Duration
+	// Max number of containers in an ancestors message sent by this node.
+	BootstrapAncestorsMaxContainersSent int
+	// This node will only consider the first [AncestorsMaxContainersReceived]
+	// containers in an ancestors message it receives.
+	BootstrapAncestorsMaxContainersReceived int
+	StateSyncBeacons                        []ids.NodeID
+	ChainDataDir                            string
 }
 
 func (c *Config) IsApricotPhase3Activated(timestamp time.Time) bool {
@@ -149,24 +147,4 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 		return c.CreateSubnetTxFee
 	}
 	return c.CreateAssetTxFee
-}
-
-// Create the blockchain described in [tx], but only if this node is a member of
-// the subnet that validates the chain
-func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
-	if c.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains
-		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
-		!c.TrackedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
-		return
-	}
-
-	chainParams := chains.ChainParameters{
-		ID:          chainID,
-		SubnetID:    tx.SubnetID,
-		GenesisData: tx.GenesisData,
-		VMID:        tx.VMID,
-		FxIDs:       tx.FxIDs,
-	}
-
-	c.Chains.QueueChainCreation(chainParams)
 }

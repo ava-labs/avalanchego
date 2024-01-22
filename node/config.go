@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
 type IPCConfig struct {
@@ -186,8 +186,8 @@ type Config struct {
 
 	SubnetConfigs map[ids.ID]subnets.Config `json:"subnetConfigs"`
 
-	ChainConfigs map[string]chains.ChainConfig `json:"-"`
-	ChainAliases map[ids.ID][]string           `json:"chainAliases"`
+	ChainConfigs map[string]platformvm.ChainConfig `json:"-"`
+	ChainAliases map[ids.ID][]string               `json:"chainAliases"`
 
 	VMAliaser ids.Aliaser `json:"-"`
 

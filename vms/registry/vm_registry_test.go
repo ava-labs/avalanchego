@@ -12,7 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 )
 
 var (
@@ -28,17 +28,17 @@ func TestReload_Success(t *testing.T) {
 
 	resources := initVMRegistryTest(t)
 
-	factory1 := vms.NewMockFactory(resources.ctrl)
-	factory2 := vms.NewMockFactory(resources.ctrl)
-	factory3 := vms.NewMockFactory(resources.ctrl)
-	factory4 := vms.NewMockFactory(resources.ctrl)
+	factory1 := rpcchainvm.NewMockFactory(resources.ctrl)
+	factory2 := rpcchainvm.NewMockFactory(resources.ctrl)
+	factory3 := rpcchainvm.NewMockFactory(resources.ctrl)
+	factory4 := rpcchainvm.NewMockFactory(resources.ctrl)
 
-	registeredVms := map[ids.ID]vms.Factory{
+	registeredVms := map[ids.ID]rpcchainvm.Factory{
 		id1: factory1,
 		id2: factory2,
 	}
 
-	unregisteredVms := map[ids.ID]vms.Factory{
+	unregisteredVms := map[ids.ID]rpcchainvm.Factory{
 		id3: factory3,
 		id4: factory4,
 	}
@@ -82,17 +82,17 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 
 	resources := initVMRegistryTest(t)
 
-	factory1 := vms.NewMockFactory(resources.ctrl)
-	factory2 := vms.NewMockFactory(resources.ctrl)
-	factory3 := vms.NewMockFactory(resources.ctrl)
-	factory4 := vms.NewMockFactory(resources.ctrl)
+	factory1 := rpcchainvm.NewMockFactory(resources.ctrl)
+	factory2 := rpcchainvm.NewMockFactory(resources.ctrl)
+	factory3 := rpcchainvm.NewMockFactory(resources.ctrl)
+	factory4 := rpcchainvm.NewMockFactory(resources.ctrl)
 
-	registeredVms := map[ids.ID]vms.Factory{
+	registeredVms := map[ids.ID]rpcchainvm.Factory{
 		id1: factory1,
 		id2: factory2,
 	}
 
-	unregisteredVms := map[ids.ID]vms.Factory{
+	unregisteredVms := map[ids.ID]rpcchainvm.Factory{
 		id3: factory3,
 		id4: factory4,
 	}
@@ -121,7 +121,7 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 type registryTestResources struct {
 	ctrl          *gomock.Controller
 	mockVMGetter  *MockVMGetter
-	mockVMManager *vms.MockManager
+	mockVMManager *rpcchainvm.MockManager
 	vmRegistry    VMRegistry
 }
 
@@ -129,7 +129,7 @@ func initVMRegistryTest(t *testing.T) *registryTestResources {
 	ctrl := gomock.NewController(t)
 
 	mockVMGetter := NewMockVMGetter(ctrl)
-	mockVMManager := vms.NewMockManager(ctrl)
+	mockVMManager := rpcchainvm.NewMockManager(ctrl)
 
 	vmRegistry := NewVMRegistry(
 		VMRegistryConfig{

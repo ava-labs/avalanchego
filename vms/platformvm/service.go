@@ -5,13 +5,12 @@ package platformvm
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"time"
-
-	stdjson "encoding/json"
 
 	"go.uber.org/zap"
 
@@ -85,6 +84,7 @@ var (
 // Service defines the API calls that can be made to the platform chain
 type Service struct {
 	vm                    *VM
+	aliaser               ids.Aliaser
 	addrManager           avax.AddressManager
 	stakerAttributesCache *cache.LRU[ids.ID, *stakerAttributes]
 }
@@ -1868,14 +1868,14 @@ func (s *Service) buildCreateBlockchainTx(args *CreateBlockchainArgs) (*txs.Tx, 
 		return nil, ids.ShortEmpty, fmt.Errorf("problem parsing genesis data: %w", err)
 	}
 
-	vmID, err := s.vm.Chains.LookupVM(args.VMID)
+	vmID, err := s.aliaser.Lookup(args.VMID)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("no VM with ID '%s' found", args.VMID)
 	}
 
 	fxIDs := []ids.ID(nil)
 	for _, fxIDStr := range args.FxIDs {
-		fxID, err := s.vm.Chains.LookupVM(fxIDStr)
+		fxID, err := s.aliaser.Lookup(fxIDStr)
 		if err != nil {
 			return nil, ids.ShortEmpty, fmt.Errorf("no FX with ID '%s' found", fxIDStr)
 		}
@@ -1969,7 +1969,7 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 	defer s.vm.ctx.Lock.Unlock()
 
 	// if its aliased then vm created this chain.
-	if aliasedID, err := s.vm.Chains.Lookup(args.BlockchainID); err == nil {
+	if aliasedID, err := s.aliaser.Lookup(args.BlockchainID); err == nil {
 		if s.nodeValidates(aliasedID) {
 			reply.Status = status.Validating
 			return nil

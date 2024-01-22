@@ -12,15 +12,15 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry"
 )
 
 type loadVMsTest struct {
 	admin          *Admin
 	ctrl           *gomock.Controller
-	mockVMManager  *vms.MockManager
+	mockVMManager  *rpcchainvm.MockManager
 	mockVMRegistry *registry.MockVMRegistry
 }
 
@@ -28,7 +28,7 @@ func initLoadVMsTest(t *testing.T) *loadVMsTest {
 	ctrl := gomock.NewController(t)
 
 	mockVMRegistry := registry.NewMockVMRegistry(ctrl)
-	mockVMManager := vms.NewMockManager(ctrl)
+	mockVMManager := rpcchainvm.NewMockManager(ctrl)
 
 	return &loadVMsTest{
 		admin: &Admin{Config: Config{

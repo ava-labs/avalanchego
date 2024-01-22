@@ -12,10 +12,10 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -24,8 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -36,13 +36,14 @@ var errNoChainProvided = errors.New("argument 'chain' not given")
 // Info is the API service for unprivileged info on a node
 type Info struct {
 	Parameters
-	log          logging.Logger
-	validators   validators.Manager
-	myIP         ips.DynamicIPPort
-	networking   network.Network
-	chainManager chains.Manager
-	vmManager    vms.Manager
-	benchlist    benchlist.Manager
+	log        logging.Logger
+	validators validators.Manager
+	myIP       ips.DynamicIPPort
+	networking network.Network
+	aliaser    ids.Aliaser
+	platformVM *platformvm.VM
+	vmManager  rpcchainvm.Manager
+	benchlist  benchlist.Manager
 }
 
 type Parameters struct {
@@ -59,15 +60,16 @@ type Parameters struct {
 	AddPrimaryNetworkDelegatorFee uint64
 	AddSubnetValidatorFee         uint64
 	AddSubnetDelegatorFee         uint64
-	VMManager                     vms.Manager
+	VMManager                     rpcchainvm.Manager
 }
 
 func NewService(
 	parameters Parameters,
 	log logging.Logger,
 	validators validators.Manager,
-	chainManager chains.Manager,
-	vmManager vms.Manager,
+	aliaser ids.Aliaser,
+	platformVM *platformvm.VM,
+	vmManager rpcchainvm.Manager,
 	myIP ips.DynamicIPPort,
 	network network.Network,
 	benchlist benchlist.Manager,
@@ -78,14 +80,15 @@ func NewService(
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	return server, server.RegisterService(
 		&Info{
-			Parameters:   parameters,
-			log:          log,
-			validators:   validators,
-			chainManager: chainManager,
-			vmManager:    vmManager,
-			myIP:         myIP,
-			networking:   network,
-			benchlist:    benchlist,
+			Parameters: parameters,
+			log:        log,
+			validators: validators,
+			aliaser:    aliaser,
+			platformVM: platformVM,
+			vmManager:  vmManager,
+			myIP:       myIP,
+			networking: network,
+			benchlist:  benchlist,
 		},
 		"info",
 	)
@@ -203,7 +206,7 @@ func (i *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply
 		zap.String("method", "getBlockchainID"),
 	)
 
-	bID, err := i.chainManager.Lookup(args.Alias)
+	bID, err := i.aliaser.Lookup(args.Alias)
 	reply.BlockchainID = bID
 	return err
 }
@@ -240,7 +243,7 @@ func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error 
 		benchedIDs := i.benchlist.GetBenched(peer.ID)
 		benchedAliases := make([]string, len(benchedIDs))
 		for idx, id := range benchedIDs {
-			alias, err := i.chainManager.PrimaryAlias(id)
+			alias, err := i.aliaser.PrimaryAlias(id)
 			if err != nil {
 				return fmt.Errorf("failed to get primary alias for chain ID %s: %w", id, err)
 			}
@@ -282,11 +285,11 @@ func (i *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *
 	if args.Chain == "" {
 		return errNoChainProvided
 	}
-	chainID, err := i.chainManager.Lookup(args.Chain)
+	chainID, err := i.aliaser.Lookup(args.Chain)
 	if err != nil {
 		return fmt.Errorf("there is no chain with alias/ID '%s'", args.Chain)
 	}
-	reply.IsBootstrapped = i.chainManager.IsBootstrapped(chainID)
+	reply.IsBootstrapped = i.platformVM.IsBootstrapped(chainID)
 	return nil
 }
 

@@ -10,11 +10,13 @@
 package registry
 
 import (
-	reflect "reflect"
+	"reflect"
 
-	ids "github.com/ava-labs/avalanchego/ids"
-	vms "github.com/ava-labs/avalanchego/vms"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 )
 
 // MockVMGetter is a mock of VMGetter interface.
@@ -41,11 +43,11 @@ func (m *MockVMGetter) EXPECT() *MockVMGetterMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockVMGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, error) {
+func (m *MockVMGetter) Get() (map[ids.ID]vms.Factory[*rpcchainvm.VMClient], map[ids.ID]vms.Factory[*rpcchainvm.VMClient], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get")
-	ret0, _ := ret[0].(map[ids.ID]vms.Factory)
-	ret1, _ := ret[1].(map[ids.ID]vms.Factory)
+	ret0, _ := ret[0].(map[ids.ID]vms.Factory[*rpcchainvm.VMClient])
+	ret1, _ := ret[1].(map[ids.ID]vms.Factory[*rpcchainvm.VMClient])
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }

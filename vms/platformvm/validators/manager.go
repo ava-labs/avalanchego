@@ -87,17 +87,19 @@ type State interface {
 func NewManager(
 	log logging.Logger,
 	cfg config.Config,
+	validatorManager validators.Manager,
 	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) Manager {
 	return &manager{
-		log:     log,
-		cfg:     cfg,
-		state:   state,
-		metrics: metrics,
-		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+		log:        log,
+		cfg:        cfg,
+		validators: validatorManager,
+		state:      state,
+		metrics:    metrics,
+		clk:        clk,
+		caches:     make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -112,11 +114,12 @@ func NewManager(
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
 type manager struct {
-	log     logging.Logger
-	cfg     config.Config
-	state   State
-	metrics metrics.Metrics
-	clk     *mockable.Clock
+	log        logging.Logger
+	cfg        config.Config
+	validators validators.Manager
+	state      State
+	metrics    metrics.Metrics
+	clk        *mockable.Clock
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
@@ -280,7 +283,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
+	primaryMap := m.validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
 	return primaryMap, currentHeight, err
 }
@@ -342,8 +345,8 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	subnetMap := m.cfg.Validators.GetMap(subnetID)
-	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
+	subnetMap := m.validators.GetMap(subnetID)
+	primaryMap := m.validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
 	return subnetMap, primaryMap, currentHeight, err
 }

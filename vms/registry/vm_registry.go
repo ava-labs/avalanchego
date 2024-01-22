@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/node/rpcchainvm"
 )
 
 var _ VMRegistry = (*vmRegistry)(nil)
@@ -22,7 +22,7 @@ type VMRegistry interface {
 // VMRegistryConfig defines configurations for VMRegistry
 type VMRegistryConfig struct {
 	VMGetter  VMGetter
-	VMManager vms.Manager
+	VMManager rpcchainvm.Manager
 }
 
 type vmRegistry struct {

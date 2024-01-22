@@ -19,7 +19,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -46,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -1015,35 +1015,35 @@ func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	return "", nil
 }
 
-func getChainConfigsFromFlag(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+func getChainConfigsFromFlag(v *viper.Viper) (map[string]platformvm.ChainConfig, error) {
 	chainConfigContentB64 := v.GetString(ChainConfigContentKey)
 	chainConfigContent, err := base64.StdEncoding.DecodeString(chainConfigContentB64)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 	}
 
-	chainConfigs := make(map[string]chains.ChainConfig)
+	chainConfigs := make(map[string]platformvm.ChainConfig)
 	if err := json.Unmarshal(chainConfigContent, &chainConfigs); err != nil {
 		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
 	}
 	return chainConfigs, nil
 }
 
-func getChainConfigsFromDir(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+func getChainConfigsFromDir(v *viper.Viper) (map[string]platformvm.ChainConfig, error) {
 	chainConfigPath, err := getPathFromDirKey(v, ChainConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(chainConfigPath) == 0 {
-		return make(map[string]chains.ChainConfig), nil
+		return make(map[string]platformvm.ChainConfig), nil
 	}
 
 	return readChainConfigPath(chainConfigPath)
 }
 
 // getChainConfigs reads & puts chainConfigs to node config
-func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+func getChainConfigs(v *viper.Viper) (map[string]platformvm.ChainConfig, error) {
 	if v.IsSet(ChainConfigContentKey) {
 		return getChainConfigsFromFlag(v)
 	}
@@ -1052,12 +1052,12 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
-func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig, error) {
+func readChainConfigPath(chainConfigPath string) (map[string]platformvm.ChainConfig, error) {
 	chainDirs, err := filepath.Glob(filepath.Join(chainConfigPath, "*"))
 	if err != nil {
 		return nil, err
 	}
-	chainConfigMap := make(map[string]chains.ChainConfig)
+	chainConfigMap := make(map[string]platformvm.ChainConfig)
 	for _, chainDir := range chainDirs {
 		dirInfo, err := os.Stat(chainDir)
 		if err != nil {
@@ -1080,7 +1080,7 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 			return chainConfigMap, err
 		}
 
-		chainConfigMap[dirInfo.Name()] = chains.ChainConfig{
+		chainConfigMap[dirInfo.Name()] = platformvm.ChainConfig{
 			Config:  configData,
 			Upgrade: upgradeData,
 		}

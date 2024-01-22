@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/ids"
+	rpcchainvm2 "github.com/ava-labs/avalanchego/node/rpcchainvm"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
@@ -27,8 +28,8 @@ type VMGetter interface {
 	// Get fetches the VMs that are registered and the VMs that are not
 	// registered but available to be installed on the node.
 	Get() (
-		registeredVMs map[ids.ID]vms.Factory,
-		unregisteredVMs map[ids.ID]vms.Factory,
+		registeredVMs map[ids.ID]vms.Factory[*rpcchainvm.VMClient],
+		unregisteredVMs map[ids.ID]vms.Factory[*rpcchainvm.VMClient],
 		err error,
 	)
 }
@@ -36,7 +37,7 @@ type VMGetter interface {
 // VMGetterConfig defines settings for VMGetter
 type VMGetterConfig struct {
 	FileReader      filesystem.Reader
-	Manager         vms.Manager
+	Manager         rpcchainvm2.Manager
 	PluginDirectory string
 	CPUTracker      resource.ProcessTracker
 	RuntimeTracker  runtime.Tracker
@@ -53,14 +54,14 @@ func NewVMGetter(config VMGetterConfig) VMGetter {
 	}
 }
 
-func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, error) {
+func (getter *vmGetter) Get() (map[ids.ID]vms.Factory[*rpcchainvm.VMClient], map[ids.ID]vms.Factory[*rpcchainvm.VMClient], error) {
 	files, err := getter.config.FileReader.ReadDir(getter.config.PluginDirectory)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	registeredVMs := make(map[ids.ID]vms.Factory)
-	unregisteredVMs := make(map[ids.ID]vms.Factory)
+	registeredVMs := make(map[ids.ID]vms.Factory[*rpcchainvm.VMClient])
+	unregisteredVMs := make(map[ids.ID]vms.Factory[*rpcchainvm.VMClient])
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -95,7 +96,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 		}
 
 		// If the error isn't "not found", then we should report the error.
-		if !errors.Is(err, vms.ErrNotFound) {
+		if !errors.Is(err, rpcchainvm2.ErrNotFound) {
 			return nil, nil, err
 		}
 

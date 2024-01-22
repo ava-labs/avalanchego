@@ -453,6 +453,7 @@ func New(
 	db database.Database,
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
+	validators validators.Manager,
 	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
@@ -462,6 +463,7 @@ func New(
 	s, err := newState(
 		db,
 		metrics,
+		validators,
 		cfg,
 		execCfg,
 		ctx,
@@ -506,6 +508,7 @@ func New(
 func newState(
 	db database.Database,
 	metrics metrics.Metrics,
+	validators validators.Manager,
 	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
@@ -629,7 +632,7 @@ func newState(
 	return &state{
 		validatorState: newValidatorState(),
 
-		validators: cfg.Validators,
+		validators: validators,
 		ctx:        ctx,
 		cfg:        cfg,
 		metrics:    metrics,

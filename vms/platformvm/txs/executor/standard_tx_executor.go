@@ -29,6 +29,11 @@ var (
 	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
 )
 
+type ChainCreator interface {
+	//TODO fxs?
+	QueueChainCreation(chainID ids.ID, subnetID ids.ID, genesis []byte, vmID ids.ID)
+}
+
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
@@ -94,7 +99,12 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
 	e.OnAccept = func() {
-		e.Config.CreateChain(txID, tx)
+		e.ChainCreator.QueueChainCreation(
+			txID,
+			tx.SubnetID,
+			tx.GenesisData,
+			tx.VMID,
+		)
 	}
 	return nil
 }
