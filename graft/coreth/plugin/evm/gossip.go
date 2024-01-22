@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -108,8 +109,8 @@ func (tx *GossipAtomicTx) GossipID() ids.ID {
 	return tx.Tx.ID()
 }
 
-func NewGossipEthTxPool(mempool *txpool.TxPool) (*GossipEthTxPool, error) {
-	bloom, err := gossip.NewBloomFilter(txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
+func NewGossipEthTxPool(mempool *txpool.TxPool, registerer prometheus.Registerer) (*GossipEthTxPool, error) {
+	bloom, err := gossip.NewBloomFilter(registerer, "eth_tx_bloom_filter", txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
 	}

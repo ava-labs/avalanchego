@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0
-	github.com/ava-labs/avalanchego v1.10.18-rc.17
+	github.com/ava-labs/avalanchego v1.10.18-wip-p2p-bloom-metrics
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.1.0
@@ -35,7 +35,7 @@ require (
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.17.2-0.20221006022127-8f469abc00aa
 	go.uber.org/goleak v1.2.1
-	go.uber.org/mock v0.2.0
+	go.uber.org/mock v0.4.0
 	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e
 	golang.org/x/sync v0.5.0

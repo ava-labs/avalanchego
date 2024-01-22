@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 # Don't export them as they're used in the context of other calls
-avalanche_version=${AVALANCHE_VERSION:-'v1.10.18-rc.17'}
+avalanche_version=${AVALANCHE_VERSION:-'v1.10.18-wip-p2p-bloom-metrics'}
