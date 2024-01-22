@@ -1102,8 +1102,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	peerIPs := p.Network.Peers(p.id, knownPeers, salt)
 
-	// We bypass throttling here to ensure that the peerlist message is
-	// acknowledged timely.
+	// We bypass throttling here to ensure that the handshake message is
+	// acknowledged correctly.
 	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error("failed to create peer list handshake message",
@@ -1194,10 +1194,22 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 		close(p.onFinishHandshake)
 	}
 
-	// the peers this peer told us about
-	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts))
+	// Invariant: We do not account for clock skew here, as the sender of the
+	// certificate is expected to account for clock skew during the activation
+	// of Durango.
+	durangoTime := version.GetDurangoTime(p.NetworkID)
+	beforeDurango := time.Now().Before(durangoTime)
+	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts)) // the peers this peer told us about
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
-		tlsCert, err := staking.ParseCertificate(claimedIPPort.X509Certificate)
+		var (
+			tlsCert *staking.Certificate
+			err     error
+		)
+		if beforeDurango {
+			tlsCert, err = staking.ParseCertificate(claimedIPPort.X509Certificate)
+		} else {
+			tlsCert, err = staking.ParseCertificatePermissive(claimedIPPort.X509Certificate)
+		}
 		if err != nil {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),

@@ -51,7 +51,8 @@ func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	if !v.txExecutorBackend.Config.IsDurangoActivated(b.Timestamp()) && len(b.Transactions) != 0 {
+	nextChainTime := b.Timestamp()
+	if !v.txExecutorBackend.Config.IsDurangoActivated(nextChainTime) && len(b.Transactions) != 0 {
 		return errBanffProposalBlockWithMultipleTransactions
 	}
 
@@ -66,7 +67,6 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	// Apply the changes, if any, from advancing the chain time.
-	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
 		v.txExecutorBackend,
 		onDecisionState,
@@ -219,7 +219,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	if err := v.verifyUniqueInputs(b.Parent(), atomicExecutor.Inputs); err != nil {
+	if err := v.verifyUniqueInputs(parentID, atomicExecutor.Inputs); err != nil {
 		return err
 	}
 
