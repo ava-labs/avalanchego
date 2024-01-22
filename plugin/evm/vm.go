@@ -566,14 +566,14 @@ func (vm *VM) Initialize(
 
 	vm.codec = Codec
 
-	// TODO: read size from settings
-	vm.mempool, err = NewMempool(chainCtx, defaultMempoolSize, vm.verifyTxAtTip)
-	if err != nil {
-		return fmt.Errorf("failed to initialize mempool: %w", err)
-	}
-
 	if err := vm.initializeMetrics(); err != nil {
 		return err
+	}
+
+	// TODO: read size from settings
+	vm.mempool, err = NewMempool(chainCtx, vm.sdkMetrics, defaultMempoolSize, vm.verifyTxAtTip)
+	if err != nil {
+		return fmt.Errorf("failed to initialize mempool: %w", err)
 	}
 
 	// initialize peer network
@@ -1113,7 +1113,7 @@ func (vm *VM) initBlockBuilding() error {
 	vm.builder.awaitSubmittedTxs()
 	vm.Network.SetGossipHandler(NewGossipHandler(vm, gossipStats))
 
-	ethTxPool, err := NewGossipEthTxPool(vm.txPool)
+	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ package evm
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -94,7 +95,7 @@ func TestAtomicMempoolIterate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			m, err := NewMempool(&snow.Context{}, 10, nil)
+			m, err := NewMempool(&snow.Context{}, prometheus.NewRegistry(), 10, nil)
 			require.NoError(err)
 
 			for _, add := range tt.add {

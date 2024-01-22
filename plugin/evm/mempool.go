@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/log"
@@ -85,8 +86,8 @@ type Mempool struct {
 }
 
 // NewMempool returns a Mempool with [maxSize]
-func NewMempool(ctx *snow.Context, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
-	bloom, err := gossip.NewBloomFilter(txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
+func NewMempool(ctx *snow.Context, registerer prometheus.Registerer, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
+	bloom, err := gossip.NewBloomFilter(registerer, "atomic_mempool_bloom_filter", txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
 	}
