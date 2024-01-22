@@ -35,7 +35,7 @@ tokio = { version = "1.21.1", features = ["rt", "sync", "macros", "rt-multi-thre
 typed-builder = "0.18.0"
 bincode = "1.3.3"
 bitflags = "2.4.1"
-env_logger = { version = "0.10.1", optional = true }
+env_logger = { version = "0.11.0", optional = true }
 log = { version = "0.4.20", optional = true }
 
 [features]

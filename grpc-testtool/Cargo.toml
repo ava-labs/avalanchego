@@ -26,7 +26,7 @@ tracing-subscriber = { version = "0.3", features = ["tracing-log", "fmt", "env-f
 clap = { version = "4.4.11", features = ["derive"] }
 tempdir = "0.3.7"
 log = "0.4.20"
-env_logger = "0.10.1"
+env_logger = "0.11.0"
 chrono = "0.4.31"
 serde_json = "1.0.108"
 serde = { version = "1.0.193", features = ["derive"] }
