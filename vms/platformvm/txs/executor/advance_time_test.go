@@ -814,35 +814,6 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
-// Test method InitiallyPrefersCommit
-func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
-	now := env.clk.Time()
-
-	// Proposed advancing timestamp to 1 second after sync bound
-	tx, err := env.txBuilder.NewAdvanceTimeTx(now.Add(SyncBound))
-	require.NoError(err)
-
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&executor))
-
-	require.True(executor.PrefersCommit, "should prefer to commit this tx because its proposed timestamp it's within sync bound")
-}
-
 func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
