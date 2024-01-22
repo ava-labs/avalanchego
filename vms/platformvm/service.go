@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
@@ -2808,6 +2809,26 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Block, err = stdjson.Marshal(result)
 	return err
+}
+
+// GetUnitFeesReply is the response from GetUnitFees
+type GetUnitFeesReply struct {
+	// Current timestamp
+	UnitFees commonfees.Dimensions `json:"unitfees"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getUnitFees"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	reply.UnitFees = s.vm.DefaultUnitFees
+	return nil
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
