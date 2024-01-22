@@ -446,6 +446,6 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			parentTimestamp,
 			pChainHeight-1,
 		)
-		require.ErrorIs(err, errProposerWindowNotStarted)
+		require.ErrorIs(err, errUnexpectedProposer)
 	}
 }
