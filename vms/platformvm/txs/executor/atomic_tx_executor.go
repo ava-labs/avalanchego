@@ -7,9 +7,11 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ txs.Visitor = (*AtomicTxExecutor)(nil)
@@ -101,7 +103,7 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 
 	executor := StandardTxExecutor{
 		Backend:       e.Backend,
-		BlkFeeManager: fees.NewManager(e.Backend.Config.DefaultUnitFees),
+		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
 		State:         e.OnAccept,
 		Tx:            e.Tx,
 	}

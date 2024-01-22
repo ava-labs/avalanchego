@@ -205,9 +205,12 @@ func addSubnet(
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	unitFees, err := env.state.GetUnitFees()
+	require.NoError(err)
+
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
+		BlkFeeManager: fees.NewManager(unitFees),
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}

@@ -4,7 +4,6 @@
 package config
 
 import (
-	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -13,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -42,14 +40,6 @@ type Config struct {
 
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
-
-	// Post E Fork, the unit fee for each dimension, denominated in Avax
-	// As long as fees are multidimensional but not dynamic, [DefaultUnitFees]
-	// will be the unit fees
-	DefaultUnitFees fees.Dimensions
-
-	// Post E Fork, the max complexity of a block for each dimension
-	DefaultBlockMaxConsumedUnits fees.Dimensions
 
 	// Pre E Fork, fee that is burned by every non-state creating transaction
 	TxFee uint64
@@ -186,15 +176,4 @@ func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 	}
 
 	c.Chains.QueueChainCreation(chainParams)
-}
-
-func (c *Config) BlockMaxConsumedUnits(timestamp time.Time) fees.Dimensions {
-	if !c.IsEForkActivated(timestamp) {
-		var res fees.Dimensions
-		for i := fees.Dimension(0); i < fees.FeeDimensions; i++ {
-			res[i] = math.MaxUint64
-		}
-		return res
-	}
-	return c.DefaultBlockMaxConsumedUnits
 }

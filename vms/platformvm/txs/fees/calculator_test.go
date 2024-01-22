@@ -29,20 +29,20 @@ import (
 )
 
 var (
-	feeTestsDefaultCfg = config.Config{
-		DefaultUnitFees: fees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: fees.Dimensions{
-			3000,
-			3500,
-			1000,
-			1000,
-		},
+	testUnitFees = fees.Dimensions{
+		1 * units.MicroAvax,
+		2 * units.MicroAvax,
+		3 * units.MicroAvax,
+		4 * units.MicroAvax,
+	}
+	testBlockMaxConsumedUnits = fees.Dimensions{
+		3000,
+		3500,
+		1000,
+		1000,
+	}
 
+	feeTestsDefaultCfg = config.Config{
 		TxFee:                         1 * units.Avax,
 		CreateAssetTxFee:              2 * units.Avax,
 		CreateSubnetTxFee:             3 * units.Avax,
@@ -61,10 +61,11 @@ var (
 )
 
 type feeTests struct {
-	description      string
-	cfgAndChainTimeF func() (*config.Config, time.Time)
-	expectedError    error
-	checksF          func(*testing.T, *Calculator)
+	description       string
+	cfgAndChainTimeF  func() (*config.Config, time.Time)
+	consumedUnitCapsF func() fees.Dimensions
+	expectedError     error
+	checksF           func(*testing.T, *Calculator)
 }
 
 func TestPartiallyFulledTransactionsSizes(t *testing.T) {
@@ -122,8 +123,8 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	fc := &Calculator{
 		IsEForkActive:    true,
-		FeeManager:       fees.NewManager(feeTestsDefaultCfg.DefaultUnitFees),
-		ConsumedUnitsCap: feeTestsDefaultCfg.DefaultBlockMaxConsumedUnits,
+		FeeManager:       fees.NewManager(testUnitFees),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 	}
 
 	units := fees.Dimensions{
@@ -296,9 +297,13 @@ func TestAddValidatorTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[0] = 741 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.Bandwidth] = 741 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -309,12 +314,17 @@ func TestAddValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -400,9 +410,13 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -413,12 +427,17 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -505,9 +524,13 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -518,12 +541,17 @@ func TestAddDelegatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -604,9 +632,13 @@ func TestCreateChainTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -617,12 +649,17 @@ func TestCreateChainTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -701,9 +738,13 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -714,12 +755,17 @@ func TestCreateSubnetTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -797,9 +843,13 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -810,12 +860,17 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -905,9 +960,13 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -918,12 +977,17 @@ func TestTransformSubnetTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -1009,9 +1073,13 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1022,12 +1090,17 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -1122,9 +1195,13 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1135,12 +1212,17 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -1230,9 +1312,13 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1243,12 +1329,17 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -1321,9 +1412,13 @@ func TestBaseTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1334,12 +1429,17 @@ func TestBaseTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -1426,9 +1526,13 @@ func TestImportTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1439,12 +1543,17 @@ func TestImportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)
@@ -1521,9 +1630,13 @@ func TestExportTxFees(t *testing.T) {
 				cfg := feeTestsDefaultCfg
 				cfg.DurangoTime = durangoTime
 				cfg.EForkTime = eForkTime
-				cfg.DefaultBlockMaxConsumedUnits[1] = 1090 - 1
 
 				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
 			checksF:       func(t *testing.T, fc *Calculator) {},
@@ -1534,12 +1647,17 @@ func TestExportTxFees(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cfg, chainTime := tt.cfgAndChainTimeF()
 
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
 			fc := &Calculator{
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(cfg.DefaultUnitFees),
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				FeeManager:       fees.NewManager(testUnitFees),
+				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
 			err := uTx.Visit(fc)

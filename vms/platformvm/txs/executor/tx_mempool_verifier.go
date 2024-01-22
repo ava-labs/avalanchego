@@ -90,9 +90,14 @@ func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 		return err
 	}
 
+	unitFees, err := baseState.GetUnitFees()
+	if err != nil {
+		return err
+	}
+
 	executor := StandardTxExecutor{
 		Backend:       v.Backend,
-		BlkFeeManager: fees.NewManager(v.Backend.Config.DefaultUnitFees),
+		BlkFeeManager: fees.NewManager(unitFees),
 		State:         baseState,
 		Tx:            v.Tx,
 	}

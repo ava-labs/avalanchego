@@ -16,11 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -51,7 +53,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
+		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -93,7 +95,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
+		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -129,7 +131,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
+		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -162,7 +164,7 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
+		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -237,7 +239,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
+				BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
 				State:         stateDiff,
 				Tx:            tx,
 			}

@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -54,19 +53,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 		fx:  fx,
 	}
 
-	cfg := &config.Config{
-		DefaultUnitFees: commonfees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		},
-		DefaultBlockMaxConsumedUnits: commonfees.Dimensions{
-			math.MaxUint64,
-			math.MaxUint64,
-			math.MaxUint64,
-			math.MaxUint64,
-		},
+	testUnitFees := commonfees.Dimensions{
+		1 * units.MicroAvax,
+		2 * units.MicroAvax,
+		3 * units.MicroAvax,
+		4 * units.MicroAvax,
+	}
+	testBlockMaxConsumedUnits := commonfees.Dimensions{
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
 	}
 
 	var (
@@ -630,11 +627,11 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			uTx := test.uTxF(t)
 
-			fm := commonfees.NewManager(cfg.DefaultUnitFees)
+			fm := commonfees.NewManager(testUnitFees)
 			feeCalc := &fees.Calculator{
 				IsEForkActive:    true,
 				FeeManager:       fm,
-				ConsumedUnitsCap: cfg.DefaultBlockMaxConsumedUnits,
+				ConsumedUnitsCap: testBlockMaxConsumedUnits,
 				Credentials:      []verify.Verifiable{},
 			}
 

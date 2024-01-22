@@ -248,9 +248,14 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
+	unitFees, err := env.state.GetUnitFees()
+	if err != nil {
+		panic(err)
+	}
+
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
-		BlkFeeManager: fees.NewManager(env.backend.Config.DefaultUnitFees),
+		BlkFeeManager: fees.NewManager(unitFees),
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}

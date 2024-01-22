@@ -19,6 +19,25 @@ import (
 var (
 	_ txs.Visitor = (*Calculator)(nil)
 
+	EmptyUnitFees = fees.Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
+	EmptyUnitCaps = fees.Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
+
+	// These are the default unit fees, used upon E-fork activation
+	DefaultUnitFees = fees.Dimensions{
+		1,
+		2,
+		3,
+		4,
+	}
+
+	// These are the default caps for units consumed in a block, used upon E-fork activation
+	DefaultBlockMaxConsumedUnits = fees.Dimensions{
+		1,
+		2,
+		3,
+		4,
+	}
+
 	errFailedFeeCalculation          = errors.New("failed fee calculation")
 	errFailedConsumedUnitsCumulation = errors.New("failed cumulating consumed units")
 )

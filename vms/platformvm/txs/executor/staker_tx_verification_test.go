@@ -19,13 +19,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
@@ -599,13 +601,13 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			var (
 				backend = tt.backendF(ctrl)
 
-				feeManager = fees.NewManager(backend.Config.DefaultUnitFees)
+				feeManager = commonfees.NewManager(fees.EmptyUnitFees)
 				state      = tt.stateF(ctrl)
 				sTx        = tt.sTxF()
 				tx         = tt.txF()
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, feeManager, state, sTx, tx)
+			err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.EmptyUnitCaps, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

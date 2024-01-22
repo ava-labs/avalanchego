@@ -2827,8 +2827,9 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	reply.UnitFees = s.vm.DefaultUnitFees
-	return nil
+	var err error
+	reply.UnitFees, err = s.vm.state.GetUnitFees()
+	return err
 }
 
 // GetBlockUnitsCapReply is the response from GetBlockUnitsCap
@@ -2847,8 +2848,9 @@ func (s *Service) GetBlockUnitsCap(_ *http.Request, _ *struct{}, reply *GetBlock
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	reply.MaxUnits = s.vm.DefaultBlockMaxConsumedUnits
-	return nil
+	var err error
+	reply.MaxUnits, err = s.vm.state.GetBlockUnitCaps()
+	return err
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {

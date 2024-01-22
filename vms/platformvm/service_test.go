@@ -1073,19 +1073,23 @@ func TestGetUnitFees(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	require.Equal(service.vm.Config.DefaultUnitFees, reply.UnitFees)
+	unitFees, err := service.vm.state.GetUnitFees()
+	require.NoError(err)
 
-	service.vm.Config.DefaultUnitFees = commonfees.Dimensions{
+	require.Equal(unitFees, reply.UnitFees)
+
+	updatedUnitFees := commonfees.Dimensions{
 		123,
 		456,
 		789,
 		1011,
 	}
+	require.NoError(service.vm.state.SetUnitFees(updatedUnitFees))
 
 	service.vm.ctx.Lock.Unlock()
 
 	require.NoError(service.GetUnitFees(nil, nil, &reply))
-	require.Equal(service.vm.Config.DefaultUnitFees, reply.UnitFees)
+	require.Equal(updatedUnitFees, reply.UnitFees)
 }
 
 func TestGetBlockUnitsCap(t *testing.T) {
@@ -1102,17 +1106,21 @@ func TestGetBlockUnitsCap(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	require.Equal(service.vm.Config.DefaultBlockMaxConsumedUnits, reply.MaxUnits)
+	unitCaps, err := service.vm.state.GetBlockUnitCaps()
+	require.NoError(err)
 
-	service.vm.Config.DefaultBlockMaxConsumedUnits = commonfees.Dimensions{
+	require.Equal(unitCaps, reply.MaxUnits)
+
+	updatedUnitCaps := commonfees.Dimensions{
 		123,
 		456,
 		789,
 		1011,
 	}
+	require.NoError(service.vm.state.SetBlockUnitCaps(updatedUnitCaps))
 
 	service.vm.ctx.Lock.Unlock()
 
 	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
-	require.Equal(service.vm.Config.DefaultBlockMaxConsumedUnits, reply.MaxUnits)
+	require.Equal(updatedUnitCaps, reply.MaxUnits)
 }
