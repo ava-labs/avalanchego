@@ -2831,6 +2831,26 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 	return nil
 }
 
+// GetBlockUnitsCapReply is the response from GetBlockUnitsCap
+type GetBlockUnitsCapReply struct {
+	// Current timestamp
+	MaxUnits commonfees.Dimensions `json:"maxUnits"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetBlockUnitsCap(_ *http.Request, _ *struct{}, reply *GetBlockUnitsCapReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getBlockUnitsCap"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	reply.MaxUnits = s.vm.DefaultBlockMaxConsumedUnits
+	return nil
+}
+
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 	// Only report uptimes that we have been actively tracking.
 	if constants.PrimaryNetworkID != staker.SubnetID && !s.vm.TrackedSubnets.Contains(staker.SubnetID) {
