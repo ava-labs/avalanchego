@@ -464,10 +464,16 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 	feeManager := fees.NewManager(unitFees)
 
+	unitCaps, err := state.GetBlockUnitCaps()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,
 			BlkFeeManager: feeManager,
+			UnitCaps:      unitCaps,
 			State:         state,
 			Tx:            tx,
 		}

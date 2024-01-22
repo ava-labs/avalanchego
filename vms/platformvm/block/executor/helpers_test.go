@@ -252,10 +252,15 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
+	unitCaps, err := env.state.GetBlockUnitCaps()
+	if err != nil {
+		panic(err)
+	}
 
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		BlkFeeManager: fees.NewManager(unitFees),
+		UnitCaps:      unitCaps,
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}

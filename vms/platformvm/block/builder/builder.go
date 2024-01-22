@@ -382,10 +382,15 @@ func packBlockTxs(
 		if err != nil {
 			return nil, err
 		}
+		unitCaps, err := txDiff.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
 
 		executor := &txexecutor.StandardTxExecutor{
 			Backend:       backend,
 			BlkFeeManager: fees.NewManager(unitFees),
+			UnitCaps:      unitCaps,
 			State:         txDiff,
 			Tx:            tx,
 		}

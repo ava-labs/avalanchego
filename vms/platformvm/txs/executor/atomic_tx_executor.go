@@ -104,6 +104,7 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	executor := StandardTxExecutor{
 		Backend:       e.Backend,
 		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
+		UnitCaps:      fees.EmptyUnitCaps,
 		State:         e.OnAccept,
 		Tx:            e.Tx,
 	}

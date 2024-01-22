@@ -60,7 +60,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil).AnyTimes()
+	onParentAccept.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil)
+	onParentAccept.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil)
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
 		apricotParentBlk.ID(),
@@ -158,6 +159,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
 	onParentAccept.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil).AnyTimes()
+	onParentAccept.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil).AnyTimes()
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{

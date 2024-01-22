@@ -83,6 +83,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
 				BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
+				UnitCaps:      fees.EmptyUnitCaps,
 				State:         stateDiff,
 				Tx:            tx,
 			}

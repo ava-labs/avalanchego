@@ -175,6 +175,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
 	onParentAccept.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil).AnyTimes()
+	onParentAccept.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{

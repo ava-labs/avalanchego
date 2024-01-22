@@ -240,9 +240,13 @@ func addSubnet(t *testing.T, env *environment) {
 	unitFees, err := env.state.GetUnitFees()
 	require.NoError(err)
 
+	unitCaps, err := env.state.GetBlockUnitCaps()
+	require.NoError(err)
+
 	executor := txexecutor.StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: fees.NewManager(unitFees),
+		UnitCaps:      unitCaps,
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}
