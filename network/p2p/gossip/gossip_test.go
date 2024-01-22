@@ -111,7 +111,7 @@ func TestGossiperGossip(t *testing.T) {
 			responseNetwork, err := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
 			require.NoError(err)
 
-			responseBloom, err := NewBloomFilter(1000, 0.01, 0.05)
+			responseBloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
 			require.NoError(err)
 			responseSet := &testSet{
 				txs:   make(map[ids.ID]*testTx),
@@ -143,7 +143,7 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(err)
 			require.NoError(requestNetwork.Connected(context.Background(), ids.EmptyNodeID, nil))
 
-			bloom, err := NewBloomFilter(1000, 0.01, 0.05)
+			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
 			require.NoError(err)
 			requestSet := &testSet{
 				txs:   make(map[ids.ID]*testTx),
@@ -365,7 +365,7 @@ func TestPushGossipE2E(t *testing.T) {
 	knownTx := &testTx{id: ids.GenerateTestID()}
 
 	log := logging.NoLog{}
-	bloom, err := NewBloomFilter(100, 0.01, 0.05)
+	bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 100, 0.01, 0.05)
 	require.NoError(err)
 	set := &testSet{
 		txs:   make(map[ids.ID]*testTx),

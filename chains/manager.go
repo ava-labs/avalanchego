@@ -50,13 +50,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/fx"
 	"github.com/ava-labs/avalanchego/vms/metervm"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -95,6 +100,12 @@ var (
 	errNoPrimaryNetworkConfig  = errors.New("no subnet config for primary network found")
 	errPartialSyncAsAValidator = errors.New("partial sync should not be configured for a validator")
 
+	fxs = map[ids.ID]fx.Factory{
+		secp256k1fx.ID: &secp256k1fx.Factory{},
+		nftfx.ID:       &nftfx.Factory{},
+		propertyfx.ID:  &propertyfx.Factory{},
+	}
+
 	_ Manager = (*manager)(nil)
 )
 
@@ -106,9 +117,6 @@ var (
 //   - Manage the aliases of chains
 type Manager interface {
 	ids.Aliaser
-
-	// Return the router this Manager is using to route consensus messages to chains
-	Router() router.Router
 
 	// Queues a chain to be created in the future after chain creator is unblocked.
 	// This is only called from the P-chain thread to create other chains
@@ -278,11 +286,6 @@ func New(config *ManagerConfig) Manager {
 	}
 }
 
-// Router that this chain manager is using to route consensus messages to chains
-func (m *manager) Router() router.Router {
-	return m.ManagerConfig.Router
-}
-
 // QueueChainCreation queues a chain creation request
 // Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
@@ -447,7 +450,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	consensusMetrics := prometheus.NewRegistry()
-	chainNamespace := fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
+	chainNamespace := metric.AppendNamespace(constants.PlatformName, primaryAlias)
 	if err := m.Metrics.Register(chainNamespace, consensusMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
 	}
@@ -456,13 +459,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
 	// there are no conflicts when registering the Snowman consensus metrics.
 	avalancheConsensusMetrics := prometheus.NewRegistry()
-	avalancheDAGNamespace := fmt.Sprintf("%s_avalanche", chainNamespace)
+	avalancheDAGNamespace := metric.AppendNamespace(chainNamespace, "avalanche")
 	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
 	}
 
 	vmMetrics := metrics.NewOptionalGatherer()
-	vmNamespace := fmt.Sprintf("%s_vm", chainNamespace)
+	vmNamespace := metric.AppendNamespace(chainNamespace, "vm")
 	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
@@ -510,23 +513,16 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 	// TODO: Shutdown VM if an error occurs
 
-	fxs := make([]*common.Fx, len(chainParams.FxIDs))
+	chainFxs := make([]*common.Fx, len(chainParams.FxIDs))
 	for i, fxID := range chainParams.FxIDs {
-		// Get a factory for the fx we want to use on our chain
-		fxFactory, err := m.VMManager.GetFactory(fxID)
-		if err != nil {
-			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
+		fxFactory, ok := fxs[fxID]
+		if !ok {
+			return nil, fmt.Errorf("fx %s not found", fxID)
 		}
 
-		fx, err := fxFactory.New(chainLog)
-		if err != nil {
-			return nil, fmt.Errorf("error while creating fx: %w", err)
-		}
-
-		// Create the fx
-		fxs[i] = &common.Fx{
+		chainFxs[i] = &common.Fx{
 			ID: fxID,
-			Fx: fx,
+			Fx: fxFactory.New(),
 		}
 	}
 
@@ -538,7 +534,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			chainParams.GenesisData,
 			m.Validators,
 			vm,
-			fxs,
+			chainFxs,
 			sb,
 		)
 		if err != nil {
@@ -556,7 +552,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			m.Validators,
 			beacons,
 			vm,
-			fxs,
+			chainFxs,
 			sb,
 		)
 		if err != nil {
