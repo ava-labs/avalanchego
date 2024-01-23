@@ -19,9 +19,8 @@ import (
 )
 
 type testDatabase struct {
-	client  *DatabaseClient
-	server  *memdb.Database
-	closeFn func()
+	client *DatabaseClient
+	server *memdb.Database
 }
 
 func setupDB(t testing.TB) *testDatabase {
@@ -45,11 +44,13 @@ func setupDB(t testing.TB) *testDatabase {
 	require.NoError(err)
 
 	db.client = NewClient(rpcdbpb.NewDatabaseClient(conn))
-	db.closeFn = func() {
+
+	t.Cleanup(func() {
 		serverCloser.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
-	}
+	})
+
 	return db
 }
 
@@ -58,8 +59,6 @@ func TestInterface(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			db := setupDB(t)
 			test(t, db.client)
-
-			db.closeFn()
 		})
 	}
 }
@@ -67,22 +66,16 @@ func TestInterface(t *testing.T) {
 func FuzzKeyValue(f *testing.F) {
 	db := setupDB(f)
 	database.FuzzKeyValue(f, db.client)
-
-	db.closeFn()
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
 	db := setupDB(f)
 	database.FuzzNewIteratorWithPrefix(f, db.client)
-
-	db.closeFn()
 }
 
 func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 	db := setupDB(f)
 	database.FuzzNewIteratorWithStartAndPrefix(f, db.client)
-
-	db.closeFn()
 }
 
 func BenchmarkInterface(b *testing.B) {
@@ -92,7 +85,6 @@ func BenchmarkInterface(b *testing.B) {
 			b.Run(fmt.Sprintf("rpcdb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
 				db := setupDB(b)
 				bench(b, db.client, keys, values)
-				db.closeFn()
 			})
 		}
 	}
