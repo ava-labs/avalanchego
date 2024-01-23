@@ -4,6 +4,7 @@
 package leveldb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -57,14 +58,16 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			db := newDB(b)
+		for name, bench := range database.Benchmarks {
+			b.Run(fmt.Sprintf("leveldb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
+				db := newDB(b)
 
-			bench(b, db, "leveldb", keys, values)
+				bench(b, db, keys, values)
 
-			// The database may have been closed by the test, so we don't care if it
-			// errors here.
-			_ = db.Close()
+				// The database may have been closed by the test, so we don't care if it
+				// errors here.
+				_ = db.Close()
+			})
 		}
 	}
 }
