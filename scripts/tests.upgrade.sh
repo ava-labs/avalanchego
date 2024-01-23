@@ -16,7 +16,7 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.10.18 includes restrictions on ports sent over the p2p network, along with
+# v1.10.18 includes restrictions on ports sent over the p2p network along with
 # proposervm and P-chain rule changes on the local network.
 DEFAULT_VERSION="1.10.18"
 
