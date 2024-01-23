@@ -22,7 +22,8 @@ fi
 
 # Ensure an absolute path to avoid dependency on the working directory
 # of script execution.
-export AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH:-./build/avalanchego})"
+AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
+export AVALANCHEGO_PATH
 
 # Provide visual separation between testing and setup/teardown
 function print_separator {
@@ -47,7 +48,8 @@ print_separator
 # Determine the network configuration path from the latest symlink
 LATEST_SYMLINK_PATH="${HOME}/.tmpnet/networks/latest"
 if [[ -h "${LATEST_SYMLINK_PATH}" ]]; then
-  export TMPNET_NETWORK_DIR="$(realpath ${LATEST_SYMLINK_PATH})"
+  TMPNET_NETWORK_DIR="$(realpath "${LATEST_SYMLINK_PATH}")"
+  export TMPNET_NETWORK_DIR
 else
   echo "failed to find configuration path: ${LATEST_SYMLINK_PATH} symlink not found"
   exit 255
