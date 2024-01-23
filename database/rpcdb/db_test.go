@@ -54,11 +54,13 @@ func setupDB(t testing.TB) *testDatabase {
 }
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		db := setupDB(t)
-		test(t, db.client)
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			db := setupDB(t)
+			test(t, db.client)
 
-		db.closeFn()
+			db.closeFn()
+		})
 	}
 }
 
