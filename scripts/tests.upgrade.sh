@@ -16,9 +16,9 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.10.17 includes the AWM activation on the C-Chain local network
-# and the inclusion of BLS Public Keys in the network genesis.
-DEFAULT_VERSION="1.10.17"
+# v1.10.18 includes restrictions on ports sent over the p2p network along with
+# proposervm and P-chain rule changes on the local network.
+DEFAULT_VERSION="1.10.18"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
