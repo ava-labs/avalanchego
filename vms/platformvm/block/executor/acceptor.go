@@ -33,11 +33,11 @@ type acceptor struct {
 }
 
 func (a *acceptor) BanffAbortBlock(b *block.BanffAbortBlock) error {
-	return a.abortBlock(b, "banff abort")
+	return a.optionBlock(b, "banff abort")
 }
 
 func (a *acceptor) BanffCommitBlock(b *block.BanffCommitBlock) error {
-	return a.commitBlock(b, "apricot commit")
+	return a.optionBlock(b, "banff commit")
 }
 
 func (a *acceptor) BanffProposalBlock(b *block.BanffProposalBlock) error {
@@ -50,11 +50,11 @@ func (a *acceptor) BanffStandardBlock(b *block.BanffStandardBlock) error {
 }
 
 func (a *acceptor) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
-	return a.abortBlock(b, "apricot abort")
+	return a.optionBlock(b, "apricot abort")
 }
 
 func (a *acceptor) ApricotCommitBlock(b *block.ApricotCommitBlock) error {
-	return a.commitBlock(b, "apricot commit")
+	return a.optionBlock(b, "apricot commit")
 }
 
 func (a *acceptor) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
@@ -116,46 +116,14 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) abortBlock(b block.Block, blockType string) error {
+func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	parentID := b.Parent()
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	if a.bootstrapped.Get() {
-		if parentState.initiallyPreferCommit {
-			a.metrics.MarkOptionVoteLost()
-		} else {
-			a.metrics.MarkOptionVoteWon()
-		}
-	}
-
-	return a.optionBlock(b, parentState.statelessBlock, blockType)
-}
-
-func (a *acceptor) commitBlock(b block.Block, blockType string) error {
-	parentID := b.Parent()
-	parentState, ok := a.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	if a.bootstrapped.Get() {
-		if parentState.initiallyPreferCommit {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
-
-	return a.optionBlock(b, parentState.statelessBlock, blockType)
-}
-
-func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 	blkID := b.ID()
-	parentID := parent.ID()
-
 	defer func() {
 		// Note: we assume this block's sibling doesn't
 		// need the parent's state when it's rejected.
@@ -164,7 +132,7 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 	}()
 
 	// Note that the parent must be accepted first.
-	if err := a.commonAccept(parent); err != nil {
+	if err := a.commonAccept(parentState.statelessBlock); err != nil {
 		return err
 	}
 
@@ -172,10 +140,6 @@ func (a *acceptor) optionBlock(b, parent block.Block, blockType string) error {
 		return err
 	}
 
-	parentState, ok := a.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("%w %s", errMissingBlockState, parentID)
-	}
 	if parentState.onDecisionState != nil {
 		if err := parentState.onDecisionState.Apply(a.state); err != nil {
 			return err

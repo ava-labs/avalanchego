@@ -23,9 +23,6 @@ import (
 
 func TestNewImportTx(t *testing.T) {
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
-	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
-	}()
 
 	type test struct {
 		description   string
