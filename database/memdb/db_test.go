@@ -4,6 +4,7 @@
 package memdb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -30,9 +31,11 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			db := New()
-			bench(b, db, "memdb", keys, values)
+		for name, bench := range database.Benchmarks {
+			b.Run(fmt.Sprintf("memdb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
+				db := New()
+				bench(b, db, keys, values)
+			})
 		}
 	}
 }
