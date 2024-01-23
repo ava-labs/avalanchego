@@ -34,7 +34,7 @@ ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 if [[ -n "${E2E_USE_EXISTING_NETWORK:-}" && -n "${TMPNET_NETWORK_DIR:-}" ]]; then
   E2E_ARGS="--use-existing-network"
 else
-  AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH:-./build/avalanchego})"
+  AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
   E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
 fi
 
@@ -60,4 +60,4 @@ fi
 
 #################################
 # - Execute in random order to identify unwanted dependency
-ginkgo -p -v --randomize-all ./tests/e2e/e2e.test -- ${E2E_ARGS} "${@}"
+ginkgo ${GINKGO_ARGS} -v --randomize-all ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"
