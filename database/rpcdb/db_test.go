@@ -54,11 +54,9 @@ func setupDB(t testing.TB) *testDatabase {
 }
 
 func TestInterface(t *testing.T) {
-	for name, f := range database.Tests {
-		t.Run(name, func(t *testing.T) {
-			db := setupDB(t)
-			f(t, db.client)
-		})
+	for _, test := range database.Tests {
+		db := setupDB(t)
+		test(t, db.client)
 	}
 }
 
@@ -80,11 +78,9 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for name, bench := range database.Benchmarks {
-			b.Run(name, func(b *testing.B) {
-				db := setupDB(b)
-				bench(b, db.client, "rpcdb", keys, values)
-			})
+		for _, bench := range database.Benchmarks {
+			db := setupDB(b)
+			bench(b, db.client, "rpcdb", keys, values)
 		}
 	}
 }
