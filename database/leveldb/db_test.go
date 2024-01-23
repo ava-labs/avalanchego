@@ -16,14 +16,16 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		folder := t.TempDir()
-		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		require.NoError(t, err)
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			folder := t.TempDir()
+			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+			require.NoError(t, err)
 
-		test(t, db)
+			test(t, db)
 
-		_ = db.Close()
+			_ = db.Close()
+		})
 	}
 }
 

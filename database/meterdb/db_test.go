@@ -16,12 +16,14 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		baseDB := memdb.New()
-		db, err := New("", prometheus.NewRegistry(), baseDB)
-		require.NoError(t, err)
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			baseDB := memdb.New()
+			db, err := New("", prometheus.NewRegistry(), baseDB)
+			require.NoError(t, err)
 
-		test(t, db)
+			test(t, db)
+		})
 	}
 }
 

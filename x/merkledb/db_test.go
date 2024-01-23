@@ -99,10 +99,12 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
 	for _, bf := range validBranchFactors {
-		for _, test := range database.Tests {
-			db, err := getBasicDBWithBranchFactor(bf)
-			require.NoError(t, err)
-			test(t, db)
+		for name, test := range database.Tests {
+			t.Run(fmt.Sprintf("%s_%d", name, bf), func(t *testing.T) {
+				db, err := getBasicDBWithBranchFactor(bf)
+				require.NoError(t, err)
+				test(t, db)
+			})
 		}
 	}
 }

@@ -16,12 +16,14 @@ import (
 const testPassword = "lol totally a secure password" //nolint:gosec
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		unencryptedDB := memdb.New()
-		db, err := New([]byte(testPassword), unencryptedDB)
-		require.NoError(t, err)
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			unencryptedDB := memdb.New()
+			db, err := New([]byte(testPassword), unencryptedDB)
+			require.NoError(t, err)
 
-		test(t, db)
+			test(t, db)
+		})
 	}
 }
 

@@ -12,14 +12,16 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		db := memdb.New()
-		test(t, New([]byte("hello"), db))
-		test(t, New([]byte("world"), db))
-		test(t, New([]byte("wor"), New([]byte("ld"), db)))
-		test(t, New([]byte("ld"), New([]byte("wor"), db)))
-		test(t, NewNested([]byte("wor"), New([]byte("ld"), db)))
-		test(t, NewNested([]byte("ld"), New([]byte("wor"), db)))
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			db := memdb.New()
+			test(t, New([]byte("hello"), db))
+			test(t, New([]byte("world"), db))
+			test(t, New([]byte("wor"), New([]byte("ld"), db)))
+			test(t, New([]byte("ld"), New([]byte("wor"), db)))
+			test(t, NewNested([]byte("wor"), New([]byte("ld"), db)))
+			test(t, NewNested([]byte("ld"), New([]byte("wor"), db)))
+		})
 	}
 }
 
