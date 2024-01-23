@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/bloombits"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/rpc"
@@ -85,7 +84,7 @@ type Backend interface {
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 
 	// Added to the backend interface to support limiting of logs requests
-	GetVMConfig() *vm.Config
+	IsAllowUnfinalizedQueries() bool
 	LastAcceptedBlock() *types.Block
 	GetMaxBlocksPerRequest() int64
 }

@@ -54,7 +54,7 @@ type Filter struct {
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
 func (sys *FilterSystem) NewRangeFilter(begin, end int64, addresses []common.Address, topics [][]common.Hash) (*Filter, error) {
-	allowUnfinalizedQueries := sys.backend.GetVMConfig().AllowUnfinalizedQueries
+	allowUnfinalizedQueries := sys.backend.IsAllowUnfinalizedQueries()
 	acceptedBlock := sys.backend.LastAcceptedBlock()
 
 	// Flatten the address and topic filter clauses into a single bloombits filter

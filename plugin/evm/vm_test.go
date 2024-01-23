@@ -1070,7 +1070,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm1.blockChain.GetVMConfig().AllowUnfinalizedQueries = true
+	vm1.eth.APIBackend.SetAllowUnfinalizedQueries(true)
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
@@ -1241,7 +1241,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm1.blockChain.GetVMConfig().AllowUnfinalizedQueries = true
+	vm1.eth.APIBackend.SetAllowUnfinalizedQueries(true)
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
@@ -1940,7 +1940,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 	blkHeight := blk.Height()
 	blkHash := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
-	vm.blockChain.GetVMConfig().AllowUnfinalizedQueries = true
+	vm.eth.APIBackend.SetAllowUnfinalizedQueries(true)
 
 	ctx := context.Background()
 	b, err := vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
@@ -1951,7 +1951,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
 	}
 
-	vm.blockChain.GetVMConfig().AllowUnfinalizedQueries = false
+	vm.eth.APIBackend.SetAllowUnfinalizedQueries(false)
 
 	_, err = vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
 	if !errors.Is(err, eth.ErrUnfinalizedData) {
