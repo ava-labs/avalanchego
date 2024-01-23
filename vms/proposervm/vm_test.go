@@ -1029,7 +1029,8 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// The first notification will be read from the consensus engine
 	<-toEngine
 
-	// Before calling BuildBlock, verify a remote block and accept it.
+	// Before calling BuildBlock, verify a remote block and set it as the
+	// preferred block.
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
