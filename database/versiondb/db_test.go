@@ -14,9 +14,11 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		baseDB := memdb.New()
-		test(t, New(baseDB))
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			baseDB := memdb.New()
+			test(t, New(baseDB))
+		})
 	}
 }
 

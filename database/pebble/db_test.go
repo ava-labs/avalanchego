@@ -23,10 +23,12 @@ func newDB(t testing.TB) *Database {
 }
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		db := newDB(t)
-		test(t, db)
-		_ = db.Close()
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			db := newDB(t)
+			test(t, db)
+			_ = db.Close()
+		})
 	}
 }
 
