@@ -40,6 +40,15 @@ func NewAPI(networkID uint32, sourceSubnetID ids.ID, sourceChainID ids.ID, state
 	}
 }
 
+// GetMessage returns the Warp message associated with a messageID.
+func (a *API) GetMessage(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+	message, err := a.backend.GetMessage(messageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
+	}
+	return hexutil.Bytes(message.Bytes()), nil
+}
+
 // GetMessageSignature returns the BLS signature associated with a messageID.
 func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
 	signature, err := a.backend.GetMessageSignature(messageID)

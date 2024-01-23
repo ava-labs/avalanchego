@@ -15,6 +15,7 @@ import (
 var _ Client = (*client)(nil)
 
 type Client interface {
+	GetMessage(ctx context.Context, messageID ids.ID) ([]byte, error)
 	GetMessageSignature(ctx context.Context, messageID ids.ID) ([]byte, error)
 	GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) ([]byte, error)
 	GetBlockSignature(ctx context.Context, blockID ids.ID) ([]byte, error)
@@ -35,6 +36,14 @@ func NewClient(uri, chain string) (Client, error) {
 	return &client{
 		client: innerClient,
 	}, nil
+}
+
+func (c *client) GetMessage(ctx context.Context, messageID ids.ID) ([]byte, error) {
+	var res hexutil.Bytes
+	if err := c.client.CallContext(ctx, &res, "warp_getMessage", messageID); err != nil {
+		return nil, fmt.Errorf("call to warp_getMessage failed. err: %w", err)
+	}
+	return res, nil
 }
 
 func (c *client) GetMessageSignature(ctx context.Context, messageID ids.ID) ([]byte, error) {
