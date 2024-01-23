@@ -20,7 +20,7 @@ func TestMarshalTxs(t *testing.T) {
 
 	base64EthTxGossip := "AAAAAAAAAAAABGJsYWg="
 	msg := []byte("blah")
-	builtMsg := TxsGossip{
+	builtMsg := EthTxsGossip{
 		Txs: msg,
 	}
 	builtMsgBytes, err := BuildGossipMessage(Codec, builtMsg)
@@ -30,7 +30,7 @@ func TestMarshalTxs(t *testing.T) {
 	parsedMsgIntf, err := ParseGossipMessage(Codec, builtMsgBytes)
 	assert.NoError(err)
 
-	parsedMsg, ok := parsedMsgIntf.(TxsGossip)
+	parsedMsg, ok := parsedMsgIntf.(EthTxsGossip)
 	assert.True(ok)
 
 	assert.Equal(msg, parsedMsg.Txs)
@@ -39,7 +39,7 @@ func TestMarshalTxs(t *testing.T) {
 func TestTxsTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
-	builtMsg := TxsGossip{
+	builtMsg := EthTxsGossip{
 		Txs: utils.RandomBytes(1024 * units.KiB),
 	}
 	_, err := BuildGossipMessage(Codec, builtMsg)

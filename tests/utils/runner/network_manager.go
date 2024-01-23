@@ -66,7 +66,7 @@ func NewDefaultANRConfig() ANRConfig {
 		AvalancheGoExecPath: os.ExpandEnv("$GOPATH/src/github.com/ava-labs/avalanchego/build/avalanchego"),
 		PluginDir:           os.ExpandEnv("$GOPATH/src/github.com/ava-labs/avalanchego/build/plugins"),
 		GlobalNodeConfig: `{
-			"log-display-level":"info",
+			"log-level":"info",
 			"proposervm-use-current-height":true
 		}`,
 		GlobalCChainConfig: `{

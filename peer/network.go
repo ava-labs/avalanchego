@@ -78,9 +78,10 @@ type Network interface {
 	// (length of response divided by request time), and with 0 if the response is invalid.
 	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
 
-	// NewAppProtocol reserves a protocol identifier and returns a corresponding
-	// client to send messages with
-	NewAppProtocol(protocol uint64, handler p2p.Handler, options ...p2p.ClientOption) (*p2p.Client, error)
+	// NewClient returns a client to send messages with for the given protocol
+	NewClient(protocol uint64, options ...p2p.ClientOption) *p2p.Client
+	// AddHandler registers a server handler for an application protocol
+	AddHandler(protocol uint64, handler p2p.Handler) error
 }
 
 // network is an implementation of Network that processes message requests for
@@ -92,7 +93,7 @@ type network struct {
 	outstandingRequestHandlers map[uint32]message.ResponseHandler // maps avalanchego requestID => message.ResponseHandler
 	activeAppRequests          *semaphore.Weighted                // controls maximum number of active outbound requests
 	activeCrossChainRequests   *semaphore.Weighted                // controls maximum number of active outbound cross chain requests
-	network                    *p2p.Network
+	p2pNetwork                 *p2p.Network
 	appSender                  common.AppSender                 // avalanchego AppSender for sending messages
 	codec                      codec.Manager                    // Codec used for parsing messages
 	crossChainCodec            codec.Manager                    // Codec used for parsing cross chain messages
@@ -123,7 +124,7 @@ func NewNetwork(p2pNetwork *p2p.Network, appSender common.AppSender, codec codec
 		outstandingRequestHandlers: make(map[uint32]message.ResponseHandler),
 		activeAppRequests:          semaphore.NewWeighted(maxActiveAppRequests),
 		activeCrossChainRequests:   semaphore.NewWeighted(maxActiveCrossChainRequests),
-		network:                    p2pNetwork,
+		p2pNetwork:                 p2pNetwork,
 		gossipHandler:              message.NoopMempoolGossipHandler{},
 		appRequestHandler:          message.NoopRequestHandler{},
 		crossChainRequestHandler:   message.NoopCrossChainRequestHandler{},
@@ -183,7 +184,7 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 
-	log.Trace("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
+	log.Debug("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
 	n.peers.TrackPeer(nodeID)
 
 	requestID := n.nextRequestID()
@@ -200,7 +201,7 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 		return err
 	}
 
-	log.Trace("sent request message to peer", "nodeID", nodeID, "requestID", requestID)
+	log.Debug("sent request message to peer", "nodeID", nodeID, "requestID", requestID)
 	return nil
 }
 
@@ -232,7 +233,7 @@ func (n *network) SendCrossChainRequest(ctx context.Context, chainID ids.ID, req
 		return err
 	}
 
-	log.Trace("sent request message to chain", "chainID", chainID, "crossChainRequestID", requestID)
+	log.Debug("sent request message to chain", "chainID", chainID, "crossChainRequestID", requestID)
 	return nil
 }
 
@@ -244,21 +245,21 @@ func (n *network) CrossChainAppRequest(ctx context.Context, requestingChainID id
 		return nil
 	}
 
-	log.Trace("received CrossChainAppRequest from chain", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request))
+	log.Debug("received CrossChainAppRequest from chain", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request))
 
 	var req message.CrossChainRequest
 	if _, err := n.crossChainCodec.Unmarshal(request, &req); err != nil {
-		log.Trace("failed to unmarshal CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request), "err", err)
+		log.Debug("failed to unmarshal CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request), "err", err)
 		return nil
 	}
 
 	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.crossChainStats)
 	if err != nil {
-		log.Trace("deadline to process CrossChainAppRequest has expired, skipping", "requestingChainID", requestingChainID, "requestID", requestID, "err", err)
+		log.Debug("deadline to process CrossChainAppRequest has expired, skipping", "requestingChainID", requestingChainID, "requestID", requestID, "err", err)
 		return nil
 	}
 
-	log.Trace("processing incoming CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "req", req)
+	log.Debug("processing incoming CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "req", req)
 	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
 	defer cancel()
 
@@ -280,13 +281,13 @@ func (n *network) CrossChainAppRequest(ctx context.Context, requestingChainID id
 // - request times out before a response is provided
 // If [requestID] is not known, this function will emit a log and return a nil error.
 // If the response handler returns an error it is propagated as a fatal error.
-func (n *network) CrossChainAppRequestFailed(ctx context.Context, respondingChainID ids.ID, requestID uint32) error {
-	log.Trace("received CrossChainAppRequestFailed from chain", "respondingChainID", respondingChainID, "requestID", requestID)
+func (n *network) CrossChainAppRequestFailed(ctx context.Context, respondingChainID ids.ID, requestID uint32, _ *common.AppError) error {
+	log.Debug("received CrossChainAppRequestFailed from chain", "respondingChainID", respondingChainID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		// Can happen after the network has been closed.
-		log.Trace("received CrossChainAppRequestFailed to unknown request", "respondingChainID", respondingChainID, "requestID", requestID)
+		log.Debug("received CrossChainAppRequestFailed to unknown request", "respondingChainID", respondingChainID, "requestID", requestID)
 		return nil
 	}
 
@@ -301,12 +302,12 @@ func (n *network) CrossChainAppRequestFailed(ctx context.Context, respondingChai
 // If [requestID] is not known, this function will emit a log and return a nil error.
 // If the response handler returns an error it is propagated as a fatal error.
 func (n *network) CrossChainAppResponse(ctx context.Context, respondingChainID ids.ID, requestID uint32, response []byte) error {
-	log.Trace("received CrossChainAppResponse from responding chain", "respondingChainID", respondingChainID, "requestID", requestID)
+	log.Debug("received CrossChainAppResponse from responding chain", "respondingChainID", respondingChainID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		// Can happen after the network has been closed.
-		log.Trace("received CrossChainAppResponse to unknown request", "respondingChainID", respondingChainID, "requestID", requestID, "responseLen", len(response))
+		log.Debug("received CrossChainAppResponse to unknown request", "respondingChainID", respondingChainID, "requestID", requestID, "responseLen", len(response))
 		return nil
 	}
 
@@ -326,21 +327,21 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 		return nil
 	}
 
-	log.Trace("received AppRequest from node", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
+	log.Debug("received AppRequest from node", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
 
 	var req message.Request
 	if _, err := n.codec.Unmarshal(request, &req); err != nil {
-		log.Trace("forwarding AppRequest to SDK network", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request), "err", err)
-		return n.network.AppRequest(ctx, nodeID, requestID, deadline, request)
+		log.Debug("forwarding AppRequest to SDK network", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request), "err", err)
+		return n.p2pNetwork.AppRequest(ctx, nodeID, requestID, deadline, request)
 	}
 
 	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.appStats)
 	if err != nil {
-		log.Trace("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
+		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
 	}
 
-	log.Trace("processing incoming request", "nodeID", nodeID, "requestID", requestID, "req", req)
+	log.Debug("processing incoming request", "nodeID", nodeID, "requestID", requestID, "req", req)
 	// We make a new context here because we don't want to cancel the context
 	// passed into n.AppSender.SendAppResponse below
 	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
@@ -362,12 +363,12 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 // If [requestID] is not known, this function will emit a log and return a nil error.
 // If the response handler returns an error it is propagated as a fatal error.
 func (n *network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-	log.Trace("received AppResponse from peer", "nodeID", nodeID, "requestID", requestID)
+	log.Debug("received AppResponse from peer", "nodeID", nodeID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
-		log.Trace("forwarding AppResponse to SDK network", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
-		return n.network.AppResponse(ctx, nodeID, requestID, response)
+		log.Debug("forwarding AppResponse to SDK network", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
+		return n.p2pNetwork.AppResponse(ctx, nodeID, requestID, response)
 	}
 
 	// We must release the slot
@@ -382,13 +383,13 @@ func (n *network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID 
 // - request times out before a response is provided
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error only when the response handler returns an error
-func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	log.Trace("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
+func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
+	log.Debug("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
-		log.Trace("forwarding AppRequestFailed to SDK network", "nodeID", nodeID, "requestID", requestID)
-		return n.network.AppRequestFailed(ctx, nodeID, requestID)
+		log.Debug("forwarding AppRequestFailed to SDK network", "nodeID", nodeID, "requestID", requestID)
+		return n.p2pNetwork.AppRequestFailed(ctx, nodeID, requestID, appErr)
 	}
 
 	// We must release the slot
@@ -445,22 +446,24 @@ func (n *network) Gossip(gossip []byte) error {
 	return n.appSender.SendAppGossip(context.TODO(), gossip)
 }
 
-// AppGossip is called by avalanchego -> VM when there is an incoming AppGossip from a peer
-// error returned by this function is expected to be treated as fatal by the engine
-// returns error if request could not be parsed as message.Request or when the requestHandler returns an error
-func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
+// AppGossip is called by avalanchego -> VM when there is an incoming AppGossip
+// from a peer. An error returned by this function is treated as fatal by the
+// engine.
+func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
 	var gossipMsg message.GossipMessage
 	if _, err := n.codec.Unmarshal(gossipBytes, &gossipMsg); err != nil {
-		log.Trace("could not parse app gossip", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
-		return nil
+		log.Debug("forwarding AppGossip to SDK network", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
+		return n.p2pNetwork.AppGossip(ctx, nodeID, gossipBytes)
 	}
 
-	log.Trace("processing AppGossip from node", "nodeID", nodeID, "msg", gossipMsg)
+	log.Debug("processing AppGossip from node", "nodeID", nodeID, "msg", gossipMsg)
 	return gossipMsg.Handle(n.gossipHandler, nodeID)
 }
 
 // Connected adds the given nodeID to the peer list so that it can receive messages
 func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	log.Debug("adding new peer", "nodeID", nodeID)
+
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -469,15 +472,17 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 	}
 
 	if nodeID == n.self {
+		log.Debug("skipping registering self as peer")
 		return nil
 	}
 
 	n.peers.Connected(nodeID, nodeVersion)
-	return n.network.Connected(ctx, nodeID, nodeVersion)
+	return n.p2pNetwork.Connected(ctx, nodeID, nodeVersion)
 }
 
 // Disconnected removes given [nodeID] from the peer list
 func (n *network) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	log.Debug("disconnecting peer", "nodeID", nodeID)
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -486,7 +491,7 @@ func (n *network) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	}
 
 	n.peers.Disconnected(nodeID)
-	return n.network.Disconnected(ctx, nodeID)
+	return n.p2pNetwork.Disconnected(ctx, nodeID)
 }
 
 // Shutdown disconnects all peers
@@ -539,8 +544,12 @@ func (n *network) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	n.peers.TrackBandwidth(nodeID, bandwidth)
 }
 
-func (n *network) NewAppProtocol(protocol uint64, handler p2p.Handler, options ...p2p.ClientOption) (*p2p.Client, error) {
-	return n.network.NewAppProtocol(protocol, handler, options...)
+func (n *network) NewClient(protocol uint64, options ...p2p.ClientOption) *p2p.Client {
+	return n.p2pNetwork.NewClient(protocol, options...)
+}
+
+func (n *network) AddHandler(protocol uint64, handler p2p.Handler) error {
+	return n.p2pNetwork.AddHandler(protocol, handler)
 }
 
 // invariant: peer/network must use explicitly even request ids.

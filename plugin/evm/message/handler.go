@@ -19,13 +19,13 @@ var (
 
 // GossipHandler handles incoming gossip messages
 type GossipHandler interface {
-	HandleTxs(nodeID ids.NodeID, msg TxsGossip) error
+	HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip) error
 }
 
 type NoopMempoolGossipHandler struct{}
 
-func (NoopMempoolGossipHandler) HandleTxs(nodeID ids.NodeID, _ TxsGossip) error {
-	log.Debug("dropping unexpected Txs message", "peerID", nodeID)
+func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip) error {
+	log.Debug("dropping unexpected EthTxsGossip message", "peerID", nodeID)
 	return nil
 }
 

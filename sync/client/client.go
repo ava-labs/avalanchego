@@ -351,7 +351,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			responseIntf, numElements, err = parseFn(c.codec, request, response)
 			if err != nil {
 				lastErr = err
-				log.Info("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
+				log.Debug("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
 				c.networkClient.TrackBandwidth(nodeID, 0)
 				metric.IncFailed()
 				metric.IncInvalidResponse()

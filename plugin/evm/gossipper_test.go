@@ -49,12 +49,12 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 	return string(bytes), err
 }
 
-func getValidTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*types.Transaction {
+func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*types.Transaction {
 	res := make([]*types.Transaction, count)
 
 	to := common.Address{}
-	amount := big.NewInt(10000)
-	gasLimit := uint64(100000)
+	amount := big.NewInt(0)
+	gasLimit := uint64(37000)
 
 	for i := 0; i < count; i++ {
 		tx, _ := types.SignTx(
@@ -76,7 +76,7 @@ func getValidTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*types.T
 // Note: channel through which subnet-evm mempool push txs to vm is injected here
 // to ease up UT, which target only VM behaviors in response to subnet-evm mempool
 // signals
-func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
+func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
 		t.Skip("FLAKY")
 	}
@@ -86,10 +86,11 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	assert.NoError(err)
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	_, vm, _, sender := GenesisVM(t, true, genesisJSON, "", "")
 	defer func() {
 		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
@@ -98,20 +99,19 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
-	ethTxs := getValidTxs(key, 3, common.Big1)
+	ethTxs := getValidEthTxs(key, 3, common.Big1)
 
 	var wg sync.WaitGroup
-	var wg2 sync.WaitGroup
 	wg.Add(2)
-	wg2.Add(1)
 	sender.CantSendAppGossip = false
+	signal1 := make(chan struct{})
 	seen := 0
 	sender.SendAppGossipF = func(_ context.Context, gossipedBytes []byte) error {
 		if seen == 0 {
 			notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(message.TxsGossip)
+			requestMsg, ok := notifyMsgIntf.(message.EthTxsGossip)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -123,12 +123,12 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 				[]common.Hash{txs[0].Hash(), txs[1].Hash()},
 			)
 			seen++
-			wg2.Done()
+			close(signal1)
 		} else if seen == 1 {
 			notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 			assert.NoError(err)
 
-			requestMsg, ok := notifyMsgIntf.(message.TxsGossip)
+			requestMsg, ok := notifyMsgIntf.(message.EthTxsGossip)
 			assert.True(ok)
 			assert.NotEmpty(requestMsg.Txs)
 
@@ -152,8 +152,8 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	}
 
 	// Gossip txs again (shouldn't gossip hashes)
-	attemptAwait(t, &wg2, 5*time.Second) // wait until reorg processed
-	assert.NoError(vm.gossiper.GossipTxs(ethTxs[:2]))
+	<-signal1 // wait until reorg processed
+	assert.NoError(vm.gossiper.GossipEthTxs(ethTxs[:2]))
 
 	errs = vm.txPool.AddRemotesSync(ethTxs)
 	assert.Contains(errs[0].Error(), "already known")
@@ -164,7 +164,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 }
 
 // show that locally issued eth txs are chunked correctly
-func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
+func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
 		t.Skip("FLAKY")
 	}
@@ -175,10 +175,10 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	_, vm, _, sender := GenesisVM(t, true, genesisJSON, "", "")
 	defer func() {
 		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
@@ -187,7 +187,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
-	txs := getValidTxs(key, 100, common.Big1)
+	ethTxs := getValidEthTxs(key, 100, common.Big1)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -197,7 +197,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 		notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 		assert.NoError(err)
 
-		requestMsg, ok := notifyMsgIntf.(message.TxsGossip)
+		requestMsg, ok := notifyMsgIntf.(message.EthTxsGossip)
 		assert.True(ok)
 		assert.NotEmpty(requestMsg.Txs)
 
@@ -211,14 +211,14 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	}
 
 	// Notify VM about eth txs
-	errs := vm.txPool.AddRemotesSync(txs)
+	errs := vm.txPool.AddRemotesSync(ethTxs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding subnet-evm tx to mempool")
 	}
 
 	attemptAwait(t, &wg, 5*time.Second)
 
-	for _, tx := range txs {
+	for _, tx := range ethTxs {
 		_, ok := seen[tx.Hash()]
 		assert.True(ok, "missing hash: %v", tx.Hash())
 	}
@@ -226,7 +226,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 
 // show that a geth tx discovered from gossip is requested to the same node that
 // gossiped it
-func TestMempoolTxsAppGossipHandling(t *testing.T) {
+func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
 		t.Skip("FLAKY")
 	}
@@ -237,10 +237,10 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	_, vm, _, sender := GenesisVM(t, true, genesisJSON, "", "")
 	defer func() {
 		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
@@ -264,12 +264,12 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 	}
 
 	// prepare a tx
-	tx := getValidTxs(key, 1, common.Big1)[0]
+	tx := getValidEthTxs(key, 1, common.Big1)[0]
 
 	// show that unknown subnet-evm hashes is requested
 	txBytes, err := rlp.EncodeToBytes([]*types.Transaction{tx})
 	assert.NoError(err)
-	msg := message.TxsGossip{
+	msg := message.EthTxsGossip{
 		Txs: txBytes,
 	}
 	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
@@ -284,7 +284,7 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 	attemptAwait(t, &wg, 5*time.Second)
 }
 
-func TestMempoolTxsRegossipSingleAccount(t *testing.T) {
+func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -304,10 +304,10 @@ func TestMempoolTxsRegossipSingleAccount(t *testing.T) {
 	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
-	txs := getValidTxs(key, 10, big.NewInt(226*params.GWei))
+	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
 
 	// Notify VM about eth txs
-	errs := vm.txPool.AddRemotesSync(txs)
+	errs := vm.txPool.AddRemotesSync(ethTxs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding subnet-evm tx to remote mempool")
 	}
@@ -317,10 +317,10 @@ func TestMempoolTxsRegossipSingleAccount(t *testing.T) {
 	pushNetwork := vm.gossiper.(*pushGossiper)
 	queued := pushNetwork.queueRegossipTxs()
 	assert.Len(queued, 1, "unexpected length of queued txs")
-	assert.Equal(txs[0].Hash(), queued[0].Hash())
+	assert.Equal(ethTxs[0].Hash(), queued[0].Hash())
 }
 
-func TestMempoolTxsRegossip(t *testing.T) {
+func TestMempoolEthTxsRegossip(t *testing.T) {
 	assert := assert.New(t)
 
 	keys := make([]*ecdsa.PrivateKey, 20)
@@ -332,10 +332,10 @@ func TestMempoolTxsRegossip(t *testing.T) {
 		addrs[i] = crypto.PubkeyToAddress(key.PublicKey)
 	}
 
-	cfgJson, err := fundAddressByGenesis(addrs)
+	genesisJSON, err := fundAddressByGenesis(addrs)
 	assert.NoError(err)
 
-	_, vm, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
+	_, vm, _, _ := GenesisVM(t, true, genesisJSON, `{"local-txs-enabled":true}`, "")
 	defer func() {
 		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
@@ -347,7 +347,7 @@ func TestMempoolTxsRegossip(t *testing.T) {
 	ethTxs := make([]*types.Transaction, 20)
 	ethTxHashes := make([]common.Hash, 20)
 	for i := 0; i < 20; i++ {
-		txs := getValidTxs(keys[i], 1, big.NewInt(226*params.GWei))
+		txs := getValidEthTxs(keys[i], 1, big.NewInt(226*params.GWei))
 		tx := txs[0]
 		ethTxs[i] = tx
 		ethTxHashes[i] = tx.Hash()
@@ -407,8 +407,8 @@ func TestMempoolTxsPriorityRegossip(t *testing.T) {
 	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
-	txs := getValidTxs(key, 10, big.NewInt(226*params.GWei))
-	txs2 := getValidTxs(key2, 10, big.NewInt(226*params.GWei))
+	txs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
+	txs2 := getValidEthTxs(key2, 10, big.NewInt(226*params.GWei))
 
 	// Notify VM about eth txs
 	for _, err := range vm.txPool.AddRemotesSync(txs) {

@@ -4,6 +4,8 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -22,12 +24,12 @@ var (
 
 func init() {
 	Codec = codec.NewManager(maxMessageSize)
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		// Gossip types
-		c.RegisterType(TxsGossip{}),
+		c.RegisterType(EthTxsGossip{}),
 
 		// Types for state sync frontier consensus
 		c.RegisterType(SyncSummary{}),
@@ -53,7 +55,7 @@ func init() {
 	}
 
 	CrossChainCodec = codec.NewManager(maxMessageSize)
-	ccc := linearcodec.NewDefault()
+	ccc := linearcodec.NewDefault(time.Time{})
 
 	errs = wrappers.Errs{}
 	errs.Add(

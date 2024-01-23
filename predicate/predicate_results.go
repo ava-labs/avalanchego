@@ -6,6 +6,7 @@ package predicate
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -24,7 +25,7 @@ var Codec codec.Manager
 func init() {
 	Codec = codec.NewManager(MaxResultsSize)
 
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(Results{}),
