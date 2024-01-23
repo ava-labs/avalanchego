@@ -167,9 +167,8 @@ func TestGossipSubscribe(t *testing.T) {
 	gossipTxPool.bloom, err = gossip.NewBloomFilter(prometheus.NewRegistry(), "", 1, 0.01, 0.0000000000000001) // maxCount =1
 	require.NoError(err)
 	ctx, cancel := context.WithCancel(context.TODO())
-	go func() {
-		gossipTxPool.Subscribe(ctx)
-	}()
+	defer cancel()
+	go gossipTxPool.Subscribe(ctx)
 
 	// create eth txs
 	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
@@ -179,12 +178,23 @@ func TestGossipSubscribe(t *testing.T) {
 	for _, err := range errs {
 		require.NoError(err, "failed adding subnet-evm tx to remote mempool")
 	}
-	time.Sleep(1 * time.Second)
-	cancel()
-	for i, tx := range ethTxs {
-		gossipable := &GossipEthTx{Tx: tx}
-		require.Truef(gossipTxPool.bloom.Has(gossipable), "expected tx to be in bloom filter: index %d", i)
-	}
+
+	require.Eventually(
+		func() bool {
+			gossipTxPool.lock.RLock()
+			defer gossipTxPool.lock.RUnlock()
+
+			for _, tx := range ethTxs {
+				if !gossipTxPool.bloom.Has(&GossipEthTx{Tx: tx}) {
+					return false
+				}
+			}
+			return true
+		},
+		10*time.Second,
+		10*time.Millisecond,
+		"expected all transactions to eventually be in the bloom filter",
+	)
 }
 
 func setupPoolWithConfig(t *testing.T, config *params.ChainConfig, fundedAddress common.Address) *txpool.TxPool {
