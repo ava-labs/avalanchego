@@ -46,23 +46,19 @@ if [ -n "${1:-}" ]; then
 fi
 
 # move to api directory
-cd $TARGET
+cd "$TARGET"
 
 echo "Running protobuf fmt..."
 buf format -w
 
 echo "Running protobuf lint check..."
-buf lint
-
-if [[ $? -ne 0 ]];  then
+if ! buf lint;  then
     echo "ERROR: protobuf linter failed"
     exit 1
 fi
 
 echo "Re-generating protobuf..."
-buf generate
-
-if [[ $? -ne 0 ]];  then
+if ! buf generate;  then
     echo "ERROR: protobuf generation failed"
     exit 1
 fi
