@@ -614,7 +614,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 				close(done)
 			}
 
-			require.ErrorIs(tt.expectedErr, err)
+			require.ErrorIs(err, tt.expectedErr)
 			<-done
 		})
 	}
