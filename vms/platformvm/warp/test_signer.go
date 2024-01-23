@@ -15,12 +15,12 @@ import (
 
 // SignerTests is a list of all signer tests
 var SignerTests = map[string]func(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
-	"TestSignerWrongChainID": TestSignerWrongChainID,
-	"TestSignerVerifies":     TestSignerVerifies,
+	"WrongChainID": TestWrongChainID,
+	"Verifies":     TestVerifies,
 }
 
 // Test that using a random SourceChainID results in an error
-func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, _ ids.ID) {
+func TestWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, _ ids.ID) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
@@ -52,7 +52,7 @@ func TestSignerWrongNetworkID(t *testing.T, s Signer, _ *bls.SecretKey, networkI
 }
 
 // Test that a signature generated with the signer verifies correctly
-func TestSignerVerifies(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID) {
+func TestVerifies(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(

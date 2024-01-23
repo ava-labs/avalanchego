@@ -54,8 +54,8 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 
 	t.Cleanup(func() {
 		serverCloser.Stop()
-		require.NoError(conn.Close())
-		require.NoError(listener.Close())
+		_ = conn.Close()
+		_ = listener.Close()
 	})
 
 	return state

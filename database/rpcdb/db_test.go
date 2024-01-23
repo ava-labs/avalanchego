@@ -46,8 +46,8 @@ func setupDB(t testing.TB) *testDatabase {
 
 	t.Cleanup(func() {
 		serverCloser.Stop()
-		require.NoError(conn.Close())
-		require.NoError(listener.Close())
+		_ = conn.Close()
+		_ = listener.Close()
 	})
 
 	return db

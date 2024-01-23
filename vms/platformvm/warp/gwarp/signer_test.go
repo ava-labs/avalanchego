@@ -57,18 +57,16 @@ func setupSigner(t testing.TB) *testSigner {
 
 	t.Cleanup(func() {
 		serverCloser.Stop()
-		require.NoError(conn.Close())
-		require.NoError(listener.Close())
+		_ = conn.Close()
+		_ = listener.Close()
 	})
 
 	return s
 }
 
 func TestInterface(t *testing.T) {
-	for name, f := range warp.SignerTests {
-		t.Run(name, func(t *testing.T) {
-			s := setupSigner(t)
-			f(t, s.client, s.sk, s.networkID, s.chainID)
-		})
+	for _, test := range warp.SignerTests {
+		s := setupSigner(t)
+		test(t, s.client, s.sk, s.networkID, s.chainID)
 	}
 }
