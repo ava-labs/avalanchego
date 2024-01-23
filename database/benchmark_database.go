@@ -119,7 +119,7 @@ func BenchmarkBatchPut(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkBatchDelete measures the time it takes to batch delete.
-func BenchmarkBatchDelete(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkBatchDelete(b *testing.B, db Database, keys, _ [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
