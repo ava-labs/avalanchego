@@ -57,6 +57,7 @@ import (
 	_ "github.com/ava-labs/subnet-evm/precompile/registry"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -194,7 +195,7 @@ type VM struct {
 	metadataDB database.Database
 
 	// [chaindb] is the database supplied to the Ethereum backend
-	chaindb Database
+	chaindb ethdb.Database
 
 	// [acceptedBlockDB] is the database to store the last accepted
 	// block.
@@ -296,7 +297,7 @@ func (vm *VM) Initialize(
 	vm.shutdownChan = make(chan struct{}, 1)
 	// Use NewNested rather than New so that the structure of the database
 	// remains the same regardless of the provided baseDB type.
-	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, db)}
+	vm.chaindb = rawdb.NewDatabase(Database{prefixdb.NewNested(ethDBPrefix, db)})
 	vm.db = versiondb.New(db)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)

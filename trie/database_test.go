@@ -28,8 +28,8 @@ package trie
 
 import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
-	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/trie/triedb/hashdb"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 // newTestDatabase initializes the trie database with specified scheme.

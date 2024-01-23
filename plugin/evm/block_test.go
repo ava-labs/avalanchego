@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
@@ -23,9 +22,9 @@ func TestHandlePrecompileAccept(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	db := memdb.New()
+	db := rawdb.NewMemoryDatabase()
 	vm := &VM{
-		chaindb:     Database{db},
+		chaindb:     db,
 		chainConfig: params.TestChainConfig,
 	}
 

@@ -5,7 +5,7 @@ package syncutils
 
 import (
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
-	"github.com/ava-labs/subnet-evm/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 var (

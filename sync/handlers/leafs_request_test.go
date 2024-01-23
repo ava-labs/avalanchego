@@ -13,13 +13,12 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/ethdb"
-	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,7 +26,7 @@ import (
 func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	rand.Seed(1)
 	mockHandlerStats := &stats.MockHandlerStats{}
-	memdb := memorydb.New()
+	memdb := rawdb.NewMemoryDatabase()
 	trieDB := trie.NewDatabase(memdb)
 
 	corruptedTrieRoot, _, _ := trie.GenerateTrie(t, trieDB, 100, common.HashLength)
@@ -686,7 +685,7 @@ func assertRangeProofIsValid(t *testing.T, request *message.LeafsRequest, respon
 
 	var proof ethdb.Database
 	if len(response.ProofVals) > 0 {
-		proof = memorydb.New()
+		proof = rawdb.NewMemoryDatabase()
 		defer proof.Close()
 		for _, proofVal := range response.ProofVals {
 			proofKey := crypto.Keccak256(proofVal)

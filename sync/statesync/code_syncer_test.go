@@ -10,13 +10,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
-	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"github.com/ava-labs/subnet-evm/sync/handlers"
 	handlerstats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +44,7 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	mockClient := statesyncclient.NewMockClient(message.Codec, nil, codeRequestHandler, nil)
 	mockClient.GetCodeIntercept = test.getCodeIntercept
 
-	clientDB := memorydb.New()
+	clientDB := rawdb.NewMemoryDatabase()
 
 	codeSyncer := newCodeSyncer(CodeSyncerConfig{
 		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,

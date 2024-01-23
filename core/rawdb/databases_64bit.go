@@ -19,8 +19,8 @@
 package rawdb
 
 import (
-	"github.com/ava-labs/subnet-evm/ethdb"
-	"github.com/ava-labs/subnet-evm/ethdb/pebble"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb/pebble"
 )
 
 // Pebble is unsuported on 32bit architecture

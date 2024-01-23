@@ -17,8 +17,8 @@ import (
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	clientstats "github.com/ava-labs/subnet-evm/sync/client/stats"
@@ -141,7 +141,7 @@ func TestGetBlocks(t *testing.T) {
 	var gspec = &core.Genesis{
 		Config: params.TestChainConfig,
 	}
-	memdb := memorydb.New()
+	memdb := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(memdb)
 	engine := dummy.NewETHFaker()
 	numBlocks := 110
@@ -409,7 +409,7 @@ func TestGetLeafs(t *testing.T) {
 
 	const leafsLimit = 1024
 
-	trieDB := trie.NewDatabase(memorydb.New())
+	trieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
 	largeTrieRoot, largeTrieKeys, _ := trie.GenerateTrie(t, trieDB, 100_000, common.HashLength)
 	smallTrieRoot, _, _ := trie.GenerateTrie(t, trieDB, leafsLimit, common.HashLength)
 
@@ -780,7 +780,7 @@ func TestGetLeafs(t *testing.T) {
 func TestGetLeafsRetries(t *testing.T) {
 	rand.Seed(1)
 
-	trieDB := trie.NewDatabase(memorydb.New())
+	trieDB := trie.NewDatabase(rawdb.NewMemoryDatabase())
 	root, _, _ := trie.GenerateTrie(t, trieDB, 100_000, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())

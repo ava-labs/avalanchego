@@ -30,8 +30,8 @@ import (
 	"sync"
 
 	"github.com/ava-labs/subnet-evm/core/rawdb"
-	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const defaultPreimagesLimit = 4 * 1024 * 1024 // 4 MB

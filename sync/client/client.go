@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 
-	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/sync/client/stats"
 
@@ -24,11 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
@@ -151,7 +151,7 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	// Populate proof when ProofVals are present in the response. Its ok to pass it as nil to the trie.VerifyRangeProof
 	// function as it will assert that all the leaves belonging to the specified root are present.
 	if len(leafsResponse.ProofVals) > 0 {
-		proof = memorydb.New()
+		proof = rawdb.NewMemoryDatabase()
 		defer proof.Close()
 		for _, proofVal := range leafsResponse.ProofVals {
 			proofKey := crypto.Keccak256(proofVal)
