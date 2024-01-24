@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -170,15 +171,23 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 	if err := csvWriter.Write(append([]string{"NodeID", "NodeIP", "Weight"}, getMessageOutputHeaders()...)); err != nil {
 		return err
 	}
+	var (
+		nodesFailed          = 0
+		stakeWeightFailed    = uint64(0)
+		nodesSuccessful      = 0
+		stakeWeightSucceeded = uint64(0)
+	)
 	for i, response := range responses {
 		// If the response is nil, due to an error querying the peer, skip processing
 		if response == nil {
+			nodesFailed++
+			stakeWeightFailed += nodes[i].weight
 			continue
 		}
 		fields := []string{
 			nodes[i].nodeID.String(),
 			nodes[i].ip.String(),
-			fmt.Sprintf("%d", nodes[i].weight),
+			fmt.Sprintf("%d", nodes[i].weight/units.Avax),
 		}
 		responseFields, err := formatMessageOutput(response)
 		if err != nil {
@@ -187,11 +196,22 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 				zap.Stringer("response", response),
 				zap.Error(err),
 			)
+			nodesFailed++
+			stakeWeightFailed += nodes[i].weight
 			continue
 		}
+		nodesSuccessful++
+		stakeWeightSucceeded += nodes[i].weight
 		fields = append(fields, responseFields...)
 		csvWriter.Write(fields)
 	}
+
+	n.log.Info("Response Summary",
+		zap.Int("nodesSucceeded", nodesSuccessful),
+		zap.Uint64("stakeWeightSucceeded", stakeWeightSucceeded/units.Avax),
+		zap.Int("nodesFailed", nodesFailed),
+		zap.Uint64("stakeWeightFailed", stakeWeightFailed/units.Avax),
+	)
 
 	return nil
 }
