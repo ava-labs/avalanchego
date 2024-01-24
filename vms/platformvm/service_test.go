@@ -282,7 +282,7 @@ func TestGetTx(t *testing.T) {
 		{
 			"proposal block",
 			func(service *Service) (*txs.Tx, error) {
-				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
+				return service.vm.txBuilder.NewAddPermissionlessValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
