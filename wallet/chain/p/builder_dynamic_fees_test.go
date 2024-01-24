@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/mocks"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -47,7 +48,7 @@ func TestCreateChainTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	be := NewMockBuilderBackend(ctrl)
+	be := mocks.NewMockBuilderBackend(ctrl)
 
 	var (
 		subnetAuthKey  = testKeys[0]
@@ -118,7 +119,7 @@ func TestCreateChainTx(t *testing.T) {
 
 	var (
 		kc  = secp256k1fx.NewKeychain(utxoKey)
-		sbe = NewMockSignerBackend(ctrl)
+		sbe = mocks.NewMockSignerBackend(ctrl)
 		s   = NewSigner(kc, sbe)
 	)
 
