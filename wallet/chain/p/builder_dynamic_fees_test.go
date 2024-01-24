@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -81,17 +82,46 @@ func TestCreateChainTx(t *testing.T) {
 	be.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
 
 	var (
-		amount      = 10 * units.Avax
 		avaxAssetID = ids.GenerateTestID()
-		utxos       = []*avax.UTXO{
-			{
+		utxos       = []*avax.UTXO{ // currently, the wallet scans UTXOs in the order provided here
+			{ // a small UTXO first, which  should not be enough to pay fees
 				UTXOID: avax.UTXOID{
 					TxID:        ids.GenerateTestID(),
 					OutputIndex: rand.Uint32(), // #nosec G404
 				},
 				Asset: avax.Asset{ID: avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: amount,
+					Amt: 2 * units.MilliAvax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Addrs:     []ids.ShortID{utxoKey.PublicKey().Address()},
+						Threshold: 1,
+					},
+				},
+			},
+			{ // a locked, small UTXO
+				UTXOID: avax.UTXOID{
+					TxID:        ids.GenerateTestID(),
+					OutputIndex: rand.Uint32(), // #nosec G404
+				},
+				Asset: avax.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 99 * units.Avax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  uint64(time.Now().Add(time.Hour).Unix()),
+						Addrs:     []ids.ShortID{utxoKey.PublicKey().Address()},
+						Threshold: 1,
+					},
+				},
+			},
+			{ // a large UTXO last, which should be enough to pay any fee by itself
+				UTXOID: avax.UTXOID{
+					TxID:        ids.GenerateTestID(),
+					OutputIndex: rand.Uint32(), // #nosec G404
+				},
+				Asset: avax.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 10 * units.Avax,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Addrs:     []ids.ShortID{utxoKey.PublicKey().Address()},
@@ -123,7 +153,9 @@ func TestCreateChainTx(t *testing.T) {
 		s   = NewSigner(kc, sbe)
 	)
 
-	sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), gomock.Any()).Return(utxos[0], nil)
+	for _, utxo := range utxos {
+		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
+	}
 	sbe.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
@@ -136,11 +168,11 @@ func TestCreateChainTx(t *testing.T) {
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
-	require.Equal(3197*units.MicroAvax, fc.Fee)
+	require.Equal(5808*units.MicroAvax, fc.Fee)
 
 	ins := utx.Ins
 	outs := utx.Outs
-	require.Len(ins, 1)
+	require.Len(ins, 2)
 	require.Len(outs, 1)
-	require.Equal(fc.Fee, ins[0].In.Amount()-outs[0].Out.Amount())
+	require.Equal(fc.Fee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
 }
