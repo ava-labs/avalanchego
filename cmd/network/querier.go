@@ -128,7 +128,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		i := i
 		node := node
 		eg.Go(func() error {
-			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 
 			chits, err := n.sendQuery(
@@ -139,7 +139,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 			)
 			if err != nil {
 				// Note: ignore errors instead of interrupting other queries
-				n.log.Debug("failed to get response from peer",
+				n.log.Info("failed to get response from peer",
 					zap.Stringer("peer", &node),
 					zap.Error(err),
 				)
@@ -171,6 +171,10 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		return err
 	}
 	for i, response := range responses {
+		// If the response is nil, due to an error querying the peer, skip processing
+		if response == nil {
+			continue
+		}
 		fields := []string{
 			nodes[i].nodeID.String(),
 			nodes[i].ip.String(),
@@ -178,8 +182,10 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		}
 		responseFields, err := formatMessageOutput(response)
 		if err != nil {
-			n.log.Debug("failed to format output from peer",
+			n.log.Info("failed to format output from peer",
 				zap.Stringer("peer", &nodes[i]),
+				zap.Stringer("response", response),
+				zap.Error(err),
 			)
 			continue
 		}

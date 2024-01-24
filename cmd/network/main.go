@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/pflag"
 )
@@ -31,8 +30,6 @@ func run() error {
 	}
 
 	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	nodes, err := getNodes(ctx, v)
 	if err != nil {
