@@ -392,7 +392,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	)
 
 	// create valid tx
-	tx, err := vm.txBuilder.NewAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
