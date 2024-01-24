@@ -130,29 +130,6 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 
-				case startPrimaryWithoutBLS:
-					// when adding a primary validator, also remove the current
-					// primary one
-					if currentPrimaryValidator != nil {
-						err := terminatePrimaryValidator(vm, currentPrimaryValidator)
-						if err != nil {
-							return fmt.Sprintf("could not terminate current primary validator: %s", err.Error())
-						}
-						// no need to nil current primary validator, we'll
-						// reassign immediately
-
-						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-							return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
-						}
-					}
-					currentPrimaryValidator, err = addPrimaryValidatorWithoutBLSKey(vm, ev)
-					if err != nil {
-						return fmt.Sprintf("could not add primary validator without BLS key: %s", err.Error())
-					}
-					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
-					}
-
 				case startPrimaryWithBLS:
 					// when adding a primary validator, also remove the current
 					// primary one
@@ -351,24 +328,6 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 	}
 	if err := signedTx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, fmt.Errorf("failed syntax verification of AddPermissionlessValidatorTx: %w", err)
-	}
-	return internalAddValidator(vm, signedTx)
-}
-
-func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
-	addr := keys[0].PublicKey().Address()
-	signedTx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.Config.MinValidatorStake,
-		uint64(data.startTime.Unix()),
-		uint64(data.endTime.Unix()),
-		data.nodeID,
-		addr,
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{keys[0], keys[1]},
-		addr,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not create AddValidatorTx: %w", err)
 	}
 	return internalAddValidator(vm, signedTx)
 }

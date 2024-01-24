@@ -103,8 +103,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
 	)
 
-	// Create a valid [AddValidatorTx]
-	tx, err := env.txBuilder.NewAddValidatorTx(
+	// Create a valid [AddPermissionlessValidatorTx]
+	tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
