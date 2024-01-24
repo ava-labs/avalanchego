@@ -37,7 +37,7 @@ func createMessage(v *viper.Viper) (message.OutboundMessage, message.Op, error) 
 }
 
 func getMessageOutputHeaders() []string {
-	return []string{"BlockNumber", "AtomicRoot"}
+	return []string{"OuterStateSummaryID", "BlockNumber", "AtomicRoot"}
 }
 
 func formatMessageOutput(msg fmt.Stringer) ([]string, error) {
@@ -49,11 +49,13 @@ func formatMessageOutput(msg fmt.Stringer) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	parsedSummary, err := evmMessage.NewSyncSummaryFromBytes(proposerVMSummary.InnerSummaryBytes(), nil)
 	if err != nil {
 		return nil, err
 	}
 	return []string{
+		proposerVMSummary.ID().String(),
 		fmt.Sprintf("%d", parsedSummary.BlockNumber),
 		ids.ID(parsedSummary.AtomicRoot).String(),
 	}, nil
