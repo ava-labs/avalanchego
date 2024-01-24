@@ -15,6 +15,7 @@ type FlagVars struct {
 	avalancheGoExecPath string
 	pluginDir           string
 	networkDir          string
+	networkID           uint
 	useExistingNetwork  bool
 }
 
@@ -34,6 +35,10 @@ func (v *FlagVars) NetworkDir() string {
 		return v.networkDir
 	}
 	return os.Getenv(tmpnet.NetworkDirEnvName)
+}
+
+func (v *FlagVars) NetworkID() uint {
+	return v.networkID
 }
 
 func (v *FlagVars) UseExistingNetwork() bool {
@@ -65,6 +70,12 @@ func RegisterFlags() *FlagVars {
 		"use-existing-network",
 		false,
 		"[optional] whether to target the existing network identified by --network-dir.",
+	)
+	flag.UintVar(
+		&vars.networkID,
+		"network-id",
+		0,
+		"[optional] the network ID to use. By default a compatible network ID will be generated. Use 808 for mainnet configuration and 909 for fuji configuration.",
 	)
 
 	return &vars

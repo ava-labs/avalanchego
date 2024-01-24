@@ -70,12 +70,24 @@ the `TMPNET_NETWORK_DIR` env var to this symlink ensures that
 `--use-existing-network` will target the most recently deployed temporary
 network.
 
+#### Configuring a network with mainnet or fuji configuration
+
+The `tmpnetctl start-network` command supports creating a network with
+the same ruleset as mainnet or fuji by using specific network IDs. The
+network ID `808` is used to configure a local test network with the
+same ruleset as mainnet, and `909` is used to configure a local test
+network with the same ruleset as fuji. The network ID can be specified
+to `tmpnetctl start-network` via the `--network-id` flag.
+
 ### Via code
 
 A temporary network can be managed in code:
 
 ```golang
 network := &tmpnet.Network{                   // Configure non-default values for the new network
+    Genesis: &genesis.UnparsedConfig{
+        NetworkID: 808,                       // (Optional) Configure the network with the mainnet ruleset (see previous section)
+    },
     DefaultFlags: tmpnet.FlagsMap{
         config.LogLevelKey: "INFO",           // Change one of the network's defaults
     },

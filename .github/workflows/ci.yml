@@ -56,7 +56,7 @@ jobs:
       - name: fuzz_test
         shell: bash
         run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
-  e2e:
+  e2e_local_ruleset:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -74,8 +74,50 @@ jobs:
         uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: e2e-tmpnet-data
+          name: e2e-local-tmpnet-data
           path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
+  e2e_mainnet_ruleset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests
+        shell: bash
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --network-id=808
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-mainnet-tmpnet-data
+          path: ~/.tmpnet/networks/808*
+          if-no-files-found: error
+  e2e_fuji_ruleset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.go_version }}
+          check-latest: true
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests
+        shell: bash
+        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --network-id=909
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-fuji-tmpnet-data
+          path: ~/.tmpnet/networks/909*
           if-no-files-found: error
   e2e_existing_network:
     runs-on: ubuntu-latest

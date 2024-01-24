@@ -263,7 +263,7 @@ func (n *Network) Create(rootDir string) error {
 		}
 	}
 
-	if n.Genesis == nil {
+	if n.Genesis == nil || len(n.Genesis.Allocations) == 0 {
 		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
 		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
 		// keys exposed by a network. Since allocation will not be exclusive, a test using a
