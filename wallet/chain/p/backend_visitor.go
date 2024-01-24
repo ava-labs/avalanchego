@@ -47,6 +47,15 @@ func (b *backendVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	owner, ok := tx.Owner.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return errUnknownOwnerType
+	}
+	b.b.setSubnetOwner(
+		b.ctx,
+		b.txID,
+		owner,
+	)
 	return b.baseTx(&tx.BaseTx)
 }
 
