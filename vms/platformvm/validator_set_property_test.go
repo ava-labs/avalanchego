@@ -304,7 +304,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		addr,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create AddValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx: %w", err)
 	}
 	return internalAddValidator(vm, signedTx)
 }
