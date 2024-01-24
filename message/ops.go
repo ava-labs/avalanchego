@@ -185,6 +185,18 @@ var (
 		AppErrorOp:                      AppResponseOp,
 		CrossChainAppErrorOp:            CrossChainAppResponseOp,
 	}
+	RequestToResponseOps = map[Op]Op{
+		GetStateSummaryFrontierOp: StateSummaryFrontierOp,
+		GetAcceptedStateSummaryOp: AcceptedStateSummaryOp,
+		GetAcceptedFrontierOp:     AcceptedFrontierOp,
+		GetAcceptedOp:             AcceptedOp,
+		GetAncestorsOp:            AncestorsOp,
+		GetOp:                     PutOp,
+		PullQueryOp:               ChitsOp,
+		PushQueryOp:               ChitsOp,
+		AppRequestOp:              AppResponseOp,
+		CrossChainAppRequestOp:    CrossChainAppResponseOp,
+	}
 	UnrequestedOps = set.Of(
 		GetAcceptedFrontierOp,
 		GetAcceptedOp,
