@@ -5,6 +5,7 @@ package p
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
@@ -61,6 +63,173 @@ func (b *DynamicFeesBuilder) NewAddValidatorTx(
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
+	vdr *txs.SubnetValidator,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.AddSubnetValidatorTx, error) {
+	ops := common.NewOptions(options)
+
+	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx := &txs.AddSubnetValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		SubnetValidator: *vdr,
+		SubnetAuth:      subnetAuth,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating input size: %w", err)
+	}
+	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for input fees: %w", err)
+	}
+	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddSubnetValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.RemoveSubnetValidatorTx, error) {
+	ops := common.NewOptions(options)
+
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx := &txs.RemoveSubnetValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Subnet:     subnetID,
+		NodeID:     nodeID,
+		SubnetAuth: subnetAuth,
+	}
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating input size: %w", err)
+	}
+	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for input fees: %w", err)
+	}
+	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *DynamicFeesBuilder) NewAddDelegatorTx(
+	vdr *txs.Validator,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.AddDelegatorTx, error) {
+	ops := common.NewOptions(options)
+	utils.Sort(rewardsOwner.Addrs)
+	utx := &txs.AddDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Validator:              *vdr,
+		DelegationRewardsOwner: rewardsOwner,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): vdr.Wght,
+	}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddDelegatorTx(utx); err != nil {
 		return nil, err
 	}
 
@@ -185,6 +354,203 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 
 	utx.Ins = inputs
 	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *DynamicFeesBuilder) NewTransformSubnetTx(
+	subnetID ids.ID,
+	assetID ids.ID,
+	initialSupply uint64,
+	maxSupply uint64,
+	minConsumptionRate uint64,
+	maxConsumptionRate uint64,
+	minValidatorStake uint64,
+	maxValidatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
+	minDelegatorStake uint64,
+	maxValidatorWeightFactor byte,
+	uptimeRequirement uint32,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.TransformSubnetTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx := &txs.TransformSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Subnet:                   subnetID,
+		AssetID:                  assetID,
+		InitialSupply:            initialSupply,
+		MaximumSupply:            maxSupply,
+		MinConsumptionRate:       minConsumptionRate,
+		MaxConsumptionRate:       maxConsumptionRate,
+		MinValidatorStake:        minValidatorStake,
+		MaxValidatorStake:        maxValidatorStake,
+		MinStakeDuration:         uint32(minStakeDuration / time.Second),
+		MaxStakeDuration:         uint32(maxStakeDuration / time.Second),
+		MinDelegationFee:         minDelegationFee,
+		MinDelegatorStake:        minDelegatorStake,
+		MaxValidatorWeightFactor: maxValidatorWeightFactor,
+		UptimeRequirement:        uptimeRequirement,
+		SubnetAuth:               subnetAuth,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{
+		assetID: maxSupply - initialSupply,
+	} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating input size: %w", err)
+	}
+	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for input fees: %w", err)
+	}
+	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.TransformSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
+	vdr *txs.SubnetValidator,
+	signer signer.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.AddPermissionlessValidatorTx, error) {
+	ops := common.NewOptions(options)
+	utils.Sort(validationRewardsOwner.Addrs)
+	utils.Sort(delegationRewardsOwner.Addrs)
+
+	utx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Validator:             vdr.Validator,
+		Subnet:                vdr.Subnet,
+		Signer:                signer,
+		ValidatorRewardsOwner: validationRewardsOwner,
+		DelegatorRewardsOwner: delegationRewardsOwner,
+		DelegationShares:      shares,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{
+		assetID: vdr.Wght,
+	}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddPermissionlessValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
+	vdr *txs.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.AddPermissionlessDelegatorTx, error) {
+	ops := common.NewOptions(options)
+	utils.Sort(rewardsOwner.Addrs)
+
+	utx := &txs.AddPermissionlessDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Validator:              vdr.Validator,
+		Subnet:                 vdr.Subnet,
+		DelegationRewardsOwner: rewardsOwner,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{
+		assetID: vdr.Wght,
+	}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddPermissionlessDelegatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
 
 	return utx, b.initCtx(utx)
 }
@@ -468,7 +834,12 @@ func (b *DynamicFeesBuilder) financeTx(
 
 			switch {
 			case feeCalc.Fee < remainingAmount:
-				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount - feeCalc.Fee
+				if assetID == b.backend.AVAXAssetID() {
+					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount - feeCalc.Fee
+				} else {
+					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount
+					amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+				}
 				changeOutputs = append(changeOutputs, changeOut)
 			case feeCalc.Fee == remainingAmount:
 				// fees wholly consume remaining amount. We don't add the change
