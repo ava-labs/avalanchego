@@ -13,11 +13,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// TODO
-// - add ability to specify input message to send the network as an input
-// - add ability to handle output
-// - add example of how to use this with App-specific query/response (pipeline from peer to desired result) (use ./peer | ./decode or xargs ./decode or something to pass JSON to AppSpecific message decoder from coreth)
-
 func main() {
 	if err := run(); err != nil {
 		fmt.Printf("failed due to %s\n", err)

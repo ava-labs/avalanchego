@@ -13,16 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -31,11 +26,9 @@ import (
 var errNoPeers = errors.New("no peers")
 
 type networkQuerier struct {
-	log                logging.Logger
+	log logging.Logger
+
 	networkID          uint32
-	chainID            ids.ID
-	deadline           time.Duration
-	creator            message.Creator
 	concurrency        int
 	queryType          string
 	outboundMsg        message.OutboundMessage
@@ -44,36 +37,10 @@ type networkQuerier struct {
 }
 
 func newQuerierFromViper(v *viper.Viper) (*networkQuerier, error) {
-	chainIDStr := v.GetString(ChainIDKey)
-	chainID, err := ids.FromString(chainIDStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse chainID: %w", err)
-	}
-	creator, err := message.NewCreator(logging.NoLog{}, prometheus.NewRegistry(), "", compression.TypeNone, v.GetDuration(DeadlineKey))
+	outboundMsg, expectedResponseOp, err := createMessage(v)
 	if err != nil {
 		return nil, err
 	}
-	deadline := v.GetDuration(DeadlineKey)
-
-	// This blockID is the hardcoded blockID accepted on the C-Chain at the given height.
-	blockIDBytes := common.Hex2Bytes("ca6fe4a31c0745c84a953f5d942013c2eb16f8f03d4e5b81b6e627fafbffc13e")
-	blockID, err := ids.ToID(blockIDBytes)
-	if err != nil {
-		return nil, err
-	}
-	blockHeight := uint64(39896056)
-	outboundMsg, err := creator.PullQuery(
-		chainID,
-		99,
-		deadline,
-		blockID,
-		blockHeight,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-	)
-	if err != nil {
-		return nil, err
-	}
-	expectedResponseOp := message.ChitsOp
 
 	log := logging.NewLogger(
 		"network-querier",
@@ -87,9 +54,6 @@ func newQuerierFromViper(v *viper.Viper) (*networkQuerier, error) {
 	return &networkQuerier{
 		log:                log,
 		networkID:          v.GetUint32(NetworkIDKey),
-		chainID:            chainID,
-		deadline:           deadline,
-		creator:            creator,
 		concurrency:        v.GetInt(ConcurrencyKey),
 		queryType:          v.GetString(QueryTypeKey),
 		outboundMsg:        outboundMsg,
@@ -103,9 +67,9 @@ func (n *networkQuerier) sendQuery(
 	peerIP ips.IPPort,
 	outboundMsg message.OutboundMessage,
 	expectedResponseOp message.Op,
-) (interface{}, error) {
+) (fmt.Stringer, error) {
 	var (
-		responseCh = make(chan interface{}, 1)
+		responseCh = make(chan fmt.Stringer, 1)
 		sendOnce   sync.Once
 	)
 	p, err := peer.StartTestPeer(
@@ -159,7 +123,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		zap.Int("numPeers", len(nodes)),
 	)
 
-	responses := make([]interface{}, len(nodes))
+	responses := make([]fmt.Stringer, len(nodes))
 	eg := errgroup.Group{}
 	eg.SetLimit(n.concurrency)
 
@@ -167,7 +131,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		i := i
 		node := node
 		eg.Go(func() error {
-			ctx, cancel := context.WithTimeout(ctx, n.deadline)
+			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			defer cancel()
 
 			chits, err := n.sendQuery(
@@ -206,16 +170,17 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
-	if err := csvWriter.Write([]string{"NodeID", "NodeIP", "Weight", "Response"}); err != nil {
+	if err := csvWriter.Write(append([]string{"NodeID", "NodeIP", "Weight"}, getMessageOutputHeaders()...)); err != nil {
 		return err
 	}
 	for i, response := range responses {
-		csvWriter.Write([]string{
+		fields := []string{
 			nodes[i].nodeID.String(),
 			nodes[i].ip.String(),
 			fmt.Sprintf("%d", nodes[i].weight),
-			fmt.Sprintf("%v", response),
-		})
+		}
+		fields = append(fields, formatMessageOutput(response)...)
+		csvWriter.Write(fields)
 	}
 
 	return nil
