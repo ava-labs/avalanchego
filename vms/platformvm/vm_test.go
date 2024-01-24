@@ -543,7 +543,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
-	tx, err := vm.txBuilder.NewAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -558,7 +558,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
 	err = vm.issueTx(context.Background(), tx)
-	require.ErrorIs(err, txexecutor.ErrAlreadyValidator)
+	require.ErrorIs(err, txexecutor.ErrDuplicateValidator)
 }
 
 // Accept proposal to add validator to subnet

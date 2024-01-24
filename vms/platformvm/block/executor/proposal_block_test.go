@@ -1317,7 +1317,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		nodeID             = ids.GenerateTestNodeID()
 	)
 
-	addValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+	addValidatorTx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -1388,7 +1388,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	validatorEndTime = validatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID = ids.GenerateTestNodeID()
 
-	addValidatorTx2, err := env.txBuilder.NewAddValidatorTx(
+	addValidatorTx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),

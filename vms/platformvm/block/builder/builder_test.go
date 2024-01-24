@@ -393,7 +393,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		validatorEndTime = now.Add(env.config.MaxStakeDuration)
 	)
 
-	tx1, err := env.txBuilder.NewAddValidatorTx(
+	tx1, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -412,7 +412,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	// Add a validator ending past [MaxStakeDuration]
 	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
 
-	tx2, err := env.txBuilder.NewAddValidatorTx(
+	tx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validator2EndTime.Unix()),
