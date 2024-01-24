@@ -2313,7 +2313,7 @@ func TestPruneMempool(t *testing.T) {
 		endTime   = startTime.Add(vm.MinStakeDuration)
 	)
 
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+	addValidatorTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultMinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
