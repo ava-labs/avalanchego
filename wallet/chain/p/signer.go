@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ Signer = (*txSigner)(nil)
@@ -22,6 +23,7 @@ type Signer interface {
 type SignerBackend interface {
 	GetUTXO(ctx stdcontext.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
 	GetTx(ctx stdcontext.Context, txID ids.ID) (*txs.Tx, error)
+	GetSubnetOwnerTransfer(ctx stdcontext.Context, subnetID ids.ID) *secp256k1fx.OutputOwners
 }
 
 type txSigner struct {

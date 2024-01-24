@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -35,6 +36,10 @@ type backend struct {
 	txsLock sync.RWMutex
 	// txID -> tx
 	txs map[ids.ID]*txs.Tx
+
+	subnetOwnerTransferLock sync.RWMutex
+	// subnetID -> owner
+	subnetOwnerTransfer map[ids.ID]*secp256k1fx.OutputOwners
 }
 
 func NewBackend(ctx Context, utxos common.ChainUTXOs, txs map[ids.ID]*txs.Tx) Backend {
@@ -96,4 +101,18 @@ func (b *backend) GetTx(_ stdcontext.Context, txID ids.ID) (*txs.Tx, error) {
 		return nil, database.ErrNotFound
 	}
 	return tx, nil
+}
+
+func (b *backend) setSubnetOwnerTransfer(_ stdcontext.Context, subnetID ids.ID, owner *secp256k1fx.OutputOwners) {
+	b.subnetOwnerTransferLock.Lock()
+	defer b.subnetOwnerTransferLock.Unlock()
+
+	b.subnetOwnerTransfer[subnetID] = owner
+}
+
+func (b *backend) GetSubnetOwnerTransfer(_ stdcontext.Context, subnetID ids.ID) *secp256k1fx.OutputOwners {
+	b.subnetOwnerTransferLock.RLock()
+	defer b.subnetOwnerTransferLock.RUnlock()
+
+	return b.subnetOwnerTransfer[subnetID]
 }

@@ -263,6 +263,10 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 	if !ok {
 		return nil, errUnknownOwnerType
 	}
+	ownerTransfer := s.backend.GetSubnetOwnerTransfer(s.ctx, subnetID)
+	if ownerTransfer != nil {
+		owner = ownerTransfer
+	}
 
 	authSigners := make([]keychain.Signer, len(subnetInput.SigIndices))
 	for sigIndex, addrIndex := range subnetInput.SigIndices {

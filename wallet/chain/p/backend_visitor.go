@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ txs.Visitor = (*backendVisitor)(nil)
@@ -54,7 +55,15 @@ func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 }
 
 func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	// TODO: Correctly track subnet owners in [getSubnetSigners]
+	owner, ok := tx.Owner.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return errUnknownOwnerType
+	}
+	b.b.setSubnetOwnerTransfer(
+		b.ctx,
+		tx.Subnet,
+		owner,
+	)
 	return b.baseTx(&tx.BaseTx)
 }
 
