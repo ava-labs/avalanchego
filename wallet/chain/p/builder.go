@@ -134,6 +134,17 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.CreateSubnetTx, error)
 
+	// NewTransferSubnetOwnershipTx changes the owner of the named subnet.
+	//
+	// - [subnetID] specifies the subnet to be modified
+	// - [owner] specifies who has the ability to create new chains and add new
+	//   validators to the subnet.
+	NewTransferSubnetOwnershipTx(
+		subnetID ids.ID,
+		owner *secp256k1fx.OutputOwners,
+		options ...common.Option,
+	) (*txs.TransferSubnetOwnershipTx, error)
+
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
 	//
@@ -528,6 +539,41 @@ func (b *builder) NewCreateSubnetTx(
 			Memo:         ops.Memo(),
 		}},
 		Owner: owner,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.TransferSubnetOwnershipTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+	}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.TransferSubnetOwnershipTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         ops.Memo(),
+		}},
+		Subnet:     subnetID,
+		Owner:      owner,
+		SubnetAuth: subnetAuth,
 	}
 	return tx, b.initCtx(tx)
 }
