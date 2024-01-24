@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,8 +20,7 @@ import (
 )
 
 func createMessage(v *viper.Viper) (message.OutboundMessage, message.Op, error) {
-	chainIDStr := v.GetString(ChainIDKey)
-	chainID, err := ids.FromString(chainIDStr)
+	chainID, err := ids.FromString("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to parse chainID: %w", err)
 	}
@@ -41,6 +41,9 @@ func getMessageOutputHeaders() []string {
 }
 
 func formatMessageOutput(msg fmt.Stringer) ([]string, error) {
+	if msg == nil {
+		return nil, errors.New("nil message")
+	}
 	res := msg.(*p2p.StateSummaryFrontier)
 	proposerVMSummary, err := proposerSummary.Parse(res.Summary)
 	if err != nil {

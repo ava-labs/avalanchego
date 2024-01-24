@@ -16,7 +16,6 @@ const (
 	ConcurrencyKey = "concurrency"
 	UriKey         = "uri"
 	NetworkIDKey   = "network-id"
-	ChainIDKey     = "chain-id"
 	SubnetIDKey    = "subnet-id"
 	OutputFileKey  = "output-file"
 )

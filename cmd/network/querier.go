@@ -178,7 +178,10 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		}
 		responseFields, err := formatMessageOutput(response)
 		if err != nil {
-			return err
+			n.log.Debug("failed to format output from peer",
+				zap.Stringer("peer", &nodes[i]),
+			)
+			continue
 		}
 		fields = append(fields, responseFields...)
 		csvWriter.Write(fields)

@@ -36,12 +36,12 @@ func run() error {
 
 	nodes, err := getNodes(ctx, v)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get nodes: %w", err)
 	}
 
 	querier, err := newQuerierFromViper(v)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create querier: %w", err)
 	}
 
 	return querier.queryPeers(ctx, nodes)
