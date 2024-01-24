@@ -97,14 +97,6 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}).Times(2)
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
-	onParentAccept.EXPECT().GetCurrentValidator(utx.SubnetID(), utx.NodeID()).Return(&state.Staker{
-		TxID:      addValTx.ID(),
-		NodeID:    utx.NodeID(),
-		SubnetID:  utx.SubnetID(),
-		StartTime: utx.StartTime(),
-		NextTime:  chainTime,
-		EndTime:   chainTime,
-	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
@@ -206,13 +198,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require.NoError(nextStakerTx.Initialize(txs.Codec))
 
 	nextStakerTxID := nextStakerTx.ID()
-	onParentAccept.EXPECT().GetCurrentValidator(unsignedNextStakerTx.SubnetID(), unsignedNextStakerTx.NodeID()).Return(&state.Staker{
-		TxID:      nextStakerTxID,
-		NodeID:    unsignedNextStakerTx.NodeID(),
-		SubnetID:  unsignedNextStakerTx.SubnetID(),
-		StartTime: unsignedNextStakerTx.StartTime(),
-		EndTime:   chainTime,
-	}, nil)
 	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)

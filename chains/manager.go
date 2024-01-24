@@ -118,9 +118,6 @@ var (
 type Manager interface {
 	ids.Aliaser
 
-	// Return the router this Manager is using to route consensus messages to chains
-	Router() router.Router
-
 	// Queues a chain to be created in the future after chain creator is unblocked.
 	// This is only called from the P-chain thread to create other chains
 	// Queued chains are created only after P-chain is bootstrapped.
@@ -287,11 +284,6 @@ func New(config *ManagerConfig) Manager {
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
 	}
-}
-
-// Router that this chain manager is using to route consensus messages to chains
-func (m *manager) Router() router.Router {
-	return m.ManagerConfig.Router
 }
 
 // QueueChainCreation queues a chain creation request

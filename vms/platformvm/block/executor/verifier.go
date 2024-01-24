@@ -386,10 +386,9 @@ func (v *verifier) proposalBlock(
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		proposalBlockState: proposalBlockState{
-			onDecisionState:       onDecisionState,
-			onCommitState:         onCommitState,
-			onAbortState:          onAbortState,
-			initiallyPreferCommit: txExecutor.PrefersCommit,
+			onDecisionState: onDecisionState,
+			onCommitState:   onCommitState,
+			onAbortState:    onAbortState,
 		},
 
 		statelessBlock: b,

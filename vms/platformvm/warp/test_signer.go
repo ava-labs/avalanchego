@@ -14,13 +14,14 @@ import (
 )
 
 // SignerTests is a list of all signer tests
-var SignerTests = []func(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
-	TestSignerWrongChainID,
-	TestSignerVerifies,
+var SignerTests = map[string]func(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
+	"WrongChainID":   TestWrongChainID,
+	"WrongNetworkID": TestWrongNetworkID,
+	"Verifies":       TestVerifies,
 }
 
 // Test that using a random SourceChainID results in an error
-func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, _ ids.ID) {
+func TestWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, _ ids.ID) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
@@ -36,7 +37,7 @@ func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, 
 }
 
 // Test that using a different networkID results in an error
-func TestSignerWrongNetworkID(t *testing.T, s Signer, _ *bls.SecretKey, networkID uint32, blockchainID ids.ID) {
+func TestWrongNetworkID(t *testing.T, s Signer, _ *bls.SecretKey, networkID uint32, blockchainID ids.ID) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
@@ -52,7 +53,7 @@ func TestSignerWrongNetworkID(t *testing.T, s Signer, _ *bls.SecretKey, networkI
 }
 
 // Test that a signature generated with the signer verifies correctly
-func TestSignerVerifies(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID) {
+func TestVerifies(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
