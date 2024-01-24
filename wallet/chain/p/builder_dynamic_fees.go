@@ -26,6 +26,56 @@ type DynamicFeesBuilder struct {
 	backend BuilderBackend
 }
 
+func (b *DynamicFeesBuilder) NewAddValidatorTx(
+	vdr *txs.Validator,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.AddValidatorTx, error) {
+	ops := common.NewOptions(options)
+	utils.Sort(rewardsOwner.Addrs)
+	utx := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Validator:        *vdr,
+		RewardsOwner:     rewardsOwner,
+		DelegationShares: shares,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): vdr.Wght,
+	}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.AddValidatorTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+	utx.StakeOuts = stakeOutputs
+
+	return utx, b.initCtx(utx)
+}
+
 func (b *DynamicFeesBuilder) NewCreateChainTx(
 	subnetID ids.ID,
 	genesis []byte,
@@ -93,6 +143,50 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	uTx.Outs = outputs
 
 	return uTx, b.initCtx(uTx)
+}
+
+func (b *DynamicFeesBuilder) NewCreateSubnetTx(
+	owner *secp256k1fx.OutputOwners,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.CreateSubnetTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+
+	utx := &txs.CreateSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		Owner: owner,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.CreateSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
 }
 
 func (b *DynamicFeesBuilder) financeTx(
