@@ -11,7 +11,7 @@ fi
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
 # using an unsupported version of grep.
-ggrep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
+grep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
   >&2 echo "error: This script requires a recent version of gnu grep.";\
   >&2 echo "       On macos, gnu grep can be installed with 'brew install grep'.";\
   >&2 echo "       It will also be necessary to ensure that gnu grep is available in the path.";\
@@ -53,14 +53,14 @@ function test_license_header {
 }
 
 function test_single_import {
-  if ggrep -R -zo -P 'import \(\n\t".*"\n\)' .; then
+  if grep -R -zo -P 'import \(\n\t".*"\n\)' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if ggrep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
     echo ""
     return 1
   fi
@@ -68,7 +68,7 @@ function test_require_error_is_no_funcs_as_params {
 
 function test_require_equal_zero {
   # check if the first arg, other than t, is 0
-  if ggrep -R -o -P 'require\.Equal\((t, )?(u?int\d*\(0\)|0)' .; then
+  if grep -R -o -P 'require\.Equal\((t, )?(u?int\d*\(0\)|0)' .; then
     echo ""
     echo "Use require.Zero instead of require.Equal when testing for 0."
     echo ""
@@ -76,7 +76,7 @@ function test_require_equal_zero {
   fi
 
   # check if the last arg is 0
-  if ggrep -R -zo -P 'require\.Equal\(.+?, (u?int\d*\(0\)|0)\)\n' .; then
+  if grep -R -zo -P 'require\.Equal\(.+?, (u?int\d*\(0\)|0)\)\n' .; then
     echo ""
     echo "Use require.Zero instead of require.Equal when testing for 0."
     echo ""
@@ -85,7 +85,7 @@ function test_require_equal_zero {
 }
 
 function test_require_len_zero {
-  if ggrep -R -o -P 'require\.Len\((t, )?.+, 0(,|\))' .; then
+  if grep -R -o -P 'require\.Len\((t, )?.+, 0(,|\))' .; then
     echo ""
     echo "Use require.Empty instead of require.Len when testing for 0 length."
     echo ""
@@ -103,7 +103,7 @@ function test_require_equal_len {
   # These should match:
   # - require.Equal(2, len(foo))
   # - require.Equal(t, 2, len(foo))
-  if ggrep -R -o -P --exclude-dir='scripts' 'require\.Equal\((t, )?.*, len\([^,]*$' .; then
+  if grep -R -o -P --exclude-dir='scripts' 'require\.Equal\((t, )?.*, len\([^,]*$' .; then
     echo ""
     echo "Use require.Len instead of require.Equal when testing for length."
     echo ""
@@ -112,21 +112,21 @@ function test_require_equal_len {
 }
 
 function test_require_nil {
-  if ggrep -R -o -P 'require\..+?!= nil' .; then
+  if grep -R -o -P 'require\..+?!= nil' .; then
     echo ""
     echo "Use require.NotNil when testing for nil inequality."
     echo ""
     return 1
   fi
 
-  if ggrep -R -o -P 'require\..+?== nil' .; then
+  if grep -R -o -P 'require\..+?== nil' .; then
     echo ""
     echo "Use require.Nil when testing for nil equality."
     echo ""
     return 1
   fi
 
-  if ggrep -R -o -P 'require\.ErrorIs.+?nil\)' .; then
+  if grep -R -o -P 'require\.ErrorIs.+?nil\)' .; then
     echo ""
     echo "Use require.NoError instead of require.ErrorIs when testing for nil error."
     echo ""
@@ -135,7 +135,7 @@ function test_require_nil {
 }
 
 function test_require_no_error_inline_func {
-  if ggrep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
@@ -145,7 +145,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if ggrep -R -o -P '_ .+? = &.+?\{\}' .; then
+  if grep -R -o -P '_ .+? = &.+?\{\}' .; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
