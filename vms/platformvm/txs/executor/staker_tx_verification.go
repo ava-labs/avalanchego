@@ -39,6 +39,8 @@ var (
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
+	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -95,15 +97,19 @@ func verifyAddValidatorTx(
 	[]*avax.TransferableOutput,
 	error,
 ) {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+	)
+	if isDurangoActive {
+		return nil, ErrAddValidatorTxPostDurango
+	}
+
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, err
 	}
@@ -360,15 +366,19 @@ func verifyAddDelegatorTx(
 	[]*avax.TransferableOutput,
 	error,
 ) {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
+	)
+	if isDurangoActive {
+		return nil, ErrAddDelegatorTxPostDurango
+	}
+
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, err
 	}
 
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.IsDurangoActivated(currentTimestamp)
-	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, err
 	}
