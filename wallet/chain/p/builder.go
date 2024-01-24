@@ -25,7 +25,6 @@ import (
 
 var (
 	errNoChangeAddress           = errors.New("no possible change address")
-	errWrongTxType               = errors.New("wrong tx type")
 	errUnknownOwnerType          = errors.New("unknown owner type")
 	errInsufficientAuthorization = errors.New("insufficient authorization")
 	errInsufficientFunds         = errors.New("insufficient funds")
