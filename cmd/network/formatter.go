@@ -5,13 +5,15 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ethereum/go-ethereum/common"
+	proposerSummary "github.com/ava-labs/avalanchego/vms/proposervm/summary"
+	evmMessage "github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 )
@@ -22,43 +24,34 @@ func createMessage(v *viper.Viper) (message.OutboundMessage, message.Op, error) 
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to parse chainID: %w", err)
 	}
-	creator, err := message.NewCreator(logging.NoLog{}, prometheus.NewRegistry(), "", compression.TypeNone, v.GetDuration(DeadlineKey))
+	creator, err := message.NewCreator(logging.NoLog{}, prometheus.NewRegistry(), "", compression.TypeNone, 3*time.Second)
 	if err != nil {
 		return nil, 0, err
 	}
-	deadline := v.GetDuration(DeadlineKey)
 
-	// This blockID is the hardcoded blockID accepted on the C-Chain at the given height.
-	blockIDBytes := common.Hex2Bytes("ca6fe4a31c0745c84a953f5d942013c2eb16f8f03d4e5b81b6e627fafbffc13e")
-	blockID, err := ids.ToID(blockIDBytes)
+	msg, err := creator.GetStateSummaryFrontier(chainID, 0, 3*time.Second)
 	if err != nil {
 		return nil, 0, err
 	}
-	blockHeight := uint64(39896056)
-	outboundMsg, err := creator.PullQuery(
-		chainID,
-		99,
-		deadline,
-		blockID,
-		blockHeight,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-	)
-	if err != nil {
-		return nil, 0, err
-	}
-	return outboundMsg, message.ChitsOp, nil
+	return msg, message.StateSummaryFrontierOp, nil
 }
 
 func getMessageOutputHeaders() []string {
-	return []string{"ChainID", "RequestID", "PreferredID", "AcceptedID"}
+	return []string{"BlockNumber", "AtomicRoot"}
 }
 
-func formatMessageOutput(msg fmt.Stringer) []string {
-	chits := msg.(*p2p.Chits)
-	return []string{
-		ids.ID(chits.ChainId).String(),
-		fmt.Sprintf("%d", chits.RequestId),
-		ids.ID(chits.PreferredId).String(),
-		ids.ID(chits.AcceptedId).String(),
+func formatMessageOutput(msg fmt.Stringer) ([]string, error) {
+	res := msg.(*p2p.StateSummaryFrontier)
+	proposerVMSummary, err := proposerSummary.Parse(res.Summary)
+	if err != nil {
+		return nil, err
 	}
+	parsedSummary, err := evmMessage.NewSyncSummaryFromBytes(proposerVMSummary.InnerSummaryBytes(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return []string{
+		fmt.Sprintf("%d", parsedSummary.BlockNumber),
+		ids.ID(parsedSummary.AtomicRoot).String(),
+	}, nil
 }

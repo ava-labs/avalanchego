@@ -30,7 +30,6 @@ type networkQuerier struct {
 
 	networkID          uint32
 	concurrency        int
-	queryType          string
 	outboundMsg        message.OutboundMessage
 	expectedResponseOp message.Op
 	outputFilePath     string
@@ -55,7 +54,6 @@ func newQuerierFromViper(v *viper.Viper) (*networkQuerier, error) {
 		log:                log,
 		networkID:          v.GetUint32(NetworkIDKey),
 		concurrency:        v.GetInt(ConcurrencyKey),
-		queryType:          v.GetString(QueryTypeKey),
 		outboundMsg:        outboundMsg,
 		expectedResponseOp: expectedResponseOp,
 		outputFilePath:     v.GetString(OutputFileKey),
@@ -119,7 +117,6 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 
 	n.log.Info(
 		"Sending query to peers",
-		zap.String("queryType", n.queryType),
 		zap.Int("numPeers", len(nodes)),
 	)
 
@@ -179,7 +176,11 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 			nodes[i].ip.String(),
 			fmt.Sprintf("%d", nodes[i].weight),
 		}
-		fields = append(fields, formatMessageOutput(response)...)
+		responseFields, err := formatMessageOutput(response)
+		if err != nil {
+			return err
+		}
+		fields = append(fields, responseFields...)
 		csvWriter.Write(fields)
 	}
 
