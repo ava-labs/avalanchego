@@ -2033,7 +2033,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	id := key.PublicKey().Address()
 	nodeID := ids.GenerateTestNodeID()
 
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+	addValidatorTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
