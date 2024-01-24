@@ -11,12 +11,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -125,6 +128,25 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
+	// stakeAmount: amount the validator stakes
+	// startTime: unix time they start validating
+	// endTime: unix time they stop validating
+	// nodeID: ID of the node we want to validate with
+	// rewardAddress: address to send reward to, if applicable
+	// shares: 10,000 times percentage of reward taken from delegators
+	// keys: Keys providing the staked tokens
+	// changeAddr: Address to send change to, if there is any
+	NewAddPermissionlessValidatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		rewardAddress ids.ShortID,
+		shares uint32,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
 	// stakeAmount: amount the delegator stakes
 	// startTime: unix time they start delegating
 	// endTime: unix time they stop delegating
@@ -133,6 +155,23 @@ type ProposalTxBuilder interface {
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		rewardAddress ids.ShortID,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
+	// stakeAmount: amount the delegator stakes
+	// startTime: unix time they start delegating
+	// endTime: unix time they stop delegating
+	// nodeID: ID of the node we are delegating to
+	// rewardAddress: address to send reward to, if applicable
+	// keys: keys providing the staked tokens
+	// changeAddr: address to send change to, if there is any
+	NewAddPermissionlessDelegatorTx(
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -492,6 +531,60 @@ func (b *builder) NewAddValidatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
+func (b *builder) NewAddPermissionlessValidatorTx(
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	nodeID ids.NodeID,
+	rewardAddress ids.ShortID,
+	shares uint32,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate bls key: %w", err)
+	}
+	// Create the tx
+	utx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  startTime,
+			End:    endTime,
+			Wght:   stakeAmount,
+		},
+		Subnet:    constants.PrimaryNetworkID,
+		Signer:    signer.NewProofOfPossession(sk),
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+		DelegationShares: shares,
+	}
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
 func (b *builder) NewAddDelegatorTx(
 	stakeAmount,
 	startTime,
@@ -519,6 +612,48 @@ func (b *builder) NewAddDelegatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
+		StakeOuts: lockedOuts,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+	}
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewAddPermissionlessDelegatorTx(
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	nodeID ids.NodeID,
+	rewardAddress ids.ShortID,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	// Create the tx
+	utx := &txs.AddPermissionlessDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unlockedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  startTime,
+			End:    endTime,
+			Wght:   stakeAmount,
+		},
+		Subnet:    constants.PrimaryNetworkID,
 		StakeOuts: lockedOuts,
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
