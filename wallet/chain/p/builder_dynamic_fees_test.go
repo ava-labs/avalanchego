@@ -25,7 +25,21 @@ import (
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
-var testKeys = secp256k1.TestKeys()
+var (
+	testKeys     = secp256k1.TestKeys()
+	testUnitFees = commonfees.Dimensions{
+		1 * units.MicroAvax,
+		2 * units.MicroAvax,
+		3 * units.MicroAvax,
+		4 * units.MicroAvax,
+	}
+	testBlockMaxConsumedUnits = commonfees.Dimensions{
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
+	}
+)
 
 // Create and sign the tx, then verify that utxos included
 // in the tx are exactly necessary to pay fees for it
@@ -36,12 +50,14 @@ func TestCreateChainTx(t *testing.T) {
 	be := NewMockBuilderBackend(ctrl)
 
 	var (
-		utxoKey  = testKeys[0]
-		utxoAddr = utxoKey.PublicKey().Address()
+		subnetAuthKey  = testKeys[0]
+		utxoKey        = testKeys[1]
+		subnetAuthAddr = subnetAuthKey.PublicKey().Address()
+		utxoAddr       = utxoKey.PublicKey().Address()
 	)
 
 	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
+		addrs:   set.Of(utxoAddr, subnetAuthAddr),
 		backend: be,
 	}
 
@@ -53,24 +69,12 @@ func TestCreateChainTx(t *testing.T) {
 		chainName    = "dummyChain"
 	)
 
-	var (
-		testUnitFees = commonfees.Dimensions{
-			1 * units.MicroAvax,
-			2 * units.MicroAvax,
-			3 * units.MicroAvax,
-			4 * units.MicroAvax,
-		}
-		testBlockMaxConsumedUnits = commonfees.Dimensions{
-			math.MaxUint64,
-			math.MaxUint64,
-			math.MaxUint64,
-			math.MaxUint64,
-		}
-	)
-
 	subnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
-			Owner: &secp256k1fx.OutputOwners{},
+			Owner: &secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
+			},
 		},
 	}
 	be.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
@@ -131,11 +135,11 @@ func TestCreateChainTx(t *testing.T) {
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
-	require.Equal(3128*units.MicroAvax, fc.Fee)
+	require.Equal(3197*units.MicroAvax, fc.Fee)
 
 	ins := utx.Ins
 	outs := utx.Outs
 	require.Len(ins, 1)
 	require.Len(outs, 1)
-	require.Equal(fc.Fee, utx.Ins[0].In.Amount()-utx.Outs[0].Out.Amount())
+	require.Equal(fc.Fee, ins[0].In.Amount()-outs[0].Out.Amount())
 }

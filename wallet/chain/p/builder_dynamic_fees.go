@@ -59,6 +59,9 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
 	feesMan := commonfees.NewManager(unitFees)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
@@ -66,13 +69,21 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 		ConsumedUnitsCap: unitCaps,
 	}
 
+	// update fees to account for the auth credentials to be added upon tx signing
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating input size: %w", err)
+	}
+	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for input fees: %w", err)
+	}
+	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.CreateChainTx(uTx); err != nil {
 		return nil, err
 	}
 
-	toStake := map[ids.ID]uint64{}
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
 	if err != nil {
 		return nil, err
