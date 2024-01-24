@@ -246,26 +246,13 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 		return nil, errUnknownSubnetAuthType
 	}
 
-	subnetTx, err := s.backend.GetTx(s.ctx, subnetID)
+	owner, err := s.backend.GetSubnetOwner(s.ctx, subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch subnet %q: %w",
 			subnetID,
 			err,
 		)
-	}
-	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, errWrongTxType
-	}
-
-	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, errUnknownOwnerType
-	}
-	ownerTransfer := s.backend.GetSubnetOwnerTransfer(s.ctx, subnetID)
-	if ownerTransfer != nil {
-		owner = ownerTransfer
 	}
 
 	authSigners := make([]keychain.Signer, len(subnetInput.SigIndices))

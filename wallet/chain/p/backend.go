@@ -37,17 +37,22 @@ type backend struct {
 	// txID -> tx
 	txs map[ids.ID]*txs.Tx
 
-	subnetOwnerTransferLock sync.RWMutex
+	subnetOwnerLock sync.RWMutex
 	// subnetID -> owner
-	subnetOwnerTransfer map[ids.ID]*secp256k1fx.OutputOwners
+	subnetOwner map[ids.ID]*secp256k1fx.OutputOwners
 }
 
-func NewBackend(ctx Context, utxos common.ChainUTXOs, txs map[ids.ID]*txs.Tx) Backend {
-	return &backend{
-		Context:    ctx,
-		ChainUTXOs: utxos,
-		txs:        txs,
+func NewBackend(ctx Context, utxos common.ChainUTXOs, txs map[ids.ID]*txs.Tx) (Backend, error) {
+	subnetOwner, err := getSubnetOwnerMap(txs)
+	if err != nil {
+		return nil, err
 	}
+	return &backend{
+		Context:     ctx,
+		ChainUTXOs:  utxos,
+		txs:         txs,
+		subnetOwner: subnetOwner,
+	}, nil
 }
 
 func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
@@ -103,16 +108,49 @@ func (b *backend) GetTx(_ stdcontext.Context, txID ids.ID) (*txs.Tx, error) {
 	return tx, nil
 }
 
-func (b *backend) setSubnetOwnerTransfer(_ stdcontext.Context, subnetID ids.ID, owner *secp256k1fx.OutputOwners) {
-	b.subnetOwnerTransferLock.Lock()
-	defer b.subnetOwnerTransferLock.Unlock()
+func (b *backend) setSubnetOwner(_ stdcontext.Context, subnetID ids.ID, owner *secp256k1fx.OutputOwners) {
+	b.subnetOwnerLock.Lock()
+	defer b.subnetOwnerLock.Unlock()
 
-	b.subnetOwnerTransfer[subnetID] = owner
+	b.subnetOwner[subnetID] = owner
 }
 
-func (b *backend) GetSubnetOwnerTransfer(_ stdcontext.Context, subnetID ids.ID) *secp256k1fx.OutputOwners {
-	b.subnetOwnerTransferLock.RLock()
-	defer b.subnetOwnerTransferLock.RUnlock()
+func (b *backend) GetSubnetOwner(_ stdcontext.Context, subnetID ids.ID) (*secp256k1fx.OutputOwners, error) {
+	b.subnetOwnerLock.RLock()
+	defer b.subnetOwnerLock.RUnlock()
 
-	return b.subnetOwnerTransfer[subnetID]
+	owner, exists := b.subnetOwner[subnetID]
+	if !exists {
+		return nil, database.ErrNotFound
+	}
+	return owner, nil
+}
+
+func getSubnetOwnerMap(pChainTxs map[ids.ID]*txs.Tx) (map[ids.ID]*secp256k1fx.OutputOwners, error) {
+	subnetOwner := map[ids.ID]*secp256k1fx.OutputOwners{}
+	// first get owners from original CreateSubnetTx
+	for txID, tx := range pChainTxs {
+		createSubnetTx, ok := tx.Unsigned.(*txs.CreateSubnetTx)
+		if !ok {
+			continue
+		}
+		owner, ok := createSubnetTx.Owner.(*secp256k1fx.OutputOwners)
+		if !ok {
+			return nil, errUnknownOwnerType
+		}
+		subnetOwner[txID] = owner
+	}
+	// then check TransferSubnetOwnershipTx
+	for txID, tx := range pChainTxs {
+		transferSubnetOwnershipTx, ok := tx.Unsigned.(*txs.TransferSubnetOwnershipTx)
+		if !ok {
+			continue
+		}
+		owner, ok := transferSubnetOwnershipTx.Owner.(*secp256k1fx.OutputOwners)
+		if !ok {
+			return nil, errUnknownOwnerType
+		}
+		subnetOwner[txID] = owner
+	}
+	return subnetOwner, nil
 }

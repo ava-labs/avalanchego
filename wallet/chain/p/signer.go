@@ -23,7 +23,7 @@ type Signer interface {
 type SignerBackend interface {
 	GetUTXO(ctx stdcontext.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
 	GetTx(ctx stdcontext.Context, txID ids.ID) (*txs.Tx, error)
-	GetSubnetOwnerTransfer(ctx stdcontext.Context, subnetID ids.ID) *secp256k1fx.OutputOwners
+	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (*secp256k1fx.OutputOwners, error)
 }
 
 type txSigner struct {

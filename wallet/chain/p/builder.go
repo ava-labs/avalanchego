@@ -262,7 +262,7 @@ type BuilderBackend interface {
 	Context
 	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
 	GetTx(ctx stdcontext.Context, txID ids.ID) (*txs.Tx, error)
-	GetSubnetOwnerTransfer(ctx stdcontext.Context, subnetID ids.ID) *secp256k1fx.OutputOwners
+	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (*secp256k1fx.OutputOwners, error)
 }
 
 type builder struct {
@@ -1147,26 +1147,13 @@ func (b *builder) spend(
 }
 
 func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	subnetTx, err := b.backend.GetTx(options.Context(), subnetID)
+	owner, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch subnet %q: %w",
 			subnetID,
 			err,
 		)
-	}
-	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, errWrongTxType
-	}
-
-	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, errUnknownOwnerType
-	}
-	ownerTransfer := b.backend.GetSubnetOwnerTransfer(options.Context(), subnetID)
-	if ownerTransfer != nil {
-		owner = ownerTransfer
 	}
 
 	addrs := options.Addresses(b.addrs)

@@ -59,7 +59,7 @@ func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnersh
 	if !ok {
 		return errUnknownOwnerType
 	}
-	b.b.setSubnetOwnerTransfer(
+	b.b.setSubnetOwner(
 		b.ctx,
 		tx.Subnet,
 		owner,
