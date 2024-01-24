@@ -47,6 +47,9 @@ jobs:
           version: v1.54
           working-directory: .
           args: --timeout 3m
+      - name: Run shellcheck
+        shell: bash
+        run: scripts/shellcheck.sh
   test:
     name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
