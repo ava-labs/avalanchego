@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	if err := run(os.Args[1:], pullQuery{}); err != nil {
+	if err := run(os.Args[1:], cChainStateSummary{}); err != nil {
 		fmt.Printf("failed due to %s\n", err)
 		os.Exit(1)
 	}
