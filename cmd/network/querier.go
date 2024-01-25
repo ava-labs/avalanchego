@@ -53,7 +53,7 @@ type networkQuerier struct {
 	qf QueryFormatter
 }
 
-func newQuerierFromViper(config networkQuerierConfig, qf QueryFormatter) (*networkQuerier, error) {
+func newQuerier(config networkQuerierConfig, qf QueryFormatter) (*networkQuerier, error) {
 	outboundMsg, expectedResponseOp, err := qf.CreateMessage()
 	if err != nil {
 		return nil, err

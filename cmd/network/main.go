@@ -36,7 +36,7 @@ func run(args []string, formatter QueryFormatter) error {
 		return fmt.Errorf("failed to get nodes: %w", err)
 	}
 
-	querier, err := newQuerierFromViper(createNetworkQuerierConfig(v), formatter)
+	querier, err := newQuerier(createNetworkQuerierConfig(v), formatter)
 	if err != nil {
 		return fmt.Errorf("failed to create querier: %w", err)
 	}
