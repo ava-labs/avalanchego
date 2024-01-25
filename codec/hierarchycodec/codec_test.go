@@ -5,25 +5,41 @@ package hierarchycodec
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 func TestVectors(t *testing.T) {
 	for _, test := range codec.Tests {
-		c := NewDefault()
+		c := NewDefault(mockable.MaxTime)
 		test(c, t)
 	}
 }
 
 func TestMultipleTags(t *testing.T) {
 	for _, test := range codec.MultipleTagsTests {
-		c := New([]string{"tag1", "tag2"}, defaultMaxSliceLength)
+		c := New(mockable.MaxTime, []string{"tag1", "tag2"}, defaultMaxSliceLength)
+		test(c, t)
+	}
+}
+
+func TestEnforceSliceLen(t *testing.T) {
+	for _, test := range codec.EnforceSliceLenTests {
+		c := NewDefault(mockable.MaxTime)
+		test(c, t)
+	}
+}
+
+func TestIgnoreSliceLen(t *testing.T) {
+	for _, test := range codec.IgnoreSliceLenTests {
+		c := NewDefault(time.Time{})
 		test(c, t)
 	}
 }
 
 func FuzzStructUnmarshalHierarchyCodec(f *testing.F) {
-	c := NewDefault()
+	c := NewDefault(mockable.MaxTime)
 	codec.FuzzStructUnmarshal(c, f)
 }

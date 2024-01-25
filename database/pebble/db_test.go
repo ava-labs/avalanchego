@@ -4,6 +4,7 @@
 package pebble
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,10 +23,12 @@ func newDB(t testing.TB) *Database {
 }
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		db := newDB(t)
-		test(t, db)
-		_ = db.Close()
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			db := newDB(t)
+			test(t, db)
+			_ = db.Close()
+		})
 	}
 }
 
@@ -50,10 +53,12 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			db := newDB(b)
-			bench(b, db, "pebble", keys, values)
-			_ = db.Close()
+		for name, bench := range database.Benchmarks {
+			b.Run(fmt.Sprintf("pebble_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
+				db := newDB(b)
+				bench(b, db, keys, values)
+				_ = db.Close()
+			})
 		}
 	}
 }

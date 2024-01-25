@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -22,6 +24,10 @@ var (
 	_ gossip.Marshaller[*txs.Tx] = (*txMarshaller)(nil)
 	_ gossip.Gossipable          = (*txs.Tx)(nil)
 )
+
+// bloomChurnMultiplier is the number used to multiply the size of the mempool
+// to determine how large of a bloom filter to create.
+const bloomChurnMultiplier = 3
 
 // txGossipHandler is the handler called when serving gossip messages
 type txGossipHandler struct {
@@ -59,27 +65,26 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 
 func newGossipMempool(
 	mempool mempool.Mempool,
+	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
-	maxExpectedElements uint64,
-	falsePositiveProbability float64,
-	maxFalsePositiveProbability float64,
+	minTargetElements int,
+	targetFalsePositiveProbability,
+	resetFalsePositiveProbability float64,
 ) (*gossipMempool, error) {
-	bloom, err := gossip.NewBloomFilter(maxExpectedElements, falsePositiveProbability)
+	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
-		Mempool:                     mempool,
-		log:                         log,
-		txVerifier:                  txVerifier,
-		bloom:                       bloom,
-		maxFalsePositiveProbability: maxFalsePositiveProbability,
+		Mempool:    mempool,
+		log:        log,
+		txVerifier: txVerifier,
+		bloom:      bloom,
 	}, err
 }
 
 type gossipMempool struct {
 	mempool.Mempool
-	log                         logging.Logger
-	txVerifier                  TxVerifier
-	maxFalsePositiveProbability float64
+	log        logging.Logger
+	txVerifier TxVerifier
 
 	lock  sync.RWMutex
 	bloom *gossip.BloomFilter
@@ -113,7 +118,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.maxFalsePositiveProbability)
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
 	if err != nil {
 		return err
 	}
@@ -130,7 +135,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte, err error) {
+func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 

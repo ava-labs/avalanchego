@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -137,7 +136,8 @@ func (vm *VM) Initialize(
 	vm.ctx = chainCtx
 	vm.db = db
 
-	vm.codecRegistry = linearcodec.NewDefault()
+	// Note: this codec is never used to serialize anything
+	vm.codecRegistry = linearcodec.NewDefault(time.Time{})
 	vm.fx = &secp256k1fx.Fx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
@@ -302,6 +302,9 @@ func (vm *VM) pruneMempool() error {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
+	// Packing all of the transactions in order performs additional checks that
+	// the MempoolTxVerifier doesn't include. So, evicting transactions from
+	// here is expected to happen occasionally.
 	blockTxs, err := vm.Builder.PackBlockTxs(math.MaxInt)
 	if err != nil {
 		return err
@@ -505,18 +508,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return map[string]http.Handler{
 		"": server,
 	}, err
-}
-
-// CreateStaticHandlers returns a map where:
-// * keys are API endpoint extensions
-// * values are API handlers
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(&api.StaticService{}, "platform")
 }
 
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {

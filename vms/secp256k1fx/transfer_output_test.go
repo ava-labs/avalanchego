@@ -5,6 +5,7 @@ package secp256k1fx
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -135,7 +136,7 @@ func TestOutputVerifyDuplicated(t *testing.T) {
 
 func TestOutputSerialize(t *testing.T) {
 	require := require.New(t)
-	c := linearcodec.NewDefault()
+	c := linearcodec.NewDefault(time.Time{})
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(0, c))
 

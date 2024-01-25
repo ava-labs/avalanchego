@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -613,7 +614,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 				close(done)
 			}
 
-			require.ErrorIs(tt.expectedErr, err)
+			require.ErrorIs(err, tt.expectedErr)
 			<-done
 		})
 	}

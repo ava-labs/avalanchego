@@ -219,6 +219,7 @@ func (vm *VM) Initialize(
 
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.parser, err = block.NewCustomParser(
+		vm.DurangoTime,
 		vm.typeToFxIndex,
 		&vm.clock,
 		ctx.Log,
@@ -359,17 +360,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		"/wallet": walletServer,
 		"/events": vm.pubsub,
 	}, err
-}
-
-func (*VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	codec := json.NewCodec()
-	server.RegisterCodec(codec, "application/json")
-	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	staticService := CreateStaticService()
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(staticService, "avm")
 }
 
 /*

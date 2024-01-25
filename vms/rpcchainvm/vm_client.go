@@ -375,25 +375,6 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler
 	return handlers, nil
 }
 
-func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	resp, err := vm.client.CreateStaticHandlers(ctx, &emptypb.Empty{})
-	if err != nil {
-		return nil, err
-	}
-
-	handlers := make(map[string]http.Handler, len(resp.Handlers))
-	for _, handler := range resp.Handlers {
-		clientConn, err := grpcutils.Dial(handler.ServerAddr)
-		if err != nil {
-			return nil, err
-		}
-
-		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
-	}
-	return handlers, nil
-}
-
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	_, err := vm.client.Connected(ctx, &vmpb.ConnectedRequest{
 		NodeId: nodeID.Bytes(),

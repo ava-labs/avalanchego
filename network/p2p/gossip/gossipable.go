@@ -25,5 +25,5 @@ type Set[T Gossipable] interface {
 	Iterate(f func(gossipable T) bool)
 	// GetFilter returns the byte representation of bloom filter and its
 	// corresponding salt.
-	GetFilter() (bloom []byte, salt []byte, err error)
+	GetFilter() (bloom []byte, salt []byte)
 }

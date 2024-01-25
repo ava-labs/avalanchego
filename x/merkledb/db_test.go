@@ -99,10 +99,12 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
 	for _, bf := range validBranchFactors {
-		for _, test := range database.Tests {
-			db, err := getBasicDBWithBranchFactor(bf)
-			require.NoError(t, err)
-			test(t, db)
+		for name, test := range database.Tests {
+			t.Run(fmt.Sprintf("%s_%d", name, bf), func(t *testing.T) {
+				db, err := getBasicDBWithBranchFactor(bf)
+				require.NoError(t, err)
+				test(t, db)
+			})
 		}
 	}
 }
@@ -111,10 +113,12 @@ func Benchmark_MerkleDB_DBInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bf := range validBranchFactors {
-			for _, bench := range database.Benchmarks {
-				db, err := getBasicDBWithBranchFactor(bf)
-				require.NoError(b, err)
-				bench(b, db, fmt.Sprintf("merkledb_%d", bf), keys, values)
+			for name, bench := range database.Benchmarks {
+				b.Run(fmt.Sprintf("merkledb_%d_%d_pairs_%d_keys_%d_values_%s", bf, size[0], size[1], size[2], name), func(b *testing.B) {
+					db, err := getBasicDBWithBranchFactor(bf)
+					require.NoError(b, err)
+					bench(b, db, keys, values)
+				})
 			}
 		}
 	}

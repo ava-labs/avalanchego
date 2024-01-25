@@ -336,7 +336,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
-		require.ErrorIs(errProposerWindowNotStarted, err)
+		require.ErrorIs(err, errProposerWindowNotStarted)
 	}
 
 	{
@@ -346,7 +346,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
-		require.ErrorIs(errProposerWindowNotStarted, err)
+		require.ErrorIs(err, errProposerWindowNotStarted)
 	}
 
 	{
@@ -356,7 +356,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
-		require.ErrorIs(errProposerWindowNotStarted, err)
+		require.ErrorIs(err, errProposerWindowNotStarted)
 	}
 
 	{
@@ -446,6 +446,6 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			parentTimestamp,
 			pChainHeight-1,
 		)
-		require.ErrorIs(err, errProposerWindowNotStarted)
+		require.ErrorIs(err, errUnexpectedProposer)
 	}
 }
