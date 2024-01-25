@@ -77,7 +77,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			initialHeight, err := pvmClients[0].GetHeight(e2e.DefaultContext())
 			require.NoError(err)
 
-			for height := initialHeight; height > 0; height-- {
+			for height := uint64(0); height <= initialHeight; height++ {
 				tests.Outf(" checked validator sets for height %d\n", height)
 				var observedValidatorSet map[ids.NodeID]*validators.GetValidatorOutput
 				for _, pvmClient := range pvmClients {
