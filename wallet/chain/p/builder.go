@@ -563,6 +563,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, err
 	}
 
+	utils.Sort(owner.Addrs)
 	tx := &txs.TransferSubnetOwnershipTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
