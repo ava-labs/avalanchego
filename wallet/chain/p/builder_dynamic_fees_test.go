@@ -427,7 +427,6 @@ func TestCreateSubnetTx(t *testing.T) {
 	var (
 		subnetAuthKey         = testKeys[0]
 		utxosKey              = testKeys[1]
-		subnetAuthAddr        = subnetAuthKey.PublicKey().Address()
 		utxoAddr              = utxosKey.PublicKey().Address()
 		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
 		subnetOwner           = &secp256k1fx.OutputOwners{
@@ -439,7 +438,7 @@ func TestCreateSubnetTx(t *testing.T) {
 	)
 
 	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, subnetAuthAddr),
+		addrs:   set.Of(utxoAddr),
 		backend: be,
 	}
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
@@ -480,6 +479,76 @@ func TestCreateSubnetTx(t *testing.T) {
 	require.Len(ins, 2)
 	require.Len(outs, 1)
 	require.Equal(fc.Fee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
+}
+
+func TestExportTx(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	be := mocks.NewMockBuilderBackend(ctrl)
+
+	var (
+		utxosKey              = testKeys[1]
+		utxoAddr              = utxosKey.PublicKey().Address()
+		subnetID              = ids.GenerateTestID()
+		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
+
+		exportedOutputs = []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 7 * units.Avax,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{utxosKey.PublicKey().Address()},
+				},
+			},
+		}}
+	)
+
+	b := &DynamicFeesBuilder{
+		addrs:   set.Of(utxoAddr),
+		backend: be,
+	}
+	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
+	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
+	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
+
+	utx, err := b.NewExportTx(
+		subnetID,
+		exportedOutputs,
+		testUnitFees,
+		testBlockMaxConsumedUnits,
+	)
+	require.NoError(err)
+
+	var (
+		kc  = secp256k1fx.NewKeychain(utxosKey)
+		sbe = mocks.NewMockSignerBackend(ctrl)
+		s   = NewSigner(kc, sbe)
+	)
+
+	for _, utxo := range utxos {
+		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
+	}
+
+	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	require.NoError(err)
+
+	fc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       commonfees.NewManager(testUnitFees),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Credentials:      tx.Creds,
+	}
+	require.NoError(utx.Visit(fc))
+	require.Equal(5966*units.MicroAvax, fc.Fee)
+
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 2)
+	require.Len(outs, 1)
+	require.Equal(fc.Fee+exportedOutputs[0].Out.Amount(), ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
+	require.Equal(utx.ExportedOutputs, exportedOutputs)
 }
 
 func TestTransformSubnetTx(t *testing.T) {
@@ -765,7 +834,7 @@ func testUTXOsList(utxosKey *secp256k1.PrivateKey) (
 				},
 				Asset: avax.Asset{ID: avaxAssetID},
 				Out: &stakeable.LockOut{
-					Locktime: uint64(time.Now().Add(time.Second).Unix()),
+					Locktime: uint64(time.Now().Add(time.Hour).Unix()),
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt: 3 * units.MilliAvax,
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -797,7 +866,7 @@ func testUTXOsList(utxosKey *secp256k1.PrivateKey) (
 				},
 				Asset: avax.Asset{ID: avaxAssetID},
 				Out: &stakeable.LockOut{
-					Locktime: uint64(time.Now().Add(time.Second).Unix()),
+					Locktime: uint64(time.Now().Add(time.Hour).Unix()),
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt: 88 * units.Avax,
 						OutputOwners: secp256k1fx.OutputOwners{

@@ -358,6 +358,61 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 	return utx, b.initCtx(utx)
 }
 
+func (b *DynamicFeesBuilder) NewExportTx(
+	chainID ids.ID,
+	outputs []*avax.TransferableOutput,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.ExportTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+	avax.SortTransferableOutputs(outputs, txs.Codec) // sort exported outputs
+
+	utx := &txs.ExportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		DestinationChain: chainID,
+		ExportedOutputs:  outputs,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	for _, out := range outputs {
+		assetID := out.AssetID()
+		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		if err != nil {
+			return nil, err
+		}
+		toBurn[assetID] = amountToBurn
+	}
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.ExportTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, changeOuts, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = changeOuts
+
+	return utx, b.initCtx(utx)
+}
+
 func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	subnetID ids.ID,
 	assetID ids.ID,
