@@ -7,7 +7,9 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
@@ -28,6 +30,7 @@ type Client interface {
 	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
 	GetLoggerLevel(ctx context.Context, loggerName string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
 	GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error)
+	DBGet(ctx context.Context, key []byte, options ...rpc.Option) ([]byte, error)
 }
 
 // Client implementation for the Avalanche Platform Info API Endpoint
@@ -139,4 +142,24 @@ func (c *client) GetConfig(ctx context.Context, options ...rpc.Option) (interfac
 	var res interface{}
 	err := c.requester.SendRequest(ctx, "admin.getConfig", struct{}{}, &res, options...)
 	return res, err
+}
+
+func (c *client) DBGet(ctx context.Context, key []byte, options ...rpc.Option) ([]byte, error) {
+	keyStr, err := formatting.Encode(formatting.HexNC, key)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &DBGetReply{}
+	err = c.requester.SendRequest(ctx, "admin.dbGet", &DBGetArgs{
+		Key: keyStr,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := rpcdb.ErrEnumToError[res.ErrorCode]; err != nil {
+		return nil, err
+	}
+	return formatting.Decode(formatting.HexNC, res.Value)
 }
