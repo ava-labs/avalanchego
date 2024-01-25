@@ -83,16 +83,16 @@ const (
 
 var (
 	// Commonly shared VM DB prefix
-	vmDBPrefix = []byte("vm")
+	VMDBPrefix = []byte("vm")
 
 	// Bootstrapping prefixes for LinearizableVMs
-	vertexDBPrefix              = []byte("vertex")
-	vertexBootstrappingDBPrefix = []byte("vertex_bs")
-	txBootstrappingDBPrefix     = []byte("tx_bs")
-	blockBootstrappingDBPrefix  = []byte("block_bs")
+	VertexDBPrefix              = []byte("vertex")
+	VertexBootstrappingDBPrefix = []byte("vertex_bs")
+	TxBootstrappingDBPrefix     = []byte("tx_bs")
+	BlockBootstrappingDBPrefix  = []byte("block_bs")
 
 	// Bootstrapping prefixes for ChainVMs
-	bootstrappingDB = []byte("bs")
+	ChainBootstrappingDBPrefix = []byte("bs")
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
@@ -596,11 +596,11 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
-	vertexDB := prefixdb.New(vertexDBPrefix, prefixDB)
-	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, prefixDB)
-	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, prefixDB)
-	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, prefixDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+	vertexDB := prefixdb.New(VertexDBPrefix, prefixDB)
+	vertexBootstrappingDB := prefixdb.New(VertexBootstrappingDBPrefix, prefixDB)
+	txBootstrappingDB := prefixdb.New(TxBootstrappingDBPrefix, prefixDB)
+	blockBootstrappingDB := prefixdb.New(BlockBootstrappingDBPrefix, prefixDB)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
@@ -999,8 +999,8 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	vmDB := prefixdb.New(vmDBPrefix, prefixDB)
-	bootstrappingDB := prefixdb.New(bootstrappingDB, prefixDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+	bootstrappingDB := prefixdb.New(ChainBootstrappingDBPrefix, prefixDB)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
