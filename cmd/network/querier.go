@@ -34,10 +34,12 @@ type networkQuerier struct {
 	outboundMsg        message.OutboundMessage
 	expectedResponseOp message.Op
 	outputFilePath     string
+
+	qf QueryFormatter
 }
 
-func newQuerierFromViper(v *viper.Viper) (*networkQuerier, error) {
-	outboundMsg, expectedResponseOp, err := createMessage(v)
+func newQuerierFromViper(v *viper.Viper, qf QueryFormatter) (*networkQuerier, error) {
+	outboundMsg, expectedResponseOp, err := qf.CreateMessage()
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +60,7 @@ func newQuerierFromViper(v *viper.Viper) (*networkQuerier, error) {
 		outboundMsg:        outboundMsg,
 		expectedResponseOp: expectedResponseOp,
 		outputFilePath:     v.GetString(OutputFileKey),
+		qf:                 qf,
 	}, nil
 }
 
@@ -169,7 +172,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
-	if err := csvWriter.Write(append([]string{"NodeID", "NodeIP", "Version", "Weight"}, getMessageOutputHeaders()...)); err != nil {
+	if err := csvWriter.Write(append([]string{"NodeID", "NodeIP", "Version", "Weight"}, n.qf.OutputHeaders()...)); err != nil {
 		return err
 	}
 	var (
@@ -191,7 +194,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 			nodes[i].version,
 			fmt.Sprintf("%d", nodes[i].weight/units.Avax),
 		}
-		responseFields, err := formatMessageOutput(response)
+		responseFields, err := n.qf.FormatOutput(response)
 		if err != nil {
 			n.log.Info("failed to format output from peer",
 				zap.Stringer("peer", &nodes[i]),

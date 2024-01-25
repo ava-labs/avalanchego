@@ -36,7 +36,7 @@ func run() error {
 		return fmt.Errorf("failed to get nodes: %w", err)
 	}
 
-	querier, err := newQuerierFromViper(v)
+	querier, err := newQuerierFromViper(v, cChainStateSummary{})
 	if err != nil {
 		return fmt.Errorf("failed to create querier: %w", err)
 	}

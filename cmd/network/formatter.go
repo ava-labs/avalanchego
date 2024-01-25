@@ -15,10 +15,17 @@ import (
 	proposerSummary "github.com/ava-labs/avalanchego/vms/proposervm/summary"
 	evmMessage "github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/viper"
 )
 
-func createMessage(v *viper.Viper) (message.OutboundMessage, message.Op, error) {
+type QueryFormatter interface {
+	CreateMessage() (message.OutboundMessage, message.Op, error)
+	OutputHeaders() []string
+	FormatOutput(result interface{}) ([]string, error)
+}
+
+type cChainStateSummary struct{}
+
+func (c cChainStateSummary) CreateMessage() (message.OutboundMessage, message.Op, error) {
 	chainID, err := ids.FromString("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to parse chainID: %w", err)
@@ -35,11 +42,11 @@ func createMessage(v *viper.Viper) (message.OutboundMessage, message.Op, error) 
 	return msg, message.StateSummaryFrontierOp, nil
 }
 
-func getMessageOutputHeaders() []string {
+func (c cChainStateSummary) OutputHeaders() []string {
 	return []string{"OuterStateSummaryID", "BlockNumber", "AtomicRoot", "Error"}
 }
 
-func formatMessageOutput(result interface{}) ([]string, error) {
+func (c cChainStateSummary) FormatOutput(result interface{}) ([]string, error) {
 	switch res := result.(type) {
 	case error:
 		return []string{"", "", "", res.Error()}, nil
