@@ -76,7 +76,8 @@ func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -90,7 +91,8 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
@@ -108,7 +110,8 @@ func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -122,7 +125,8 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
@@ -136,7 +140,8 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
@@ -158,7 +163,8 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
@@ -172,7 +178,8 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
@@ -186,7 +193,8 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
@@ -208,7 +216,8 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
@@ -230,7 +239,8 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
@@ -244,7 +254,8 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
@@ -262,7 +273,8 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
@@ -280,7 +292,8 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	return fc.AddFeesFor(consumedUnits)
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
 }
 
 func (fc *Calculator) commonConsumedUnits(
@@ -323,31 +336,31 @@ func (fc *Calculator) commonConsumedUnits(
 	return consumedUnits, nil
 }
 
-func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) error {
+func (fc *Calculator) AddFeesFor(consumedUnits fees.Dimensions) (uint64, error) {
 	boundBreached, dimension := fc.FeeManager.CumulateUnits(consumedUnits, fc.ConsumedUnitsCap)
 	if boundBreached {
-		return fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
+		return 0, fmt.Errorf("%w: breached dimension %d", errFailedConsumedUnitsCumulation, dimension)
 	}
 
 	fee, err := fc.FeeManager.CalculateFee(consumedUnits)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
+		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
-	fc.Fee = fee
-	return nil
+	fc.Fee += fee
+	return fee, nil
 }
 
-func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) error {
+func (fc *Calculator) RemoveFeesFor(unitsToRm fees.Dimensions) (uint64, error) {
 	if err := fc.FeeManager.RemoveUnits(unitsToRm); err != nil {
-		return fmt.Errorf("failed removing units: %w", err)
+		return 0, fmt.Errorf("failed removing units: %w", err)
 	}
 
 	fee, err := fc.FeeManager.CalculateFee(unitsToRm)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
+		return 0, fmt.Errorf("%w: %w", errFailedFeeCalculation, err)
 	}
 
 	fc.Fee -= fee
-	return nil
+	return fee, nil
 }

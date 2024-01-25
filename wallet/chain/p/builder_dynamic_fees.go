@@ -170,10 +170,9 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
 		return nil, fmt.Errorf("account for input fees: %w", err)
 	}
-	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddSubnetValidatorTx(utx); err != nil {
@@ -230,10 +229,9 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
 		return nil, fmt.Errorf("account for input fees: %w", err)
 	}
-	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
@@ -347,10 +345,9 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
 		return nil, fmt.Errorf("account for input fees: %w", err)
 	}
-	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.CreateChainTx(uTx); err != nil {
@@ -534,10 +531,9 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
 		return nil, fmt.Errorf("account for input fees: %w", err)
 	}
-	toBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.TransformSubnetTx(utx); err != nil {
@@ -747,20 +743,22 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(insDimensions); err != nil {
+		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 
 		// update fees to account for the credentials to be added with inputs upon tx signing
 		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		addedFees, err = feeCalc.AddFeesFor(credsDimensions)
+		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 
 		inputs = append(inputs, input)
 
@@ -787,10 +785,11 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+		addedFees, err = feeCalc.AddFeesFor(outDimensions)
+		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 
 		stakeOutputs = append(stakeOutputs, stakeOut)
 
@@ -813,10 +812,11 @@ func (b *DynamicFeesBuilder) financeTx(
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
 			}
-			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
-			amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+			amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 
 			changeOutputs = append(changeOutputs, changeOut)
 		}
@@ -869,20 +869,22 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(insDimensions); err != nil {
+		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 
 		// update fees to account for the credentials to be added with inputs upon tx signing
 		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		addedFees, err = feeCalc.AddFeesFor(credsDimensions)
+		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 
 		inputs = append(inputs, input)
 
@@ -917,10 +919,11 @@ func (b *DynamicFeesBuilder) financeTx(
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
 			}
-			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
-			amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+			amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 		}
 
 		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
@@ -937,23 +940,24 @@ func (b *DynamicFeesBuilder) financeTx(
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
 			}
-			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
 
 			switch {
-			case feeCalc.Fee < remainingAmount:
+			case addedFees < remainingAmount:
 				if assetID == b.backend.AVAXAssetID() {
-					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount - feeCalc.Fee
+					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount - addedFees
 				} else {
 					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount
-					amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+					amountsToBurn[b.backend.AVAXAssetID()] += addedFees
 				}
 				changeOutputs = append(changeOutputs, changeOut)
-			case feeCalc.Fee == remainingAmount:
+			case addedFees == remainingAmount:
 				// fees wholly consume remaining amount. We don't add the change
-			case feeCalc.Fee > remainingAmount:
-				amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee - remainingAmount
+			case addedFees > remainingAmount:
+				amountsToBurn[b.backend.AVAXAssetID()] += addedFees - remainingAmount
 			}
 		}
 	}

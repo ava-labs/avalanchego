@@ -504,10 +504,11 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(insDimensions); err != nil {
+		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		targetFee += feeCalc.Fee
+		targetFee += addedFees
 
 		// Stake any value that should be staked
 		amountToStake := math.Min(
@@ -536,10 +537,11 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+		addedFees, err = feeCalc.AddFeesFor(outDimensions)
+		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 		}
-		targetFee += feeCalc.Fee
+		targetFee += addedFees
 
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, stakedOut)
@@ -563,10 +565,11 @@ func (h *handler) FinanceTx(
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
 			}
-			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			addedFees, err = feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
-			targetFee += feeCalc.Fee
+			targetFee += addedFees
 
 			returnedOuts = append(returnedOuts, changeOut)
 		}
@@ -627,10 +630,11 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		if err := feeCalc.AddFeesFor(insDimensions); err != nil {
+		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		targetFee += feeCalc.Fee
+		targetFee += addedFees
 
 		// Burn any value that should be burned
 		amountToBurn := math.Min(
@@ -670,10 +674,11 @@ func (h *handler) FinanceTx(
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
 			}
-			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
-			targetFee += feeCalc.Fee
+			targetFee += addedFees
 
 			amountToBurn := math.Min(
 				targetFee-amountBurned, // Amount we still need to burn
@@ -703,14 +708,15 @@ func (h *handler) FinanceTx(
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
 			}
-			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
 
-			if remainingValue > feeCalc.Fee {
-				targetFee += feeCalc.Fee
-				amountBurned += feeCalc.Fee
-				remainingValue -= feeCalc.Fee
+			if remainingValue > addedFees {
+				targetFee += addedFees
+				amountBurned += addedFees
+				remainingValue -= addedFees
 
 				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingValue
 				// This input had extra value, so some of it must be returned

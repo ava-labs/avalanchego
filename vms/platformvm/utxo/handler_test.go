@@ -177,7 +177,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 		uTxF          func(t *testing.T) txs.UnsignedTx
 
 		expectedErr error
-		checksF     func(*testing.T, txs.UnsignedTx, *fees.Calculator, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
+		checksF     func(*testing.T, txs.UnsignedTx, []*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput)
 	}{
 		{
 			description: "Tx, stake outputs, single locked UTXO and multiple UTXOs",
@@ -232,8 +232,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
+
+				fm := commonfees.NewManager(testUnitFees)
+				calc := &fees.Calculator{
+					IsEForkActive:    true,
+					FeeManager:       fm,
+					ConsumedUnitsCap: testBlockMaxConsumedUnits,
+					Credentials:      []verify.Verifiable{},
+				}
+
 				expectedFee := 8911 * units.MicroAvax
 
 				// complete uTx with the utxos
@@ -304,8 +313,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
+
+				fm := commonfees.NewManager(testUnitFees)
+				calc := &fees.Calculator{
+					IsEForkActive:    true,
+					FeeManager:       fm,
+					ConsumedUnitsCap: testBlockMaxConsumedUnits,
+					Credentials:      []verify.Verifiable{},
+				}
+
 				expectedFee := 5999 * units.MicroAvax
 
 				// complete uTx with the utxos
@@ -378,8 +396,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
+
+				fm := commonfees.NewManager(testUnitFees)
+				calc := &fees.Calculator{
+					IsEForkActive:    true,
+					FeeManager:       fm,
+					ConsumedUnitsCap: testBlockMaxConsumedUnits,
+					Credentials:      []verify.Verifiable{},
+				}
+
 				expectedFee := 5879 * units.MicroAvax
 
 				// complete uTx with the utxos
@@ -447,8 +474,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
+
+				fm := commonfees.NewManager(testUnitFees)
+				calc := &fees.Calculator{
+					IsEForkActive:    true,
+					FeeManager:       fm,
+					ConsumedUnitsCap: testBlockMaxConsumedUnits,
+					Credentials:      []verify.Verifiable{},
+				}
+
 				expectedFee := 3341 * units.MicroAvax
 
 				// complete uTx with the utxos
@@ -507,8 +543,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
+
+				fm := commonfees.NewManager(testUnitFees)
+				calc := &fees.Calculator{
+					IsEForkActive:    true,
+					FeeManager:       fm,
+					ConsumedUnitsCap: testBlockMaxConsumedUnits,
+					Credentials:      []verify.Verifiable{},
+				}
+
 				expectedFee := 3014 * units.MicroAvax
 
 				// complete uTx with the utxos
@@ -568,8 +613,17 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return uTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
+
+				fm := commonfees.NewManager(testUnitFees)
+				calc := &fees.Calculator{
+					IsEForkActive:    true,
+					FeeManager:       fm,
+					ConsumedUnitsCap: testBlockMaxConsumedUnits,
+					Credentials:      []verify.Verifiable{},
+				}
+
 				expectedFee := 5552 * units.MicroAvax
 
 				// complete uTx with the utxos
@@ -607,8 +661,16 @@ func TestVerifyFinanceTx(t *testing.T) {
 				return &unsignedTx
 			},
 			expectedErr: nil,
-			checksF: func(t *testing.T, uTx txs.UnsignedTx, calc *fees.Calculator, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
+			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
+
+				fm := commonfees.NewManager(testUnitFees)
+				calc := &fees.Calculator{
+					IsEForkActive:    true,
+					FeeManager:       fm,
+					ConsumedUnitsCap: testBlockMaxConsumedUnits,
+					Credentials:      []verify.Verifiable{},
+				}
 
 				r.NoError(uTx.Visit(calc))
 				r.Zero(calc.Fee)
@@ -646,7 +708,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 				ids.GenerateTestShortID(),
 			)
 			r.ErrorIs(err, test.expectedErr)
-			test.checksF(t, uTx, feeCalc, ins, outs, staked)
+			test.checksF(t, uTx, ins, outs, staked)
 		})
 	}
 }

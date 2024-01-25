@@ -127,19 +127,33 @@ func TestAddAndRemoveFees(t *testing.T) {
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 	}
 
-	units := fees.Dimensions{
-		1,
-		2,
-		3,
-		4,
-	}
+	var (
+		units       = fees.Dimensions{1, 2, 3, 4}
+		doubleUnits = fees.Dimensions{2, 4, 6, 8}
+	)
 
-	r.NoError(fc.AddFeesFor(units))
+	feeDelta, err := fc.AddFeesFor(units)
+	r.NoError(err)
 	r.Equal(units, fc.FeeManager.GetCumulatedUnits())
-	r.NotZero(fc.Fee)
+	r.NotZero(feeDelta)
+	r.Equal(feeDelta, fc.Fee)
 
-	r.NoError(fc.RemoveFeesFor(units))
+	feeDelta2, err := fc.AddFeesFor(units)
+	r.NoError(err)
+	r.Equal(doubleUnits, fc.FeeManager.GetCumulatedUnits())
+	r.Equal(feeDelta, feeDelta2)
+	r.Equal(feeDelta+feeDelta2, fc.Fee)
+
+	feeDelta3, err := fc.RemoveFeesFor(units)
+	r.NoError(err)
+	r.Equal(units, fc.FeeManager.GetCumulatedUnits())
+	r.Equal(feeDelta, feeDelta3)
+	r.Equal(feeDelta, fc.Fee)
+
+	feeDelta4, err := fc.RemoveFeesFor(units)
+	r.NoError(err)
 	r.Zero(fc.FeeManager.GetCumulatedUnits())
+	r.Equal(feeDelta, feeDelta4)
 	r.Zero(fc.Fee)
 }
 

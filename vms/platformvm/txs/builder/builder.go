@@ -366,14 +366,15 @@ func (b *builder) NewImportTx(
 			if err != nil {
 				return nil, fmt.Errorf("failed calculating output size: %w", err)
 			}
-			if err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
 				return nil, fmt.Errorf("account for output fees: %w", err)
 			}
 
-			if feeCalc.Fee >= importedAVAX {
+			if addedFees >= importedAVAX {
 				// imported avax are not enough to pay fees
 				// Drop the changeOut and finance the tx
-				if err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+				if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
 					return nil, fmt.Errorf("failed reverting change output: %w", err)
 				}
 				feeCalc.Fee -= importedAVAX
