@@ -141,7 +141,7 @@ func getSubnetOwnerMap(pChainTxs map[ids.ID]*txs.Tx) (map[ids.ID]*secp256k1fx.Ou
 		subnetOwner[txID] = owner
 	}
 	// then check TransferSubnetOwnershipTx
-	for txID, tx := range pChainTxs {
+	for _, tx := range pChainTxs {
 		transferSubnetOwnershipTx, ok := tx.Unsigned.(*txs.TransferSubnetOwnershipTx)
 		if !ok {
 			continue
@@ -150,7 +150,7 @@ func getSubnetOwnerMap(pChainTxs map[ids.ID]*txs.Tx) (map[ids.ID]*secp256k1fx.Ou
 		if !ok {
 			return nil, errUnknownOwnerType
 		}
-		subnetOwner[txID] = owner
+		subnetOwner[transferSubnetOwnershipTx.Subnet] = owner
 	}
 	return subnetOwner, nil
 }
