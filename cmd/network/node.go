@@ -15,12 +15,15 @@ import (
 )
 
 type node struct {
-	nodeID ids.NodeID
-	ip     ips.IPPort
-	weight uint64
+	nodeID  ids.NodeID
+	version string
+	ip      ips.IPPort
+	weight  uint64
 }
 
-func (p *node) String() string { return fmt.Sprintf("Node(%s, %s, %d)", p.nodeID, p.ip, p.weight) }
+func (p *node) String() string {
+	return fmt.Sprintf("Node(%s, %s, %s, %d)", p.nodeID, p.ip, p.version, p.weight)
+}
 
 func getNodes(ctx context.Context, v *viper.Viper) ([]node, error) {
 	var (
@@ -88,9 +91,10 @@ func getNodes(ctx context.Context, v *viper.Viper) ([]node, error) {
 			return nil, err
 		}
 		nodes = append(nodes, node{
-			nodeID: peer.ID,
-			ip:     publicIP,
-			weight: peerIPToVdr[peer.ID].Weight,
+			nodeID:  peer.ID,
+			ip:      publicIP,
+			version: peer.Version,
+			weight:  peerIPToVdr[peer.ID].Weight,
 		})
 	}
 	return nodes, nil

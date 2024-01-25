@@ -168,7 +168,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
-	if err := csvWriter.Write(append([]string{"NodeID", "NodeIP", "Weight"}, getMessageOutputHeaders()...)); err != nil {
+	if err := csvWriter.Write(append([]string{"NodeID", "NodeIP", "Version", "Weight"}, getMessageOutputHeaders()...)); err != nil {
 		return err
 	}
 	var (
@@ -187,6 +187,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		fields := []string{
 			nodes[i].nodeID.String(),
 			nodes[i].ip.String(),
+			nodes[i].version,
 			fmt.Sprintf("%d", nodes[i].weight/units.Avax),
 		}
 		responseFields, err := formatMessageOutput(response)
