@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -26,41 +26,58 @@ import (
 
 var errNoPeers = errors.New("no peers")
 
+type networkQuerierConfig struct {
+	logLevel       string
+	networkID      uint32
+	concurrency    int
+	outputFilePath string
+}
+
+func createNetworkQuerierConfig(v *viper.Viper) networkQuerierConfig {
+	return networkQuerierConfig{
+		logLevel:       v.GetString(LogLevelKey),
+		networkID:      v.GetUint32(NetworkIDKey),
+		concurrency:    v.GetInt(ConcurrencyKey),
+		outputFilePath: v.GetString(OutputFileKey),
+	}
+}
+
 type networkQuerier struct {
 	log logging.Logger
 
-	networkID          uint32
-	concurrency        int
+	networkQuerierConfig
+
 	outboundMsg        message.OutboundMessage
 	expectedResponseOp message.Op
-	outputFilePath     string
 
 	qf QueryFormatter
 }
 
-func newQuerierFromViper(v *viper.Viper, qf QueryFormatter) (*networkQuerier, error) {
+func newQuerierFromViper(config networkQuerierConfig, qf QueryFormatter) (*networkQuerier, error) {
 	outboundMsg, expectedResponseOp, err := qf.CreateMessage()
 	if err != nil {
 		return nil, err
 	}
 
+	level, err := logging.ToLevel(config.logLevel)
+	if err != nil {
+		return nil, err
+	}
 	log := logging.NewLogger(
 		"network-querier",
 		logging.NewWrappedCore(
-			logging.Info,
+			level,
 			os.Stdout,
 			logging.Colors.ConsoleEncoder(),
 		),
 	)
 
 	return &networkQuerier{
-		log:                log,
-		networkID:          v.GetUint32(NetworkIDKey),
-		concurrency:        v.GetInt(ConcurrencyKey),
-		outboundMsg:        outboundMsg,
-		expectedResponseOp: expectedResponseOp,
-		outputFilePath:     v.GetString(OutputFileKey),
-		qf:                 qf,
+		log:                  log,
+		networkQuerierConfig: config,
+		outboundMsg:          outboundMsg,
+		expectedResponseOp:   expectedResponseOp,
+		qf:                   qf,
 	}, nil
 }
 
@@ -69,9 +86,9 @@ func (n *networkQuerier) sendQuery(
 	peerIP ips.IPPort,
 	outboundMsg message.OutboundMessage,
 	expectedResponseOp message.Op,
-) (fmt.Stringer, error) {
+) (interface{}, error) {
 	var (
-		responseCh = make(chan fmt.Stringer, 1)
+		responseCh = make(chan interface{}, 1)
 		sendOnce   sync.Once
 	)
 	p, err := peer.StartTestPeer(
@@ -143,7 +160,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 			)
 			if err != nil {
 				// Note: ignore errors instead of interrupting other queries
-				n.log.Info("failed to get response from peer",
+				n.log.Debug("failed to get response from peer",
 					zap.Stringer("peer", &node),
 					zap.Error(err),
 				)
@@ -196,7 +213,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		}
 		responseFields, err := n.qf.FormatOutput(response)
 		if err != nil {
-			n.log.Info("failed to format output from peer",
+			n.log.Debug("failed to format output from peer",
 				zap.Stringer("peer", &nodes[i]),
 				zap.Any("response", response),
 				zap.Error(err),

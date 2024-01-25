@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
@@ -48,13 +49,29 @@ func getNodes(ctx context.Context, v *viper.Viper) ([]node, error) {
 		peerIPToVdr[vdr.NodeID] = vdr
 	}
 
+	versionRegexStr := v.GetString(VersionRegexKey)
+	var versionRegex *regexp.Regexp
+	if len(versionRegexStr) > 0 {
+		r, err := regexp.Compile(versionRegexStr)
+		if err != nil {
+			return nil, err
+		}
+		versionRegex = r
+	}
+
 	// Trim the set of peers to ONLY validators since non-validators may not be willing
 	// to accept an incoming connection.
 	selectPeers := make([]info.Peer, 0, len(vdrs))
 	for _, peer := range peers {
-		if _, ok := peerIPToVdr[peer.ID]; ok {
-			selectPeers = append(selectPeers, peer)
+		if _, ok := peerIPToVdr[peer.ID]; !ok {
+			continue
 		}
+
+		if versionRegex != nil && !versionRegex.MatchString(peer.Version) {
+			continue
+		}
+
+		selectPeers = append(selectPeers, peer)
 	}
 	peers = selectPeers
 

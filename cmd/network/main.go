@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -13,14 +13,14 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:], pullQuery{}); err != nil {
 		fmt.Printf("failed due to %s\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	v, err := BuildViper(os.Args[1:])
+func run(args []string, formatter QueryFormatter) error {
+	v, err := BuildViper(args)
 	if errors.Is(err, pflag.ErrHelp) {
 		os.Exit(0)
 	}
@@ -36,7 +36,7 @@ func run() error {
 		return fmt.Errorf("failed to get nodes: %w", err)
 	}
 
-	querier, err := newQuerierFromViper(v, cChainStateSummary{})
+	querier, err := newQuerierFromViper(createNetworkQuerierConfig(v), formatter)
 	if err != nil {
 		return fmt.Errorf("failed to create querier: %w", err)
 	}
