@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -37,14 +36,16 @@ func createMessage(v *viper.Viper) (message.OutboundMessage, message.Op, error) 
 }
 
 func getMessageOutputHeaders() []string {
-	return []string{"OuterStateSummaryID", "BlockNumber", "AtomicRoot"}
+	return []string{"OuterStateSummaryID", "BlockNumber", "AtomicRoot", "Error"}
 }
 
-func formatMessageOutput(msg fmt.Stringer) ([]string, error) {
-	if msg == nil {
-		return nil, errors.New("nil message")
+func formatMessageOutput(result interface{}) ([]string, error) {
+	switch res := result.(type) {
+	case error:
+		return []string{"", "", "", res.Error()}, nil
+	default:
 	}
-	res := msg.(*p2p.StateSummaryFrontier)
+	res := result.(*p2p.StateSummaryFrontier)
 	proposerVMSummary, err := proposerSummary.Parse(res.Summary)
 	if err != nil {
 		return nil, err
@@ -58,5 +59,6 @@ func formatMessageOutput(msg fmt.Stringer) ([]string, error) {
 		proposerVMSummary.ID().String(),
 		fmt.Sprintf("%d", parsedSummary.BlockNumber),
 		ids.ID(parsedSummary.AtomicRoot).String(),
+		"",
 	}, nil
 }

@@ -121,7 +121,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		zap.Int("numPeers", len(nodes)),
 	)
 
-	responses := make([]fmt.Stringer, len(nodes))
+	responses := make([]interface{}, len(nodes))
 	eg := errgroup.Group{}
 	eg.SetLimit(n.concurrency)
 
@@ -144,6 +144,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 					zap.Stringer("peer", &node),
 					zap.Error(err),
 				)
+				responses[i] = err
 				return nil
 			}
 			responses[i] = chits
@@ -194,7 +195,7 @@ func (n *networkQuerier) queryPeers(ctx context.Context, nodes []node) error {
 		if err != nil {
 			n.log.Info("failed to format output from peer",
 				zap.Stringer("peer", &nodes[i]),
-				zap.Stringer("response", response),
+				zap.Any("response", response),
 				zap.Error(err),
 			)
 			nodesFailed++
