@@ -28,6 +28,60 @@ type DynamicFeesBuilder struct {
 	backend BuilderBackend
 }
 
+func (b *DynamicFeesBuilder) NewBaseTx(
+	outputs []*avax.TransferableOutput,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.BaseTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+
+	utx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+			Outs:         outputs, // not sorted yet, we'll sort later on when we have all the outputs
+		},
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	for _, out := range outputs {
+		assetID := out.AssetID()
+		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		if err != nil {
+			return nil, err
+		}
+		toBurn[assetID] = amountToBurn
+	}
+
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.BaseTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, changeOuts, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	outputs = append(outputs, changeOuts...)
+	avax.SortTransferableOutputs(outputs, txs.Codec)
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, b.initCtx(utx)
+}
+
 func (b *DynamicFeesBuilder) NewAddValidatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,

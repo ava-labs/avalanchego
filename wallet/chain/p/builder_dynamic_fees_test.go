@@ -49,6 +49,74 @@ var (
 // These tests create and sign a tx, then verify that utxos included
 // in the tx are exactly necessary to pay fees for it
 
+func TestBaseTx(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	be := mocks.NewMockBuilderBackend(ctrl)
+
+	var (
+		utxosKey              = testKeys[1]
+		utxoAddr              = utxosKey.PublicKey().Address()
+		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
+
+		outputsToMove = []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 7 * units.Avax,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{utxosKey.PublicKey().Address()},
+				},
+			},
+		}}
+	)
+
+	b := &DynamicFeesBuilder{
+		addrs:   set.Of(utxoAddr),
+		backend: be,
+	}
+	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
+	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
+	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
+
+	utx, err := b.NewBaseTx(
+		outputsToMove,
+		testUnitFees,
+		testBlockMaxConsumedUnits,
+	)
+	require.NoError(err)
+
+	var (
+		kc  = secp256k1fx.NewKeychain(utxosKey)
+		sbe = mocks.NewMockSignerBackend(ctrl)
+		s   = NewSigner(kc, sbe)
+	)
+
+	for _, utxo := range utxos {
+		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
+	}
+
+	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	require.NoError(err)
+
+	fc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       commonfees.NewManager(testUnitFees),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Credentials:      tx.Creds,
+	}
+	require.NoError(utx.Visit(fc))
+	require.Equal(5930*units.MicroAvax, fc.Fee)
+
+	ins := utx.Ins
+	outs := utx.Outs
+	require.Len(ins, 2)
+	require.Len(outs, 2)
+	require.Equal(fc.Fee+outputsToMove[0].Out.Amount(), ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
+	require.Equal(outputsToMove[0], outs[1])
+}
+
 func TestAddValidatorTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
