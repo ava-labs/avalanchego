@@ -40,6 +40,20 @@ func getNodes(ctx context.Context, v *viper.Viper) ([]node, error) {
 	if err != nil {
 		return nil, err
 	}
+	peerIPToVdr := make(map[ids.NodeID]platformvm.ClientPermissionlessValidator, len(vdrs))
+	for _, vdr := range vdrs {
+		peerIPToVdr[vdr.NodeID] = vdr
+	}
+
+	// Trim the set of peers to ONLY validators since non-validators may not be willing
+	// to accept an incoming connection.
+	selectPeers := make([]info.Peer, 0, len(vdrs))
+	for _, peer := range peers {
+		if _, ok := peerIPToVdr[peer.ID]; ok {
+			selectPeers = append(selectPeers, peer)
+		}
+	}
+	peers = selectPeers
 
 	// If specified, cut peers to only the specified publicIPs
 	if v.IsSet(IPPortKey) {
@@ -65,11 +79,6 @@ func getNodes(ctx context.Context, v *viper.Viper) ([]node, error) {
 		if peerLimit > 0 && peerLimit <= len(peers) {
 			peers = peers[:peerLimit]
 		}
-	}
-
-	peerIPToVdr := make(map[ids.NodeID]platformvm.ClientPermissionlessValidator, len(vdrs))
-	for _, vdr := range vdrs {
-		peerIPToVdr[vdr.NodeID] = vdr
 	}
 
 	nodes := make([]node, 0, len(peers))
