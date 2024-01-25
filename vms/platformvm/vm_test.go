@@ -1257,8 +1257,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require := require.New(t)
 
 	baseDB := memdb.New()
-	vmDB := prefixdb.New([]byte("vm"), baseDB)
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDB)
+	vmDB := prefixdb.New(chains.VMDBPrefix, baseDB)
+	bootstrappingDB := prefixdb.New(chains.ChainBootstrappingDBPrefix, baseDB)
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 

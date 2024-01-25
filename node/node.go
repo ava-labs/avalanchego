@@ -1325,6 +1325,7 @@ func (n *Node) initAdminAPI() error {
 	service, err := admin.NewService(
 		admin.Config{
 			Log:          n.Log,
+			DB:           n.DB,
 			ChainManager: n.chainManager,
 			HTTPServer:   n.APIServer,
 			ProfileDir:   n.Config.ProfilerConfig.Dir,
