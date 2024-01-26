@@ -133,11 +133,6 @@ func TestExportKey(t *testing.T) {
 
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	reply := ExportKeyReply{}
 	require.NoError(service.ExportKey(nil, &args, &reply))
@@ -152,11 +147,6 @@ func TestImportKey(t *testing.T) {
 	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
 	service, _ := defaultService(t)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	reply := api.JSONAddress{}
 	require.NoError(service.ImportKey(nil, &args, &reply))
@@ -169,11 +159,6 @@ func TestGetTxStatus(t *testing.T) {
 	service, mutableSharedMemory := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -374,10 +359,6 @@ func TestGetTx(t *testing.T) {
 					require.NoError(err)
 					require.Equal(expectedTxJSON, []byte(response.Tx))
 				}
-
-				service.vm.ctx.Lock.Lock()
-				require.NoError(service.vm.Shutdown(context.Background()))
-				service.vm.ctx.Lock.Unlock()
 			})
 		}
 	}
@@ -387,11 +368,6 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -421,11 +397,6 @@ func TestGetStake(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -597,11 +568,6 @@ func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 
@@ -727,11 +693,6 @@ func TestGetCurrentValidators(t *testing.T) {
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -769,11 +730,6 @@ func TestGetBlock(t *testing.T) {
 			require := require.New(t)
 			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
-			defer func() {
-				service.vm.ctx.Lock.Lock()
-				require.NoError(service.vm.Shutdown(context.Background()))
-				service.vm.ctx.Lock.Unlock()
-			}()
 
 			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
