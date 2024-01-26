@@ -324,8 +324,8 @@ func (vm *VM) Initialize(
 		g.Config = params.SubnetEVMDefaultChainConfig
 	}
 
-	mandatoryNetworkUpgrades, enforce := getMandatoryNetworkUpgrades(chainCtx.NetworkID)
-	if enforce {
+	mandatoryNetworkUpgrades := params.GetMandatoryNetworkUpgrades(chainCtx.NetworkID)
+	if avalanchegoConstants.ProductionNetworkIDs.Contains(chainCtx.NetworkID) {
 		// We enforce network upgrades here, regardless of the chain config
 		// provided in the genesis file
 		g.Config.MandatoryNetworkUpgrades = mandatoryNetworkUpgrades
@@ -693,7 +693,7 @@ func (vm *VM) initBlockBuilding() error {
 	vm.builder.awaitSubmittedTxs()
 	vm.Network.SetGossipHandler(NewGossipHandler(vm, gossipStats))
 
-	ethTxPool, err := NewGossipEthTxPool(vm.txPool)
+	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
 		return err
 	}
@@ -1090,19 +1090,4 @@ func attachEthService(handler *rpc.Server, apis []rpc.API, names []string) error
 	}
 
 	return nil
-}
-
-// getMandatoryNetworkUpgrades returns the mandatory network upgrades for the specified network ID,
-// along with a flag that indicates if returned upgrades should be strictly enforced.
-func getMandatoryNetworkUpgrades(networkID uint32) (params.MandatoryNetworkUpgrades, bool) {
-	switch networkID {
-	case avalanchegoConstants.MainnetID:
-		return params.MainnetNetworkUpgrades, true
-	case avalanchegoConstants.FujiID:
-		return params.FujiNetworkUpgrades, true
-	case avalanchegoConstants.UnitTestID:
-		return params.UnitTestNetworkUpgrades, false
-	default:
-		return params.LocalNetworkUpgrades, false
-	}
 }

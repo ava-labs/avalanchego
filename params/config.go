@@ -31,8 +31,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
@@ -86,7 +89,7 @@ var (
 		PetersburgBlock:          big.NewInt(0),
 		IstanbulBlock:            big.NewInt(0),
 		MuirGlacierBlock:         big.NewInt(0),
-		MandatoryNetworkUpgrades: MainnetNetworkUpgrades, // This can be changed to correct network (local, test) via VM.
+		MandatoryNetworkUpgrades: GetMandatoryNetworkUpgrades(constants.MainnetID), // This can be changed to correct network (local, test) via VM.
 		GenesisPrecompiles:       Precompiles{},
 	}
 
@@ -154,6 +157,23 @@ var (
 
 	TestRules = TestChainConfig.AvalancheRules(new(big.Int), 0)
 )
+
+func getUpgradeTime(networkID uint32, upgradeTimes map[uint32]time.Time) *uint64 {
+	if upgradeTime, ok := upgradeTimes[networkID]; ok {
+		return utils.TimeToNewUint64(upgradeTime)
+	}
+	// If the upgrade time isn't specified, default being enabled in the
+	// genesis.
+	return utils.NewUint64(0)
+}
+
+// GetMandatoryNetworkUpgrades returns the mandatory network upgrades for the specified network ID.
+func GetMandatoryNetworkUpgrades(networkID uint32) MandatoryNetworkUpgrades {
+	return MandatoryNetworkUpgrades{
+		SubnetEVMTimestamp: utils.NewUint64(0),
+		DurangoTimestamp:   getUpgradeTime(networkID, version.DurangoTimes),
+	}
+}
 
 // UpgradeConfig includes the following configs that may be specified in upgradeBytes:
 // - Timestamps that enable avalanche network upgrades,

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,11 +50,11 @@ func TestGossipSubscribe(t *testing.T) {
 	txPool.SetGasPrice(common.Big1)
 	txPool.SetMinFee(common.Big0)
 
-	gossipTxPool, err := NewGossipEthTxPool(txPool)
+	gossipTxPool, err := NewGossipEthTxPool(txPool, prometheus.NewRegistry())
 	require.NoError(err)
 
 	// use a custom bloom filter to test the bloom filter reset
-	gossipTxPool.bloom, err = gossip.NewBloomFilter(1, 0.01, 0.0000000000000001) // maxCount =1
+	gossipTxPool.bloom, err = gossip.NewBloomFilter(prometheus.NewRegistry(), "", 1, 0.01, 0.0000000000000001) // maxCount =1
 	require.NoError(err)
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()

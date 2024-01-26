@@ -3,32 +3,6 @@
 
 package params
 
-import (
-	"github.com/ava-labs/subnet-evm/utils"
-)
-
-var (
-	LocalNetworkUpgrades = MandatoryNetworkUpgrades{
-		SubnetEVMTimestamp: utils.NewUint64(0),
-		DurangoTimestamp:   utils.NewUint64(0),
-	}
-
-	FujiNetworkUpgrades = MandatoryNetworkUpgrades{
-		SubnetEVMTimestamp: utils.NewUint64(0),
-		// DurangoTimestamp: utils.NewUint64(0), // TODO: Uncomment and set this to the correct value
-	}
-
-	MainnetNetworkUpgrades = MandatoryNetworkUpgrades{
-		SubnetEVMTimestamp: utils.NewUint64(0),
-		// DurangoTimestamp: utils.NewUint64(0), // TODO: Uncomment and set this to the correct value
-	}
-
-	UnitTestNetworkUpgrades = MandatoryNetworkUpgrades{
-		SubnetEVMTimestamp: utils.NewUint64(0),
-		DurangoTimestamp:   utils.NewUint64(0),
-	}
-)
-
 // MandatoryNetworkUpgrades contains timestamps that enable mandatory network upgrades.
 // These upgrades are mandatory, meaning that if a node does not upgrade by the
 // specified timestamp, it will be unable to participate in consensus.
