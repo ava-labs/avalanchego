@@ -178,13 +178,13 @@ func newEnvironment(t *testing.T) *environment {
 		if res.isBootstrapped.Get() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
-			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+			r.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
 
-			require.NoError(res.state.Commit())
+			r.NoError(res.state.Commit())
 		}
 
-		require.NoError(res.state.Close())
-		require.NoError(res.baseDB.Close())
+		r.NoError(res.state.Close())
+		r.NoError(res.baseDB.Close())
 	})
 
 	return res
