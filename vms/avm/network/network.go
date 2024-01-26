@@ -90,6 +90,7 @@ func New(
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		registerer,
 		ctx.Log,
 		txVerifier,
 		parser,
