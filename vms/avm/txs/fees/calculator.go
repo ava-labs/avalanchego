@@ -4,18 +4,13 @@
 package fees
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
 
-var (
-	_ txs.Visitor = (*Calculator)(nil)
-
-	errEForkFeesNotDefinedYet = errors.New("fees in E fork not defined yet")
-)
+var _ txs.Visitor = (*Calculator)(nil)
 
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
