@@ -409,6 +409,184 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 	return utx, b.initCtx(utx)
 }
 
+func (b *DynamicFeesBuilder) NewImportTx(
+	sourceChainID ids.ID,
+	to *secp256k1fx.OutputOwners,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.ImportTx, error) {
+	ops := common.NewOptions(options)
+	// 1. Build core transaction
+	utx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		SourceChain: sourceChainID,
+	}
+
+	// 2. Add imported inputs first
+	utxos, err := b.backend.UTXOs(ops.Context(), sourceChainID)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		addrs           = ops.Addresses(b.addrs)
+		minIssuanceTime = ops.MinIssuanceTime()
+		avaxAssetID     = b.backend.AVAXAssetID()
+
+		importedInputs     = make([]*avax.TransferableInput, 0, len(utxos))
+		importedSigIndices = make([][]uint32, 0)
+		importedAmounts    = make(map[ids.ID]uint64)
+	)
+
+	for _, utxo := range utxos {
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			continue
+		}
+
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+		if !ok {
+			// We couldn't spend this UTXO, so we skip to the next one
+			continue
+		}
+
+		importedInputs = append(importedInputs, &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  utxo.Asset,
+			In: &secp256k1fx.TransferInput{
+				Amt: out.Amt,
+				Input: secp256k1fx.Input{
+					SigIndices: inputSigIndices,
+				},
+			},
+		})
+
+		assetID := utxo.AssetID()
+		newImportedAmount, err := math.Add64(importedAmounts[assetID], out.Amt)
+		if err != nil {
+			return nil, err
+		}
+		importedAmounts[assetID] = newImportedAmount
+		importedSigIndices = append(importedSigIndices, inputSigIndices)
+	}
+	if len(importedInputs) == 0 {
+		return nil, fmt.Errorf(
+			"%w: no UTXOs available to import",
+			errInsufficientFunds,
+		)
+	}
+
+	utils.Sort(importedInputs) // sort imported inputs
+	utx.ImportedInputs = importedInputs
+
+	// 3. Add an output for all non-avax denominated inputs.
+	for assetID, amount := range importedAmounts {
+		if assetID == avaxAssetID {
+			// Avax-denominated inputs may be used to fully or partially pay fees,
+			// so we'll handle them later on.
+			continue
+		}
+
+		utx.Outs = append(utx.Outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: *to,
+			},
+		}) // we'll sort them later on
+	}
+
+	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.ImportTx(utx); err != nil {
+		return nil, err
+	}
+
+	for _, sigIndices := range importedSigIndices {
+		// update fees to account for the credentials to be added with inputs upon tx signing
+		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, sigIndices)
+		if err != nil {
+			return nil, fmt.Errorf("failed calculating input size: %w", err)
+		}
+		if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+			return nil, fmt.Errorf("account for input fees: %w", err)
+		}
+	}
+
+	switch importedAVAX := importedAmounts[avaxAssetID]; {
+	case importedAVAX == feeCalc.Fee:
+		// imported inputs match exactly the fees to be paid
+		avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+		return utx, b.initCtx(utx)
+
+	case importedAVAX < feeCalc.Fee:
+		// imported inputs can partially pay fees
+		feeCalc.Fee -= importedAmounts[avaxAssetID]
+
+	default:
+		// imported inputs may be enough to pay taxes by themselves
+		changeOut := &avax.TransferableOutput{
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				OutputOwners: *to, // we set amount after considering own fees
+			},
+		}
+
+		// update fees to target given the extra output added
+		outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+		if err != nil {
+			return nil, fmt.Errorf("failed calculating output size: %w", err)
+		}
+		if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
+			return nil, fmt.Errorf("account for output fees: %w", err)
+		}
+
+		switch {
+		case feeCalc.Fee < importedAVAX:
+			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
+			utx.Outs = append(utx.Outs, changeOut)
+			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+			return utx, b.initCtx(utx)
+
+		case feeCalc.Fee == importedAVAX:
+			// imported fees pays exactly the tx cost. We don't include the outputs
+			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+			return utx, b.initCtx(utx)
+
+		default:
+			// imported avax are not enough to pay fees
+			// Drop the changeOut and finance the tx
+			if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
+				return nil, fmt.Errorf("failed reverting change output: %w", err)
+			}
+			feeCalc.Fee -= importedAVAX
+		}
+	}
+
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{}
+	inputs, changeOuts, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = append(utx.Outs, changeOuts...)
+	avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
+	return utx, b.initCtx(utx)
+}
+
 func (b *DynamicFeesBuilder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,

@@ -549,6 +549,79 @@ func TestCreateSubnetTx(t *testing.T) {
 	require.Equal(fc.Fee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
 }
 
+func TestImportTx(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	be := mocks.NewMockBuilderBackend(ctrl)
+
+	var (
+		utxosKey              = testKeys[1]
+		utxoAddr              = utxosKey.PublicKey().Address()
+		sourceChainID         = ids.GenerateTestID()
+		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
+
+		importKey = testKeys[0]
+		importTo  = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				importKey.Address(),
+			},
+		}
+	)
+
+	importedUtxo := utxos[0]
+	utxos = utxos[1:]
+
+	b := &DynamicFeesBuilder{
+		addrs:   set.Of(utxoAddr),
+		backend: be,
+	}
+	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
+	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
+	be.EXPECT().UTXOs(gomock.Any(), sourceChainID).Return([]*avax.UTXO{importedUtxo}, nil)
+	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
+
+	utx, err := b.NewImportTx(
+		sourceChainID,
+		importTo,
+		testUnitFees,
+		testBlockMaxConsumedUnits,
+	)
+	require.NoError(err)
+
+	var (
+		kc  = secp256k1fx.NewKeychain(utxosKey)
+		sbe = mocks.NewMockSignerBackend(ctrl)
+		s   = NewSigner(kc, sbe)
+	)
+
+	sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), importedUtxo.InputID()).Return(importedUtxo, nil).AnyTimes()
+	for _, utxo := range utxos {
+		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
+	}
+
+	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	require.NoError(err)
+
+	fc := &fees.Calculator{
+		IsEForkActive:    true,
+		FeeManager:       commonfees.NewManager(testUnitFees),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Credentials:      tx.Creds,
+	}
+	require.NoError(utx.Visit(fc))
+	require.Equal(5640*units.MicroAvax, fc.Fee)
+
+	ins := utx.Ins
+	outs := utx.Outs
+	importedIns := utx.ImportedInputs
+	require.Len(ins, 1)
+	require.Len(importedIns, 1)
+	require.Len(outs, 1)
+	require.Equal(fc.Fee, importedIns[0].In.Amount()+ins[0].In.Amount()-outs[0].Out.Amount())
+}
+
 func TestExportTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
