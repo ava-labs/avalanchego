@@ -38,11 +38,6 @@ const (
 	AtomicTxBaseCost uint64 = 10_000
 )
 
-// Constants for message sizes
-const (
-	MaxCodeHashesPerRequest = 5
-)
-
 // The atomic gas limit specifies the maximum amount of gas that can be consumed by the atomic
 // transactions included in a block and is enforced as of ApricotPhase5. Prior to ApricotPhase5,
 // a block included a single atomic transaction. As of ApricotPhase5, each block can include a set

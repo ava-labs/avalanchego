@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
@@ -50,7 +49,7 @@ func (n *CodeRequestHandler) OnCodeRequest(_ context.Context, nodeID ids.NodeID,
 		n.stats.UpdateCodeReadTime(time.Since(startTime))
 	}()
 
-	if len(codeRequest.Hashes) > params.MaxCodeHashesPerRequest {
+	if len(codeRequest.Hashes) > message.MaxCodeHashesPerRequest {
 		n.stats.IncTooManyHashesRequested()
 		log.Debug("too many hashes requested, dropping request", "nodeID", nodeID, "requestID", requestID, "numHashes", len(codeRequest.Hashes))
 		return nil, nil
