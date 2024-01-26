@@ -172,6 +172,8 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
+	latestForkTime := genesistest.GenesisTime.Add(time.Second) // same forkTime used in defaultVM
+
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := configtest.MaxValidatorStake / 5
@@ -193,16 +195,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 	delegator4Stake := configtest.MaxValidatorStake - validatorStake - configtest.MinValidatorStake
 
 	tests := []struct {
-		name    string
-		ap3Time time.Time
+		name string
+		fork configtest.ActiveFork
 	}{
 		{
-			name:    "pre-upgrade is no longer restrictive",
-			ap3Time: validatorEndTime,
+			name: "pre-upgrade is no longer restrictive",
+			fork: configtest.ApricotPhase3Fork,
 		},
 		{
-			name:    "post-upgrade calculate max stake correctly",
-			ap3Time: genesistest.GenesisTime,
+			name: "post-upgrade calculate max stake correctly",
+			fork: configtest.ApricotPhase5Fork,
 		},
 	}
 
@@ -210,8 +212,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, configtest.ApricotPhase3Fork)
-			vm.ApricotPhase3Time = test.ap3Time
+			vm, _, _ := defaultVM(t, test.fork)
 
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
@@ -354,8 +355,12 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 
 	baseDB := memdb.New()
 
+	var (
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
+	)
 	vm := &VM{
-		Config: *configtest.Config(configtest.CortinaFork, latestForkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
 	ctx, _ := configtest.Context(t, baseDB)
@@ -380,9 +385,9 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		nil,
 	))
 
-	// set time to post Banff fork
-	vm.clock.Set(latestForkTime.Add(time.Second))
-	vm.state.SetTimestamp(latestForkTime.Add(time.Second))
+	// set time to post fork
+	vm.clock.Set(forkTime.Add(time.Second))
+	vm.state.SetTimestamp(forkTime.Add(time.Second))
 
 	key0 := genesistest.Keys[0]
 	key1 := genesistest.Keys[1]
@@ -1106,9 +1111,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, configtest.CortinaFork) // defaultVM reset latestForkTime
+	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 
-	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(time.Second)
+	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := configtest.MaxValidatorStake / 5
 
@@ -1202,13 +1207,12 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
-	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
-
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
-
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
+	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -1324,13 +1328,12 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
-	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
-
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
-
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
+	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)

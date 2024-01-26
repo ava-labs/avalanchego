@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
@@ -96,16 +95,12 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
-	var (
-		fork     = configtest.ApricotPhase5Fork
-		forkTime = genesistest.ValidateEndTime
-	)
-
+func newEnvironment(t *testing.T, fork configtest.ActiveFork, ctrl *gomock.Controller) *environment {
+	forkTime := genesistest.ValidateStartTime
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         configtest.Config(fork, forkTime),
-		clk:            defaultClock(),
+		clk:            configtest.Clock(forkTime),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -178,7 +173,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			res.backend,
 			pvalidators.TestManager,
 		)
-		addSubnet(res)
+		addSubnet(t, res)
 	} else {
 		res.blkManager = NewManager(
 			res.mempool,
@@ -219,7 +214,9 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	return res
 }
 
-func addSubnet(env *environment) {
+func addSubnet(t *testing.T, env *environment) {
+	require := require.New(t)
+
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
@@ -232,16 +229,12 @@ func addSubnet(env *environment) {
 		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
 		genesistest.Keys[0].PublicKey().Address(),
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	// store it
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	executor := executor.StandardTxExecutor{
 		Backend: env.backend,
@@ -254,9 +247,8 @@ func addSubnet(env *environment) {
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	if err := stateDiff.Apply(env.state); err != nil {
-		panic(err)
-	}
+	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(
@@ -290,12 +282,6 @@ func defaultState(
 	}
 	genesisBlkID = state.GetLastAccepted()
 	return state
-}
-
-func defaultClock() *mockable.Clock {
-	clk := &mockable.Clock{}
-	clk.Set(genesistest.GenesisTime)
-	return clk
 }
 
 type fxVMInt struct {

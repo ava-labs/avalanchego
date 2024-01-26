@@ -75,31 +75,13 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *environment {
+func newEnvironment(t *testing.T, fork configtest.ActiveFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	var (
-		fork     configtest.ActiveFork
-		forkTime time.Time
-	)
-	switch {
-	case postDurango:
-		fork = configtest.DurangoFork
-		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
-	case postCortina:
-		fork = configtest.CortinaFork
-		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
-	case postBanff:
-		fork = configtest.BanffFork
-		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
-	default:
-		fork = configtest.ApricotPhase5Fork
-		forkTime = genesistest.GenesisTime
-	}
-
+	forkTime := genesistest.ValidateStartTime
 	config := configtest.Config(fork, forkTime)
-	clk := defaultClock(forkTime)
+	clk := configtest.Clock(forkTime)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx, msm := configtest.Context(t, baseDB)
@@ -197,7 +179,7 @@ func addSubnet(
 			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
 		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
-		genesistest.Keys[0].PublicKey().Address(),
+		genesistest.Keys[4].PublicKey().Address(),
 	)
 	require.NoError(err)
 
@@ -248,12 +230,6 @@ func defaultState(
 	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
-}
-
-func defaultClock(forkTime time.Time) *mockable.Clock {
-	clk := &mockable.Clock{}
-	clk.Set(forkTime)
-	return clk
 }
 
 type fxVMInt struct {

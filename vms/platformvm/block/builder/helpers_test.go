@@ -75,14 +75,15 @@ func newEnvironment(t *testing.T) *environment {
 	r := require.New(t)
 
 	var (
-		fork     = configtest.DurangoFork
-		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
+		// Note unlike other packages we pick the latest fork here
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateStartTime
 	)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         configtest.Config(fork, forkTime),
-		clk:            defaultClock(),
+		clk:            configtest.Clock(forkTime),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -221,6 +222,7 @@ func addSubnet(t *testing.T, env *environment) {
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultState(
@@ -250,13 +252,6 @@ func defaultState(
 	state.SetHeight(0)
 	require.NoError(state.Commit())
 	return state
-}
-
-func defaultClock() *mockable.Clock {
-	// set time after Banff fork (and before default nextStakerTime)
-	clk := &mockable.Clock{}
-	clk.Set(genesistest.GenesisTime)
-	return clk
 }
 
 type fxVMInt struct {

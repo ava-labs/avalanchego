@@ -64,30 +64,23 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var (
-	latestForkTime = genesistest.ValidateEndTime.Add(-5 * configtest.MinStakingDuration)
-
-	// subnet that exists at genesis in defaultVM
-	// Its controlKeys are ts.SubnetControlKeys
-	// Its threshold is 2
-	testSubnet1 *txs.Tx
-)
+// subnet that exists at genesis in defaultVM
+// Its controlKeys are ts.SubnetControlKeys
+// Its threshold is 2
+var testSubnet1 *txs.Tx
 
 func defaultVM(t *testing.T, fork configtest.ActiveFork) (*VM, database.Database, *configtest.MutableSharedMemory) {
 	require := require.New(t)
 
-	// always reset latestForkTime (a package level variable)
-	// to ensure test independence
-	latestForkTime = genesistest.GenesisTime.Add(time.Second)
-
+	forkTime := genesistest.GenesisTime.Add(time.Second)
 	vm := &VM{
-		Config: *configtest.Config(fork, latestForkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
 	baseDB := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, baseDB)
 
-	vm.clock.Set(latestForkTime)
+	vm.clock.Set(forkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
 	ctx, msm := configtest.Context(t, baseDB)
 
@@ -128,8 +121,8 @@ func defaultVM(t *testing.T, fork configtest.ActiveFork) (*VM, database.Database
 			genesistest.SubnetControlKeys[1].PublicKey().Address(),
 			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{genesistest.Keys[0]}, // pays tx fee
-		genesistest.Keys[0].PublicKey().Address(),    // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]}, // pays tx fee
+		genesistest.Keys[4].PublicKey().Address(),    // change addr
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
@@ -182,7 +175,7 @@ func TestGenesis(t *testing.T) {
 
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
-			id := genesistest.Keys[0].PublicKey().Address()
+			id := genesistest.Keys[4].PublicKey().Address()
 			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
@@ -356,7 +349,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := genesistest.GenesisNodeIDs[0]
 
-	startTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(configtest.MinStakingDuration)
 
 	// create valid tx
@@ -886,10 +879,11 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	require.NoError(err)
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := block.NewApricotAtomicBlock(
+	statelessBlk, err := block.NewBanffStandardBlock(
+		vm.state.GetTimestamp(),
 		preferredID,
 		preferredHeight+1,
-		tx,
+		[]*txs.Tx{tx},
 	)
 	require.NoError(err)
 
@@ -916,16 +910,20 @@ func TestOptimisticAtomicImport(t *testing.T) {
 func TestRestartFullyAccepted(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-
 	firstDB := prefixdb.New([]byte{}, db)
+
+	var (
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
+	)
 	firstVM := &VM{
-		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
 	firstCtx, _ := configtest.Context(t, memdb.New())
 	_, genesisBytes := genesistest.Genesis(t, firstCtx)
 
-	initialClkTime := latestForkTime.Add(time.Second)
+	initialClkTime := forkTime
 	firstVM.clock.Set(initialClkTime)
 	firstCtx.Lock.Lock()
 
@@ -992,7 +990,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
-		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
 	secondCtx, _ := configtest.Context(t, db)
@@ -1032,11 +1030,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
+	var (
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
+	)
+
 	vm := &VM{
-		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
-	initialClkTime := latestForkTime.Add(time.Second)
+	initialClkTime := forkTime
 	vm.clock.Set(initialClkTime)
 	ctx, _ := configtest.Context(t, baseDB)
 	_, genesisBytes := genesistest.Genesis(t, ctx)
@@ -1361,11 +1364,16 @@ func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
 	baseDB := memdb.New()
 
+	var (
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateStartTime
+	)
+
 	vm := &VM{
-		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+		Config: *configtest.Config(fork, forkTime),
 	}
 
-	initialClkTime := latestForkTime.Add(time.Second)
+	initialClkTime := forkTime
 	vm.clock.Set(initialClkTime)
 	ctx, _ := configtest.Context(t, baseDB)
 	ctx.Lock.Lock()
@@ -1509,12 +1517,18 @@ func TestMaxStakeAmount(t *testing.T) {
 
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
-	latestForkTime = genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 	db := memdb.New()
 
-	firstDB := prefixdb.New([]byte{}, db)
 	const firstUptimePercentage = 20 // 20%
-	firstCfg := configtest.Config(configtest.DurangoFork, latestForkTime)
+
+	var (
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateStartTime
+		firstCfg = configtest.Config(fork, forkTime)
+
+		firstDB = prefixdb.New([]byte{}, db)
+	)
+
 	firstCfg.UptimePercentage = firstUptimePercentage / 100.
 	firstVM := &VM{Config: *firstCfg}
 
@@ -1536,8 +1550,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		nil,
 	))
 
-	initialClkTime := latestForkTime.Add(time.Second)
-	firstVM.clock.Set(initialClkTime)
+	firstVM.clock.Set(forkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
@@ -1556,8 +1569,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	// Restart the VM with a larger uptime requirement
 	secondDB := prefixdb.New([]byte{}, db)
 
+	// Reset vm config for the second VM
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondCfg := configtest.Config(configtest.DurangoFork, latestForkTime)
+	secondCfg := configtest.Config(fork, forkTime)
 	secondCfg.UptimePercentage = secondUptimePercentage / 100.
 	secondVM := &VM{Config: *secondCfg}
 
@@ -1645,10 +1659,14 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
-	latestForkTime = genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 	db := memdb.New()
 
-	cfg := configtest.Config(configtest.DurangoFork, latestForkTime)
+	var (
+		fork     = configtest.LatestFork
+		forkTime = genesistest.ValidateStartTime
+	)
+
+	cfg := configtest.Config(fork, forkTime)
 	cfg.UptimePercentage = .2
 	vm := &VM{
 		Config: *cfg,
@@ -1682,8 +1700,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	initialClkTime := latestForkTime.Add(time.Second)
-	vm.clock.Set(initialClkTime)
+	vm.clock.Set(forkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1746,14 +1763,11 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	vm, _, _ := defaultVM(t, configtest.LatestFork)
 
-	var (
-		chainTime          = vm.state.GetTimestamp()
-		validatorStartTime = chainTime.Add(txexecutor.SyncBound - time.Second)
-		validatorEndTime   = validatorStartTime.Add(360 * 24 * time.Hour)
-	)
-
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
+	validatorStartTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)

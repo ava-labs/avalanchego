@@ -711,7 +711,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	vm := &VM{
 		Config: *configtest.Config(configtest.LatestFork, forkTime),
 	}
-	vm.clock.Set(vm.CortinaTime.Add(time.Second))
+	vm.clock.Set(forkTime)
 
 	baseDB := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, baseDB)
@@ -760,8 +760,8 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		[]ids.ShortID{
 			genesistest.SubnetControlKeys[0].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{genesistest.Keys[len(genesistest.Keys)-1]}, // pays tx fee
-		genesistest.Keys[0].PublicKey().Address(),                          // change addr
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]}, // pays tx fee
+		genesistest.Keys[4].PublicKey().Address(),    // change addr
 	)
 	if err != nil {
 		return nil, ids.Empty, err

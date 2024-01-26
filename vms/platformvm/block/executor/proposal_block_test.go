@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
@@ -35,7 +34,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, configtest.ApricotPhase5Fork, ctrl)
 
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
@@ -138,10 +137,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, configtest.BanffFork, ctrl)
 	env.clk.Set(genesistest.GenesisTime)
-	env.config.BanffTime = time.Time{}        // activate Banff
-	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := genesistest.GenesisTime
@@ -389,7 +386,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// So in this test we avoid ids.GenerateTestNodeID, in favour of ids.BuildTestNodeID
 	// so that TxID does not depend on the order we run tests.
 	staker0 := staker{
-		nodeID:        ids.BuildTestNodeID([]byte{0xff}),
+		nodeID:        ids.BuildTestNodeID([]byte{0xfb}),
 		rewardAddress: ids.ShortID{0xf0},
 		startTime:     genesistest.GenesisTime,
 		endTime:       time.Time{}, // actual endTime depends on specific test
@@ -549,8 +546,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, configtest.BanffFork, nil)
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -699,8 +695,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, configtest.BanffFork, nil)
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -839,8 +834,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, configtest.BanffFork, nil)
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -942,8 +936,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, configtest.BanffFork, nil)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1124,8 +1117,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, configtest.BanffFork, nil)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1306,9 +1298,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 func TestAddValidatorProposalBlock(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{}   // activate Banff
-	env.config.DurangoTime = time.Time{} // activate Durango
+	env := newEnvironment(t, configtest.LatestFork, nil)
 
 	now := env.clk.Time()
 

@@ -27,7 +27,7 @@ import (
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, configtest.ApricotPhase5Fork)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -127,7 +127,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, configtest.ApricotPhase5Fork)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -221,7 +221,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, configtest.ApricotPhase5Fork)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -342,7 +342,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, configtest.CortinaFork)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -558,7 +558,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, configtest.CortinaFork)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -717,7 +717,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, configtest.ApricotPhase5Fork)
 	dummyHeight := uint64(1)
 
 	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)

@@ -48,6 +48,12 @@ var (
 	TxFee = uint64(100) // a default Tx Fee
 )
 
+func Clock(forkTime time.Time) *mockable.Clock {
+	clk := &mockable.Clock{}
+	clk.Set(forkTime)
+	return clk
+}
+
 type MutableSharedMemory struct {
 	atomic.SharedMemory
 }
