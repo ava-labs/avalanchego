@@ -500,6 +500,17 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
+	feeCalculator := fees.Calculator{
+		IsEForkActive:    e.Backend.Config.IsEForkActivated(currentTimestamp),
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -510,7 +521,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {
