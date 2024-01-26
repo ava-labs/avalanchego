@@ -424,3 +424,21 @@ func TestMempoolTxsPriorityRegossip(t *testing.T) {
 	assert.Len(queued, 10, "unexpected length of queued txs")
 	assert.ElementsMatch(txs, queued)
 }
+
+func attemptAwait(t *testing.T, wg *sync.WaitGroup, delay time.Duration) {
+	ticker := make(chan struct{})
+
+	// Wait for [wg] and then close [ticket] to indicate that
+	// the wait group has finished.
+	go func() {
+		wg.Wait()
+		close(ticker)
+	}()
+
+	select {
+	case <-time.After(delay):
+		t.Fatal("Timed out waiting for wait group to complete")
+	case <-ticker:
+		// The wait group completed without issue
+	}
+}
