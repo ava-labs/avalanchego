@@ -33,10 +33,7 @@ func TestBuildBlockBasic(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -78,10 +75,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	tx, exists := env.mempool.Peek()
 	require.False(exists)
@@ -98,10 +92,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		now    = env.backend.Clk.Time()
@@ -198,10 +189,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	var (
 		now      = env.backend.Clk.Time()
@@ -234,10 +222,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -291,10 +276,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// The [StartTime] in a staker tx is only validated pre-Durango.
 	// TODO: Delete this test post-Durango activation.
@@ -397,10 +379,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Post-Durango, [StartTime] is no longer validated. Staking durations are
 	// based on the current chain timestamp and must be validated.
@@ -476,11 +455,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	defer func() {
-		env.ctx.Lock.Lock()
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// Create a valid transaction
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -509,6 +484,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Unlock()
 	err = env.network.IssueTx(context.Background(), tx)
 	require.ErrorIs(err, errTestingDropped)
+	env.ctx.Lock.Lock()
 	_, ok := env.mempool.Get(txID)
 	require.False(ok)
 
@@ -522,11 +498,9 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
 	env.isBootstrapped.Set(false)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-		env.ctx.Lock.Unlock()
-	}()
 
 	require.True(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
 }

@@ -1022,16 +1022,15 @@ func TestExpiredBuildBlock(t *testing.T) {
 	coreVM.InitializeF = nil
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
-
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
-
-	// Make sure that passing a message works
-	toScheduler <- common.PendingTxs
-	<-toEngine
 
 	// Notify the proposer VM of a new block on the inner block side
 	toScheduler <- common.PendingTxs
+	// The first notification will be read from the consensus engine
+	<-toEngine
 
+	// Before calling BuildBlock, verify a remote block and set it as the
+	// preferred block.
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -1076,7 +1075,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(parsedBlock.Verify(context.Background()))
-
 	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -1084,17 +1082,18 @@ func TestExpiredBuildBlock(t *testing.T) {
 		return nil, errUnexpectedCall
 	}
 
-	// The first notification will be read from the consensus engine
-	<-toEngine
-
+	// Because we are now building on a different block, the proposer window
+	// shouldn't have started.
 	_, err = proVM.BuildBlock(context.Background())
 	require.ErrorIs(err, errProposerWindowNotStarted)
 
-	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxVerifyDelay))
+	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxBuildDelay))
 	proVM.Scheduler.SetBuildBlockTime(time.Now())
 
 	// The engine should have been notified to attempt to build a block now that
-	// the window has started again
+	// the window has started again. This is to guarantee that the inner VM has
+	// build block called after it sent a pendingTxs message on its internal
+	// engine channel.
 	<-toEngine
 }
 

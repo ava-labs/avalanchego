@@ -16,9 +16,9 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.10.17 includes the AWM activation on the C-Chain local network
-# and the inclusion of BLS Public Keys in the network genesis.
-DEFAULT_VERSION="1.10.17"
+# v1.10.18 includes restrictions on ports sent over the p2p network along with
+# proposervm and P-chain rule changes on the local network.
+DEFAULT_VERSION="1.10.18"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
@@ -27,7 +27,7 @@ if [[ -z "${VERSION}" ]]; then
   exit 255
 fi
 
-AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH:-./build/avalanchego})"
+AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
 
 #################################
 # download avalanchego
@@ -42,20 +42,20 @@ if [[ ${GOOS} == "darwin" ]]; then
 fi
 
 rm -f ${DOWNLOAD_PATH}
-rm -rf /tmp/avalanchego-v${VERSION}
+rm -rf "/tmp/avalanchego-v${VERSION}"
 rm -rf /tmp/avalanchego-build
 
 echo "downloading avalanchego ${VERSION} at ${DOWNLOAD_URL}"
-curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
+curl -L "${DOWNLOAD_URL}" -o "${DOWNLOAD_PATH}"
 
 echo "extracting downloaded avalanchego"
 if [[ ${GOOS} == "linux" ]]; then
   tar xzvf ${DOWNLOAD_PATH} -C /tmp
 elif [[ ${GOOS} == "darwin" ]]; then
   unzip ${DOWNLOAD_PATH} -d /tmp/avalanchego-build
-  mv /tmp/avalanchego-build/build /tmp/avalanchego-v${VERSION}
+  mv /tmp/avalanchego-build/build "/tmp/avalanchego-v${VERSION}"
 fi
-find /tmp/avalanchego-v${VERSION}
+find "/tmp/avalanchego-v${VERSION}"
 
 # Sourcing constants.sh ensures that the necessary CGO flags are set to
 # build the portable version of BLST. Without this, ginkgo may fail to
@@ -75,5 +75,5 @@ ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
 echo "running upgrade tests against the local cluster with ${AVALANCHEGO_PATH}"
 ./tests/upgrade/upgrade.test \
   --ginkgo.v \
-  --avalanchego-path=/tmp/avalanchego-v${VERSION}/avalanchego \
-  --avalanchego-path-to-upgrade-to=${AVALANCHEGO_PATH}
+  --avalanchego-path="/tmp/avalanchego-v${VERSION}/avalanchego" \
+  --avalanchego-path-to-upgrade-to="${AVALANCHEGO_PATH}"
