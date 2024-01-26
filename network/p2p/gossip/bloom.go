@@ -6,6 +6,8 @@ package gossip
 import (
 	"crypto/rand"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -18,35 +20,38 @@ import (
 // Invariant: The returned bloom filter is not safe to reset concurrently with
 // other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
+	registerer prometheus.Registerer,
+	namespace string,
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
 ) (*BloomFilter, error) {
-	numHashes, numEntries := bloom.OptimalParameters(
-		minTargetElements,
-		targetFalsePositiveProbability,
-	)
-	b, err := bloom.New(numHashes, numEntries)
+	metrics, err := bloom.NewMetrics(namespace, registerer)
 	if err != nil {
 		return nil, err
 	}
-
-	salt, err := randomSalt()
-	return &BloomFilter{
+	filter := &BloomFilter{
 		minTargetElements:              minTargetElements,
 		targetFalsePositiveProbability: targetFalsePositiveProbability,
 		resetFalsePositiveProbability:  resetFalsePositiveProbability,
 
-		maxCount: bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability),
-		bloom:    b,
-		salt:     salt,
-	}, err
+		metrics: metrics,
+	}
+	err = resetBloomFilter(
+		filter,
+		minTargetElements,
+		targetFalsePositiveProbability,
+		resetFalsePositiveProbability,
+	)
+	return filter, err
 }
 
 type BloomFilter struct {
 	minTargetElements              int
 	targetFalsePositiveProbability float64
 	resetFalsePositiveProbability  float64
+
+	metrics *bloom.Metrics
 
 	maxCount int
 	bloom    *bloom.Filter
@@ -59,6 +64,7 @@ type BloomFilter struct {
 func (b *BloomFilter) Add(gossipable Gossipable) {
 	h := gossipable.GossipID()
 	bloom.Add(b.bloom, h[:], b.salt[:])
+	b.metrics.Count.Inc()
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
@@ -88,26 +94,39 @@ func ResetBloomFilterIfNeeded(
 		return false, nil
 	}
 
-	numHashes, numEntries := bloom.OptimalParameters(
-		math.Max(bloomFilter.minTargetElements, targetElements),
+	targetElements = math.Max(bloomFilter.minTargetElements, targetElements)
+	err := resetBloomFilter(
+		bloomFilter,
+		targetElements,
 		bloomFilter.targetFalsePositiveProbability,
+		bloomFilter.resetFalsePositiveProbability,
+	)
+	return err == nil, err
+}
+
+func resetBloomFilter(
+	bloomFilter *BloomFilter,
+	targetElements int,
+	targetFalsePositiveProbability,
+	resetFalsePositiveProbability float64,
+) error {
+	numHashes, numEntries := bloom.OptimalParameters(
+		targetElements,
+		targetFalsePositiveProbability,
 	)
 	newBloom, err := bloom.New(numHashes, numEntries)
 	if err != nil {
-		return false, err
+		return err
 	}
-	salt, err := randomSalt()
-	if err != nil {
-		return false, err
+	var newSalt ids.ID
+	if _, err := rand.Read(newSalt[:]); err != nil {
+		return err
 	}
-	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, bloomFilter.resetFalsePositiveProbability)
-	bloomFilter.bloom = newBloom
-	bloomFilter.salt = salt
-	return true, nil
-}
 
-func randomSalt() (ids.ID, error) {
-	salt := ids.ID{}
-	_, err := rand.Read(salt[:])
-	return salt, err
+	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability)
+	bloomFilter.bloom = newBloom
+	bloomFilter.salt = newSalt
+
+	bloomFilter.metrics.Reset(newBloom, bloomFilter.maxCount)
+	return nil
 }

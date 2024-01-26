@@ -23,9 +23,6 @@ import (
 
 func TestNewImportTx(t *testing.T) {
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
-	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
-	}()
 
 	type test struct {
 		description   string
@@ -182,19 +179,15 @@ func TestNewImportTx(t *testing.T) {
 
 			require.Equal(env.config.TxFee, totalIn-totalOut)
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			fakedState.SetTimestamp(tt.timestamp)
+			stateDiff.SetTimestamp(tt.timestamp)
 
-			fakedParent := ids.GenerateTestID()
-			env.SetState(fakedParent, fakedState)
-
-			verifier := MempoolTxVerifier{
-				Backend:       &env.backend,
-				ParentID:      fakedParent,
-				StateVersions: env,
-				Tx:            tx,
+			verifier := StandardTxExecutor{
+				Backend: &env.backend,
+				State:   stateDiff,
+				Tx:      tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&verifier))
 		})

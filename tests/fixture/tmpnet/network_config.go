@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -25,7 +25,10 @@ func (n *Network) Read() error {
 	if err := n.readNetwork(); err != nil {
 		return err
 	}
-	return n.readNodes()
+	if err := n.readNodes(); err != nil {
+		return err
+	}
+	return n.readSubnets()
 }
 
 // Write network configuration to disk.
@@ -216,5 +219,18 @@ func (n *Network) writeEnvFile() error {
 	if err := os.WriteFile(n.EnvFilePath(), []byte(n.EnvFileContents()), perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write network env file: %w", err)
 	}
+	return nil
+}
+
+func (n *Network) getSubnetDir() string {
+	return filepath.Join(n.Dir, defaultSubnetDirName)
+}
+
+func (n *Network) readSubnets() error {
+	subnets, err := readSubnets(n.getSubnetDir())
+	if err != nil {
+		return err
+	}
+	n.Subnets = subnets
 	return nil
 }

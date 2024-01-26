@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto/tls"
+	"net"
 	"sync"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var (
@@ -30,6 +32,9 @@ var (
 	testCertBytes3 []byte
 	//go:embed test_key_3.key
 	testKeyBytes3 []byte
+
+	ip      *ips.ClaimedIPPort
+	otherIP *ips.ClaimedIPPort
 
 	certLock   sync.Mutex
 	tlsCerts   []*tls.Certificate
@@ -52,6 +57,25 @@ func init() {
 	tlsCerts = []*tls.Certificate{
 		cert1, cert2, cert3,
 	}
+
+	ip = ips.NewClaimedIPPort(
+		staking.CertificateFromX509(cert1.Leaf),
+		ips.IPPort{
+			IP:   net.IPv4(127, 0, 0, 1),
+			Port: 9651,
+		},
+		1,   // timestamp
+		nil, // signature
+	)
+	otherIP = ips.NewClaimedIPPort(
+		staking.CertificateFromX509(cert2.Leaf),
+		ips.IPPort{
+			IP:   net.IPv4(127, 0, 0, 1),
+			Port: 9651,
+		},
+		1,   // timestamp
+		nil, // signature
+	)
 }
 
 func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config) {

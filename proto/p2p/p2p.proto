@@ -8,6 +8,8 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
 // Represents peer-to-peer messages.
 // Only one type can be non-null.
 message Message {
+  reserved 33; // Until after durango activation.
+  reserved 36; // Next unused field number.
   // NOTES
   // Use "oneof" for each message type and set rest to null if not used.
   // That is because when the compression is enabled, we don't want to include uncompressed fields.
@@ -29,6 +31,7 @@ message Message {
     Ping ping = 11;
     Pong pong = 12;
     Handshake handshake = 13;
+    GetPeerList get_peer_list = 35;
     PeerList peer_list = 14;
 
     // State-sync messages:
@@ -56,8 +59,6 @@ message Message {
     AppRequest app_request = 30;
     AppResponse app_response = 31;
     AppGossip app_gossip = 32;
-
-    PeerListAck peer_list_ack = 33;
     AppError app_error = 34;
   }
 }
@@ -118,6 +119,7 @@ message Handshake {
   Client client = 9;
   repeated uint32 supported_acps = 10;
   repeated uint32 objected_acps = 11;
+  BloomFilter known_peers = 12;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility
@@ -128,6 +130,12 @@ message Client {
   uint32 major = 2;
   uint32 minor = 3;
   uint32 patch = 4;
+}
+
+// BloomFilter with a random salt to prevent consistent hash collisions
+message BloomFilter {
+  bytes filter = 1;
+  bytes salt = 2;
 }
 
 // ClaimedIpPort contains metadata needed to connect to a peer
@@ -146,36 +154,27 @@ message ClaimedIpPort {
   bytes tx_id = 6;
 }
 
+// GetPeerList contains a bloom filter of the currently known validator IPs.
+//
+// GetPeerList must not be responded to until finishing the handshake. After the
+// handshake is completed, GetPeerlist messages should be responded to with a
+// Peerlist message containing validators that are not present in the bloom
+// filter.
+message GetPeerList {
+  BloomFilter known_peers = 1;
+}
+
 // PeerList contains network-level metadata for a set of validators.
 //
 // PeerList must be sent in response to an inbound Handshake message from a
 // remote peer a peer wants to connect to. Once a PeerList is received after
 // a Handshake message, the p2p handshake is complete and the connection is
 // established.
-
-// Peers should periodically send PeerList messages to allow peers to
-// discover each other.
 //
-// PeerListAck should be sent in response to a PeerList.
+// PeerList should be sent in response to a GetPeerlist message if the handshake
+// has been completed.
 message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
-}
-
-// PeerAck acknowledges that a gossiped peer in a PeerList message will be
-// tracked by the remote peer.
-message PeerAck {
-  // P-Chain transaction that added the acknowledged peer to the validator
-  // set
-  bytes tx_id = 1;
-  // Timestamp of the signed ip of the peer
-  uint64 timestamp = 2;
-}
-
-// PeerListAck is sent in response to PeerList to acknowledge the subset of
-// peers that the peer will attempt to connect to.
-message PeerListAck {
-  reserved 1; // deprecated; used to be tx_ids
-  repeated PeerAck peer_acks = 2;
 }
 
 // GetStateSummaryFrontier requests a peer's most recently accepted state
