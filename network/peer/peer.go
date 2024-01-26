@@ -906,8 +906,9 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	myTime := p.Clock.Unix()
-	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTime))
+	myTime := p.Clock.Time()
+	myTimeUnix := uint64(myTime.Unix())
+	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTimeUnix))
 
 	p.Metrics.ClockSkew.Observe(clockDifference)
 
@@ -916,13 +917,13 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			p.Log.Warn("beacon reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
-				zap.Uint64("myTime", myTime),
+				zap.Uint64("myTime", myTimeUnix),
 			)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", msg.MyTime),
-				zap.Uint64("myTime", myTime),
+				zap.Uint64("myTime", myTimeUnix),
 			)
 		}
 		p.StartClose()
@@ -969,18 +970,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("peerVersion", p.version),
 			zap.Error(err),
-		)
-		p.StartClose()
-		return
-	}
-
-	// Note that it is expected that the [ipSigningTime] can be in the past. We
-	// are just verifying that the claimed signing time isn't too far in the
-	// future here.
-	if float64(msg.IpSigningTime)-float64(myTime) > p.MaxClockDifference.Seconds() {
-		p.Log.Debug("peer attempting to connect with version timestamp too far in the future",
-			zap.Stringer("nodeID", p.id),
-			zap.Uint64("ipSigningTime", msg.IpSigningTime),
 		)
 		p.StartClose()
 		return
@@ -1089,11 +1078,24 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		},
 		Signature: msg.Sig,
 	}
-	if err := p.ip.Verify(p.cert); err != nil {
-		p.Log.Debug("signature verification failed",
-			zap.Stringer("nodeID", p.id),
-			zap.Error(err),
-		)
+	maxTimestamp := myTime.Add(p.MaxClockDifference)
+	if err := p.ip.Verify(p.cert, maxTimestamp); err != nil {
+		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
+			p.Log.Warn("beacon has invalid signature or is out of sync",
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", msg.MyTime),
+				zap.Uint64("myTime", myTimeUnix),
+				zap.Error(err),
+			)
+		} else {
+			p.Log.Debug("peer has invalid signature or is out of sync",
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", msg.MyTime),
+				zap.Uint64("myTime", myTimeUnix),
+				zap.Error(err),
+			)
+		}
+
 		p.StartClose()
 		return
 	}
