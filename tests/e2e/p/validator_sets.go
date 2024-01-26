@@ -43,7 +43,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			avaxAssetID := pWallet.AVAXAssetID()
 			startTime := time.Now().Add(tmpnet.DefaultValidatorStartTimeDiff)
 			endTime := startTime.Add(time.Second * 360)
-			// TODO(marun) Ensure this is appropriate for the targeted network (is it accessible from the API?)
+			// This is the default flag value for MinDelegatorStake.
 			weight := genesis.LocalParams.StakingConfig.MinDelegatorStake
 
 			for i := 0; i < delegatorCount; i++ {
@@ -68,19 +68,32 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			}
 		})
 
+		ginkgo.By("getting the current P-Chain height from the wallet")
+		currentPChainHeight, err := platformvm.NewClient(nodeURI.URI).GetHeight(e2e.DefaultContext())
+		require.NoError(err)
+
 		ginkgo.By("checking that validator sets are equal across all heights for all nodes", func() {
 			pvmClients := make([]platformvm.Client, len(e2e.Env.URIs))
 			for i, nodeURI := range e2e.Env.URIs {
 				pvmClients[i] = platformvm.NewClient(nodeURI.URI)
 			}
 
-			initialHeight, err := pvmClients[0].GetHeight(e2e.DefaultContext())
-			require.NoError(err)
-
-			for height := uint64(0); height <= initialHeight; height++ {
+			for height := uint64(0); height <= currentPChainHeight; height++ {
 				tests.Outf(" checked validator sets for height %d\n", height)
 				var observedValidatorSet map[ids.NodeID]*validators.GetValidatorOutput
-				for _, pvmClient := range pvmClients {
+				for i, pvmClient := range pvmClients {
+					// Ensure that the height of the target node is at least the expected height
+					e2e.Eventually(
+						func() bool {
+							pChainHeight, err := pvmClient.GetHeight(e2e.DefaultContext())
+							require.NoError(err)
+							return pChainHeight >= currentPChainHeight
+						},
+						e2e.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						fmt.Sprintf("failed to see expected height %d for %s before timeout", height, e2e.Env.URIs[i].NodeID),
+					)
+
 					validatorSet, err := pvmClient.GetValidatorsAt(
 						e2e.DefaultContext(),
 						constants.PrimaryNetworkID,
