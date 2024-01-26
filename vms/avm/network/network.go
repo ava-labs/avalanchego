@@ -204,8 +204,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	err = n.mempool.Add(tx)
-	if err == nil {
+	if err := n.mempool.Add(tx); err == nil {
 		txID := tx.ID()
 		n.txPushGossiper.Add(tx)
 		if err := n.txPushGossiper.Gossip(ctx); err != nil {
