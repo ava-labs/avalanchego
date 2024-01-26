@@ -47,11 +47,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		vm.ctx.Lock.Lock()
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
@@ -172,6 +168,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm.ctx.Lock.Unlock()
 	err = vm.issueTx(context.Background(), addThirdDelegatorTx)
 	require.ErrorIs(err, executor.ErrOverDelegated)
+	vm.ctx.Lock.Lock()
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
@@ -217,10 +214,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
-			defer func() {
-				require.NoError(vm.Shutdown(context.Background()))
-				vm.ctx.Lock.Unlock()
-			}()
+			defer vm.ctx.Lock.Unlock()
 
 			key, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
@@ -473,10 +467,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	vm, baseDB, mutableSharedMemory := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
@@ -681,10 +672,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm, baseDB, mutableSharedMemory := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, vm.RewardConfig.SupplyCap/2)
 
@@ -996,10 +984,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
@@ -1136,12 +1121,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2Stake := configtest.MaxValidatorStake - validatorStake
 
 	vm.ctx.Lock.Lock()
-	defer func() {
-		vm.ctx.Lock.Lock()
-		require.NoError(vm.Shutdown(context.Background()))
-
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -1216,6 +1196,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	vm.ctx.Lock.Unlock()
 	err = vm.issueTx(context.Background(), addSecondDelegatorTx)
 	require.ErrorIs(err, executor.ErrOverDelegated)
+	vm.ctx.Lock.Lock()
 }
 
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t *testing.T) {
@@ -1227,10 +1208,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -1352,11 +1330,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -1460,10 +1434,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.TxID
 
@@ -1748,10 +1719,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	// setup time
 	currentTime := genesistest.GenesisTime
@@ -1911,10 +1879,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.TxID
 
@@ -2128,10 +2093,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
+	defer vm.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.TxID
 
