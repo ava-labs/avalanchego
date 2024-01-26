@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -261,9 +263,13 @@ func NewWallet(
 
 type wallet struct {
 	Backend
-	builder Builder
-	signer  Signer
-	client  platformvm.Client
+	signer Signer
+	client platformvm.Client
+
+	isEForkActive      bool
+	builder            Builder
+	dynamicBuilder     DynamicFeesBuilder
+	unitFees, unitCaps fees.Dimensions
 }
 
 func (w *wallet) Builder() Builder {
@@ -278,10 +284,27 @@ func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewBaseTx(outputs, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewBaseTx(outputs, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewBaseTx(outputs, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -291,10 +314,27 @@ func (w *wallet) IssueAddValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewAddValidatorTx(vdr, rewardsOwner, shares, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -302,10 +342,27 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewAddSubnetValidatorTx(vdr, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewAddSubnetValidatorTx(vdr, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -314,10 +371,27 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewRemoveSubnetValidatorTx(nodeID, subnetID, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -326,10 +400,27 @@ func (w *wallet) IssueAddDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddDelegatorTx(vdr, rewardsOwner, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewAddDelegatorTx(vdr, rewardsOwner, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewAddDelegatorTx(vdr, rewardsOwner, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -341,10 +432,27 @@ func (w *wallet) IssueCreateChainTx(
 	chainName string,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -352,10 +460,27 @@ func (w *wallet) IssueCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewCreateSubnetTx(owner, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewCreateSubnetTx(owner, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewCreateSubnetTx(owner, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -364,10 +489,27 @@ func (w *wallet) IssueImportTx(
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewImportTx(sourceChainID, to, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewImportTx(sourceChainID, to, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewImportTx(sourceChainID, to, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -376,10 +518,27 @@ func (w *wallet) IssueExportTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewExportTx(chainID, outputs, options...)
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
+	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewExportTx(chainID, outputs, w.unitFees, w.unitCaps, options...)
+	} else {
+		utx, err = w.builder.NewExportTx(chainID, outputs, options...)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -400,26 +559,61 @@ func (w *wallet) IssueTransformSubnetTx(
 	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewTransformSubnetTx(
-		subnetID,
-		assetID,
-		initialSupply,
-		maxSupply,
-		minConsumptionRate,
-		maxConsumptionRate,
-		minValidatorStake,
-		maxValidatorStake,
-		minStakeDuration,
-		maxStakeDuration,
-		minDelegationFee,
-		minDelegatorStake,
-		maxValidatorWeightFactor,
-		uptimeRequirement,
-		options...,
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
 	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewTransformSubnetTx(
+			subnetID,
+			assetID,
+			initialSupply,
+			maxSupply,
+			minConsumptionRate,
+			maxConsumptionRate,
+			minValidatorStake,
+			maxValidatorStake,
+			minStakeDuration,
+			maxStakeDuration,
+			minDelegationFee,
+			minDelegatorStake,
+			maxValidatorWeightFactor,
+			uptimeRequirement,
+			w.unitFees,
+			w.unitCaps,
+			options...,
+		)
+	} else {
+		utx, err = w.builder.NewTransformSubnetTx(
+			subnetID,
+			assetID,
+			initialSupply,
+			maxSupply,
+			minConsumptionRate,
+			maxConsumptionRate,
+			minValidatorStake,
+			maxValidatorStake,
+			minStakeDuration,
+			maxStakeDuration,
+			minDelegationFee,
+			minDelegatorStake,
+			maxValidatorWeightFactor,
+			uptimeRequirement,
+			options...,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -432,18 +626,45 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddPermissionlessValidatorTx(
-		vdr,
-		signer,
-		assetID,
-		validationRewardsOwner,
-		delegationRewardsOwner,
-		shares,
-		options...,
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
 	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewAddPermissionlessValidatorTx(
+			vdr,
+			signer,
+			assetID,
+			validationRewardsOwner,
+			delegationRewardsOwner,
+			shares,
+			w.unitFees,
+			w.unitCaps,
+			options...,
+		)
+	} else {
+		utx, err = w.builder.NewAddPermissionlessValidatorTx(
+			vdr,
+			signer,
+			assetID,
+			validationRewardsOwner,
+			delegationRewardsOwner,
+			shares,
+			options...,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -453,15 +674,39 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewAddPermissionlessDelegatorTx(
-		vdr,
-		assetID,
-		rewardsOwner,
-		options...,
+	if err := w.refreshFork(options...); err != nil {
+		return nil, err
+	}
+
+	var (
+		utx txs.UnsignedTx
+		err error
 	)
+	if w.isEForkActive {
+		if err := w.refreshFeesData(options...); err != nil {
+			return nil, err
+		}
+
+		utx, err = w.dynamicBuilder.NewAddPermissionlessDelegatorTx(
+			vdr,
+			assetID,
+			rewardsOwner,
+			w.unitFees,
+			w.unitCaps,
+			options...,
+		)
+	} else {
+		utx, err = w.builder.NewAddPermissionlessDelegatorTx(
+			vdr,
+			assetID,
+			rewardsOwner,
+			options...,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return w.IssueUnsignedTx(utx, options...)
 }
 
@@ -509,6 +754,47 @@ func (w *wallet) IssueTx(
 
 	if txStatus.Status != status.Committed {
 		return fmt.Errorf("%w: %s", errNotCommitted, txStatus.Reason)
+	}
+	return nil
+}
+
+func (w *wallet) refreshFork(options ...common.Option) error {
+	if w.isEForkActive {
+		// E fork enables dinamic fees and it is active
+		// not need to recheck
+		return nil
+	}
+
+	var (
+		ops       = common.NewOptions(options)
+		ctx       = ops.Context()
+		eForkTime = version.GetEForkTime(w.NetworkID())
+	)
+
+	chainTime, err := w.client.GetTimestamp(ctx)
+	if err != nil {
+		return err
+	}
+
+	w.isEForkActive = !chainTime.Before(eForkTime)
+	return nil
+}
+
+func (w *wallet) refreshFeesData(options ...common.Option) error {
+	var (
+		ops = common.NewOptions(options)
+		ctx = ops.Context()
+		err error
+	)
+
+	w.unitFees, err = w.client.GetUnitFees(ctx)
+	if err != nil {
+		return err
+	}
+
+	w.unitCaps, err = w.client.GetBlockUnitsCap(ctx)
+	if err != nil {
+		return err
 	}
 	return nil
 }
