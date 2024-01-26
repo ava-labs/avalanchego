@@ -724,11 +724,16 @@ func TestTransformSubnetTx(t *testing.T) {
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	var (
+		initialSupply = 40 * units.MegaAvax
+		maxSupply     = 100 * units.MegaAvax
+	)
+
 	utx, err := b.NewTransformSubnetTx(
 		subnetID,
 		subnetAssetID,
-		50*units.MegaAvax,             // initial supply
-		100*units.MegaAvax,            // max supply
+		initialSupply,                 // initial supply
+		maxSupply,                     // max supply
 		reward.PercentDenominator,     // min consumption rate
 		reward.PercentDenominator,     // max consumption rate
 		1,                             // min validator stake
@@ -771,6 +776,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	outs := utx.Outs
 	require.Len(ins, 3)
 	require.Len(outs, 2)
+	require.Equal(maxSupply-initialSupply, ins[0].In.Amount()-outs[0].Out.Amount())
 	require.Equal(fc.Fee, ins[1].In.Amount()+ins[2].In.Amount()-outs[1].Out.Amount())
 }
 
