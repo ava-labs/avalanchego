@@ -93,3 +93,7 @@ func (c *Client) GetValidatorSet(
 	}
 	return vdrs, nil
 }
+
+func (*Client) ValidateCachedGetValidatorSet(context.Context, uint64, ids.ID) error {
+	return nil
+}

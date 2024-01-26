@@ -79,3 +79,7 @@ func (vm *TestState) GetValidatorSet(
 	}
 	return nil, errGetValidatorSet
 }
+
+func (*TestState) ValidateCachedGetValidatorSet(context.Context, uint64, ids.ID) error {
+	return nil
+}

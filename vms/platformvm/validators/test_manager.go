@@ -30,4 +30,8 @@ func (testManager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.Nod
 	return nil, nil
 }
 
+func (testManager) ValidateCachedGetValidatorSet(context.Context, uint64, ids.ID) error {
+	return nil
+}
+
 func (testManager) OnAcceptedBlockID(ids.ID) {}

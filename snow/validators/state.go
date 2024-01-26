@@ -32,6 +32,12 @@ type State interface {
 		height uint64,
 		subnetID ids.ID,
 	) (map[ids.NodeID]*GetValidatorOutput, error)
+
+	ValidateCachedGetValidatorSet(
+		ctx context.Context,
+		targetHeight uint64,
+		subnetID ids.ID,
+	) error
 }
 
 type lockedState struct {
@@ -76,6 +82,10 @@ func (s *lockedState) GetValidatorSet(
 	defer s.lock.Unlock()
 
 	return s.s.GetValidatorSet(ctx, height, subnetID)
+}
+
+func (*lockedState) ValidateCachedGetValidatorSet(context.Context, uint64, ids.ID) error {
+	return nil
 }
 
 type noValidators struct {

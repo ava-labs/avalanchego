@@ -73,3 +73,7 @@ func (s *tracedState) GetValidatorSet(
 
 	return s.s.GetValidatorSet(ctx, height, subnetID)
 }
+
+func (*tracedState) ValidateCachedGetValidatorSet(context.Context, uint64, ids.ID) error {
+	return nil
+}

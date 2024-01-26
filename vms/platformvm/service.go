@@ -2671,6 +2671,15 @@ func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
 
 		m[vdr.NodeID] = vdrJSON
 	}
+	if v.ErrorString != "" {
+		return stdjson.Marshal(struct {
+			Validators  map[ids.NodeID]*jsonGetValidatorOutput
+			ErrorString string
+		}{
+			Validators:  m,
+			ErrorString: v.ErrorString,
+		})
+	}
 	return stdjson.Marshal(m)
 }
 
@@ -2710,7 +2719,8 @@ func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
 
 // GetValidatorsAtReply is the response from GetValidatorsAt
 type GetValidatorsAtReply struct {
-	Validators map[ids.NodeID]*validators.GetValidatorOutput
+	Validators  map[ids.NodeID]*validators.GetValidatorOutput
+	ErrorString string
 }
 
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
@@ -2732,6 +2742,14 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("failed to get validator set: %w", err)
+	}
+	if err := s.vm.ValidateCachedGetValidatorSet(ctx, height, args.SubnetID); err != nil {
+		s.vm.ctx.Log.Error("invalid validator set",
+			zap.Stringer("subnetID", args.SubnetID),
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
+		reply.ErrorString = err.Error()
 	}
 	return nil
 }

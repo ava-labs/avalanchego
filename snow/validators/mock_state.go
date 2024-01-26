@@ -99,3 +99,17 @@ func (mr *MockStateMockRecorder) GetValidatorSet(arg0, arg1, arg2 any) *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorSet", reflect.TypeOf((*MockState)(nil).GetValidatorSet), arg0, arg1, arg2)
 }
+
+// ValidateCachedGetValidatorSet mocks base method.
+func (m *MockState) ValidateCachedGetValidatorSet(arg0 context.Context, arg1 uint64, arg2 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateCachedGetValidatorSet", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ValidateCachedGetValidatorSet indicates an expected call of ValidateCachedGetValidatorSet.
+func (mr *MockStateMockRecorder) ValidateCachedGetValidatorSet(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateCachedGetValidatorSet", reflect.TypeOf((*MockState)(nil).ValidateCachedGetValidatorSet), arg0, arg1, arg2)
+}

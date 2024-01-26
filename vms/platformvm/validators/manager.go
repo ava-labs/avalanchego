@@ -5,7 +5,9 @@ package validators
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -30,12 +32,22 @@ const (
 	recentlyAcceptedWindowTTL     = 2 * time.Minute
 )
 
-var _ validators.State = (*manager)(nil)
+var (
+	_ validators.State = (*manager)(nil)
+
+	errInconsistentValidatorSet = errors.New("inconsistent validator set")
+)
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
 // interface.
 type Manager interface {
 	validators.State
+
+	ValidateCachedGetValidatorSet(
+		ctx context.Context,
+		targetHeight uint64,
+		subnetID ids.ID,
+	) error
 
 	// OnAcceptedBlockID registers the ID of the latest accepted block.
 	// It is used to update the [recentlyAccepted] sliding window.
@@ -97,7 +109,7 @@ func NewManager(
 		state:   state,
 		metrics: metrics,
 		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+		caches:  make(map[ids.ID]cache.Cacher[uint64, *cachedValidatorSet]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -121,10 +133,15 @@ type manager struct {
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+	caches map[ids.ID]cache.Cacher[uint64, *cachedValidatorSet]
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
+}
+
+type cachedValidatorSet struct {
+	validatorSet     map[ids.NodeID]*validators.GetValidatorOutput
+	calculatedHeight uint64
 }
 
 // GetMinimumHeight returns the height of the most recent block beyond the
@@ -187,10 +204,9 @@ func (m *manager) GetValidatorSet(
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	validatorSetsCache := m.getValidatorSetCache(subnetID)
-
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncValidatorSetsCached()
-		return validatorSet, nil
+		return validatorSet.validatorSet, nil
 	}
 
 	// get the start time to track metrics
@@ -211,7 +227,10 @@ func (m *manager) GetValidatorSet(
 	}
 
 	// cache the validator set
-	validatorSetsCache.Put(targetHeight, validatorSet)
+	validatorSetsCache.Put(targetHeight, &cachedValidatorSet{
+		validatorSet:     validatorSet,
+		calculatedHeight: currentHeight,
+	})
 
 	duration := m.clk.Time().Sub(startTime)
 	m.metrics.IncValidatorSetsCreated()
@@ -220,10 +239,49 @@ func (m *manager) GetValidatorSet(
 	return validatorSet, nil
 }
 
-func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
+func (m *manager) ValidateCachedGetValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+	subnetID ids.ID,
+) error {
+	validatorSetsCache := m.getValidatorSetCache(subnetID)
+	cachedValidatorSet, ok := validatorSetsCache.Get(targetHeight)
+	if !ok {
+		// If the validator set isn't cached, then there is nothing to check.
+		return nil
+	}
+
+	var (
+		validatorSet  map[ids.NodeID]*validators.GetValidatorOutput
+		currentHeight uint64
+		err           error
+	)
+	if subnetID == constants.PrimaryNetworkID {
+		validatorSet, currentHeight, err = m.makePrimaryNetworkValidatorSet(ctx, targetHeight)
+	} else {
+		validatorSet, currentHeight, err = m.makeSubnetValidatorSet(ctx, targetHeight, subnetID)
+	}
+	if err != nil {
+		return err
+	}
+
+	if reflect.DeepEqual(cachedValidatorSet.validatorSet, validatorSet) {
+		return nil
+	}
+
+	return fmt.Errorf("%w calculated for %s:%d at %d and %d",
+		errInconsistentValidatorSet,
+		subnetID,
+		targetHeight,
+		cachedValidatorSet.calculatedHeight,
+		currentHeight,
+	)
+}
+
+func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, *cachedValidatorSet] {
 	// Only cache tracked subnets
 	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
-		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
+		return &cache.Empty[uint64, *cachedValidatorSet]{}
 	}
 
 	validatorSetsCache, exists := m.caches[subnetID]
@@ -231,7 +289,7 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 		return validatorSetsCache
 	}
 
-	validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
+	validatorSetsCache = &cache.LRU[uint64, *cachedValidatorSet]{
 		Size: validatorSetsCacheSize,
 	}
 	m.caches[subnetID] = validatorSetsCache
