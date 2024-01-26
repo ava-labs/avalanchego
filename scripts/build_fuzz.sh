@@ -18,18 +18,17 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 fuzzTime=${1:-1}
 fuzzDir=${2:-.}
 
-files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' $fuzzDir)
+files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
 failed=false
 for file in ${files}
 do
-    funcs=$(grep -oP 'func \K(Fuzz\w*)' $file)
+    funcs=$(grep -oP 'func \K(Fuzz\w*)' "$file")
     for func in ${funcs}
     do
         echo "Fuzzing $func in $file"
-        parentDir=$(dirname $file)
-        go test $parentDir -run=$func -fuzz=$func -fuzztime=${fuzzTime}s
+        parentDir=$(dirname "$file")
         # If any of the fuzz tests fail, return exit code 1
-        if [ $? -ne 0 ]; then
+        if ! go test "$parentDir" -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s; then
             failed=true
         fi
     done

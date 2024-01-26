@@ -16,24 +16,23 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-var errTest = errors.New("non-nil error")
+var (
+	errTest = errors.New("non-nil error")
 
-// SuccessResponseTest defines the expected result of an API call that returns SuccessResponse
-type SuccessResponseTest struct {
-	Err error
-}
-
-// GetSuccessResponseTests returns a list of possible SuccessResponseTests
-func GetSuccessResponseTests() []SuccessResponseTest {
-	return []SuccessResponseTest{
+	SuccessResponseTests = []struct {
+		name        string
+		expectedErr error
+	}{
 		{
-			Err: nil,
+			name:        "no error",
+			expectedErr: nil,
 		},
 		{
-			Err: errTest,
+			name:        "error",
+			expectedErr: errTest,
 		},
 	}
-}
+)
 
 type mockClient struct {
 	response interface{}
@@ -76,74 +75,62 @@ func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, re
 }
 
 func TestStartCPUProfiler(t *testing.T) {
-	require := require.New(t)
-
-	tests := GetSuccessResponseTests()
-
-	for _, test := range tests {
-		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
-		err := mockClient.StartCPUProfiler(context.Background())
-		require.ErrorIs(err, test.Err)
+	for _, test := range SuccessResponseTests {
+		t.Run(test.name, func(t *testing.T) {
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.expectedErr)}
+			err := mockClient.StartCPUProfiler(context.Background())
+			require.ErrorIs(t, err, test.expectedErr)
+		})
 	}
 }
 
 func TestStopCPUProfiler(t *testing.T) {
-	require := require.New(t)
-
-	tests := GetSuccessResponseTests()
-
-	for _, test := range tests {
-		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
-		err := mockClient.StopCPUProfiler(context.Background())
-		require.ErrorIs(err, test.Err)
+	for _, test := range SuccessResponseTests {
+		t.Run(test.name, func(t *testing.T) {
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.expectedErr)}
+			err := mockClient.StopCPUProfiler(context.Background())
+			require.ErrorIs(t, err, test.expectedErr)
+		})
 	}
 }
 
 func TestMemoryProfile(t *testing.T) {
-	require := require.New(t)
-
-	tests := GetSuccessResponseTests()
-
-	for _, test := range tests {
-		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
-		err := mockClient.MemoryProfile(context.Background())
-		require.ErrorIs(err, test.Err)
+	for _, test := range SuccessResponseTests {
+		t.Run(test.name, func(t *testing.T) {
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.expectedErr)}
+			err := mockClient.MemoryProfile(context.Background())
+			require.ErrorIs(t, err, test.expectedErr)
+		})
 	}
 }
 
 func TestLockProfile(t *testing.T) {
-	require := require.New(t)
-
-	tests := GetSuccessResponseTests()
-
-	for _, test := range tests {
-		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
-		err := mockClient.LockProfile(context.Background())
-		require.ErrorIs(err, test.Err)
+	for _, test := range SuccessResponseTests {
+		t.Run(test.name, func(t *testing.T) {
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.expectedErr)}
+			err := mockClient.LockProfile(context.Background())
+			require.ErrorIs(t, err, test.expectedErr)
+		})
 	}
 }
 
 func TestAlias(t *testing.T) {
-	require := require.New(t)
-
-	tests := GetSuccessResponseTests()
-
-	for _, test := range tests {
-		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
-		err := mockClient.Alias(context.Background(), "alias", "alias2")
-		require.ErrorIs(err, test.Err)
+	for _, test := range SuccessResponseTests {
+		t.Run(test.name, func(t *testing.T) {
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.expectedErr)}
+			err := mockClient.Alias(context.Background(), "alias", "alias2")
+			require.ErrorIs(t, err, test.expectedErr)
+		})
 	}
 }
 
 func TestAliasChain(t *testing.T) {
-	require := require.New(t)
-
-	tests := GetSuccessResponseTests()
-
-	for _, test := range tests {
-		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
-		err := mockClient.AliasChain(context.Background(), "chain", "chain-alias")
-		require.ErrorIs(err, test.Err)
+	for _, test := range SuccessResponseTests {
+		t.Run(test.name, func(t *testing.T) {
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.expectedErr)}
+			err := mockClient.AliasChain(context.Background(), "chain", "chain-alias")
+			require.ErrorIs(t, err, test.expectedErr)
+		})
 	}
 }
 
@@ -169,14 +156,12 @@ func TestGetChainAliases(t *testing.T) {
 }
 
 func TestStacktrace(t *testing.T) {
-	require := require.New(t)
-
-	tests := GetSuccessResponseTests()
-
-	for _, test := range tests {
-		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
-		err := mockClient.Stacktrace(context.Background())
-		require.ErrorIs(err, test.Err)
+	for _, test := range SuccessResponseTests {
+		t.Run(test.name, func(t *testing.T) {
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.expectedErr)}
+			err := mockClient.Stacktrace(context.Background())
+			require.ErrorIs(t, err, test.expectedErr)
+		})
 	}
 }
 

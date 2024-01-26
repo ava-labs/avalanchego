@@ -109,17 +109,16 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
-      # TODO: re-activate this test after there is a compatible tag to use
-      # - name: Run e2e tests
-      #   shell: bash
-      #   run: ./scripts/tests.upgrade.sh
-      # - name: Upload tmpnet network dir
-      #   uses: actions/upload-artifact@v3
-      #   if: always()
-      #   with:
-      #     name: upgrade-tmpnet-data
-      #     path: ${{ env.tmpnet_data_path }}
-      #     if-no-files-found: error
+      - name: Run e2e tests
+        shell: bash
+        run: ./scripts/tests.upgrade.sh
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: upgrade-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
   Lint:
     runs-on: ubuntu-latest
     steps:
@@ -131,6 +130,9 @@ jobs:
       - name: Run static analysis tests
         shell: bash
         run: scripts/lint.sh
+      - name: Run shellcheck
+        shell: bash
+        run: scripts/shellcheck.sh
   buf-lint:
     name: Protobuf Lint
     runs-on: ubuntu-latest
