@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -35,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -46,12 +44,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -69,31 +64,8 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-type activeFork uint8
-
-const (
-	apricotPhase3 activeFork = iota
-	apricotPhase5
-	banffFork
-	cortinaFork
-	durangoFork
-
-	latestFork activeFork = durangoFork
-)
-
 var (
-	defaultRewardConfig = reward.Config{
-		MaxConsumptionRate: .12 * reward.PercentDenominator,
-		MinConsumptionRate: .10 * reward.PercentDenominator,
-		MintingPeriod:      365 * 24 * time.Hour,
-		SupplyCap:          720 * units.MegaAvax,
-	}
-
-	defaultTxFee = uint64(100)
-
 	latestForkTime = genesistest.ValidateEndTime.Add(-5 * configtest.MinStakingDuration)
-
-	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are ts.SubnetControlKeys
@@ -101,77 +73,23 @@ var (
 	testSubnet1 *txs.Tx
 )
 
-type mutableSharedMemory struct {
-	atomic.SharedMemory
-}
-
-func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, fork configtest.ActiveFork) (*VM, database.Database, *configtest.MutableSharedMemory) {
 	require := require.New(t)
-	var (
-		apricotPhase3Time = mockable.MaxTime
-		apricotPhase5Time = mockable.MaxTime
-		banffTime         = mockable.MaxTime
-		cortinaTime       = mockable.MaxTime
-		durangoTime       = mockable.MaxTime
-	)
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = genesistest.GenesisTime.Add(time.Second)
-	switch fork {
-	case durangoFork:
-		durangoTime = latestForkTime
-		fallthrough
-	case cortinaFork:
-		cortinaTime = latestForkTime
-		fallthrough
-	case banffFork:
-		banffTime = latestForkTime
-		fallthrough
-	case apricotPhase5:
-		apricotPhase5Time = latestForkTime
-		fallthrough
-	case apricotPhase3:
-		apricotPhase3Time = latestForkTime
-	default:
-		require.NoError(fmt.Errorf("unhandled fork %d", fork))
+
+	vm := &VM{
+		Config: *configtest.Config(fork, latestForkTime),
 	}
 
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		SybilProtectionEnabled: true,
-		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		TransformSubnetTxFee:   100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      configtest.MinValidatorStake,
-		MaxValidatorStake:      configtest.MaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      apricotPhase3Time,
-		ApricotPhase5Time:      apricotPhase5Time,
-		BanffTime:              banffTime,
-		CortinaTime:            cortinaTime,
-		DurangoTime:            durangoTime,
-	}}
-
-	db := memdb.New()
-	chainDB := prefixdb.New([]byte{0}, db)
-	atomicDB := prefixdb.New([]byte{1}, db)
+	baseDB := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, baseDB)
 
 	vm.clock.Set(latestForkTime)
 	msgChan := make(chan common.Message, 1)
-	ctx := snowtest.Context(t, snowtest.PChainID)
-
-	m := atomic.NewMemory(atomicDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
+	ctx, msm := configtest.Context(t, baseDB)
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -230,13 +148,13 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		require.NoError(vm.Shutdown(context.Background()))
 	})
 
-	return vm, db, msm
+	return vm, baseDB, msm
 }
 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -289,7 +207,7 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -336,7 +254,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -386,7 +304,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, configtest.CortinaFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -431,7 +349,7 @@ func TestAddValidatorReject(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -464,7 +382,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -511,7 +429,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -557,7 +475,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -626,7 +544,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -696,7 +614,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -707,7 +625,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -756,7 +674,7 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -854,7 +772,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, baseDB, mutableSharedMemory := defaultVM(t, latestFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -940,7 +858,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, apricotPhase3)
+	vm, _, _ := defaultVM(t, configtest.ApricotPhase3Fork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1000,26 +918,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := memdb.New()
 
 	firstDB := prefixdb.New([]byte{}, db)
-	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-	}}
+	firstVM := &VM{
+		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+	}
 
-	firstCtx := snowtest.Context(t, snowtest.PChainID)
-
+	firstCtx, _ := configtest.Context(t, memdb.New())
 	_, genesisBytes := genesistest.Genesis(t, firstCtx)
-
-	baseDB := memdb.New()
-	atomicDB := prefixdb.New([]byte{1}, baseDB)
-	m := atomic.NewMemory(atomicDB)
-	firstCtx.SharedMemory = m.NewSharedMemory(firstCtx.ChainID)
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
@@ -1087,20 +991,11 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
 
-	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-	}}
+	secondVM := &VM{
+		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+	}
 
-	secondCtx := snowtest.Context(t, snowtest.PChainID)
-	secondCtx.SharedMemory = firstCtx.SharedMemory
+	secondCtx, _ := configtest.Context(t, db)
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -1137,27 +1032,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-	}}
+	vm := &VM{
+		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+	}
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := snowtest.Context(t, snowtest.PChainID)
-
+	ctx, _ := configtest.Context(t, baseDB)
 	_, genesisBytes := genesistest.Genesis(t, ctx)
-
-	atomicDB := prefixdb.New([]byte{1}, baseDB)
-	m := atomic.NewMemory(atomicDB)
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	consensusCtx := snowtest.ConsensusContext(ctx)
 	ctx.Lock.Lock()
@@ -1477,22 +1359,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
+	baseDB := memdb.New()
 
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-	}}
+	vm := &VM{
+		Config: *configtest.Config(configtest.DurangoFork, latestForkTime),
+	}
 
 	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
-	ctx := snowtest.Context(t, snowtest.PChainID)
+	ctx, _ := configtest.Context(t, baseDB)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1505,7 +1380,7 @@ func TestUnverifiedParent(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		memdb.New(),
+		baseDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -1586,7 +1461,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1639,18 +1514,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	firstDB := prefixdb.New([]byte{}, db)
 	const firstUptimePercentage = 20 // 20%
-	firstVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       firstUptimePercentage / 100.,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-	}}
+	firstCfg := configtest.Config(configtest.DurangoFork, latestForkTime)
+	firstCfg.UptimePercentage = firstUptimePercentage / 100.
+	firstVM := &VM{Config: *firstCfg}
 
-	firstCtx := snowtest.Context(t, snowtest.PChainID)
+	firstCtx, _ := configtest.Context(t, db)
 	firstCtx.Lock.Lock()
 
 	_, genesisBytes := genesistest.Genesis(t, firstCtx)
@@ -1687,18 +1555,13 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Restart the VM with a larger uptime requirement
 	secondDB := prefixdb.New([]byte{}, db)
-	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondVM := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       secondUptimePercentage / 100.,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-	}}
 
-	secondCtx := snowtest.Context(t, snowtest.PChainID)
+	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
+	secondCfg := configtest.Config(configtest.DurangoFork, latestForkTime)
+	secondCfg.UptimePercentage = secondUptimePercentage / 100.
+	secondVM := &VM{Config: *secondCfg}
+
+	secondCtx, _ := configtest.Context(t, db)
 	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
@@ -1785,18 +1648,13 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	latestForkTime = genesistest.ValidateStartTime.Add(configtest.MinStakingDuration)
 	db := memdb.New()
 
-	vm := &VM{Config: config.Config{
-		Chains:                 chains.TestManager,
-		UptimePercentage:       .2,
-		RewardConfig:           defaultRewardConfig,
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              latestForkTime,
-		CortinaTime:            latestForkTime,
-		DurangoTime:            latestForkTime,
-	}}
+	cfg := configtest.Config(configtest.DurangoFork, latestForkTime)
+	cfg.UptimePercentage = .2
+	vm := &VM{
+		Config: *cfg,
+	}
 
-	ctx := snowtest.Context(t, snowtest.PChainID)
+	ctx, _ := configtest.Context(t, db)
 	ctx.Lock.Lock()
 
 	_, genesisBytes := genesistest.Genesis(t, ctx)
@@ -1886,7 +1744,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 
 	var (
 		chainTime          = vm.state.GetTimestamp()
@@ -1988,7 +1846,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2064,7 +1922,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 func TestBaseTx(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2138,7 +1996,7 @@ func TestBaseTx(t *testing.T) {
 
 func TestPruneMempool(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, latestFork)
+	vm, _, _ := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

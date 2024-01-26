@@ -12,26 +12,20 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
@@ -53,15 +47,7 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-var (
-	testSubnet1 *txs.Tx
-
-	defaultTxFee = uint64(100)
-)
-
-type mutableSharedMemory struct {
-	atomic.SharedMemory
-}
+var testSubnet1 *txs.Tx
 
 type environment struct {
 	Builder
@@ -75,7 +61,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *mutableSharedMemory
+	msm            *configtest.MutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	atomicUTXOs    avax.AtomicUTXOManager
@@ -86,24 +72,22 @@ type environment struct {
 }
 
 func newEnvironment(t *testing.T) *environment {
-	require := require.New(t)
+	r := require.New(t)
+
+	var (
+		fork     = configtest.DurangoFork
+		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
+	)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
+		config:         configtest.Config(fork, forkTime),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
-	m := atomic.NewMemory(atomicDB)
-
-	res.ctx = snowtest.Context(t, snowtest.PChainID)
-	res.msm = &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(res.ctx.ChainID),
-	}
-	res.ctx.SharedMemory = res.msm
+	res.ctx, res.msm = configtest.Context(t, res.baseDB)
 
 	res.ctx.Lock.Lock()
 	defer res.ctx.Lock.Unlock()
@@ -146,10 +130,10 @@ func newEnvironment(t *testing.T) *environment {
 	}
 
 	metrics, err := metrics.New("", registerer)
-	require.NoError(err)
+	r.NoError(err)
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
-	require.NoError(err)
+	r.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
@@ -172,7 +156,7 @@ func newEnvironment(t *testing.T) *environment {
 		registerer,
 		network.DefaultConfig,
 	)
-	require.NoError(err)
+	r.NoError(err)
 
 	res.Builder = New(
 		res.mempool,
@@ -194,13 +178,13 @@ func newEnvironment(t *testing.T) *environment {
 		if res.isBootstrapped.Get() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
-			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+			r.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
 
-			require.NoError(res.state.Commit())
+			r.NoError(res.state.Commit())
 		}
 
-		require.NoError(res.state.Close())
-		require.NoError(res.baseDB.Close())
+		r.NoError(res.state.Close())
+		r.NoError(res.baseDB.Close())
 	})
 
 	return res
@@ -218,7 +202,7 @@ func addSubnet(t *testing.T, env *environment) {
 			genesistest.SubnetControlKeys[1].PublicKey().Address(),
 			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
 		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
@@ -266,31 +250,6 @@ func defaultState(
 	state.SetHeight(0)
 	require.NoError(state.Commit())
 	return state
-}
-
-func defaultConfig() *config.Config {
-	return &config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig: reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
-		ApricotPhase3Time: genesistest.ValidateEndTime,
-		ApricotPhase5Time: genesistest.ValidateEndTime,
-		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
-	}
 }
 
 func defaultClock() *mockable.Clock {

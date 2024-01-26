@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -174,13 +175,13 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		{
 			name:          "post-fork - incorrectly priced",
 			time:          ap3Time,
-			fee:           100*defaultTxFee - 1*units.NanoAvax,
+			fee:           100*configtest.TxFee - 1*units.NanoAvax,
 			expectedError: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name:          "post-fork - correctly priced",
 			time:          ap3Time,
-			fee:           100 * defaultTxFee,
+			fee:           100 * configtest.TxFee,
 			expectedError: nil,
 		},
 	}

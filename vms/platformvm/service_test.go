@@ -74,8 +74,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, latestFork)
+func defaultService(t *testing.T) (*Service, *configtest.MutableSharedMemory) {
+	vm, _, mutableSharedMemory := defaultVM(t, configtest.LatestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -733,7 +733,7 @@ func TestGetBlock(t *testing.T) {
 			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.Config.CreateAssetTxFee = 100 * configtest.TxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks

@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -21,15 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
@@ -46,15 +41,10 @@ import (
 )
 
 var (
-	defaultTxFee   = uint64(100)
 	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1 *txs.Tx
 )
-
-type mutableSharedMemory struct {
-	atomic.SharedMemory
-}
 
 type environment struct {
 	isBootstrapped *utils.Atomic[bool]
@@ -62,7 +52,7 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *mutableSharedMemory
+	msm            *configtest.MutableSharedMemory
 	fx             fx.Fx
 	state          state.State
 	states         map[ids.ID]state.Chain
@@ -89,16 +79,30 @@ func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *env
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina, postDurango)
-	clk := defaultClock(postBanff || postCortina || postDurango)
+	var (
+		fork     configtest.ActiveFork
+		forkTime time.Time
+	)
+	switch {
+	case postDurango:
+		fork = configtest.DurangoFork
+		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
+	case postCortina:
+		fork = configtest.CortinaFork
+		forkTime = genesistest.ValidateStartTime.Add(-2 * time.Second).Add(-2 * time.Second)
+	case postBanff:
+		fork = configtest.BanffFork
+		forkTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
+	default:
+		fork = configtest.ApricotPhase5Fork
+		forkTime = genesistest.GenesisTime
+	}
+
+	config := configtest.Config(fork, forkTime)
+	clk := defaultClock(forkTime)
 
 	baseDB := versiondb.New(memdb.New())
-	ctx := snowtest.Context(t, snowtest.PChainID)
-	m := atomic.NewMemory(baseDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
+	ctx, msm := configtest.Context(t, baseDB)
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
@@ -192,7 +196,7 @@ func addSubnet(
 			genesistest.SubnetControlKeys[1].PublicKey().Address(),
 			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
 		genesistest.Keys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
@@ -246,54 +250,9 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
-	}
-	durangoTime := mockable.MaxTime
-	if postDurango {
-		durangoTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
-	}
-
-	return &config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig: reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
-		ApricotPhase3Time: genesistest.ValidateEndTime,
-		ApricotPhase5Time: genesistest.ValidateEndTime,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
-		DurangoTime:       durangoTime,
-	}
-}
-
-func defaultClock(postFork bool) *mockable.Clock {
-	now := genesistest.GenesisTime
-	if postFork {
-		// 1 second after Banff fork
-		now = genesistest.ValidateEndTime.Add(-2 * time.Second)
-	}
+func defaultClock(forkTime time.Time) *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(now)
+	clk.Set(forkTime)
 	return clk
 }
 

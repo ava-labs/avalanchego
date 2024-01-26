@@ -14,26 +14,20 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
@@ -103,19 +97,20 @@ type environment struct {
 }
 
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
+	var (
+		fork     = configtest.ApricotPhase5Fork
+		forkTime = genesistest.ValidateEndTime
+	)
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		ctx:            snowtest.Context(t, snowtest.PChainID),
-		config:         defaultConfig(),
+		config:         configtest.Config(fork, forkTime),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
 
 	res.baseDB = versiondb.New(memdb.New())
-	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
-	m := atomic.NewMemory(atomicDB)
-	res.ctx.SharedMemory = m.NewSharedMemory(res.ctx.ChainID)
-
+	res.ctx, _ = configtest.Context(t, res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
@@ -234,7 +229,7 @@ func addSubnet(env *environment) {
 			genesistest.SubnetControlKeys[1].PublicKey().Address(),
 			genesistest.SubnetControlKeys[2].PublicKey().Address(),
 		},
-		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
+		[]*secp256k1.PrivateKey{genesistest.Keys[4]},
 		genesistest.Keys[0].PublicKey().Address(),
 	)
 	if err != nil {
@@ -295,31 +290,6 @@ func defaultState(
 	}
 	genesisBlkID = state.GetLastAccepted()
 	return state
-}
-
-func defaultConfig() *config.Config {
-	return &config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       configtest.MinStakingDuration,
-		MaxStakeDuration:       configtest.MaxStakingDuration,
-		RewardConfig: reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
-		ApricotPhase3Time: genesistest.ValidateEndTime,
-		ApricotPhase5Time: genesistest.ValidateEndTime,
-		BanffTime:         mockable.MaxTime,
-	}
 }
 
 func defaultClock() *mockable.Clock {
