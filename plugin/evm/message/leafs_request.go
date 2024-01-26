@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const MaxCodeHashesPerRequest = 5
+
 var _ Request = LeafsRequest{}
 
 // NodeType outlines the trie that a leaf node belongs to

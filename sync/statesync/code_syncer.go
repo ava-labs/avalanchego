@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/message"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -140,7 +140,7 @@ func (c *codeSyncer) addCodeToFetchFromDBToQueue() error {
 // work fulfills any incoming requests from the producer channel by fetching code bytes from the network
 // and fulfilling them by updating the database.
 func (c *codeSyncer) work(ctx context.Context) error {
-	codeHashes := make([]common.Hash, 0, params.MaxCodeHashesPerRequest)
+	codeHashes := make([]common.Hash, 0, message.MaxCodeHashesPerRequest)
 
 	for {
 		select {
@@ -159,7 +159,7 @@ func (c *codeSyncer) work(ctx context.Context) error {
 			codeHashes = append(codeHashes, codeHash)
 			// Try to wait for at least [MaxCodeHashesPerRequest] code hashes to batch into a single request
 			// if there's more work remaining.
-			if len(codeHashes) < params.MaxCodeHashesPerRequest {
+			if len(codeHashes) < message.MaxCodeHashesPerRequest {
 				continue
 			}
 			if err := c.fulfillCodeRequest(ctx, codeHashes); err != nil {
