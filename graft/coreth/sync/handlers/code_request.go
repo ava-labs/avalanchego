@@ -76,7 +76,7 @@ func (n *CodeRequestHandler) OnCodeRequest(_ context.Context, nodeID ids.NodeID,
 	codeResponse := message.CodeResponse{Data: codeBytes}
 	responseBytes, err := n.codec.Marshal(message.Version, codeResponse)
 	if err != nil {
-		log.Warn("could not marshal CodeResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "request", codeRequest, "err", err)
+		log.Error("could not marshal CodeResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "request", codeRequest, "err", err)
 		return nil, nil
 	}
 	n.stats.UpdateCodeBytesReturned(uint32(totalBytes))

@@ -581,7 +581,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call interfaces.Call
 			if transfer == nil {
 				transfer = new(big.Int)
 			}
-			log.Warn("Gas estimation capped by limited funds", "original", hi, "balance", balance,
+			log.Info("Gas estimation capped by limited funds", "original", hi, "balance", balance,
 				"sent", transfer, "feecap", feeCap, "fundable", allowance)
 			hi = allowance.Uint64()
 		}

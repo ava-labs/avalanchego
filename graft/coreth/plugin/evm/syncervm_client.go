@@ -264,7 +264,7 @@ func (client *stateSyncerClient) syncBlocks(ctx context.Context, fromHash common
 		}
 		blocks, err := client.client.GetBlocks(ctx, nextHash, nextHeight, parentsPerRequest)
 		if err != nil {
-			log.Warn("could not get blocks from peer", "err", err, "nextHash", nextHash, "remaining", i+1)
+			log.Error("could not get blocks from peer", "err", err, "nextHash", nextHash, "remaining", i+1)
 			return err
 		}
 		for _, block := range blocks {
