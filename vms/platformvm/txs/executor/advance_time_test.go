@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -20,15 +21,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+func newAdvanceTimeTx(t testing.TB, timestamp time.Time) (*txs.Tx, error) {
+	utx := &txs.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
+}
+
 // Ensure semantic verification updates the current and pending staker set
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
@@ -45,7 +53,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -90,11 +98,8 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 
-	tx, err := env.txBuilder.NewAdvanceTimeTx(env.state.GetTimestamp())
+	tx, err := newAdvanceTimeTx(t, env.state.GetTimestamp())
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -118,6 +123,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -128,7 +134,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	require.NoError(err)
 
 	{
-		tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
+		tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime.Add(1*time.Second))
 		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -147,21 +153,17 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		require.ErrorIs(err, ErrChildBlockAfterStakerChangeTime)
 	}
 
-	require.NoError(shutdownEnvironment(env))
-
 	// Case: Timestamp is after next validator end time
 	env = newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	// fast forward clock to 10 seconds before genesis validators stop validating
 	env.clk.Set(defaultValidateEndTime.Add(-10 * time.Second))
 
 	{
 		// Proposes advancing timestamp to 1 second after genesis validators stop validating
-		tx, err := env.txBuilder.NewAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second))
+		tx, err := newAdvanceTimeTx(t, defaultValidateEndTime.Add(1*time.Second))
 		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -354,9 +356,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 			env.ctx.Lock.Lock()
-			defer func() {
-				require.NoError(shutdownEnvironment(env))
-			}()
+			defer env.ctx.Lock.Unlock()
 
 			dummyHeight := uint64(1)
 
@@ -400,7 +400,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 
 			for _, newTime := range test.advanceTimeTo {
 				env.clk.Set(newTime)
-				tx, err := env.txBuilder.NewAdvanceTimeTx(newTime)
+				tx, err := newAdvanceTimeTx(t, newTime)
 				require.NoError(err)
 
 				onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -459,9 +459,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -526,7 +524,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	// Advance time to the first staker's end time.
 	env.clk.Set(subnetVdr1EndTime)
-	tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1EndTime)
+	tx, err = newAdvanceTimeTx(t, subnetVdr1EndTime)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -563,9 +561,7 @@ func TestTrackedSubnet(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 			env.ctx.Lock.Lock()
-			defer func() {
-				require.NoError(shutdownEnvironment(env))
-			}()
+			defer env.ctx.Lock.Unlock()
 			dummyHeight := uint64(1)
 
 			subnetID := testSubnet1.ID()
@@ -602,7 +598,7 @@ func TestTrackedSubnet(t *testing.T) {
 
 			// Advance time to the staker's start time.
 			env.clk.Set(subnetVdr1StartTime)
-			tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1StartTime)
+			tx, err = newAdvanceTimeTx(t, subnetVdr1StartTime)
 			require.NoError(err)
 
 			onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -633,9 +629,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
@@ -652,7 +646,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -709,7 +703,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// Advance Time
-	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
+	tx, err = newAdvanceTimeTx(t, pendingDelegatorStartTime)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -740,9 +734,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
@@ -753,7 +745,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*secp256k1.PrivateKey{preFundedKeys[0]})
 	require.NoError(err)
 
-	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -805,7 +797,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// Advance Time
-	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
+	tx, err = newAdvanceTimeTx(t, pendingDelegatorStartTime)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -832,44 +824,11 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
-// Test method InitiallyPrefersCommit
-func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-	now := env.clk.Time()
-
-	// Proposed advancing timestamp to 1 second after sync bound
-	tx, err := env.txBuilder.NewAdvanceTimeTx(now.Add(SyncBound))
-	require.NoError(err)
-
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&executor))
-
-	require.True(executor.PrefersCommit, "should prefer to commit this tx because its proposed timestamp it's within sync bound")
-}
-
 func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 	upgradeTime := env.clk.Time().Add(SyncBound)
 	env.config.BanffTime = upgradeTime
@@ -877,7 +836,7 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	env.config.DurangoTime = upgradeTime
 
 	// Proposed advancing timestamp to the banff timestamp
-	tx, err := env.txBuilder.NewAdvanceTimeTx(upgradeTime)
+	tx, err := newAdvanceTimeTx(t, upgradeTime)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -901,12 +860,10 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	chainTime := env.state.GetTimestamp()
-	tx, err := env.txBuilder.NewAdvanceTimeTx(chainTime.Add(time.Second))
+	tx, err := newAdvanceTimeTx(t, chainTime.Add(time.Second))
 	require.NoError(err)
 
 	bytes, err := txs.Codec.Marshal(txs.CodecVersion, tx)

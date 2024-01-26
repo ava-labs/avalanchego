@@ -70,6 +70,16 @@ var (
 
 	DefaultUpgradeTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
+	ApricotPhase1Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
+	}
+
+	ApricotPhase2Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
+	}
+
 	ApricotPhase3Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
@@ -89,9 +99,19 @@ var (
 		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
 	}
 
+	ApricotPhasePre6Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.September, 5, 1, 30, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+	}
+
 	ApricotPhase6Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+	}
+
+	ApricotPhasePost6Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC),
 	}
 
 	BanffTimes = map[uint32]time.Time{
@@ -156,6 +176,20 @@ func init() {
 	}
 }
 
+func GetApricotPhase1Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase1Times[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
+}
+
+func GetApricotPhase2Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase2Times[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
+}
+
 func GetApricotPhase3Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase3Times[networkID]; exists {
 		return upgradeTime
@@ -177,8 +211,22 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	return DefaultUpgradeTime
 }
 
+func GetApricotPhasePre6Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhasePre6Times[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
+}
+
 func GetApricotPhase6Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
+}
+
+func GetApricotPhasePost6Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhasePost6Times[networkID]; exists {
 		return upgradeTime
 	}
 	return DefaultUpgradeTime
