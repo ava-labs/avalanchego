@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package propertyfx
@@ -39,7 +39,7 @@ var (
 
 func TestFxInitialize(t *testing.T) {
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
@@ -56,7 +56,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -98,7 +98,7 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -132,7 +132,7 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -163,7 +163,7 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -195,7 +195,7 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -226,7 +226,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -264,7 +264,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -301,7 +301,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -335,7 +335,7 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -364,7 +364,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -399,7 +399,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
@@ -431,7 +431,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 	require := require.New(t)
 
 	vm := secp256k1fx.TestVM{
-		Codec: linearcodec.NewDefault(),
+		Codec: linearcodec.NewDefault(time.Time{}),
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -158,7 +158,7 @@ func TestValidatorsSample(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockValidators := validators.NewMockState(ctrl)
 
-			calls := make([]*gomock.Call, 0)
+			calls := make([]any, 0)
 			for _, call := range tt.calls {
 				calls = append(calls, mockValidators.EXPECT().
 					GetCurrentHeight(gomock.Any()).Return(call.height, call.getCurrentHeightErr))

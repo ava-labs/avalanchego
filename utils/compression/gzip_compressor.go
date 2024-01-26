@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -21,6 +21,7 @@ var (
 	ErrMsgTooLarge              = errors.New("msg too large to be compressed")
 )
 
+// TODO: Remove once v1.11.x is out.
 type gzipCompressor struct {
 	maxSize        int64
 	gzipWriterPool sync.Pool

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcdb
@@ -43,7 +43,7 @@ func (db *DatabaseClient) Has(key []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return resp.Has, errEnumToError[resp.Err]
+	return resp.Has, ErrEnumToError[resp.Err]
 }
 
 // Get attempts to return the value that was mapped to the key that was provided
@@ -54,7 +54,7 @@ func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.Value, errEnumToError[resp.Err]
+	return resp.Value, ErrEnumToError[resp.Err]
 }
 
 // Put attempts to set the value this key maps to
@@ -66,7 +66,7 @@ func (db *DatabaseClient) Put(key, value []byte) error {
 	if err != nil {
 		return err
 	}
-	return errEnumToError[resp.Err]
+	return ErrEnumToError[resp.Err]
 }
 
 // Delete attempts to remove any mapping from the key
@@ -77,7 +77,7 @@ func (db *DatabaseClient) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
-	return errEnumToError[resp.Err]
+	return ErrEnumToError[resp.Err]
 }
 
 // NewBatch returns a new batch
@@ -120,7 +120,7 @@ func (db *DatabaseClient) Compact(start, limit []byte) error {
 	if err != nil {
 		return err
 	}
-	return errEnumToError[resp.Err]
+	return ErrEnumToError[resp.Err]
 }
 
 // Close attempts to close the database
@@ -130,7 +130,7 @@ func (db *DatabaseClient) Close() error {
 	if err != nil {
 		return err
 	}
-	return errEnumToError[resp.Err]
+	return ErrEnumToError[resp.Err]
 }
 
 func (db *DatabaseClient) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -175,7 +175,7 @@ func (b *batch) Write() error {
 	if err != nil {
 		return err
 	}
-	return errEnumToError[resp.Err]
+	return ErrEnumToError[resp.Err]
 }
 
 func (b *batch) Inner() database.Batch {
@@ -224,7 +224,7 @@ func (it *iterator) fetch() {
 		if err != nil {
 			it.setError(err)
 		} else {
-			it.setError(errEnumToError[resp.Err])
+			it.setError(ErrEnumToError[resp.Err])
 		}
 
 		close(it.fetchedData)
@@ -324,7 +324,7 @@ func (it *iterator) updateError() {
 	if err != nil {
 		it.setError(err)
 	} else {
-		it.setError(errEnumToError[resp.Err])
+		it.setError(ErrEnumToError[resp.Err])
 	}
 }
 

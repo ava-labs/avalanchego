@@ -1,9 +1,23 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bimap
 
-import "github.com/ava-labs/avalanchego/utils"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+
+	"github.com/ava-labs/avalanchego/utils"
+)
+
+var (
+	_ json.Marshaler   = (*BiMap[int, int])(nil)
+	_ json.Unmarshaler = (*BiMap[int, int])(nil)
+
+	nullBytes       = []byte("null")
+	errNotBijective = errors.New("map not bijective")
+)
 
 type Entry[K, V any] struct {
 	Key   K
@@ -99,4 +113,29 @@ func (m *BiMap[K, V]) DeleteValue(val V) (K, bool) {
 // Len return the number of entries in this map.
 func (m *BiMap[K, V]) Len() int {
 	return len(m.keyToValue)
+}
+
+func (m *BiMap[K, V]) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.keyToValue)
+}
+
+func (m *BiMap[K, V]) UnmarshalJSON(b []byte) error {
+	if bytes.Equal(b, nullBytes) {
+		return nil
+	}
+	var keyToValue map[K]V
+	if err := json.Unmarshal(b, &keyToValue); err != nil {
+		return err
+	}
+	valueToKey := make(map[V]K, len(keyToValue))
+	for k, v := range keyToValue {
+		valueToKey[v] = k
+	}
+	if len(keyToValue) != len(valueToKey) {
+		return errNotBijective
+	}
+
+	m.keyToValue = keyToValue
+	m.valueToKey = valueToKey
+	return nil
 }

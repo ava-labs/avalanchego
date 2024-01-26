@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -24,7 +25,7 @@ func (m *messageQueueMetrics) initialize(
 	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
 ) error {
-	namespace := fmt.Sprintf("%s_%s", metricsNamespace, "unprocessed_msgs")
+	namespace := metric.AppendNamespace(metricsNamespace, "unprocessed_msgs")
 	m.len = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "len",

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -347,12 +347,9 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	changes, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp)
-	if err != nil {
+	if _, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp); err != nil {
 		return nil, err
 	}
-	changes.Apply(stateDiff)
-	stateDiff.SetTimestamp(timestamp)
 
 	var (
 		blockTxs []*txs.Tx

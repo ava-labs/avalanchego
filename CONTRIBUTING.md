@@ -33,7 +33,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 - Open a new GitHub pull request containing your changes.
 - Ensure the PR description clearly describes the problem and solution. Include the relevant issue number if applicable.
-- The PR should be opened against the `dev` branch.
+- The PR should be opened against the `master` branch.
 - If your PR isn't ready to be reviewed just yet, you can open it as a draft to collect early feedback on your changes.
 - Once the PR is ready for review, mark it as ready-for-review and request review from one of the maintainers.
 

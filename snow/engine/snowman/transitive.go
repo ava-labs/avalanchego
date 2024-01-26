@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -556,6 +556,15 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	t.Ctx.Lock.Lock()
 	defer t.Ctx.Lock.Unlock()
 
+	t.Ctx.Log.Verbo("running health check",
+		zap.Uint32("requestID", t.requestID),
+		zap.Int("gossipCounter", t.gossipCounter),
+		zap.Stringer("polls", t.polls),
+		zap.Reflect("outstandingBlockRequests", t.blkReqs),
+		zap.Stringer("blockedJobs", &t.blocked),
+		zap.Int("pendingBuildBlocks", t.pendingBuildBlocks),
+	)
+
 	consensusIntf, consensusErr := t.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := t.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
@@ -1112,12 +1121,14 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 	issuedMetric prometheus.Counter,
 ) (bool, error) {
 	blkID := blk.ID()
+	blkHeight := blk.Height()
 
 	// make sure this block is valid
 	if err := blk.Verify(ctx); err != nil {
 		t.Ctx.Log.Debug("block verification failed",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", blkHeight),
 			zap.Error(err),
 		)
 
@@ -1134,6 +1145,7 @@ func (t *Transitive) addUnverifiedBlockToConsensus(
 	t.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", blkHeight),
 	)
 	return true, t.Consensus.Add(ctx, &memoryBlock{
 		Block:   blk,

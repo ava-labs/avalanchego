@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -249,9 +249,6 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			require := require.New(t)
 			freshTH := newEnvironment(t, configtest.ApricotPhase5Fork)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
-			defer func() {
-				require.NoError(shutdownEnvironment(freshTH))
-			}()
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
 				tt.stakeAmount,
@@ -290,9 +287,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.ApricotPhase5Fork)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	nodeID := genesistest.GenesisNodeIDs[0]
 	{
@@ -725,9 +720,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.ApricotPhase5Fork)
 	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	defer env.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
 	chainTime := env.state.GetTimestamp()

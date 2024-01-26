@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcdb
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,9 +19,8 @@ import (
 )
 
 type testDatabase struct {
-	client  *DatabaseClient
-	server  *memdb.Database
-	closeFn func()
+	client *DatabaseClient
+	server *memdb.Database
 }
 
 func setupDB(t testing.TB) *testDatabase {
@@ -44,51 +44,48 @@ func setupDB(t testing.TB) *testDatabase {
 	require.NoError(err)
 
 	db.client = NewClient(rpcdbpb.NewDatabaseClient(conn))
-	db.closeFn = func() {
+
+	t.Cleanup(func() {
 		serverCloser.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
-	}
+	})
+
 	return db
 }
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		db := setupDB(t)
-		test(t, db.client)
-
-		db.closeFn()
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			db := setupDB(t)
+			test(t, db.client)
+		})
 	}
 }
 
 func FuzzKeyValue(f *testing.F) {
 	db := setupDB(f)
 	database.FuzzKeyValue(f, db.client)
-
-	db.closeFn()
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
 	db := setupDB(f)
 	database.FuzzNewIteratorWithPrefix(f, db.client)
-
-	db.closeFn()
 }
 
 func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 	db := setupDB(f)
 	database.FuzzNewIteratorWithStartAndPrefix(f, db.client)
-
-	db.closeFn()
 }
 
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			db := setupDB(b)
-			bench(b, db.client, "rpcdb", keys, values)
-			db.closeFn()
+		for name, bench := range database.Benchmarks {
+			b.Run(fmt.Sprintf("rpcdb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
+				db := setupDB(b)
+				bench(b, db.client, keys, values)
+			})
 		}
 	}
 }

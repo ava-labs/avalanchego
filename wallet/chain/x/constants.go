@@ -1,9 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -22,11 +24,14 @@ var Parser block.Parser
 
 func init() {
 	var err error
-	Parser, err = block.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-		&nftfx.Fx{},
-		&propertyfx.Fx{},
-	})
+	Parser, err = block.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+			&nftfx.Fx{},
+			&propertyfx.Fx{},
+		},
+	)
 	if err != nil {
 		panic(err)
 	}

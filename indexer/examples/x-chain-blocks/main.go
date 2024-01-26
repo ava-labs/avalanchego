@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/indexer"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -32,7 +33,7 @@ func main() {
 			continue
 		}
 
-		proposerVMBlock, err := block.Parse(container.Bytes)
+		proposerVMBlock, err := block.Parse(container.Bytes, version.DefaultUpgradeTime)
 		if err != nil {
 			log.Fatalf("failed to parse proposervm block: %s\n", err)
 		}

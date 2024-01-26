@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -59,9 +59,12 @@ func TestNetworkAppGossip(t *testing.T) {
 		},
 	}
 
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(t, err)
 	require.NoError(t, testTx.Initialize(parser.Codec()))
 
@@ -162,6 +165,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock()
 				return mempool
 			},
@@ -183,11 +187,14 @@ func TestNetworkAppGossip(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			parser, err := txs.NewParser([]fxs.Fx{
-				&secp256k1fx.Fx{},
-				&nftfx.Fx{},
-				&propertyfx.Fx{},
-			})
+			parser, err := txs.NewParser(
+				time.Time{},
+				[]fxs.Fx{
+					&secp256k1fx.Fx{},
+					&nftfx.Fx{},
+					&propertyfx.Fx{},
+				},
+			)
 			require.NoError(err)
 
 			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
@@ -297,6 +304,7 @@ func TestNetworkIssueTx(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock()
 				return mempool
 			},
@@ -319,11 +327,14 @@ func TestNetworkIssueTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			parser, err := txs.NewParser([]fxs.Fx{
-				&secp256k1fx.Fx{},
-				&nftfx.Fx{},
-				&propertyfx.Fx{},
-			})
+			parser, err := txs.NewParser(
+				time.Time{},
+				[]fxs.Fx{
+					&secp256k1fx.Fx{},
+					&nftfx.Fx{},
+					&propertyfx.Fx{},
+				},
+			)
 			require.NoError(err)
 
 			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
@@ -389,6 +400,7 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
+				mempool.EXPECT().Len().Return(0)
 				mempool.EXPECT().RequestBuildBlock()
 				return mempool
 			},
@@ -406,11 +418,14 @@ func TestNetworkIssueVerifiedTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			parser, err := txs.NewParser([]fxs.Fx{
-				&secp256k1fx.Fx{},
-				&nftfx.Fx{},
-				&propertyfx.Fx{},
-			})
+			parser, err := txs.NewParser(
+				time.Time{},
+				[]fxs.Fx{
+					&secp256k1fx.Fx{},
+					&nftfx.Fx{},
+					&propertyfx.Fx{},
+				},
+			)
 			require.NoError(err)
 
 			mempoolFunc := func(ctrl *gomock.Controller) mempool.Mempool {
@@ -449,9 +464,12 @@ func TestNetworkGossipTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := txs.NewParser(
+		time.Time{},
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
 	appSender := common.NewMockSender(ctrl)

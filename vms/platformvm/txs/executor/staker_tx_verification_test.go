@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -139,13 +139,15 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(now) // chain time is after Durango fork activation since now.After(activeForkTime)
+				return mockState
 			},
 			sTxF: func() *txs.Tx {
 				return &verifiedSignedTx
 			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
-				return nil
+				return &txs.AddPermissionlessValidatorTx{}
 			},
 			expectedErr: nil,
 		},

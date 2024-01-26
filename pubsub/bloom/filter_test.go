@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bloom
@@ -13,10 +13,10 @@ import (
 
 func TestNew(t *testing.T) {
 	var (
-		require         = require.New(t)
-		maxN     uint64 = 10000
-		p               = 0.1
-		maxBytes uint64 = 1 * units.MiB // 1 MiB
+		require  = require.New(t)
+		maxN     = 10000
+		p        = 0.1
+		maxBytes = 1 * units.MiB // 1 MiB
 	)
 	f, err := New(maxN, p, maxBytes)
 	require.NoError(err)

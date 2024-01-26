@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
@@ -36,9 +35,6 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	env := newEnvironment(t, configtest.ApricotPhase5Fork, ctrl)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
@@ -102,14 +98,6 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}).Times(2)
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
-	onParentAccept.EXPECT().GetCurrentValidator(utx.SubnetID(), utx.NodeID()).Return(&state.Staker{
-		TxID:      addValTx.ID(),
-		NodeID:    utx.NodeID(),
-		SubnetID:  utx.SubnetID(),
-		StartTime: utx.StartTime(),
-		NextTime:  chainTime,
-		EndTime:   chainTime,
-	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
@@ -150,12 +138,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	env := newEnvironment(t, configtest.BanffFork, ctrl)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 	env.clk.Set(genesistest.GenesisTime)
-	env.config.BanffTime = time.Time{}        // activate Banff
-	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := genesistest.GenesisTime
@@ -214,13 +197,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require.NoError(nextStakerTx.Initialize(txs.Codec))
 
 	nextStakerTxID := nextStakerTx.ID()
-	onParentAccept.EXPECT().GetCurrentValidator(unsignedNextStakerTx.SubnetID(), unsignedNextStakerTx.NodeID()).Return(&state.Staker{
-		TxID:      nextStakerTxID,
-		NodeID:    unsignedNextStakerTx.NodeID(),
-		SubnetID:  unsignedNextStakerTx.SubnetID(),
-		StartTime: unsignedNextStakerTx.StartTime(),
-		EndTime:   chainTime,
-	}, nil)
 	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
@@ -571,10 +547,6 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, configtest.BanffFork, nil)
-			defer func() {
-				require.NoError(shutdownEnvironment(env))
-			}()
-			env.config.BanffTime = time.Time{} // activate Banff
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -724,10 +696,6 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.BanffFork, nil)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-	env.config.BanffTime = time.Time{} // activate Banff
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -867,10 +835,6 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, configtest.BanffFork, nil)
-			defer func() {
-				require.NoError(shutdownEnvironment(env))
-			}()
-			env.config.BanffTime = time.Time{} // activate Banff
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -973,10 +937,6 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.BanffFork, nil)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-	env.config.BanffTime = time.Time{} // activate Banff
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1158,10 +1118,6 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.BanffFork, nil)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-	env.config.BanffTime = time.Time{} // activate Banff
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1343,9 +1299,6 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 func TestAddValidatorProposalBlock(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.LatestFork, nil)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 
 	now := env.clk.Time()
 

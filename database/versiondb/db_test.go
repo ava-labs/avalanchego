@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package versiondb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,9 +14,11 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		baseDB := memdb.New()
-		test(t, New(baseDB))
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			baseDB := memdb.New()
+			test(t, New(baseDB))
+		})
 	}
 }
 
@@ -299,11 +302,13 @@ func TestSetDatabaseClosed(t *testing.T) {
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			baseDB := memdb.New()
-			db := New(baseDB)
-			bench(b, db, "versiondb", keys, values)
-			_ = db.Close()
+		for name, bench := range database.Benchmarks {
+			b.Run(fmt.Sprintf("versiondb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
+				baseDB := memdb.New()
+				db := New(baseDB)
+				bench(b, db, keys, values)
+				_ = db.Close()
+			})
 		}
 	}
 }

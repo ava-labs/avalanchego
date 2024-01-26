@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -90,6 +90,7 @@ func New(
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		registerer,
 		ctx.Log,
 		txVerifier,
 		parser,
@@ -204,8 +205,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	err = n.mempool.Add(tx)
-	if err == nil {
+	if err := n.mempool.Add(tx); err == nil {
 		txID := tx.ID()
 		n.txPushGossiper.Add(tx)
 		if err := n.txPushGossiper.Gossip(ctx); err != nil {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -28,9 +28,6 @@ import (
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.ApricotPhase5Fork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -131,9 +128,6 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.ApricotPhase5Fork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -228,9 +222,6 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.ApricotPhase5Fork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -352,9 +343,6 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.CortinaFork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -571,9 +559,6 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.CortinaFork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -733,9 +718,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, configtest.ApricotPhase5Fork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
 	dummyHeight := uint64(1)
 
 	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)

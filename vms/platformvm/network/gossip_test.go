@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -6,6 +6,8 @@ package network
 import (
 	"errors"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
@@ -38,6 +40,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
 		testConfig.ExpectedBloomFilterElements,
@@ -71,6 +74,7 @@ func TestGossipMempoolAddError(t *testing.T) {
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
 		testConfig.ExpectedBloomFilterElements,
@@ -101,6 +105,7 @@ func TestMempoolDuplicate(t *testing.T) {
 
 	gossipMempool, err := newGossipMempool(
 		testMempool,
+		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
 		testConfig.ExpectedBloomFilterElements,
@@ -130,10 +135,12 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	mempool.EXPECT().Get(txID).Return(nil, false)
 	mempool.EXPECT().GetDropReason(txID).Return(nil)
 	mempool.EXPECT().Add(tx).Return(nil)
+	mempool.EXPECT().Len().Return(0)
 	mempool.EXPECT().RequestBuildBlock(false)
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
 		testConfig.ExpectedBloomFilterElements,

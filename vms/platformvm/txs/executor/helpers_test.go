@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -6,6 +6,7 @@ package executor
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -134,6 +135,30 @@ func newEnvironment(t *testing.T, fork configtest.ActiveFork) *environment {
 
 	addSubnet(t, env, txBuilder)
 
+	t.Cleanup(func() {
+		env.ctx.Lock.Lock()
+		defer env.ctx.Lock.Unlock()
+
+		require := require.New(t)
+
+		if env.isBootstrapped.Get() {
+			validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+
+			require.NoError(env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+
+			for subnetID := range env.config.TrackedSubnets {
+				validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
+
+				require.NoError(env.uptimes.StopTracking(validatorIDs, subnetID))
+			}
+			env.state.SetHeight(math.MaxUint64)
+			require.NoError(env.state.Commit())
+		}
+
+		require.NoError(env.state.Close())
+		require.NoError(env.baseDB.Close())
+	})
+
 	return env
 }
 
@@ -227,7 +252,7 @@ func (fvi *fxVMInt) Logger() logging.Logger {
 
 func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(),
+		registry: linearcodec.NewDefault(time.Time{}),
 		clk:      clk,
 		log:      log,
 	}
@@ -241,31 +266,4 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 		}
 	}
 	return res
-}
-
-func shutdownEnvironment(env *environment) error {
-	if env.isBootstrapped.Get() {
-		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
-			return err
-		}
-
-		for subnetID := range env.config.TrackedSubnets {
-			validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
-
-			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
-				return err
-			}
-		}
-		env.state.SetHeight( /*height*/ math.MaxUint64)
-		if err := env.state.Commit(); err != nil {
-			return err
-		}
-	}
-
-	return utils.Err(
-		env.state.Close(),
-		env.baseDB.Close(),
-	)
 }

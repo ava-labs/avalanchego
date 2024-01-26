@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -35,7 +35,10 @@ func BuildUnsigned(
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+
+	// Invariant: The durango timestamp isn't used here because the certificate
+	// is empty.
+	return block, block.initialize(bytes, time.Time{})
 }
 
 func Build(
@@ -121,5 +124,7 @@ func BuildOption(
 	if err != nil {
 		return nil, err
 	}
-	return block, block.initialize(bytes)
+
+	// Invariant: The durango timestamp isn't used.
+	return block, block.initialize(bytes, time.Time{})
 }

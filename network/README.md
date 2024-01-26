@@ -46,7 +46,7 @@ When starting an Avalanche node, a node needs to be able to initiate some proces
 In Avalanche, nodes connect to an initial set of bootstrapper nodes known as **beacons** (this is user-configurable). Once connected to a set of beacons, a node is able to discover other nodes in the network. Over time, a node eventually discovers other peers in the network through `PeerList` messages it receives through:
 
 - The handshake initiated between two peers when attempting to connect to a peer (see [Connecting](#connecting)).
-- Periodic `PeerList` gossip messages that every peer sends to the peers it's connected to (see [Connected](#connected)).
+- Responses to periodically sent `GetPeerList` messages requesting a `PeerList` of unknown peers (see [Connected](#connected)).
 
 #### Connecting
 
@@ -79,7 +79,6 @@ Note right of Peer: LGTM!
 Note over Node,Peer: PeerList message
 Peer->>Node: Peer-X, Peer-Y, Peer-Z
 Note over Node,Peer: Handshake Complete
-Node->>Peer: ACK Peer-X, Peer-Y, Peer-Z
 ```
 
 Once the node attempting to join the network receives this `PeerList` message, the handshake is complete and the node is now connected to the peer. The node attempts to connect to the new peers discovered in the `PeerList` message. Each connection results in another peer handshake, which results in the node incrementally discovering more and more peers in the network as more and more `PeerList` messages are exchanged.
@@ -92,71 +91,53 @@ Some peers aren't discovered through the `PeerList` messages exchanged through p
 sequenceDiagram
 Node ->> Peer-1: Handshake - v1.9.5
 Peer-1 ->> Node: PeerList - Peer-2
-Node ->> Peer-1: ACK - Peer-2
 Note left of Node: Node is connected to Peer-1 and now tries to connect to Peer-2.
 Node ->> Peer-2: Handshake - v1.9.5
 Peer-2 ->> Node: PeerList - Peer-1
-Node ->> Peer-2: ACK - Peer-1
 Note left of Node: Peer-3 was never sampled, so we haven't connected yet!
 Node --> Peer-3: No connection
 ```
 
-To guarantee that a node can discover all peers, each node periodically gossips a sample of the peers it knows about to other peers.
+To guarantee that a node can discover all peers, each node periodically sends a `GetPeerList` message to a random peer.
 
 ##### PeerList Gossip
 
 ###### Messages
 
-A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains networking-level metadata about the peer that provides the necessary information to connect to it, alongside the corresponding transaction id that added that peer to the validator set. Transaction ids are unique hashes that only add a single validator, so it is guaranteed that there is a 1:1 mapping between a validator and its associated transaction id.
+A `GetPeerList` message requests that the peer sends a `PeerList` message. `GetPeerList` messages contain a bloom filter of already known peers to reduce useless bandwidth on `PeerList` messages. The bloom filter reduces bandwidth by enabling the `PeerList` message to only include peers that aren't already known.
 
-`PeerListAck` messages are sent in response to `PeerList` messages to allow a peer to confirm which peers it will actually attempt to connect to. Because nodes only gossip peers they believe another peer doesn't already know about to optimize bandwidth, `PeerListAck` messages are important to confirm that a peer will attempt to connect to someone. Without this, a node might gossip a peer to another peer and assume a connection between the two is being established, and not re-gossip the peer in future gossip cycles. If the connection was never actually wanted by the peer being gossiped to due to a transient reason, that peer would never be able to re-discover the gossiped peer and could be isolated from a subset of the network.
+A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains signed networking-level metadata about a peer that provides the necessary information to connect to it.
 
-Once a `PeerListAck` message is received from a peer, the node that sent the original `PeerList` message marks the corresponding acknowledged validators as already having been transmitted to the peer, so that it's excluded from subsequent iterations of `PeerList` gossip.
+Once peer metadata is received, the node will add that data to its bloom filter to prevent learning about it again.
 
 ###### Gossip
 
 Handshake messages provide a node with some knowledge of peers in the network, but offers no guarantee that learning about a subset of peers from each peer the node connects with will result in the node learning about every peer in the network.
 
-In order to provide a probabilistic guarantee that all peers in the network will eventually learn of one another, each node periodically gossips a sample of the peers that they're aware of to a sample of the peers that they're connected to. Over time, this probabilistically guarantees that every peer will eventually learn of every other peer.
+To provide an eventual guarantee that all peers learn of one another, each node periodically requests peers from a random peer.
 
-To optimize bandwidth usage, each node tracks which peers are guaranteed to know of which peers. A node learns this information by tracking both inbound and outbound `PeerList` gossip.
+To optimize bandwidth, each node tracks the most recent IPs of validators. The validator's nodeID and timestamp are inserted into a bloom filter which is used to select only necessary IPs to gossip.
 
-- Inbound
-  - If a node ever receives `PeerList` from a peer, that peer _must_ have known about the peers in that `PeerList` message in order to have gossiped them.
-- Outbound
-  - If a node sends a `PeerList` to a peer and the peer replies with an `PeerListAck` message, then all peers in the `PeerListAck` must be known by the peer.
+As the number of entries increases in the bloom filter, the probability of a false positive increases. False positives can cause recent IPs not to be gossiped when they otherwise should be, slowing down the rate of `PeerList` gossip. To prevent the bloom filter from having too many false positives, a new bloom filter is periodically generated and the number of entries a validator is allowed to have in the bloom filter is capped. Generating the new bloom filter both removes stale entries and modifies the hash functions to avoid persistent hash collisions.
 
-To efficiently track which peers know of which peers, the peers that each peer is aware of is represented in a [bit set](https://en.wikipedia.org/wiki/Bit_array). A peer is represented by either a `0` if it isn't known by the peer yet, or a `1` if it is known by the peer.
-
-A node follows the following steps for every cycle of `PeerList` gossip:
-
-1. Get a sample of peers in the network that the node is connected to
-2. For each peer:
-    1. Figure out which peers the node hasn't gossiped to them yet.
-    2. Take a random sample of these unknown peers.
-    3. Send a message describing these peers to the peer.
+A node follows the following steps for of `PeerList` gossip:
 
 ```mermaid
 sequenceDiagram
-Note left of Node: Initialize gossip bit set for Peer-123
-Note left of Node: Peer-123: [0, 0, 0]
-Node->>Peer-123: PeerList - Peer-1
-Peer-123->>Node: PeerListAck - Peer-1
-Note left of Node: Peer-123: [1, 0, 0]
-Node->>Peer-123: PeerList - Peer-3
-Peer-123->>Node: PeerListAck - Peer-3
-Note left of Node: Peer-123: [1, 0, 1]
-Node->>Peer-123: PeerList - Peer-2
-Peer-123->>Node: PeerListAck - Peer-2
-Note left of Node: Peer-123: [1, 1, 1]
-Note left of Node: No more gossip left to send to Peer-123!
+Note left of Node: Initialize bloom filter
+Note left of Node: Bloom: [0, 0, 0]
+Node->>Peer-123: GetPeerList [0, 0, 0]
+Note right of Peer-123: Any peers can be sent.
+Peer-123->>Node: PeerList - Peer-1
+Note left of Node: Bloom: [1, 0, 0]
+Node->>Peer-123: GetPeerList [1, 0, 0]
+Note right of Peer-123: Either Peer-2 or Peer-3 can be sent.
+Peer-123->>Node: PeerList - Peer-3
+Note left of Node: Bloom: [1, 0, 1]
+Node->>Peer-123: GetPeerList [1, 0, 1]
+Note right of Peer-123: Only Peer-2 can be sent.
+Peer-123->>Node: PeerList - Peer-2
+Note left of Node: Bloom: [1, 1, 1]
+Node->>Peer-123: GetPeerList [1, 1, 1]
+Note right of Peer-123: There are no more peers left to send!
 ```
-
-Because network state is generally expected to be stable (i.e nodes are not continuously flickering online/offline), as more and more gossip messages are exchanged nodes eventually realize that the peers that they are connected to have learned about every other peer.
-
-A node eventually stops gossiping peers when there's no more new peers to gossip about. `PeerList` gossip only resumes once:
-
-1. a new peer joins
-2. a peer disconnects and reconnects
-3. a new validator joins the network
-4. a validator's IP is updated

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gwarp
@@ -23,7 +23,6 @@ type testSigner struct {
 	sk        *bls.SecretKey
 	networkID uint32
 	chainID   ids.ID
-	closeFn   func()
 }
 
 func setupSigner(t testing.TB) *testSigner {
@@ -55,18 +54,21 @@ func setupSigner(t testing.TB) *testSigner {
 	require.NoError(err)
 
 	s.client = NewClient(pb.NewSignerClient(conn))
-	s.closeFn = func() {
+
+	t.Cleanup(func() {
 		serverCloser.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
-	}
+	})
+
 	return s
 }
 
 func TestInterface(t *testing.T) {
-	for _, test := range warp.SignerTests {
-		s := setupSigner(t)
-		test(t, s.client, s.sk, s.networkID, s.chainID)
-		s.closeFn()
+	for name, test := range warp.SignerTests {
+		t.Run(name, func(t *testing.T) {
+			s := setupSigner(t)
+			test(t, s.client, s.sk, s.networkID, s.chainID)
+		})
 	}
 }

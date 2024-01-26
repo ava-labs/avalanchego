@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -65,6 +65,7 @@ func StartTestPeer(
 	clientUpgrader := NewTLSClientUpgrader(
 		tlsConfg,
 		prometheus.NewCounter(prometheus.CounterOpts{}),
+		version.GetDurangoTime(networkID),
 	)
 
 	peerID, conn, cert, err := clientUpgrader.Upgrade(conn)
@@ -102,7 +103,7 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
+	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 1)
 	tls := tlsCert.PrivateKey.(crypto.Signer)
 
 	peer := Start(

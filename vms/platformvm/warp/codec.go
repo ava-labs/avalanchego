@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -17,7 +18,7 @@ var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewManager(math.MaxInt)
-	lc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+	lc := linearcodec.NewDefault(time.Time{})
 
 	err := utils.Err(
 		lc.RegisterType(&BitSetSignature{}),

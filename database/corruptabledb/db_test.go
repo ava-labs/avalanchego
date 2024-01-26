@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package corruptabledb
@@ -18,17 +18,17 @@ import (
 
 var errTest = errors.New("non-nil error")
 
-func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		baseDB := memdb.New()
-		db := New(baseDB)
-		test(t, db)
-	}
-}
-
 func newDB() *Database {
 	baseDB := memdb.New()
 	return New(baseDB)
+}
+
+func TestInterface(t *testing.T) {
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			test(t, newDB())
+		})
+	}
 }
 
 func FuzzKeyValue(f *testing.F) {

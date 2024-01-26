@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -6,7 +6,6 @@ package builder
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -182,10 +181,6 @@ type ProposalTxBuilder interface {
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
-
-	// newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
-	// Commit block, will set the chain's timestamp to [timestamp].
-	NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error)
 
 	// RewardStakerTx creates a new transaction that proposes to remove the staker
 	// [validatorID] from the default validator set.
@@ -609,15 +604,6 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		SubnetAuth: subnetAuth,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
-	if err != nil {
-		return nil, err
-	}
-	return tx, tx.SyntacticVerify(b.ctx)
-}
-
-func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error) {
-	utx := &txs.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err
 	}
