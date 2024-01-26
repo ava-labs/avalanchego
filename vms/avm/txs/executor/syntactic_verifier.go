@@ -16,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-
-	commonFees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -51,9 +49,8 @@ var (
 
 type SyntacticVerifier struct {
 	*Backend
-	BlkFeeManager *commonFees.Manager
-	BlkTimestamp  time.Time
-	Tx            *txs.Tx
+	BlkTimestamp time.Time
+	Tx           *txs.Tx
 }
 
 func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
@@ -62,11 +59,8 @@ func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		FeeManager:  v.BlkFeeManager,
-		Codec:       v.Codec,
-		Config:      v.Config,
-		ChainTime:   v.BlkTimestamp,
-		Credentials: v.Tx.Creds,
+		Config:    v.Config,
+		ChainTime: v.BlkTimestamp,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -136,11 +130,8 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		FeeManager:  v.BlkFeeManager,
-		Codec:       v.Codec,
-		Config:      v.Config,
-		ChainTime:   v.BlkTimestamp,
-		Credentials: v.Tx.Creds,
+		Config:    v.Config,
+		ChainTime: v.BlkTimestamp,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -195,11 +186,8 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		FeeManager:  v.BlkFeeManager,
-		Codec:       v.Codec,
-		Config:      v.Config,
-		ChainTime:   v.BlkTimestamp,
-		Credentials: v.Tx.Creds,
+		Config:    v.Config,
+		ChainTime: v.BlkTimestamp,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -266,11 +254,8 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		FeeManager:  v.BlkFeeManager,
-		Codec:       v.Codec,
-		Config:      v.Config,
-		ChainTime:   v.BlkTimestamp,
-		Credentials: v.Tx.Creds,
+		Config:    v.Config,
+		ChainTime: v.BlkTimestamp,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -319,11 +304,8 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		FeeManager:  v.BlkFeeManager,
-		Codec:       v.Codec,
-		Config:      v.Config,
-		ChainTime:   v.BlkTimestamp,
-		Credentials: v.Tx.Creds,
+		Config:    v.Config,
+		ChainTime: v.BlkTimestamp,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

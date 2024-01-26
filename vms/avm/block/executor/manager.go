@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -149,10 +148,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
-		Backend:       m.backend,
-		BlkFeeManager: fees.NewManager(m.backend.Config.DefaultUnitFees),
-		BlkTimestamp:  m.state.GetTimestamp(),
-		Tx:            tx,
+		Backend:      m.backend,
+		BlkTimestamp: m.state.GetTimestamp(),
+		Tx:           tx,
 	})
 	if err != nil {
 		return err

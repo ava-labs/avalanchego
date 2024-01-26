@@ -54,9 +54,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			tests.Outf("{{blue}} fetching X-chain tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
-			XchainFees, err := infoClient.GetTxFee(e2e.DefaultContext())
+			xchainFees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
-			xChainTxFees := uint64(XchainFees.TxFee)
+			xChainTxFees := uint64(xchainFees.TxFee)
 			tests.Outf("{{green}} X-chain TxFee: %d {{/}}\n", xChainTxFees)
 
 			// amount to transfer from P to X chain
