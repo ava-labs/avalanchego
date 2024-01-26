@@ -249,15 +249,17 @@ type Wallet interface {
 
 func NewWallet(
 	builder Builder,
+	dynFeesBuilder *DynamicFeesBuilder,
 	signer Signer,
 	client platformvm.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
-		Backend: backend,
-		builder: builder,
-		signer:  signer,
-		client:  client,
+		Backend:        backend,
+		builder:        builder,
+		dynamicBuilder: dynFeesBuilder,
+		signer:         signer,
+		client:         client,
 	}
 }
 
@@ -268,7 +270,7 @@ type wallet struct {
 
 	isEForkActive      bool
 	builder            Builder
-	dynamicBuilder     DynamicFeesBuilder
+	dynamicBuilder     *DynamicFeesBuilder
 	unitFees, unitCaps fees.Dimensions
 }
 

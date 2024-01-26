@@ -28,6 +28,13 @@ type DynamicFeesBuilder struct {
 	backend BuilderBackend
 }
 
+func NewDynamicFeesBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) *DynamicFeesBuilder {
+	return &DynamicFeesBuilder{
+		addrs:   addrs,
+		backend: backend,
+	}
+}
+
 func (b *DynamicFeesBuilder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	unitFees, unitCaps commonfees.Dimensions,

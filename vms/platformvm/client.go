@@ -907,6 +907,6 @@ func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (common
 
 func (c *client) GetBlockUnitsCap(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error) {
 	res := &GetBlockUnitsCapReply{}
-	err := c.requester.SendRequest(ctx, "platform.GetBlockUnitsCapReply", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "platform.getBlockUnitsCap", struct{}{}, res, options...)
 	return res.MaxUnits, err
 }

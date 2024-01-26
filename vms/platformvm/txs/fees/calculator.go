@@ -6,6 +6,7 @@ package fees
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -23,6 +24,7 @@ var (
 	EmptyUnitCaps = fees.Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
 
 	// These are the default unit fees, used upon E-fork activation
+	// TODO ABENEGIA: to be tuned
 	DefaultUnitFees = fees.Dimensions{
 		1,
 		2,
@@ -31,11 +33,12 @@ var (
 	}
 
 	// These are the default caps for units consumed in a block, used upon E-fork activation
+	// TODO ABENEGIA: to be tuned
 	DefaultBlockMaxConsumedUnits = fees.Dimensions{
-		1,
-		2,
-		3,
-		4,
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
 	}
 
 	errFailedFeeCalculation          = errors.New("failed fee calculation")

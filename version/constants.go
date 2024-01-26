@@ -115,7 +115,6 @@ var (
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
-	TempForkTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
 )
 
 func init() {
@@ -215,7 +214,7 @@ func GetEForkTime(networkID uint32) time.Time {
 	if upgradeTime, exists := EForkTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return TempForkTime
+	return DefaultUpgradeTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
