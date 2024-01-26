@@ -27,46 +27,26 @@ type Calculator struct {
 }
 
 func (fc *Calculator) BaseTx(*txs.BaseTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
 
 func (fc *Calculator) CreateAssetTx(*txs.CreateAssetTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.CreateAssetTxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.CreateAssetTxFee
+	return nil
 }
 
 func (fc *Calculator) OperationTx(*txs.OperationTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
 
 func (fc *Calculator) ImportTx(*txs.ImportTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
 
 func (fc *Calculator) ExportTx(*txs.ExportTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
