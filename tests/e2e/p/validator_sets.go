@@ -76,24 +76,23 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			pvmClients := make([]platformvm.Client, len(e2e.Env.URIs))
 			for i, nodeURI := range e2e.Env.URIs {
 				pvmClients[i] = platformvm.NewClient(nodeURI.URI)
+				// Ensure that the height of the target node is at least the expected height
+				e2e.Eventually(
+					func() bool {
+						pChainHeight, err := pvmClients[i].GetHeight(e2e.DefaultContext())
+						require.NoError(err)
+						return pChainHeight >= currentPChainHeight
+					},
+					e2e.DefaultTimeout,
+					e2e.DefaultPollingInterval,
+					fmt.Sprintf("failed to see expected height %d for %s before timeout", currentPChainHeight, nodeURI.NodeID),
+				)
 			}
 
 			for height := uint64(0); height <= currentPChainHeight; height++ {
 				tests.Outf(" checked validator sets for height %d\n", height)
 				var observedValidatorSet map[ids.NodeID]*validators.GetValidatorOutput
-				for i, pvmClient := range pvmClients {
-					// Ensure that the height of the target node is at least the expected height
-					e2e.Eventually(
-						func() bool {
-							pChainHeight, err := pvmClient.GetHeight(e2e.DefaultContext())
-							require.NoError(err)
-							return pChainHeight >= currentPChainHeight
-						},
-						e2e.DefaultTimeout,
-						e2e.DefaultPollingInterval,
-						fmt.Sprintf("failed to see expected height %d for %s before timeout", height, e2e.Env.URIs[i].NodeID),
-					)
-
+				for _, pvmClient := range pvmClients {
 					validatorSet, err := pvmClient.GetValidatorsAt(
 						e2e.DefaultContext(),
 						constants.PrimaryNetworkID,
