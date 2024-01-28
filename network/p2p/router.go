@@ -399,18 +399,19 @@ func (r *router) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requ
 // - A boolean indicating that parsing succeeded.
 //
 // Invariant: Assumes [r.lock] isn't held.
-func (r *router) parse(msg []byte) ([]byte, *meteredHandler, string, bool) {
-	handlerID, bytesRead := binary.Uvarint(msg)
-	if bytesRead <= 0 {
+func (r *router) parse(prefixedMsg []byte) ([]byte, *meteredHandler, string, bool) {
+	handlerID, msg, ok := ParseMessage(prefixedMsg)
+	if !ok {
 		return nil, nil, "", false
 	}
+
+	handlerStr := strconv.FormatUint(handlerID, 10)
 
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	handlerStr := strconv.FormatUint(handlerID, 10)
 	handler, ok := r.handlers[handlerID]
-	return msg[bytesRead:], handler, handlerStr, ok
+	return msg, handler, handlerStr, ok
 }
 
 // Invariant: Assumes [r.lock] isn't held.
@@ -431,4 +432,18 @@ func (r *router) clearCrossChainAppRequest(requestID uint32) (pendingCrossChainA
 	callback, ok := r.pendingCrossChainAppRequests[requestID]
 	delete(r.pendingCrossChainAppRequests, requestID)
 	return callback, ok
+}
+
+// Parse a gossip or request message.
+//
+// Returns:
+// - The protocol ID.
+// - The unprefixed protocol message.
+// - A boolean indicating that parsing succeeded.
+func ParseMessage(msg []byte) (uint64, []byte, bool) {
+	handlerID, bytesRead := binary.Uvarint(msg)
+	if bytesRead <= 0 {
+		return 0, nil, false
+	}
+	return handlerID, msg[bytesRead:], true
 }
