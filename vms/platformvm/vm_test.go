@@ -277,13 +277,14 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		return nil
 	}
 
+	dynamicConfigBytes := []byte(`{"network":{"max-validator-set-staleness":0}}`)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		chainDB,
 		genesisBytes,
 		nil,
-		nil,
+		dynamicConfigBytes,
 		msgChan,
 		nil,
 		appSender,
