@@ -2245,21 +2245,34 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 		protocolAppRequestBytest,
 	)
 
-	var eg errgroup.Group
-	for i := 0; i < 100; i++ {
+	sendAppRequest := func() error {
+		return vm.AppRequest(
+			context.Background(),
+			nodeID,
+			0,
+			time.Now().Add(time.Hour),
+			appRequestBytes,
+		)
+	}
+
+	var (
+		eg          errgroup.Group
+		ctx, cancel = context.WithCancel(context.Background())
+	)
+	// keep 10 workers running
+	for i := 0; i < 10; i++ {
 		eg.Go(func() error {
-			return vm.AppRequest(
-				context.Background(),
-				nodeID,
-				0,
-				time.Now().Add(time.Hour),
-				appRequestBytes,
-			)
+			for ctx.Err() == nil {
+				if err := sendAppRequest(); err != nil {
+					return err
+				}
+			}
+			return nil
 		})
 	}
 
 	// If the validator set lock isn't held, the race detector should fail here.
-	for i := uint64(0); i < 100; i++ {
+	for i := uint64(0); i < 1000; i++ {
 		blk, err := block.NewBanffStandardBlock(
 			time.Now(),
 			vm.state.GetLastAccepted(),
@@ -2276,6 +2289,8 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	// If the validator set lock is grabbed, we need to make sure to release the
 	// lock to avoid a deadlock.
 	vm.ctx.Lock.Unlock()
+	cancel() // stop and wait for workers
+
 	require.NoError(eg.Wait())
 	vm.ctx.Lock.Lock()
 }
