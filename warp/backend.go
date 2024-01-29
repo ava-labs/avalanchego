@@ -94,6 +94,14 @@ func (b *backend) initOffChainMessages(offchainMessages [][]byte) error {
 			return fmt.Errorf("%w at index %d: %w", errParsingOffChainMessage, i, err)
 		}
 
+		if unsignedMsg.NetworkID != b.networkID {
+			return fmt.Errorf("%w at index %d", avalancheWarp.ErrWrongNetworkID, i)
+		}
+
+		if unsignedMsg.SourceChainID != b.sourceChainID {
+			return fmt.Errorf("%w at index %d", avalancheWarp.ErrWrongSourceChainID, i)
+		}
+
 		_, err = payload.ParseAddressedCall(unsignedMsg.Payload)
 		if err != nil {
 			return fmt.Errorf("%w at index %d as AddressedCall: %w", errParsingOffChainMessage, i, err)

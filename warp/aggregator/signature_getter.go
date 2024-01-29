@@ -105,6 +105,9 @@ func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.No
 		if _, err := message.Codec.Unmarshal(signatureRes, &response); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal signature res: %w", err)
 		}
+		if response.Signature == [bls.SignatureLen]byte{} {
+			return nil, fmt.Errorf("received empty signature response")
+		}
 		blsSignature, err := bls.SignatureFromBytes(response.Signature[:])
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse signature from res: %w", err)
