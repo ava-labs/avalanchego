@@ -64,8 +64,8 @@ func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
 
 	feeCalculator := fees.Calculator{
 		IsEForkActive:    v.Config.IsEForkActivated(v.BlkTimestamp),
-		Config:           v.Config,
 		Codec:            v.Codec,
+		Config:           v.Config,
 		FeeManager:       v.BlkFeeManager,
 		ConsumedUnitsCap: v.UnitCaps,
 		Credentials:      v.Tx.Creds,
@@ -139,8 +139,8 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 
 	feeCalculator := fees.Calculator{
 		IsEForkActive:    v.Config.IsEForkActivated(v.BlkTimestamp),
-		Config:           v.Config,
 		Codec:            v.Codec,
+		Config:           v.Config,
 		FeeManager:       v.BlkFeeManager,
 		ConsumedUnitsCap: v.UnitCaps,
 		Credentials:      v.Tx.Creds,
@@ -199,8 +199,8 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 
 	feeCalculator := fees.Calculator{
 		IsEForkActive:    v.Config.IsEForkActivated(v.BlkTimestamp),
-		Config:           v.Config,
 		Codec:            v.Codec,
+		Config:           v.Config,
 		FeeManager:       v.BlkFeeManager,
 		ConsumedUnitsCap: v.UnitCaps,
 		Credentials:      v.Tx.Creds,
@@ -271,8 +271,8 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 
 	feeCalculator := fees.Calculator{
 		IsEForkActive:    v.Config.IsEForkActivated(v.BlkTimestamp),
-		Config:           v.Config,
 		Codec:            v.Codec,
+		Config:           v.Config,
 		FeeManager:       v.BlkFeeManager,
 		ConsumedUnitsCap: v.UnitCaps,
 		Credentials:      v.Tx.Creds,
@@ -325,8 +325,8 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 
 	feeCalculator := fees.Calculator{
 		IsEForkActive:    v.Config.IsEForkActivated(v.BlkTimestamp),
-		Config:           v.Config,
 		Codec:            v.Codec,
+		Config:           v.Config,
 		FeeManager:       v.BlkFeeManager,
 		ConsumedUnitsCap: v.UnitCaps,
 		Credentials:      v.Tx.Creds,

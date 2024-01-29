@@ -44,11 +44,10 @@ var (
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
 	IsEForkActive bool
+	Codec         codec.Manager
 
 	// Pre E-fork inputs
 	Config *config.Config
-	Codec  codec.Manager
-	// ChainTime time.Time
 
 	// Post E-fork inputs
 	FeeManager       *fees.Manager
