@@ -237,6 +237,17 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		delegatorData := data[0].Delegators[0]
 		actualGammaDelegationPeriod := time.Duration(delegatorData.EndTime-delegatorData.StartTime) * time.Second
 
+		preRewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
+		for _, rewardKey := range rewardKeys {
+			keychain := secp256k1fx.NewKeychain(rewardKey)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
+			pWallet := baseWallet.P()
+			balances, err := pWallet.Builder().GetBalance()
+			require.NoError(err)
+			preRewardBalances[rewardKey.Address()] = balances[pWallet.AVAXAssetID()]
+		}
+		require.Len(preRewardBalances, len(rewardKeys))
+
 		ginkgo.By("waiting until all validation periods are over")
 		// The beta validator was the last added and so has the latest end time. The
 		// delegation periods are shorter than the validation periods.
@@ -290,13 +301,14 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		ginkgo.By("checking expected rewards against actual rewards")
 		expectedRewardBalances := map[ids.ShortID]uint64{
-			alphaValidationRewardKey.Address(): expectedValidationReward,
-			alphaDelegationRewardKey.Address(): expectedDelegationFee,
-			betaValidationRewardKey.Address():  0, // Validator didn't meet uptime requirement
-			betaDelegationRewardKey.Address():  0, // Validator didn't meet uptime requirement
-			gammaDelegationRewardKey.Address(): expectedDelegatorReward,
-			deltaDelegationRewardKey.Address(): 0, // Validator didn't meet uptime requirement
+			alphaValidationRewardKey.Address(): preRewardBalances[alphaValidationRewardKey.Address()] + expectedValidationReward,
+			alphaDelegationRewardKey.Address(): preRewardBalances[alphaDelegationRewardKey.Address()] + expectedDelegationFee,
+			betaValidationRewardKey.Address():  preRewardBalances[betaValidationRewardKey.Address()] + 0, // Validator didn't meet uptime requirement
+			betaDelegationRewardKey.Address():  preRewardBalances[betaDelegationRewardKey.Address()] + 0, // Validator didn't meet uptime requirement
+			gammaDelegationRewardKey.Address(): preRewardBalances[gammaDelegationRewardKey.Address()] + expectedDelegatorReward,
+			deltaDelegationRewardKey.Address(): preRewardBalances[deltaDelegationRewardKey.Address()] + 0, // Validator didn't meet uptime requirement
 		}
+
 		for address := range expectedRewardBalances {
 			require.Equal(expectedRewardBalances[address], rewardBalances[address])
 		}
