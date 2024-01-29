@@ -14,11 +14,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -151,12 +148,7 @@ type PullGossiper[T Gossipable] struct {
 }
 
 func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
-	bloom, salt := p.set.GetFilter()
-	request := &sdk.PullGossipRequest{
-		Filter: bloom,
-		Salt:   salt,
-	}
-	msgBytes, err := proto.Marshal(request)
+	msgBytes, err := MarshalAppRequest(p.set.GetFilter())
 	if err != nil {
 		return err
 	}
@@ -186,14 +178,14 @@ func (p *PullGossiper[_]) handleResponse(
 		return
 	}
 
-	response := &sdk.PullGossipResponse{}
-	if err := proto.Unmarshal(responseBytes, response); err != nil {
+	gossip, err := ParseAppResponse(responseBytes)
+	if err != nil {
 		p.log.Debug("failed to unmarshal gossip response", zap.Error(err))
 		return
 	}
 
 	receivedBytes := 0
-	for _, bytes := range response.Gossip {
+	for _, bytes := range gossip {
 		receivedBytes += len(bytes)
 
 		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
@@ -235,7 +227,7 @@ func (p *PullGossiper[_]) handleResponse(
 		return
 	}
 
-	receivedCountMetric.Add(float64(len(response.Gossip)))
+	receivedCountMetric.Add(float64(len(gossip)))
 	receivedBytesMetric.Add(float64(receivedBytes))
 }
 
@@ -270,11 +262,8 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	msg := &sdk.PushGossip{
-		Gossip: make([][]byte, 0, p.pending.Len()),
-	}
-
 	sentBytes := 0
+	gossip := make([][]byte, 0, p.pending.Len())
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
@@ -288,12 +277,12 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 			return err
 		}
 
-		msg.Gossip = append(msg.Gossip, bytes)
+		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
 		p.pending.PopLeft()
 	}
 
-	msgBytes, err := proto.Marshal(msg)
+	msgBytes, err := MarshalAppGossip(gossip)
 	if err != nil {
 		return err
 	}
@@ -308,7 +297,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return fmt.Errorf("failed to get sent bytes metric: %w", err)
 	}
 
-	sentCountMetric.Add(float64(len(msg.Gossip)))
+	sentCountMetric.Add(float64(len(gossip)))
 	sentBytesMetric.Add(float64(sentBytes))
 
 	return p.client.AppGossip(ctx, msgBytes)
