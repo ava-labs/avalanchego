@@ -5,6 +5,7 @@ package p
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -856,10 +857,24 @@ func (b *DynamicFeesBuilder) financeTx(
 	stakeOutputs []*avax.TransferableOutput,
 	err error,
 ) {
+	avaxAssetID := b.backend.AVAXAssetID()
 	utxos, err := b.backend.UTXOs(options.Context(), constants.PlatformChainID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	// we can only pay fees in avax, so we sort avax-denominated UTXOs last
+	// to maximize probability of being able to pay fees
+	slices.SortFunc(utxos, func(lhs, rhs *avax.UTXO) int {
+		switch {
+		case lhs.Asset.AssetID() == avaxAssetID && rhs.Asset.AssetID() != avaxAssetID:
+			return 1
+		case lhs.Asset.AssetID() != avaxAssetID && rhs.Asset.AssetID() == avaxAssetID:
+			return -1
+		default:
+			return 0
+		}
+	})
 
 	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
@@ -873,7 +888,7 @@ func (b *DynamicFeesBuilder) financeTx(
 		Addrs:     []ids.ShortID{addr},
 	})
 
-	amountsToBurn[b.backend.AVAXAssetID()] += feeCalc.Fee
+	amountsToBurn[avaxAssetID] += feeCalc.Fee
 
 	// Iterate over the locked UTXOs
 	for _, utxo := range utxos {
@@ -932,7 +947,7 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
+		amountsToBurn[avaxAssetID] += addedFees
 
 		// update fees to account for the credentials to be added with inputs upon tx signing
 		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
@@ -943,7 +958,7 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
+		amountsToBurn[avaxAssetID] += addedFees
 
 		inputs = append(inputs, input)
 
@@ -974,7 +989,7 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
+		amountsToBurn[avaxAssetID] += addedFees
 
 		stakeOutputs = append(stakeOutputs, stakeOut)
 
@@ -1001,7 +1016,7 @@ func (b *DynamicFeesBuilder) financeTx(
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
-			amountsToBurn[b.backend.AVAXAssetID()] += addedFees
+			amountsToBurn[avaxAssetID] += addedFees
 
 			changeOutputs = append(changeOutputs, changeOut)
 		}
@@ -1058,7 +1073,7 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
+		amountsToBurn[avaxAssetID] += addedFees
 
 		// update fees to account for the credentials to be added with inputs upon tx signing
 		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
@@ -1069,7 +1084,7 @@ func (b *DynamicFeesBuilder) financeTx(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		amountsToBurn[b.backend.AVAXAssetID()] += addedFees
+		amountsToBurn[avaxAssetID] += addedFees
 
 		inputs = append(inputs, input)
 
@@ -1108,7 +1123,7 @@ func (b *DynamicFeesBuilder) financeTx(
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
-			amountsToBurn[b.backend.AVAXAssetID()] += addedFees
+			amountsToBurn[avaxAssetID] += addedFees
 		}
 
 		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
@@ -1130,19 +1145,19 @@ func (b *DynamicFeesBuilder) financeTx(
 				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
 
-			switch {
-			case addedFees < remainingAmount:
-				if assetID == b.backend.AVAXAssetID() {
-					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount - addedFees
-				} else {
-					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount
-					amountsToBurn[b.backend.AVAXAssetID()] += addedFees
-				}
+			if assetID != avaxAssetID {
+				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount
+				amountsToBurn[avaxAssetID] += addedFees
 				changeOutputs = append(changeOutputs, changeOut)
-			case addedFees == remainingAmount:
-				// fees wholly consume remaining amount. We don't add the change
-			case addedFees > remainingAmount:
-				amountsToBurn[b.backend.AVAXAssetID()] += addedFees - remainingAmount
+			} else {
+				// here assetID == b.backend.AVAXAssetID()
+				switch {
+				case addedFees < remainingAmount:
+					changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmount - addedFees
+					changeOutputs = append(changeOutputs, changeOut)
+				case addedFees >= remainingAmount:
+					amountsToBurn[assetID] += addedFees - remainingAmount
+				}
 			}
 		}
 	}
