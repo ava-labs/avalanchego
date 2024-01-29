@@ -1158,6 +1158,18 @@ func (s *state) ApplyValidatorWeightDiffs(
 		if err != nil {
 			return err
 		}
+
+		if parsedHeight > prevHeight {
+			s.ctx.Log.Error("unexpected parsed height",
+				zap.Stringer("subnetID", subnetID),
+				zap.Uint64("parsedHeight", parsedHeight),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint64("prevHeight", prevHeight),
+				zap.Uint64("startHeight", startHeight),
+				zap.Uint64("endHeight", endHeight),
+			)
+		}
+
 		// If the parsedHeight is less than our target endHeight, then we have
 		// fully processed the diffs from startHeight through endHeight.
 		if parsedHeight < endHeight {
