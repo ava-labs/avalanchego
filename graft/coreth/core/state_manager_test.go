@@ -45,7 +45,7 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 				Root:   common.BigToHash(bigI),
 				Number: bigI,
 			},
-			nil, nil, nil, nil, nil, true,
+			nil, nil, nil, nil,
 		)
 
 		assert.NoError(w.InsertTrie(block))
@@ -84,7 +84,7 @@ func TestNoPruningTrieWriter(t *testing.T) {
 				Root:   common.BigToHash(bigI),
 				Number: bigI,
 			},
-			nil, nil, nil, nil, nil, true,
+			nil, nil, nil, nil,
 		)
 
 		assert.NoError(w.InsertTrie(block))

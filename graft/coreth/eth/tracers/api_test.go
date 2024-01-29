@@ -232,7 +232,8 @@ func TestTraceCall(t *testing.T) {
 			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
 			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
 			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
-		}}
+		},
+	}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
 	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {

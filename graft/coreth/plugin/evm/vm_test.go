@@ -1115,7 +1115,7 @@ func testConflictingImportTxs(t *testing.T, genesis string) {
 		t.Fatal(err)
 	}
 
-	conflictingAtomicTxBlock := types.NewBlock(
+	conflictingAtomicTxBlock := types.NewBlockWithExtData(
 		types.CopyHeader(validEthBlock.Header()),
 		nil,
 		nil,
@@ -1151,7 +1151,7 @@ func testConflictingImportTxs(t *testing.T, genesis string) {
 	header := types.CopyHeader(validEthBlock.Header())
 	header.ExtDataGasUsed.Mul(common.Big2, header.ExtDataGasUsed)
 
-	internalConflictBlock := types.NewBlock(
+	internalConflictBlock := types.NewBlockWithExtData(
 		header,
 		nil,
 		nil,
@@ -2603,7 +2603,7 @@ func TestUncleBlock(t *testing.T) {
 	uncleBlockHeader := types.CopyHeader(blkDEthBlock.Header())
 	uncleBlockHeader.UncleHash = types.CalcUncleHash(uncles)
 
-	uncleEthBlock := types.NewBlock(
+	uncleEthBlock := types.NewBlockWithExtData(
 		uncleBlockHeader,
 		blkDEthBlock.Transactions(),
 		uncles,
@@ -2660,7 +2660,7 @@ func TestEmptyBlock(t *testing.T) {
 	// Create empty block from blkA
 	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 
-	emptyEthBlock := types.NewBlock(
+	emptyEthBlock := types.NewBlockWithExtData(
 		types.CopyHeader(ethBlock.Header()),
 		nil,
 		nil,
@@ -2941,7 +2941,7 @@ func TestFutureBlock(t *testing.T) {
 	// Set the modified time to exceed the allowed future time
 	modifiedTime := modifiedHeader.Time + uint64(maxFutureBlockTime.Seconds()+1)
 	modifiedHeader.Time = modifiedTime
-	modifiedBlock := types.NewBlock(
+	modifiedBlock := types.NewBlockWithExtData(
 		modifiedHeader,
 		nil,
 		nil,
@@ -4047,7 +4047,7 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 	}
 
 	// Construct the new block with the extra data in the new format (slice of atomic transactions).
-	ethBlk2 := types.NewBlock(
+	ethBlk2 := types.NewBlockWithExtData(
 		types.CopyHeader(validEthBlock.Header()),
 		nil,
 		nil,

@@ -222,7 +222,7 @@ func TestBlockSubscription(t *testing.T) {
 		api          = NewFilterAPI(sys)
 		genesis      = &core.Genesis{
 			Config:  params.TestChainConfig,
-			BaseFee: big.NewInt(params.ApricotPhase4MinBaseFee),
+			BaseFee: big.NewInt(1),
 		}
 		_, chain, _, _ = core.GenerateChainWithGenesis(genesis, dummy.NewFaker(), 10, 10, func(i int, b *core.BlockGen) {})
 		chainEvents    = []core.ChainEvent{}

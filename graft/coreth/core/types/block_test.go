@@ -363,7 +363,7 @@ func makeBenchBlock() *Block {
 			Extra:      []byte("benchmark uncle"),
 		}
 	}
-	return NewBlock(header, txs, uncles, receipts, newHasher(), nil, true)
+	return NewBlock(header, txs, uncles, receipts, newHasher())
 }
 
 func TestAP4BlockEncoding(t *testing.T) {
