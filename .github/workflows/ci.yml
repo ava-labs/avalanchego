@@ -31,8 +31,8 @@ jobs:
       matrix:
         os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, [self-hosted, linux, ARM64, focal], [self-hosted, linux, ARM64, jammy]]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -48,8 +48,8 @@ jobs:
   Fuzz:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -59,8 +59,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -71,7 +71,7 @@ jobs:
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
       - name: Upload tmpnet network dir
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-tmpnet-data
@@ -80,8 +80,8 @@ jobs:
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -92,7 +92,7 @@ jobs:
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
       - name: Upload tmpnet network dir
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-existing-network-tmpnet-data
@@ -101,8 +101,8 @@ jobs:
   Upgrade:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -113,7 +113,7 @@ jobs:
         shell: bash
         run: ./scripts/tests.upgrade.sh
       - name: Upload tmpnet network dir
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: upgrade-tmpnet-data
@@ -122,8 +122,8 @@ jobs:
   Lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -137,7 +137,7 @@ jobs:
     name: Protobuf Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: bufbuild/buf-setup-action@v1.26.1
         with:
           github_token: ${{ github.token }}
@@ -148,8 +148,8 @@ jobs:
     name: Up-to-date protobuf
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -162,8 +162,8 @@ jobs:
     name: Up-to-date mocks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -175,8 +175,8 @@ jobs:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
