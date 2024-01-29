@@ -39,22 +39,9 @@ type Database struct {
 	closed bool
 }
 
-// New returns a new prefixed database
-func New(prefix []byte, db database.Database) *Database {
-	if prefixDB, ok := db.(*Database); ok {
-		simplePrefix := make([]byte, len(prefixDB.dbPrefix)+len(prefix))
-		copy(simplePrefix, prefixDB.dbPrefix)
-		copy(simplePrefix[len(prefixDB.dbPrefix):], prefix)
-		return NewNested(simplePrefix, prefixDB.db)
-	}
-	return NewNested(prefix, db)
-}
-
-// NewNested returns a new prefixed database without attempting to compress
-// prefixes.
-func NewNested(prefix []byte, db database.Database) *Database {
+func newDB(prefix []byte, db database.Database) *Database {
 	return &Database{
-		dbPrefix: hashing.ComputeHash256(prefix),
+		dbPrefix: prefix,
 		db:       db,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
@@ -62,6 +49,47 @@ func NewNested(prefix []byte, db database.Database) *Database {
 			},
 		},
 	}
+}
+
+// New returns a new prefixed database
+func New(prefix []byte, db database.Database) *Database {
+	if prefixDB, ok := db.(*Database); ok {
+		return newDB(
+			JoinPrefixes(prefixDB.dbPrefix, prefix),
+			prefixDB.db,
+		)
+	}
+	return newDB(
+		MakePrefix(prefix),
+		db,
+	)
+}
+
+// NewNested returns a new prefixed database without attempting to compress
+// prefixes.
+func NewNested(prefix []byte, db database.Database) *Database {
+	return newDB(
+		MakePrefix(prefix),
+		db,
+	)
+}
+
+func MakePrefix(prefix []byte) []byte {
+	return hashing.ComputeHash256(prefix)
+}
+
+func JoinPrefixes(firstPrefix, secondPrefix []byte) []byte {
+	simplePrefix := make([]byte, len(firstPrefix)+len(secondPrefix))
+	copy(simplePrefix, firstPrefix)
+	copy(simplePrefix[len(firstPrefix):], secondPrefix)
+	return MakePrefix(simplePrefix)
+}
+
+func PrefixKey(prefix, key []byte) []byte {
+	prefixedKey := make([]byte, len(prefix)+len(key))
+	copy(prefixedKey, prefix)
+	copy(prefixedKey[len(prefix):], key)
+	return prefixedKey
 }
 
 // Assumes that it is OK for the argument to db.db.Has
