@@ -1,5 +1,11 @@
 # Release Notes
 
+## [v0.12.10](https://github.com/ava-labs/coreth/releases/tag/v0.12.10)
+- Add support for off-chain warp messages
+- Add support for getBlockReceipts RPC API
+- Fix issue with state sync for large blocks
+- Migrating Push Gossip to avalanchego network SDK handlers
+
 ## [v0.12.9](https://github.com/ava-labs/coreth/releases/tag/v0.12.9)
 
 - Add concurrent prefetching of trie nodes during block processing
