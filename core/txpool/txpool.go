@@ -621,8 +621,12 @@ func (pool *TxPool) Pending(enforceTips bool) map[common.Address]types.Transacti
 }
 
 // PendingSize returns the number of pending txs in the tx pool.
-func (pool *TxPool) PendingSize() int {
-	pending := pool.Pending(true)
+//
+// The enforceTips parameter can be used to do an extra filtering on the pending
+// transactions and only return those whose **effective** tip is large enough in
+// the next pending execution environment.
+func (pool *TxPool) PendingSize(enforceTips bool) int {
+	pending := pool.Pending(enforceTips)
 	count := 0
 	for _, txs := range pending {
 		count += len(txs)

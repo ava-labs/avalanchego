@@ -102,7 +102,7 @@ func (b *blockBuilder) handleGenerateBlock() {
 // needToBuild returns true if there are outstanding transactions to be issued
 // into a block.
 func (b *blockBuilder) needToBuild() bool {
-	size := b.txPool.PendingSize()
+	size := b.txPool.PendingSize(true)
 	return size > 0 || b.mempool.Len() > 0
 }
 
