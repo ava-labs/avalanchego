@@ -18,8 +18,8 @@ jobs:
     runs-on: [self-hosted, linux, ARM64, jammy]
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -64,7 +64,7 @@ jobs:
           RELEASE: "jammy"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jammy
           path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-arm64.deb
@@ -78,8 +78,8 @@ jobs:
     runs-on: [self-hosted, linux, ARM64, focal]
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -92,7 +92,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt -y install awscli
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -124,7 +124,7 @@ jobs:
           RELEASE: "focal"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: focal
           path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-arm64.deb
