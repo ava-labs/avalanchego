@@ -424,7 +424,7 @@ impl Canvas {
         #[allow(clippy::unwrap_used)]
         let (c, rid) = q.pop_front().unwrap();
         if q.is_empty() {
-            self.queue.remove(&pos);
+            self.queue.swap_remove(&pos);
         }
         self.canvas[pos as usize] = c;
         if let Some(cnt) = self.waiting.get_mut(&rid) {
