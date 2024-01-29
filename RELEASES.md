@@ -1,5 +1,36 @@
 # Release Notes
 
+## [v1.10.19](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.19)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `31` and is compatible with version `v1.10.18`.
+
+### APIs
+
+- Added `admin.dbGet` call to the `admin` API
+- Added bloom filter metrics:
+  - `bloom_filter_count`
+  - `bloom_filter_entries`
+  - `bloom_filter_hashes`
+  - `bloom_filter_max_count`
+  - `bloom_filter_reset_count`
+  to the following namespaces:
+  - `avalanche_X_vm_mempool`
+  - `avalanche_P_vm_mempool`
+  - `avalanche_C_vm_sdk_atomic_mempool`
+  - `avalanche_C_vm_sdk_eth_mempool`
+
+### Fixes
+
+- Fixed race condition during validator set creation
+
+### What's Changed
+
+- 
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.18...v1.10.19
+
 ## [v1.10.18](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.18)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
@@ -28,7 +59,6 @@ The plugin version is updated to `31` all plugins must update to be compatible.
 - Removed `gzip` compression time metrics
 - Converted p2p SDK metrics to use vectors rather than independent metrics
 - Converted client name reported over the p2p network from `avalanche` to `avalanchego`
-
 
 ### Configs
 
