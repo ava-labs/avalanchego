@@ -24,6 +24,7 @@ The plugin version is unchanged at `31` and is compatible with version `v1.10.18
 ### Fixes
 
 - Fixed race condition during validator set creation
+- Fixed C-chain mempool bloom filter recalculation
 
 ### What's Changed
 
