@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 )
 
 var (
@@ -148,6 +149,9 @@ func TestManagerVerifyTx(t *testing.T) {
 			managerF: func(ctrl *gomock.Controller) *manager {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
+				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
@@ -180,6 +184,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
+				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -216,6 +222,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
+				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -252,6 +260,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
+				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{

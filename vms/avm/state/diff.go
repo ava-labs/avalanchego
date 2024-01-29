@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -159,6 +160,22 @@ func (d *diff) GetTimestamp() time.Time {
 
 func (d *diff) SetTimestamp(t time.Time) {
 	d.timestamp = t
+}
+
+func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return commonfees.Dimensions{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.GetUnitFees()
+}
+
+func (d *diff) GetBlockUnitCaps() (commonfees.Dimensions, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return commonfees.Dimensions{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.GetBlockUnitCaps()
 }
 
 func (d *diff) Apply(state Chain) {

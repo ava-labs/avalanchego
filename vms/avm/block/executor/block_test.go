@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
@@ -149,6 +150,11 @@ func TestBlockVerify(t *testing.T) {
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(errTx.ID(), errTest).Times(1)
+
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -158,6 +164,7 @@ func TestBlockVerify(t *testing.T) {
 								EForkTime:   mockable.MaxTime,
 							},
 						},
+						state:        mockState,
 						mempool:      mempool,
 						metrics:      metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{},
@@ -187,6 +194,9 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -224,10 +234,13 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := state.NewMockState(ctrl)
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight) // Should be blockHeight - 1
+
+				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(mockParentBlock, nil)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -274,6 +287,10 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp.Add(1))
 
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -283,6 +300,7 @@ func TestBlockVerify(t *testing.T) {
 								EForkTime:   mockable.MaxTime,
 							},
 						},
+						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -325,6 +343,10 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
 				return &Block{
@@ -336,6 +358,7 @@ func TestBlockVerify(t *testing.T) {
 								EForkTime:   mockable.MaxTime,
 							},
 						},
+						state:   mockState,
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{
@@ -381,6 +404,10 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
 				return &Block{
@@ -394,6 +421,7 @@ func TestBlockVerify(t *testing.T) {
 								EForkTime:   mockable.MaxTime,
 							},
 						},
+						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -464,6 +492,10 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx2.ID(), ErrConflictingBlockTxs).Times(1)
 				return &Block{
@@ -477,6 +509,7 @@ func TestBlockVerify(t *testing.T) {
 								EForkTime:   mockable.MaxTime,
 							},
 						},
+						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -531,6 +564,10 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -540,6 +577,7 @@ func TestBlockVerify(t *testing.T) {
 								EForkTime:   mockable.MaxTime,
 							},
 						},
+						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -584,6 +622,10 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
+				mockState := state.NewMockState(ctrl)
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
+
 				mockMempool := mempool.NewMockMempool(ctrl)
 				mockMempool.EXPECT().Remove([]*txs.Tx{tx})
 				return &Block{
@@ -597,6 +639,7 @@ func TestBlockVerify(t *testing.T) {
 								EForkTime:   mockable.MaxTime,
 							},
 						},
+						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -959,6 +1002,8 @@ func TestBlockReject(t *testing.T) {
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -1021,6 +1066,8 @@ func TestBlockReject(t *testing.T) {
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,

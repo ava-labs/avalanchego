@@ -27,9 +27,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -69,6 +71,10 @@ type ReadOnlyChain interface {
 	GetBlock(blkID ids.ID) (block.Block, error)
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
+
+	// at this iteration we don't need to reset these, we are just metering
+	GetUnitFees() (commonfees.Dimensions, error)
+	GetBlockUnitCaps() (commonfees.Dimensions, error)
 }
 
 type Chain interface {
@@ -98,6 +104,10 @@ type State interface {
 	// Invariant: After the chain is linearized, this function is expected to be
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
+
+	// At this iteration these getters are helpful for UTs only
+	SetUnitFees(uf commonfees.Dimensions) error
+	SetBlockUnitCaps(caps commonfees.Dimensions) error
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -173,6 +183,11 @@ type state struct {
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
+
+	// multifees data are not persisted at this stage. We just meter for now,
+	// we'll revisit when we'll introduce dynamic fees
+	unitFees      commonfees.Dimensions
+	blockUnitCaps commonfees.Dimensions
 
 	trackChecksum bool
 	txChecksum    ids.ID
@@ -256,6 +271,9 @@ func New(
 		blockDB:     blockDB,
 
 		singletonDB: singletonDB,
+
+		unitFees:      fees.DefaultUnitFees,
+		blockUnitCaps: fees.DefaultBlockMaxConsumedUnits,
 
 		trackChecksum: trackChecksums,
 	}
@@ -499,6 +517,24 @@ func (s *state) GetTimestamp() time.Time {
 
 func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
+}
+
+func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
+	return s.unitFees, nil
+}
+
+func (s *state) SetUnitFees(uf commonfees.Dimensions) error {
+	s.unitFees = uf
+	return nil
+}
+
+func (s *state) GetBlockUnitCaps() (commonfees.Dimensions, error) {
+	return s.blockUnitCaps, nil
+}
+
+func (s *state) SetBlockUnitCaps(caps commonfees.Dimensions) error {
+	s.blockUnitCaps = caps
+	return nil
 }
 
 func (s *state) Commit() error {
