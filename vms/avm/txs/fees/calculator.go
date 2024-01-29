@@ -4,18 +4,13 @@
 package fees
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
 
-var (
-	_ txs.Visitor = (*Calculator)(nil)
-
-	errEForkFeesNotDefinedYet = errors.New("fees in E fork not defined yet")
-)
+var _ txs.Visitor = (*Calculator)(nil)
 
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
@@ -27,46 +22,26 @@ type Calculator struct {
 }
 
 func (fc *Calculator) BaseTx(*txs.BaseTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
 
 func (fc *Calculator) CreateAssetTx(*txs.CreateAssetTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.CreateAssetTxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.CreateAssetTxFee
+	return nil
 }
 
 func (fc *Calculator) OperationTx(*txs.OperationTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
 
 func (fc *Calculator) ImportTx(*txs.ImportTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
 
 func (fc *Calculator) ExportTx(*txs.ExportTx) error {
-	if !fc.Config.IsEForkActivated(fc.ChainTime) {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
-	return errEForkFeesNotDefinedYet
+	fc.Fee = fc.Config.TxFee
+	return nil
 }
