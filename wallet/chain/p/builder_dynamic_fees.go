@@ -175,12 +175,8 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for input fees: %w", err)
+	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -234,12 +230,8 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for input fees: %w", err)
+	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -350,12 +342,8 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for input fees: %w", err)
+	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -523,13 +511,8 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	}
 
 	for _, sigIndices := range importedSigIndices {
-		// update fees to account for the credentials to be added with inputs upon tx signing
-		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, sigIndices)
-		if err != nil {
-			return nil, fmt.Errorf("failed calculating input size: %w", err)
-		}
-		if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-			return nil, fmt.Errorf("account for input fees: %w", err)
+		if _, err = financeCredential(feeCalc, sigIndices); err != nil {
+			return nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 	}
 
@@ -714,12 +697,8 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, subnetAuth.SigIndices)
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for input fees: %w", err)
+	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -865,7 +844,7 @@ func (b *DynamicFeesBuilder) financeTx(
 	}
 
 	// we can only pay fees in avax, so we sort avax-denominated UTXOs last
-	// to maximize probability of being able to pay fees
+	// to maximize probability of being able to pay fees.
 	slices.SortFunc(utxos, func(lhs, rhs *avax.UTXO) int {
 		switch {
 		case lhs.Asset.AssetID() == avaxAssetID && rhs.Asset.AssetID() != avaxAssetID:
@@ -939,23 +918,13 @@ func (b *DynamicFeesBuilder) financeTx(
 			},
 		}
 
-		// update fees to account for the input added
-		insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
-		}
-		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		addedFees, err := financeInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		// update fees to account for the credentials to be added with inputs upon tx signing
-		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
-		}
-		addedFees, err = feeCalc.AddFeesFor(credsDimensions)
+		addedFees, err = financeCredential(feeCalc, inputSigIndices)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
@@ -981,14 +950,9 @@ func (b *DynamicFeesBuilder) financeTx(
 			},
 		}
 
-		// update fees to account for the staked output
-		outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{stakeOut})
+		addedFees, err = financeOutput(feeCalc, stakeOut)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
-		}
-		addedFees, err = feeCalc.AddFeesFor(outDimensions)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+			return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
@@ -1009,13 +973,9 @@ func (b *DynamicFeesBuilder) financeTx(
 			}
 
 			// update fees to account for the change output
-			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+			addedFees, err = financeOutput(feeCalc, changeOut)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
-			}
-			addedFees, err := feeCalc.AddFeesFor(outDimensions)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
 			amountsToBurn[avaxAssetID] += addedFees
 
@@ -1065,25 +1025,15 @@ func (b *DynamicFeesBuilder) financeTx(
 			},
 		}
 
-		// update fees to account for the input added
-		insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
-		}
-		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		addedFees, err := financeInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		// update fees to account for the credentials to be added with inputs upon tx signing
-		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
+		addedFees, err = financeCredential(feeCalc, inputSigIndices)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
-		}
-		addedFees, err = feeCalc.AddFeesFor(credsDimensions)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
+			return nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
@@ -1115,14 +1065,9 @@ func (b *DynamicFeesBuilder) financeTx(
 
 			stakeOutputs = append(stakeOutputs, stakeOut)
 
-			// update fees to account for the staked output
-			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{stakeOut})
+			addedFees, err = financeOutput(feeCalc, stakeOut)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
-			}
-			addedFees, err := feeCalc.AddFeesFor(outDimensions)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
 			amountsToBurn[avaxAssetID] += addedFees
 		}
@@ -1137,13 +1082,9 @@ func (b *DynamicFeesBuilder) financeTx(
 			}
 
 			// update fees to account for the change output
-			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+			addedFees, err = financeOutput(feeCalc, changeOut)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
-			}
-			addedFees, err := feeCalc.AddFeesFor(outDimensions)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
 
 			if assetID != avaxAssetID {
@@ -1230,4 +1171,40 @@ func (b *DynamicFeesBuilder) initCtx(tx txs.UnsignedTx) error {
 
 	tx.InitCtx(ctx)
 	return nil
+}
+
+func financeInput(feeCalc *fees.Calculator, input *avax.TransferableInput) (uint64, error) {
+	insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
+	if err != nil {
+		return 0, fmt.Errorf("failed calculating input size: %w", err)
+	}
+	addedFees, err := feeCalc.AddFeesFor(insDimensions)
+	if err != nil {
+		return 0, fmt.Errorf("account for input fees: %w", err)
+	}
+	return addedFees, nil
+}
+
+func financeOutput(feeCalc *fees.Calculator, output *avax.TransferableOutput) (uint64, error) {
+	outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{output})
+	if err != nil {
+		return 0, fmt.Errorf("failed calculating changeOut size: %w", err)
+	}
+	addedFees, err := feeCalc.AddFeesFor(outDimensions)
+	if err != nil {
+		return 0, fmt.Errorf("account for stakedOut fees: %w", err)
+	}
+	return addedFees, nil
+}
+
+func financeCredential(feeCalc *fees.Calculator, inputSigIndices []uint32) (uint64, error) {
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
+	if err != nil {
+		return 0, fmt.Errorf("failed calculating input size: %w", err)
+	}
+	addedFees, err := feeCalc.AddFeesFor(credsDimensions)
+	if err != nil {
+		return 0, fmt.Errorf("account for input fees: %w", err)
+	}
+	return addedFees, nil
 }
