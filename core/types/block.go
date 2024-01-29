@@ -190,8 +190,7 @@ type extblock struct {
 // are ignored and set to values derived from the given txs, uncles
 // and receipts.
 func NewBlock(
-	header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt,
-	hasher TrieHasher, extdata []byte, recalc bool,
+	header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher TrieHasher,
 ) *Block {
 	b := &Block{header: CopyHeader(header)}
 
@@ -221,7 +220,6 @@ func NewBlock(
 		}
 	}
 
-	b.setExtData(extdata, recalc)
 	return b
 }
 
@@ -268,38 +266,6 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	b.header, b.uncles, b.transactions, b.version, b.extdata = eb.Header, eb.Uncles, eb.Txs, eb.Version, eb.ExtData
 	b.size.Store(rlp.ListSize(size))
 	return nil
-}
-
-func (b *Block) setExtDataHelper(data *[]byte, recalc bool) {
-	if data == nil {
-		b.setExtData(nil, recalc)
-		return
-	}
-	b.setExtData(*data, recalc)
-}
-
-func (b *Block) setExtData(data []byte, recalc bool) {
-	_data := make([]byte, len(data))
-	b.extdata = &_data
-	copy(*b.extdata, data)
-	if recalc {
-		b.header.ExtDataHash = CalcExtDataHash(*b.extdata)
-	}
-}
-
-func (b *Block) ExtData() []byte {
-	if b.extdata == nil {
-		return nil
-	}
-	return *b.extdata
-}
-
-func (b *Block) SetVersion(ver uint32) {
-	b.version = ver
-}
-
-func (b *Block) Version() uint32 {
-	return b.version
 }
 
 // EncodeRLP serializes b into the Ethereum RLP block format.
@@ -353,13 +319,6 @@ func (b *Block) BaseFee() *big.Int {
 	return new(big.Int).Set(b.header.BaseFee)
 }
 
-func (b *Block) ExtDataGasUsed() *big.Int {
-	if b.header.ExtDataGasUsed == nil {
-		return nil
-	}
-	return new(big.Int).Set(b.header.ExtDataGasUsed)
-}
-
 func (b *Block) BlockGasCost() *big.Int {
 	if b.header.BlockGasCost == nil {
 		return nil
@@ -391,13 +350,6 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func CalcExtDataHash(extdata []byte) common.Hash {
-	if len(extdata) == 0 {
-		return EmptyExtDataHash
-	}
-	return rlpHash(extdata)
-}
-
 func CalcUncleHash(uncles []*Header) common.Hash {
 	if len(uncles) == 0 {
 		return EmptyUncleHash
@@ -418,18 +370,16 @@ func (b *Block) WithSeal(header *Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, version uint32, extdata *[]byte) *Block {
+func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
 	block := &Block{
 		header:       CopyHeader(b.header),
 		transactions: make([]*Transaction, len(transactions)),
 		uncles:       make([]*Header, len(uncles)),
-		version:      version,
 	}
 	copy(block.transactions, transactions)
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
 	}
-	block.setExtDataHelper(extdata, false)
 	return block
 }
 

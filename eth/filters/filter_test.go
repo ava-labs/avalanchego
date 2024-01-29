@@ -65,7 +65,7 @@ func BenchmarkFilters(b *testing.B) {
 		gspec = &core.Genesis{
 			Config:  params.TestChainConfig,
 			Alloc:   core.GenesisAlloc{addr1: {Balance: big.NewInt(1000000)}},
-			BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+			BaseFee: big.NewInt(1),
 		}
 	)
 	defer db.Close()
@@ -106,6 +106,7 @@ func BenchmarkFilters(b *testing.B) {
 	require.NoError(b, err)
 
 	for i := 0; i < b.N; i++ {
+		filter.begin = 0
 		logs, _ := filter.Logs(context.Background())
 		if len(logs) != 4 {
 			b.Fatal("expected 4 logs, got", len(logs))
@@ -128,7 +129,7 @@ func TestFilters(t *testing.T) {
 		gspec = &core.Genesis{
 			Config:  params.TestChainConfig,
 			Alloc:   core.GenesisAlloc{addr: {Balance: big.NewInt(1000000)}},
-			BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+			BaseFee: big.NewInt(1),
 		}
 	)
 	defer db.Close()

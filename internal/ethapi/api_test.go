@@ -709,7 +709,7 @@ func TestRPCMarshalBlock(t *testing.T) {
 		}
 		txs = append(txs, tx)
 	}
-	block := types.NewBlock(&types.Header{Number: big.NewInt(100)}, txs, nil, nil, newHasher(), nil, false)
+	block := types.NewBlock(&types.Header{Number: big.NewInt(100)}, txs, nil, nil, newHasher())
 
 	var testSuite = []struct {
 		inclTx bool

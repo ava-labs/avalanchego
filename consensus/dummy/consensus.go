@@ -439,7 +439,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(
+	return types.NewBlockWithExtData(
 		header, txs, uncles, receipts, trie.NewStackTrie(nil), extraData,
 		chain.Config().IsApricotPhase1(header.Time),
 	), nil
