@@ -243,6 +243,19 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 	return nil
 }
 
+// HasChainConfig indicates whether at least one of the subnet's
+// chains have explicit configuration. This can be used to determine
+// whether validator restart is required after chain creation to
+// ensure that chains are configured correctly.
+func (s *Subnet) HasChainConfig() bool {
+	for _, chain := range s.Chains {
+		if len(chain.Config) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func waitForActiveValidators(
 	ctx context.Context,
 	w io.Writer,

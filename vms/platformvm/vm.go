@@ -205,7 +205,10 @@ func (vm *VM) Initialize(
 		chainCtx.Log,
 		chainCtx.NodeID,
 		chainCtx.SubnetID,
-		chainCtx.ValidatorState,
+		validators.NewLockedState(
+			&chainCtx.Lock,
+			validatorManager,
+		),
 		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
@@ -228,7 +231,6 @@ func (vm *VM) Initialize(
 
 	vm.Builder = blockbuilder.New(
 		mempool,
-		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
 	)

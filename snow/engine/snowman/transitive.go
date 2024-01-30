@@ -171,7 +171,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		// nodes with a large amount of stake weight.
 		vdrID, ok := t.ConnectedValidators.SampleValidator()
 		if !ok {
-			t.Ctx.Log.Error("skipping block gossip",
+			t.Ctx.Log.Warn("skipping block gossip",
 				zap.String("reason", "no connected validators"),
 			)
 			return nil
@@ -201,6 +201,11 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 			zap.String("reason", "blocks currently processing"),
 			zap.Int("numProcessing", numProcessing),
 		)
+
+		// repoll is called here to unblock the engine if it previously errored
+		// when attempting to issue a query. This can happen if a subnet was
+		// temporarily misconfigured and there were no validators.
+		t.repoll(ctx)
 	}
 
 	// TODO: Remove periodic push gossip after v1.11.x is activated
@@ -932,7 +937,7 @@ func (t *Transitive) sendQuery(
 
 	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.Params.K)
 	if err != nil {
-		t.Ctx.Log.Error("dropped query for block",
+		t.Ctx.Log.Warn("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
 			zap.Stringer("blkID", blkID),
 			zap.Int("size", t.Params.K),

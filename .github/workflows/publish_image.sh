@@ -14,7 +14,7 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
 # Build current avalanchego
-source "$AVALANCHE_PATH"/scripts/build_image.sh -r
+source "$AVALANCHE_PATH"/scripts/build_image.sh
 
 if [[ $current_branch == "master" ]]; then
   echo "Tagging current avalanchego image as $avalanchego_dockerhub_repo:latest"
