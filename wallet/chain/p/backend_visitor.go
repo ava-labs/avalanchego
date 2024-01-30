@@ -46,6 +46,10 @@ func (b *backendVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	b.b.setSubnetOwner(
+		b.txID,
+		tx.Owner,
+	)
 	return b.baseTx(&tx.BaseTx)
 }
 
@@ -54,7 +58,10 @@ func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 }
 
 func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	// TODO: Correctly track subnet owners in [getSubnetSigners]
+	b.b.setSubnetOwner(
+		tx.Subnet,
+		tx.Owner,
+	)
 	return b.baseTx(&tx.BaseTx)
 }
 
