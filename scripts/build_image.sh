@@ -8,6 +8,11 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
+if [[ $current_branch == *"-race" ]]; then
+  echo "Branch name must not end in '-race'"
+  exit 1
+fi
+
 # WARNING: this will use the most recent commit even if there are un-committed changes present
 full_commit_hash="$(git --git-dir="$AVALANCHE_PATH/.git" rev-parse HEAD)"
 commit_hash="${full_commit_hash::8}"
