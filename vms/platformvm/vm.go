@@ -231,7 +231,6 @@ func (vm *VM) Initialize(
 
 	vm.Builder = blockbuilder.New(
 		mempool,
-		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
 	)

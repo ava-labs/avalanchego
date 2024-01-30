@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -32,16 +33,30 @@ type backend struct {
 	Context
 	common.ChainUTXOs
 
-	txsLock sync.RWMutex
-	// txID -> tx
-	txs map[ids.ID]*txs.Tx
+	subnetOwnerLock sync.RWMutex
+	subnetOwner     map[ids.ID]fx.Owner // subnetID -> owner
 }
 
-func NewBackend(ctx Context, utxos common.ChainUTXOs, txs map[ids.ID]*txs.Tx) Backend {
+func NewBackend(ctx Context, utxos common.ChainUTXOs, subnetTxs map[ids.ID]*txs.Tx) Backend {
+	subnetOwner := make(map[ids.ID]fx.Owner)
+	for txID, tx := range subnetTxs { // first get owners from the CreateSubnetTx
+		createSubnetTx, ok := tx.Unsigned.(*txs.CreateSubnetTx)
+		if !ok {
+			continue
+		}
+		subnetOwner[txID] = createSubnetTx.Owner
+	}
+	for _, tx := range subnetTxs { // then check for TransferSubnetOwnershipTx
+		transferSubnetOwnershipTx, ok := tx.Unsigned.(*txs.TransferSubnetOwnershipTx)
+		if !ok {
+			continue
+		}
+		subnetOwner[transferSubnetOwnershipTx.Subnet] = transferSubnetOwnershipTx.Owner
+	}
 	return &backend{
-		Context:    ctx,
-		ChainUTXOs: utxos,
-		txs:        txs,
+		Context:     ctx,
+		ChainUTXOs:  utxos,
+		subnetOwner: subnetOwner,
 	}
 }
 
@@ -57,16 +72,7 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
 	}
 
 	producedUTXOSlice := tx.UTXOs()
-	err = b.addUTXOs(ctx, constants.PlatformChainID, producedUTXOSlice)
-	if err != nil {
-		return err
-	}
-
-	b.txsLock.Lock()
-	defer b.txsLock.Unlock()
-
-	b.txs[txID] = tx
-	return nil
+	return b.addUTXOs(ctx, constants.PlatformChainID, producedUTXOSlice)
 }
 
 func (b *backend) addUTXOs(ctx stdcontext.Context, destinationChainID ids.ID, utxos []*avax.UTXO) error {
@@ -87,13 +93,20 @@ func (b *backend) removeUTXOs(ctx stdcontext.Context, sourceChain ids.ID, utxoID
 	return nil
 }
 
-func (b *backend) GetTx(_ stdcontext.Context, txID ids.ID) (*txs.Tx, error) {
-	b.txsLock.RLock()
-	defer b.txsLock.RUnlock()
+func (b *backend) GetSubnetOwner(_ stdcontext.Context, subnetID ids.ID) (fx.Owner, error) {
+	b.subnetOwnerLock.RLock()
+	defer b.subnetOwnerLock.RUnlock()
 
-	tx, exists := b.txs[txID]
+	owner, exists := b.subnetOwner[subnetID]
 	if !exists {
 		return nil, database.ErrNotFound
 	}
-	return tx, nil
+	return owner, nil
+}
+
+func (b *backend) setSubnetOwner(subnetID ids.ID, owner fx.Owner) {
+	b.subnetOwnerLock.Lock()
+	defer b.subnetOwnerLock.Unlock()
+
+	b.subnetOwner[subnetID] = owner
 }
