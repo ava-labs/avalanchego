@@ -3031,7 +3031,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	}
 
 	// Voting for the block that was issued during the period when the validator
-	// set was misconfigured should result in it being accepted succesfully.
+	// set was misconfigured should result in it being accepted successfully.
 	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
 	require.Equal(choices.Accepted, blk.Status())
 }
