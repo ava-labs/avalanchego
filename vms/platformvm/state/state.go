@@ -61,35 +61,35 @@ var (
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errIsNotSubnet                  = errors.New("is not a subnet")
 
-	blockIDPrefix                       = []byte("blockID")
-	blockPrefix                         = []byte("block")
-	validatorsPrefix                    = []byte("validators")
-	currentPrefix                       = []byte("current")
-	pendingPrefix                       = []byte("pending")
-	validatorPrefix                     = []byte("validator")
-	delegatorPrefix                     = []byte("delegator")
-	subnetValidatorPrefix               = []byte("subnetValidator")
-	subnetDelegatorPrefix               = []byte("subnetDelegator")
-	nestedValidatorWeightDiffsPrefix    = []byte("validatorDiffs")
-	nestedValidatorPublicKeyDiffsPrefix = []byte("publicKeyDiffs")
-	flatValidatorWeightDiffsPrefix      = []byte("flatValidatorDiffs")
-	flatValidatorPublicKeyDiffsPrefix   = []byte("flatPublicKeyDiffs")
-	txPrefix                            = []byte("tx")
-	rewardUTXOsPrefix                   = []byte("rewardUTXOs")
-	utxoPrefix                          = []byte("utxo")
-	subnetPrefix                        = []byte("subnet")
-	subnetOwnerPrefix                   = []byte("subnetOwner")
-	transformedSubnetPrefix             = []byte("transformedSubnet")
-	supplyPrefix                        = []byte("supply")
-	chainPrefix                         = []byte("chain")
-	singletonPrefix                     = []byte("singleton")
+	BlockIDPrefix                       = []byte("blockID")
+	BlockPrefix                         = []byte("block")
+	ValidatorsPrefix                    = []byte("validators")
+	CurrentPrefix                       = []byte("current")
+	PendingPrefix                       = []byte("pending")
+	ValidatorPrefix                     = []byte("validator")
+	DelegatorPrefix                     = []byte("delegator")
+	SubnetValidatorPrefix               = []byte("subnetValidator")
+	SubnetDelegatorPrefix               = []byte("subnetDelegator")
+	NestedValidatorWeightDiffsPrefix    = []byte("validatorDiffs")
+	NestedValidatorPublicKeyDiffsPrefix = []byte("publicKeyDiffs")
+	FlatValidatorWeightDiffsPrefix      = []byte("flatValidatorDiffs")
+	FlatValidatorPublicKeyDiffsPrefix   = []byte("flatPublicKeyDiffs")
+	TxPrefix                            = []byte("tx")
+	RewardUTXOsPrefix                   = []byte("rewardUTXOs")
+	UTXOPrefix                          = []byte("utxo")
+	SubnetPrefix                        = []byte("subnet")
+	SubnetOwnerPrefix                   = []byte("subnetOwner")
+	TransformedSubnetPrefix             = []byte("transformedSubnet")
+	SupplyPrefix                        = []byte("supply")
+	ChainPrefix                         = []byte("chain")
+	SingletonPrefix                     = []byte("singleton")
 
-	timestampKey      = []byte("timestamp")
-	currentSupplyKey  = []byte("current supply")
-	lastAcceptedKey   = []byte("last accepted")
-	heightsIndexedKey = []byte("heights indexed")
-	initializedKey    = []byte("initialized")
-	prunedKey         = []byte("pruned")
+	TimestampKey      = []byte("timestamp")
+	CurrentSupplyKey  = []byte("current supply")
+	LastAcceptedKey   = []byte("last accepted")
+	HeightsIndexedKey = []byte("heights indexed")
+	InitializedKey    = []byte("initialized")
+	PrunedKey         = []byte("pruned")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -491,7 +491,7 @@ func New(
 		// If the pruned key is on disk, we must delete it to ensure our disk
 		// can't get into a partially pruned state if the node restarts mid-way
 		// through pruning.
-		if err := s.singletonDB.Delete(prunedKey); err != nil {
+		if err := s.singletonDB.Delete(PrunedKey); err != nil {
 			return nil, fmt.Errorf("failed to remove prunedKey from singletonDB: %w", err)
 		}
 
@@ -532,24 +532,24 @@ func newState(
 
 	baseDB := versiondb.New(db)
 
-	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
+	validatorsDB := prefixdb.New(ValidatorsPrefix, baseDB)
 
-	currentValidatorsDB := prefixdb.New(currentPrefix, validatorsDB)
-	currentValidatorBaseDB := prefixdb.New(validatorPrefix, currentValidatorsDB)
-	currentDelegatorBaseDB := prefixdb.New(delegatorPrefix, currentValidatorsDB)
-	currentSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, currentValidatorsDB)
-	currentSubnetDelegatorBaseDB := prefixdb.New(subnetDelegatorPrefix, currentValidatorsDB)
+	currentValidatorsDB := prefixdb.New(CurrentPrefix, validatorsDB)
+	currentValidatorBaseDB := prefixdb.New(ValidatorPrefix, currentValidatorsDB)
+	currentDelegatorBaseDB := prefixdb.New(DelegatorPrefix, currentValidatorsDB)
+	currentSubnetValidatorBaseDB := prefixdb.New(SubnetValidatorPrefix, currentValidatorsDB)
+	currentSubnetDelegatorBaseDB := prefixdb.New(SubnetDelegatorPrefix, currentValidatorsDB)
 
-	pendingValidatorsDB := prefixdb.New(pendingPrefix, validatorsDB)
-	pendingValidatorBaseDB := prefixdb.New(validatorPrefix, pendingValidatorsDB)
-	pendingDelegatorBaseDB := prefixdb.New(delegatorPrefix, pendingValidatorsDB)
-	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
-	pendingSubnetDelegatorBaseDB := prefixdb.New(subnetDelegatorPrefix, pendingValidatorsDB)
+	pendingValidatorsDB := prefixdb.New(PendingPrefix, validatorsDB)
+	pendingValidatorBaseDB := prefixdb.New(ValidatorPrefix, pendingValidatorsDB)
+	pendingDelegatorBaseDB := prefixdb.New(DelegatorPrefix, pendingValidatorsDB)
+	pendingSubnetValidatorBaseDB := prefixdb.New(SubnetValidatorPrefix, pendingValidatorsDB)
+	pendingSubnetDelegatorBaseDB := prefixdb.New(SubnetDelegatorPrefix, pendingValidatorsDB)
 
-	nestedValidatorWeightDiffsDB := prefixdb.New(nestedValidatorWeightDiffsPrefix, validatorsDB)
-	nestedValidatorPublicKeyDiffsDB := prefixdb.New(nestedValidatorPublicKeyDiffsPrefix, validatorsDB)
-	flatValidatorWeightDiffsDB := prefixdb.New(flatValidatorWeightDiffsPrefix, validatorsDB)
-	flatValidatorPublicKeyDiffsDB := prefixdb.New(flatValidatorPublicKeyDiffsPrefix, validatorsDB)
+	nestedValidatorWeightDiffsDB := prefixdb.New(NestedValidatorWeightDiffsPrefix, validatorsDB)
+	nestedValidatorPublicKeyDiffsDB := prefixdb.New(NestedValidatorPublicKeyDiffsPrefix, validatorsDB)
+	flatValidatorWeightDiffsDB := prefixdb.New(FlatValidatorWeightDiffsPrefix, validatorsDB)
+	flatValidatorPublicKeyDiffsDB := prefixdb.New(FlatValidatorPublicKeyDiffsPrefix, validatorsDB)
 
 	txCache, err := metercacher.New(
 		"tx_cache",
@@ -560,7 +560,7 @@ func newState(
 		return nil, err
 	}
 
-	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
+	rewardUTXODB := prefixdb.New(RewardUTXOsPrefix, baseDB)
 	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
@@ -570,15 +570,15 @@ func newState(
 		return nil, err
 	}
 
-	utxoDB := prefixdb.New(utxoPrefix, baseDB)
+	utxoDB := prefixdb.New(UTXOPrefix, baseDB)
 	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
+	subnetBaseDB := prefixdb.New(SubnetPrefix, baseDB)
 
-	subnetOwnerDB := prefixdb.New(subnetOwnerPrefix, baseDB)
+	subnetOwnerDB := prefixdb.New(SubnetOwnerPrefix, baseDB)
 	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
@@ -638,11 +638,11 @@ func newState(
 
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDCache:  blockIDCache,
-		blockIDDB:     prefixdb.New(blockIDPrefix, baseDB),
+		blockIDDB:     prefixdb.New(BlockIDPrefix, baseDB),
 
 		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
-		blockDB:     prefixdb.New(blockPrefix, baseDB),
+		blockDB:     prefixdb.New(BlockPrefix, baseDB),
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -672,7 +672,7 @@ func newState(
 		flatValidatorPublicKeyDiffsDB:   flatValidatorPublicKeyDiffsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
-		txDB:     prefixdb.New(txPrefix, baseDB),
+		txDB:     prefixdb.New(TxPrefix, baseDB),
 		txCache:  txCache,
 
 		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
@@ -692,18 +692,18 @@ func newState(
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
-		transformedSubnetDB:    prefixdb.New(transformedSubnetPrefix, baseDB),
+		transformedSubnetDB:    prefixdb.New(TransformedSubnetPrefix, baseDB),
 
 		modifiedSupplies: make(map[ids.ID]uint64),
 		supplyCache:      supplyCache,
-		supplyDB:         prefixdb.New(supplyPrefix, baseDB),
+		supplyDB:         prefixdb.New(SupplyPrefix, baseDB),
 
 		addedChains:  make(map[ids.ID][]*txs.Tx),
-		chainDB:      prefixdb.New(chainPrefix, baseDB),
+		chainDB:      prefixdb.New(ChainPrefix, baseDB),
 		chainCache:   chainCache,
 		chainDBCache: chainDBCache,
 
-		singletonDB: prefixdb.New(singletonPrefix, baseDB),
+		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
 	}, nil
 }
 
@@ -764,16 +764,16 @@ func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
 }
 
 func (s *state) shouldInit() (bool, error) {
-	has, err := s.singletonDB.Has(initializedKey)
+	has, err := s.singletonDB.Has(InitializedKey)
 	return !has, err
 }
 
 func (s *state) doneInit() error {
-	return s.singletonDB.Put(initializedKey, nil)
+	return s.singletonDB.Put(InitializedKey, nil)
 }
 
 func (s *state) ShouldPrune() (bool, error) {
-	has, err := s.singletonDB.Has(prunedKey)
+	has, err := s.singletonDB.Has(PrunedKey)
 	if err != nil {
 		return true, err
 	}
@@ -800,7 +800,7 @@ func (s *state) ShouldPrune() (bool, error) {
 }
 
 func (s *state) donePrune() error {
-	return s.singletonDB.Put(prunedKey, nil)
+	return s.singletonDB.Put(PrunedKey, nil)
 }
 
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
@@ -1158,6 +1158,18 @@ func (s *state) ApplyValidatorWeightDiffs(
 		if err != nil {
 			return err
 		}
+
+		if parsedHeight > prevHeight {
+			s.ctx.Log.Error("unexpected parsed height",
+				zap.Stringer("subnetID", subnetID),
+				zap.Uint64("parsedHeight", parsedHeight),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint64("prevHeight", prevHeight),
+				zap.Uint64("startHeight", startHeight),
+				zap.Uint64("endHeight", endHeight),
+			)
+		}
+
 		// If the parsedHeight is less than our target endHeight, then we have
 		// fully processed the diffs from startHeight through endHeight.
 		if parsedHeight < endHeight {
@@ -1394,21 +1406,21 @@ func (s *state) load() error {
 }
 
 func (s *state) loadMetadata() error {
-	timestamp, err := database.GetTimestamp(s.singletonDB, timestampKey)
+	timestamp, err := database.GetTimestamp(s.singletonDB, TimestampKey)
 	if err != nil {
 		return err
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
 
-	currentSupply, err := database.GetUInt64(s.singletonDB, currentSupplyKey)
+	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
 		return err
 	}
 	s.persistedCurrentSupply = currentSupply
 	s.SetCurrentSupply(constants.PrimaryNetworkID, currentSupply)
 
-	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
+	lastAccepted, err := database.GetID(s.singletonDB, LastAcceptedKey)
 	if err != nil {
 		return err
 	}
@@ -1417,7 +1429,7 @@ func (s *state) loadMetadata() error {
 
 	// Lookup the most recently indexed range on disk. If we haven't started
 	// indexing the weights, then we keep the indexed heights as nil.
-	indexedHeightsBytes, err := s.singletonDB.Get(heightsIndexedKey)
+	indexedHeightsBytes, err := s.singletonDB.Get(HeightsIndexedKey)
 	if err == database.ErrNotFound {
 		return nil
 	}
@@ -2410,19 +2422,19 @@ func (s *state) writeChains() error {
 
 func (s *state) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
-		if err := database.PutTimestamp(s.singletonDB, timestampKey, s.timestamp); err != nil {
+		if err := database.PutTimestamp(s.singletonDB, TimestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
 	}
 	if s.persistedCurrentSupply != s.currentSupply {
-		if err := database.PutUInt64(s.singletonDB, currentSupplyKey, s.currentSupply); err != nil {
+		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {
 			return fmt.Errorf("failed to write current supply: %w", err)
 		}
 		s.persistedCurrentSupply = s.currentSupply
 	}
 	if s.persistedLastAccepted != s.lastAccepted {
-		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {
+		if err := database.PutID(s.singletonDB, LastAcceptedKey, s.lastAccepted); err != nil {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
@@ -2433,7 +2445,7 @@ func (s *state) writeMetadata() error {
 		if err != nil {
 			return err
 		}
-		if err := s.singletonDB.Put(heightsIndexedKey, indexedHeightsBytes); err != nil {
+		if err := s.singletonDB.Put(HeightsIndexedKey, indexedHeightsBytes); err != nil {
 			return fmt.Errorf("failed to write indexed range: %w", err)
 		}
 	}

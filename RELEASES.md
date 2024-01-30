@@ -1,5 +1,65 @@
 # Release Notes
 
+## [v1.10.19](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.19)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `31` and is compatible with version `v1.10.18`.
+
+### APIs
+
+- Added `admin.dbGet` call to the `admin` API
+- Added bloom filter metrics:
+  - `bloom_filter_count`
+  - `bloom_filter_entries`
+  - `bloom_filter_hashes`
+  - `bloom_filter_max_count`
+  - `bloom_filter_reset_count`
+  to the following namespaces:
+  - `avalanche_X_vm_mempool`
+  - `avalanche_P_vm_mempool`
+  - `avalanche_C_vm_sdk_atomic_mempool`
+  - `avalanche_C_vm_sdk_eth_mempool`
+
+### Fixes
+
+- Fixed race condition during validator set creation
+- Fixed C-chain mempool bloom filter recalculation
+
+### What's Changed
+
+- `vms/platformvm`: Change `AdvanceTimeTo` to modify passed-in `parentState` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2489
+- `vms/platformvm`: Remove `MempoolTxVerifier` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2362
+- Verify `SignedIP.Timestamp` from `PeerList` messages by @danlaine in https://github.com/ava-labs/avalanchego/pull/2587
+- Fix metrics namespace by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2632
+- Add bloom filter metrics to the p2p sdk by @ceyonur in https://github.com/ava-labs/avalanchego/pull/2612
+- Replace `shutdownEnvironment` with `t.Cleanup()` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2491
+- P-chain - Memo field zeroed post Durango  by @abi87 in https://github.com/ava-labs/avalanchego/pull/2607
+- Refactor feature extensions out of VMManager by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2578
+- Remove getter for router on chain manager by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2641
+- Fix `require.ErrorIs` argument order by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2645
+- `api/admin`: Cleanup `SuccessResponseTests` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2644
+- Allow calls to `Options` before `Verify` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2363
+- Improve logging of unexpected proposer errors by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2646
+- Disable non-security related dependabot PRs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2647
+- Add historical fork times by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2649
+- Cleanup warp signer tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2651
+- Reintroduce the upgrade test against v1.10.18 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2652
+- Cleanup database benchmarks by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2653
+- Cleanup database tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2654
+- `ci`: Add shellcheck step to lint job by @marun in https://github.com/ava-labs/avalanchego/pull/2650
+- Replace `closeFn` with `t.Cleanup` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2638
+- Fix TestExpiredBuildBlock by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2655
+- Add admin.dbGet API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2667
+- `ci`: Update shellcheck.sh to pass all args to shellcheck by @marun in https://github.com/ava-labs/avalanchego/pull/2657
+- `vms/platformvm`: Remove `NewAdvanceTimeTx` from `Builder` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2668
+- Log error if database returns unsorted heights by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2670
+- `vms/platformvm`: Move `vm.Shutdown` call in tests to `t.Cleanup` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2669
+- `e2e`: Add test of `platform.getValidatorsAt` across nodes by @marun in https://github.com/ava-labs/avalanchego/pull/2664
+- Fix P-chain validator set lookup race condition by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2672
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.18...v1.10.19
+
 ## [v1.10.18](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.18)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
@@ -28,7 +88,6 @@ The plugin version is updated to `31` all plugins must update to be compatible.
 - Removed `gzip` compression time metrics
 - Converted p2p SDK metrics to use vectors rather than independent metrics
 - Converted client name reported over the p2p network from `avalanche` to `avalanchego`
-
 
 ### Configs
 
