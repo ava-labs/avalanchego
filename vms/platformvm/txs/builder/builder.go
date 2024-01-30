@@ -164,23 +164,6 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
-	// stakeAmount: amount the delegator stakes
-	// startTime: unix time they start delegating
-	// endTime: unix time they stop delegating
-	// nodeID: ID of the node we are delegating to
-	// rewardAddress: address to send reward to, if applicable
-	// keys: keys providing the staked tokens
-	// changeAddr: address to send change to, if there is any
-	NewAddPermissionlessDelegatorTx(
-		stakeAmount,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
-		rewardAddress ids.ShortID,
-		keys []*secp256k1.PrivateKey,
-		changeAddr ids.ShortID,
-	) (*txs.Tx, error)
-
 	// weight: sampling weight of the new validator
 	// startTime: unix time they start delegating
 	// endTime:  unix time they top delegating
@@ -612,48 +595,6 @@ func (b *builder) NewAddDelegatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
-		StakeOuts: lockedOuts,
-		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{rewardAddress},
-		},
-	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
-	if err != nil {
-		return nil, err
-	}
-	return tx, tx.SyntacticVerify(b.ctx)
-}
-
-func (b *builder) NewAddPermissionlessDelegatorTx(
-	stakeAmount,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
-	rewardAddress ids.ShortID,
-	keys []*secp256k1.PrivateKey,
-	changeAddr ids.ShortID,
-) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-	// Create the tx
-	utx := &txs.AddPermissionlessDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unlockedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmount,
-		},
-		Subnet:    constants.PrimaryNetworkID,
 		StakeOuts: lockedOuts,
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
