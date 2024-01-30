@@ -124,6 +124,18 @@ func (w *walletWithOptions) IssueCreateSubnetTx(
 	)
 }
 
+func (w *walletWithOptions) IssueTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.Wallet.IssueTransferSubnetOwnershipTx(
+		subnetID,
+		owner,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *walletWithOptions) IssueImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
