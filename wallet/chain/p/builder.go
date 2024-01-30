@@ -1150,7 +1150,7 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to fetch subnet %q: %w",
+			"failed to fetch subnet owner for %q: %w",
 			subnetID,
 			err,
 		)
