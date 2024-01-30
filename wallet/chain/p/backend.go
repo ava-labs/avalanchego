@@ -104,7 +104,7 @@ func (b *backend) GetSubnetOwner(_ stdcontext.Context, subnetID ids.ID) (fx.Owne
 	return owner, nil
 }
 
-func (b *backend) setSubnetOwner(_ stdcontext.Context, subnetID ids.ID, owner fx.Owner) {
+func (b *backend) setSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	b.subnetOwnerLock.Lock()
 	defer b.subnetOwnerLock.Unlock()
 
