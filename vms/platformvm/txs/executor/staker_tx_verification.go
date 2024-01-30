@@ -114,11 +114,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	startTime := currentTimestamp
-	if !isDurangoActive {
-		startTime = tx.StartTime()
-	}
-
+	startTime := tx.StartTime()
 	duration := tx.EndTime().Sub(startTime)
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
@@ -150,7 +146,7 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
+	if err := verifyStakerStartTime(false /*=isDurangoActive*/, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -186,7 +182,7 @@ func verifyAddValidatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
+	return outs, verifyStakerStartsSoon(false /*=isDurangoActive*/, currentTimestamp, startTime)
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -385,13 +381,9 @@ func verifyAddDelegatorTx(
 
 	var (
 		endTime   = tx.EndTime()
-		startTime = currentTimestamp
-	)
-	if !isDurangoActive {
 		startTime = tx.StartTime()
-	}
-	duration := endTime.Sub(startTime)
-
+		duration  = endTime.Sub(startTime)
+	)
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -414,7 +406,7 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
+	if err := verifyStakerStartTime(false /*=isDurangoActive*/, currentTimestamp, startTime); err != nil {
 		return nil, err
 	}
 
@@ -475,7 +467,7 @@ func verifyAddDelegatorTx(
 
 	// verifyStakerStartsSoon is checked last to allow
 	// the verifier visitor to explicitly check for this error.
-	return outs, verifyStakerStartsSoon(isDurangoActive, currentTimestamp, startTime)
+	return outs, verifyStakerStartsSoon(false /*=isDurangoActive*/, currentTimestamp, startTime)
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
