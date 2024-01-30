@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -1409,7 +1410,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	preferred, err = env.blkManager.GetStatelessBlock(preferredID)
 	require.NoError(err)
 
-	rewardValidatorTx, err := env.txBuilder.NewRewardValidatorTx(addValidatorTx.ID())
+	rewardValidatorTx, err := newRewardValidatorTx(t, addValidatorTx.ID())
 	require.NoError(err)
 
 	statelessProposalBlk, err := block.NewBanffProposalBlock(
@@ -1439,4 +1440,13 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	rewardUTXOs, err := env.state.GetRewardUTXOs(addValidatorTx.ID())
 	require.NoError(err)
 	require.NotEmpty(rewardUTXOs)
+}
+
+func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
 }

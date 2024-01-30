@@ -202,7 +202,6 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.Builder = New(
 		res.mempool,
-		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 	)
