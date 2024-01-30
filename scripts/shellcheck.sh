@@ -2,6 +2,16 @@
 
 set -euo pipefail
 
+# This script can also be used to correct the problems detected by shellcheck by invoking as follows:
+#
+# ./scripts/tests.shellcheck.sh -f diff | git apply
+#
+
+if ! [[ "$0" =~ scripts/shellcheck.sh ]]; then
+  echo "must be run from repository root"
+  exit 255
+fi
+
 VERSION="v0.9.0"
 
 function get_version {
@@ -11,14 +21,12 @@ function get_version {
   fi
 }
 
-REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-
 SYSTEM_VERSION="$(get_version shellcheck)"
 if [[ "${SYSTEM_VERSION}" == "${VERSION}" ]]; then
   SHELLCHECK=shellcheck
 else
   # Try to install a local version
-  SHELLCHECK="${REPO_ROOT}/bin/shellcheck"
+  SHELLCHECK=./bin/shellcheck
   LOCAL_VERSION="$(get_version "${SHELLCHECK}")"
   if [[ -z "${LOCAL_VERSION}" || "${LOCAL_VERSION}" != "${VERSION}" ]]; then
     if which sw_vers &> /dev/null; then
@@ -36,4 +44,4 @@ else
   fi
 fi
 
-find "${REPO_ROOT}" -name "*.sh" -type f -print0 | xargs -0 "${SHELLCHECK}" "${@}"
+find . -name "*.sh" -type f -printf '%P\0' | xargs -0 "${SHELLCHECK}" "${@}"
