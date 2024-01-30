@@ -560,8 +560,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
 	err = vm.issueTx(context.Background(), tx)
-	require.ErrorIs(err, txexecutor.ErrAlreadyValidator)
 	vm.ctx.Lock.Lock()
+	require.ErrorIs(err, txexecutor.ErrDuplicateValidator)
 }
 
 // Accept proposal to add validator to subnet
