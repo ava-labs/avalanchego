@@ -47,7 +47,6 @@ func (b *backendVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	b.b.setSubnetOwner(
-		b.ctx,
 		b.txID,
 		tx.Owner,
 	)
@@ -60,7 +59,6 @@ func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 
 func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	b.b.setSubnetOwner(
-		b.ctx,
 		tx.Subnet,
 		tx.Owner,
 	)
