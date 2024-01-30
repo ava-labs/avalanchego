@@ -8,11 +8,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
@@ -38,10 +36,7 @@ func main() {
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
 	pUTXOs := primary.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
-	pBackend, err := p.NewBackend(state.PCTX, pUTXOs, make(map[ids.ID]*txs.Tx))
-	if err != nil {
-		log.Fatalf("failed to create wallet backend: %s\n", err)
-	}
+	pBackend := p.NewBackend(state.PCTX, pUTXOs, nil)
 	pBuilder := p.NewBuilder(addresses, pBackend)
 
 	currentBalances, err := pBuilder.GetBalance()

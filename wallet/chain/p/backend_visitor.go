@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ txs.Visitor = (*backendVisitor)(nil)
@@ -47,14 +46,10 @@ func (b *backendVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	owner, ok := tx.Owner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return errUnknownOwnerType
-	}
 	b.b.setSubnetOwner(
 		b.ctx,
 		b.txID,
-		owner,
+		tx.Owner,
 	)
 	return b.baseTx(&tx.BaseTx)
 }
@@ -64,14 +59,10 @@ func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx
 }
 
 func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	owner, ok := tx.Owner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return errUnknownOwnerType
-	}
 	b.b.setSubnetOwner(
 		b.ctx,
 		tx.Subnet,
-		owner,
+		tx.Owner,
 	)
 	return b.baseTx(&tx.BaseTx)
 }

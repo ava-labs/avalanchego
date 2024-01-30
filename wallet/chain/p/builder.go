@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -260,8 +261,7 @@ type Builder interface {
 type BuilderBackend interface {
 	Context
 	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetTx(ctx stdcontext.Context, txID ids.ID) (*txs.Tx, error)
-	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (*secp256k1fx.OutputOwners, error)
+	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
 }
 
 type builder struct {
@@ -1147,13 +1147,17 @@ func (b *builder) spend(
 }
 
 func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	owner, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
+	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch subnet %q: %w",
 			subnetID,
 			err,
 		)
+	}
+	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return nil, errUnknownOwnerType
 	}
 
 	addrs := options.Addresses(b.addrs)

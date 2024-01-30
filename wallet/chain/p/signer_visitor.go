@@ -246,13 +246,17 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 		return nil, errUnknownSubnetAuthType
 	}
 
-	owner, err := s.backend.GetSubnetOwner(s.ctx, subnetID)
+	ownerIntf, err := s.backend.GetSubnetOwner(s.ctx, subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch subnet %q: %w",
 			subnetID,
 			err,
 		)
+	}
+	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return nil, errUnknownOwnerType
 	}
 
 	authSigners := make([]keychain.Signer, len(subnetInput.SigIndices))
