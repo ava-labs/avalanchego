@@ -152,6 +152,126 @@ func (b *DynamicFeesBuilder) NewCreateAssetTx(
 	return utx, b.initCtx(utx)
 }
 
+func (b *DynamicFeesBuilder) NewOperationTx(
+	operations []*txs.Operation,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.OperationTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+	codec := Parser.Codec()
+	txs.SortOperations(operations, codec)
+
+	utx := &txs.OperationTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: b.backend.BlockchainID(),
+			Memo:         ops.Memo(),
+		}},
+		Ops: operations,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	feesMan := commonfees.NewManager(unitFees)
+	feeCalc := &fees.Calculator{
+		IsEForkActive:    true,
+		Codec:            Parser.Codec(),
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: unitCaps,
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.OperationTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, changeOuts, err := b.financeTx(toBurn, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = changeOuts
+
+	return utx, b.initCtx(utx)
+}
+
+func (b *DynamicFeesBuilder) NewOperationTxMintFT(
+	outputs map[ids.ID]*secp256k1fx.TransferOutput,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.OperationTx, error) {
+	ops := common.NewOptions(options)
+	operations, err := mintFTs(b.addrs, b.backend, outputs, ops)
+	if err != nil {
+		return nil, err
+	}
+	return b.NewOperationTx(
+		operations,
+		unitFees,
+		unitCaps,
+		options...,
+	)
+}
+
+func (b *DynamicFeesBuilder) NewOperationTxMintNFT(
+	assetID ids.ID,
+	payload []byte,
+	owners []*secp256k1fx.OutputOwners,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.OperationTx, error) {
+	ops := common.NewOptions(options)
+	operations, err := mintNFTs(b.addrs, b.backend, assetID, payload, owners, ops)
+	if err != nil {
+		return nil, err
+	}
+	return b.NewOperationTx(
+		operations,
+		unitFees,
+		unitCaps,
+		options...,
+	)
+}
+
+func (b *DynamicFeesBuilder) NewOperationTxMintProperty(
+	assetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.OperationTx, error) {
+	ops := common.NewOptions(options)
+	operations, err := mintProperty(b.addrs, b.backend, assetID, owner, ops)
+	if err != nil {
+		return nil, err
+	}
+	return b.NewOperationTx(
+		operations,
+		unitFees,
+		unitCaps,
+		options...,
+	)
+}
+
+func (b *DynamicFeesBuilder) NewOperationTxBurnProperty(
+	assetID ids.ID,
+	unitFees, unitCaps commonfees.Dimensions,
+	options ...common.Option,
+) (*txs.OperationTx, error) {
+	ops := common.NewOptions(options)
+	operations, err := burnProperty(b.addrs, b.backend, assetID, ops)
+	if err != nil {
+		return nil, err
+	}
+	return b.NewOperationTx(
+		operations,
+		unitFees,
+		unitCaps,
+		options...,
+	)
+}
+
 func (b *DynamicFeesBuilder) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
