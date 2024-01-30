@@ -2938,6 +2938,8 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
+	// Setup the engine with no validators. When a block is issued, the poll
+	// should fail to be created because there is nobody to poll.
 	vals := validators.NewManager()
 	engCfg.Validators = vals
 
@@ -2983,6 +2985,8 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
+	// Issue the block. This shouldn't call the sender, because creating the
+	// poll should fail.
 	require.NoError(te.issue(
 		context.Background(),
 		te.Ctx.NodeID,
@@ -2991,8 +2995,10 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
-	require.Equal(choices.Processing, blk.Status())
+	// The block should have successfully been added into consensus.
+	require.Equal(1, te.Consensus.NumProcessing())
 
+	// Fix the subnet configuration by adding a validator.
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
@@ -3008,6 +3014,8 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		queried = true
 	}
 
+	// Because there is now a validator that can be queried, gossip should
+	// trigger creation of the poll.
 	require.NoError(te.Gossip(context.Background()))
 	require.True(queried)
 
@@ -3022,7 +3030,8 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
+	// Voting for the block that was issued during the period when the validator
+	// set was misconfigured should result in it being accepted succesfully.
 	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
-
 	require.Equal(choices.Accepted, blk.Status())
 }
