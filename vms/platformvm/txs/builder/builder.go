@@ -6,13 +6,11 @@ package builder
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -132,6 +130,7 @@ type ProposalTxBuilder interface {
 	// startTime: unix time they start validating
 	// endTime: unix time they stop validating
 	// nodeID: ID of the node we want to validate with
+	// pop: the node proof of possession
 	// rewardAddress: address to send reward to, if applicable
 	// shares: 10,000 times percentage of reward taken from delegators
 	// keys: Keys providing the staked tokens
@@ -141,6 +140,7 @@ type ProposalTxBuilder interface {
 		startTime,
 		endTime uint64,
 		nodeID ids.NodeID,
+		pop *signer.ProofOfPossession,
 		rewardAddress ids.ShortID,
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
@@ -221,10 +221,6 @@ type ProposalTxBuilder interface {
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
-
-	// newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
-	// Commit block, will set the chain's timestamp to [timestamp].
-	NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error)
 
 	// RewardStakerTx creates a new transaction that proposes to remove the staker
 	// [validatorID] from the default validator set.
@@ -536,6 +532,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
+	pop *signer.ProofOfPossession,
 	rewardAddress ids.ShortID,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
@@ -544,10 +541,6 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-	sk, err := bls.NewSecretKey()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate bls key: %w", err)
 	}
 	// Create the tx
 	utx := &txs.AddPermissionlessValidatorTx{
@@ -564,7 +557,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 			Wght:   stakeAmount,
 		},
 		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk),
+		Signer:    pop,
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
@@ -744,15 +737,6 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		SubnetAuth: subnetAuth,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
-	if err != nil {
-		return nil, err
-	}
-	return tx, tx.SyntacticVerify(b.ctx)
-}
-
-func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error) {
-	utx := &txs.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err
 	}

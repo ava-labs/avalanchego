@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -268,11 +269,18 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
 	addr := keys[0].PublicKey().Address()
+
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
+	}
+
 	signedTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(data.startTime.Unix()),
 		uint64(data.endTime.Unix()),
 		data.nodeID,
+		signer.NewProofOfPossession(sk),
 		addr,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
