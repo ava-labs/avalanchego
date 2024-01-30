@@ -2921,3 +2921,108 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	require.Equal(choices.Accepted, blk.Status())
 }
+
+func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
+	require := require.New(t)
+
+	engCfg := DefaultConfig(t)
+	engCfg.Params = snowball.Parameters{
+		K:                     1,
+		AlphaPreference:       1,
+		AlphaConfidence:       1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+
+	vals := validators.NewManager()
+	engCfg.Validators = vals
+
+	sender := &common.SenderTest{T: t}
+	engCfg.Sender = sender
+
+	sender.Default(true)
+
+	vm := &block.TestVM{}
+	vm.T = t
+	engCfg.VM = vm
+
+	vm.Default(true)
+	vm.CantSetState = false
+	vm.CantSetPreference = false
+
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+		require.Equal(gBlk.ID(), id)
+		return gBlk, nil
+	}
+
+	te, err := newTransitive(engCfg)
+	require.NoError(err)
+	require.NoError(te.Start(context.Background(), 0))
+
+	vm.LastAcceptedF = nil
+
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk.IDV,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		true,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
+
+	require.Equal(choices.Processing, blk.Status())
+
+	vdr := ids.GenerateTestNodeID()
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
+
+	var (
+		queryRequestID uint32
+		queried        bool
+	)
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		queryRequestID = requestID
+		require.Contains(inVdrs, vdr)
+		require.Equal(blk.ID(), blkID)
+		require.Equal(uint64(1), requestedHeight)
+		queried = true
+	}
+
+	require.NoError(te.Gossip(context.Background()))
+	require.True(queried)
+
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+		switch id {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk.ID():
+			return blk, nil
+		}
+		require.FailNow(errUnknownBlock.Error())
+		return nil, errUnknownBlock
+	}
+
+	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
+
+	require.Equal(choices.Accepted, blk.Status())
+}
