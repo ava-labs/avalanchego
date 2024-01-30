@@ -44,4 +44,10 @@ else
   fi
 fi
 
-find . -name "*.sh" -type f -printf '%P\0' | xargs -0 "${SHELLCHECK}" "${@}"
+# `find *` is the simplest way to ensure find does not include a
+# leading `.` in filenames it emits. A leading `.` will prevent the
+# use of `git apply` to fix reported shellcheck issues. This is
+# compatible with both macos and linux (unlike the use of -printf).
+#
+# shellcheck disable=SC2035
+find * -name "*.sh" -type f -print0 | xargs -0 "${SHELLCHECK}" "${@}"
