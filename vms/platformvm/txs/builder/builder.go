@@ -181,10 +181,6 @@ type ProposalTxBuilder interface {
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
-
-	// RewardStakerTx creates a new transaction that proposes to remove the staker
-	// [validatorID] from the default validator set.
-	NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error)
 }
 
 func New(
@@ -607,16 +603,6 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
-	return tx, tx.SyntacticVerify(b.ctx)
-}
-
-func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
-	utx := &txs.RewardValidatorTx{TxID: txID}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
