@@ -121,8 +121,8 @@ func buildGenesisTest(t *testing.T, genesisJSON string) []byte {
 
 func NewContext() *snow.Context {
 	ctx := utils.TestSnowContext()
-	ctx.NetworkID = testNetworkID
 	ctx.NodeID = ids.GenerateTestNodeID()
+	ctx.NetworkID = testNetworkID
 	ctx.ChainID = testCChainID
 	ctx.AVAXAssetID = testAvaxAssetID
 	ctx.XChainID = testXChainID
@@ -153,6 +153,7 @@ func NewContext() *snow.Context {
 	return ctx
 }
 
+// setupGenesis sets up the genesis
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func setupGenesis(
 	t *testing.T,

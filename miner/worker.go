@@ -202,7 +202,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		return nil, err
 	}
 
-	// Get the pending txs from TxPool
+	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)
 
 	// Split the pending transactions into locals and remotes

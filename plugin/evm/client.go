@@ -27,13 +27,13 @@ type Client interface {
 
 // Client implementation for interacting with EVM [chain]
 type client struct {
-	requester rpc.EndpointRequester
+	adminRequester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with EVM [chain]
 func NewClient(uri, chain string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(fmt.Sprintf("%s/ext/bc/%s/admin", uri, chain)),
+		adminRequester: rpc.NewEndpointRequester(fmt.Sprintf("%s/ext/bc/%s/admin", uri, chain)),
 	}
 }
 
@@ -44,24 +44,24 @@ func NewCChainClient(uri string) Client {
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
+	return c.adminRequester.SendRequest(ctx, "admin.startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
+	return c.adminRequester.SendRequest(ctx, "admin.stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
+	return c.adminRequester.SendRequest(ctx, "admin.memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.lockProfile", struct{}{}, &api.EmptyReply{}, options...)
+	return c.adminRequester.SendRequest(ctx, "admin.lockProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 // SetLogLevel dynamically sets the log level for the C Chain
 func (c *client) SetLogLevel(ctx context.Context, level log.Lvl, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.setLogLevel", &SetLogLevelArgs{
+	return c.adminRequester.SendRequest(ctx, "admin.setLogLevel", &SetLogLevelArgs{
 		Level: level.String(),
 	}, &api.EmptyReply{}, options...)
 }
@@ -69,6 +69,6 @@ func (c *client) SetLogLevel(ctx context.Context, level log.Lvl, options ...rpc.
 // GetVMConfig returns the current config of the VM
 func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*Config, error) {
 	res := &ConfigReply{}
-	err := c.requester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
+	err := c.adminRequester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
 	return res.Config, err
 }

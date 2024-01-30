@@ -33,16 +33,16 @@ func (l LeafsRequest) String() string {
 }
 
 func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
-	return handler.HandleTrieLeafsRequest(ctx, nodeID, requestID, l)
+	return handler.HandleStateTrieLeafsRequest(ctx, nodeID, requestID, l)
 }
 
 // LeafsResponse is a response to a LeafsRequest
 // Keys must be within LeafsRequest.Start and LeafsRequest.End and sorted in lexicographical order.
 //
-// ProofKeys and ProofVals are expected to be non-nil and valid range proofs if the key-value pairs
-// in the response are not the entire trie.
-// If the key-value pairs make up the entire trie, ProofKeys and ProofVals should be empty since the
-// root will be sufficient to prove that the leaves are included in the trie.
+// ProofVals must be non-empty and contain a valid range proof unless the key-value pairs in the
+// response are the entire trie.
+// If the key-value pairs make up the entire trie, ProofVals should be empty since the root will be
+// sufficient to prove that the leaves are included in the trie.
 //
 // More is a flag set in the client after verifying the response, which indicates if the last key-value
 // pair in the response has any more elements to its right within the trie.

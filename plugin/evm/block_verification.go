@@ -31,15 +31,15 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	if b == nil || b.ethBlock == nil {
 		return errInvalidBlock
 	}
+	ethHeader := b.ethBlock.Header()
+	blockHash := b.ethBlock.Hash()
 
-	// Skip verification of the genesis block since it
-	// should already be marked as accepted
-	if b.ethBlock.Hash() == b.vm.genesisHash {
+	// Skip verification of the genesis block since it should already be marked as accepted.
+	if blockHash == b.vm.genesisHash {
 		return nil
 	}
 
 	// Perform block and header sanity checks
-	ethHeader := b.ethBlock.Header()
 	if ethHeader.Number == nil || !ethHeader.Number.IsUint64() {
 		return errInvalidBlock
 	}
@@ -58,26 +58,28 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		return fmt.Errorf("invalid mix digest: %v", ethHeader.MixDigest)
 	}
 
+	// Check that the size of the header's Extra data field is correct for [rules].
+	headerExtraDataSize := len(ethHeader.Extra)
 	switch {
 	case rules.IsDurango:
-		if len(ethHeader.Extra) < params.DynamicFeeExtraDataSize {
+		if headerExtraDataSize < params.DynamicFeeExtraDataSize {
 			return fmt.Errorf(
 				"expected header ExtraData to be len >= %d but got %d",
 				params.DynamicFeeExtraDataSize, len(ethHeader.Extra),
 			)
 		}
 	case rules.IsSubnetEVM:
-		if len(ethHeader.Extra) != params.DynamicFeeExtraDataSize {
+		if headerExtraDataSize != params.DynamicFeeExtraDataSize {
 			return fmt.Errorf(
 				"expected header ExtraData to be len %d but got %d",
-				params.DynamicFeeExtraDataSize, len(ethHeader.Extra),
+				params.DynamicFeeExtraDataSize, headerExtraDataSize,
 			)
 		}
 	default:
-		if len(ethHeader.Extra) > int(params.MaximumExtraDataSize) {
+		if uint64(headerExtraDataSize) > params.MaximumExtraDataSize {
 			return fmt.Errorf(
 				"expected header ExtraData to be <= %d but got %d",
-				params.MaximumExtraDataSize, len(ethHeader.Extra),
+				params.MaximumExtraDataSize, headerExtraDataSize,
 			)
 		}
 	}
@@ -106,6 +108,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	if len(b.ethBlock.Uncles()) > 0 {
 		return errUnclesUnsupported
 	}
+
 	// Block must not be empty
 	txs := b.ethBlock.Transactions()
 	if len(txs) == 0 {

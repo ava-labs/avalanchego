@@ -218,13 +218,6 @@ const (
 	TSTORE OpCode = 0xb4
 )
 
-// unofficial opcodes used for parsing.
-const (
-	PUSH OpCode = 0xb0 + iota
-	DUP
-	SWAP
-)
-
 // 0xf0 range - closures.
 const (
 	CREATE       OpCode = 0xf0

@@ -69,7 +69,7 @@ func (b *Block) Accept(context.Context) error {
 	// precompiles are committed atomically with the vm's lastAcceptedKey.
 	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
 	sharedMemoryWriter := NewSharedMemoryWriter()
-	if err := b.handlePrecompileAccept(&rules, sharedMemoryWriter); err != nil {
+	if err := b.handlePrecompileAccept(rules, sharedMemoryWriter); err != nil {
 		return err
 	}
 	if err := vm.blockChain.Accept(b.ethBlock); err != nil {
@@ -82,9 +82,9 @@ func (b *Block) Accept(context.Context) error {
 
 	// Get pending operations on the vm's versionDB so we can apply them atomically
 	// with the shared memory requests.
-	vdbBatch, err := vm.db.CommitBatch()
+	vdbBatch, err := b.vm.db.CommitBatch()
 	if err != nil {
-		return fmt.Errorf("failed to get commit batch: %w", err)
+		return fmt.Errorf("could not create commit batch processing block[%s]: %w", b.ID(), err)
 	}
 
 	// Apply any shared memory requests that accumulated from processing the logs
@@ -97,7 +97,7 @@ func (b *Block) Accept(context.Context) error {
 // contract.Accepter
 // This function assumes that the Accept function will ONLY operate on state maintained in the VM's versiondb.
 // This ensures that any DB operations are performed atomically with marking the block as accepted.
-func (b *Block) handlePrecompileAccept(rules *params.Rules, sharedMemoryWriter *sharedMemoryWriter) error {
+func (b *Block) handlePrecompileAccept(rules params.Rules, sharedMemoryWriter *sharedMemoryWriter) error {
 	// Short circuit early if there are no precompile accepters to execute
 	if len(rules.AccepterPrecompiles) == 0 {
 		return nil

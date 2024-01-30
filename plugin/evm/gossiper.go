@@ -67,7 +67,7 @@ type pushGossiper struct {
 	shutdownChan       chan struct{}
 	shutdownWg         *sync.WaitGroup
 
-	// [recentTxs] prevent us from over-gossiping the
+	// [recentEthTxs] prevent us from over-gossiping the
 	// same transaction in a short period of time.
 	recentEthTxs *cache.LRU[common.Hash, interface{}]
 
@@ -78,7 +78,9 @@ type pushGossiper struct {
 
 // createGossiper constructs and returns a pushGossiper or noopGossiper
 // based on whether vm.chainConfig.SubnetEVMTimestamp is set
-func (vm *VM) createGossiper(stats GossipStats, ethTxGossiper gossip.Accumulator[*GossipEthTx],
+func (vm *VM) createGossiper(
+	stats GossipStats,
+	ethTxGossiper gossip.Accumulator[*GossipEthTx],
 ) Gossiper {
 	net := &pushGossiper{
 		ctx:                vm.ctx,
@@ -162,6 +164,7 @@ func (n *pushGossiper) queueExecutableTxs(
 		status.txsAdded++
 		stxs.Shift()
 	}
+
 	return queued
 }
 
@@ -474,6 +477,8 @@ func (h *GossipHandler) HandleEthTxs(nodeID ids.NodeID, msg message.EthTxsGossip
 			)
 			if err == txpool.ErrAlreadyKnown {
 				h.stats.IncEthTxsGossipReceivedKnown()
+			} else {
+				h.stats.IncEthTxsGossipReceivedError()
 			}
 			continue
 		}

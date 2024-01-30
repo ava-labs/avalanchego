@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestMarshalTxs asserts that the structure or serialization logic hasn't changed, primarily to
+// TestMarshalEthTxs asserts that the structure or serialization logic hasn't changed, primarily to
 // ensure compatibility with the network.
-func TestMarshalTxs(t *testing.T) {
+func TestMarshalEthTxs(t *testing.T) {
 	assert := assert.New(t)
 
 	base64EthTxGossip := "AAAAAAAAAAAABGJsYWg="
@@ -36,7 +36,7 @@ func TestMarshalTxs(t *testing.T) {
 	assert.Equal(msg, parsedMsg.Txs)
 }
 
-func TestTxsTooLarge(t *testing.T) {
+func TestEthTxsTooLarge(t *testing.T) {
 	assert := assert.New(t)
 
 	builtMsg := EthTxsGossip{

@@ -3,9 +3,7 @@
 
 package core
 
-import (
-	"sync"
-)
+import "sync"
 
 var (
 	_ FIFOCache[int, int] = (*BufferFIFOCache[int, int])(nil)

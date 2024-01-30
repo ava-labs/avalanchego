@@ -20,7 +20,7 @@ func (h *CounterHandler) HandleEthTxs(ids.NodeID, EthTxsGossip) error {
 	return nil
 }
 
-func TestHandleTxs(t *testing.T) {
+func TestHandleEthTxs(t *testing.T) {
 	assert := assert.New(t)
 
 	handler := CounterHandler{}

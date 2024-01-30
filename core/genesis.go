@@ -183,7 +183,6 @@ func SetupGenesisBlock(
 	if genesis.Config == nil {
 		return nil, common.Hash{}, errGenesisNoConfig
 	}
-
 	// Just commit the new block if there is no stored genesis block.
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {

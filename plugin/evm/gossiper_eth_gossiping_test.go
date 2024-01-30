@@ -292,10 +292,10 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
+	_, vm, _, _ := GenesisVM(t, true, genesisJSON, `{"local-txs-enabled":true}`, "")
 	defer func() {
 		err := vm.Shutdown(context.Background())
 		assert.NoError(err)

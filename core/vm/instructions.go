@@ -675,8 +675,6 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	// Get the arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
-	// Note: this code fails to check that value2 is zero, which was a bug when CALLEX was active.
-	// The CALLEX opcode was de-activated in ApricotPhase2 resolving this issue.
 	if interpreter.readOnly && !value.IsZero() {
 		return nil, vmerrs.ErrWriteProtection
 	}
@@ -855,6 +853,8 @@ func makeLog(size int) executionFunc {
 			scope.Contract.Address(),
 			topics,
 			d,
+			// This is a non-consensus field, but assigned here because
+			// core/state doesn't know the current block number.
 			interpreter.evm.Context.BlockNumber.Uint64(),
 		)
 

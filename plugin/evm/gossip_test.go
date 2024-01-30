@@ -91,7 +91,7 @@ func setupPoolWithConfig(t *testing.T, config *params.ChainConfig, fundedAddress
 	diskdb := rawdb.NewMemoryDatabase()
 	engine := dummy.NewETHFaker()
 
-	var gspec = &core.Genesis{
+	gspec := &core.Genesis{
 		Config: config,
 		Alloc:  core.GenesisAlloc{fundedAddress: core.GenesisAccount{Balance: big.NewInt(1000000000000000000)}},
 	}

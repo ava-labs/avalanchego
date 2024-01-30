@@ -86,9 +86,9 @@ type Config struct {
 
 	// Subnet EVM APIs
 	SnowmanAPIEnabled bool   `json:"snowman-api-enabled"`
-	WarpAPIEnabled    bool   `json:"warp-api-enabled"`
 	AdminAPIEnabled   bool   `json:"admin-api-enabled"`
 	AdminAPIDir       string `json:"admin-api-dir"`
+	WarpAPIEnabled    bool   `json:"warp-api-enabled"`
 
 	// EnabledEthAPIs is a list of Ethereum services that should be enabled
 	// If none is specified, then we use the default list [defaultEnabledAPIs]
@@ -99,7 +99,7 @@ type Config struct {
 	ContinuousProfilerFrequency Duration `json:"continuous-profiler-frequency"` // Frequency to run continuous profiler if enabled
 	ContinuousProfilerMaxFiles  int      `json:"continuous-profiler-max-files"` // Maximum number of files to maintain
 
-	// Gas/Price Caps
+	// API Gas/Price Caps
 	RPCGasCap   uint64  `json:"rpc-gas-cap"`
 	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 

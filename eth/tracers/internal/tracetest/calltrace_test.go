@@ -45,9 +45,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rlp"
-
-	// Force-load native, to trigger registration
-	_ "github.com/ava-labs/subnet-evm/eth/tracers/native"
 )
 
 type callContext struct {
@@ -297,6 +294,7 @@ func TestInternals(t *testing.T) {
 		}
 		return tr
 	}
+
 	for _, tc := range []struct {
 		name   string
 		code   []byte

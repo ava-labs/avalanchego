@@ -241,6 +241,7 @@ type VM struct {
 	// Avalanche Warp Messaging backend
 	// Used to serve BLS signatures of warp messages over RPC
 	warpBackend warp.Backend
+
 	// Initialize only sets these if nil so they can be overridden in tests
 	p2pSender          commonEng.AppSender
 	ethTxGossipHandler p2p.Handler
@@ -790,6 +791,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	return nil
 }
 
+// buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock(ctx context.Context) (snowman.Block, error) {
 	return vm.buildBlockWithContext(ctx, nil)
 }

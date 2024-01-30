@@ -434,7 +434,7 @@ const warningLog = `
 
 WARNING!
 
-The clean trie cache is not found. Please delete it by yourself after the
+The clean trie cache is not found. Please delete it by yourself after the 
 pruning. Remember don't start the Subnet-EVM without deleting the clean trie cache
 otherwise the entire database may be damaged!
 
