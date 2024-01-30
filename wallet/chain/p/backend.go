@@ -39,14 +39,14 @@ type backend struct {
 
 func NewBackend(ctx Context, utxos common.ChainUTXOs, subnetTxs map[ids.ID]*txs.Tx) Backend {
 	subnetOwner := make(map[ids.ID]fx.Owner)
-	for txID, tx := range subnetTxs { // first get owners from original CreateSubnetTx
+	for txID, tx := range subnetTxs { // first get owners from the CreateSubnetTx
 		createSubnetTx, ok := tx.Unsigned.(*txs.CreateSubnetTx)
 		if !ok {
 			continue
 		}
 		subnetOwner[txID] = createSubnetTx.Owner
 	}
-	for _, tx := range subnetTxs { // then check TransferSubnetOwnershipTx
+	for _, tx := range subnetTxs { // then check for TransferSubnetOwnershipTx
 		transferSubnetOwnershipTx, ok := tx.Unsigned.(*txs.TransferSubnetOwnershipTx)
 		if !ok {
 			continue
