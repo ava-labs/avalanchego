@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -45,8 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -297,60 +294,25 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
 	addr := keys[0].PublicKey().Address()
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
-		vm.state,
-		keys,
-		vm.MinValidatorStake,
-		vm.Config.AddPrimaryNetworkValidatorFee,
-		addr, // change Addresss
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not create inputs/outputs for permissionless validator: %w", err)
-	}
+
 	sk, err := bls.NewSecretKey()
 	if err != nil {
-		return nil, fmt.Errorf("could not create secret key: %w", err)
+		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
 	}
 
-	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: data.nodeID,
-			Start:  uint64(data.startTime.Unix()),
-			End:    uint64(data.endTime.Unix()),
-			Wght:   vm.MinValidatorStake,
-		},
-		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk),
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegationShares: reward.PercentDenominator,
-	}
-	signedTx, err := txs.NewSigned(uPrimaryTx, txs.Codec, signers)
+	signedTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
+		vm.Config.MinValidatorStake,
+		uint64(data.startTime.Unix()),
+		uint64(data.endTime.Unix()),
+		data.nodeID,
+		signer.NewProofOfPossession(sk),
+		addr,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		addr,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx with BLS key: %w", err)
-	}
-	if err := signedTx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, fmt.Errorf("failed syntax verification of AddPermissionlessValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx: %w", err)
 	}
 	return internalAddValidator(vm, signedTx)
 }
