@@ -50,7 +50,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees),
+		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees, commonfees.EmptyWindows),
 		UnitCaps:      commonfees.EmptyUnitCaps,
 		State:         stateDiff,
 		Tx:            tx,
@@ -91,7 +91,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees),
+		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees, commonfees.EmptyWindows),
 		UnitCaps:      commonfees.EmptyUnitCaps,
 		State:         stateDiff,
 		Tx:            tx,
@@ -126,7 +126,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees),
+		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees, commonfees.EmptyWindows),
 		UnitCaps:      commonfees.EmptyUnitCaps,
 		State:         stateDiff,
 		Tx:            tx,
@@ -158,7 +158,7 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees),
+		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees, commonfees.EmptyWindows),
 		UnitCaps:      commonfees.EmptyUnitCaps,
 		State:         stateDiff,
 		Tx:            tx,
@@ -231,7 +231,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees),
+				BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees, commonfees.EmptyWindows),
 				UnitCaps:      commonfees.EmptyUnitCaps,
 				State:         stateDiff,
 				Tx:            tx,

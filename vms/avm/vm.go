@@ -502,7 +502,7 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 
 	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
 		Backend:       vm.txBackend,
-		BlkFeeManager: fees.NewManager(unitFees),
+		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
 		UnitCaps:      unitCaps,
 		BlkTimestamp:  vm.state.GetTimestamp(),
 		Tx:            tx,

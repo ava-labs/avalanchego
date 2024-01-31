@@ -328,7 +328,7 @@ func (b *builder) NewImportTx(
 		utx.BaseTx.Outs = outs
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -494,7 +494,7 @@ func (b *builder) NewExportTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -589,7 +589,7 @@ func (b *builder) NewCreateChainTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -673,7 +673,7 @@ func (b *builder) NewCreateSubnetTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -766,7 +766,7 @@ func (b *builder) NewAddValidatorTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -857,7 +857,7 @@ func (b *builder) NewAddDelegatorTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -949,7 +949,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -1031,7 +1031,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -1127,7 +1127,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -1203,7 +1203,7 @@ func (b *builder) NewBaseTx(
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
+			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}

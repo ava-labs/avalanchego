@@ -235,7 +235,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
 
-				fm := commonfees.NewManager(testUnitFees)
+				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
 					IsEForkActive:    true,
 					FeeManager:       fm,
@@ -316,7 +316,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
 
-				fm := commonfees.NewManager(testUnitFees)
+				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
 					IsEForkActive:    true,
 					FeeManager:       fm,
@@ -399,7 +399,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
 
-				fm := commonfees.NewManager(testUnitFees)
+				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
 					IsEForkActive:    true,
 					FeeManager:       fm,
@@ -477,7 +477,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
 
-				fm := commonfees.NewManager(testUnitFees)
+				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
 					IsEForkActive:    true,
 					FeeManager:       fm,
@@ -546,7 +546,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
 
-				fm := commonfees.NewManager(testUnitFees)
+				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
 					IsEForkActive:    true,
 					FeeManager:       fm,
@@ -616,7 +616,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
 
-				fm := commonfees.NewManager(testUnitFees)
+				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
 					IsEForkActive:    true,
 					FeeManager:       fm,
@@ -664,7 +664,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 			checksF: func(t *testing.T, uTx txs.UnsignedTx, ins []*avax.TransferableInput, outs, staked []*avax.TransferableOutput) {
 				r := require.New(t)
 
-				fm := commonfees.NewManager(testUnitFees)
+				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
 					IsEForkActive:    true,
 					FeeManager:       fm,
@@ -689,7 +689,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			uTx := test.uTxF(t)
 
-			fm := commonfees.NewManager(testUnitFees)
+			fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 			feeCalc := &fees.Calculator{
 				IsEForkActive:    true,
 				FeeManager:       fm,

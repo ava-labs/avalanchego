@@ -24,9 +24,10 @@ type Manager struct {
 	cumulatedUnits Dimensions
 }
 
-func NewManager(unitFees Dimensions) *Manager {
+func NewManager(unitFees Dimensions, windows [FeeDimensions]Window) *Manager {
 	return &Manager{
 		unitFees: unitFees,
+		windows:  windows,
 	}
 }
 

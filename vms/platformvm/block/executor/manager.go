@@ -155,7 +155,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
-		BlkFeeManager: fees.NewManager(unitFees),
+		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
 		UnitCaps:      unitCaps,
 		State:         stateDiff,
 		Tx:            tx,

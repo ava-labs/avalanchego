@@ -160,7 +160,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	err = tx.Unsigned.Visit(&executor.SyntacticVerifier{
 		Backend:       m.backend,
-		BlkFeeManager: fees.NewManager(unitFees),
+		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
 		UnitCaps:      unitCaps,
 		BlkTimestamp:  m.state.GetTimestamp(),
 		Tx:            tx,

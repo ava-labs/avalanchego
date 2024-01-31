@@ -102,7 +102,7 @@ func TestBaseTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -173,7 +173,7 @@ func TestAddValidatorTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -251,7 +251,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -321,7 +321,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -390,7 +390,7 @@ func TestAddDelegatorTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -472,7 +472,7 @@ func TestCreateChainTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -535,7 +535,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -606,7 +606,7 @@ func TestImportTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -677,7 +677,7 @@ func TestExportTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -765,7 +765,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -851,7 +851,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -927,7 +927,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}

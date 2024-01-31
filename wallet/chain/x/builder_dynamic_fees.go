@@ -64,7 +64,7 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
@@ -128,7 +128,7 @@ func (b *DynamicFeesBuilder) NewCreateAssetTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
@@ -173,7 +173,7 @@ func (b *DynamicFeesBuilder) NewOperationTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
@@ -364,7 +364,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	}
 
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
@@ -476,7 +476,7 @@ func (b *DynamicFeesBuilder) NewExportTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),

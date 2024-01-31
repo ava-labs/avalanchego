@@ -86,7 +86,7 @@ func (b *Block) Verify(context.Context) error {
 		return err
 	}
 
-	feeManager := fees.NewManager(unitFees)
+	feeManager := fees.NewManager(unitFees, fees.EmptyWindows)
 	for _, tx := range txs {
 		err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
 			Backend:       b.manager.backend,

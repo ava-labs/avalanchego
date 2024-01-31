@@ -123,7 +123,7 @@ func TestAddAndRemoveFees(t *testing.T) {
 
 	fc := &Calculator{
 		IsEForkActive:    true,
-		FeeManager:       fees.NewManager(testUnitFees),
+		FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 	}
 
@@ -337,7 +337,7 @@ func TestAddValidatorTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -450,7 +450,7 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -564,7 +564,7 @@ func TestAddDelegatorTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -672,7 +672,7 @@ func TestCreateChainTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -778,7 +778,7 @@ func TestCreateSubnetTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -883,7 +883,7 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -1000,7 +1000,7 @@ func TestTransformSubnetTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -1113,7 +1113,7 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -1235,7 +1235,7 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -1352,7 +1352,7 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -1452,7 +1452,7 @@ func TestBaseTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -1566,7 +1566,7 @@ func TestImportTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}
@@ -1670,7 +1670,7 @@ func TestExportTxFees(t *testing.T) {
 				IsEForkActive:    cfg.IsEForkActivated(chainTime),
 				Config:           cfg,
 				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees),
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 				ConsumedUnitsCap: consumedUnitCaps,
 				Credentials:      sTx.Creds,
 			}

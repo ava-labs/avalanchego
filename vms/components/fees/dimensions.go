@@ -17,6 +17,7 @@ const (
 var (
 	EmptyUnitFees = Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
 	EmptyUnitCaps = Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
+	EmptyWindows  = [FeeDimensions]Window{}
 )
 
 type (

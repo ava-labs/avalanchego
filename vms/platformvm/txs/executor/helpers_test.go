@@ -237,7 +237,7 @@ func addSubnet(
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(unitFees),
+		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
 		UnitCaps:      unitCaps,
 		State:         stateDiff,
 		Tx:            testSubnet1,

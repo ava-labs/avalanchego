@@ -449,7 +449,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	feeManager := fees.NewManager(unitFees)
+	feeManager := fees.NewManager(unitFees, fees.EmptyWindows)
 
 	unitCaps, err := state.GetBlockUnitCaps()
 	if err != nil {

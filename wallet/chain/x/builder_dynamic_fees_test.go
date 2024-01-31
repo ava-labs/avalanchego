@@ -104,7 +104,7 @@ func TestBaseTx(t *testing.T) {
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -216,7 +216,7 @@ func TestCreateAssetTx(t *testing.T) {
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -289,7 +289,7 @@ func TestImportTx(t *testing.T) {
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}
@@ -362,7 +362,7 @@ func TestExportTx(t *testing.T) {
 	fc := &fees.Calculator{
 		IsEForkActive:    true,
 		Codec:            Parser.Codec(),
-		FeeManager:       commonfees.NewManager(testUnitFees),
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
 	}

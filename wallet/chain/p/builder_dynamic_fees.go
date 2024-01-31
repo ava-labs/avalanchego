@@ -66,7 +66,7 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -117,7 +117,7 @@ func (b *DynamicFeesBuilder) NewAddValidatorTx(
 	}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -167,7 +167,7 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -222,7 +222,7 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -274,7 +274,7 @@ func (b *DynamicFeesBuilder) NewAddDelegatorTx(
 	}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -334,7 +334,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -383,7 +383,7 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -498,7 +498,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	}
 
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -611,7 +611,7 @@ func (b *DynamicFeesBuilder) NewExportTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -689,7 +689,7 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 		assetID: maxSupply - initialSupply,
 	} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -751,7 +751,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
 	}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
@@ -802,7 +802,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
 	}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
+	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
 		IsEForkActive:    true,
 		FeeManager:       feesMan,
