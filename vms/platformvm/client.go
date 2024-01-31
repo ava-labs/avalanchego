@@ -381,6 +381,37 @@ func (c *client) GetAtomicUTXOs(
 	return utxos, endAddr, endUTXOID, err
 }
 
+// GetSubnetClientResponse is the response from calling GetSubnet on the client
+type GetSubnetClientResponse struct {
+	IsPermissioned bool
+	// subnet auth information for a permissioned subnet
+	ControlKeys []ids.ShortID
+	Threshold   uint32
+	// subnet transformation tx ID for a permissionless subnet
+	SubnetTransformationTxID ids.ID
+}
+
+func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error) {
+	res := &GetSubnetResponse{}
+	err := c.requester.SendRequest(ctx, "platform.getSubnets", &GetSubnetArgs{
+		ID: subnetID,
+	}, res, options...)
+	if err != nil {
+		return GetSubnetClientResponse{}, err
+	}
+	controlKeys, err := address.ParseToIDs(res.ControlKeys)
+	if err != nil {
+		return GetSubnetClientResponse{}, err
+	}
+
+	return GetSubnetClientResponse{
+		IsPermissioned:           res.IsPermissioned,
+		ControlKeys:              controlKeys,
+		Threshold:                uint32(res.Threshold),
+		SubnetTransformationTxID: res.SubnetTransformationTxID,
+	}, nil
+}
+
 // ClientSubnet is a representation of a subnet used in client methods
 type ClientSubnet struct {
 	// ID of the subnet

@@ -530,7 +530,7 @@ type GetSubnetResponse struct {
 	ControlKeys []string    `json:"controlKeys"`
 	Threshold   json.Uint32 `json:"threshold"`
 	// subnet transformation tx ID for a permissionless subnet
-	SubnetTransformationTxID ids.ID `json:"permissionlessTxID"`
+	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
 }
 
 func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetSubnetResponse) error {
