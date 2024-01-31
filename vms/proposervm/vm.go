@@ -57,26 +57,13 @@ var (
 	_ block.StateSyncableVM = (*VM)(nil)
 
 	// TODO: remove after the X-chain supports height indexing.
-	mainnetXChainID ids.ID
-	fujiXChainID    ids.ID
+	mainnetXChainID = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
+	fujiXChainID    = ids.FromStringOrPanic("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
 
 	dbPrefix = []byte("proposervm")
 
 	errHeightIndexInvalidWhilePruning = errors.New("height index invalid while pruning old blocks")
 )
-
-func init() {
-	var err error
-	mainnetXChainID, err = ids.FromString("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
-	if err != nil {
-		panic(err)
-	}
-
-	fujiXChainID, err = ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-	if err != nil {
-		panic(err)
-	}
-}
 
 func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
