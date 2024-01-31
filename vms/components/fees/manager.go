@@ -105,7 +105,7 @@ func (m *Manager) ComputeNext(
 	since := int((currTime - lastTime) / 1000 /*milliseconds per second*/)
 	nextManager := &Manager{}
 	for i := Bandwidth; i < FeeDimensions; i++ {
-		nextUnitPrice, nextUnitWindow, err := computeNextPriceWindow(
+		nextUnitPrice, nextUnitWindow := computeNextPriceWindow(
 			m.windows[i],
 			m.lastConsumed[i],
 			m.unitFees[i],
@@ -114,9 +114,6 @@ func (m *Manager) ComputeNext(
 			minUnitPrice[i],
 			since,
 		)
-		if err != nil {
-			return nil, err
-		}
 
 		nextManager.unitFees[i] = nextUnitPrice
 		nextManager.windows[i] = nextUnitWindow
@@ -139,11 +136,8 @@ func computeNextPriceWindow(
 	changeDenom uint64,
 	minPrice uint64,
 	since int, /* seconds */
-) (uint64, Window, error) {
-	newRollupWindow, err := Roll(previous, since)
-	if err != nil {
-		return 0, Window{}, err
-	}
+) (uint64, Window) {
+	newRollupWindow := Roll(previous, since)
 	if since < WindowSize {
 		// add in the units used by the parent block in the correct place
 		// If the parent consumed units within the rollup window, add the consumed
@@ -156,7 +150,7 @@ func computeNextPriceWindow(
 	nextPrice := previousPrice
 	switch {
 	case total == target:
-		return nextPrice, newRollupWindow, nil
+		return nextPrice, newRollupWindow
 	case total > target:
 		// If the parent block used more units than its target, the baseFee should increase.
 		delta := total - target
@@ -198,5 +192,5 @@ func computeNextPriceWindow(
 		}
 	}
 	nextPrice = safemath.Max(nextPrice, minPrice)
-	return nextPrice, newRollupWindow, nil
+	return nextPrice, newRollupWindow
 }

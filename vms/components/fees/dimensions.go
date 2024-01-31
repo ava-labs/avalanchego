@@ -9,7 +9,7 @@ const (
 	Bandwidth Dimension = 0
 	UTXORead  Dimension = 1
 	UTXOWrite Dimension = 2 // includes delete
-	Compute   Dimension = 3 // any other cost, tx-specific
+	Compute   Dimension = 3 // signatures checks, tx-specific
 
 	FeeDimensions = 4
 )

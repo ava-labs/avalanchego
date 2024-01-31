@@ -29,18 +29,18 @@ type Window [WindowSize]uint64
 // Roll >= 4
 // [0, 0, 0, 0]
 // Assumes that [roll] is greater than or equal to 0
-func Roll(w Window, roll int) (Window, error) {
+func Roll(w Window, roll int) Window {
 	// Note: make allocates a zeroed array, so we are guaranteed
 	// that what we do not copy into, will be set to 0
 	var res [WindowSize]uint64
 	if roll > WindowSize {
-		return res, nil
+		return res
 	}
 	copy(res[:], w[roll:])
-	return res, nil
+	return res
 }
 
-// Sum sums [numUint64s] encoded in [window]. If an overflow occurs,
+// Sum sums the consumed units recorded in [window]. If an overflow occurs,
 // while summing the contents, the maximum uint64 value is returned.
 func Sum(w Window) uint64 {
 	var (
@@ -61,14 +61,14 @@ func Sum(w Window) uint64 {
 // Update adds [unitsConsumed] in at index within [window].
 // Assumes that [index] has already been validated.
 // If an overflow occurs, the maximum uint64 value is used.
-func Update(w *Window, start int, unitsConsumed uint64) {
-	prevUnitsConsumed := w[start]
+func Update(w *Window, idx int, unitsConsumed uint64) {
+	prevUnitsConsumed := w[idx]
 
 	totalUnitsConsumed, overflow := safemath.Add64(prevUnitsConsumed, unitsConsumed)
 	if overflow != nil {
 		totalUnitsConsumed = math.MaxUint64
 	}
-	w[start] = totalUnitsConsumed
+	w[idx] = totalUnitsConsumed
 }
 
 func Last(w *Window) uint64 {
