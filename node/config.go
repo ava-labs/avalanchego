@@ -172,8 +172,6 @@ type Config struct {
 	// Metrics
 	MeterVMEnabled bool `json:"meterVMEnabled"`
 
-	// Router that is used to handle incoming consensus messages
-	ConsensusRouter          router.Router       `json:"-"`
 	RouterHealthConfig       router.HealthConfig `json:"routerHealthConfig"`
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
 	// Poll for new frontiers every [FrontierPollFrequency]
