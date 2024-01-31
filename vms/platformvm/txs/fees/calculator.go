@@ -20,9 +20,6 @@ import (
 var (
 	_ txs.Visitor = (*Calculator)(nil)
 
-	EmptyUnitFees = fees.Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
-	EmptyUnitCaps = fees.Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
-
 	// These are the default unit fees, used upon E-fork activation
 	// TODO ABENEGIA: to be tuned
 	DefaultUnitFees = fees.Dimensions{

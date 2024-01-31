@@ -18,12 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -57,8 +57,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil)
-	onParentAccept.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil)
+	onParentAccept.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees, nil)
+	onParentAccept.EXPECT().GetBlockUnitCaps().Return(commonfees.EmptyUnitCaps, nil)
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
 		apricotParentBlk.ID(),
@@ -152,8 +152,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
-	onParentAccept.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil).AnyTimes()
-	onParentAccept.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil).AnyTimes()
+	onParentAccept.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees, nil).AnyTimes()
+	onParentAccept.EXPECT().GetBlockUnitCaps().Return(commonfees.EmptyUnitCaps, nil).AnyTimes()
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{

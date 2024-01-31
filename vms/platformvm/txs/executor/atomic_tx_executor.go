@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -103,8 +102,8 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 
 	executor := StandardTxExecutor{
 		Backend:       e.Backend,
-		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-		UnitCaps:      fees.EmptyUnitCaps,
+		BlkFeeManager: commonfees.NewManager(commonfees.EmptyUnitFees),
+		UnitCaps:      commonfees.EmptyUnitCaps,
 		State:         e.OnAccept,
 		Tx:            e.Tx,
 	}

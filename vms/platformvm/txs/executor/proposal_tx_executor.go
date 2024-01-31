@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -119,7 +118,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	onAbortOuts, err := verifyAddValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		fees.EmptyUnitCaps,
+		commonfees.EmptyUnitCaps,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -168,7 +167,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		fees.EmptyUnitCaps,
+		commonfees.EmptyUnitCaps,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -216,7 +215,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	onAbortOuts, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		fees.EmptyUnitCaps,
+		commonfees.EmptyUnitCaps,
 		e.OnCommitState,
 		e.Tx,
 		tx,
