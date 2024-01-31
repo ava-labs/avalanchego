@@ -5,16 +5,20 @@ package primary
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"golang.org/x/exp/maps"
 )
 
 var _ Wallet = (*wallet)(nil)
@@ -99,25 +103,26 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		return nil, err
 	}
 
-	pChainTxs := config.PChainTxs
-	if pChainTxs == nil {
-		pChainTxs = make(map[ids.ID]*txs.Tx)
-	}
+	pChainTxIDs := config.PChainTxsToFetch
+	pChainTxIDs.Add(maps.Keys(config.PChainTxs)...)
 
-	for txID := range config.PChainTxsToFetch {
-		txBytes, err := avaxState.PClient.GetTx(ctx, txID)
+	subnetOwner := map[ids.ID]fx.Owner{}
+	for txID := range pChainTxIDs {
+		subnetInfo, err := avaxState.PClient.GetSubnet(ctx, txID)
 		if err != nil {
 			return nil, err
 		}
-		tx, err := txs.Parse(txs.Codec, txBytes)
-		if err != nil {
-			return nil, err
+		if !subnetInfo.IsPermissioned {
+			return nil, fmt.Errorf("subnet %s is not permissioned", txID)
 		}
-		pChainTxs[txID] = tx
+		subnetOwner[txID] = &secp256k1fx.OutputOwners{
+			Threshold: subnetInfo.Threshold,
+			Addrs:     subnetInfo.ControlKeys,
+		}
 	}
 
 	pUTXOs := NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
+	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, subnetOwner)
 	pBuilder := p.NewBuilder(avaxAddrs, pBackend)
 	pSigner := p.NewSigner(config.AVAXKeychain, pBackend)
 
