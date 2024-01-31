@@ -10,6 +10,7 @@ import (
 
 	"github.com/onsi/gomega"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
@@ -35,7 +36,11 @@ func init() {
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
-	return e2e.NewTestEnvironment(flagVars, &tmpnet.Network{}).Marshal()
+	return e2e.NewTestEnvironment(flagVars, &tmpnet.Network{
+		Genesis: &genesis.UnparsedConfig{
+			NetworkID: uint32(flagVars.NetworkID()),
+		},
+	}).Marshal()
 }, func(envBytes []byte) {
 	// Run in every ginkgo process
 

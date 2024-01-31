@@ -25,6 +25,10 @@ const (
 	UnitTestID uint32 = 10
 	LocalID    uint32 = 12345
 
+	// IDs used for validating mainnet and fuji in e2e
+	TestMainnetID uint32 = 808
+	TestFujiID    uint32 = 909
+
 	MainnetName  = "mainnet"
 	CascadeName  = "cascade"
 	DenaliName   = "denali"

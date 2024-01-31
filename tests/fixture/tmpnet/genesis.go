@@ -146,9 +146,20 @@ func NewTestGenesis(
 		)
 	}
 
+	// Use the C-Chain configuration appropriate to the network ID
+	var cChainConfig *params.ChainConfig
+	switch networkID {
+	case constants.TestMainnetID:
+		cChainConfig = params.AvalancheMainnetChainConfig
+	case constants.TestFujiID:
+		cChainConfig = params.AvalancheFujiChainConfig
+	default:
+		cChainConfig = params.AvalancheLocalChainConfig
+	}
+
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{
-		Config:     params.AvalancheLocalChainConfig,
+		Config:     cChainConfig,
 		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
 		GasLimit:   defaultGasLimit,
 		Alloc:      cChainBalances,

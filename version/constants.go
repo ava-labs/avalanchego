@@ -130,6 +130,9 @@ var (
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
+
+	// Reminder: Add new time variables to updateTimesForTesting to
+	// ensure e2e is able to test with new versions.
 )
 
 func init() {
@@ -173,6 +176,30 @@ func init() {
 	CortinaXChainStopVertexID = map[uint32]ids.ID{
 		constants.MainnetID: mainnetXChainStopVertexID,
 		constants.FujiID:    fujiXChainStopVertexID,
+	}
+
+	updateTimesForTesting(
+		ApricotPhase1Times,
+		ApricotPhase2Times,
+		ApricotPhase3Times,
+		ApricotPhase4Times,
+		ApricotPhase5Times,
+		ApricotPhasePre6Times,
+		ApricotPhase6Times,
+		ApricotPhasePost6Times,
+		BanffTimes,
+		CortinaTimes,
+		DurangoTimes,
+	)
+}
+
+// updateTimesForTesting ensures that the provided time maps are updated
+// to include entries for contants.TestMainnetID and constants.TestFujiID
+// that mirror their mainnet and fuji equivalents to enable e2e testing.
+func updateTimesForTesting(timeMaps ...map[uint32]time.Time) {
+	for _, timeMap := range timeMaps {
+		timeMap[constants.TestFujiID] = timeMap[constants.FujiID]
+		timeMap[constants.TestMainnetID] = timeMap[constants.MainnetID]
 	}
 }
 
