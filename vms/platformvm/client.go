@@ -67,6 +67,8 @@ type Client interface {
 		startUTXOID ids.ID,
 		options ...rpc.Option,
 	) ([][]byte, ids.ShortID, ids.ID, error)
+	// GetSubnet returns information about the specified subnet
+	GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error)
 	// GetSubnets returns information about the specified subnets
 	//
 	// Deprecated: Subnets should be fetched from a dedicated indexer.
