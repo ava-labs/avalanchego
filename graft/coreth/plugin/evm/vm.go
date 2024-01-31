@@ -97,13 +97,16 @@ import (
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
+var (
+	_ block.ChainVM                      = &VM{}
+	_ block.BuildBlockWithContextChainVM = &VM{}
+	_ block.StateSyncableVM              = &VM{}
+	_ statesyncclient.EthBlockParser     = &VM{}
+)
+
 const (
 	x2cRateInt64       int64 = 1_000_000_000
 	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
-
-	// Prefixes for metrics gatherers
-	ethMetricsPrefix        = "eth"
-	chainStateMetricsPrefix = "chain_state"
 )
 
 var (
@@ -113,10 +116,6 @@ var (
 	// places on the X and P chains, but is 18 decimal places within the EVM.
 	x2cRate       = big.NewInt(x2cRateInt64)
 	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
-
-	_ block.ChainVM                  = &VM{}
-	_ block.StateSyncableVM          = &VM{}
-	_ statesyncclient.EthBlockParser = &VM{}
 )
 
 const (
@@ -133,6 +132,10 @@ const (
 	unverifiedCacheSize    = 5 * units.MiB
 	bytesToIDCacheSize     = 5 * units.MiB
 	warpSignatureCacheSize = 500
+
+	// Prefixes for metrics gatherers
+	ethMetricsPrefix        = "eth"
+	chainStateMetricsPrefix = "chain_state"
 
 	targetAtomicTxsSize = 40 * units.KiB
 
@@ -819,8 +822,8 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
-func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
-	return &dummy.ConsensusCallbacks{
+func (vm *VM) createConsensusCallbacks() dummy.ConsensusCallbacks {
+	return dummy.ConsensusCallbacks{
 		OnFinalizeAndAssemble: vm.onFinalizeAndAssemble,
 		OnExtraStateChange:    vm.onExtraStateChange,
 	}

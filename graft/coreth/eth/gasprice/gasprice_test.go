@@ -125,7 +125,7 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, ext
 		Alloc:  core.GenesisAlloc{addr: core.GenesisAccount{Balance: bal}},
 	}
 
-	engine := dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
+	engine := dummy.NewFakerWithCallbacks(dummy.ConsensusCallbacks{
 		OnFinalizeAndAssemble: func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 			return nil, common.Big0, extDataGasUsage, nil
 		},

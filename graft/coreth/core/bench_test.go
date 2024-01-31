@@ -162,11 +162,11 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 		Config: params.TestChainConfig,
 		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
 	}
-	_, chain, _, _ := GenerateChainWithGenesis(gspec, dummy.NewFaker(), b.N, 10, gen)
+	_, chain, _, _ := GenerateChainWithGenesis(gspec, dummy.NewCoinbaseFaker(), b.N, 10, gen)
 
 	// Time the insertion of the new chain.
 	// State and blocks are stored in the same DB.
-	chainman, _ := NewBlockChain(db, DefaultCacheConfig, gspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
+	chainman, _ := NewBlockChain(db, DefaultCacheConfig, gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
 	defer chainman.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()

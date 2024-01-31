@@ -10,11 +10,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -31,16 +31,14 @@ var (
 	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
 )
 
-type Mode uint
-
-const (
-	ModeSkipHeader   Mode = 1 // Skip over header verification
-	ModeSkipBlockFee Mode = 2 // Skip block fee verification
-)
+type Mode struct {
+	ModeSkipHeader   bool
+	ModeSkipBlockFee bool
+	ModeSkipCoinbase bool
+}
 
 type (
 	OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, extDataGasUsed *big.Int, err error)
-	OnAPIsCallbackType                = func(consensus.ChainHeaderReader) []rpc.API
 	OnExtraStateChangeType            = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, extDataGasUsed *big.Int, err error)
 
 	ConsensusCallbacks struct {
@@ -49,39 +47,58 @@ type (
 	}
 
 	DummyEngine struct {
-		cb            *ConsensusCallbacks
+		cb            ConsensusCallbacks
+		clock         *mockable.Clock
 		consensusMode Mode
 	}
 )
 
-func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
-	return &DummyEngine{
-		cb: cb,
-	}
-}
-
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
-		cb:            new(ConsensusCallbacks),
-		consensusMode: ModeSkipBlockFee,
-	}
-}
-
-func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
-	return &DummyEngine{
-		cb:            cb,
-		consensusMode: ModeSkipBlockFee,
+		clock:         &mockable.Clock{},
+		consensusMode: Mode{ModeSkipBlockFee: true},
 	}
 }
 
 func NewFaker() *DummyEngine {
-	return NewDummyEngine(new(ConsensusCallbacks))
+	return &DummyEngine{
+		clock: &mockable.Clock{},
+	}
+}
+
+func NewFakerWithClock(cb ConsensusCallbacks, clock *mockable.Clock) *DummyEngine {
+	return &DummyEngine{
+		cb:    cb,
+		clock: clock,
+	}
+}
+
+func NewFakerWithCallbacks(cb ConsensusCallbacks) *DummyEngine {
+	return &DummyEngine{
+		cb:    cb,
+		clock: &mockable.Clock{},
+	}
+}
+
+func NewFakerWithMode(cb ConsensusCallbacks, mode Mode) *DummyEngine {
+	return &DummyEngine{
+		cb:            cb,
+		clock:         &mockable.Clock{},
+		consensusMode: mode,
+	}
+}
+
+func NewCoinbaseFaker() *DummyEngine {
+	return &DummyEngine{
+		clock:         &mockable.Clock{},
+		consensusMode: Mode{ModeSkipCoinbase: true},
+	}
 }
 
 func NewFullFaker() *DummyEngine {
 	return &DummyEngine{
-		cb:            new(ConsensusCallbacks),
-		consensusMode: ModeSkipHeader,
+		clock:         &mockable.Clock{},
+		consensusMode: Mode{ModeSkipHeader: true},
 	}
 }
 
@@ -212,7 +229,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Verify the header's timestamp
-	if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
+	if header.Time > uint64(self.clock.Time().Add(allowedFutureBlockTime).Unix()) {
 		return consensus.ErrFutureBlock
 	}
 	// Verify the header's timestamp is not earlier than parent's
@@ -241,7 +258,7 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
 	// If we're running a full engine faking, accept any input as valid
-	if self.consensusMode == ModeSkipHeader {
+	if self.consensusMode.ModeSkipHeader {
 		return nil
 	}
 	// Short circuit if the header is known, or it's parent not
@@ -276,7 +293,7 @@ func (self *DummyEngine) verifyBlockFee(
 	receipts []*types.Receipt,
 	extraStateChangeContribution *big.Int,
 ) error {
-	if self.consensusMode == ModeSkipBlockFee {
+	if self.consensusMode.ModeSkipBlockFee {
 		return nil
 	}
 	if baseFee == nil || baseFee.Sign() <= 0 {
@@ -442,8 +459,8 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlockWithExtData(
-		header, txs, uncles, receipts, trie.NewStackTrie(nil), extraData,
-		chain.Config().IsApricotPhase1(header.Time),
+		header, txs, uncles, receipts, trie.NewStackTrie(nil),
+		extraData, chain.Config().IsApricotPhase1(header.Time),
 	), nil
 }
 

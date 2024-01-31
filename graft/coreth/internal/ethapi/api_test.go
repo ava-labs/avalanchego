@@ -200,7 +200,7 @@ type testBackend struct {
 
 func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i int, b *core.BlockGen)) *testBackend {
 	var (
-		engine  = dummy.NewETHFaker()
+		engine  = dummy.NewCoinbaseFaker()
 		backend = &testBackend{
 			db: rawdb.NewMemoryDatabase(),
 		}
