@@ -90,6 +90,7 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
+// TODO ABENEGIA: fix method with dynamic fees
 func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -98,12 +99,22 @@ func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
 	return parentState.GetUnitFees()
 }
 
+// TODO ABENEGIA: fix method with dynamic fees
 func (d *diff) GetBlockUnitCaps() (commonfees.Dimensions, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return commonfees.Dimensions{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetBlockUnitCaps()
+}
+
+// TODO ABENEGIA: fix method with dynamic fees
+func (d *diff) GetConsumedUnitsWindows() (commonfees.Windows, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return commonfees.Windows{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.GetConsumedUnitsWindows()
 }
 
 func (d *diff) GetTimestamp() time.Time {

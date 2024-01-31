@@ -10,21 +10,21 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// Fees are not dynamic yet. We'll add mechanism for fee updating iterativelly
+type Windows [FeeDimensions]Window
 
 type Manager struct {
 	// Avax denominated unit fees for all fee dimensions
 	unitFees Dimensions
 
 	// cunsumed units window per each fee dimension.
-	windows [FeeDimensions]Window
+	windows Windows
 
 	// cumulatedUnits helps aggregating the units consumed by a block
 	// so that we can verify it's not too big/build it properly.
 	cumulatedUnits Dimensions
 }
 
-func NewManager(unitFees Dimensions, windows [FeeDimensions]Window) *Manager {
+func NewManager(unitFees Dimensions, windows Windows) *Manager {
 	return &Manager{
 		unitFees: unitFees,
 		windows:  windows,

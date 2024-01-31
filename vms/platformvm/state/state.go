@@ -102,9 +102,9 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	// at this iteration we don't need to reset these, we are just metering
 	GetUnitFees() (commonfees.Dimensions, error)
 	GetBlockUnitCaps() (commonfees.Dimensions, error)
+	GetConsumedUnitsWindows() (commonfees.Windows, error)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -150,6 +150,7 @@ type State interface {
 	// At this iteration these getters are helpful for UTs only
 	SetUnitFees(uf commonfees.Dimensions) error
 	SetBlockUnitCaps(caps commonfees.Dimensions) error
+	SetConsumedUnitsWindows(windows commonfees.Windows) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -386,10 +387,11 @@ type state struct {
 	indexedHeights                      *heightRange
 	singletonDB                         database.Database
 
-	// multifees data are not persisted at this stage. We just meter for now,
-	// we'll revisit when we'll introduce dynamic fees
-	unitFees      commonfees.Dimensions
-	blockUnitCaps commonfees.Dimensions
+	// TODO ABENEGIA: handle persistence of these attributes
+	// Maybe blockUnitCaps is an exception, since it should be a fork related quantity
+	unitFees             commonfees.Dimensions
+	blockUnitCaps        commonfees.Dimensions
+	consumedUnitsWindows commonfees.Windows
 }
 
 // heightRange is used to track which heights are safe to use the native DB
@@ -1111,6 +1113,15 @@ func (s *state) GetBlockUnitCaps() (commonfees.Dimensions, error) {
 
 func (s *state) SetBlockUnitCaps(caps commonfees.Dimensions) error {
 	s.blockUnitCaps = caps
+	return nil
+}
+
+func (s *state) GetConsumedUnitsWindows() (commonfees.Windows, error) {
+	return s.consumedUnitsWindows, nil
+}
+
+func (s *state) SetConsumedUnitsWindows(windows commonfees.Windows) error {
+	s.consumedUnitsWindows = windows
 	return nil
 }
 

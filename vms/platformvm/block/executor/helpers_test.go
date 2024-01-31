@@ -283,10 +283,14 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
+	unitWindows, err := env.state.GetConsumedUnitsWindows()
+	if err != nil {
+		panic(err)
+	}
 
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
-		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
+		BlkFeeManager: fees.NewManager(unitFees, unitWindows),
 		UnitCaps:      unitCaps,
 		State:         stateDiff,
 		Tx:            testSubnet1,

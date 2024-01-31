@@ -311,15 +311,23 @@ func (b *builder) NewImportTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
@@ -328,7 +336,7 @@ func (b *builder) NewImportTx(
 		utx.BaseTx.Outs = outs
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -479,22 +487,30 @@ func (b *builder) NewExportTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -574,22 +590,30 @@ func (b *builder) NewCreateChainTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -658,22 +682,30 @@ func (b *builder) NewCreateSubnetTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -751,22 +783,30 @@ func (b *builder) NewAddValidatorTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -842,22 +882,30 @@ func (b *builder) NewAddDelegatorTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -934,22 +982,30 @@ func (b *builder) NewAddSubnetValidatorTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -1016,22 +1072,30 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -1112,22 +1176,30 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
@@ -1188,22 +1260,30 @@ func (b *builder) NewBaseTx(
 	)
 	if isEForkActive {
 		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
+			unitFees    commonfees.Dimensions
+			unitCaps    commonfees.Dimensions
+			unitWindows commonfees.Windows
 		)
 		unitFees, err = b.state.GetUnitFees()
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO ABENEGIA: this should probably be a config quantity, related to forks
+		// but not really dynamically changing much over time
 		unitCaps, err = b.state.GetBlockUnitCaps()
+		if err != nil {
+			return nil, err
+		}
+
+		unitWindows, err = b.state.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}

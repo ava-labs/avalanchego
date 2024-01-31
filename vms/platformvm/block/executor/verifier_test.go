@@ -289,6 +289,8 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees, nil)
 	parentState.EXPECT().GetBlockUnitCaps().Return(commonfees.EmptyUnitCaps, nil)
+	parentState.EXPECT().GetConsumedUnitsWindows().Return(commonfees.EmptyWindows, nil)
+
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -770,6 +772,8 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees, nil)
 	parentState.EXPECT().GetBlockUnitCaps().Return(commonfees.EmptyUnitCaps, nil)
+	parentState.EXPECT().GetConsumedUnitsWindows().Return(commonfees.EmptyWindows, nil)
+
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

@@ -198,6 +198,21 @@ func (mr *MockChainMockRecorder) GetBlockUnitCaps() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockUnitCaps", reflect.TypeOf((*MockChain)(nil).GetBlockUnitCaps))
 }
 
+// GetConsumedUnitsWindows mocks base method.
+func (m *MockChain) GetConsumedUnitsWindows() (fees.Windows, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConsumedUnitsWindows")
+	ret0, _ := ret[0].(fees.Windows)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConsumedUnitsWindows indicates an expected call of GetConsumedUnitsWindows.
+func (mr *MockChainMockRecorder) GetConsumedUnitsWindows() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConsumedUnitsWindows", reflect.TypeOf((*MockChain)(nil).GetConsumedUnitsWindows))
+}
+
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockChain) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -688,6 +703,21 @@ func (m *MockDiff) GetBlockUnitCaps() (fees.Dimensions, error) {
 func (mr *MockDiffMockRecorder) GetBlockUnitCaps() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockUnitCaps", reflect.TypeOf((*MockDiff)(nil).GetBlockUnitCaps))
+}
+
+// GetConsumedUnitsWindows mocks base method.
+func (m *MockDiff) GetConsumedUnitsWindows() (fees.Windows, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConsumedUnitsWindows")
+	ret0, _ := ret[0].(fees.Windows)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConsumedUnitsWindows indicates an expected call of GetConsumedUnitsWindows.
+func (mr *MockDiffMockRecorder) GetConsumedUnitsWindows() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConsumedUnitsWindows", reflect.TypeOf((*MockDiff)(nil).GetConsumedUnitsWindows))
 }
 
 // GetCurrentDelegatorIterator mocks base method.
@@ -1307,6 +1337,21 @@ func (mr *MockStateMockRecorder) GetChains(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChains", reflect.TypeOf((*MockState)(nil).GetChains), arg0)
 }
 
+// GetConsumedUnitsWindows mocks base method.
+func (m *MockState) GetConsumedUnitsWindows() (fees.Windows, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConsumedUnitsWindows")
+	ret0, _ := ret[0].(fees.Windows)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConsumedUnitsWindows indicates an expected call of GetConsumedUnitsWindows.
+func (mr *MockStateMockRecorder) GetConsumedUnitsWindows() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConsumedUnitsWindows", reflect.TypeOf((*MockState)(nil).GetConsumedUnitsWindows))
+}
+
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockState) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -1681,6 +1726,20 @@ func (m *MockState) SetBlockUnitCaps(arg0 fees.Dimensions) error {
 func (mr *MockStateMockRecorder) SetBlockUnitCaps(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlockUnitCaps", reflect.TypeOf((*MockState)(nil).SetBlockUnitCaps), arg0)
+}
+
+// SetConsumedUnitsWindows mocks base method.
+func (m *MockState) SetConsumedUnitsWindows(arg0 fees.Windows) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
+func (mr *MockStateMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockState)(nil).SetConsumedUnitsWindows), arg0)
 }
 
 // SetCurrentSupply mocks base method.
