@@ -6,6 +6,7 @@ package getter
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,6 +46,7 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.
 	sender.Default(true)
 
 	bs, err := New(
+		&sync.Mutex{},
 		vm,
 		sender,
 		logging.NoLog{},

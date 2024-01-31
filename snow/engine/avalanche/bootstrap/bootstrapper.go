@@ -133,6 +133,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		)
 		return b.GetAncestorsFailed(ctx, nodeID, requestID)
 	}
+
 	if lenVtxs > b.Config.AncestorsMaxContainersReceived {
 		b.Ctx.Log.Debug("ignoring containers in Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -142,6 +143,9 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 
 		vtxs = vtxs[:b.Config.AncestorsMaxContainersReceived]
 	}
+
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
 
 	requestedVtxID, requested := b.outstandingRequests.DeleteKey(common.Request{
 		NodeID:    nodeID,
@@ -253,6 +257,9 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	vtxID, ok := b.outstandingRequests.DeleteKey(common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
@@ -274,6 +281,9 @@ func (b *bootstrapper) Connected(
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -282,6 +292,9 @@ func (b *bootstrapper) Connected(
 }
 
 func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}

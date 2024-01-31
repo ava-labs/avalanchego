@@ -464,20 +464,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		)
 	}
 	h.resourceTracker.StartProcessing(nodeID, startTime)
-	h.ctx.Lock.Lock()
-	lockAcquiredTime := h.clock.Time()
 	defer func() {
-		h.ctx.Lock.Unlock()
-
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
 			processingTime    = endTime.Sub(startTime)
-			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
+		// There is no lock grabbed here, so both metrics are identical
 		messageHistograms.processingTime.Observe(float64(processingTime))
-		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
@@ -485,7 +481,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		if processingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
-				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
 				zap.Stringer("message", body),

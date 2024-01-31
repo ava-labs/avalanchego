@@ -55,6 +55,7 @@ func setup(t *testing.T, engCfg Config) (ids.NodeID, validators.Manager, *common
 	engCfg.VM = vm
 
 	snowGetHandler, err := getter.New(
+		&engCfg.Ctx.Lock,
 		vm,
 		sender,
 		engCfg.Ctx.Log,

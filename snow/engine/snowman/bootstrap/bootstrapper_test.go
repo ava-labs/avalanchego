@@ -77,7 +77,15 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
+	snowGetHandler, err := getter.New(
+		&ctx.Lock,
+		vm,
+		sender,
+		ctx.Log,
+		time.Second,
+		2000,
+		ctx.Registerer,
+	)
 	require.NoError(err)
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
@@ -119,7 +127,15 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	peers.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
+	snowGetHandler, err := getter.New(
+		&ctx.Lock,
+		vm,
+		sender,
+		ctx.Log,
+		time.Second,
+		2000,
+		ctx.Registerer,
+	)
 	require.NoError(err)
 	cfg := Config{
 		AllGetsServer:                  snowGetHandler,
@@ -1353,7 +1369,15 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	peers.RegisterCallbackListener(ctx.SubnetID, startupTracker)
 	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, ctx.Registerer)
+	snowGetHandler, err := getter.New(
+		&ctx.Lock,
+		vm,
+		sender,
+		ctx.Log,
+		time.Second,
+		2000,
+		ctx.Registerer,
+	)
 	require.NoError(err)
 
 	queueDB := memdb.New()

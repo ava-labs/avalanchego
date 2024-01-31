@@ -1400,6 +1400,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// The engine handles consensus
 	snowGetHandler, err := snowgetter.New(
+		&consensusCtx.Lock,
 		vm,
 		sender,
 		consensusCtx.Log,
@@ -1510,7 +1511,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
+	ctx.Lock.Unlock()
+
 	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
+
+	ctx.Lock.Lock()
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1522,7 +1527,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
+	ctx.Lock.Unlock()
+
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
+
+	ctx.Lock.Lock()
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1538,8 +1547,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
+	ctx.Lock.Unlock()
+
 	frontier := set.Of(advanceTimeBlkID)
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
+
+	ctx.Lock.Lock()
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1553,7 +1566,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
+	ctx.Lock.Unlock()
+
 	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
+
+	ctx.Lock.Lock()
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1565,15 +1582,25 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
+	ctx.Lock.Unlock()
+
 	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
+
+	ctx.Lock.Lock()
 
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
+	ctx.Lock.Unlock()
+
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
+
+	ctx.Lock.Lock()
+
 	require.Equal(advanceTimeBlk.ID(), vm.manager.Preferred())
 
 	ctx.Lock.Unlock()
+
 	chainRouter.Shutdown(context.Background())
 }
 

@@ -193,6 +193,9 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 }
 
 func (b *Bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -209,6 +212,9 @@ func (b *Bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 }
 
 func (b *Bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
@@ -322,6 +328,9 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 }
 
 func (b *Bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if requestID != b.requestID {
 		b.Ctx.Log.Debug("received out-of-sync AcceptedFrontier message",
 			zap.Stringer("nodeID", nodeID),
@@ -338,6 +347,9 @@ func (b *Bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 }
 
 func (b *Bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if requestID != b.requestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
 			zap.Stringer("nodeID", nodeID),
@@ -354,6 +366,9 @@ func (b *Bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 }
 
 func (b *Bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs set.Set[ids.ID]) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if requestID != b.requestID {
 		b.Ctx.Log.Debug("received out-of-sync Accepted message",
 			zap.Stringer("nodeID", nodeID),
@@ -370,6 +385,9 @@ func (b *Bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 }
 
 func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if requestID != b.requestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFailed message",
 			zap.Stringer("nodeID", nodeID),
@@ -463,6 +481,9 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.outstandingRequests.DeleteKey(common.Request{
 		NodeID:    nodeID,
@@ -536,6 +557,9 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	blkID, ok := b.outstandingRequests.DeleteKey(common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,

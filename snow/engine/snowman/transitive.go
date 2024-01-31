@@ -232,6 +232,9 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	if err != nil {
 		if t.Ctx.Log.Enabled(logging.Verbo) {
@@ -248,10 +251,10 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 				zap.Error(err),
 			)
 		}
-		// because GetFailed doesn't utilize the assumption that we actually
-		// sent a Get message, we can safely call GetFailed here to potentially
+		// because getFailed doesn't utilize the assumption that we actually
+		// sent a Get message, we can safely call getFailed here to potentially
 		// abandon the request.
-		return t.GetFailed(ctx, nodeID, requestID)
+		return t.getFailed(ctx, nodeID, requestID)
 	}
 
 	var (
@@ -273,7 +276,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			)
 			// We assume that [blk] is useless because it doesn't match what we
 			// expected.
-			return t.GetFailed(ctx, nodeID, requestID)
+			return t.getFailed(ctx, nodeID, requestID)
 		}
 
 		issuedMetric = t.blkReqSourceMetric[req]
@@ -305,6 +308,13 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
+	return t.getFailed(ctx, nodeID, requestID)
+}
+
+func (t *Transitive) getFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the
 	// request was for if it exists.
@@ -330,6 +340,9 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	t.sendChits(ctx, nodeID, requestID, requestedHeight)
 
 	issuedMetric := t.metrics.issued.WithLabelValues(pushGossipSource)
@@ -344,6 +357,9 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte, requestedHeight uint64) error {
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
+
 	t.sendChits(ctx, nodeID, requestID, requestedHeight)
 
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
@@ -394,6 +410,9 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		zap.Stringer("acceptedID", acceptedID),
 	)
+
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
 
 	issuedMetric := t.metrics.issued.WithLabelValues(pullGossipSource)
 
@@ -446,6 +465,9 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 	if ok {
 		return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted, lastAccepted)
 	}
+
+	t.Ctx.Lock.Lock()
+	defer t.Ctx.Lock.Unlock()
 
 	t.blocked.Register(
 		ctx,

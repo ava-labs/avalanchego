@@ -91,6 +91,7 @@ func buildTestsObjects(
 	}
 	sender := &common.SenderTest{T: t}
 	dummyGetter, err := getter.New(
+		&ctx.Lock,
 		fullVM,
 		sender,
 		ctx.Log,

@@ -6,6 +6,7 @@ package getter
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ func newTest(t *testing.T) (common.AllGetsServer, *vertex.TestManager, *common.S
 	sender.Default(true)
 
 	bs, err := New(
+		&sync.Mutex{},
 		manager,
 		sender,
 		logging.NoLog{},

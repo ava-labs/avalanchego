@@ -48,6 +48,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 		TestVM: common.TestVM{T: t},
 	}
 	dummyGetter, err := getter.New(
+		&snowCtx.Lock,
 		nonStateSyncableVM,
 		sender,
 		logging.NoLog{},
@@ -77,6 +78,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 		},
 	}
 	dummyGetter, err = getter.New(
+		&snowCtx.Lock,
 		fullVM,
 		sender,
 		logging.NoLog{},

@@ -517,6 +517,9 @@ func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Applica
 }
 
 func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.NodeID, subnetID ids.ID) error {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
 	return vm.uptimeManager.Connect(nodeID, subnetID)
 }
 

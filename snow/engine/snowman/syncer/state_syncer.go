@@ -130,6 +130,9 @@ func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 }
 
 func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -142,6 +145,9 @@ func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 }
 
 func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	if err := ss.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
@@ -161,6 +167,9 @@ func (ss *stateSyncer) tryStartSyncing(ctx context.Context) error {
 }
 
 func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync StateSummaryFrontier message",
@@ -211,6 +220,9 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 }
 
 func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetStateSummaryFrontierFailed message",
@@ -272,6 +284,9 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 }
 
 func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -282,6 +297,32 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		return nil
 	}
 
+	return ss.receivedAcceptedStateSummary(ctx, nodeID, summaryIDs)
+}
+
+func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
+	// ignores any late responses
+	if requestID != ss.requestID {
+		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", ss.requestID),
+			zap.Uint32("requestID", requestID),
+		)
+		return nil
+	}
+
+	// If we can't get a response from [nodeID], act as though they said that
+	// they think none of the containers we sent them in GetAccepted are
+	// accepted
+	ss.failedVoters.Add(nodeID)
+
+	return ss.receivedAcceptedStateSummary(ctx, nodeID, nil)
+}
+
+func (ss *stateSyncer) receivedAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, summaryIDs set.Set[ids.ID]) error {
 	if !ss.pendingVoters.Contains(nodeID) {
 		ss.Ctx.Log.Debug("received unexpected AcceptedStateSummary message",
 			zap.Stringer("nodeID", nodeID),
@@ -448,25 +489,6 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 		}
 	}
 	return preferredStateSummary
-}
-
-func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	// ignores any late responses
-	if requestID != ss.requestID {
-		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("expectedRequestID", ss.requestID),
-			zap.Uint32("requestID", requestID),
-		)
-		return nil
-	}
-
-	// If we can't get a response from [nodeID], act as though they said that
-	// they think none of the containers we sent them in GetAccepted are
-	// accepted
-	ss.failedVoters.Add(nodeID)
-
-	return ss.AcceptedStateSummary(ctx, nodeID, requestID, nil)
 }
 
 // startup do start the whole state sync process by
