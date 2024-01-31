@@ -89,6 +89,8 @@ func validate(jt JumpTable) JumpTable {
 	return jt
 }
 
+// newDurangoInstructionSet returns the frontier, homestead, byzantium,
+// constantinople, istanbul, petersburg, subnet-evm, durango instructions.
 func newDurangoInstructionSet() JumpTable {
 	instructionSet := newApricotPhase3InstructionSet()
 	enable3855(&instructionSet) // PUSH0 instruction

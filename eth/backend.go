@@ -358,9 +358,12 @@ func (s *Ethereum) Stop() error {
 
 	// Clean shutdown marker as the last thing before closing db
 	s.shutdownTracker.Stop()
+	log.Info("Stopped shutdownTracker")
 
 	s.chainDb.Close()
+	log.Info("Closed chaindb")
 	s.eventMux.Stop()
+	log.Info("Stopped EventMux")
 	return nil
 }
 

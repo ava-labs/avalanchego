@@ -157,6 +157,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		Extra:      nil,
 		Time:       timestamp,
 	}
+
 	// Set BaseFee and Extra data field if we are post ApricotPhase3
 	if w.chainConfig.IsApricotPhase3(timestamp) {
 		var err error
@@ -165,6 +166,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
 	}
+
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
 	}

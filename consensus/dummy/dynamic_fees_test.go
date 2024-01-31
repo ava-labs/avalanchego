@@ -107,6 +107,7 @@ type test struct {
 
 func TestDynamicFees(t *testing.T) {
 	spacedTimestamps := []uint64{1, 1, 2, 5, 15, 120}
+
 	var tests []test = []test{
 		// Test minimal gas usage
 		{
@@ -276,7 +277,7 @@ func TestSelectBigWithinBounds(t *testing.T) {
 		lower, value, upper, expected *big.Int
 	}
 
-	var tests = map[string]test{
+	tests := map[string]test{
 		"value within bounds": {
 			lower:    big.NewInt(0),
 			value:    big.NewInt(5),

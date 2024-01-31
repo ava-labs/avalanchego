@@ -118,7 +118,12 @@ func (vm *VM) createGossiper(
 // We assume that [txs] contains an array of nonce-ordered transactions for a given
 // account. This array of transactions can have gaps and start at a nonce lower
 // than the current state of an account.
-func (n *pushGossiper) queueExecutableTxs(state *state.StateDB, baseFee *big.Int, txs map[common.Address]types.Transactions, maxTxs int) types.Transactions {
+func (n *pushGossiper) queueExecutableTxs(
+	state *state.StateDB,
+	baseFee *big.Int,
+	txs map[common.Address]types.Transactions,
+	maxTxs int,
+) types.Transactions {
 	// Setup heap for transactions
 	heads := make(types.TxByPriceAndTime, 0, len(txs))
 	for addr, accountTxs := range txs {

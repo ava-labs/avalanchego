@@ -15,7 +15,7 @@ import (
 
 var _ contract.Configurator = &configurator{}
 
-// ConfigKey is the key used in json config files to specify this precompile precompileconfig.
+// ConfigKey is the key used in json config files to specify this precompile config.
 // must be unique across all precompiles.
 const ConfigKey = "warpConfig"
 
@@ -41,7 +41,7 @@ func init() {
 }
 
 // MakeConfig returns a new precompile config instance.
-// This is required for Marshal/Unmarshal the precompile config.
+// This is required to Marshal/Unmarshal the precompile config.
 func (*configurator) MakeConfig() precompileconfig.Config {
 	return new(Config)
 }

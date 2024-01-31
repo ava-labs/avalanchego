@@ -17,8 +17,13 @@ func TestIsProhibited(t *testing.T) {
 	assert.True(t, IsProhibited(common.HexToAddress("0x01000000000000000000000000000000000000f0")))
 	assert.True(t, IsProhibited(common.HexToAddress("0x01000000000000000000000000000000000000ff")))
 	assert.True(t, IsProhibited(common.HexToAddress("0x0200000000000000000000000000000000000000")))
+	assert.True(t, IsProhibited(common.HexToAddress("0x0200000000000000000000000000000000000010")))
+	assert.True(t, IsProhibited(common.HexToAddress("0x02000000000000000000000000000000000000f0")))
 	assert.True(t, IsProhibited(common.HexToAddress("0x02000000000000000000000000000000000000ff")))
+	// reserved addresses (custom precompiles)
 	assert.True(t, IsProhibited(common.HexToAddress("0x0300000000000000000000000000000000000000")))
+	assert.True(t, IsProhibited(common.HexToAddress("0x0300000000000000000000000000000000000010")))
+	assert.True(t, IsProhibited(common.HexToAddress("0x03000000000000000000000000000000000000f0")))
 	assert.True(t, IsProhibited(common.HexToAddress("0x03000000000000000000000000000000000000ff")))
 
 	// allowed for use

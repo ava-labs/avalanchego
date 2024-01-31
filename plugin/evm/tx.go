@@ -288,14 +288,3 @@ func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
 	}
 	return output, nil
 }
-
-// mergeAtomicOps merges atomic ops for [chainID] represented by [requests]
-// to the [output] map provided.
-func mergeAtomicOpsToMap(output map[ids.ID]*atomic.Requests, chainID ids.ID, requests *atomic.Requests) {
-	if request, exists := output[chainID]; exists {
-		request.PutRequests = append(request.PutRequests, requests.PutRequests...)
-		request.RemoveRequests = append(request.RemoveRequests, requests.RemoveRequests...)
-	} else {
-		output[chainID] = requests
-	}
-}

@@ -40,9 +40,9 @@ const (
 	defaultOfflinePruningBloomFilterSize       uint64 = 512 // Default size (MB) for the offline pruner to use
 	defaultLogLevel                                   = "info"
 	defaultLogJSONFormat                              = false
-	defaultPopulateMissingTriesParallelism            = 1024
 	defaultMaxOutboundActiveRequests                  = 16
 	defaultMaxOutboundActiveCrossChainRequests        = 64
+	defaultPopulateMissingTriesParallelism            = 1024
 	defaultStateSyncServerTrieCache                   = 64 // MB
 	defaultAcceptedCacheSize                          = 32 // blocks
 
@@ -95,7 +95,7 @@ type Config struct {
 	ContinuousProfilerFrequency Duration `json:"continuous-profiler-frequency"` // Frequency to run continuous profiler if enabled
 	ContinuousProfilerMaxFiles  int      `json:"continuous-profiler-max-files"` // Maximum number of files to maintain
 
-	// Coreth API Gas/Price Caps
+	// API Gas/Price Caps
 	RPCGasCap   uint64  `json:"rpc-gas-cap"`
 	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 
@@ -251,17 +251,17 @@ func (c *Config) SetDefaults() {
 	c.TriePrefetcherParallelism = defaultTriePrefetcherParallelism
 	c.SnapshotCache = defaultSnapshotCache
 	c.AcceptorQueueLimit = defaultAcceptorQueueLimit
+	c.CommitInterval = defaultCommitInterval
 	c.SnapshotWait = defaultSnapshotWait
 	c.RegossipFrequency.Duration = defaultTxRegossipFrequency
 	c.RegossipMaxTxs = defaultTxRegossipMaxSize
 	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize
 	c.LogLevel = defaultLogLevel
-	c.PopulateMissingTriesParallelism = defaultPopulateMissingTriesParallelism
 	c.LogJSONFormat = defaultLogJSONFormat
 	c.MaxOutboundActiveRequests = defaultMaxOutboundActiveRequests
 	c.MaxOutboundActiveCrossChainRequests = defaultMaxOutboundActiveCrossChainRequests
+	c.PopulateMissingTriesParallelism = defaultPopulateMissingTriesParallelism
 	c.StateSyncServerTrieCache = defaultStateSyncServerTrieCache
-	c.CommitInterval = defaultCommitInterval
 	c.StateSyncCommitInterval = defaultSyncableCommitInterval
 	c.StateSyncMinBlocks = defaultStateSyncMinBlocks
 	c.StateSyncRequestSize = defaultStateSyncRequestSize
@@ -304,6 +304,7 @@ func (c *Config) Validate() error {
 	if c.Pruning && c.CommitInterval == 0 {
 		return fmt.Errorf("cannot use commit interval of 0 with pruning enabled")
 	}
+
 	return nil
 }
 

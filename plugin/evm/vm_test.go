@@ -54,7 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -193,18 +193,18 @@ func NewContext() *snow.Context {
 	}
 	ctx.WarpSigner = avalancheWarp.NewSigner(blsSecretKey, ctx.NetworkID, ctx.ChainID)
 	ctx.PublicKey = bls.PublicFromSecretKey(blsSecretKey)
-
 	return ctx
 }
 
 // setupGenesis sets up the genesis
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
-func setupGenesis(t *testing.T,
+func setupGenesis(
+	t *testing.T,
 	genesisJSON string,
 ) (*snow.Context,
 	database.Database,
 	[]byte,
-	chan engCommon.Message,
+	chan commonEng.Message,
 	*atomic.Memory,
 ) {
 	if len(genesisJSON) == 0 {
@@ -215,66 +215,64 @@ func setupGenesis(t *testing.T,
 
 	baseDB := memdb.New()
 
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+	// initialize the atomic memory
+	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
+	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.New(
-		logging.NoLog{},
-		memdb.New(),
-	)
+	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
 	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
-	issuer := make(chan engCommon.Message, 1)
+	issuer := make(chan commonEng.Message, 1)
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
-	return ctx, prefixedDB, genesisBytes, issuer, m
+	return ctx, prefixedDB, genesisBytes, issuer, atomicMemory
 }
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
-// the channel use to send messages to the engine, the vm, and atomic memory
+// the channel use to send messages to the engine, the VM, database manager,
+// sender, and atomic memory.
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func GenesisVM(t *testing.T,
 	finishBootstrapping bool,
 	genesisJSON string,
 	configJSON string,
 	upgradeJSON string,
-) (chan engCommon.Message,
+) (chan commonEng.Message,
 	*VM, database.Database,
 	*atomic.Memory,
-	*engCommon.SenderTest,
+	*commonEng.SenderTest,
 ) {
 	vm := &VM{}
-	vm.p2pSender = &engCommon.FakeSender{}
-	ctx, db, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
-	appSender := &engCommon.SenderTest{T: t}
+	vm.p2pSender = &commonEng.FakeSender{}
+	ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
+	appSender := &commonEng.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
-	if err := vm.Initialize(
+	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		db,
+		dbManager,
 		genesisBytes,
 		[]byte(upgradeJSON),
 		[]byte(configJSON),
 		issuer,
-		[]*engCommon.Fx{},
+		[]*commonEng.Fx{},
 		appSender,
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
+	require.NoError(t, err, "error initializing GenesisVM")
 
 	if finishBootstrapping {
 		require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
 		require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
 	}
 
-	return issuer, vm, db, m, appSender
+	return issuer, vm, dbManager, m, appSender
 }
 
 func addUTXO(sharedMemory *atomic.Memory, ctx *snow.Context, txID ids.ID, index uint32, assetID ids.ID, amount uint64, addr ids.ShortID) (*avax.UTXO, error) {
@@ -315,7 +313,7 @@ func addUTXO(sharedMemory *atomic.Memory, ctx *snow.Context, txID ids.ID, index 
 // GenesisVMWithUTXOs creates a GenesisVM and generates UTXOs in the X-Chain Shared Memory containing AVAX based on the [utxos] map
 // Generates UTXOIDs by using a hash of the address in the [utxos] map such that the UTXOs will be generated deterministically.
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
-func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string, utxos map[ids.ShortID]uint64) (chan engCommon.Message, *VM, database.Database, *atomic.Memory, *engCommon.SenderTest) {
+func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string, utxos map[ids.ShortID]uint64) (chan commonEng.Message, *VM, database.Database, *atomic.Memory, *commonEng.SenderTest) {
 	issuer, vm, db, sharedMemory, sender := GenesisVM(t, finishBootstrapping, genesisJSON, configJSON, upgradeJSON)
 	for addr, avaxAmount := range utxos {
 		txID, err := ids.ToID(hashing.ComputeHash256(addr.Bytes()))
@@ -335,9 +333,9 @@ func TestVMConfig(t *testing.T) {
 	enabledEthAPIs := []string{"debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
 	_, vm, _, _, _ := GenesisVM(t, false, "", configJSON, "")
-	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
-	assert.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
+	require.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
+	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestCrossChainMessagestoVM(t *testing.T) {
@@ -516,8 +514,8 @@ func TestVMConfigDefaults(t *testing.T) {
 	vmConfig.SetDefaults()
 	vmConfig.RPCTxFeeCap = txFeeCap
 	vmConfig.EnabledEthAPIs = enabledEthAPIs
-	assert.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
+	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMNilConfig(t *testing.T) {
@@ -526,27 +524,27 @@ func TestVMNilConfig(t *testing.T) {
 	// VM Config should match defaults if no config is passed in
 	var vmConfig Config
 	vmConfig.SetDefaults()
-	assert.Equal(t, vmConfig, vm.config, "VM Config should match default config")
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.Equal(t, vmConfig, vm.config, "VM Config should match default config")
+	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
-func TestVMContinuosProfiler(t *testing.T) {
+func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": \"500ms\"}", profilerDir)
 	_, vm, _, _, _ := GenesisVM(t, false, "", configJSON, "")
-	assert.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
-	assert.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
+	require.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
+	require.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
 
 	// Sleep for twice the frequency of the profiler to give it time
 	// to generate the first profile.
 	time.Sleep(2 * time.Second)
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.NoError(t, vm.Shutdown(context.Background()))
 
 	// Check that the first profile was generated
 	expectedFileName := filepath.Join(profilerDir, "cpu.profile.1")
 	_, err := os.Stat(expectedFileName)
-	assert.NoError(t, err, "Expected continuous profiler to generate the first CPU profile at %s", expectedFileName)
+	require.NoError(t, err, "Expected continuous profiler to generate the first CPU profile at %s", expectedFileName)
 }
 
 func TestVMUpgrades(t *testing.T) {
@@ -976,7 +974,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		[]byte(""),
 		[]byte("{\"pruning-enabled\":true}"),
 		issuer,
-		[]*engCommon.Fx{},
+		[]*commonEng.Fx{},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -3409,7 +3407,7 @@ func TestConfigureLogLevel(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			vm := &VM{}
 			ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
-			appSender := &engCommon.SenderTest{T: t}
+			appSender := &commonEng.SenderTest{T: t}
 			appSender.CantSendAppGossip = true
 			appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 			err := vm.Initialize(
@@ -3420,7 +3418,7 @@ func TestConfigureLogLevel(t *testing.T) {
 				[]byte(""),
 				[]byte(test.logConfig),
 				issuer,
-				[]*engCommon.Fx{},
+				[]*commonEng.Fx{},
 				appSender,
 			)
 			if len(test.expectedErr) == 0 && err != nil {
@@ -4102,12 +4100,12 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	require.NoError(t, err)
 
 	// this will not be allowed
-	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*engCommon.Fx{}, appSender)
+	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*commonEng.Fx{}, appSender)
 	require.ErrorContains(t, err, "mismatching ApricotPhase2 fork block timestamp in database")
 
 	// try again with skip-upgrade-check
 	config := []byte("{\"skip-upgrade-check\": true}")
-	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, issuer, []*engCommon.Fx{}, appSender)
+	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, issuer, []*commonEng.Fx{}, appSender)
 	require.NoError(t, err)
 	require.NoError(t, reinitVM.Shutdown(context.Background()))
 }

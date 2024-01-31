@@ -175,7 +175,6 @@ func TestSetupGenesis(t *testing.T) {
 // regression test for precompile activation after header block
 func TestNetworkUpgradeBetweenHeadAndAcceptedBlock(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-
 	customg := Genesis{
 		Config: params.TestApricotPhase1Config,
 		Alloc: GenesisAlloc{

@@ -54,8 +54,8 @@ func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter boo
 	if snapshotter {
 		snapconfig := snapshot.Config{
 			CacheSize:  1,
-			AsyncBuild: false,
 			NoBuild:    false,
+			AsyncBuild: false,
 			SkipVerify: true,
 		}
 		snaps, _ = snapshot.New(snapconfig, db, sdb.TrieDB(), common.Hash{}, root)

@@ -16,9 +16,7 @@
 
 package rawdb
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
 	// errNotSupported is returned if the database doesn't support the required operation.
