@@ -45,6 +45,7 @@ import (
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -672,7 +673,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 
 	// Reward the delegator
-	tx, err := service.vm.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := builder.NewRewardValidatorTx(service.vm.ctx, delTx.ID())
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
