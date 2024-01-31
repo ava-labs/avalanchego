@@ -512,6 +512,80 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 }
 
 /*
+ *****************************************************
+ ******************* Get Subnet **********************
+ *****************************************************
+ */
+
+// GetSubnetArgs are the arguments to GetSubnet
+type GetSubnetArgs struct {
+	// ID of the subnet to retrieve information about
+	ID ids.ID `json:"ids"`
+}
+
+// GetSubnetResponse is the response from calling GetSubnet
+type GetSubnetResponse struct {
+	IsPermissioned bool `json:"isPermissioned"`
+	// subnet auth information for a permissioned subnet
+	ControlKeys []string    `json:"controlKeys"`
+	Threshold   json.Uint32 `json:"threshold"`
+	// subnet transformation tx ID for a permissionless subnet
+	SubnetTransformationTxID ids.ID `json:"permissionlessTxID"`
+}
+
+func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetSubnetResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getSubnet"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	subnetID := args.ID
+
+	if subnetID == constants.PrimaryNetworkID {
+		response.IsPermissioned = false
+		response.ControlKeys = []string{}
+		response.Threshold = json.Uint32(0)
+		response.SubnetTransformationTxID = ids.Empty
+		return nil
+	}
+
+	if subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(subnetID); err == nil {
+		response.IsPermissioned = false
+		response.ControlKeys = []string{}
+		response.Threshold = json.Uint32(0)
+		response.SubnetTransformationTxID = subnetTransformationTx.ID()
+		return nil
+	}
+
+	subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
+	if err != nil {
+		return err
+	}
+	owner, ok := subnetOwner.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnetOwner)
+	}
+	controlAddrs := make([]string, len(owner.Addrs))
+	for i, controlKeyID := range owner.Addrs {
+		addr, err := s.addrManager.FormatLocalAddress(controlKeyID)
+		if err != nil {
+			return fmt.Errorf("problem formatting address: %w", err)
+		}
+		controlAddrs[i] = addr
+	}
+
+	response.IsPermissioned = true
+	response.ControlKeys = controlAddrs
+	response.Threshold = json.Uint32(owner.Threshold)
+	response.SubnetTransformationTxID = ids.Empty
+
+	return nil
+}
+
+/*
  ******************************************************
  ******************* Get Subnets **********************
  ******************************************************
@@ -529,7 +603,7 @@ type APISubnet struct {
 	Threshold   json.Uint32 `json:"threshold"`
 }
 
-// GetSubnetsArgs are the arguments to GetSubnet
+// GetSubnetsArgs are the arguments to GetSubnets
 type GetSubnetsArgs struct {
 	// IDs of the subnets to retrieve information about
 	// If omitted, gets all subnets
