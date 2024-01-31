@@ -36,14 +36,14 @@ mkdir ${ROOT_PATH}
 cd ${ROOT_PATH}
 git clone https://github.com/ava-labs/avalanchego.git
 cd avalanchego
-git checkout ${avalanche_version}
+git checkout "${avalanche_version}"
 # We build AvalancheGo manually instead of downloading binaries
 # because the machine code will be better optimized for the local environment
 #
 # For example, using the pre-built binary on Apple Silicon is about ~40% slower
 # because it requires Rosetta 2 emulation.
 ./scripts/build.sh
-cd ${PPWD}
+cd "${PPWD}"
 
 ############################
 echo "building timestampvm"
@@ -84,7 +84,7 @@ ACK_GINKGO_RC=true ginkgo build ./tests/load
 ANR_REPO_PATH=github.com/ava-labs/avalanche-network-runner
 ANR_VERSION=$avalanche_network_runner_version
 # version set
-go install -v ${ANR_REPO_PATH}@${ANR_VERSION}
+go install -v ${ANR_REPO_PATH}@"${ANR_VERSION}"
 
 #################################
 # run "avalanche-network-runner" server
@@ -118,7 +118,7 @@ echo "running load tests"
   --vm-genesis-path=${ROOT_PATH}/.genesis \
   --vm-config-path=${ROOT_PATH}/.config \
   --subnet-config-path=${ROOT_PATH}/.subnet \
-  --terminal-height=${TERMINAL_HEIGHT}
+  --terminal-height="${TERMINAL_HEIGHT}"
 
 ############################
 # load.test" already terminates the cluster

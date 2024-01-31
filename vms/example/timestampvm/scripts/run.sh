@@ -41,8 +41,8 @@ fi
 AVALANCHE_LOG_LEVEL=${AVALANCHE_LOG_LEVEL:-INFO}
 
 echo "Running with:"
-echo avalanche_version: ${avalanche_version}
-echo MODE: ${MODE}
+echo avalanche_version: "${avalanche_version}"
+echo MODE: "${MODE}"
 
 ############################
 # download avalanchego
@@ -60,21 +60,21 @@ if [ ! -f "$AVALANCHEGO_PATH" ]; then
     DOWNLOAD_PATH=/tmp/avalanchego.zip
   fi
 
-  rm -rf /tmp/avalanchego-${avalanche_version}
+  rm -rf /tmp/avalanchego-"${avalanche_version}"
   rm -rf /tmp/avalanchego-build
   rm -f ${DOWNLOAD_PATH}
 
   echo "downloading avalanchego ${avalanche_version} at ${DOWNLOAD_URL}"
-  curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
+  curl -L "${DOWNLOAD_URL}" -o ${DOWNLOAD_PATH}
 
   echo "extracting downloaded avalanchego"
   if [[ ${GOOS} == "linux" ]]; then
     tar xzvf ${DOWNLOAD_PATH} -C /tmp
   elif [[ ${GOOS} == "darwin" ]]; then
     unzip ${DOWNLOAD_PATH} -d /tmp/avalanchego-build
-    mv /tmp/avalanchego-build/build /tmp/avalanchego-${avalanche_version}
+    mv /tmp/avalanchego-build/build /tmp/avalanchego-"${avalanche_version}"
   fi
-  find /tmp/avalanchego-${avalanche_version}
+  find /tmp/avalanchego-"${avalanche_version}"
 fi
 
 ############################
@@ -83,12 +83,12 @@ fi
 echo "building timestampvm"
 
 # delete previous (if exists)
-rm -f /tmp/avalanchego-${avalanche_version}/plugins/tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH
+rm -f /tmp/avalanchego-"${avalanche_version}"/plugins/tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH
 
 go build \
-  -o /tmp/avalanchego-${avalanche_version}/plugins/tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH \
+  -o /tmp/avalanchego-"${avalanche_version}"/plugins/tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH \
   ./main/
-find /tmp/avalanchego-${avalanche_version}
+find /tmp/avalanchego-"${avalanche_version}"
 
 ############################
 
@@ -118,7 +118,7 @@ ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ANR_REPO_PATH=github.com/ava-labs/avalanche-network-runner
 ANR_VERSION=$avalanche_network_runner_version
 # version set
-go install -v ${ANR_REPO_PATH}@${ANR_VERSION}
+go install -v ${ANR_REPO_PATH}@"${ANR_VERSION}"
 
 #################################
 # run "avalanche-network-runner" server
@@ -147,18 +147,18 @@ echo "running e2e tests"
   --ginkgo.v \
   --network-runner-log-level info \
   --network-runner-grpc-endpoint="0.0.0.0:12342" \
-  --avalanchego-path=${AVALANCHEGO_PATH} \
-  --avalanchego-plugin-dir=${AVALANCHEGO_PLUGIN_DIR} \
+  --avalanchego-path="${AVALANCHEGO_PATH}" \
+  --avalanchego-plugin-dir="${AVALANCHEGO_PLUGIN_DIR}" \
   --vm-genesis-path=/tmp/.genesis \
   --vm-config-path=/tmp/.config \
-  --output-path=/tmp/avalanchego-${avalanche_version}/output.yaml \
-  --mode=${MODE}
+  --output-path=/tmp/avalanchego-"${avalanche_version}"/output.yaml \
+  --mode="${MODE}"
 STATUS=$?
 
 ############################
 if [[ -f "/tmp/avalanchego-${avalanche_version}/output.yaml" ]]; then
   echo "cluster is ready!"
-  cat /tmp/avalanchego-${avalanche_version}/output.yaml
+  cat /tmp/avalanchego-"${avalanche_version}"/output.yaml
 else
   echo "cluster is not ready in time... terminating ${PID}"
   kill ${PID}
