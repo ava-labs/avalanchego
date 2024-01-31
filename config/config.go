@@ -55,6 +55,7 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
+	authDeprecationMsg                   = "Auth API is deprecated"
 	ipcDeprecationMsg                    = "IPC API is deprecated"
 	keystoreDeprecationMsg               = "keystore API is deprecated"
 	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
@@ -66,6 +67,10 @@ var (
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
 	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
 	deprecatedKeys                = map[string]string{
+		APIAuthRequiredKey:     authDeprecationMsg,
+		APIAuthPasswordKey:     authDeprecationMsg,
+		APIAuthPasswordFileKey: authDeprecationMsg,
+
 		IpcAPIEnabledKey: ipcDeprecationMsg,
 		IpcsChainIDsKey:  ipcDeprecationMsg,
 		IpcsPathKey:      ipcDeprecationMsg,
