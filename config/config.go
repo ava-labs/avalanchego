@@ -1387,7 +1387,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Router
-	nodeConfig.ConsensusRouter = &router.ChainRouter{}
 	nodeConfig.RouterHealthConfig, err = getRouterHealthConfig(v, healthCheckAveragerHalflife)
 	if err != nil {
 		return node.Config{}, err
