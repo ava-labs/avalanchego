@@ -133,7 +133,6 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		)
 		return b.GetAncestorsFailed(ctx, nodeID, requestID)
 	}
-
 	if lenVtxs > b.Config.AncestorsMaxContainersReceived {
 		b.Ctx.Log.Debug("ignoring containers in Ancestors",
 			zap.Stringer("nodeID", nodeID),
