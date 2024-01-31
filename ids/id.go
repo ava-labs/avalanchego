@@ -46,6 +46,15 @@ func FromString(idStr string) (ID, error) {
 	return ToID(bytes)
 }
 
+// FromStringOrPanic is the same as FromString, but will panic on error
+func FromStringOrPanic(idStr string) ID {
+	id, err := FromString(idStr)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 func (id ID) MarshalJSON() ([]byte, error) {
 	str, err := cb58.Encode(id[:])
 	if err != nil {
