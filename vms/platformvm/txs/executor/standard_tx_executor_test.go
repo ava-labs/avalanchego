@@ -953,17 +953,18 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	}
 }
 
-// Verifies that the Memo field is required to be empty post-Durango
-func TestDurangoMemoField(t *testing.T) {
+// Verifies that [AddValidatorTx] and [AddDelegatorTx] are disabled post-Durango
+func TestDurangoDisabledTransactions(t *testing.T) {
 	type test struct {
-		name      string
-		setupTest func(*environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice)
+		name        string
+		buildTx     func(*environment) *txs.Tx
+		expectedErr error
 	}
 
 	tests := []test{
 		{
 			name: "AddValidatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
+			buildTx: func(env *environment) *txs.Tx {
 				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
 					env.state,
 					preFundedKeys,
@@ -979,10 +980,7 @@ func TestDurangoMemoField(t *testing.T) {
 					endTime   = chainTime.Add(defaultMaxStakingDuration)
 				)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-				require.NoError(t, err)
-
-				tx := &txs.AddValidatorTx{
+				utx := &txs.AddValidatorTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 						NetworkID:    env.ctx.NetworkID,
 						BlockchainID: env.ctx.ChainID,
@@ -1003,9 +1001,99 @@ func TestDurangoMemoField(t *testing.T) {
 					},
 					DelegationShares: reward.PercentDenominator,
 				}
-				return tx, signers, onAcceptState, &tx.Memo
+
+				tx, err := txs.NewSigned(utx, txs.Codec, signers)
+				require.NoError(t, err)
+
+				return tx
 			},
+			expectedErr: ErrAddValidatorTxPostDurango,
 		},
+		{
+			name: "AddDelegatorTx",
+			buildTx: func(env *environment) *txs.Tx {
+				var primaryValidator *state.Staker
+				it, err := env.state.GetCurrentStakerIterator()
+				require.NoError(t, err)
+				for it.Next() {
+					staker := it.Value()
+					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+						continue
+					}
+					primaryValidator = staker
+					break
+				}
+				it.Release()
+
+				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
+					env.state,
+					preFundedKeys,
+					defaultMinValidatorStake,
+					env.config.AddPrimaryNetworkDelegatorFee,
+					ids.ShortEmpty,
+				)
+				require.NoError(t, err)
+
+				utx := &txs.AddDelegatorTx{
+					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+						NetworkID:    env.ctx.NetworkID,
+						BlockchainID: env.ctx.ChainID,
+						Ins:          ins,
+						Outs:         unstakedOuts,
+					}},
+					Validator: txs.Validator{
+						NodeID: primaryValidator.NodeID,
+						End:    uint64(primaryValidator.EndTime.Unix()),
+						Wght:   defaultMinValidatorStake,
+					},
+					StakeOuts: stakedOuts,
+					DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.ShortEmpty},
+					},
+				}
+
+				tx, err := txs.NewSigned(utx, txs.Codec, signers)
+				require.NoError(t, err)
+
+				return tx
+			},
+			expectedErr: ErrAddDelegatorTxPostDurango,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
+
+			onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+			require.NoError(err)
+
+			tx := tt.buildTx(env)
+
+			err = tx.Unsigned.Visit(&StandardTxExecutor{
+				Backend: &env.backend,
+				State:   onAcceptState,
+				Tx:      tx,
+			})
+			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
+// Verifies that the Memo field is required to be empty post-Durango
+func TestDurangoMemoField(t *testing.T) {
+	type test struct {
+		name      string
+		setupTest func(*environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice)
+	}
+
+	tests := []test{
 		{
 			name: "AddSubnetValidatorTx",
 			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
@@ -1054,56 +1142,6 @@ func TestDurangoMemoField(t *testing.T) {
 						Subnet: testSubnet1.TxID,
 					},
 					SubnetAuth: subnetAuth,
-				}
-				return tx, signers, onAcceptState, &tx.Memo
-			},
-		},
-		{
-			name: "AddDelegatorTx",
-			setupTest: func(env *environment) (txs.UnsignedTx, [][]*secp256k1.PrivateKey, state.Diff, *types.JSONByteSlice) {
-				var primaryValidator *state.Staker
-				it, err := env.state.GetCurrentStakerIterator()
-				require.NoError(t, err)
-				for it.Next() {
-					staker := it.Value()
-					if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
-						continue
-					}
-					primaryValidator = staker
-					break
-				}
-				it.Release()
-
-				ins, unstakedOuts, stakedOuts, signers, err := env.utxosHandler.Spend(
-					env.state,
-					preFundedKeys,
-					defaultMinValidatorStake,
-					env.config.AddPrimaryNetworkDelegatorFee,
-					ids.ShortEmpty,
-				)
-				require.NoError(t, err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-				require.NoError(t, err)
-
-				tx := &txs.AddDelegatorTx{
-					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    env.ctx.NetworkID,
-						BlockchainID: env.ctx.ChainID,
-						Ins:          ins,
-						Outs:         unstakedOuts,
-					}},
-					Validator: txs.Validator{
-						NodeID: primaryValidator.NodeID,
-						End:    uint64(primaryValidator.EndTime.Unix()),
-						Wght:   defaultMinValidatorStake,
-					},
-					StakeOuts: stakedOuts,
-					DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{ids.ShortEmpty},
-					},
 				}
 				return tx, signers, onAcceptState, &tx.Memo
 			},

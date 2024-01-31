@@ -16,11 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -103,12 +105,16 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
 	)
 
-	// Create a valid [AddValidatorTx]
-	tx, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	// Create a valid [AddPermissionlessValidatorTx]
+	tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -393,11 +399,15 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		validatorEndTime = now.Add(env.config.MaxStakeDuration)
 	)
 
-	tx1, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	tx1, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.GenerateTestNodeID(),
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -412,11 +422,15 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	// Add a validator ending past [MaxStakeDuration]
 	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
 
-	tx2, err := env.txBuilder.NewAddValidatorTx(
+	sk, err = bls.NewSecretKey()
+	require.NoError(err)
+
+	tx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validator2EndTime.Unix()),
 		ids.GenerateTestNodeID(),
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[2].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
