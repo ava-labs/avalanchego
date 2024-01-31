@@ -20,16 +20,16 @@ jobs:
     name: Lint
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.event.inputs.avalanchegoRepo }}
           ref: ${{ github.event.inputs.avalanchegoBranch }}
           path: avalanchego
           token: ${{ secrets.AVALANCHE_PAT }}
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '~1.20.12'
           check-latest: true
@@ -57,16 +57,16 @@ jobs:
       matrix:
         os: [macos-11.0, ubuntu-20.04, windows-latest]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
       if: ${{ github.event_name == 'workflow_dispatch' }}
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: ${{ github.event.inputs.avalanchegoRepo }}
         ref: ${{ github.event.inputs.avalanchegoBranch }}
         path: avalanchego
         token: ${{ secrets.AVALANCHE_PAT }}
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
         go-version: '~1.20.12'
         check-latest: true
@@ -90,16 +90,16 @@ jobs:
       matrix:
         os: [ubuntu-20.04]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
       if: ${{ github.event_name == 'workflow_dispatch' }}
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: ${{ github.event.inputs.avalanchegoRepo }}
         ref: ${{ github.event.inputs.avalanchegoBranch }}
         path: avalanchego
         token: ${{ secrets.AVALANCHE_PAT }}
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
         go-version: '~1.20.12'
         check-latest: true
@@ -121,25 +121,25 @@ jobs:
       matrix:
         os: [ ubuntu-20.04 ]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
       if: ${{ github.event_name == 'workflow_dispatch' }}
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: ${{ github.event.inputs.avalanchegoRepo }}
         ref: ${{ github.event.inputs.avalanchegoBranch }}
         path: avalanchego
         token: ${{ secrets.AVALANCHE_PAT }}
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
         go-version: '~1.20.12'
         check-latest: true
     - name: Run e2e tests
       run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
       shell: bash
-    - name: Upload testnet network dir
-      uses: actions/upload-artifact@v3
+    - name: Upload tmpnet network dir
+      uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: testnet-data
-        path: ~/.testnetctl/networks/1000
+        name: tmpnet-data
+        path: ~/.tmpnet/networks/1000
