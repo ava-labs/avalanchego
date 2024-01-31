@@ -55,9 +55,9 @@ func TestBaseTx(t *testing.T) {
 	be := mocks.NewMockBuilderBackend(ctrl)
 
 	var (
-		utxosKey              = testKeys[1]
-		utxoAddr              = utxosKey.PublicKey().Address()
-		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
+		utxosKey           = testKeys[1]
+		utxoAddr           = utxosKey.PublicKey().Address()
+		utxos, avaxAssetID = testUTXOsList(utxosKey)
 
 		outputsToMove = []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxAssetID},
@@ -126,9 +126,9 @@ func TestCreateAssetTx(t *testing.T) {
 	be := mocks.NewMockBuilderBackend(ctrl)
 
 	var (
-		utxosKey              = testKeys[1]
-		utxoAddr              = utxosKey.PublicKey().Address()
-		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
+		utxosKey           = testKeys[1]
+		utxoAddr           = utxosKey.PublicKey().Address()
+		utxos, avaxAssetID = testUTXOsList(utxosKey)
 
 		assetName          = "Team Rocket"
 		symbol             = "TR"
@@ -237,10 +237,10 @@ func TestImportTx(t *testing.T) {
 	be := mocks.NewMockBuilderBackend(ctrl)
 
 	var (
-		utxosKey              = testKeys[1]
-		utxoAddr              = utxosKey.PublicKey().Address()
-		sourceChainID         = ids.GenerateTestID()
-		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
+		utxosKey           = testKeys[1]
+		utxoAddr           = utxosKey.PublicKey().Address()
+		sourceChainID      = ids.GenerateTestID()
+		utxos, avaxAssetID = testUTXOsList(utxosKey)
 
 		importKey = testKeys[0]
 		importTo  = &secp256k1fx.OutputOwners{
@@ -312,10 +312,10 @@ func TestExportTx(t *testing.T) {
 	be := mocks.NewMockBuilderBackend(ctrl)
 
 	var (
-		utxosKey              = testKeys[1]
-		utxoAddr              = utxosKey.PublicKey().Address()
-		subnetID              = ids.GenerateTestID()
-		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
+		utxosKey           = testKeys[1]
+		utxoAddr           = utxosKey.PublicKey().Address()
+		subnetID           = ids.GenerateTestID()
+		utxos, avaxAssetID = testUTXOsList(utxosKey)
 
 		exportedOutputs = []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxAssetID},
@@ -380,7 +380,6 @@ func TestExportTx(t *testing.T) {
 func testUTXOsList(utxosKey *secp256k1.PrivateKey) (
 	[]*avax.UTXO,
 	ids.ID, // avaxAssetID,
-	ids.ID, // subnetAssetID
 ) {
 	// Note: we avoid ids.GenerateTestNodeID here to make sure that UTXO IDs won't change
 	// run by run. This simplifies checking what utxos are included in the built txs.
@@ -472,6 +471,5 @@ func testUTXOsList(utxosKey *secp256k1.PrivateKey) (
 				},
 			},
 		},
-		avaxAssetID,
-		subnetAssetID
+		avaxAssetID
 }

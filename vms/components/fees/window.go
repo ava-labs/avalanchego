@@ -1,4 +1,4 @@
-// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fees
@@ -40,9 +40,8 @@ func Roll(w Window, roll int) (Window, error) {
 	return res, nil
 }
 
-// Sum sums [numUint64s] encoded in [window]. Assumes that the length of [window]
-// is sufficient to contain [numUint64s] or else this function panics.
-// If an overflow occurs, while summing the contents, the maximum uint64 value is returned.
+// Sum sums [numUint64s] encoded in [window]. If an overflow occurs,
+// while summing the contents, the maximum uint64 value is returned.
 func Sum(w Window) uint64 {
 	var (
 		sum      uint64
