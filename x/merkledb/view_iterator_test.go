@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-func Test_TrieView_Iterator(t *testing.T) {
+func Test_View_Iterator(t *testing.T) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -34,7 +34,9 @@ func Test_TrieView_Iterator(t *testing.T) {
 	require.NoError(db.Put(key1, value1))
 	require.NoError(db.Put(key2, value2))
 
-	iterator := db.NewIterator()
+	view, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
+	iterator := view.NewIterator()
 	require.NotNil(iterator)
 
 	defer iterator.Release()
@@ -53,9 +55,36 @@ func Test_TrieView_Iterator(t *testing.T) {
 	require.NoError(iterator.Error())
 }
 
-// Test_TrieView_IteratorStart tests to make sure the iterator can be configured to
+func Test_View_Iterator_DBClosed(t *testing.T) {
+	require := require.New(t)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	require.NoError(db.Put(key1, value1))
+
+	view, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
+	iterator := view.NewIterator()
+	require.NotNil(iterator)
+
+	defer iterator.Release()
+
+	require.NoError(db.Close())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	err = iterator.Error()
+	require.ErrorIs(err, ErrInvalid)
+}
+
+// Test_View_IteratorStart tests to make sure the iterator can be configured to
 // start midway through the database.
-func Test_TrieView_IteratorStart(t *testing.T) {
+func Test_View_IteratorStart(t *testing.T) {
 	require := require.New(t)
 	db, err := getBasicDB()
 	require.NoError(err)
@@ -69,7 +98,9 @@ func Test_TrieView_IteratorStart(t *testing.T) {
 	require.NoError(db.Put(key1, value1))
 	require.NoError(db.Put(key2, value2))
 
-	iterator := db.NewIteratorWithStart(key2)
+	view, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
+	iterator := view.NewIteratorWithStart(key2)
 	require.NotNil(iterator)
 
 	defer iterator.Release()
@@ -84,9 +115,9 @@ func Test_TrieView_IteratorStart(t *testing.T) {
 	require.NoError(iterator.Error())
 }
 
-// Test_TrieView_IteratorPrefix tests to make sure the iterator can be configured to skip
+// Test_View_IteratorPrefix tests to make sure the iterator can be configured to skip
 // keys missing the provided prefix.
-func Test_TrieView_IteratorPrefix(t *testing.T) {
+func Test_View_IteratorPrefix(t *testing.T) {
 	require := require.New(t)
 	db, err := getBasicDB()
 	require.NoError(err)
@@ -104,7 +135,9 @@ func Test_TrieView_IteratorPrefix(t *testing.T) {
 	require.NoError(db.Put(key2, value2))
 	require.NoError(db.Put(key3, value3))
 
-	iterator := db.NewIteratorWithPrefix([]byte("h"))
+	view, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
+	iterator := view.NewIteratorWithPrefix([]byte("h"))
 	require.NotNil(iterator)
 
 	defer iterator.Release()
@@ -119,9 +152,9 @@ func Test_TrieView_IteratorPrefix(t *testing.T) {
 	require.NoError(iterator.Error())
 }
 
-// Test_TrieView_IteratorStartPrefix tests to make sure that the iterator can start
+// Test_View_IteratorStartPrefix tests to make sure that the iterator can start
 // midway through the database while skipping a prefix.
-func Test_TrieView_IteratorStartPrefix(t *testing.T) {
+func Test_View_IteratorStartPrefix(t *testing.T) {
 	require := require.New(t)
 	db, err := getBasicDB()
 	require.NoError(err)
@@ -139,7 +172,9 @@ func Test_TrieView_IteratorStartPrefix(t *testing.T) {
 	require.NoError(db.Put(key2, value2))
 	require.NoError(db.Put(key3, value3))
 
-	iterator := db.NewIteratorWithStartAndPrefix(key1, []byte("h"))
+	view, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
+	iterator := view.NewIteratorWithStartAndPrefix(key1, []byte("h"))
 	require.NotNil(iterator)
 
 	defer iterator.Release()
@@ -161,7 +196,7 @@ func Test_TrieView_IteratorStartPrefix(t *testing.T) {
 // Test view iteration by creating a stack of views,
 // inserting random key/value pairs into them, and
 // iterating over the last view.
-func Test_TrieView_Iterator_Random(t *testing.T) {
+func Test_View_Iterator_Random(t *testing.T) {
 	require := require.New(t)
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)

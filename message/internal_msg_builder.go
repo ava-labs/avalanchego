@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 //nolint:stylecheck // proto generates interfaces that fail linting
@@ -51,10 +51,6 @@ var (
 	_ chainIDGetter    = (*QueryFailed)(nil)
 	_ requestIDGetter  = (*QueryFailed)(nil)
 	_ engineTypeGetter = (*QueryFailed)(nil)
-
-	_ fmt.Stringer    = (*AppRequestFailed)(nil)
-	_ chainIDGetter   = (*AppRequestFailed)(nil)
-	_ requestIDGetter = (*AppRequestFailed)(nil)
 
 	_ fmt.Stringer        = (*CrossChainAppRequest)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppRequest)(nil)
@@ -365,42 +361,6 @@ func InternalQueryFailed(
 	}
 }
 
-type AppRequestFailed struct {
-	ChainID   ids.ID `json:"chain_id,omitempty"`
-	RequestID uint32 `json:"request_id,omitempty"`
-}
-
-func (m *AppRequestFailed) String() string {
-	return fmt.Sprintf(
-		"ChainID: %s RequestID: %d",
-		m.ChainID, m.RequestID,
-	)
-}
-
-func (m *AppRequestFailed) GetChainId() []byte {
-	return m.ChainID[:]
-}
-
-func (m *AppRequestFailed) GetRequestId() uint32 {
-	return m.RequestID
-}
-
-func InternalAppRequestFailed(
-	nodeID ids.NodeID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     AppRequestFailedOp,
-		message: &AppRequestFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
-
 type CrossChainAppRequest struct {
 	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
@@ -452,6 +412,8 @@ type CrossChainAppRequestFailed struct {
 	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
 	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
 	RequestID          uint32 `json:"request_id,omitempty"`
+	ErrorCode          int32  `json:"error_code,omitempty"`
+	ErrorMessage       string `json:"error_message,omitempty"`
 }
 
 func (m *CrossChainAppRequestFailed) String() string {
@@ -473,19 +435,23 @@ func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
-func InternalCrossChainAppRequestFailed(
+func InternalCrossChainAppError(
 	nodeID ids.NodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
+	errorCode int32,
+	errorMessage string,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
-		op:     CrossChainAppRequestFailedOp,
+		op:     CrossChainAppErrorOp,
 		message: &CrossChainAppRequestFailed{
 			SourceChainID:      sourceChainID,
 			DestinationChainID: destinationChainID,
 			RequestID:          requestID,
+			ErrorCode:          errorCode,
+			ErrorMessage:       errorMessage,
 		},
 		expiration: mockable.MaxTime,
 	}

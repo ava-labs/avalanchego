@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -13,6 +13,8 @@ const (
 	GenesisFileKey                                     = "genesis-file"
 	GenesisFileContentKey                              = "genesis-file-content"
 	NetworkNameKey                                     = "network-id"
+	ACPSupportKey                                      = "acp-support"
+	ACPObjectKey                                       = "acp-object"
 	TxFeeKey                                           = "tx-fee"
 	CreateAssetTxFeeKey                                = "create-asset-tx-fee"
 	CreateSubnetTxFeeKey                               = "create-subnet-tx-fee"
@@ -34,6 +36,7 @@ const (
 	StakeMintingPeriodKey                              = "stake-minting-period"
 	StakeSupplyCapKey                                  = "stake-supply-cap"
 	DBTypeKey                                          = "db-type"
+	DBReadOnlyKey                                      = "db-read-only"
 	DBPathKey                                          = "db-dir"
 	DBConfigFileKey                                    = "db-config-file"
 	DBConfigContentKey                                 = "db-config-file-content"
@@ -91,6 +94,8 @@ const (
 	NetworkPeerListNonValidatorGossipSizeKey           = "network-peer-list-non-validator-gossip-size"
 	NetworkPeerListPeersGossipSizeKey                  = "network-peer-list-peers-gossip-size"
 	NetworkPeerListGossipFreqKey                       = "network-peer-list-gossip-frequency"
+	NetworkPeerListPullGossipFreqKey                   = "network-peer-list-pull-gossip-frequency"
+	NetworkPeerListBloomResetFreqKey                   = "network-peer-list-bloom-reset-frequency"
 	NetworkInitialReconnectDelayKey                    = "network-initial-reconnect-delay"
 	NetworkReadHandshakeTimeoutKey                     = "network-read-handshake-timeout"
 	NetworkPingTimeoutKey                              = "network-ping-timeout"
@@ -127,6 +132,7 @@ const (
 	SnowConfidenceQuorumSizeKey                        = "snow-confidence-quorum-size"
 	SnowVirtuousCommitThresholdKey                     = "snow-virtuous-commit-threshold"
 	SnowRogueCommitThresholdKey                        = "snow-rogue-commit-threshold"
+	SnowCommitThresholdKey                             = "snow-commit-threshold"
 	SnowConcurrentRepollsKey                           = "snow-concurrent-repolls"
 	SnowOptimalProcessingKey                           = "snow-optimal-processing"
 	SnowMaxProcessingKey                               = "snow-max-processing"
@@ -142,8 +148,9 @@ const (
 	IpcsChainIDsKey                                    = "ipcs-chain-ids"
 	IpcsPathKey                                        = "ipcs-path"
 	MeterVMsEnabledKey                                 = "meter-vms-enabled"
-	ConsensusAcceptedFrontierGossipFrequencyKey        = "consensus-accepted-frontier-gossip-frequency"
 	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
+	ConsensusShutdownTimeoutKey                        = "consensus-shutdown-timeout"
+	ConsensusFrontierPollFrequencyKey                  = "consensus-frontier-poll-frequency"
 	ConsensusGossipAcceptedFrontierValidatorSizeKey    = "consensus-accepted-frontier-gossip-validator-size"
 	ConsensusGossipAcceptedFrontierNonValidatorSizeKey = "consensus-accepted-frontier-gossip-non-validator-size"
 	ConsensusGossipAcceptedFrontierPeerSizeKey         = "consensus-accepted-frontier-gossip-peer-size"
@@ -153,7 +160,6 @@ const (
 	AppGossipValidatorSizeKey                          = "consensus-app-gossip-validator-size"
 	AppGossipNonValidatorSizeKey                       = "consensus-app-gossip-non-validator-size"
 	AppGossipPeerSizeKey                               = "consensus-app-gossip-peer-size"
-	ConsensusShutdownTimeoutKey                        = "consensus-shutdown-timeout"
 	ProposerVMUseCurrentHeightKey                      = "proposervm-use-current-height"
 	FdLimitKey                                         = "fd-limit"
 	IndexEnabledKey                                    = "index-enabled"
@@ -162,8 +168,6 @@ const (
 	RouterHealthMaxOutstandingRequestsKey              = "router-health-max-outstanding-requests"
 	HealthCheckFreqKey                                 = "health-check-frequency"
 	HealthCheckAveragerHalflifeKey                     = "health-check-averager-halflife"
-	RetryBootstrapKey                                  = "bootstrap-retry-enabled"
-	RetryBootstrapWarnFrequencyKey                     = "bootstrap-retry-warn-frequency"
 	PluginDirKey                                       = "plugin-dir"
 	BootstrapBeaconConnectionTimeoutKey                = "bootstrap-beacon-connection-timeout"
 	BootstrapMaxTimeGetAncestorsKey                    = "bootstrap-max-time-get-ancestors"

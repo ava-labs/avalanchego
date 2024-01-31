@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package leveldb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,51 +16,60 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		folder := t.TempDir()
-		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		require.NoError(t, err)
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			folder := t.TempDir()
+			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+			require.NoError(t, err)
 
-		test(t, db)
+			test(t, db)
 
-		_ = db.Close()
+			_ = db.Close()
+		})
 	}
 }
 
-func FuzzKeyValue(f *testing.F) {
-	folder := f.TempDir()
+func newDB(t testing.TB) database.Database {
+	folder := t.TempDir()
 	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-	require.NoError(f, err)
+	require.NoError(t, err)
+	return db
+}
 
+func FuzzKeyValue(f *testing.F) {
+	db := newDB(f)
 	defer db.Close()
 
 	database.FuzzKeyValue(f, db)
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	folder := f.TempDir()
-	db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-	require.NoError(f, err)
-
+	db := newDB(f)
 	defer db.Close()
 
 	database.FuzzNewIteratorWithPrefix(f, db)
 }
 
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	db := newDB(f)
+	defer db.Close()
+
+	database.FuzzNewIteratorWithStartAndPrefix(f, db)
+}
+
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for _, bench := range database.Benchmarks {
-			folder := b.TempDir()
+		for name, bench := range database.Benchmarks {
+			b.Run(fmt.Sprintf("leveldb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
+				db := newDB(b)
 
-			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-			require.NoError(b, err)
+				bench(b, db, keys, values)
 
-			bench(b, db, "leveldb", keys, values)
-
-			// The database may have been closed by the test, so we don't care if it
-			// errors here.
-			_ = db.Close()
+				// The database may have been closed by the test, so we don't care if it
+				// errors here.
+				_ = db.Close()
+			})
 		}
 	}
 }

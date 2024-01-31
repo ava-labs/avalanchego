@@ -1,17 +1,21 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
+
+var errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 
 // Shared fields used by visitors.
 type backend struct {
@@ -94,4 +98,29 @@ func (b *backend) getTimestamp(blkID ids.ID) time.Time {
 	// block is the only accepted block that must return a correct timestamp,
 	// so we just return the chain time.
 	return b.state.GetTimestamp()
+}
+
+// verifyUniqueInputs returns nil iff no blocks in the inclusive
+// ancestry of [blkID] consume an input in [inputs].
+func (b *backend) verifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
+	if inputs.Len() == 0 {
+		return nil
+	}
+
+	// Check for conflicts in ancestors.
+	for {
+		state, ok := b.blkIDToState[blkID]
+		if !ok {
+			// The parent state isn't pinned in memory.
+			// This means the parent must be accepted already.
+			return nil
+		}
+
+		if state.inputs.Overlaps(inputs) {
+			return errConflictingParentTxs
+		}
+
+		blk := state.statelessBlock
+		blkID = blk.Parent()
+	}
 }

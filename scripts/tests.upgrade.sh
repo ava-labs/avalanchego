@@ -3,21 +3,31 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/tests.upgrade.sh 1.7.16
-# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.7.16 # Customization of avalanchego path
+# ./scripts/tests.upgrade.sh                                                # Use default version
+# ./scripts/tests.upgrade.sh 1.10.18                                        # Specify a version
+# AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.10.18 # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
 
-VERSION="${1:-}"
+# The AvalancheGo local network does not support long-lived
+# backwards-compatible networks. When a breaking change is made to the
+# local network, this flag must be updated to the last compatible
+# version with the latest code.
+#
+# v1.10.18 includes restrictions on ports sent over the p2p network along with
+# proposervm and P-chain rule changes on the local network.
+DEFAULT_VERSION="1.10.18"
+
+VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
   echo "Usage: ${0} [VERSION]" >>/dev/stderr
   exit 255
 fi
 
-AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH:-./build/avalanchego})"
+AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
 
 #################################
 # download avalanchego
@@ -32,20 +42,20 @@ if [[ ${GOOS} == "darwin" ]]; then
 fi
 
 rm -f ${DOWNLOAD_PATH}
-rm -rf /tmp/avalanchego-v${VERSION}
+rm -rf "/tmp/avalanchego-v${VERSION}"
 rm -rf /tmp/avalanchego-build
 
 echo "downloading avalanchego ${VERSION} at ${DOWNLOAD_URL}"
-curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
+curl -L "${DOWNLOAD_URL}" -o "${DOWNLOAD_PATH}"
 
 echo "extracting downloaded avalanchego"
 if [[ ${GOOS} == "linux" ]]; then
   tar xzvf ${DOWNLOAD_PATH} -C /tmp
 elif [[ ${GOOS} == "darwin" ]]; then
   unzip ${DOWNLOAD_PATH} -d /tmp/avalanchego-build
-  mv /tmp/avalanchego-build/build /tmp/avalanchego-v${VERSION}
+  mv /tmp/avalanchego-build/build "/tmp/avalanchego-v${VERSION}"
 fi
-find /tmp/avalanchego-v${VERSION}
+find "/tmp/avalanchego-v${VERSION}"
 
 # Sourcing constants.sh ensures that the necessary CGO flags are set to
 # build the portable version of BLST. Without this, ginkgo may fail to
@@ -56,7 +66,7 @@ source ./scripts/constants.sh
 #################################
 echo "building upgrade.test"
 # to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.1.4
+go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
 ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
 ./tests/upgrade/upgrade.test --help
 
@@ -65,5 +75,5 @@ ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
 echo "running upgrade tests against the local cluster with ${AVALANCHEGO_PATH}"
 ./tests/upgrade/upgrade.test \
   --ginkgo.v \
-  --avalanchego-path=/tmp/avalanchego-v${VERSION}/avalanchego \
-  --avalanchego-path-to-upgrade-to=${AVALANCHEGO_PATH}
+  --avalanchego-path="/tmp/avalanchego-v${VERSION}/avalanchego" \
+  --avalanchego-path-to-upgrade-to="${AVALANCHEGO_PATH}"

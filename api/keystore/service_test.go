@@ -1,18 +1,20 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
 
 import (
-	"fmt"
+	"encoding/hex"
 	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 )
 
@@ -23,8 +25,7 @@ var strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
 func TestServiceListNoUsers(t *testing.T) {
 	require := require.New(t)
 
-	ks, err := CreateTestKeystore()
-	require.NoError(err)
+	ks := New(logging.NoLog{}, memdb.New())
 	s := service{ks: ks.(*keystore)}
 
 	reply := ListUsersReply{}
@@ -35,8 +36,7 @@ func TestServiceListNoUsers(t *testing.T) {
 func TestServiceCreateUser(t *testing.T) {
 	require := require.New(t)
 
-	ks, err := CreateTestKeystore()
-	require.NoError(err)
+	ks := New(logging.NoLog{}, memdb.New())
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -58,7 +58,7 @@ func TestServiceCreateUser(t *testing.T) {
 func genStr(n int) string {
 	b := make([]byte, n)
 	rand.Read(b) // #nosec G404
-	return fmt.Sprintf("%x", b)[:n]
+	return hex.EncodeToString(b)[:n]
 }
 
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
@@ -66,8 +66,7 @@ func genStr(n int) string {
 func TestServiceCreateUserArgsCheck(t *testing.T) {
 	require := require.New(t)
 
-	ks, err := CreateTestKeystore()
-	require.NoError(err)
+	ks := New(logging.NoLog{}, memdb.New())
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -100,8 +99,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 func TestServiceCreateUserWeakPassword(t *testing.T) {
 	require := require.New(t)
 
-	ks, err := CreateTestKeystore()
-	require.NoError(err)
+	ks := New(logging.NoLog{}, memdb.New())
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -117,8 +115,7 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 func TestServiceCreateDuplicate(t *testing.T) {
 	require := require.New(t)
 
-	ks, err := CreateTestKeystore()
-	require.NoError(err)
+	ks := New(logging.NoLog{}, memdb.New())
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -140,12 +137,11 @@ func TestServiceCreateDuplicate(t *testing.T) {
 func TestServiceCreateUserNoName(t *testing.T) {
 	require := require.New(t)
 
-	ks, err := CreateTestKeystore()
-	require.NoError(err)
+	ks := New(logging.NoLog{}, memdb.New())
 	s := service{ks: ks.(*keystore)}
 
 	reply := api.EmptyReply{}
-	err = s.CreateUser(nil, &api.UserPass{
+	err := s.CreateUser(nil, &api.UserPass{
 		Password: strongPassword,
 	}, &reply)
 	require.ErrorIs(err, errEmptyUsername)
@@ -154,8 +150,7 @@ func TestServiceCreateUserNoName(t *testing.T) {
 func TestServiceUseBlockchainDB(t *testing.T) {
 	require := require.New(t)
 
-	ks, err := CreateTestKeystore()
-	require.NoError(err)
+	ks := New(logging.NoLog{}, memdb.New())
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -185,8 +180,7 @@ func TestServiceExportImport(t *testing.T) {
 
 	encodings := []formatting.Encoding{formatting.Hex}
 	for _, encoding := range encodings {
-		ks, err := CreateTestKeystore()
-		require.NoError(err)
+		ks := New(logging.NoLog{}, memdb.New())
 		s := service{ks: ks.(*keystore)}
 
 		{
@@ -212,8 +206,7 @@ func TestServiceExportImport(t *testing.T) {
 		exportReply := ExportUserReply{}
 		require.NoError(s.ExportUser(nil, &exportArgs, &exportReply))
 
-		newKS, err := CreateTestKeystore()
-		require.NoError(err)
+		newKS := New(logging.NoLog{}, memdb.New())
 		newS := service{ks: newKS.(*keystore)}
 
 		{
@@ -324,8 +317,7 @@ func TestServiceDeleteUser(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			require := require.New(t)
 
-			ksIntf, err := CreateTestKeystore()
-			require.NoError(err)
+			ksIntf := New(logging.NoLog{}, memdb.New())
 			ks := ksIntf.(*keystore)
 			s := service{ks: ks}
 
@@ -333,7 +325,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				require.NoError(tt.setup(ks))
 			}
 			got := &api.EmptyReply{}
-			err = s.DeleteUser(nil, tt.request, got)
+			err := s.DeleteUser(nil, tt.request, got)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return

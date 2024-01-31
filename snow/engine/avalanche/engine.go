@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -64,10 +64,6 @@ func (*engine) Start(context.Context, uint32) error {
 
 func (e *engine) Context() *snow.ConsensusContext {
 	return e.ctx
-}
-
-func (e *engine) GetVM() common.VM {
-	return e.vm
 }
 
 func (*engine) HealthCheck(context.Context) (interface{}, error) {

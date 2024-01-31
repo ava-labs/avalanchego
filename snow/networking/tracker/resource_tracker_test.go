@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -48,8 +48,8 @@ func TestCPUTracker(t *testing.T) {
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
 	require.NoError(err)
 
-	node1 := ids.NodeID{1}
-	node2 := ids.NodeID{2}
+	node1 := ids.BuildTestNodeID([]byte{1})
+	node2 := ids.BuildTestNodeID([]byte{2})
 
 	// Note that all the durations between start and end are [halflife].
 	startTime1 := time.Now()

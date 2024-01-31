@@ -1,21 +1,22 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Version is the current default codec version
-const Version = 0
+const CodecVersion = 0
 
 var (
 	Codec codec.Manager
@@ -27,11 +28,13 @@ var (
 	GenesisCodec codec.Manager
 )
 
-func init() {
-	c := linearcodec.NewDefault()
-	Codec = codec.NewDefaultManager()
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	GenesisCodec = codec.NewManager(math.MaxInt32)
+// TODO: Remove after v1.11.x has activated
+//
+// Invariant: InitCodec, Codec, and GenesisCodec must not be accessed
+// concurrently
+func InitCodec(durangoTime time.Time) error {
+	c := linearcodec.NewDefault(durangoTime)
+	gc := linearcodec.NewDefault(time.Time{})
 
 	errs := wrappers.Errs{}
 	for _, c := range []linearcodec.Codec{c, gc} {
@@ -41,13 +44,30 @@ func init() {
 		c.SkipRegistrations(5)
 
 		errs.Add(RegisterUnsignedTxsTypes(c))
+
+		c.SkipRegistrations(4)
+
+		errs.Add(RegisterDUnsignedTxsTypes(c))
 	}
+
+	newCodec := codec.NewDefaultManager()
+	newGenesisCodec := codec.NewManager(math.MaxInt32)
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
-		GenesisCodec.RegisterCodec(Version, gc),
+		newCodec.RegisterCodec(CodecVersion, c),
+		newGenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
-		panic(errs.Err)
+		return errs.Err
+	}
+
+	Codec = newCodec
+	GenesisCodec = newGenesisCodec
+	return nil
+}
+
+func init() {
+	if err := InitCodec(time.Time{}); err != nil {
+		panic(err)
 	}
 }
 
@@ -96,4 +116,11 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&signer.ProofOfPossession{}),
 	)
 	return errs.Err
+}
+
+func RegisterDUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+	return utils.Err(
+		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
+		targetCodec.RegisterType(&BaseTx{}),
+	)
 }

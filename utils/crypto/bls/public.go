@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bls
@@ -69,4 +69,12 @@ func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
 // Invariant: [pk] and [sig] have both been validated.
 func VerifyProofOfPossession(pk *PublicKey, sig *Signature, msg []byte) bool {
 	return sig.Verify(false, pk, false, msg, ciphersuiteProofOfPossession)
+}
+
+func DeserializePublicKey(pkBytes []byte) *PublicKey {
+	return new(PublicKey).Deserialize(pkBytes)
+}
+
+func SerializePublicKey(key *PublicKey) []byte {
+	return key.Serialize()
 }

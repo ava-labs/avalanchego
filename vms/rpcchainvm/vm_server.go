@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/corruptabledb"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
@@ -75,7 +75,7 @@ type VMServer struct {
 	allowShutdown *utils.Atomic[bool]
 
 	processMetrics prometheus.Gatherer
-	dbManager      manager.Manager
+	db             database.Database
 	log            logging.Logger
 
 	serverCloser grpcutils.ServerCloser
@@ -150,40 +150,19 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	// Register metrics for each Go plugin processes
 	vm.processMetrics = registerer
 
-	// Dial each database in the request and construct the database manager
-	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
-	for i, vDBReq := range req.DbServers {
-		version, err := version.Parse(vDBReq.Version)
-		if err != nil {
-			// Ignore closing errors to return the original error
-			_ = vm.connCloser.Close()
-			return nil, err
-		}
-
-		clientConn, err := grpcutils.Dial(
-			vDBReq.ServerAddr,
-			grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
-			grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
-		)
-		if err != nil {
-			// Ignore closing errors to return the original error
-			_ = vm.connCloser.Close()
-			return nil, err
-		}
-		vm.connCloser.Add(clientConn)
-		db := rpcdb.NewClient(rpcdbpb.NewDatabaseClient(clientConn))
-		versionedDBs[i] = &manager.VersionedDatabase{
-			Database: corruptabledb.New(db),
-			Version:  version,
-		}
-	}
-	dbManager, err := manager.NewManagerFromDBs(versionedDBs)
+	// Dial the database
+	dbClientConn, err := grpcutils.Dial(
+		req.DbServerAddr,
+		grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
+		grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
+	)
 	if err != nil {
-		// Ignore closing errors to return the original error
-		_ = vm.connCloser.Close()
 		return nil, err
 	}
-	vm.dbManager = dbManager
+	vm.connCloser.Add(dbClientConn)
+	vm.db = corruptabledb.New(
+		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
+	)
 
 	// TODO: Allow the logger to be configured by the client
 	vm.log = logging.NewLogger(
@@ -259,7 +238,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		ChainDataDir: req.ChainDataDir,
 	}
 
-	if err := vm.vm.Initialize(ctx, vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
+	if err := vm.vm.Initialize(ctx, vm.ctx, vm.db, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
 		close(vm.closed)
@@ -358,43 +337,18 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 	return resp, nil
 }
 
-func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateStaticHandlersResponse, error) {
-	handlers, err := vm.vm.CreateStaticHandlers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	resp := &vmpb.CreateStaticHandlersResponse{}
-	for prefix, handler := range handlers {
-		serverListener, err := grpcutils.NewListener()
-		if err != nil {
-			return nil, err
-		}
-		server := grpcutils.NewServer()
-		vm.serverCloser.Add(server)
-		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
-
-		// Start HTTP service
-		go grpcutils.Serve(serverListener, server)
-
-		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
-			Prefix:     prefix,
-			ServerAddr: serverListener.Addr().String(),
-		})
-	}
-	return resp, nil
-}
-
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
 
-	peerVersion, err := version.ParseApplication(req.Version)
-	if err != nil {
-		return nil, err
+	peerVersion := &version.Application{
+		Name:  req.Name,
+		Major: int(req.Major),
+		Minor: int(req.Minor),
+		Patch: int(req.Patch),
 	}
-
 	return &emptypb.Empty{}, vm.vm.Connected(ctx, nodeID, peerVersion)
 }
 
@@ -518,7 +472,7 @@ func (vm *VMServer) Health(ctx context.Context, _ *emptypb.Empty) (*vmpb.HealthR
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-	dbHealth, err := vm.dbHealthChecks(ctx)
+	dbHealth, err := vm.db.HealthCheck(ctx)
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
@@ -531,22 +485,6 @@ func (vm *VMServer) Health(ctx context.Context, _ *emptypb.Empty) (*vmpb.HealthR
 	return &vmpb.HealthResponse{
 		Details: details,
 	}, err
-}
-
-func (vm *VMServer) dbHealthChecks(ctx context.Context) (interface{}, error) {
-	details := make(map[string]interface{}, len(vm.dbManager.GetDatabases()))
-
-	// Check Database health
-	for _, client := range vm.dbManager.GetDatabases() {
-		// Shared gRPC client don't close
-		health, err := client.Database.HealthCheck(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check db health %q: %w", client.Version.String(), err)
-		}
-		details[client.Version.String()] = health
-	}
-
-	return details, nil
 }
 
 func (vm *VMServer) Version(ctx context.Context, _ *emptypb.Empty) (*vmpb.VersionResponse, error) {
@@ -573,7 +511,12 @@ func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.Cr
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId)
+
+	appErr := &common.AppError{
+		Code:    msg.ErrorCode,
+		Message: msg.ErrorMessage,
+	}
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId, appErr)
 }
 
 func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
@@ -601,7 +544,12 @@ func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmpb.AppRequestFa
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, nodeID, req.RequestId)
+
+	appErr := &common.AppError{
+		Code:    req.ErrorCode,
+		Message: req.ErrorMessage,
+	}
+	return &emptypb.Empty{}, vm.vm.AppRequestFailed(ctx, nodeID, req.RequestId, appErr)
 }
 
 func (vm *VMServer) AppResponse(ctx context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {

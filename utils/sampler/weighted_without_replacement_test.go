@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -23,7 +23,9 @@ var (
 		{
 			name: "generic with replacer and best",
 			sampler: &weightedWithoutReplacementGeneric{
-				u: &uniformReplacer{},
+				u: &uniformReplacer{
+					rng: globalRNG,
+				},
 				w: &weightedBest{
 					samplers: []Weighted{
 						&weightedArray{},

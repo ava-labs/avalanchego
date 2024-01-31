@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -8,11 +8,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
@@ -38,7 +36,7 @@ func main() {
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
 	pUTXOs := primary.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
-	pBackend := p.NewBackend(state.PCTX, pUTXOs, make(map[ids.ID]*txs.Tx))
+	pBackend := p.NewBackend(state.PCTX, pUTXOs, nil)
 	pBuilder := p.NewBuilder(addresses, pBackend)
 
 	currentBalances, err := pBuilder.GetBalance()

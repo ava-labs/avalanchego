@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
 
 import (
-	"errors"
-	"math"
 	"testing"
 	"time"
 
@@ -14,17 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-var _ BlockTimer = (*noopBlkTimer)(nil)
-
-type noopBlkTimer struct{}
-
-func (*noopBlkTimer) ResetBlockTimer() {}
 
 var preFundedKeys = secp256k1.TestKeys()
 
@@ -34,7 +28,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(1)
@@ -45,7 +39,12 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
 	err = mpool.Add(tx)
-	require.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
+	require.ErrorIs(err, ErrMempoolFull)
+
+	// tx should not be marked as dropped if the mempool is full
+	txID := tx.ID()
+	mpool.MarkDropped(txID, err)
+	require.NoError(mpool.GetDropReason(txID))
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
@@ -58,48 +57,30 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	decisionTxs, err := createTestDecisionTxs(2)
 	require.NoError(err)
 
-	// txs must not already there before we start
-	require.False(mpool.HasTxs())
-
 	for _, tx := range decisionTxs {
 		// tx not already there
-		require.False(mpool.Has(tx.ID()))
+		_, ok := mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can insert
 		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		require.True(mpool.Has(tx.ID()))
-
-		retrieved := mpool.Get(tx.ID())
-		require.NotNil(retrieved)
-		require.Equal(tx, retrieved)
-
-		// we can peek it
-		peeked := mpool.PeekTxs(math.MaxInt)
-
-		// tx will be among those peeked,
-		// in NO PARTICULAR ORDER
-		found := false
-		for _, pk := range peeked {
-			if pk.ID() == tx.ID() {
-				found = true
-				break
-			}
-		}
-		require.True(found)
+		got, ok := mpool.Get(tx.ID())
+		require.True(ok)
+		require.Equal(tx, got)
 
 		// once removed it cannot be there
-		mpool.Remove([]*txs.Tx{tx})
+		mpool.Remove(tx)
 
-		require.False(mpool.Has(tx.ID()))
-		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
+		_, ok = mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can reinsert it again to grow the mempool
 		require.NoError(mpool.Add(tx))
@@ -110,7 +91,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	mpool, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	// The proposal txs are ordered by decreasing start time. This means after
@@ -119,52 +100,23 @@ func TestProposalTxsInMempool(t *testing.T) {
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)
 
-	// txs should not be already there
-	require.False(mpool.HasStakerTx())
-
-	for i, tx := range proposalTxs {
-		require.False(mpool.Has(tx.ID()))
+	for _, tx := range proposalTxs {
+		_, ok := mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can insert
 		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		require.True(mpool.HasStakerTx())
-		require.True(mpool.Has(tx.ID()))
-
-		retrieved := mpool.Get(tx.ID())
-		require.NotNil(retrieved)
-		require.Equal(tx, retrieved)
-
-		{
-			// we can peek it
-			peeked := mpool.PeekStakerTx()
-			require.NotNil(peeked)
-			require.Equal(tx, peeked)
-		}
-
-		{
-			// we can peek it
-			peeked := mpool.PeekTxs(math.MaxInt)
-			require.Len(peeked, i+1)
-
-			// tx will be among those peeked,
-			// in NO PARTICULAR ORDER
-			found := false
-			for _, pk := range peeked {
-				if pk.ID() == tx.ID() {
-					found = true
-					break
-				}
-			}
-			require.True(found)
-		}
+		got, ok := mpool.Get(tx.ID())
+		require.Equal(tx, got)
+		require.True(ok)
 
 		// once removed it cannot be there
-		mpool.Remove([]*txs.Tx{tx})
+		mpool.Remove(tx)
 
-		require.False(mpool.Has(tx.ID()))
-		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
+		_, ok = mpool.Get(tx.ID())
+		require.False(ok)
 
 		// we can reinsert it again to grow the mempool
 		require.NoError(mpool.Add(tx))
@@ -222,21 +174,127 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 	now := time.Now()
 	proposalTxs := make([]*txs.Tx, 0, count)
 	for i := 0; i < count; i++ {
-		utx := &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{},
-			Validator: txs.Validator{
-				Start: uint64(now.Add(time.Duration(count-i) * time.Second).Unix()),
-			},
-			StakeOuts:        nil,
-			RewardsOwner:     &secp256k1fx.OutputOwners{},
-			DelegationShares: 100,
-		}
-
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		tx, err := generateAddValidatorTx(
+			uint64(now.Add(time.Duration(count-i)*time.Second).Unix()), // startTime
+			0, // endTime
+		)
 		if err != nil {
 			return nil, err
 		}
 		proposalTxs = append(proposalTxs, tx)
 	}
 	return proposalTxs, nil
+}
+
+func generateAddValidatorTx(startTime uint64, endTime uint64) (*txs.Tx, error) {
+	utx := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{},
+		Validator: txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Start:  startTime,
+			End:    endTime,
+		},
+		StakeOuts:        nil,
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: 100,
+	}
+
+	return txs.NewSigned(utx, txs.Codec, nil)
+}
+
+func TestPeekTxs(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
+	require.NoError(err)
+
+	testDecisionTxs, err := createTestDecisionTxs(1)
+	require.NoError(err)
+	testProposalTxs, err := createTestProposalTxs(1)
+	require.NoError(err)
+
+	tx, exists := mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
+
+	require.NoError(mempool.Add(testDecisionTxs[0]))
+	require.NoError(mempool.Add(testProposalTxs[0]))
+
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, testDecisionTxs[0])
+	require.NotEqual(tx, testProposalTxs[0])
+
+	mempool.Remove(testDecisionTxs[0])
+
+	tx, exists = mempool.Peek()
+	require.True(exists)
+	require.NotEqual(tx, testDecisionTxs[0])
+	require.Equal(tx, testProposalTxs[0])
+
+	mempool.Remove(testProposalTxs[0])
+
+	tx, exists = mempool.Peek()
+	require.False(exists)
+	require.Nil(tx)
+}
+
+func TestRemoveConflicts(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
+	require.NoError(err)
+
+	txs, err := createTestDecisionTxs(1)
+	require.NoError(err)
+	conflictTxs, err := createTestDecisionTxs(1)
+	require.NoError(err)
+
+	require.NoError(mempool.Add(txs[0]))
+
+	tx, exists := mempool.Peek()
+	require.True(exists)
+	require.Equal(tx, txs[0])
+
+	mempool.Remove(conflictTxs[0])
+
+	_, exists = mempool.Peek()
+	require.False(exists)
+}
+
+func TestIterate(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
+	require.NoError(err)
+
+	testDecisionTxs, err := createTestDecisionTxs(1)
+	require.NoError(err)
+	decisionTx := testDecisionTxs[0]
+
+	testProposalTxs, err := createTestProposalTxs(1)
+	require.NoError(err)
+	proposalTx := testProposalTxs[0]
+
+	require.NoError(mempool.Add(decisionTx))
+	require.NoError(mempool.Add(proposalTx))
+
+	expectedSet := set.Of(
+		decisionTx.ID(),
+		proposalTx.ID(),
+	)
+
+	set := set.NewSet[ids.ID](2)
+	mempool.Iterate(func(tx *txs.Tx) bool {
+		set.Add(tx.ID())
+		return true
+	})
+
+	require.Equal(expectedSet, set)
 }

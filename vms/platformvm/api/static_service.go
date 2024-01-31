@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -50,30 +50,25 @@ type UTXO struct {
 }
 
 // TODO can we define this on *UTXO?
-func (utxo UTXO) Less(other UTXO) bool {
-	if utxo.Locktime < other.Locktime {
-		return true
-	} else if utxo.Locktime > other.Locktime {
-		return false
+func (utxo UTXO) Compare(other UTXO) int {
+	if locktimeCmp := utils.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
+		return locktimeCmp
 	}
-
-	if utxo.Amount < other.Amount {
-		return true
-	} else if utxo.Amount > other.Amount {
-		return false
+	if amountCmp := utils.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
+		return amountCmp
 	}
 
 	utxoAddr, err := bech32ToID(utxo.Address)
 	if err != nil {
-		return false
+		return 0
 	}
 
 	otherAddr, err := bech32ToID(other.Address)
 	if err != nil {
-		return false
+		return 0
 	}
 
-	return utxoAddr.Less(otherAddr)
+	return utxoAddr.Compare(otherAddr)
 }
 
 // TODO: Refactor APIStaker, APIValidators and merge them together for
@@ -97,6 +92,9 @@ type Staker struct {
 	// TODO: remove [StakeAmount] after enough time for dependencies to update
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 }
+
+// GenesisValidator should to be used for genesis validators only.
+type GenesisValidator Staker
 
 // Owner is the repr. of a reward owner sent over APIs.
 type Owner struct {
@@ -130,6 +128,16 @@ type PermissionlessValidator struct {
 	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
 	DelegatorWeight *json.Uint64        `json:"delegatorWeight,omitempty"`
 	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
+}
+
+// GenesisPermissionlessValidator should to be used for genesis validators only.
+type GenesisPermissionlessValidator struct {
+	GenesisValidator
+	RewardOwner        *Owner                    `json:"rewardOwner,omitempty"`
+	DelegationFee      json.Float32              `json:"delegationFee"`
+	ExactDelegationFee *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Staked             []UTXO                    `json:"staked,omitempty"`
+	Signer             *signer.ProofOfPossession `json:"signer,omitempty"`
 }
 
 // PermissionedValidator is the repr. of a permissioned validator sent over APIs.
@@ -170,15 +178,15 @@ type Chain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID   ids.ID                    `json:"avaxAssetID"`
-	NetworkID     json.Uint32               `json:"networkID"`
-	UTXOs         []UTXO                    `json:"utxos"`
-	Validators    []PermissionlessValidator `json:"validators"`
-	Chains        []Chain                   `json:"chains"`
-	Time          json.Uint64               `json:"time"`
-	InitialSupply json.Uint64               `json:"initialSupply"`
-	Message       string                    `json:"message"`
-	Encoding      formatting.Encoding       `json:"encoding"`
+	AvaxAssetID   ids.ID                           `json:"avaxAssetID"`
+	NetworkID     json.Uint32                      `json:"networkID"`
+	UTXOs         []UTXO                           `json:"utxos"`
+	Validators    []GenesisPermissionlessValidator `json:"validators"`
+	Chains        []Chain                          `json:"chains"`
+	Time          json.Uint64                      `json:"time"`
+	InitialSupply json.Uint64                      `json:"initialSupply"`
+	Message       string                           `json:"message"`
+	Encoding      formatting.Encoding              `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -303,21 +311,39 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			delegationFee = uint32(*vdr.ExactDelegationFee)
 		}
 
-		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+		var (
+			baseTx = txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
-			}},
-			Validator: txs.Validator{
+			}}
+			validator = txs.Validator{
 				NodeID: vdr.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,
-			},
-			StakeOuts:        stake,
-			RewardsOwner:     owner,
-			DelegationShares: delegationFee,
-		}}
+			}
+			tx *txs.Tx
+		)
+		if vdr.Signer == nil {
+			tx = &txs.Tx{Unsigned: &txs.AddValidatorTx{
+				BaseTx:           baseTx,
+				Validator:        validator,
+				StakeOuts:        stake,
+				RewardsOwner:     owner,
+				DelegationShares: delegationFee,
+			}}
+		} else {
+			tx = &txs.Tx{Unsigned: &txs.AddPermissionlessValidatorTx{
+				BaseTx:                baseTx,
+				Validator:             validator,
+				Signer:                vdr.Signer,
+				StakeOuts:             stake,
+				ValidatorRewardsOwner: owner,
+				DelegatorRewardsOwner: owner,
+				DelegationShares:      delegationFee,
+			}}
+		}
+
 		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
@@ -364,7 +390,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := genesis.Codec.Marshal(genesis.Version, g)
+	bytes, err := genesis.Codec.Marshal(genesis.CodecVersion, g)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}

@@ -1,130 +1,132 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gossip
 
 import (
 	"crypto/rand"
-	"encoding/binary"
-	"hash"
 
-	bloomfilter "github.com/holiman/bloomfilter/v2"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ hash.Hash64 = (*hasher)(nil)
-
-// NewBloomFilter returns a new instance of a bloom filter with at most
-// [maxExpectedElements] elements anticipated at any moment, and a false
-// positive probability of [falsePositiveProbability].
+// NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
+// anticipated at any moment, and a false positive probability of [targetFalsePositiveProbability]. If the
+// false positive probability exceeds [resetFalsePositiveProbability], the bloom filter will be reset.
+//
+// Invariant: The returned bloom filter is not safe to reset concurrently with
+// other operations. However, it is otherwise safe to access concurrently.
 func NewBloomFilter(
-	maxExpectedElements uint64,
-	falsePositiveProbability float64,
+	registerer prometheus.Registerer,
+	namespace string,
+	minTargetElements int,
+	targetFalsePositiveProbability,
+	resetFalsePositiveProbability float64,
 ) (*BloomFilter, error) {
-	bloom, err := bloomfilter.NewOptimal(
-		maxExpectedElements,
-		falsePositiveProbability,
-	)
+	metrics, err := bloom.NewMetrics(namespace, registerer)
 	if err != nil {
 		return nil, err
 	}
+	filter := &BloomFilter{
+		minTargetElements:              minTargetElements,
+		targetFalsePositiveProbability: targetFalsePositiveProbability,
+		resetFalsePositiveProbability:  resetFalsePositiveProbability,
 
-	salt, err := randomSalt()
-	return &BloomFilter{
-		Bloom: bloom,
-		Salt:  salt,
-	}, err
+		metrics: metrics,
+	}
+	err = resetBloomFilter(
+		filter,
+		minTargetElements,
+		targetFalsePositiveProbability,
+		resetFalsePositiveProbability,
+	)
+	return filter, err
 }
 
 type BloomFilter struct {
-	Bloom *bloomfilter.Filter
-	// Salt is provided to eventually unblock collisions in Bloom. It's possible
+	minTargetElements              int
+	targetFalsePositiveProbability float64
+	resetFalsePositiveProbability  float64
+
+	metrics *bloom.Metrics
+
+	maxCount int
+	bloom    *bloom.Filter
+	// salt is provided to eventually unblock collisions in Bloom. It's possible
 	// that conflicting Gossipable items collide in the bloom filter, so a salt
 	// is generated to eventually resolve collisions.
-	Salt ids.ID
-}
-
-func (b *BloomFilter) Add(gossipable Gossipable) {
-	h := gossipable.GetID()
-	salted := &hasher{
-		hash: h[:],
-		salt: b.Salt,
-	}
-	b.Bloom.Add(salted)
-}
-
-func (b *BloomFilter) Has(gossipable Gossipable) bool {
-	h := gossipable.GetID()
-	salted := &hasher{
-		hash: h[:],
-		salt: b.Salt,
-	}
-	return b.Bloom.Contains(salted)
-}
-
-// ResetBloomFilterIfNeeded resets a bloom filter if it breaches a target false
-// positive probability. Returns true if the bloom filter was reset.
-func ResetBloomFilterIfNeeded(
-	bloomFilter *BloomFilter,
-	falsePositiveProbability float64,
-) (bool, error) {
-	if bloomFilter.Bloom.FalsePosititveProbability() < falsePositiveProbability {
-		return false, nil
-	}
-
-	newBloom, err := bloomfilter.New(bloomFilter.Bloom.M(), bloomFilter.Bloom.K())
-	if err != nil {
-		return false, err
-	}
-	salt, err := randomSalt()
-	if err != nil {
-		return false, err
-	}
-
-	bloomFilter.Bloom = newBloom
-	bloomFilter.Salt = salt
-	return true, nil
-}
-
-func randomSalt() (ids.ID, error) {
-	salt := ids.ID{}
-	_, err := rand.Read(salt[:])
-	return salt, err
-}
-
-type hasher struct {
-	hash []byte
 	salt ids.ID
 }
 
-func (h *hasher) Write(p []byte) (n int, err error) {
-	h.hash = append(h.hash, p...)
-	return len(p), nil
+func (b *BloomFilter) Add(gossipable Gossipable) {
+	h := gossipable.GossipID()
+	bloom.Add(b.bloom, h[:], b.salt[:])
+	b.metrics.Count.Inc()
 }
 
-func (h *hasher) Sum(b []byte) []byte {
-	h.hash = append(h.hash, b...)
-	return h.hash
+func (b *BloomFilter) Has(gossipable Gossipable) bool {
+	h := gossipable.GossipID()
+	return bloom.Contains(b.bloom, h[:], b.salt[:])
 }
 
-func (h *hasher) Reset() {
-	h.hash = ids.Empty[:]
+func (b *BloomFilter) Marshal() ([]byte, []byte) {
+	bloomBytes := b.bloom.Marshal()
+	// salt must be copied here to ensure the bytes aren't overwritten if salt
+	// is later modified.
+	salt := b.salt
+	return bloomBytes, salt[:]
 }
 
-func (*hasher) BlockSize() int {
-	return ids.IDLen
-}
-
-func (h *hasher) Sum64() uint64 {
-	salted := ids.ID{}
-	for i := 0; i < len(h.hash) && i < ids.IDLen; i++ {
-		salted[i] = h.hash[i] ^ h.salt[i]
+// ResetBloomFilterIfNeeded resets a bloom filter if it breaches [targetFalsePositiveProbability].
+//
+// If [targetElements] exceeds [minTargetElements], the size of the bloom filter will grow to maintain
+// the same [targetFalsePositiveProbability].
+//
+// Returns true if the bloom filter was reset.
+func ResetBloomFilterIfNeeded(
+	bloomFilter *BloomFilter,
+	targetElements int,
+) (bool, error) {
+	if bloomFilter.bloom.Count() <= bloomFilter.maxCount {
+		return false, nil
 	}
 
-	return binary.BigEndian.Uint64(salted[:])
+	targetElements = math.Max(bloomFilter.minTargetElements, targetElements)
+	err := resetBloomFilter(
+		bloomFilter,
+		targetElements,
+		bloomFilter.targetFalsePositiveProbability,
+		bloomFilter.resetFalsePositiveProbability,
+	)
+	return err == nil, err
 }
 
-func (h *hasher) Size() int {
-	return len(h.hash)
+func resetBloomFilter(
+	bloomFilter *BloomFilter,
+	targetElements int,
+	targetFalsePositiveProbability,
+	resetFalsePositiveProbability float64,
+) error {
+	numHashes, numEntries := bloom.OptimalParameters(
+		targetElements,
+		targetFalsePositiveProbability,
+	)
+	newBloom, err := bloom.New(numHashes, numEntries)
+	if err != nil {
+		return err
+	}
+	var newSalt ids.ID
+	if _, err := rand.Read(newSalt[:]); err != nil {
+		return err
+	}
+
+	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability)
+	bloomFilter.bloom = newBloom
+	bloomFilter.salt = newSalt
+
+	bloomFilter.metrics.Reset(newBloom, bloomFilter.maxCount)
+	return nil
 }

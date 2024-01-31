@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -17,12 +17,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"gonum.org/v1/gonum/mathext/prng"
+
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
 type testFunc func(*testing.T, Factory)
@@ -93,7 +94,8 @@ func InitializeTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -118,7 +120,8 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -160,7 +163,8 @@ func AddToTailTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -199,7 +203,8 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -247,7 +252,8 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -287,7 +293,8 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -316,7 +323,8 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -353,7 +361,8 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -390,7 +399,8 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -429,7 +439,8 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -471,7 +482,8 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -524,7 +536,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require := require.New(t)
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	registerer := prometheus.NewRegistry()
 	ctx.Registerer = registerer
 
@@ -587,7 +600,8 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -612,7 +626,8 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -682,7 +697,8 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -774,7 +790,8 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -815,7 +832,8 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     3,
 		AlphaPreference:       3,
@@ -925,7 +943,8 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1028,7 +1047,8 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	sm := factory.New()
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1132,7 +1152,8 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1239,7 +1260,8 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1323,7 +1345,8 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1352,7 +1375,8 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1381,7 +1405,8 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1410,7 +1435,8 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1449,7 +1475,8 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1486,7 +1513,8 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1532,7 +1560,8 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1585,28 +1614,30 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	require := require.New(t)
 
-	numColors := 50
-	numNodes := 100
-	params := snowball.Parameters{
-		K:                     20,
-		AlphaPreference:       15,
-		AlphaConfidence:       15,
-		BetaVirtuous:          20,
-		BetaRogue:             30,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-	seed := int64(0)
+	var (
+		numColors = 50
+		numNodes  = 100
+		params    = snowball.Parameters{
+			K:                     20,
+			AlphaPreference:       15,
+			AlphaConfidence:       15,
+			BetaVirtuous:          20,
+			BetaRogue:             30,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		}
+		seed   uint64 = 0
+		source        = prng.NewMT19937()
+	)
 
-	sampler.Seed(seed)
+	source.Seed(seed)
 
-	n := Network{}
-	n.Initialize(params, numColors)
+	n := NewNetwork(params, numColors, source)
 
 	for i := 0; i < numNodes; i++ {
-		require.NoError(n.AddNode(factory.New()))
+		require.NoError(n.AddNode(t, factory.New()))
 	}
 
 	for !n.Finalized() {
@@ -1620,7 +1651,8 @@ func ErrorOnAddDecidedBlockTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1650,7 +1682,8 @@ func ErrorOnAddDuplicateBlockIDTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.Parameters{
 		K:                     1,
 		AlphaPreference:       1,
@@ -1714,7 +1747,8 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 
 	sm := factory.New()
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
 	params := snowball.DefaultParameters
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -8,8 +8,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
 )
+
+const Alias = "P"
 
 var _ Context = (*context)(nil)
 
@@ -143,4 +148,16 @@ func (c *context) AddSubnetValidatorFee() uint64 {
 
 func (c *context) AddSubnetDelegatorFee() uint64 {
 	return c.addSubnetDelegatorFee
+}
+
+func newSnowContext(c Context) (*snow.Context, error) {
+	lookup := ids.NewAliaser()
+	return &snow.Context{
+		NetworkID:   c.NetworkID(),
+		SubnetID:    constants.PrimaryNetworkID,
+		ChainID:     constants.PlatformChainID,
+		AVAXAssetID: c.AVAXAssetID(),
+		Log:         logging.NoLog{},
+		BCLookup:    lookup,
+	}, lookup.Alias(constants.PlatformChainID, Alias)
 }

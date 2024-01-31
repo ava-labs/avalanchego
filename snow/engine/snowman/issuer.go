@@ -1,10 +1,12 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
 
 import (
 	"context"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -13,11 +15,13 @@ import (
 
 // issuer issues [blk] into to consensus after its dependencies are met.
 type issuer struct {
-	t         *Transitive
-	blk       snowman.Block
-	abandoned bool
-	deps      set.Set[ids.ID]
-	push      bool
+	t            *Transitive
+	nodeID       ids.NodeID // nodeID of the peer that provided this block
+	blk          snowman.Block
+	issuedMetric prometheus.Counter
+	abandoned    bool
+	deps         set.Set[ids.ID]
+	push         bool
 }
 
 func (i *issuer) Dependencies() set.Set[ids.ID] {
@@ -51,5 +55,5 @@ func (i *issuer) Update(ctx context.Context) {
 		return
 	}
 	// Issue the block into consensus
-	i.t.errs.Add(i.t.deliver(ctx, i.blk, i.push))
+	i.t.errs.Add(i.t.deliver(ctx, i.nodeID, i.blk, i.push, i.issuedMetric))
 }

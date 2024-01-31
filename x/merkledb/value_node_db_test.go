@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -20,19 +20,18 @@ func TestValueNodeDB(t *testing.T) {
 
 	baseDB := memdb.New()
 
-	size := 10
+	cacheSize := 10_000
 	db := newValueNodeDB(
 		baseDB,
 		&sync.Pool{
 			New: func() interface{} { return make([]byte, 0) },
 		},
 		&mockMetrics{},
-		size,
-		BranchFactor16,
+		cacheSize,
 	)
 
 	// Getting a key that doesn't exist should return an error.
-	key := NewPath([]byte{0x01}, BranchFactor16)
+	key := ToKey([]byte{0x01})
 	_, err := db.Get(key)
 	require.ErrorIs(err, database.ErrNotFound)
 
@@ -124,12 +123,11 @@ func TestValueNodeDBIterator(t *testing.T) {
 		},
 		&mockMetrics{},
 		cacheSize,
-		BranchFactor16,
 	)
 
 	// Put key-node pairs.
 	for i := 0; i < cacheSize; i++ {
-		key := NewPath([]byte{byte(i)}, BranchFactor16)
+		key := ToKey([]byte{byte(i)})
 		node := &node{
 			dbNode: dbNode{
 				value: maybe.Some([]byte{byte(i)}),
@@ -167,7 +165,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 	it.Release()
 
 	// Put key-node pairs with a common prefix.
-	key := NewPath([]byte{0xFF, 0x00}, BranchFactor16)
+	key := ToKey([]byte{0xFF, 0x00})
 	n := &node{
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x00}),
@@ -178,7 +176,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 	batch.Put(key, n)
 	require.NoError(batch.Write())
 
-	key = NewPath([]byte{0xFF, 0x01}, BranchFactor16)
+	key = ToKey([]byte{0xFF, 0x01})
 	n = &node{
 		dbNode: dbNode{
 			value: maybe.Some([]byte{0xFF, 0x01}),
@@ -219,4 +217,35 @@ func TestValueNodeDBIterator(t *testing.T) {
 	require.False(it.Next())
 	err := it.Error()
 	require.ErrorIs(err, database.ErrClosed)
+}
+
+func TestValueNodeDBClear(t *testing.T) {
+	require := require.New(t)
+	cacheSize := 200
+	baseDB := memdb.New()
+	db := newValueNodeDB(
+		baseDB,
+		&sync.Pool{
+			New: func() interface{} { return make([]byte, 0) },
+		},
+		&mockMetrics{},
+		cacheSize,
+	)
+
+	batch := db.NewBatch()
+	for _, b := range [][]byte{{1}, {2}, {3}} {
+		batch.Put(ToKey(b), newNode(ToKey(b)))
+	}
+	require.NoError(batch.Write())
+
+	// Assert the db is not empty
+	iter := baseDB.NewIteratorWithPrefix(valueNodePrefix)
+	require.True(iter.Next())
+	iter.Release()
+
+	require.NoError(db.Clear())
+
+	iter = baseDB.NewIteratorWithPrefix(valueNodePrefix)
+	defer iter.Release()
+	require.False(iter.Next())
 }

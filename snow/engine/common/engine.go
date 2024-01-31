@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Engine describes the standard interface of a consensus engine.
@@ -31,9 +32,6 @@ type Engine interface {
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
 	health.Checker
-
-	// GetVM returns this engine's VM
-	GetVM() VM
 }
 
 type Handler interface {
@@ -108,7 +106,7 @@ type GetAcceptedStateSummaryHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		heights []uint64,
+		heights set.Set[uint64],
 	) error
 }
 
@@ -122,7 +120,7 @@ type AcceptedStateSummaryHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		summaryIDs []ids.ID,
+		summaryIDs set.Set[ids.ID],
 	) error
 
 	// Notify this engine that a GetAcceptedStateSummary request it issued has
@@ -182,7 +180,7 @@ type GetAcceptedHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerIDs set.Set[ids.ID],
 	) error
 }
 
@@ -196,7 +194,7 @@ type AcceptedHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerIDs set.Set[ids.ID],
 	) error
 
 	// Notify this engine that a GetAccepted request it issued has failed.
@@ -398,6 +396,7 @@ type AppResponseHandler interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
+		appErr *AppError,
 	) error
 }
 
@@ -467,6 +466,7 @@ type CrossChainAppResponseHandler interface {
 		ctx context.Context,
 		chainID ids.ID,
 		requestID uint32,
+		appErr *AppError,
 	) error
 }
 

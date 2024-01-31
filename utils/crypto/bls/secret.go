@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bls
@@ -70,4 +70,12 @@ func Sign(sk *SecretKey, msg []byte) *Signature {
 // Sign [msg] to prove the ownership of this [sk].
 func SignProofOfPossession(sk *SecretKey, msg []byte) *Signature {
 	return new(Signature).Sign(sk, msg, ciphersuiteProofOfPossession)
+}
+
+func DeserializeSecretKey(pkBytes []byte) *SecretKey {
+	return new(SecretKey).Deserialize(pkBytes)
+}
+
+func SerializeSecretKey(key *SecretKey) []byte {
+	return key.Serialize()
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timer
@@ -84,7 +84,7 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := NewAdaptiveTimeoutManager(&test.config, "", prometheus.NewRegistry()) //nolint:gosec
+		_, err := NewAdaptiveTimeoutManager(&test.config, "", prometheus.NewRegistry())
 		require.ErrorIs(t, err, test.expectedErr)
 	}
 }

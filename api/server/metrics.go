@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -9,7 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 type metrics struct {
@@ -46,13 +46,12 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 		),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		registerer.Register(m.numProcessing),
 		registerer.Register(m.numCalls),
 		registerer.Register(m.totalDuration),
 	)
-	return m, errs.Err
+	return m, err
 }
 
 func (m *metrics) wrapHandler(chainName string, handler http.Handler) http.Handler {

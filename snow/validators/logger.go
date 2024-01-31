@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -18,7 +17,6 @@ var _ SetCallbackListener = (*logger)(nil)
 
 type logger struct {
 	log      logging.Logger
-	enabled  *utils.Atomic[bool]
 	subnetID ids.ID
 	nodeIDs  set.Set[ids.NodeID]
 }
@@ -27,14 +25,12 @@ type logger struct {
 // the specified validators
 func NewLogger(
 	log logging.Logger,
-	enabled *utils.Atomic[bool],
 	subnetID ids.ID,
 	nodeIDs ...ids.NodeID,
 ) SetCallbackListener {
 	nodeIDSet := set.Of(nodeIDs...)
 	return &logger{
 		log:      log,
-		enabled:  enabled,
 		subnetID: subnetID,
 		nodeIDs:  nodeIDSet,
 	}
@@ -46,7 +42,7 @@ func (l *logger) OnValidatorAdded(
 	txID ids.ID,
 	weight uint64,
 ) {
-	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
+	if l.nodeIDs.Contains(nodeID) {
 		var pkBytes []byte
 		if pk != nil {
 			pkBytes = bls.PublicKeyToBytes(pk)
@@ -65,7 +61,7 @@ func (l *logger) OnValidatorRemoved(
 	nodeID ids.NodeID,
 	weight uint64,
 ) {
-	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
+	if l.nodeIDs.Contains(nodeID) {
 		l.log.Info("node removed from validator set",
 			zap.Stringer("subnetID", l.subnetID),
 			zap.Stringer("nodeID", nodeID),
@@ -79,7 +75,7 @@ func (l *logger) OnValidatorWeightChanged(
 	oldWeight uint64,
 	newWeight uint64,
 ) {
-	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
+	if l.nodeIDs.Contains(nodeID) {
 		l.log.Info("validator weight changed",
 			zap.Stringer("subnetID", l.subnetID),
 			zap.Stringer("nodeID", nodeID),

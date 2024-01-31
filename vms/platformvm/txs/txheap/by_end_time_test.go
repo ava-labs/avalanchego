@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txheap
@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestByStopTime(t *testing.T) {
+func TestByEndTime(t *testing.T) {
 	require := require.New(t)
 
 	txHeap := NewByEndTime()
@@ -23,7 +23,7 @@ func TestByStopTime(t *testing.T) {
 
 	utx0 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: ids.NodeID{0},
+			NodeID: ids.BuildTestNodeID([]byte{0}),
 			Start:  uint64(baseTime.Unix()),
 			End:    uint64(baseTime.Unix()) + 1,
 		},
@@ -34,7 +34,7 @@ func TestByStopTime(t *testing.T) {
 
 	utx1 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: ids.NodeID{1},
+			NodeID: ids.BuildTestNodeID([]byte{1}),
 			Start:  uint64(baseTime.Unix()),
 			End:    uint64(baseTime.Unix()) + 2,
 		},
@@ -45,7 +45,7 @@ func TestByStopTime(t *testing.T) {
 
 	utx2 := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: ids.NodeID{1},
+			NodeID: ids.BuildTestNodeID([]byte{1}),
 			Start:  uint64(baseTime.Unix()),
 			End:    uint64(baseTime.Unix()) + 3,
 		},

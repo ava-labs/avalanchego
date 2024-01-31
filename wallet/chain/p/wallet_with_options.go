@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -119,6 +119,18 @@ func (w *walletWithOptions) IssueCreateSubnetTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.Wallet.IssueCreateSubnetTx(
+		owner,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *walletWithOptions) IssueTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.Wallet.IssueTransferSubnetOwnershipTx(
+		subnetID,
 		owner,
 		common.UnionOptions(w.options, options)...,
 	)

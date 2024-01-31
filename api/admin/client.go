@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
@@ -7,7 +7,9 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
@@ -25,9 +27,10 @@ type Client interface {
 	GetChainAliases(ctx context.Context, chainID string, options ...rpc.Option) ([]string, error)
 	Stacktrace(context.Context, ...rpc.Option) error
 	LoadVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error)
-	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) error
+	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
 	GetLoggerLevel(ctx context.Context, loggerName string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
 	GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error)
+	DBGet(ctx context.Context, key []byte, options ...rpc.Option) ([]byte, error)
 }
 
 // Client implementation for the Avalanche Platform Info API Endpoint
@@ -96,7 +99,7 @@ func (c *client) SetLoggerLevel(
 	logLevel,
 	displayLevel string,
 	options ...rpc.Option,
-) error {
+) (map[string]LogAndDisplayLevels, error) {
 	var (
 		logLevelArg     logging.Level
 		displayLevelArg logging.Level
@@ -105,20 +108,22 @@ func (c *client) SetLoggerLevel(
 	if len(logLevel) > 0 {
 		logLevelArg, err = logging.ToLevel(logLevel)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if len(displayLevel) > 0 {
 		displayLevelArg, err = logging.ToLevel(displayLevel)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return c.requester.SendRequest(ctx, "admin.setLoggerLevel", &SetLoggerLevelArgs{
+	res := &LoggerLevelReply{}
+	err = c.requester.SendRequest(ctx, "admin.setLoggerLevel", &SetLoggerLevelArgs{
 		LoggerName:   loggerName,
 		LogLevel:     &logLevelArg,
 		DisplayLevel: &displayLevelArg,
-	}, &api.EmptyReply{}, options...)
+	}, res, options...)
+	return res.LoggerLevels, err
 }
 
 func (c *client) GetLoggerLevel(
@@ -126,7 +131,7 @@ func (c *client) GetLoggerLevel(
 	loggerName string,
 	options ...rpc.Option,
 ) (map[string]LogAndDisplayLevels, error) {
-	res := &GetLoggerLevelReply{}
+	res := &LoggerLevelReply{}
 	err := c.requester.SendRequest(ctx, "admin.getLoggerLevel", &GetLoggerLevelArgs{
 		LoggerName: loggerName,
 	}, res, options...)
@@ -137,4 +142,24 @@ func (c *client) GetConfig(ctx context.Context, options ...rpc.Option) (interfac
 	var res interface{}
 	err := c.requester.SendRequest(ctx, "admin.getConfig", struct{}{}, &res, options...)
 	return res, err
+}
+
+func (c *client) DBGet(ctx context.Context, key []byte, options ...rpc.Option) ([]byte, error) {
+	keyStr, err := formatting.Encode(formatting.HexNC, key)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &DBGetReply{}
+	err = c.requester.SendRequest(ctx, "admin.dbGet", &DBGetArgs{
+		Key: keyStr,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := rpcdb.ErrEnumToError[res.ErrorCode]; err != nil {
+		return nil, err
+	}
+	return formatting.Decode(formatting.HexNC, res.Value)
 }

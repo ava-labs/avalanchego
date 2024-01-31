@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linearcodec
@@ -7,15 +7,17 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
 	// default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
-	defaultMaxSliceLength = 256 * 1024
+	DefaultMaxSliceLength = 256 * 1024
 )
 
 var (
@@ -36,32 +38,30 @@ type Codec interface {
 type linearCodec struct {
 	codec.Codec
 
-	lock         sync.RWMutex
-	nextTypeID   uint32
-	typeIDToType map[uint32]reflect.Type
-	typeToTypeID map[reflect.Type]uint32
+	lock            sync.RWMutex
+	nextTypeID      uint32
+	registeredTypes *bimap.BiMap[uint32, reflect.Type]
 }
 
 // New returns a new, concurrency-safe codec; it allow to specify
 // both tagNames and maxSlicelenght
-func New(tagNames []string, maxSliceLen uint32) Codec {
+func New(durangoTime time.Time, tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &linearCodec{
-		nextTypeID:   0,
-		typeIDToType: map[uint32]reflect.Type{},
-		typeToTypeID: map[reflect.Type]uint32{},
+		nextTypeID:      0,
+		registeredTypes: bimap.New[uint32, reflect.Type](),
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames, durangoTime, maxSliceLen)
 	return hCodec
 }
 
 // NewDefault is a convenience constructor; it returns a new codec with reasonable default values
-func NewDefault() Codec {
-	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+func NewDefault(durangoTime time.Time) Codec {
+	return New(durangoTime, []string{reflectcodec.DefaultTagName}, DefaultMaxSliceLength)
 }
 
 // NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
-func NewCustomMaxLength(maxSliceLen uint32) Codec {
-	return New([]string{reflectcodec.DefaultTagName}, maxSliceLen)
+func NewCustomMaxLength(durangoTime time.Time, maxSliceLen uint32) Codec {
+	return New(durangoTime, []string{reflectcodec.DefaultTagName}, maxSliceLen)
 }
 
 // Skip some number of type IDs
@@ -78,12 +78,11 @@ func (c *linearCodec) RegisterType(val interface{}) error {
 	defer c.lock.Unlock()
 
 	valType := reflect.TypeOf(val)
-	if _, exists := c.typeToTypeID[valType]; exists {
+	if c.registeredTypes.HasValue(valType) {
 		return fmt.Errorf("%w: %v", codec.ErrDuplicateType, valType)
 	}
 
-	c.typeIDToType[c.nextTypeID] = valType
-	c.typeToTypeID[valType] = c.nextTypeID
+	c.registeredTypes.Put(c.nextTypeID, valType)
 	c.nextTypeID++
 	return nil
 }
@@ -97,7 +96,7 @@ func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) err
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	typeID, ok := c.typeToTypeID[valueType] // Get the type ID of the value being marshaled
+	typeID, ok := c.registeredTypes.GetKey(valueType) // Get the type ID of the value being marshaled
 	if !ok {
 		return fmt.Errorf("can't marshal unregistered type %q", valueType)
 	}
@@ -114,7 +113,7 @@ func (c *linearCodec) UnpackPrefix(p *wrappers.Packer, valueType reflect.Type) (
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %w", p.Err)
 	}
 	// Get a type that implements the interface
-	implementingType, ok := c.typeIDToType[typeID]
+	implementingType, ok := c.registeredTypes.GetValue(typeID)
 	if !ok {
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: unknown type ID %d", typeID)
 	}

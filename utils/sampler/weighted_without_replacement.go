@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -9,15 +9,12 @@ package sampler
 type WeightedWithoutReplacement interface {
 	Initialize(weights []uint64) error
 	Sample(count int) ([]int, error)
-
-	Seed(int64)
-	ClearSeed()
 }
 
 // NewWeightedWithoutReplacement returns a new sampler
-func NewDeterministicWeightedWithoutReplacement() WeightedWithoutReplacement {
+func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
-		u: NewUniform(),
+		u: NewDeterministicUniform(source),
 		w: NewDeterministicWeighted(),
 	}
 }

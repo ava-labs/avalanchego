@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package constants
@@ -32,6 +32,8 @@ const (
 	DefaultNetworkPeerListNonValidatorGossipSize = 0
 	DefaultNetworkPeerListPeersGossipSize        = 10
 	DefaultNetworkPeerListGossipFreq             = time.Minute
+	DefaultNetworkPeerListPullGossipFreq         = 2 * time.Second
+	DefaultNetworkPeerListBloomResetFreq         = time.Minute
 
 	// Inbound Connection Throttling
 	DefaultInboundConnUpgradeThrottlerCooldown = 10 * time.Second
@@ -71,12 +73,12 @@ const (
 	DefaultBenchlistMinFailingDuration = 2*time.Minute + 30*time.Second
 
 	// Router
-	DefaultAcceptedFrontierGossipFrequency                 = 10 * time.Second
 	DefaultConsensusAppConcurrency                         = 2
 	DefaultConsensusShutdownTimeout                        = time.Minute
+	DefaultFrontierPollFrequency                           = 100 * time.Millisecond
 	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
 	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
-	DefaultConsensusGossipAcceptedFrontierPeerSize         = 15
+	DefaultConsensusGossipAcceptedFrontierPeerSize         = 1
 	DefaultConsensusGossipOnAcceptValidatorSize            = 0
 	DefaultConsensusGossipOnAcceptNonValidatorSize         = 0
 	DefaultConsensusGossipOnAcceptPeerSize                 = 10

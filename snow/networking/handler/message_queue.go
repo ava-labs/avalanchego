@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -7,16 +7,15 @@ import (
 	"context"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -60,9 +59,9 @@ type messageQueue struct {
 	clock   mockable.Clock
 	metrics messageQueueMetrics
 
-	log logging.Logger
+	ctx *snow.ConsensusContext
 	// Validator set for the chain associated with this
-	vdrs validators.Set
+	vdrs validators.Manager
 	// Tracks CPU utilization of each node
 	cpuTracker tracker.Tracker
 
@@ -71,25 +70,25 @@ type messageQueue struct {
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.NodeID]int
 	// Unprocessed messages
-	msgAndCtxs []*msgAndContext
+	msgAndCtxs buffer.Deque[*msgAndContext]
 }
 
 func NewMessageQueue(
-	log logging.Logger,
-	vdrs validators.Set,
+	ctx *snow.ConsensusContext,
+	vdrs validators.Manager,
 	cpuTracker tracker.Tracker,
 	metricsNamespace string,
-	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
 ) (MessageQueue, error) {
 	m := &messageQueue{
-		log:                   log,
+		ctx:                   ctx,
 		vdrs:                  vdrs,
 		cpuTracker:            cpuTracker,
 		cond:                  sync.NewCond(&sync.Mutex{}),
 		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
+		msgAndCtxs:            buffer.NewUnboundedDeque[*msgAndContext](1 /*=initSize*/),
 	}
-	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
+	return m, m.metrics.initialize(metricsNamespace, ctx.Registerer, ops)
 }
 
 func (m *messageQueue) Push(ctx context.Context, msg Message) {
@@ -102,7 +101,7 @@ func (m *messageQueue) Push(ctx context.Context, msg Message) {
 	}
 
 	// Add the message to the queue
-	m.msgAndCtxs = append(m.msgAndCtxs, &msgAndContext{
+	m.msgAndCtxs.PushRight(&msgAndContext{
 		msg: msg,
 		ctx: ctx,
 	})
@@ -127,36 +126,30 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		if m.closed {
 			return nil, Message{}, false
 		}
-		if len(m.msgAndCtxs) != 0 {
+		if m.msgAndCtxs.Len() != 0 {
 			break
 		}
 		m.cond.Wait()
 	}
 
-	n := len(m.msgAndCtxs)
+	n := m.msgAndCtxs.Len() // note that n > 0
 	i := 0
 	for {
 		if i == n {
-			m.log.Debug("canPop is false for all unprocessed messages",
+			m.ctx.Log.Debug("canPop is false for all unprocessed messages",
 				zap.Int("numMessages", n),
 			)
 		}
 
 		var (
-			msgAndCtx = m.msgAndCtxs[0]
-			msg       = msgAndCtx.msg
-			ctx       = msgAndCtx.ctx
-			nodeID    = msg.NodeID()
+			msgAndCtx, _ = m.msgAndCtxs.PopLeft()
+			msg          = msgAndCtx.msg
+			ctx          = msgAndCtx.ctx
+			nodeID       = msg.NodeID()
 		)
-		m.msgAndCtxs[0] = nil
 
 		// See if it's OK to process [msg] next
 		if m.canPop(msg) || i == n { // i should never == n but handle anyway as a fail-safe
-			if cap(m.msgAndCtxs) == 1 {
-				m.msgAndCtxs = nil // Give back memory if possible
-			} else {
-				m.msgAndCtxs = m.msgAndCtxs[1:]
-			}
 			m.nodeToUnprocessedMsgs[nodeID]--
 			if m.nodeToUnprocessedMsgs[nodeID] == 0 {
 				delete(m.nodeToUnprocessedMsgs, nodeID)
@@ -168,8 +161,7 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 		}
 		// [msg.nodeID] is causing excessive CPU usage.
 		// Push [msg] to back of [m.msgs] and handle it later.
-		m.msgAndCtxs = append(m.msgAndCtxs, msgAndCtx)
-		m.msgAndCtxs = m.msgAndCtxs[1:]
+		m.msgAndCtxs.PushRight(msgAndCtx)
 		i++
 		m.metrics.numExcessiveCPU.Inc()
 	}
@@ -179,7 +171,7 @@ func (m *messageQueue) Len() int {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
-	return len(m.msgAndCtxs)
+	return m.msgAndCtxs.Len()
 }
 
 func (m *messageQueue) Shutdown() {
@@ -187,10 +179,10 @@ func (m *messageQueue) Shutdown() {
 	defer m.cond.L.Unlock()
 
 	// Remove all the current messages from the queue
-	for _, msg := range m.msgAndCtxs {
-		msg.msg.OnFinishedHandling()
+	for m.msgAndCtxs.Len() > 0 {
+		msgAndCtx, _ := m.msgAndCtxs.PopLeft()
+		msgAndCtx.msg.OnFinishedHandling()
 	}
-	m.msgAndCtxs = nil
 	m.nodeToUnprocessedMsgs = nil
 
 	// Update metrics
@@ -218,14 +210,26 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
 	nodeID := msg.NodeID()
-	weight := m.vdrs.GetWeight(nodeID)
-	// The sum of validator weights should never be 0, but handle
-	// that case for completeness here to avoid divide by 0.
-	portionWeight := float64(0)
-	totalVdrsWeight := m.vdrs.Weight()
-	if totalVdrsWeight != 0 {
+	weight := m.vdrs.GetWeight(m.ctx.SubnetID, nodeID)
+
+	var portionWeight float64
+	if totalVdrsWeight, err := m.vdrs.TotalWeight(m.ctx.SubnetID); err != nil {
+		// The sum of validator weights should never overflow, but if they do,
+		// we treat portionWeight as 0.
+		m.ctx.Log.Error("failed to get total weight of validators",
+			zap.Stringer("subnetID", m.ctx.SubnetID),
+			zap.Error(err),
+		)
+	} else if totalVdrsWeight == 0 {
+		// The sum of validator weights should never be 0, but handle that case
+		// for completeness here to avoid divide by 0.
+		m.ctx.Log.Warn("validator set is empty",
+			zap.Stringer("subnetID", m.ctx.SubnetID),
+		)
+	} else {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
+
 	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
 	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight

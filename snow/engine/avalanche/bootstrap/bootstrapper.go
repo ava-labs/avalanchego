@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -15,8 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bimap"
+	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -29,6 +30,14 @@ const (
 	stripeDistance = 2000
 	stripeWidth    = 5
 	cacheSize      = 100000
+
+	// statusUpdateFrequency is how many containers should be processed between
+	// logs
+	statusUpdateFrequency = 5000
+
+	// maxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
+	// sent but not yet responded to/failed
+	maxOutstandingGetAncestorsRequests = 10
 )
 
 var _ common.BootstrapableEngine = (*bootstrapper)(nil)
@@ -42,44 +51,41 @@ func New(
 
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
+		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 
+		outstandingRequests: bimap.New[common.Request, ids.ID](),
+
 		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
-		Fetcher: common.Fetcher{
-			OnFinished: onFinished,
-		},
+		onFinished:     onFinished,
 	}
-
-	if err := b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer); err != nil {
-		return nil, err
-	}
-
-	config.Config.Bootstrapable = b
-	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
-	return b, nil
+	return b, b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer)
 }
 
 // Note: To align with the Snowman invariant, it should be guaranteed the VM is
 // not used until after the bootstrapper has been Started.
 type bootstrapper struct {
 	Config
+	common.Halter
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
 	common.StateSummaryFrontierHandler
 	common.AcceptedStateSummaryHandler
+	common.AcceptedFrontierHandler
+	common.AcceptedHandler
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
 	common.AppHandler
 
-	common.Bootstrapper
-	common.Fetcher
 	metrics
 
-	started bool
+	// tracks which validators were asked for which containers in which requests
+	outstandingRequests *bimap.BiMap[common.Request, ids.ID]
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
@@ -87,9 +93,22 @@ type bootstrapper struct {
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU[ids.ID, struct{}]
+
+	// Tracks the last requestID that was used in a request
+	requestID uint32
+
+	// Called when bootstrapping is done on a specific chain
+	onFinished func(ctx context.Context, lastReqID uint32) error
 }
 
-func (b *bootstrapper) Clear() error {
+func (b *bootstrapper) Context() *snow.ConsensusContext {
+	return b.Ctx
+}
+
+func (b *bootstrapper) Clear(context.Context) error {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	if err := b.VtxBlocked.Clear(); err != nil {
 		return err
 	}
@@ -124,7 +143,10 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		vtxs = vtxs[:b.Config.AncestorsMaxContainersReceived]
 	}
 
-	requestedVtxID, requested := b.OutstandingRequests.Remove(nodeID, requestID)
+	requestedVtxID, requested := b.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	vtx, err := b.Manager.ParseVtx(ctx, vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
@@ -164,7 +186,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		)
 		return b.fetch(ctx, requestedVtxID)
 	}
-	if !requested && !b.OutstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
+	if !requested && !b.outstandingRequests.HasValue(vtxID) && !b.needToFetch.Contains(vtxID) {
 		b.Ctx.Log.Debug("received un-needed vertex",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
@@ -231,7 +253,10 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	vtxID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
+	vtxID, ok := b.outstandingRequests.DeleteKey(common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	})
 	if !ok {
 		b.Ctx.Log.Debug("skipping GetAncestorsFailed call",
 			zap.String("reason", "no matching outstanding request"),
@@ -253,16 +278,7 @@ func (b *bootstrapper) Connected(
 		return err
 	}
 
-	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if b.started || !b.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	b.started = true
-	return b.Startup(ctx)
+	return b.StartupTracker.Connected(ctx, nodeID, nodeVersion)
 }
 
 func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
@@ -283,6 +299,10 @@ func (*bootstrapper) Gossip(context.Context) error {
 
 func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
+
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	return b.VM.Shutdown(ctx)
 }
 
@@ -320,7 +340,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return err
 	}
 
-	b.Config.SharedCfg.RequestID = startReqID
+	b.requestID = startReqID
 
 	// If the network was already linearized, don't attempt to linearize it
 	// again.
@@ -329,41 +349,44 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to get linearization status: %w", err)
 	}
 	if linearized {
-		edge := b.Manager.Edge(ctx)
-		return b.ForceAccepted(ctx, edge)
+		return b.startSyncing(ctx, nil)
 	}
 
-	// If requested, assume the currently accepted state is what was linearized.
+	// If a stop vertex is well known, accept that.
+	if b.Config.StopVertexID != ids.Empty {
+		b.Ctx.Log.Info("using well known stop vertex",
+			zap.Stringer("vtxID", b.Config.StopVertexID),
+		)
+
+		return b.startSyncing(ctx, []ids.ID{b.Config.StopVertexID})
+	}
+
+	// If a stop vertex isn't well known, treat the current state as the final
+	// DAG state.
 	//
 	// Note: This is used to linearize networks that were created after the
 	// linearization occurred.
-	if b.Config.LinearizeOnStartup {
-		edge := b.Manager.Edge(ctx)
-		stopVertex, err := b.Manager.BuildStopVtx(ctx, edge)
-		if err != nil {
-			return fmt.Errorf("failed to create stop vertex: %w", err)
-		}
-		if err := stopVertex.Accept(ctx); err != nil {
-			return fmt.Errorf("failed to accept stop vertex: %w", err)
-		}
-
-		stopVertexID := stopVertex.ID()
-		b.Ctx.Log.Info("accepted stop vertex",
-			zap.Stringer("vtxID", stopVertexID),
-		)
-
-		return b.ForceAccepted(ctx, []ids.ID{stopVertexID})
+	edge := b.Manager.Edge(ctx)
+	stopVertex, err := b.Manager.BuildStopVtx(ctx, edge)
+	if err != nil {
+		return fmt.Errorf("failed to create stop vertex: %w", err)
+	}
+	if err := stopVertex.Accept(ctx); err != nil {
+		return fmt.Errorf("failed to accept stop vertex: %w", err)
 	}
 
-	if !b.StartupTracker.ShouldStart() {
-		return nil
-	}
+	stopVertexID := stopVertex.ID()
+	b.Ctx.Log.Info("generated stop vertex",
+		zap.Stringer("vtxID", stopVertexID),
+	)
 
-	b.started = true
-	return b.Startup(ctx)
+	return b.startSyncing(ctx, nil)
 }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+	b.Ctx.Lock.Lock()
+	defer b.Ctx.Lock.Unlock()
+
 	vmIntf, vmErr := b.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": struct{}{},
@@ -372,21 +395,16 @@ func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (b *bootstrapper) GetVM() common.VM {
-	return b.VM
-}
-
 // Add the vertices in [vtxIDs] to the set of vertices that we need to fetch,
 // and then fetch vertices (and their ancestors) until either there are no more
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingGetAncestorsRequests {
-		vtxID := b.needToFetch.CappedList(1)[0]
-		b.needToFetch.Remove(vtxID)
+	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() < maxOutstandingGetAncestorsRequests {
+		vtxID, _ := b.needToFetch.Pop() // Length checked in predicate above
 
 		// Make sure we haven't already requested this vertex
-		if b.OutstandingRequests.Contains(vtxID) {
+		if b.outstandingRequests.HasValue(vtxID) {
 			continue
 		}
 
@@ -395,29 +413,36 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 			continue
 		}
 
-		validatorIDs, err := b.Config.Beacons.Sample(1) // validator to send request to
+		validatorIDs, err := b.Config.Beacons.Sample(b.Ctx.SubnetID, 1) // validator to send request to
 		if err != nil {
 			return fmt.Errorf("dropping request for %s as there are no validators", vtxID)
 		}
 		validatorID := validatorIDs[0]
-		b.Config.SharedCfg.RequestID++
+		b.requestID++
 
-		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
-		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
+		b.outstandingRequests.Put(
+			common.Request{
+				NodeID:    validatorID,
+				RequestID: b.requestID,
+			},
+			vtxID,
+		)
+		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.requestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish(ctx)
 }
 
 // Process the vertices in [vtxs].
 func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) error {
-	// Vertices that we need to process. Store them in a heap for deduplication
-	// and so we always process vertices further down in the DAG first. This helps
-	// to reduce the number of repeated DAG traversals.
-	toProcess := vertex.NewHeap()
+	// Vertices that we need to process prioritized by vertices that are unknown
+	// or the furthest down the DAG. Unknown vertices are prioritized to ensure
+	// that once we have made it below a certain height in DAG traversal we do
+	// not need to reset and repeat DAG traversals.
+	toProcess := heap.NewMap[ids.ID, avalanche.Vertex](vertexLess)
 	for _, vtx := range vtxs {
 		vtxID := vtx.ID()
 		if _, ok := b.processedCache.Get(vtxID); !ok { // only process a vertex if we haven't already
-			toProcess.Push(vtx)
+			_, _ = toProcess.Push(vtxID, vtx)
 		} else {
 			b.VtxBlocked.RemoveMissingID(vtxID)
 		}
@@ -426,13 +451,15 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	vtxHeightSet := set.Set[ids.ID]{}
 	prevHeight := uint64(0)
 
-	for toProcess.Len() > 0 { // While there are unprocessed vertices
+	for {
 		if b.Halted() {
 			return nil
 		}
 
-		vtx := toProcess.Pop() // Get an unknown vertex or one furthest down the DAG
-		vtxID := vtx.ID()
+		vtxID, vtx, ok := toProcess.Pop()
+		if !ok {
+			break
+		}
 
 		switch vtx.Status() {
 		case choices.Unknown:
@@ -484,16 +511,10 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 			b.numFetchedVts.Inc()
 
 			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
-			if verticesFetchedSoFar%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				if !b.Config.SharedCfg.Restarted {
-					b.Ctx.Log.Info("fetched vertices",
-						zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
-					)
-				} else {
-					b.Ctx.Log.Debug("fetched vertices",
-						zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
-					)
-				}
+			if verticesFetchedSoFar%statusUpdateFrequency == 0 { // Periodically print progress
+				b.Ctx.Log.Info("fetched vertices",
+					zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
+				)
 			}
 
 			parents, err := vtx.Parents()
@@ -504,7 +525,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 				parentID := parent.ID()
 				if _, ok := b.processedCache.Get(parentID); !ok { // But only if we haven't processed the parent
 					if !vtxHeightSet.Contains(parentID) {
-						toProcess.Push(parent)
+						toProcess.Push(parentID, parent)
 					}
 				}
 			}
@@ -536,8 +557,8 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 	return b.fetch(ctx)
 }
 
-// ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
-func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+// startSyncing starts bootstrapping. Process the vertices in [accepterContainerIDs].
+func (b *bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
@@ -565,58 +586,36 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 // checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *bootstrapper) checkFinish(ctx context.Context) error {
-	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.IsBootstrapped() || len(pendingJobs) > 0 {
+	// If we still need to fetch vertices, we can't finish
+	if len(b.VtxBlocked.MissingIDs()) > 0 {
 		return nil
 	}
 
-	if !b.Config.SharedCfg.Restarted {
-		b.Ctx.Log.Info("executing transactions")
-	} else {
-		b.Ctx.Log.Debug("executing transactions")
-	}
-
+	b.Ctx.Log.Info("executing transactions")
 	_, err := b.TxBlocked.ExecuteAll(
 		ctx,
 		b.Config.Ctx,
 		b,
-		b.Config.SharedCfg.Restarted,
+		false,
 		b.Ctx.TxAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err
 	}
 
-	if !b.Config.SharedCfg.Restarted {
-		b.Ctx.Log.Info("executing vertices")
-	} else {
-		b.Ctx.Log.Debug("executing vertices")
-	}
-
+	b.Ctx.Log.Info("executing vertices")
 	_, err = b.VtxBlocked.ExecuteAll(
 		ctx,
 		b.Config.Ctx,
 		b,
-		b.Config.SharedCfg.Restarted,
+		false,
 		b.Ctx.VertexAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err
 	}
 
-	// If the chain is linearized, we should immediately move on to start
-	// bootstrapping snowman.
-	linearized, err := b.Manager.StopVertexAccepted(ctx)
-	if err != nil {
-		return err
-	}
-	if !linearized {
-		b.Ctx.Log.Debug("checking for stop vertex before finishing bootstrapping")
-		return b.Restart(ctx, true)
-	}
-
-	// Invariant: edge will only be the stop vertex after its acceptance.
+	// Invariant: edge will only be the stop vertex
 	edge := b.Manager.Edge(ctx)
 	stopVertexID := edge[0]
 	if err := b.VM.Linearize(ctx, stopVertexID); err != nil {
@@ -624,5 +623,28 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	b.processedCache.Flush()
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	return b.onFinished(ctx, b.requestID)
+}
+
+// A vertex is less than another vertex if it is unknown. Ties are broken by
+// prioritizing vertices that have a greater height.
+func vertexLess(i, j avalanche.Vertex) bool {
+	if !i.Status().Fetched() {
+		return true
+	}
+	if !j.Status().Fetched() {
+		return false
+	}
+
+	// Treat errors on retrieving the height as if the vertex is not fetched
+	heightI, errI := i.Height()
+	if errI != nil {
+		return true
+	}
+	heightJ, errJ := j.Height()
+	if errJ != nil {
+		return false
+	}
+
+	return heightI > heightJ
 }

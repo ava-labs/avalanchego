@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/version"
@@ -23,7 +23,6 @@ var (
 	errSetState                   = errors.New("unexpectedly called SetState")
 	errShutdown                   = errors.New("unexpectedly called Shutdown")
 	errCreateHandlers             = errors.New("unexpectedly called CreateHandlers")
-	errCreateStaticHandlers       = errors.New("unexpectedly called CreateStaticHandlers")
 	errHealthCheck                = errors.New("unexpectedly called HealthCheck")
 	errConnected                  = errors.New("unexpectedly called Connected")
 	errDisconnected               = errors.New("unexpectedly called Disconnected")
@@ -44,27 +43,26 @@ type TestVM struct {
 	T *testing.T
 
 	CantInitialize, CantSetState,
-	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
+	CantShutdown, CantCreateHandlers,
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
 
-	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
+	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
 	SetStateF                   func(ctx context.Context, state snow.State) error
 	ShutdownF                   func(context.Context) error
 	CreateHandlersF             func(context.Context) (map[string]http.Handler, error)
-	CreateStaticHandlersF       func(context.Context) (map[string]http.Handler, error)
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthCheckF                func(context.Context) (interface{}, error)
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error
 	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -72,7 +70,6 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantSetState = cant
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
-	vm.CantCreateStaticHandlers = cant
 	vm.CantHealthCheck = cant
 	vm.CantAppRequest = cant
 	vm.CantAppRequestFailed = cant
@@ -89,7 +86,7 @@ func (vm *TestVM) Default(cant bool) {
 func (vm *TestVM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	db manager.Manager,
+	db database.Database,
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
@@ -152,16 +149,6 @@ func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]http.Handler, 
 	return nil, nil
 }
 
-func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	if vm.CreateStaticHandlersF != nil {
-		return vm.CreateStaticHandlersF(ctx)
-	}
-	if vm.CantCreateStaticHandlers && vm.T != nil {
-		require.FailNow(vm.T, errCreateStaticHandlers.Error())
-	}
-	return nil, nil
-}
-
 func (vm *TestVM) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vm.HealthCheckF != nil {
 		return vm.HealthCheckF(ctx)
@@ -185,9 +172,9 @@ func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error {
 	if vm.AppRequestFailedF != nil {
-		return vm.AppRequestFailedF(ctx, nodeID, requestID)
+		return vm.AppRequestFailedF(ctx, nodeID, requestID, appErr)
 	}
 	if !vm.CantAppRequestFailed {
 		return nil
@@ -237,9 +224,9 @@ func (vm *TestVM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requ
 	return errCrossChainAppRequest
 }
 
-func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error {
 	if vm.CrossChainAppRequestFailedF != nil {
-		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID)
+		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID, appErr)
 	}
 	if !vm.CantCrossChainAppRequestFailed {
 		return nil

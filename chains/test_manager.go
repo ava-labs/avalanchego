@@ -1,22 +1,15 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 // TestManager implements Manager but does nothing. Always returns nil error.
 // To be used only in tests
 var TestManager Manager = testManager{}
 
 type testManager struct{}
-
-func (testManager) Router() router.Router {
-	return nil
-}
 
 func (testManager) QueueChainCreation(ChainParameters) {}
 

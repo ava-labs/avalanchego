@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package staking
@@ -11,28 +11,13 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-
-	"github.com/ava-labs/avalanchego/utils/units"
-)
-
-// MaxRSAKeyBitLen is the maximum RSA key size in bits that we are willing to
-// parse.
-//
-// https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L860-L862
-const (
-	MaxCertificateLen = 16 * units.KiB
-	MaxRSAKeyByteLen  = units.KiB
-	MaxRSAKeyBitLen   = 8 * MaxRSAKeyByteLen
 )
 
 var (
-	ErrCertificateTooLarge        = fmt.Errorf("staking: certificate length is greater than %d", MaxCertificateLen)
-	ErrUnsupportedAlgorithm       = errors.New("staking: cannot verify signature: unsupported algorithm")
-	ErrPublicKeyAlgoMismatch      = errors.New("staking: signature algorithm specified different public key type")
-	ErrInvalidRSAPublicKey        = errors.New("staking: invalid RSA public key")
-	ErrInvalidECDSAPublicKey      = errors.New("staking: invalid ECDSA public key")
-	ErrECDSAVerificationFailure   = errors.New("staking: ECDSA verification failure")
-	ErrED25519VerificationFailure = errors.New("staking: Ed25519 verification failure")
+	ErrUnsupportedAlgorithm     = errors.New("staking: cannot verify signature: unsupported algorithm")
+	ErrPublicKeyAlgoMismatch    = errors.New("staking: signature algorithm specified different public key type")
+	ErrInvalidECDSAPublicKey    = errors.New("staking: invalid ECDSA public key")
+	ErrECDSAVerificationFailure = errors.New("staking: ECDSA verification failure")
 )
 
 // CheckSignature verifies that the signature is a valid signature over signed
@@ -41,10 +26,6 @@ var (
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L793-L797
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L816-L879
 func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
-	if err := ValidateCertificate(cert); err != nil {
-		return err
-	}
-
 	hasher := crypto.SHA256.New()
 	_, err := hasher.Write(msg)
 	if err != nil {
@@ -67,6 +48,8 @@ func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
 
 // ValidateCertificate verifies that this certificate conforms to the required
 // staking format assuming that it was already able to be parsed.
+//
+// TODO: Remove after v1.11.x activates.
 func ValidateCertificate(cert *Certificate) error {
 	if len(cert.Raw) > MaxCertificateLen {
 		return ErrCertificateTooLarge
@@ -82,8 +65,14 @@ func ValidateCertificate(cert *Certificate) error {
 		if pubkeyAlgo != x509.RSA {
 			return signaturePublicKeyAlgoMismatchError(pubkeyAlgo, pub)
 		}
-		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
-			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidRSAPublicKey, bitLen, MaxRSAKeyBitLen)
+		if bitLen := pub.N.BitLen(); bitLen != allowedRSALargeModulusLen && bitLen != allowedRSASmallModulusLen {
+			return fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
+		}
+		if pub.N.Bit(0) == 0 {
+			return ErrRSAModulusIsEven
+		}
+		if pub.E != allowedRSAPublicExponentValue {
+			return fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
 		}
 		return nil
 	case *ecdsa.PublicKey:

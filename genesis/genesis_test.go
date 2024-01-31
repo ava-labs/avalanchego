@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -244,7 +245,7 @@ func TestGenesisFromFile(t *testing.T) {
 			genesisBytes, _, err := FromFile(test.networkID, customFile, genesisStakingCfg)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr == nil {
-				genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
+				genesisHash := hex.EncodeToString(hashing.ComputeHash256(genesisBytes))
 				require.Equal(test.expectedHash, genesisHash, "genesis hash mismatch")
 
 				_, err = genesis.Parse(genesisBytes)
@@ -330,7 +331,7 @@ func TestGenesisFromFlag(t *testing.T) {
 			genesisBytes, _, err := FromFlag(test.networkID, content, genesisStakingCfg)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr == nil {
-				genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
+				genesisHash := hex.EncodeToString(hashing.ComputeHash256(genesisBytes))
 				require.Equal(test.expectedHash, genesisHash, "genesis hash mismatch")
 
 				_, err = genesis.Parse(genesisBytes)

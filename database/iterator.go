@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // For ease of implementation, our database's interface matches Ethereum's
@@ -34,10 +34,12 @@ type Iterator interface {
 
 	// Key returns the key of the current key/value pair, or nil if done.
 	// If the database is closed, must still report the current contents.
+	// Behavior is undefined after Release is called.
 	Key() []byte
 
 	// Value returns the value of the current key/value pair, or nil if done.
 	// If the database is closed, must still report the current contents.
+	// Behavior is undefined after Release is called.
 	Value() []byte
 
 	// Release releases associated resources. Release should always succeed and

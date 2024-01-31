@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -13,12 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -36,7 +38,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
 			keychain := e2e.Env.NewKeychain(2)
-			baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
+			baseWallet := e2e.NewWallet(keychain, nodeURI)
 
 			pWallet := baseWallet.P()
 			avaxAssetID := baseWallet.P().AVAXAssetID()
@@ -68,20 +70,19 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 				require.GreaterOrEqual(pBalance, minBalance)
 			})
-			// create validator data
-			validatorStartTimeDiff := 30 * time.Second
-			vdrStartTime := time.Now().Add(validatorStartTimeDiff)
 
 			// Use a random node ID to ensure that repeated test runs
-			// will succeed against a persistent network.
+			// will succeed against a network that persists across runs.
 			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
 			require.NoError(err)
 
-			vdr := &txs.Validator{
-				NodeID: validatorID,
-				Start:  uint64(vdrStartTime.Unix()),
-				End:    uint64(vdrStartTime.Add(72 * time.Hour).Unix()),
-				Wght:   minValStake,
+			vdr := &txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: validatorID,
+					End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
+					Wght:   minValStake,
+				},
+				Subnet: constants.PrimaryNetworkID,
 			}
 			rewardOwner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -89,9 +90,16 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			}
 			shares := uint32(20000) // TODO: retrieve programmatically
 
+			sk, err := bls.NewSecretKey()
+			require.NoError(err)
+			pop := signer.NewProofOfPossession(sk)
+
 			ginkgo.By("issue add validator tx", func() {
-				_, err := pWallet.IssueAddValidatorTx(
+				_, err := pWallet.IssueAddPermissionlessValidatorTx(
 					vdr,
+					pop,
+					avaxAssetID,
+					rewardOwner,
 					rewardOwner,
 					shares,
 					e2e.WithDefaultContext(),
@@ -100,8 +108,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			})
 
 			ginkgo.By("issue add delegator tx", func() {
-				_, err := pWallet.IssueAddDelegatorTx(
+				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					vdr,
+					avaxAssetID,
 					rewardOwner,
 					e2e.WithDefaultContext(),
 				)

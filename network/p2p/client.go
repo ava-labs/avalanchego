@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	ErrAppRequestFailed = errors.New("app request failed")
-	ErrRequestPending   = errors.New("request pending")
-	ErrNoPeers          = errors.New("no peers")
+	ErrRequestPending = errors.New("request pending")
+	ErrNoPeers        = errors.New("no peers")
 )
 
 // AppResponseCallback is called upon receiving an AppResponse for an AppRequest
@@ -41,11 +40,11 @@ type CrossChainAppResponseCallback func(
 
 type Client struct {
 	handlerID     uint64
+	handlerIDStr  string
 	handlerPrefix []byte
-	router        *Router
+	router        *router
 	sender        common.AppSender
-	// nodeSampler is used to select nodes to route AppRequestAny to
-	nodeSampler NodeSampler
+	options       *clientOptions
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -56,7 +55,7 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	sampled := c.nodeSampler.Sample(ctx, 1)
+	sampled := c.options.nodeSampler.Sample(ctx, 1)
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
@@ -76,7 +75,7 @@ func (c *Client) AppRequest(
 	c.router.lock.Lock()
 	defer c.router.lock.Unlock()
 
-	appRequestBytes = c.prefixMessage(appRequestBytes)
+	appRequestBytes = PrefixMessage(c.handlerPrefix, appRequestBytes)
 	for nodeID := range nodeIDs {
 		requestID := c.router.requestID
 		if _, ok := c.router.pendingAppRequests[requestID]; ok {
@@ -97,8 +96,8 @@ func (c *Client) AppRequest(
 		}
 
 		c.router.pendingAppRequests[requestID] = pendingAppRequest{
-			AppResponseCallback: onResponse,
-			metrics:             c.router.handlers[c.handlerID].metrics,
+			handlerID: c.handlerIDStr,
+			callback:  onResponse,
 		}
 		c.router.requestID += 2
 	}
@@ -113,7 +112,7 @@ func (c *Client) AppGossip(
 ) error {
 	return c.sender.SendAppGossip(
 		ctx,
-		c.prefixMessage(appGossipBytes),
+		PrefixMessage(c.handlerPrefix, appGossipBytes),
 	)
 }
 
@@ -126,7 +125,7 @@ func (c *Client) AppGossipSpecific(
 	return c.sender.SendAppGossipSpecific(
 		ctx,
 		nodeIDs,
-		c.prefixMessage(appGossipBytes),
+		PrefixMessage(c.handlerPrefix, appGossipBytes),
 	)
 }
 
@@ -154,29 +153,28 @@ func (c *Client) CrossChainAppRequest(
 		ctx,
 		chainID,
 		requestID,
-		c.prefixMessage(appRequestBytes),
+		PrefixMessage(c.handlerPrefix, appRequestBytes),
 	); err != nil {
 		return err
 	}
 
 	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
-		CrossChainAppResponseCallback: onResponse,
-		metrics:                       c.router.handlers[c.handlerID].metrics,
+		handlerID: c.handlerIDStr,
+		callback:  onResponse,
 	}
 	c.router.requestID += 2
 
 	return nil
 }
 
-// prefixMessage prefixes the original message with the handler identifier
-// corresponding to this client.
+// PrefixMessage prefixes the original message with the protocol identifier.
 //
 // Only gossip and request messages need to be prefixed.
 // Response messages don't need to be prefixed because request ids are tracked
 // which map to the expected response handler.
-func (c *Client) prefixMessage(src []byte) []byte {
-	messageBytes := make([]byte, len(c.handlerPrefix)+len(src))
-	copy(messageBytes, c.handlerPrefix)
-	copy(messageBytes[len(c.handlerPrefix):], src)
+func PrefixMessage(prefix, msg []byte) []byte {
+	messageBytes := make([]byte, len(prefix)+len(msg))
+	copy(messageBytes, prefix)
+	copy(messageBytes[len(prefix):], msg)
 	return messageBytes
 }

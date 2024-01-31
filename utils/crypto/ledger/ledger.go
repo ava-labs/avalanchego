@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ledger
@@ -8,6 +8,8 @@ import (
 
 	ledger "github.com/ava-labs/ledger-avalanche/go"
 
+	bip32 "github.com/tyler-smith/go-bip32"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -15,7 +17,7 @@ import (
 )
 
 const (
-	rootPath          = "m/44'/9000'/0'"
+	rootPath          = "m/44'/9000'/0'" // BIP44: m / purpose' / coin_type' / account'
 	ledgerBufferLimit = 8192
 	ledgerPathSize    = 9
 )
@@ -26,6 +28,7 @@ var _ keychain.Ledger = (*Ledger)(nil)
 // provides Avalanche-specific access.
 type Ledger struct {
 	device *ledger.LedgerAvalanche
+	epk    *bip32.Key
 }
 
 func New() (keychain.Ledger, error) {
@@ -40,21 +43,37 @@ func addressPath(index uint32) string {
 }
 
 func (l *Ledger) Address(hrp string, addressIndex uint32) (ids.ShortID, error) {
-	_, hash, err := l.device.GetPubKey(addressPath(addressIndex), true, hrp, "")
+	resp, err := l.device.GetPubKey(addressPath(addressIndex), true, hrp, "")
 	if err != nil {
 		return ids.ShortEmpty, err
 	}
-	return ids.ToShortID(hash)
+	return ids.ToShortID(resp.Hash)
 }
 
 func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
-	addresses := make([]ids.ShortID, len(addressIndices))
-	for i, v := range addressIndices {
-		_, hash, err := l.device.GetPubKey(addressPath(v), false, "", "")
+	if l.epk == nil {
+		pk, chainCode, err := l.device.GetExtPubKey(rootPath, false, "", "")
 		if err != nil {
 			return nil, err
 		}
-		copy(addresses[i][:], hash)
+		l.epk = &bip32.Key{
+			Key:       pk,
+			ChainCode: chainCode,
+		}
+	}
+	// derivation path rootPath/0 (BIP44 change level, when set to 0, known as external chain)
+	externalChain, err := l.epk.NewChildKey(0)
+	if err != nil {
+		return nil, err
+	}
+	addresses := make([]ids.ShortID, len(addressIndices))
+	for i, addressIndex := range addressIndices {
+		// derivation path rootPath/0/v (BIP44 address index level)
+		address, err := externalChain.NewChildKey(addressIndex)
+		if err != nil {
+			return nil, err
+		}
+		copy(addresses[i][:], hashing.PubkeyBytesToAddress(address.Key))
 	}
 	return addresses, nil
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -104,8 +104,8 @@ type Config struct {
 	// Time of the Cortina network upgrade
 	CortinaTime time.Time
 
-	// Time of the D network upgrade
-	DTime time.Time
+	// Time of the Durango network upgrade
+	DurangoTime time.Time
 
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
@@ -133,9 +133,8 @@ func (c *Config) IsCortinaActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.CortinaTime)
 }
 
-// TODO: Rename
-func (c *Config) IsDActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.DTime)
+func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.DurangoTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

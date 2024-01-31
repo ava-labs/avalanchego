@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -9,11 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -151,12 +154,11 @@ func TestValidatorsSample(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
 			subnetID := ids.GenerateTestID()
+			ctrl := gomock.NewController(t)
 			mockValidators := validators.NewMockState(ctrl)
 
-			calls := make([]*gomock.Call, 0)
+			calls := make([]any, 0)
 			for _, call := range tt.calls {
 				calls = append(calls, mockValidators.EXPECT().
 					GetCurrentHeight(gomock.Any()).Return(call.height, call.getCurrentHeightErr))
@@ -177,10 +179,17 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			v := NewValidators(logging.NoLog{}, subnetID, mockValidators, tt.maxStaleness)
+			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
+			require.NoError(err)
+
+			ctx := context.Background()
+			require.NoError(network.Connected(ctx, nodeID1, nil))
+			require.NoError(network.Connected(ctx, nodeID2, nil))
+
+			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
 				v.lastUpdated = call.time
-				sampled := v.Sample(context.Background(), call.limit)
+				sampled := v.Sample(ctx, call.limit)
 				require.LessOrEqual(len(sampled), call.limit)
 				require.Subset(call.expected, sampled)
 			}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -36,6 +36,7 @@ var (
 	_ Client = (*client)(nil)
 
 	errInvalidRangeProof             = errors.New("failed to verify range proof")
+	errInvalidChangeProof            = errors.New("failed to verify change proof")
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
 	errTooManyBytes                  = errors.New("response contains more than requested bytes")
 	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
@@ -73,7 +74,7 @@ type client struct {
 	stateSyncMinVersion *version.Application
 	log                 logging.Logger
 	metrics             SyncMetrics
-	branchFactor        merkledb.BranchFactor
+	tokenSize           int
 }
 
 type ClientConfig struct {
@@ -95,7 +96,7 @@ func NewClient(config *ClientConfig) (Client, error) {
 		stateSyncMinVersion: config.StateSyncMinVersion,
 		log:                 config.Log,
 		metrics:             config.Metrics,
-		branchFactor:        config.BranchFactor,
+		tokenSize:           merkledb.BranchFactorToTokenSize[config.BranchFactor],
 	}, nil
 }
 
@@ -124,7 +125,7 @@ func (c *client) GetChangeProof(
 		case *pb.SyncGetChangeProofResponse_ChangeProof:
 			// The server had enough history to send us a change proof
 			var changeProof merkledb.ChangeProof
-			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof, c.branchFactor); err != nil {
+			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
 				return nil, err
 			}
 
@@ -149,7 +150,7 @@ func (c *client) GetChangeProof(
 				endKey,
 				endRoot,
 			); err != nil {
-				return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
+				return nil, fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 			}
 
 			return &merkledb.ChangeOrRangeProof{
@@ -158,7 +159,7 @@ func (c *client) GetChangeProof(
 		case *pb.SyncGetChangeProofResponse_RangeProof:
 
 			var rangeProof merkledb.RangeProof
-			if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof, c.branchFactor); err != nil {
+			if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
 				return nil, err
 			}
 
@@ -171,6 +172,7 @@ func (c *client) GetChangeProof(
 				startKey,
 				endKey,
 				req.EndRootHash,
+				c.tokenSize,
 			)
 			if err != nil {
 				return nil, err
@@ -208,6 +210,7 @@ func verifyRangeProof(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
+	tokenSize int,
 ) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
@@ -227,6 +230,7 @@ func verifyRangeProof(
 		start,
 		end,
 		root,
+		tokenSize,
 	); err != nil {
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
@@ -253,11 +257,8 @@ func (c *client) GetRangeProof(
 			return nil, err
 		}
 
-		startKey := maybeBytesToMaybe(req.StartKey)
-		endKey := maybeBytesToMaybe(req.EndKey)
-
 		var rangeProof merkledb.RangeProof
-		if err := rangeProof.UnmarshalProto(&rangeProofProto, c.branchFactor); err != nil {
+		if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
 			return nil, err
 		}
 
@@ -265,9 +266,10 @@ func (c *client) GetRangeProof(
 			ctx,
 			&rangeProof,
 			int(req.KeyLimit),
-			startKey,
-			endKey,
+			maybeBytesToMaybe(req.StartKey),
+			maybeBytesToMaybe(req.EndKey),
 			req.RootHash,
+			c.tokenSize,
 		); err != nil {
 			return nil, err
 		}

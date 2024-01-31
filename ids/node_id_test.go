@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -67,11 +68,16 @@ func TestNodeIDMarshalJSON(t *testing.T) {
 		out   []byte
 		err   error
 	}{
-		{"NodeID{}", NodeID{}, []byte("\"NodeID-111111111111111111116DBWJs\""), nil},
 		{
-			"ID(\"ava labs\")",
+			"NodeID{}",
+			NodeID{},
+			[]byte(`"NodeID-111111111111111111116DBWJs"`),
+			nil,
+		},
+		{
+			`ID("ava labs")`,
 			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
 			nil,
 		},
 	}
@@ -93,40 +99,45 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 		out         NodeID
 		expectedErr error
 	}{
-		{"NodeID{}", []byte("null"), NodeID{}, nil},
 		{
-			"NodeID(\"ava labs\")",
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			"NodeID{}",
+			[]byte("null"),
+			NodeID{},
+			nil,
+		},
+		{
+			`NodeID("ava labs")`,
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
 			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 			nil,
 		},
 		{
 			"missing start quote",
-			[]byte("NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			[]byte(`NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
 			NodeID{},
 			errMissingQuotes,
 		},
 		{
 			"missing end quote",
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz`),
 			NodeID{},
 			errMissingQuotes,
 		},
 		{
 			"NodeID-",
-			[]byte("\"NodeID-\""),
+			[]byte(`"NodeID-"`),
 			NodeID{},
 			errShortNodeID,
 		},
 		{
 			"NodeID-1",
-			[]byte("\"NodeID-1\""),
+			[]byte(`"NodeID-1"`),
 			NodeID{},
 			cb58.ErrMissingChecksum,
 		},
 		{
 			"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz1",
-			[]byte("\"NodeID-1\""),
+			[]byte(`"NodeID-1"`),
 			NodeID{},
 			cb58.ErrMissingChecksum,
 		},
@@ -174,26 +185,34 @@ func TestNodeIDMapMarshalling(t *testing.T) {
 	require.Equal(originalMap, unmarshalledMap)
 }
 
-func TestNodeIDLess(t *testing.T) {
-	require := require.New(t)
+func TestNodeIDCompare(t *testing.T) {
+	tests := []struct {
+		a        NodeID
+		b        NodeID
+		expected int
+	}{
+		{
+			a:        NodeID{1},
+			b:        NodeID{0},
+			expected: 1,
+		},
+		{
+			a:        NodeID{1},
+			b:        NodeID{1},
+			expected: 0,
+		},
+		{
+			a:        NodeID{1, 0},
+			b:        NodeID{1, 2},
+			expected: -1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s_%s_%d", test.a, test.b, test.expected), func(t *testing.T) {
+			require := require.New(t)
 
-	id1 := NodeID{}
-	id2 := NodeID{}
-	require.False(id1.Less(id2))
-	require.False(id2.Less(id1))
-
-	id1 = NodeID{1}
-	id2 = NodeID{}
-	require.False(id1.Less(id2))
-	require.True(id2.Less(id1))
-
-	id1 = NodeID{1}
-	id2 = NodeID{1}
-	require.False(id1.Less(id2))
-	require.False(id2.Less(id1))
-
-	id1 = NodeID{1}
-	id2 = NodeID{1, 2}
-	require.True(id1.Less(id2))
-	require.False(id2.Less(id1))
+			require.Equal(test.expected, test.a.Compare(test.b))
+			require.Equal(-test.expected, test.b.Compare(test.a))
+		})
+	}
 }

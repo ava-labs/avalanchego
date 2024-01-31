@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -19,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -37,14 +38,17 @@ func TestBaseTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := block.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{secpFx},
+	)
 	require.NoError(err)
 	codec := parser.Codec()
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer, trackChecksums)
+	state, err := state.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -142,14 +146,17 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := block.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{secpFx},
+	)
 	require.NoError(err)
 	codec := parser.Codec()
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer, trackChecksums)
+	state, err := state.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -285,14 +292,17 @@ func TestOperationTxExecutor(t *testing.T) {
 	require := require.New(t)
 
 	secpFx := &secp256k1fx.Fx{}
-	parser, err := block.NewParser([]fxs.Fx{secpFx})
+	parser, err := block.NewParser(
+		time.Time{},
+		[]fxs.Fx{secpFx},
+	)
 	require.NoError(err)
 	codec := parser.Codec()
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer, trackChecksums)
+	state, err := state.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{

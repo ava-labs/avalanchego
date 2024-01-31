@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p2p
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -32,20 +33,20 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 		name         string
 		validatorSet ValidatorSet
 		nodeID       ids.NodeID
-		expected     error
+		expected     bool
 	}{
 		{
 			name:         "message dropped",
 			validatorSet: testValidatorSet{},
 			nodeID:       nodeID,
-			expected:     ErrNotValidator,
 		},
 		{
 			name: "message handled",
 			validatorSet: testValidatorSet{
 				validators: validatorSet,
 			},
-			nodeID: nodeID,
+			nodeID:   nodeID,
+			expected: true,
 		},
 	}
 
@@ -53,13 +54,19 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := ValidatorHandler{
-				Handler:      NoOpHandler{},
-				ValidatorSet: tt.validatorSet,
-			}
+			called := false
+			handler := NewValidatorHandler(
+				&TestHandler{
+					AppGossipF: func(context.Context, ids.NodeID, []byte) {
+						called = true
+					},
+				},
+				tt.validatorSet,
+				logging.NoLog{},
+			)
 
-			err := handler.AppGossip(context.Background(), tt.nodeID, []byte("foobar"))
-			require.ErrorIs(err, tt.expected)
+			handler.AppGossip(context.Background(), tt.nodeID, []byte("foobar"))
+			require.Equal(tt.expected, called)
 		})
 	}
 }
@@ -93,10 +100,11 @@ func TestValidatorHandlerAppRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := ValidatorHandler{
-				Handler:      NoOpHandler{},
-				ValidatorSet: tt.validatorSet,
-			}
+			handler := NewValidatorHandler(
+				NoOpHandler{},
+				tt.validatorSet,
+				logging.NoLog{},
+			)
 
 			_, err := handler.AppRequest(context.Background(), tt.nodeID, time.Time{}, []byte("foobar"))
 			require.ErrorIs(err, tt.expected)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -58,11 +58,11 @@ func (t *testExternalHandler) Disconnected(nodeID ids.NodeID) {
 	)
 }
 
-type testAggressiveValidatorSet struct {
-	validators.Set
+type testAggressiveValidatorManager struct {
+	validators.Manager
 }
 
-func (*testAggressiveValidatorSet) Contains(ids.NodeID) bool {
+func (*testAggressiveValidatorManager) Contains(ids.ID, ids.NodeID) bool {
 	return true
 }
 
@@ -78,8 +78,8 @@ func ExampleNewTestNetwork() {
 
 	// Needs to be periodically updated by the caller to have the latest
 	// validator set
-	validators := &testAggressiveValidatorSet{
-		Set: validators.NewSet(),
+	validators := &testAggressiveValidatorManager{
+		Manager: validators.NewManager(),
 	}
 
 	// If we want to be able to communicate with non-primary network subnets, we

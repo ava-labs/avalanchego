@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Assert fields are set correctly.
@@ -24,10 +26,11 @@ func TestNewTargeter(t *testing.T) {
 		MaxNonVdrUsage:     10,
 		MaxNonVdrNodeUsage: 10,
 	}
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
 	tracker := NewMockTracker(ctrl)
 
 	targeterIntf := NewTargeter(
+		logging.NoLog{},
 		config,
 		vdrs,
 		tracker,
@@ -43,13 +46,13 @@ func TestNewTargeter(t *testing.T) {
 func TestTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	vdr := ids.NodeID{1}
+	vdr := ids.BuildTestNodeID([]byte{1})
 	vdrWeight := uint64(1)
 	totalVdrWeight := uint64(10)
-	nonVdr := ids.NodeID{2}
-	vdrs := validators.NewSet()
-	require.NoError(t, vdrs.Add(vdr, nil, ids.Empty, 1))
-	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
+	nonVdr := ids.BuildTestNodeID([]byte{2})
+	vdrs := validators.NewManager()
+	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, vdr, nil, ids.Empty, 1))
+	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
 
 	tracker := NewMockTracker(ctrl)
 	config := &TargeterConfig{
@@ -59,6 +62,7 @@ func TestTarget(t *testing.T) {
 	}
 
 	targeter := NewTargeter(
+		logging.NoLog{},
 		config,
 		vdrs,
 		tracker,

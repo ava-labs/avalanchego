@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -24,11 +24,10 @@ type valueNodeDB struct {
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Paths in [nodeCache] aren't prefixed with [valueNodePrefix].
-	nodeCache cache.Cacher[Path, *node]
+	nodeCache cache.Cacher[Key, *node]
 	metrics   merkleMetrics
 
-	closed       utils.Atomic[bool]
-	branchFactor BranchFactor
+	closed utils.Atomic[bool]
 }
 
 func newValueNodeDB(
@@ -36,14 +35,12 @@ func newValueNodeDB(
 	bufferPool *sync.Pool,
 	metrics merkleMetrics,
 	cacheSize int,
-	branchFactor BranchFactor,
 ) *valueNodeDB {
 	return &valueNodeDB{
-		metrics:      metrics,
-		baseDB:       db,
-		bufferPool:   bufferPool,
-		nodeCache:    cache.NewSizedLRU(cacheSize, cacheEntrySize),
-		branchFactor: branchFactor,
+		metrics:    metrics,
+		baseDB:     db,
+		bufferPool: bufferPool,
+		nodeCache:  cache.NewSizedLRU(cacheSize, cacheEntrySize),
 	}
 }
 
@@ -66,11 +63,11 @@ func (db *valueNodeDB) Close() {
 func (db *valueNodeDB) NewBatch() *valueNodeBatch {
 	return &valueNodeBatch{
 		db:  db,
-		ops: make(map[Path]*node, defaultBufferLength),
+		ops: make(map[Key]*node, defaultBufferLength),
 	}
 }
 
-func (db *valueNodeDB) Get(key Path) (*node, error) {
+func (db *valueNodeDB) Get(key Key) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.ValueNodeCacheHit()
 		if cachedValue == nil {
@@ -92,17 +89,22 @@ func (db *valueNodeDB) Get(key Path) (*node, error) {
 	return parseNode(key, nodeBytes)
 }
 
+func (db *valueNodeDB) Clear() error {
+	db.nodeCache.Flush()
+	return database.AtomicClearPrefix(db.baseDB, db.baseDB, valueNodePrefix)
+}
+
 // Batch of database operations
 type valueNodeBatch struct {
 	db  *valueNodeDB
-	ops map[Path]*node
+	ops map[Key]*node
 }
 
-func (b *valueNodeBatch) Put(key Path, value *node) {
+func (b *valueNodeBatch) Put(key Key, value *node) {
 	b.ops[key] = value
 }
 
-func (b *valueNodeBatch) Delete(key Path) {
+func (b *valueNodeBatch) Delete(key Key) {
 	b.ops[key] = nil
 }
 
@@ -170,7 +172,7 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(NewPath(key, i.db.branchFactor), i.nodeIter.Value())
+	n, err := parseNode(ToKey(key), i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false

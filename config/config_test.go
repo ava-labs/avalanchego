@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -73,7 +73,7 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			// Create custom configs
 			for key, value := range test.configs {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainConfigFileName+".ex", value)
+				setupFile(t, chainDir, chainConfigFileName+".ex", value) //nolint:goconst
 			}
 			for key, value := range test.upgrades {
 				chainDir := filepath.Join(chainsDir, key)

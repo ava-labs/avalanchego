@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package beacon
@@ -16,9 +16,9 @@ import (
 func TestSet(t *testing.T) {
 	require := require.New(t)
 
-	id0 := ids.NodeID{0}
-	id1 := ids.NodeID{1}
-	id2 := ids.NodeID{2}
+	id0 := ids.BuildTestNodeID([]byte{0})
+	id1 := ids.BuildTestNodeID([]byte{1})
+	id2 := ids.BuildTestNodeID([]byte{2})
 
 	ip0 := ips.IPPort{
 		IP:   net.IPv4zero,

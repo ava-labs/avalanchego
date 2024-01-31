@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -11,14 +11,22 @@ type Uniform interface {
 	// negative the implementation may panic.
 	Sample(length int) ([]uint64, error)
 
-	Seed(int64)
-	ClearSeed()
-
 	Reset()
 	Next() (uint64, error)
 }
 
 // NewUniform returns a new sampler
 func NewUniform() Uniform {
-	return &uniformReplacer{}
+	return &uniformReplacer{
+		rng: globalRNG,
+	}
+}
+
+// NewDeterministicUniform returns a new sampler
+func NewDeterministicUniform(source Source) Uniform {
+	return &uniformReplacer{
+		rng: &rng{
+			rng: source,
+		},
+	}
 }

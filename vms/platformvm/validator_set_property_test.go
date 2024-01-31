@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -20,12 +20,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -36,8 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -45,8 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -54,7 +51,6 @@ import (
 
 const (
 	startPrimaryWithBLS uint8 = iota
-	startPrimaryWithoutBLS
 	startSubnetValidator
 )
 
@@ -130,29 +126,6 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 
-				case startPrimaryWithoutBLS:
-					// when adding a primary validator, also remove the current
-					// primary one
-					if currentPrimaryValidator != nil {
-						err := terminatePrimaryValidator(vm, currentPrimaryValidator)
-						if err != nil {
-							return fmt.Sprintf("could not terminate current primary validator: %s", err.Error())
-						}
-						// no need to nil current primary validator, we'll
-						// reassign immediately
-
-						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-							return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
-						}
-					}
-					currentPrimaryValidator, err = addPrimaryValidatorWithoutBLSKey(vm, ev)
-					if err != nil {
-						return fmt.Sprintf("could not add primary validator without BLS key: %s", err.Error())
-					}
-					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
-					}
-
 				case startPrimaryWithBLS:
 					// when adding a primary validator, also remove the current
 					// primary one
@@ -217,12 +190,11 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			10,
 			gen.OneConstOf(
 				startPrimaryWithBLS,
-				startPrimaryWithoutBLS,
 				startSubnetValidator,
 			),
 		).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
+			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),
 	))
 
@@ -297,85 +269,35 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
 	addr := keys[0].PublicKey().Address()
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
-		vm.state,
-		keys,
-		vm.MinValidatorStake,
-		vm.Config.AddPrimaryNetworkValidatorFee,
-		addr, // change Addresss
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not create inputs/outputs for permissionless validator: %w", err)
-	}
+
 	sk, err := bls.NewSecretKey()
 	if err != nil {
-		return nil, fmt.Errorf("could not create secret key: %w", err)
+		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
 	}
 
-	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: data.nodeID,
-			Start:  uint64(data.startTime.Unix()),
-			End:    uint64(data.endTime.Unix()),
-			Wght:   vm.MinValidatorStake,
-		},
-		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk),
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegationShares: reward.PercentDenominator,
-	}
-	signedTx, err := txs.NewSigned(uPrimaryTx, txs.Codec, signers)
-	if err != nil {
-		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx with BLS key: %w", err)
-	}
-	if err := signedTx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, fmt.Errorf("failed syntax verification of AddPermissionlessValidatorTx: %w", err)
-	}
-	return internalAddValidator(vm, signedTx)
-}
-
-func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
-	addr := keys[0].PublicKey().Address()
-	signedTx, err := vm.txBuilder.NewAddValidatorTx(
+	signedTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(data.startTime.Unix()),
 		uint64(data.endTime.Unix()),
 		data.nodeID,
+		signer.NewProofOfPossession(sk),
 		addr,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create AddValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx: %w", err)
 	}
 	return internalAddValidator(vm, signedTx)
 }
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
-	stakerTx := signedTx.Unsigned.(txs.StakerTx)
-	if err := vm.Builder.AddUnverifiedTx(signedTx); err != nil {
+	vm.ctx.Lock.Unlock()
+	err := vm.issueTx(context.Background(), signedTx)
+	vm.ctx.Lock.Lock()
+
+	if err != nil {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
 
@@ -393,25 +315,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed setting preference: %w", err)
 	}
 
-	// move time ahead, promoting the validator to current
-	currentTime := stakerTx.StartTime()
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed building block: %w", err)
-	}
-	if err := blk.Verify(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed verifying block: %w", err)
-	}
-	if err := blk.Accept(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed accepting block: %w", err)
-	}
-	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return nil, fmt.Errorf("failed setting preference: %w", err)
-	}
-
+	stakerTx := signedTx.Unsigned.(txs.Staker)
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 
@@ -507,14 +411,6 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 			nodeID:    nodeID,
 			publicKey: bls.PublicFromSecretKey(sk),
 		})
-	case startPrimaryWithoutBLS:
-		res = append(res, &validatorInputData{
-			eventType: startPrimaryWithoutBLS,
-			startTime: currentTime,
-			endTime:   endTime,
-			nodeID:    nodeID,
-			publicKey: nil,
-		})
 	default:
 		return nil, fmt.Errorf("unexpected initial event %d", events[0])
 	}
@@ -553,19 +449,6 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 				endTime:   endTime,
 				nodeID:    nodeID,
 				publicKey: bls.PublicFromSecretKey(sk),
-			}
-			res = append(res, val)
-			currentPrimaryVal = val
-
-		case startPrimaryWithoutBLS:
-			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
-			endTime := currentTime.Add(defaultMinStakingDuration)
-			val := &validatorInputData{
-				eventType: startPrimaryWithoutBLS,
-				startTime: currentTime,
-				endTime:   endTime,
-				nodeID:    nodeID,
-				publicKey: nil,
 			}
 			res = append(res, val)
 			currentPrimaryVal = val
@@ -621,11 +504,10 @@ func TestTimestampListGenerator(t *testing.T) {
 		},
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
-			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
+			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),
 	))
 
@@ -673,11 +555,10 @@ func TestTimestampListGenerator(t *testing.T) {
 		},
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
-			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
+			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),
 	))
 
@@ -711,11 +592,10 @@ func TestTimestampListGenerator(t *testing.T) {
 		},
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
-			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
+			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),
 	))
 
@@ -725,16 +605,12 @@ func TestTimestampListGenerator(t *testing.T) {
 // add a single validator at the end of times,
 // to make sure it won't pollute our tests
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
 	forkTime := defaultGenesisTime
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
-		Validators:             vdrs,
+		Validators:             validators.NewManager(),
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		TransformSubnetTxFee:   100 * defaultTxFee,
@@ -752,12 +628,12 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	baseDB := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, baseDB)
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
 	msgChan := make(chan common.Message, 1)
-	ctx := defaultContext(t)
+	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
@@ -770,7 +646,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil
 	}
 
-	genesisBytes, err := buildCustomGenesis()
+	genesisBytes, err := buildCustomGenesis(ctx.AVAXAssetID)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
@@ -778,7 +654,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	err = vm.Initialize(
 		context.Background(),
 		ctx,
-		chainDBManager,
+		chainDB,
 		genesisBytes,
 		nil,
 		nil,
@@ -807,7 +683,10 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
+	vm.ctx.Lock.Unlock()
+	err = vm.issueTx(context.Background(), testSubnet1)
+	vm.ctx.Lock.Lock()
+	if err != nil {
 		return nil, ids.Empty, err
 	}
 
@@ -828,7 +707,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	return vm, testSubnet1.ID(), nil
 }
 
-func buildCustomGenesis() ([]byte, error) {
+func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()
@@ -846,7 +725,7 @@ func buildCustomGenesis() ([]byte, error) {
 	// won't find next staker to promote/evict from stakers set. Contrary to
 	// what happens with production code we push such validator at the end of
 	// times, so to avoid interference with our tests
-	nodeID := ids.NodeID(keys[len(keys)-1].PublicKey().Address())
+	nodeID := genesisNodeIDs[len(genesisNodeIDs)-1]
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	if err != nil {
 		return nil, err
@@ -854,8 +733,8 @@ func buildCustomGenesis() ([]byte, error) {
 
 	starTime := mockable.MaxTime.Add(-1 * defaultMinStakingDuration)
 	endTime := mockable.MaxTime
-	genesisValidator := api.PermissionlessValidator{
-		Staker: api.Staker{
+	genesisValidator := api.GenesisPermissionlessValidator{
+		GenesisValidator: api.GenesisValidator{
 			StartTime: json.Uint64(starTime.Unix()),
 			EndTime:   json.Uint64(endTime.Unix()),
 			NodeID:    nodeID,
@@ -876,7 +755,7 @@ func buildCustomGenesis() ([]byte, error) {
 		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
-		Validators:    []api.PermissionlessValidator{genesisValidator},
+		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),

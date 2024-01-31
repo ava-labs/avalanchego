@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -11,9 +11,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -33,6 +33,9 @@ type Peers interface {
 	ConnectedPercent() float64
 	// TotalWeight returns the total validator weight
 	TotalWeight() uint64
+	// SampleValidator returns a randomly selected connected validator. If there
+	// are no currently connected validators then it will return false.
+	SampleValidator() (ids.NodeID, bool)
 	// PreferredPeers returns the currently connected validators. If there are
 	// no currently connected validators then it will return the currently
 	// connected peers.
@@ -108,6 +111,13 @@ func (p *lockedPeers) TotalWeight() uint64 {
 	return p.peers.TotalWeight()
 }
 
+func (p *lockedPeers) SampleValidator() (ids.NodeID, bool) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.peers.SampleValidator()
+}
+
 func (p *lockedPeers) PreferredPeers() set.Set[ids.NodeID] {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -139,8 +149,7 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 		Name:      "num_validators",
 		Help:      "Total number of validators",
 	})
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := utils.Err(
 		reg.Register(percentConnected),
 		reg.Register(totalWeight),
 		reg.Register(numValidators),
@@ -154,7 +163,7 @@ func NewMeteredPeers(namespace string, reg prometheus.Registerer) (Peers, error)
 			totalWeight:      totalWeight,
 			numValidators:    numValidators,
 		},
-	}, errs.Err
+	}, err
 }
 
 func (p *meteredPeers) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
@@ -262,6 +271,10 @@ func (p *peerData) ConnectedPercent() float64 {
 
 func (p *peerData) TotalWeight() uint64 {
 	return p.totalWeight
+}
+
+func (p *peerData) SampleValidator() (ids.NodeID, bool) {
+	return p.connectedValidators.Peek()
 }
 
 func (p *peerData) PreferredPeers() set.Set[ids.NodeID] {

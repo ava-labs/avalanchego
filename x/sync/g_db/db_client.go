@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gdb
@@ -19,16 +19,14 @@ import (
 
 var _ sync.DB = (*DBClient)(nil)
 
-func NewDBClient(client pb.DBClient, branchFactor merkledb.BranchFactor) *DBClient {
+func NewDBClient(client pb.DBClient) *DBClient {
 	return &DBClient{
-		client:       client,
-		branchFactor: branchFactor,
+		client: client,
 	}
 }
 
 type DBClient struct {
-	client       pb.DBClient
-	branchFactor merkledb.BranchFactor
+	client pb.DBClient
 }
 
 func (c *DBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -47,6 +45,10 @@ func (c *DBClient) GetChangeProof(
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
+	if endRootID == ids.Empty {
+		return nil, merkledb.ErrEmptyProof
+	}
+
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
@@ -65,12 +67,15 @@ func (c *DBClient) GetChangeProof(
 	}
 
 	// TODO handle merkledb.ErrInvalidMaxLength
+	// TODO disambiguate between the root not being present due to
+	// the end root not being present and the start root not being
+	// present before the end root. i.e. ErrNoEndRoot vs ErrInsufficientHistory.
 	if resp.GetRootNotPresent() {
 		return nil, merkledb.ErrInsufficientHistory
 	}
 
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(resp.GetChangeProof(), c.branchFactor); err != nil {
+	if err := proof.UnmarshalProto(resp.GetChangeProof()); err != nil {
 		return nil, err
 	}
 	return &proof, nil
@@ -122,7 +127,7 @@ func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, e
 	}
 
 	var proof merkledb.Proof
-	if err := proof.UnmarshalProto(resp.Proof, c.branchFactor); err != nil {
+	if err := proof.UnmarshalProto(resp.Proof); err != nil {
 		return nil, err
 	}
 	return &proof, nil
@@ -135,6 +140,10 @@ func (c *DBClient) GetRangeProofAtRoot(
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
+	if rootID == ids.Empty {
+		return nil, merkledb.ErrEmptyProof
+	}
+
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
 		RootHash: rootID[:],
 		StartKey: &pb.MaybeBytes{
@@ -152,7 +161,7 @@ func (c *DBClient) GetRangeProofAtRoot(
 	}
 
 	var proof merkledb.RangeProof
-	if err := proof.UnmarshalProto(resp.Proof, c.branchFactor); err != nil {
+	if err := proof.UnmarshalProto(resp.Proof); err != nil {
 		return nil, err
 	}
 	return &proof, nil
@@ -175,5 +184,10 @@ func (c *DBClient) CommitRangeProof(
 		},
 		RangeProof: proof.ToProto(),
 	})
+	return err
+}
+
+func (c *DBClient) Clear() error {
+	_, err := c.client.Clear(context.Background(), &emptypb.Empty{})
 	return err
 }

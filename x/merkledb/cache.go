@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -25,6 +25,7 @@ type onEvictCache[K comparable, V any] struct {
 	onEviction func(K, V) error
 }
 
+// [size] must always return a positive number.
 func newOnEvictCache[K comparable, V any](
 	maxSize int,
 	size func(K, V) int,
@@ -48,7 +49,7 @@ func (c *onEvictCache[K, V]) Get(key K) (V, bool) {
 
 // Put an element into this cache. If this causes an element
 // to be evicted, calls [c.onEviction] on the evicted element
-// and returns the error from [c.onEviction]. Otherwise returns nil.
+// and returns the error from [c.onEviction]. Otherwise, returns nil.
 func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()

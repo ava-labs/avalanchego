@@ -1,11 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 var _ InboundMsgThrottler = (*inboundMsgThrottler)(nil)
@@ -56,7 +56,7 @@ func NewInboundMsgThrottler(
 	log logging.Logger,
 	namespace string,
 	registerer prometheus.Registerer,
-	vdrs validators.Set,
+	vdrs validators.Manager,
 	throttlerConfig InboundMsgThrottlerConfig,
 	resourceTracker tracker.ResourceTracker,
 	cpuTargeter tracker.Targeter,
@@ -90,7 +90,7 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	cpuThrottler, err := NewSystemThrottler(
-		fmt.Sprintf("%s_cpu", namespace),
+		metric.AppendNamespace(namespace, "cpu"),
 		registerer,
 		throttlerConfig.CPUThrottlerConfig,
 		resourceTracker.CPUTracker(),
@@ -100,7 +100,7 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	diskThrottler, err := NewSystemThrottler(
-		fmt.Sprintf("%s_disk", namespace),
+		metric.AppendNamespace(namespace, "disk"),
 		registerer,
 		throttlerConfig.DiskThrottlerConfig,
 		resourceTracker.DiskTracker(),

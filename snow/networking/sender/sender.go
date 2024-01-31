@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -1210,11 +1210,13 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	ctx = utils.Detach(ctx)
 
 	// The failed message is treated as if it was sent by the requested chain
-	failedMsg := message.InternalCrossChainAppRequestFailed(
+	failedMsg := message.InternalCrossChainAppError(
 		s.ctx.NodeID,
 		chainID,
 		s.ctx.ChainID,
 		requestID,
+		common.ErrTimeout.Code,
+		common.ErrTimeout.Message,
 	)
 	s.router.RegisterRequest(
 		ctx,
@@ -1262,10 +1264,12 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		inMsg := message.InternalAppRequestFailed(
+		inMsg := message.InboundAppError(
 			nodeID,
 			s.ctx.ChainID,
 			requestID,
+			common.ErrTimeout.Code,
+			common.ErrTimeout.Message,
 		)
 		s.router.RegisterRequest(
 			ctx,
@@ -1308,10 +1312,12 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 			// Immediately register a failure. Do so asynchronously to avoid
 			// deadlock.
-			inMsg := message.InternalAppRequestFailed(
+			inMsg := message.InboundAppError(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
+				common.ErrTimeout.Code,
+				common.ErrTimeout.Message,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
@@ -1366,10 +1372,12 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
-			inMsg := message.InternalAppRequestFailed(
+			inMsg := message.InboundAppError(
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
+				common.ErrTimeout.Code,
+				common.ErrTimeout.Message,
 			)
 			go s.router.HandleInbound(ctx, inMsg)
 		}

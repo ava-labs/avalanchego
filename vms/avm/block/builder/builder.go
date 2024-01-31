@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/states"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 
@@ -82,7 +82,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		nextTimestamp = preferredTimestamp
 	}
 
-	stateDiff, err := states.NewDiff(preferredID, b.manager)
+	stateDiff, err := state.NewDiff(preferredID, b.manager)
 	if err != nil {
 		return nil, err
 	}
@@ -93,15 +93,19 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		remainingSize = targetBlockSize
 	)
 	for {
-		tx := b.mempool.Peek(remainingSize)
-		if tx == nil {
+		tx, exists := b.mempool.Peek()
+		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
+		// that we will only stop building a block once there are no
+		// transactions in the mempool or the block is at least
+		// [targetBlockSize - mempool.MaxTxSize] bytes full.
+		if !exists || len(tx.Bytes()) > remainingSize {
 			break
 		}
-		b.mempool.Remove([]*txs.Tx{tx})
+		b.mempool.Remove(tx)
 
 		// Invariant: [tx] has already been syntactically verified.
 
-		txDiff, err := wrapState(stateDiff)
+		txDiff, err := state.NewDiffOn(stateDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -165,18 +169,4 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	return b.manager.NewBlock(statelessBlk), nil
-}
-
-type stateGetter struct {
-	state states.Chain
-}
-
-func (s stateGetter) GetState(ids.ID) (states.Chain, bool) {
-	return s.state, true
-}
-
-func wrapState(parentState states.Chain) (states.Diff, error) {
-	return states.NewDiff(ids.Empty, stateGetter{
-		state: parentState,
-	})
 }

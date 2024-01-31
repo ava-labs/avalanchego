@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1
@@ -14,8 +14,7 @@ func TestKeys() []*PrivateKey {
 			"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 			"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 		}
-		keys    = make([]*PrivateKey, len(keyStrings))
-		factory = Factory{}
+		keys = make([]*PrivateKey, len(keyStrings))
 	)
 
 	for i, key := range keyStrings {
@@ -24,7 +23,7 @@ func TestKeys() []*PrivateKey {
 			panic(err)
 		}
 
-		keys[i], err = factory.ToPrivateKey(privKeyBytes)
+		keys[i], err = ToPrivateKey(privKeyBytes)
 		if err != nil {
 			panic(err)
 		}

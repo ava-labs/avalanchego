@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -22,10 +22,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
-	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
-	}()
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 
 	type test struct {
 		description   string
@@ -36,8 +33,7 @@ func TestNewImportTx(t *testing.T) {
 		expectedErr   error
 	}
 
-	factory := secp256k1.Factory{}
-	sourceKey, err := factory.NewPrivateKey()
+	sourceKey, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
 
 	cnt := new(byte)
@@ -68,7 +64,7 @@ func TestNewImportTx(t *testing.T) {
 					},
 				},
 			}
-			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
 			require.NoError(t, err)
 
 			inputID := utxo.InputID()
@@ -119,9 +115,9 @@ func TestNewImportTx(t *testing.T) {
 		},
 		{
 			description:   "attempting to import from C-chain",
-			sourceChainID: cChainID,
+			sourceChainID: env.ctx.CChainID,
 			sharedMemory: fundedSharedMemory(
-				cChainID,
+				env.ctx.CChainID,
 				map[ids.ID]uint64{
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
@@ -183,19 +179,15 @@ func TestNewImportTx(t *testing.T) {
 
 			require.Equal(env.config.TxFee, totalIn-totalOut)
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
-			fakedState.SetTimestamp(tt.timestamp)
+			stateDiff.SetTimestamp(tt.timestamp)
 
-			fakedParent := ids.GenerateTestID()
-			env.SetState(fakedParent, fakedState)
-
-			verifier := MempoolTxVerifier{
-				Backend:       &env.backend,
-				ParentID:      fakedParent,
-				StateVersions: env,
-				Tx:            tx,
+			verifier := StandardTxExecutor{
+				Backend: &env.backend,
+				State:   stateDiff,
+				Tx:      tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&verifier))
 		})

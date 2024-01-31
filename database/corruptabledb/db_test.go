@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package corruptabledb
@@ -18,24 +18,29 @@ import (
 
 var errTest = errors.New("non-nil error")
 
+func newDB() *Database {
+	baseDB := memdb.New()
+	return New(baseDB)
+}
+
 func TestInterface(t *testing.T) {
-	for _, test := range database.Tests {
-		baseDB := memdb.New()
-		db := New(baseDB)
-		test(t, db)
+	for name, test := range database.Tests {
+		t.Run(name, func(t *testing.T) {
+			test(t, newDB())
+		})
 	}
 }
 
 func FuzzKeyValue(f *testing.F) {
-	baseDB := memdb.New()
-	db := New(baseDB)
-	database.FuzzKeyValue(f, db)
+	database.FuzzKeyValue(f, newDB())
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	baseDB := memdb.New()
-	db := New(baseDB)
-	database.FuzzNewIteratorWithPrefix(f, db)
+	database.FuzzNewIteratorWithPrefix(f, newDB())
+}
+
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
+	database.FuzzNewIteratorWithStartAndPrefix(f, newDB())
 }
 
 // TestCorruption tests to make sure corruptabledb wrapper works as expected.
@@ -70,9 +75,7 @@ func TestCorruption(t *testing.T) {
 			return err
 		},
 	}
-	baseDB := memdb.New()
-	// wrap this db
-	corruptableDB := New(baseDB)
+	corruptableDB := newDB()
 	_ = corruptableDB.handleError(errTest)
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
@@ -176,9 +179,7 @@ func TestIterator(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			// Make a database
-			baseDB := memdb.New()
-			corruptableDB := New(baseDB)
-
+			corruptableDB := newDB()
 			// Put a key-value pair in the database.
 			require.NoError(corruptableDB.Put([]byte{0}, []byte{1}))
 

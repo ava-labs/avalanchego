@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
@@ -6,12 +6,15 @@ package syncer
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -54,26 +57,29 @@ type fullVM struct {
 	*block.TestStateSyncableVM
 }
 
-func buildTestPeers(t *testing.T) validators.Set {
-	// we consider more than common.MaxOutstandingBroadcastRequests peers
-	// so to test the effect of cap on number of requests sent out
-	vdrs := validators.NewSet()
-	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
+func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
+	// We consider more than maxOutstandingBroadcastRequests peers to test
+	// capping the number of requests sent out.
+	vdrs := validators.NewManager()
+	for idx := 0; idx < 2*maxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
-		require.NoError(t, vdrs.Add(beaconID, nil, ids.Empty, 1))
+		require.NoError(t, vdrs.AddStaker(subnetID, beaconID, nil, ids.Empty, 1))
 	}
 	return vdrs
 }
 
-func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
+func buildTestsObjects(
+	t *testing.T,
+	ctx *snow.ConsensusContext,
+	startupTracker tracker.Startup,
+	beacons validators.Manager,
+	alpha uint64,
+) (
 	*stateSyncer,
 	*fullVM,
 	*common.SenderTest,
 ) {
 	require := require.New(t)
-
-	sender := &common.SenderTest{T: t}
-	commonCfg.Sender = sender
 
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
@@ -83,10 +89,28 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 			T: t,
 		},
 	}
-	dummyGetter, err := getter.New(fullVM, *commonCfg)
+	sender := &common.SenderTest{T: t}
+	dummyGetter, err := getter.New(
+		fullVM,
+		sender,
+		ctx.Log,
+		time.Second,
+		2000,
+		ctx.Registerer,
+	)
 	require.NoError(err)
 
-	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
+	cfg, err := NewConfig(
+		dummyGetter,
+		ctx,
+		startupTracker,
+		sender,
+		beacons,
+		beacons.Count(ctx.SubnetID),
+		alpha,
+		nil,
+		fullVM,
+	)
 	require.NoError(err)
 	commonSyncer := New(cfg, func(context.Context, uint32) error {
 		return nil

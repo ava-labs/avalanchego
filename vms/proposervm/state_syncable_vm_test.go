@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -11,14 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -51,7 +52,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		HeightV: 0,
 		BytesV:  []byte("genesis state"),
 	}
-	innerVM.InitializeF = func(context.Context, *snow.Context, manager.Manager,
+	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
 		[]*common.Fx, common.AppSender,
 	) error {
@@ -67,27 +68,27 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		return innerGenesisBlk, nil
 	}
 
-	// createVM
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
-
+	// create the VM
 	vm := New(
 		innerVM,
-		time.Time{},
-		0,
-		DefaultMinBlockDelay,
-		DefaultNumHistoricalBlocks,
-		pTestSigner,
-		pTestCert,
+		Config{
+			ActivationTime:      time.Unix(0, 0),
+			DurangoTime:         time.Unix(0, 0),
+			MinimumPChainHeight: 0,
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+		},
 	)
 
-	ctx := snow.DefaultContextTest()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
+		prefixdb.New([]byte{}, memdb.New()),
 		innerGenesisBlk.Bytes(),
 		nil,
 		nil,
@@ -176,9 +177,9 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 
 	// store post fork block associated with summary
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		TimestampV: vm.Time(),
-		HeightV:    innerSummary.Height(),
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(innerBlk.Bytes(), b)
@@ -189,10 +190,10 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -261,9 +262,9 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 
 	// store post fork block associated with summary
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		TimestampV: vm.Time(),
-		HeightV:    innerSummary.Height(),
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(innerBlk.Bytes(), b)
@@ -274,10 +275,10 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -349,9 +350,9 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 
 	// store post fork block associated with summary
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		TimestampV: vm.Time(),
-		HeightV:    innerSummary.Height(),
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(innerBlk.Bytes(), b)
@@ -362,10 +363,10 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -422,9 +423,9 @@ func TestParseStateSummary(t *testing.T) {
 
 	// store post fork block associated with summary
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		TimestampV: vm.Time(),
-		HeightV:    innerSummary.Height(),
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(innerBlk.Bytes(), b)
@@ -435,10 +436,10 @@ func TestParseStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -481,19 +482,19 @@ func TestStateSummaryAccept(t *testing.T) {
 
 	// store post fork block associated with summary
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		TimestampV: vm.Time(),
-		HeightV:    innerSummary.Height(),
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: innerSummary.Height(),
 	}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 
@@ -553,9 +554,9 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 
 	// store post fork block associated with summary
 	innerBlk := &snowman.TestBlock{
-		BytesV:     []byte{1},
-		TimestampV: vm.Time(),
-		HeightV:    innerSummary.Height(),
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: innerSummary.Height(),
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
 		require.Equal(reqHeight, h)
@@ -570,10 +571,10 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.StakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -602,7 +603,11 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 	require := require.New(t)
 
 	// Note: by default proVM is built such that heightIndex will be considered complete
-	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()

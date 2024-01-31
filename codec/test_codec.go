@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package codec
@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -39,7 +41,6 @@ var (
 		TestNegativeNumbers,
 		TestTooLargeUnmarshal,
 		TestUnmarshalInvalidInterface,
-		TestRestrictedSlice,
 		TestExtraSpace,
 		TestSliceLengthOverflow,
 		TestMap,
@@ -47,6 +48,15 @@ var (
 
 	MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
 		TestMultipleTags,
+	}
+
+	EnforceSliceLenTests = []func(c GeneralCodec, t testing.TB){
+		TestCanNotMarshalLargeSlices,
+		TestCanNotUnmarshalLargeSlices,
+	}
+
+	IgnoreSliceLenTests = []func(c GeneralCodec, t testing.TB){
+		TestCanMarshalLargeSlices,
 	}
 )
 
@@ -417,7 +427,6 @@ func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
 // Test marshalling a slice of structs
 func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
-
 	mySlice := []MyInnerStruct3{
 		{
 			Str: "One",
@@ -875,27 +884,6 @@ func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
 	}
 }
 
-// Ensure deserializing slices that have been length restricted errors correctly
-func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	type inner struct {
-		Bytes []byte `serialize:"true" len:"2"`
-	}
-	bytes := []byte{0, 0, 0, 0, 0, 3, 0, 1, 2}
-
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	s := inner{}
-	_, err := manager.Unmarshal(bytes, &s)
-	require.ErrorIs(err, ErrMaxSliceLenExceeded)
-
-	s.Bytes = []byte{0, 1, 2}
-	_, err = manager.Marshal(0, s)
-	require.ErrorIs(err, ErrMaxSliceLenExceeded)
-}
-
 // Test unmarshaling something with extra data
 func TestExtraSpace(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
@@ -910,12 +898,12 @@ func TestExtraSpace(codec GeneralCodec, t testing.TB) {
 	require.ErrorIs(err, ErrExtraSpace)
 }
 
-// Ensure deserializing slices that have been length restricted errors correctly
+// Ensure deserializing slices whose lengths exceed MaxInt32 error correctly
 func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type inner struct {
-		Vals []uint32 `serialize:"true" len:"2"`
+		Vals []uint32 `serialize:"true"`
 	}
 	bytes := []byte{
 		// Codec Version:
@@ -1041,6 +1029,52 @@ func TestMap(codec GeneralCodec, t testing.TB) {
 	outerArraySize, err := manager.Size(0, outerArray)
 	require.NoError(err)
 	require.Len(outerArrayBytes, outerArraySize)
+}
+
+func TestCanNotMarshalLargeSlices(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	data := make([]uint16, 1_000_000)
+
+	manager := NewManager(math.MaxInt)
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	_, err := manager.Marshal(0, data)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
+}
+
+func TestCanNotUnmarshalLargeSlices(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	writer := wrappers.Packer{
+		Bytes: make([]byte, 2+4+2_000_000),
+	}
+	writer.PackShort(0)
+	writer.PackInt(1_000_000)
+
+	manager := NewManager(math.MaxInt)
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	var data []uint16
+	_, err := manager.Unmarshal(writer.Bytes, &data)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
+}
+
+func TestCanMarshalLargeSlices(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	data := make([]uint16, 1_000_000)
+
+	manager := NewManager(math.MaxInt)
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	bytes, err := manager.Marshal(0, data)
+	require.NoError(err)
+
+	var unmarshalledData []uint16
+	_, err = manager.Unmarshal(bytes, &unmarshalledData)
+	require.NoError(err)
+	require.Equal(data, unmarshalledData)
 }
 
 func FuzzStructUnmarshal(codec GeneralCodec, f *testing.F) {

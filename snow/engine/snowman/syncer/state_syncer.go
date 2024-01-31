@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
@@ -23,6 +23,10 @@ import (
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
+
+// maxOutstandingBroadcastRequests is the maximum number of requests to have
+// outstanding when broadcasting.
+const maxOutstandingBroadcastRequests = 50
 
 var _ common.StateSyncer = (*stateSyncer)(nil)
 
@@ -59,7 +63,7 @@ type stateSyncer struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	// Won't be consumed as seeders are reached out. Used to rescale
 	// alpha for frontiers
-	frontierSeeders validators.Set
+	frontierSeeders validators.Manager
 	// IDs of validators we should request state summary frontier from.
 	// Will be consumed seeders are reached out for frontier.
 	targetSeeders set.Set[ids.NodeID]
@@ -84,9 +88,6 @@ type stateSyncer struct {
 	// we keep a list of deduplicated height ready for voting
 	summariesHeights       set.Set[uint64]
 	uniqueSummariesHeights []uint64
-
-	// number of times the state sync has been attempted
-	attempts int
 }
 
 func New(
@@ -106,6 +107,57 @@ func New(
 		stateSyncVM:             ssVM,
 		onDoneStateSyncing:      onDoneStateSyncing,
 	}
+}
+
+func (ss *stateSyncer) Context() *snow.ConsensusContext {
+	return ss.Ctx
+}
+
+func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
+	ss.Ctx.Log.Info("starting state sync")
+
+	ss.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.StateSyncing,
+	})
+	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
+		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
+	}
+
+	ss.requestID = startReqID
+
+	return ss.tryStartSyncing(ctx)
+}
+
+func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	if err := ss.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
+		return err
+	}
+
+	return ss.tryStartSyncing(ctx)
+}
+
+func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := ss.VM.Disconnected(ctx, nodeID); err != nil {
+		return err
+	}
+
+	return ss.StartupTracker.Disconnected(ctx, nodeID)
+}
+
+// tryStartSyncing will start syncing the first time it is called while the
+// startupTracker is reporting that the protocol should start.
+func (ss *stateSyncer) tryStartSyncing(ctx context.Context) error {
+	if ss.started || !ss.StartupTracker.ShouldStart() {
+		return nil
+	}
+
+	ss.started = true
+	return ss.startup(ctx)
 }
 
 func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
@@ -191,20 +243,27 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	// If we got too many timeouts, we restart state syncing hoping that network
 	// problems will go away and we can collect a qualified frontier.
 	// We assume the frontier is qualified after an alpha proportion of frontier seeders have responded
-	frontierAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
-	failedBeaconWeight := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
+	frontiersTotalWeight, err := ss.frontierSeeders.TotalWeight(ss.Ctx.SubnetID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of frontier seeders for subnet %s: %w", ss.Ctx.SubnetID, err)
+	}
+	beaconsTotalWeight, err := ss.StateSyncBeacons.TotalWeight(ss.Ctx.SubnetID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of state sync beacons for subnet %s: %w", ss.Ctx.SubnetID, err)
+	}
+	frontierAlpha := float64(frontiersTotalWeight*ss.Alpha) / float64(beaconsTotalWeight)
+	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.Ctx.SubnetID, ss.failedSeeders)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of failed beacons: %w", err)
+	}
 
-	frontierStake := ss.frontierSeeders.Weight() - failedBeaconWeight
+	frontierStake := frontiersTotalWeight - failedBeaconWeight
 	if float64(frontierStake) < frontierAlpha {
-		ss.Ctx.Log.Debug("didn't receive enough frontiers",
+		ss.Ctx.Log.Debug("restarting state sync",
+			zap.String("reason", "didn't receive enough frontiers"),
 			zap.Int("numFailedValidators", ss.failedSeeders.Len()),
-			zap.Int("numStateSyncAttempts", ss.attempts),
 		)
-
-		if ss.Config.RetryBootstrap {
-			ss.Ctx.Log.Debug("restarting state sync")
-			return ss.restart(ctx)
-		}
+		return ss.startup(ctx)
 	}
 
 	ss.requestID++
@@ -212,7 +271,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -233,13 +292,14 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	// Mark that we received a response from [nodeID]
 	ss.pendingVoters.Remove(nodeID)
 
-	nodeWeight := ss.StateSyncBeacons.GetWeight(nodeID)
+	nodeWeight := ss.StateSyncBeacons.GetWeight(ss.Ctx.SubnetID, nodeID)
 	ss.Ctx.Log.Debug("adding weight to summaries",
 		zap.Stringer("nodeID", nodeID),
-		zap.Stringers("summaryIDs", summaryIDs),
+		zap.Stringer("subnetID", ss.Ctx.SubnetID),
+		zap.Reflect("summaryIDs", summaryIDs),
 		zap.Uint64("nodeWeight", nodeWeight),
 	)
-	for _, summaryID := range summaryIDs {
+	for summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
 			ss.Ctx.Log.Debug("skipping summary",
@@ -299,22 +359,28 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	size := len(ss.weightedSummaries)
 	if size == 0 {
 		// retry the state sync if the weight is not enough to state sync
-		failedBeaconWeight := ss.StateSyncBeacons.SubsetWeight(ss.failedVoters)
+		failedVotersWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.Ctx.SubnetID, ss.failedVoters)
+		if err != nil {
+			return fmt.Errorf("failed to get total weight of failed voters: %w", err)
+		}
 
 		// if we had too many timeouts when asking for validator votes, we should restart
 		// state sync hoping for the network problems to go away; otherwise, we received
 		// enough (>= ss.Alpha) responses, but no state summary was supported by a majority
 		// of validators (i.e. votes are split between minorities supporting different state
 		// summaries), so there is no point in retrying state sync; we should move ahead to bootstrapping
-		votingStakes := ss.StateSyncBeacons.Weight() - failedBeaconWeight
-		if ss.Config.RetryBootstrap && votingStakes < ss.Alpha {
+		beaconsTotalWeight, err := ss.StateSyncBeacons.TotalWeight(ss.Ctx.SubnetID)
+		if err != nil {
+			return fmt.Errorf("failed to get total weight of state sync beacons for subnet %s: %w", ss.Ctx.SubnetID, err)
+		}
+		votingStakes := beaconsTotalWeight - failedVotersWeight
+		if votingStakes < ss.Alpha {
 			ss.Ctx.Log.Debug("restarting state sync",
 				zap.String("reason", "not enough votes received"),
-				zap.Int("numBeacons", ss.StateSyncBeacons.Len()),
+				zap.Int("numBeacons", ss.StateSyncBeacons.Count(ss.Ctx.SubnetID)),
 				zap.Int("numFailedSyncers", ss.failedVoters.Len()),
-				zap.Int("numAttempts", ss.attempts),
 			)
-			return ss.restart(ctx)
+			return ss.startup(ctx)
 		}
 
 		ss.Ctx.Log.Info("skipping state sync",
@@ -403,27 +469,6 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 	return ss.AcceptedStateSummary(ctx, nodeID, requestID, nil)
 }
 
-func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
-	ss.Ctx.Log.Info("starting state sync")
-
-	ss.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.StateSyncing,
-	})
-	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
-		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
-	}
-
-	ss.requestID = startReqID
-
-	if !ss.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	ss.started = true
-	return ss.startup(ctx)
-}
-
 // startup do start the whole state sync process by
 // sampling frontier seeders, listing state syncers to request votes to
 // and reaching out frontier seeders if any. Otherwise, it moves immediately
@@ -445,18 +490,18 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.failedVoters.Clear()
 
 	// sample K beacons to retrieve frontier from
-	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Config.SampleK)
+	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Ctx.SubnetID, ss.Config.SampleK)
 	if err != nil {
 		return err
 	}
 
-	ss.frontierSeeders = validators.NewSet()
+	ss.frontierSeeders = validators.NewManager()
 	for _, nodeID := range beaconIDs {
-		if !ss.frontierSeeders.Contains(nodeID) {
+		if _, ok := ss.frontierSeeders.GetValidator(ss.Ctx.SubnetID, nodeID); !ok {
 			// Invariant: We never use the TxID or BLS keys populated here.
-			err = ss.frontierSeeders.Add(nodeID, nil, ids.Empty, 1)
+			err = ss.frontierSeeders.AddStaker(ss.Ctx.SubnetID, nodeID, nil, ids.Empty, 1)
 		} else {
-			err = ss.frontierSeeders.AddWeight(nodeID, 1)
+			err = ss.frontierSeeders.AddWeight(ss.Ctx.SubnetID, nodeID, 1)
 		}
 		if err != nil {
 			return err
@@ -465,9 +510,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// list all beacons, to reach them for voting on frontier
-	for nodeID := range ss.StateSyncBeacons.Map() {
-		ss.targetVoters.Add(nodeID)
-	}
+	ss.targetVoters.Add(ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID)...)
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
@@ -490,7 +533,6 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// initiate messages exchange
-	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
@@ -501,22 +543,12 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) restart(ctx context.Context) error {
-	if ss.attempts > 0 && ss.attempts%ss.RetryBootstrapWarnFrequency == 0 {
-		ss.Ctx.Log.Debug("check internet connection",
-			zap.Int("numSyncAttempts", ss.attempts),
-		)
-	}
-
-	return ss.startup(ctx)
-}
-
 // Ask up to [common.MaxOutstandingBroadcastRequests] state sync validators at a time
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
-	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < maxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
 		ss.pendingSeeders.Add(vdr)
@@ -532,7 +564,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 // no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 	vdrs := set.NewSet[ids.NodeID](1)
-	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < maxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
 		vdrs.Add(vdr)
 		ss.pendingVoters.Add(vdr)
@@ -562,37 +594,16 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 
-func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := ss.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if err := ss.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
-		return err
-	}
-
-	if ss.started || !ss.StartupTracker.ShouldStart() {
-		return nil
-	}
-
-	ss.started = true
-	return ss.startup(ctx)
-}
-
-func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	if err := ss.VM.Disconnected(ctx, nodeID); err != nil {
-		return err
-	}
-
-	return ss.StartupTracker.Disconnected(ctx, nodeID)
-}
-
 func (*stateSyncer) Gossip(context.Context) error {
 	return nil
 }
 
 func (ss *stateSyncer) Shutdown(ctx context.Context) error {
 	ss.Config.Ctx.Log.Info("shutting down state syncer")
+
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	return ss.VM.Shutdown(ctx)
 }
 
@@ -603,6 +614,9 @@ func (*stateSyncer) Timeout(context.Context) error {
 }
 
 func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
+
 	vmIntf, vmErr := ss.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": struct{}{},
@@ -611,15 +625,14 @@ func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (ss *stateSyncer) GetVM() common.VM {
-	return ss.VM
-}
-
 func (ss *stateSyncer) IsEnabled(ctx context.Context) (bool, error) {
 	if ss.stateSyncVM == nil {
 		// state sync is not implemented
 		return false, nil
 	}
+
+	ss.Ctx.Lock.Lock()
+	defer ss.Ctx.Lock.Unlock()
 
 	return ss.stateSyncVM.StateSyncEnabled(ctx)
 }
