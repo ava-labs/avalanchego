@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
 	"golang.org/x/exp/maps"
 )
 
