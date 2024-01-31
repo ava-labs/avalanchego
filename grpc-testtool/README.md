@@ -44,6 +44,6 @@ Then, run the test you want:
 export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 export CGO_ENABLED=1
 export GOPROXY=https://proxy.golang.org
-cd $BASE/merkledb-tester/tests
-go test -timeout 5m github.com/ava-labs/merkledb-tester/... -v -count=1
+cd $BASE/merkledb-tester
+./scripts/test.sh
 ```
