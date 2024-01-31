@@ -18,4 +18,4 @@ SUBNET_EVM_PATH=$(
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
-go run ./cmd/precompilegen/main.go $@
+go run ./cmd/precompilegen/main.go "$@"

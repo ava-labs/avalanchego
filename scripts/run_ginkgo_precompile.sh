@@ -17,7 +17,7 @@ source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
 # Build ginkgo
 # to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION}
+go install -v github.com/onsi/ginkgo/v2/ginkgo@"${GINKGO_VERSION}"
 
 TEST_SOURCE_ROOT=$(pwd)
 
@@ -26,4 +26,4 @@ TEST_SOURCE_ROOT=$(pwd)
 # Use "--ginkgo.focus" to select tests.
 TEST_SOURCE_ROOT="$TEST_SOURCE_ROOT" ginkgo run -procs=5 tests/precompile \
   --ginkgo.vv \
-  --ginkgo.label-filter=${GINKGO_LABEL_FILTER:-""}
+  --ginkgo.label-filter="${GINKGO_LABEL_FILTER:-""}"

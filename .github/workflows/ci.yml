@@ -26,6 +26,9 @@ jobs:
           version: v1.54
           working-directory: .
           args: --timeout 10m
+      - name: Run shellcheck
+        shell: bash
+        run: scripts/shellcheck.sh
 
   unit_test:
     name: Golang Unit Tests

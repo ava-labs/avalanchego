@@ -19,7 +19,7 @@ GOOS=$(go env GOOS)
 BASEDIR=${BASEDIR:-"/tmp/avalanchego-release"}
 AVALANCHEGO_BUILD_PATH=${AVALANCHEGO_BUILD_PATH:-${BASEDIR}/avalanchego}
 
-mkdir -p ${BASEDIR}
+mkdir -p "${BASEDIR}"
 
 AVAGO_DOWNLOAD_URL=https://github.com/ava-labs/avalanchego/releases/download/${AVALANCHE_VERSION}/avalanchego-linux-${GOARCH}-${AVALANCHE_VERSION}.tar.gz
 AVAGO_DOWNLOAD_PATH=${BASEDIR}/avalanchego-linux-${GOARCH}-${AVALANCHE_VERSION}.tar.gz
@@ -32,14 +32,14 @@ fi
 BUILD_DIR=${AVALANCHEGO_BUILD_PATH}-${AVALANCHE_VERSION}
 
 extract_archive() {
-  mkdir -p ${BUILD_DIR}
+  mkdir -p "${BUILD_DIR}"
 
   if [[ ${AVAGO_DOWNLOAD_PATH} == *.tar.gz ]]; then
-    tar xzvf ${AVAGO_DOWNLOAD_PATH} --directory ${BUILD_DIR} --strip-components 1
+    tar xzvf "${AVAGO_DOWNLOAD_PATH}" --directory "${BUILD_DIR}" --strip-components 1
   elif [[ ${AVAGO_DOWNLOAD_PATH} == *.zip ]]; then
-    unzip ${AVAGO_DOWNLOAD_PATH} -d ${BUILD_DIR}
-    mv ${BUILD_DIR}/build/* ${BUILD_DIR}
-    rm -rf ${BUILD_DIR}/build/
+    unzip "${AVAGO_DOWNLOAD_PATH}" -d "${BUILD_DIR}"
+    mv "${BUILD_DIR}"/build/* "${BUILD_DIR}"
+    rm -rf "${BUILD_DIR}"/build/
   fi
 }
 
@@ -51,10 +51,10 @@ if [[ -f ${AVAGO_DOWNLOAD_PATH} ]]; then
   extract_archive
 else
   # try to download the archive if it exists
-  if curl -s --head --request GET ${AVAGO_DOWNLOAD_URL} | grep "302" > /dev/null; then
+  if curl -s --head --request GET "${AVAGO_DOWNLOAD_URL}" | grep "302" > /dev/null; then
     echo "${AVAGO_DOWNLOAD_URL} found"
     echo "downloading to ${AVAGO_DOWNLOAD_PATH}"
-    curl -L ${AVAGO_DOWNLOAD_URL} -o ${AVAGO_DOWNLOAD_PATH}
+    curl -L "${AVAGO_DOWNLOAD_URL}" -o "${AVAGO_DOWNLOAD_PATH}"
 
     extract_archive
   else
@@ -65,13 +65,13 @@ else
     # check to see if the repo already exists, if not clone it
     if [[ ! -d ${GIT_CLONE_PATH} ]]; then
       echo "cloning ${GIT_CLONE_URL} to ${GIT_CLONE_PATH}"
-      git clone --no-checkout ${GIT_CLONE_URL} ${GIT_CLONE_PATH}
+      git clone --no-checkout ${GIT_CLONE_URL} "${GIT_CLONE_PATH}"
     fi
 
     # check to see if the commitish exists in the repo
     WORKDIR=$(pwd)
 
-    cd ${GIT_CLONE_PATH}
+    cd "${GIT_CLONE_PATH}"
 
     git fetch
 
@@ -79,14 +79,14 @@ else
 
     set +e
     # try to checkout the branch
-    git checkout origin/${AVALANCHE_VERSION} > /dev/null 2>&1
+    git checkout origin/"${AVALANCHE_VERSION}" > /dev/null 2>&1
     CHECKOUT_STATUS=$?
     set -e
 
     # if it's not a branch, try to checkout the commit
     if [[ $CHECKOUT_STATUS -ne 0 ]]; then
       set +e
-      git checkout ${AVALANCHE_VERSION} > /dev/null 2>&1
+      git checkout "${AVALANCHE_VERSION}" > /dev/null 2>&1
       CHECKOUT_STATUS=$?
       set -e
 
@@ -106,21 +106,21 @@ else
     if [[ ! -d ${BUILD_DIR} ]]; then
       echo "building avalanchego ${COMMIT} to ${BUILD_DIR}"
       ./scripts/build.sh
-      mkdir -p ${BUILD_DIR}
+      mkdir -p "${BUILD_DIR}"
 
-      mv ${GIT_CLONE_PATH}/build/* ${BUILD_DIR}/
+      mv "${GIT_CLONE_PATH}"/build/* "${BUILD_DIR}"/
     fi
 
-    cd $WORKDIR
+    cd "$WORKDIR"
   fi
 fi
 
 AVALANCHEGO_PATH=${AVALANCHEGO_BUILD_PATH}/avalanchego
 AVALANCHEGO_PLUGIN_DIR=${AVALANCHEGO_BUILD_PATH}/plugins
 
-mkdir -p ${AVALANCHEGO_BUILD_PATH}
+mkdir -p "${AVALANCHEGO_BUILD_PATH}"
 
-cp ${BUILD_DIR}/avalanchego ${AVALANCHEGO_PATH}
+cp "${BUILD_DIR}"/avalanchego "${AVALANCHEGO_PATH}"
 
 
 echo "Installed AvalancheGo release ${AVALANCHE_VERSION}"

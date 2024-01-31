@@ -17,12 +17,10 @@ source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
 # Build ginkgo
 # to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION}
-
-TEST_SOURCE_ROOT=$(pwd)
+go install -v "github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION}"
 
 ACK_GINKGO_RC=true ginkgo build ./tests/warp
 
 ./tests/warp/warp.test \
   --ginkgo.vv \
-  --ginkgo.label-filter=${GINKGO_LABEL_FILTER:-""}
+  --ginkgo.label-filter="${GINKGO_LABEL_FILTER:-""}"

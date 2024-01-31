@@ -24,11 +24,11 @@ AVALANCHEGO_PATH=${AVALANCHEGO_PATH:-"$AVALANCHEGO_BUILD_PATH/avalanchego"}
 AVALANCHEGO_PLUGIN_DIR=${AVALANCHEGO_PLUGIN_DIR:-"$AVALANCHEGO_BUILD_PATH/plugins"}
 DATA_DIR=${DATA_DIR:-/tmp/subnet-evm-start-node/$(date "+%Y-%m-%d%:%H:%M:%S")}
 
-mkdir -p $DATA_DIR
+mkdir -p "$DATA_DIR"
 
 # Set the config file contents for the path passed in as the first argument
 function _set_config(){
-  cat <<EOF >$1
+  cat <<EOF >"$1"
   {
     "network-id": "local",
     "sybil-protection-enabled": false,
@@ -38,18 +38,11 @@ function _set_config(){
 EOF
 }
 
-function execute_cmd() {
-  echo "Executing command: $@"
-  $@
-}
-
 NODE_NAME="node1"
 NODE_DATA_DIR="$DATA_DIR/$NODE_NAME"
 echo "Creating data directory: $NODE_DATA_DIR"
-mkdir -p $NODE_DATA_DIR
+mkdir -p "$NODE_DATA_DIR"
 NODE_CONFIG_FILE_PATH="$NODE_DATA_DIR/config.json"
-_set_config $NODE_CONFIG_FILE_PATH
+_set_config "$NODE_CONFIG_FILE_PATH"
 
-CMD="$AVALANCHEGO_PATH --data-dir=$NODE_DATA_DIR --config-file=$NODE_CONFIG_FILE_PATH"
-
-execute_cmd $CMD
+(set -x; $AVALANCHEGO_PATH --data-dir="$NODE_DATA_DIR" --config-file="$NODE_CONFIG_FILE_PATH")
