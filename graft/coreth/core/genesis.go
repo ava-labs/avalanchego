@@ -157,6 +157,10 @@ func (e *GenesisMismatchError) Error() string {
 //	                  +------------------------------------------
 //	db has no genesis |  main-net default  |  genesis
 //	db has genesis    |  from DB           |  genesis (if compatible)
+
+// The argument [genesis] must be specified and must contain a valid chain config.
+// If the genesis block has already been set up, then we verify the hash matches the genesis passed in
+// and that the chain config contained in genesis is backwards compatible with what is stored in the database.
 //
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the

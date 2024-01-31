@@ -36,7 +36,7 @@ func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip
 }
 
 // RequestHandler interface handles incoming requests from peers
-// Must have methods in format of handleType(context.Context, ids.ShortID, uint32, request Type) error
+// Must have methods in format of handleType(context.Context, ids.NodeID, uint32, request Type) error
 // so that the Request object of relevant Type can invoke its respective handle method
 // on this struct.
 // Also see GossipHandler for implementation style.

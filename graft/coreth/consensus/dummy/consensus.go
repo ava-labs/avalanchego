@@ -206,16 +206,17 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 		}
 	}
-
 	// Ensure gas-related header fields are correct
 	if err := self.verifyHeaderGasFields(config, header, parent); err != nil {
 		return err
 	}
+
 	// Verify the header's timestamp
 	if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
 		return consensus.ErrFutureBlock
 	}
-	// if header.Time <= parent.Time {
+	// Verify the header's timestamp is not earlier than parent's
+	// it does include equality(==), so multiple blocks per second is ok
 	if header.Time < parent.Time {
 		return errInvalidBlockTime
 	}
@@ -315,6 +316,7 @@ func (self *DummyEngine) verifyBlockFee(
 		// Minimum Fee = 10 gwei * 1M gas (minimum fee that would have been accepted for this transaction)
 		// Fee Premium = 90 gwei
 		// Total Overpaid = 90 gwei * 1M gas
+
 		blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
 		totalBlockFee.Add(totalBlockFee, blockFeeContribution)
 	}

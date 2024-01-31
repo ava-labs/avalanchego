@@ -54,9 +54,9 @@ func TestNoopHandler(t *testing.T) {
 
 	handler := NoopMempoolGossipHandler{}
 
-	err := handler.HandleAtomicTx(ids.EmptyNodeID, AtomicTxGossip{})
+	err := handler.HandleEthTxs(ids.EmptyNodeID, EthTxsGossip{})
 	assert.NoError(err)
 
-	err = handler.HandleEthTxs(ids.EmptyNodeID, EthTxsGossip{})
+	err = handler.HandleAtomicTx(ids.EmptyNodeID, AtomicTxGossip{})
 	assert.NoError(err)
 }
