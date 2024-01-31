@@ -19,8 +19,6 @@ type Manager struct {
 	// cunsumed units window per each fee dimension.
 	windows [FeeDimensions]Window
 
-	lastConsumed Dimensions
-
 	// cumulatedUnits helps aggregating the units consumed by a block
 	// so that we can verify it's not too big/build it properly.
 	cumulatedUnits Dimensions
@@ -101,13 +99,13 @@ func (m *Manager) ComputeNext(
 	targetUnits,
 	priceChangeDenominator,
 	minUnitPrice Dimensions,
-) (*Manager, error) {
-	since := int((currTime - lastTime) / 1000 /*milliseconds per second*/)
+) *Manager {
+	since := int(currTime - lastTime)
 	nextManager := &Manager{}
-	for i := Bandwidth; i < FeeDimensions; i++ {
+	for i := Dimension(0); i < FeeDimensions; i++ {
 		nextUnitPrice, nextUnitWindow := computeNextPriceWindow(
 			m.windows[i],
-			m.lastConsumed[i],
+			m.cumulatedUnits[i],
 			m.unitFees[i],
 			targetUnits[i],
 			priceChangeDenominator[i],
@@ -117,80 +115,66 @@ func (m *Manager) ComputeNext(
 
 		nextManager.unitFees[i] = nextUnitPrice
 		nextManager.windows[i] = nextUnitWindow
-
-		// TODO ABENEGIA: how about last consumed
-
-		// start := dimensionStateLen * i
-		// binary.BigEndian.PutUint64(bytes[start:start+consts.Uint64Len], nextUnitPrice)
-		// copy(bytes[start+consts.Uint64Len:start+consts.Uint64Len+WindowSliceSize], nextUnitWindow[:])
-		// // Usage must be set after block is processed (we leave as 0 for now)
+		// unit consumed are zeroed in nextManager
 	}
-	return nextManager, nil
+	return nextManager
 }
 
 func computeNextPriceWindow(
-	previous Window,
-	previousConsumed uint64,
-	previousPrice uint64,
-	target uint64, /* per window */
+	current Window,
+	currentUnitsConsumed uint64,
+	currentUnitFee uint64,
+	target uint64, /* per window, must be non-zero */
 	changeDenom uint64,
-	minPrice uint64,
+	minUnitFee uint64,
 	since int, /* seconds */
 ) (uint64, Window) {
-	newRollupWindow := Roll(previous, since)
+	newRollupWindow := Roll(current, since)
 	if since < WindowSize {
 		// add in the units used by the parent block in the correct place
 		// If the parent consumed units within the rollup window, add the consumed
 		// units in.
 		start := WindowSize - 1 - since
-		Update(&newRollupWindow, start, previousConsumed)
+		Update(&newRollupWindow, start, currentUnitsConsumed)
 	}
-	total := Sum(newRollupWindow)
 
-	nextPrice := previousPrice
+	var (
+		totalUnitsConsumed = Sum(newRollupWindow)
+		nextUnitFee        = currentUnitFee
+	)
+
 	switch {
-	case total == target:
-		return nextPrice, newRollupWindow
-	case total > target:
+	case totalUnitsConsumed == target:
+		return nextUnitFee, newRollupWindow
+	case totalUnitsConsumed > target:
 		// If the parent block used more units than its target, the baseFee should increase.
-		delta := total - target
-		x := previousPrice * delta
-		y := x / target
-		baseDelta := y / changeDenom
-		if baseDelta < 1 {
-			baseDelta = 1
-		}
-		n, over := safemath.Add64(nextPrice, baseDelta)
+		rawDelta := currentUnitFee * (totalUnitsConsumed - target) / target
+		delta := safemath.Max(rawDelta/changeDenom, 1) * changeDenom // price must change in increments on changeDenom
+
+		var over error
+		nextUnitFee, over = safemath.Add64(nextUnitFee, delta)
 		if over != nil {
-			nextPrice = math.MaxUint64
-		} else {
-			nextPrice = n
-		}
-	case total < target:
-		// Otherwise if the parent block used less units than its target, the baseFee should decrease.
-		delta := target - total
-		x := previousPrice * delta
-		y := x / target
-		baseDelta := y / changeDenom
-		if baseDelta < 1 {
-			baseDelta = 1
+			nextUnitFee = math.MaxUint64
 		}
 
-		// If [roll] is greater than [rollupWindow], apply the state transition to the base fee to account
-		// for the interval during which no blocks were produced.
-		// We use roll/rollupWindow, so that the transition is applied for every [rollupWindow] seconds
-		// that has elapsed between the parent and this block.
+	case totalUnitsConsumed < target:
+		// Otherwise if the parent block used less units than its target, the baseFee should decrease.
+		rawDelta := currentUnitFee * (target - totalUnitsConsumed) / target
+		delta := safemath.Max(rawDelta/changeDenom, 1) * changeDenom // price must change in increments on changeDenom
+
+		// if we had no blocks for more than [WindowSize] seconds, we reduce fees even more,
+		// to try and account for all the low activity interval
 		if since > WindowSize {
-			// Note: roll/rollupWindow must be greater than 1 since we've checked that roll > rollupWindow
-			baseDelta *= uint64(since / WindowSize)
+			delta *= uint64(since / WindowSize)
 		}
-		n, under := safemath.Sub(nextPrice, baseDelta)
+
+		var under error
+		nextUnitFee, under = safemath.Sub(nextUnitFee, delta)
 		if under != nil {
-			nextPrice = 0
-		} else {
-			nextPrice = n
+			nextUnitFee = 0
 		}
 	}
-	nextPrice = safemath.Max(nextPrice, minPrice)
-	return nextPrice, newRollupWindow
+
+	nextUnitFee = safemath.Max(nextUnitFee, minUnitFee)
+	return nextUnitFee, newRollupWindow
 }
