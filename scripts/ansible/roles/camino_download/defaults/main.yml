@@ -1,0 +1,17 @@
+camino-node_architectures:
+  x86_64: amd64
+  aarch64: arm64
+
+camino_binaries_dir: "camino-node-{{ camino-node_version }}"
+
+camino-node_architecture: "{{ camino-node_architectures[ansible_facts.architecture] }}"
+camino-node_archive: "camino-node-{{ camino-node_os }}-{{ camino-node_architecture }}-{{ camino-node_version }}.tar.gz"
+camino-node_release: "{{ camino-node_releases.json | rejectattr('prerelease') | first }}"
+camino-node_os: "{{ ansible_facts.system | lower }}"
+camino-node_version: "{{ camino-node_release.tag_name }}"
+
+camino-node_signer_keyid: D93080B0C0D5FE8B
+camino-node_signer_pubkey: "{{ lookup('file', 'camino-node.gpg.key') }}"
+
+repo_url: https://github.com/chain4travel/camino-node
+repo_api_base: https://api.github.com

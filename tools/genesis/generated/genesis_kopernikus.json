@@ -1,0 +1,1307 @@
+{
+  "networkID": 1002,
+  "allocations": null,
+  "startTime": 1667217600,
+  "initialStakeDuration": 0,
+  "initialStakeDurationOffset": 3600,
+  "initialStakedFunds": null,
+  "initialStakers": null,
+  "camino": {
+    "verifyNodeSignature": true,
+    "lockModeBondDeposit": true,
+    "initialAdmin": "X-kopernikus1xnzumqv2nzcg24g5ql34jv38qhpjyfxk9h069d",
+    "depositOffers": [
+      {
+        "interestRateNominator": 80000,
+        "startOffset": 0,
+        "endOffset": 116856000,
+        "minAmount": 1,
+        "minDuration": 110376000,
+        "maxDuration": 110376000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
+        "memo": "PreSale 3 Years 8%",
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "interestRateNominator": 90000,
+        "startOffset": 0,
+        "endOffset": 148392000,
+        "minAmount": 1,
+        "minDuration": 141912000,
+        "maxDuration": 141912000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
+        "memo": "PreSale 4 Years 9%",
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "interestRateNominator": 100000,
+        "startOffset": 0,
+        "endOffset": 179928000,
+        "minAmount": 1,
+        "minDuration": 173448000,
+        "maxDuration": 173448000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
+        "memo": "PreSale 5 Years 10%",
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "interestRateNominator": 0,
+        "startOffset": 0,
+        "endOffset": 179928000,
+        "minAmount": 1,
+        "minDuration": 157680000,
+        "maxDuration": 157680000,
+        "unlockPeriodDuration": 157680000,
+        "noRewardsPeriodDuration": 0,
+        "memo": "Undeposit 5 Years 0%",
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "interestRateNominator": 0,
+        "startOffset": 0,
+        "endOffset": 116856000,
+        "minAmount": 1,
+        "minDuration": 110376000,
+        "maxDuration": 110376000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 0,
+        "memo": "Seed 3 Years 0%",
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "interestRateNominator": 0,
+        "startOffset": 0,
+        "endOffset": 164160000,
+        "minAmount": 1,
+        "minDuration": 157680000,
+        "maxDuration": 157680000,
+        "unlockPeriodDuration": 63072000,
+        "noRewardsPeriodDuration": 0,
+        "memo": "Team 5 Years 0%",
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "interestRateNominator": 90000,
+        "startOffset": 0,
+        "endOffset": 36806400,
+        "minAmount": 1,
+        "minDuration": 31536000,
+        "maxDuration": 31536000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
+        "memo": "UnDepositTest 1 Year 9%",
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "interestRateNominator": 110000,
+        "startOffset": 0,
+        "endOffset": 68342400,
+        "minAmount": 1,
+        "minDuration": 60,
+        "maxDuration": 31536000,
+        "unlockPeriodDuration": 0,
+        "noRewardsPeriodDuration": 0,
+        "memo": "FlexDepositTest 60s-1Y 11%",
+        "flags": {
+          "locked": false
+        }
+      },
+      {
+        "interestRateNominator": 210000,
+        "startOffset": 0,
+        "endOffset": 68342400,
+        "minAmount": 1,
+        "minDuration": 86400,
+        "maxDuration": 31536000,
+        "unlockPeriodDuration": 43200,
+        "noRewardsPeriodDuration": 43200,
+        "memo": "FlexDepositTest 1d-1Y 21%",
+        "flags": {
+          "locked": false
+        }
+      }
+    ],
+    "allocations": [
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1xnzumqv2nzcg24g5ql34jv38qhpjyfxk9h069d",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "memo": "ID: 2, Bucket: 01 ADMIN, Type: unlocked"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1vn7g4vf59pd98m6nswcja6328m2nsucwtsurhr",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "memo": "ID: 3, Bucket: 01 ADMIN, Type: unlocked"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1lmwsgy9zv8hyxwsek0pvsq7cpejtkvwk2nm7k0",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 286,
+            "depositOfferMemo": "FlexDepositTest 60s-1Y 11%",
+            "memo": "ID: 4, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "memo": "ID: 4, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 250000000000000,
+            "depositDuration": 120,
+            "depositOfferMemo": "FlexDepositTest 60s-1Y 11%",
+            "memo": "ID: 5, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 2500000000000,
+            "memo": "ID: 5, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1maff3tql60ndkwn9mvz06ssywvag4uf48el62q",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 864000,
+            "depositOfferMemo": "FlexDepositTest 1d-1Y 21%",
+            "memo": "ID: 6, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "memo": "ID: 6, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 275000000000000,
+            "depositDuration": 86400,
+            "depositOfferMemo": "FlexDepositTest 1d-1Y 21%",
+            "memo": "ID: 7, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 2750000000000,
+            "memo": "ID: 7, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1nff7e6p069r3d2jcrwm8cywwlv0nur5j9jvetc",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "nodeID": "NodeID-YUy7DaNMhNe9mqdLX9PDsusaQFeRZKSy",
+            "validatorDuration": 31104000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 8, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 8, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1fm0ny2lghpfepry46usu0a8yrm90r90ssyg9nf",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 9, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 9, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 10, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 10, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1k37u7w6pvc85whd8c6fh4zecfe8yyyecl8v62y",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 11, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 11, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1xw2kqx2xzqsvnuecz2yw6fwpt87k48s25ean4x",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 12, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 12, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 125000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 13, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1250000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 13, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1whcusz08xtlx0dgmrsxqt7a8gupgzd32r5stpy",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 14, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 14, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1yzx5v9hjjxth43ajer93pdt786s22ag8t8zjhr",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "ID: 15, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 15, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus10arus5qqv8e5kj5hrx5zuyp4c7nsr24s8gwv0v",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "nodeID": "NodeID-ErN1zp6C2abP2F8HL9TxLL8RwT6kTmnAN",
+            "validatorDuration": 62208000,
+            "depositDuration": 141912000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 4 Years 9%",
+            "memo": "ID: 16, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 16, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1xr4jz5tenry87u9wrqy74swa3pznl6l5usz7j7",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 141912000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 4 Years 9%",
+            "memo": "ID: 17, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 17, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1c35zu69gd42yu9ecrptzwf0z9g7fhfvrmrjgam",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 141912000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 4 Years 9%",
+            "memo": "ID: 18, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 18, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 150000000000000,
+            "depositDuration": 141912000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 4 Years 9%",
+            "memo": "ID: 19, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 19, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus16r6ppaekevfkfrpnr9vfhy09tgupderyrkwc3t",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 173448000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "ID: 20, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 20, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus10xf9u6we06ljq20jtq90hj0f6q8l2psp0njqmu",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 173448000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "ID: 21, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 21, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 175000000000000,
+            "depositDuration": 173448000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "ID: 22, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1750000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 22, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1qfyvkqnv8yd9rmlf6sv0gdx20dgg4erslxurav",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 5270400,
+            "depositOfferMemo": "Seed 3 Years 0%",
+            "memo": "ID: 23, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 5270400,
+            "memo": "ID: 23, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1er4q5rqwl5955y39dyshj8kr9tut3krggn8sks",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "ID: 24, Bucket: 99 TESTACCOUNT"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1fvr4nd743ew0gcy00se24hp2ecpmk4h7lhkll4",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "ID: 25, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "memo": "ID: 25, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 225000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "ID: 26, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 2250000000000,
+            "memo": "ID: 26, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1dgrg4j4p5e6k5jn8080n6333r934pyum0zgczg",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Undeposit 5 Years 0%",
+            "memo": "ID: 27, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "memo": "ID: 27, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 28, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 100000000000000,
+            "memo": "ID: 28, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus10jd9cn8gw4h75u9wlns6qs022776ljsthzxwan",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 29, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 100000000000000,
+            "memo": "ID: 29, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 30, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 100000000000000,
+            "memo": "ID: 30, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1fjv60r0t87y2m3p49he6gnmgvaze9anh6cwyg2",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 31, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 31, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1rf43hs576l0jj72haq0h4yq06lmv2pk8ljjxjd",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 32, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 100000000000000,
+            "memo": "ID: 32, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus12a96grhwgmv489kn9zn5rdm2vj5y8yhu6smyxf",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 33, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 33, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1tdw5tlm2ccnavy8ndq90c0c55d5qznefj842ae",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 34, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 34, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1dty07uqqndf22dqkgfq4ysa9nucg33q2ut5sq6",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 35, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 35, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1ftrh6sly2fh4k8rz4wwp60jj4dfdtg2xv3unrj",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 36, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 36, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1e3zck3mw3z620ujulx96cm4zvs0qdfnlc96775",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 37, Bucket: 99 TESTACCOUNT"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1sltcgxr6s90uexlghpqf3qlwh0ptpknx9gadu7",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 38, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 38, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus133a4vhn0qa6fzf8434zzy80pdzefq2f8vwj7h7",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 39, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 39, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus12ymv8mufsrdal5ej3ce9cyjwwmu7kclgv5929w",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 40, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 40, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus12pz34dgmhe6ahdruf66nvkfrz50mm9zss5d82t",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 41, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 41, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1ytsp00yv55dg72xjlsh3l444a7xczmn27386yu",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 42, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 42, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1xe5hkpx5w7ryky3ddzjjdwmuuvf8dkpf4vapsh",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 150000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 43, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1500000000000,
+            "memo": "ID: 43, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1d0ydd4wyq670lzrp0y7xd3wej4z7ysp2surum8",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 44, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 44, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus13lcv2qp3jl8kkz7hm4uwf5scquvsfnx72ksdz4",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 45, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "ID: 45, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1yk9lw48um0r0rn9ydf9fhjfwwfq0qh7qpytjcr",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 46, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 10000000000000,
+            "memo": "ID: 46, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 47, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 2000000000000,
+            "memo": "ID: 47, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1vctr8ha7zna8fxdkazt5k6cnlj7fmg7eef8daq",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 300000000000000,
+            "depositDuration": 31536000,
+            "depositOfferMemo": "UnDepositTest 1 Year 9%",
+            "memo": "ID: 48, Bucket: 99 TESTACCOUNT"
+          },
+          {
+            "amount": 3000000000000,
+            "memo": "ID: 48, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1scypky9j3knjge7cey2zy49w5rueplykw599qk",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 730754200000000000,
+            "memo": "ID: 49, Bucket: 99 TESTACCOUNT, Type: unlocked"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1zawetvfggky6yvx5wdcn0tjsalw9ql9dgnluur",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000000,
+            "memo": "ID: 50, Bucket: 99 TESTACCOUNT, Type: unlocked"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1nff7e6p069r3d2jcrwm8cywwlv0nur5j9jvetc",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 101000000000000,
+            "memo": "ID: 51, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1kuv84fhr5meu3nwuh4y284k7y2dxatqt0jx8cv",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1010000000000000,
+            "memo": "ID: 52, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      }
+    ],
+    "initialMultisigAddresses": [
+      {
+        "alias": "X-kopernikus1cwnua4x8ay3mnzm6t6ys0ymfp2nuswkylqa80p",
+        "addresses": [
+          "X-kopernikus1qfyvkqnv8yd9rmlf6sv0gdx20dgg4erslxurav",
+          "X-kopernikus1yk9lw48um0r0rn9ydf9fhjfwwfq0qh7qpytjcr",
+          "X-kopernikus1fvr4nd743ew0gcy00se24hp2ecpmk4h7lhkll4",
+          "X-kopernikus1dgrg4j4p5e6k5jn8080n6333r934pyum0zgczg",
+          "X-kopernikus10xf9u6we06ljq20jtq90hj0f6q8l2psp0njqmu",
+          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj",
+          "X-kopernikus1c35zu69gd42yu9ecrptzwf0z9g7fhfvrmrjgam",
+          "X-kopernikus1maff3tql60ndkwn9mvz06ssywvag4uf48el62q",
+          "X-kopernikus1lmwsgy9zv8hyxwsek0pvsq7cpejtkvwk2nm7k0"
+        ],
+        "threshold": 2,
+        "memo": "1000"
+      },
+      {
+        "alias": "X-kopernikus1whcusz08xtlx0dgmrsxqt7a8gupgzd32r5stpy",
+        "addresses": [
+          "X-kopernikus1qfyvkqnv8yd9rmlf6sv0gdx20dgg4erslxurav",
+          "X-kopernikus1yk9lw48um0r0rn9ydf9fhjfwwfq0qh7qpytjcr",
+          "X-kopernikus1fvr4nd743ew0gcy00se24hp2ecpmk4h7lhkll4",
+          "X-kopernikus1dgrg4j4p5e6k5jn8080n6333r934pyum0zgczg",
+          "X-kopernikus10xf9u6we06ljq20jtq90hj0f6q8l2psp0njqmu",
+          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj",
+          "X-kopernikus1c35zu69gd42yu9ecrptzwf0z9g7fhfvrmrjgam",
+          "X-kopernikus1maff3tql60ndkwn9mvz06ssywvag4uf48el62q",
+          "X-kopernikus1lmwsgy9zv8hyxwsek0pvsq7cpejtkvwk2nm7k0"
+        ],
+        "threshold": 2,
+        "memo": "1001"
+      },
+      {
+        "alias": "X-kopernikus1xw2kqx2xzqsvnuecz2yw6fwpt87k48s25ean4x",
+        "addresses": [
+          "X-kopernikus17tldvcdnq52a29y5vplw5l4pys80jnlpj78cm4"
+        ],
+        "threshold": 1,
+        "memo": "1155"
+      },
+      {
+        "alias": "X-kopernikus1nff7e6p069r3d2jcrwm8cywwlv0nur5j9jvetc",
+        "addresses": [
+          "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
+          "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
+          "X-kopernikus1d0ydd4wyq670lzrp0y7xd3wej4z7ysp2surum8",
+          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9"
+        ],
+        "threshold": 2,
+        "memo": "1931"
+      },
+      {
+        "alias": "X-kopernikus10arus5qqv8e5kj5hrx5zuyp4c7nsr24s8gwv0v",
+        "addresses": [
+          "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
+          "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
+          "X-kopernikus1d0ydd4wyq670lzrp0y7xd3wej4z7ysp2surum8",
+          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9"
+        ],
+        "threshold": 2,
+        "memo": "1932"
+      },
+      {
+        "alias": "X-kopernikus1scypky9j3knjge7cey2zy49w5rueplykw599qk",
+        "addresses": [
+          "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
+          "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
+          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9"
+        ],
+        "threshold": 2,
+        "memo": "1933"
+      },
+      {
+        "alias": "X-kopernikus1yzx5v9hjjxth43ajer93pdt786s22ag8t8zjhr",
+        "addresses": [
+          "X-kopernikus1ejmjsgslx2e2zqfu24xlthdnn5zt8255whpth6"
+        ],
+        "threshold": 1,
+        "memo": "1957"
+      },
+      {
+        "alias": "X-kopernikus1k37u7w6pvc85whd8c6fh4zecfe8yyyecl8v62y",
+        "addresses": [
+          "X-kopernikus1qfyvkqnv8yd9rmlf6sv0gdx20dgg4erslxurav",
+          "X-kopernikus1yk9lw48um0r0rn9ydf9fhjfwwfq0qh7qpytjcr",
+          "X-kopernikus1fvr4nd743ew0gcy00se24hp2ecpmk4h7lhkll4",
+          "X-kopernikus1dgrg4j4p5e6k5jn8080n6333r934pyum0zgczg",
+          "X-kopernikus10xf9u6we06ljq20jtq90hj0f6q8l2psp0njqmu",
+          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj",
+          "X-kopernikus1c35zu69gd42yu9ecrptzwf0z9g7fhfvrmrjgam",
+          "X-kopernikus1maff3tql60ndkwn9mvz06ssywvag4uf48el62q",
+          "X-kopernikus1lmwsgy9zv8hyxwsek0pvsq7cpejtkvwk2nm7k0"
+        ],
+        "threshold": 2,
+        "memo": "1999"
+      }
+    ]
+  },
+  "cChainGenesis": "{\"config\":{\"chainId\":502},\"initialAdmin\":\"0x9d6203fed4f1e2b6b71950515403c2b79b436186\", \"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}",
+  "message": "Have a nice trip!"
+}

@@ -1,0 +1,6 @@
+camino_daemon_dynamic_public_ip: ifconfigme
+camino_daemon_http_host: localhost
+# This variable is ignored, if camino_daemon_dynamic_public_ip is not false
+camino_daemon_public_ip: "{{ ansible_facts.default_ipv4.address }}"
+camino_daemon_service_name: camino-node
+log_level: info

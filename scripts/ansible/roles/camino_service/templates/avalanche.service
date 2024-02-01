@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+
+[Unit]
+Description=Camino-Node node
+Documentation=https://docs.avax.network/
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory={{ camino_daemon_home_dir }}
+Restart=always
+RestartSec=1
+User={{ camino_daemon_user }}
+ExecStart={{ bindir }}/{{ camino_binary | basename }} \
+{% if camino_daemon_dynamic_public_ip %}
+            --dynamic-public-ip="{{ camino_daemon_dynamic_public_ip }}" \
+{% else %}
+            --public-ip="{{ camino_daemon_public_ip }}" \
+{% endif %}
+            --http-host="{{ camino_daemon_http_host }}" \
+            --db-dir="{{ camino_daemon_db_dir }}" \
+            --log-dir="{{ camino_daemon_log_dir }}" \
+            --log-level="{{ log_level }}" \
+            --staking-tls-cert-file="{{ camino_daemon_staking_tls_cert }}" \
+            --staking-tls-key-file="{{ camino_daemon_staking_tls_key }}"
+
+[Install]
+WantedBy=multi-user.target

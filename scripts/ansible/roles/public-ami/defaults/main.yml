@@ -1,0 +1,10 @@
+---
+ava_user: chain4travel
+ava_group: admin
+network: columbus
+db_dir: /data/camino-node
+log_dir: /var/log/camino-node
+config_dir: /etc/camino-node
+plugin_dir: /usr/local/lib/camino-node/plugins
+repo_url: https://github.com/chain4travel/camino-node
+repo_folder: /tmp/camino-node

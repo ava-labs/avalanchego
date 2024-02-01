@@ -1,0 +1,109 @@
+- name: Setup gpg key
+  apt_key:
+    url: https://downloads.camino.foundation/camino-node.gpg.key
+    state: present
+
+- name: Setup camino-node repo
+  apt_repository:
+    repo: deb https://downloads.camino.foundation/apt bionic main
+    state: present
+
+- name: Setup golang repo
+  apt_repository:
+    repo: ppa:longsleep/golang-backports 
+    state: present
+
+- name: Install go
+  apt:
+    name: golang
+    state: latest
+
+- name: Update git clone
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_folder }}"
+    version: "{{ tag }}"
+    update: yes
+    force: yes
+
+- name: Setup systemd
+  template:
+    src: templates/camino-node.service.j2
+    dest: /etc/systemd/system/camino-node.service
+    mode: 0755
+
+- name: Create chain4travel user
+  user:
+    name: "{{ c4t_user }}"
+    shell: /bin/bash
+    uid: 114
+    group: "{{ c4t_group }}"
+
+- name: Create camino config dir
+  file:
+    path: /etc/camino-node
+    owner: "{{ c4t_user }}"
+    group: "{{ c4t_group }}"
+    state: directory
+
+- name: Create camino C config dir
+  file:
+    path: /etc/camino-node/C
+    owner: "{{ c4t_user }}"
+    group: "{{ c4t_group }}"
+    state: directory
+
+- name: Create camino log dir
+  file:
+    path: "{{ log_dir }}"
+    owner: "{{ c4t_user }}"
+    group: "{{ c4t_group }}"
+    state: directory
+
+- name: Create camino database dir
+  file:
+    path: "{{ db_dir }}"
+    owner: "{{ c4t_user }}"
+    group: "{{ c4t_group }}"
+    state: directory
+
+- name: Create camino plugins directory
+  file:
+    path: "{{ plugin_dir }}"
+    owner: "{{ c4t_user }}"
+    group: "{{ c4t_group }}"
+    state: directory
+    recurse: yes
+
+- name: Build camino-node
+  command: ./scripts/build.sh
+  args:
+    chdir: "{{ repo_folder }}"
+
+- name: Copy camino-node binaries to the correct location
+  command: cp build/camino-node /usr/local/bin/camino-node
+  args:
+    chdir: "{{ repo_folder }}"
+
+- name: Copy evm binaries to the correct location
+  command: cp build/plugins/evm {{ plugin_dir }}
+  args:
+    chdir: "{{ repo_folder }}"
+
+
+- name: Configure camino-node 
+  template:
+    src: templates/conf.json.j2
+    dest: /etc/camino-node/conf.json
+    mode: 0644
+
+- name: Configure camino C Chain
+  template:
+    src: templates/C/config.json.j2
+    dest: /etc/camino-node/C/config.json
+    mode: 0644
+
+- name: Enable Camino
+  systemd:
+    name: camino-node
+    enabled: yes

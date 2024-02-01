@@ -1,0 +1,2 @@
+log_level: info
+camino_binary: ~/go/src/github.com/chain4travel/camino-node/build/camino-node

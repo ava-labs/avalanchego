@@ -1,0 +1,17 @@
+# CentOS 7.x does not include golang.
+# The EPEL repository includes it, and tracks golang packages from Fedora.
+
+- name: Install Go repo
+  yum:
+    name:
+      - epel-release
+  tags:
+    - golang_base
+
+- name: Install Go
+  become: true
+  yum:
+    name:
+      - "golang >= {{ golang_version_min }}"
+  tags:
+    - golang_base

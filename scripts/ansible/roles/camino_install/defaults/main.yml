@@ -1,0 +1,25 @@
+# These names, & default values are based on Meson build builtin options;
+# which in turn follow established *nix conventions.
+# See
+#   https://mesonbuild.com/Builtin-options.html
+#   https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
+prefix: "/usr/local"
+bindir: "{{ prefix }}/bin"
+libdir: "{{ prefix }}/lib"
+localstatedir: "{{ prefix | replace('/usr', '/var') }}"
+sharedstatedir: "{{ localstatedir }}/lib"
+# Has no Meson builtin equivalent
+logdir: "{{ localstatedir }}/log"
+
+camino_binary: "{{ camino_binaries_dir }}/camino-node"
+
+# These names are specific to Camino. Default values are based loosely on *nix
+# conventions.
+camino_daemon_home_dir: "{{ sharedstatedir }}/camino-node"
+camino_daemon_db_dir: "{{ camino_daemon_home_dir }}/db"
+camino_daemon_log_dir: "{{ logdir }}/camino-node"
+camino_daemon_lib_dir: "{{ libdir }}/camino-node"
+camino_daemon_staking_dir: "{{ camino_daemon_home_dir }}/staking"
+camino_daemon_staking_tls_cert: "{{ camino_daemon_staking_dir }}/staker.crt"
+camino_daemon_staking_tls_csr: "{{ camino_daemon_staking_dir }}/staker.csr"
+camino_daemon_staking_tls_key: "{{ camino_daemon_staking_dir }}/staker.key"

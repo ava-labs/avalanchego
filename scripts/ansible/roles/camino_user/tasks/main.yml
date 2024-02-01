@@ -1,0 +1,14 @@
+- name: Create Camino daemon group
+  become: true
+  group:
+    name: "{{ camino_daemon_group }}"
+    system: true
+
+- name: Create Camino daemon user
+  become: true
+  user:
+    name: "{{ camino_daemon_user }}"
+    group: "{{ camino_daemon_group }}"
+    home: "{{ camino_daemon_home_dir }}"
+    shell: /bin/false
+    system: true

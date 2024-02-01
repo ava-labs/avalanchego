@@ -1,0 +1,17 @@
+- name: Kill Node
+  command: killall -SIGTERM camino-node
+  register: killall_camino-node
+  changed_when:
+    - "killall_camino-node.rc in [0]"
+  failed_when:
+    - "killall_camino-node.rc not in [0]"
+    - "killall_camino-node.stderr not in ['camino-node: no process found']"
+
+- name: Kill EVM
+  command: killall -SIGTERM evm
+  register: killall_evm
+  changed_when:
+    - "killall_evm.rc in [0]"
+  failed_when:
+    - "killall_evm.rc not in [0]"
+    - "killall_evm.stderr not in ['evm: no process found']"

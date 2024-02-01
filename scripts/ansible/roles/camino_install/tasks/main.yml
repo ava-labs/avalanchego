@@ -1,0 +1,84 @@
+- name: Create shared directories
+  become: true
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    # This task intentionally leaves the owner, group, & mode unspecified.
+    # These directories (e.g. /var/local/log) are shared resources.
+    # We lack the authority to unilaterally decide their permissions.
+    # The goals are
+    #  - Don't modify existing permissions, if the directories already exist.
+    #  - Follow system policy (e.g. umask ), if the directories are created.
+    # noqa 208
+  loop:
+    - path: "{{ bindir }}"
+    - path: "{{ sharedstatedir }}"
+    - path: "{{ logdir }}"
+
+- name: Create Camino directories
+  become: true
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner | default(camino_daemon_user) }}"
+    group: "{{ item.group | default(camino_daemon_group) }}"
+    mode: "{{ item.mode }}"
+    recurse: "{{ item.recurse | default(omit) }}"
+    state: directory
+  loop:
+    - path: "{{ camino_daemon_home_dir }}"
+      mode: u=rwX,go=rX
+    - path: "{{ camino_daemon_db_dir }}"
+      mode: u=rwX,go=rX
+    - path: "{{ camino_daemon_staking_dir }}"
+      mode: u=rX,go=
+    - path: "{{ camino_daemon_log_dir }}"
+      mode: u=rwX,go=rX
+    - path: "{{ camino_daemon_lib_dir }}"
+      owner: root
+      group: root
+      mode: u=rwX,go=rX
+      recurse: true
+  loop_control:
+    label: "{{ item.path }}"
+  notify:
+    - Restart Camino service
+
+- name: Install Camino binary
+  become: true
+  copy:
+    src: "{{ camino_binary }}"
+    dest: "{{ bindir }}/{{ camino_binary | basename }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: u=rwx,go=rx
+  notify:
+    - Restart Camino service
+
+- name: Remove outdated support files
+  become: true
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop:
+    - path: "{{ camino_daemon_lib_dir }}/evm"
+    - path: "{{ camino_daemon_lib_dir }}/camino-node-preupgrade"
+    - path: "{{ camino_daemon_lib_dir }}/camino-node-latest"
+  notify:
+    - Restart Camino service
+
+- name: Install support files
+  become: true
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ camino_daemon_lib_dir }}/"
+    owner: root
+    group: root
+    mode: u=rwx,go=rx
+    remote_src: true
+  loop:
+    - src: "{{ camino_binaries_dir }}/plugins"
+  loop_control:
+    label: "{{ camino_daemon_lib_dir }}/{{ item.src | basename }}"
+  notify:
+    - Restart Camino service

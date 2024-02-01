@@ -1,0 +1,15 @@
+- name: Update git clone
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_folder }}"
+    version: "{{ repo_branch }}"
+    update: yes
+    force: yes
+
+- name: Build project
+  # noqa 301
+  command: ./scripts/build.sh
+  args:
+    chdir: "{{ repo_folder }}"
+  environment:
+    PATH: /usr/lib/go-{{ golang_version_min_major }}.{{ golang_version_min_minor }}/bin:/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin:/snap/bin
