@@ -562,7 +562,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	// Reconfigure nodes for the new subnets and their chains
+	// Reconfigure nodes for the new subnets
 	if _, err := fmt.Fprintf(w, "Configured nodes to track new subnet(s). Restart is required.\n"); err != nil {
 		return err
 	}
@@ -571,8 +571,8 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 			return err
 		}
 	}
-
 	// Restart nodes to allow new configuration to take effect
+	// TODO(marun) Only restart the validator nodes of newly-created subnets
 	if err := n.Restart(ctx, w); err != nil {
 		return err
 	}
@@ -589,6 +589,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 
 	// Wait for nodes to become subnet validators
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
+	restartRequired := false
 	for _, subnet := range createdSubnets {
 		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
 			return err
@@ -606,9 +607,22 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %q\n", subnet.Name); err != nil {
 			return err
 		}
+
+		// If one or more of the subnets chains have explicit configuration, the
+		// subnet's validator nodes will need to be restarted for those nodes to read
+		// the newly written chain configuration and apply it to the chain(s).
+		if subnet.HasChainConfig() {
+			restartRequired = true
+		}
 	}
 
-	return nil
+	if !restartRequired {
+		return nil
+	}
+
+	// Restart nodes to allow configuration for the new chains to take effect
+	// TODO(marun) Only restart the validator nodes of subnets that have chains that need configuring
+	return n.Restart(ctx, w)
 }
 
 func (n *Network) GetURIForNodeID(nodeID ids.NodeID) (string, error) {

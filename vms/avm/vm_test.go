@@ -135,8 +135,8 @@ func TestIssueNFT(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-			EForkTime:   mockable.MaxTime,
+			DurangoTime:  time.Time{},
+			EUpgradeTime: mockable.MaxTime,
 		},
 	})
 	env.vm.ctx.Lock.Unlock()
@@ -239,8 +239,8 @@ func TestIssueProperty(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-			EForkTime:   mockable.MaxTime,
+			DurangoTime:  time.Time{},
+			EUpgradeTime: mockable.MaxTime,
 		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
@@ -529,8 +529,8 @@ func TestIssueImportTx(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-			EForkTime:   mockable.MaxTime,
+			DurangoTime:  time.Time{},
+			EUpgradeTime: mockable.MaxTime,
 		},
 	})
 	defer func() {
@@ -632,8 +632,8 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-			EForkTime:   mockable.MaxTime,
+			DurangoTime:  time.Time{},
+			EUpgradeTime: mockable.MaxTime,
 		},
 		notLinearized: true,
 	})
