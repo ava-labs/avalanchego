@@ -143,19 +143,25 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	unitFees, err := stateDiff.GetUnitFees()
-	if err != nil {
-		return err
-	}
-	unitWindows, err := stateDiff.GetConsumedUnitsWindows()
-	if err != nil {
-		return err
-	}
+	var (
+		feesCfg     = m.txExecutorBackend.Config.GetDynamicFeesConfig()
+		unitFees    = stateDiff.GetUnitFees()
+		unitWindows = stateDiff.GetConsumedUnitsWindows()
+	)
+
+	parentFeeManager := fees.NewManager(unitFees, unitWindows)
+	feeManager := parentFeeManager.ComputeNext(
+		stateDiff.GetTimestamp().Unix(),
+		nextBlkTime.Unix(),
+		feesCfg.BlockUnitsTarget,
+		feesCfg.FeesChangeDenominator,
+		feesCfg.MinUnitFees,
+	)
 
 	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
-		BlkFeeManager: fees.NewManager(unitFees, unitWindows),
-		UnitCaps:      m.txExecutorBackend.Config.GetDynamicFeesConfig().BlockUnitsCap,
+		BlkFeeManager: feeManager,
+		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	})

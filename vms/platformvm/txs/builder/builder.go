@@ -312,18 +312,9 @@ func (b *builder) NewImportTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
 		utx.BaseTx.Outs = outs
@@ -481,18 +472,9 @@ func (b *builder) NewExportTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -577,18 +559,9 @@ func (b *builder) NewCreateChainTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -662,18 +635,9 @@ func (b *builder) NewCreateSubnetTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -756,18 +720,9 @@ func (b *builder) NewAddValidatorTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -848,18 +803,9 @@ func (b *builder) NewAddDelegatorTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -941,18 +887,9 @@ func (b *builder) NewAddSubnetValidatorTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -1024,18 +961,9 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -1121,18 +1049,9 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
@@ -1198,18 +1117,9 @@ func (b *builder) NewBaseTx(
 	if isEForkActive {
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          commonfees.Dimensions
-			unitWindows       commonfees.Windows
+			unitFees          = b.state.GetUnitFees()
+			unitWindows       = b.state.GetConsumedUnitsWindows()
 		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err = b.state.GetConsumedUnitsWindows()
-		if err != nil {
-			return nil, err
-		}
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,

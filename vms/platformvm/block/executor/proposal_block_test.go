@@ -27,8 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestApricotProposalBlockTimeVerification(t *testing.T) {
@@ -142,6 +140,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env.clk.Set(defaultGenesisTime)
 	env.config.BanffTime = time.Time{}        // activate Banff
 	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
+	env.config.EForkTime = mockable.MaxTime
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
@@ -161,9 +160,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
-	onParentAccept.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees, nil).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetConsumedUnitsWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,

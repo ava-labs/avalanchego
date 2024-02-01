@@ -255,12 +255,8 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
-	unitFees, err := env.state.GetUnitFees()
-	require.NoError(err)
-
-	unitWindows, err := env.state.GetConsumedUnitsWindows()
-	require.NoError(err)
-
+	unitFees := env.state.GetUnitFees()
+	unitWindows := env.state.GetConsumedUnitsWindows()
 	executor := txexecutor.StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: fees.NewManager(unitFees, unitWindows),

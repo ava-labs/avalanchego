@@ -45,6 +45,13 @@ var EForkDynamicFeesConfig = DynamicFeesConfig{
 		1,
 		1,
 	},
+
+	FeesChangeDenominator: commonfees.Dimensions{
+		1,
+		1,
+		1,
+		1,
+	},
 }
 
 type DynamicFeesConfig struct {
@@ -79,6 +86,10 @@ func (c *DynamicFeesConfig) validate() error {
 				c.InitialUnitFees[i],
 				c.MinUnitFees[i],
 			)
+		}
+
+		if c.FeesChangeDenominator[i] == 0 {
+			return fmt.Errorf("dimension %d, fees change denominator set to zero", i)
 		}
 
 		if c.BlockUnitsTarget[i] > c.BlockUnitsCap[i] {

@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -72,7 +73,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent(), b.Timestamp())
 	if err != nil {
 		return err
 	}
@@ -125,7 +126,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
+	return v.standardBlock(&b.ApricotStandardBlock, b.Timestamp(), onAcceptState)
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -171,7 +172,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	return v.standardBlock(b, onAcceptState)
+	return v.standardBlock(b, time.Time{}, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -409,9 +410,10 @@ func (v *verifier) proposalBlock(
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
+	blkTimestamp time.Time,
 	onAcceptState state.Diff,
 ) error {
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent())
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent(), blkTimestamp)
 	if err != nil {
 		return err
 	}
@@ -432,29 +434,35 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID, blkTimestamp time.Time) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
 	error,
 ) {
 	var (
+		currentTimestamp = state.GetTimestamp()
+		isEForkActive    = v.txExecutorBackend.Config.IsEForkActivated(currentTimestamp)
+		feesCfg          = v.txExecutorBackend.Config.GetDynamicFeesConfig()
+		unitFees         = state.GetUnitFees()
+		unitWindows      = state.GetConsumedUnitsWindows()
+
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
 		funcs          = make([]func(), 0, len(txs))
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
 
-	unitFees, err := state.GetUnitFees()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	unitWindows, err := state.GetConsumedUnitsWindows()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	feeManager := fees.NewManager(unitFees, unitWindows)
+	if isEForkActive {
+		feeManager = feeManager.ComputeNext(
+			currentTimestamp.Unix(),
+			blkTimestamp.Unix(),
+			feesCfg.BlockUnitsTarget,
+			feesCfg.FeesChangeDenominator,
+			feesCfg.MinUnitFees,
+		)
+	}
 
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
@@ -496,6 +504,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
 		return nil, nil, nil, err
+	}
+
+	if isEForkActive {
+		state.SetUnitFees(feeManager.GetUnitFees())
+		state.SetConsumedUnitsWindows(feeManager.GetFeeWindows())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {

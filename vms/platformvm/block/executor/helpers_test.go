@@ -275,14 +275,8 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	unitFees, err := env.state.GetUnitFees()
-	if err != nil {
-		panic(err)
-	}
-	unitWindows, err := env.state.GetConsumedUnitsWindows()
-	if err != nil {
-		panic(err)
-	}
+	unitFees := env.state.GetUnitFees()
+	unitWindows := env.state.GetConsumedUnitsWindows()
 
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,

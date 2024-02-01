@@ -2827,9 +2827,8 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	var err error
-	reply.UnitFees, err = s.vm.state.GetUnitFees()
-	return err
+	reply.UnitFees = s.vm.state.GetUnitFees()
+	return nil
 }
 
 // GetBlockUnitsCapReply is the response from GetBlockUnitsCap

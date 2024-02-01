@@ -16,7 +16,7 @@ type Manager struct {
 	// Avax denominated unit fees for all fee dimensions
 	unitFees Dimensions
 
-	// cunsumed units window per each fee dimension.
+	// consumed units window per each fee dimension.
 	windows Windows
 
 	// cumulatedUnits helps aggregating the units consumed by a block
@@ -29,6 +29,14 @@ func NewManager(unitFees Dimensions, windows Windows) *Manager {
 		unitFees: unitFees,
 		windows:  windows,
 	}
+}
+
+func (m *Manager) GetUnitFees() Dimensions {
+	return m.unitFees
+}
+
+func (m *Manager) GetFeeWindows() Windows {
+	return m.windows
 }
 
 // CalculateFee must be a stateless method

@@ -37,6 +37,9 @@ type diff struct {
 
 	timestamp time.Time
 
+	unitFees             commonfees.Dimensions
+	consumedUnitsWindows commonfees.Windows
+
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
 
@@ -91,22 +94,20 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-// TODO ABENEGIA: fix method with dynamic fees
-func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return commonfees.Dimensions{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetUnitFees()
+func (d *diff) GetUnitFees() commonfees.Dimensions {
+	return d.unitFees
 }
 
-// TODO ABENEGIA: fix method with dynamic fees
-func (d *diff) GetConsumedUnitsWindows() (commonfees.Windows, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return commonfees.Windows{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetConsumedUnitsWindows()
+func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
+	d.unitFees = uf
+}
+
+func (d *diff) GetConsumedUnitsWindows() commonfees.Windows {
+	return d.consumedUnitsWindows
+}
+
+func (d *diff) SetConsumedUnitsWindows(windows commonfees.Windows) {
+	d.consumedUnitsWindows = windows
 }
 
 func (d *diff) GetTimestamp() time.Time {

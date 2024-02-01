@@ -353,6 +353,9 @@ func packBlockTxs(
 	}
 
 	var (
+		unitFees    = stateDiff.GetUnitFees()
+		unitWindows = stateDiff.GetConsumedUnitsWindows()
+
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
@@ -371,16 +374,6 @@ func packBlockTxs(
 		// Invariant: [tx] has already been syntactically verified.
 
 		txDiff, err := state.NewDiffOn(stateDiff)
-		if err != nil {
-			return nil, err
-		}
-
-		unitFees, err := txDiff.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitWindows, err := txDiff.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
 		}

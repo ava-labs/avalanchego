@@ -229,11 +229,8 @@ func addSubnet(
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	unitFees, err := env.state.GetUnitFees()
-	require.NoError(err)
-
-	unitWindows, err := env.state.GetConsumedUnitsWindows()
-	require.NoError(err)
+	unitFees := env.state.GetUnitFees()
+	unitWindows := env.state.GetConsumedUnitsWindows()
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,

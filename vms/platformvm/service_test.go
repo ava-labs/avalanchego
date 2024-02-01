@@ -1024,8 +1024,7 @@ func TestGetUnitFees(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	unitFees, err := service.vm.state.GetUnitFees()
-	require.NoError(err)
+	unitFees := service.vm.state.GetUnitFees()
 
 	require.Equal(unitFees, reply.UnitFees)
 
@@ -1035,7 +1034,7 @@ func TestGetUnitFees(t *testing.T) {
 		789,
 		1011,
 	}
-	require.NoError(service.vm.state.SetUnitFees(updatedUnitFees))
+	service.vm.state.SetUnitFees(updatedUnitFees)
 
 	service.vm.ctx.Lock.Unlock()
 

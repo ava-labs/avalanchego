@@ -101,8 +101,11 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	GetUnitFees() (commonfees.Dimensions, error)
-	GetConsumedUnitsWindows() (commonfees.Windows, error)
+	GetUnitFees() commonfees.Dimensions
+	SetUnitFees(uf commonfees.Dimensions)
+
+	GetConsumedUnitsWindows() commonfees.Windows
+	SetConsumedUnitsWindows(windows commonfees.Windows)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -144,10 +147,6 @@ type State interface {
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	GetSubnets() ([]*txs.Tx, error)
 	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
-
-	// At this iteration these getters are helpful for UTs only
-	SetUnitFees(uf commonfees.Dimensions) error
-	SetConsumedUnitsWindows(windows commonfees.Windows) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -385,7 +384,6 @@ type state struct {
 	singletonDB                         database.Database
 
 	// TODO ABENEGIA: handle persistence of these attributes
-	// Maybe blockUnitCaps is an exception, since it should be a fork related quantity
 	unitFees             commonfees.Dimensions
 	consumedUnitsWindows commonfees.Windows
 }
@@ -1093,22 +1091,20 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
-	return s.unitFees, nil
+func (s *state) GetUnitFees() commonfees.Dimensions {
+	return s.unitFees
 }
 
-func (s *state) SetUnitFees(uf commonfees.Dimensions) error {
+func (s *state) SetUnitFees(uf commonfees.Dimensions) {
 	s.unitFees = uf
-	return nil
 }
 
-func (s *state) GetConsumedUnitsWindows() (commonfees.Windows, error) {
-	return s.consumedUnitsWindows, nil
+func (s *state) GetConsumedUnitsWindows() commonfees.Windows {
+	return s.consumedUnitsWindows
 }
 
-func (s *state) SetConsumedUnitsWindows(windows commonfees.Windows) error {
+func (s *state) SetConsumedUnitsWindows(windows commonfees.Windows) {
 	s.consumedUnitsWindows = windows
-	return nil
 }
 
 func (s *state) GetTimestamp() time.Time {
