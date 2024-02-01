@@ -25,8 +25,6 @@ func newResponseHandler() *responseHandler {
 type responseHandler struct {
 	// If [OnResponse] is called, the response bytes are sent on this channel.
 	responseChan chan []byte
-	// Set to true in [OnFailure].
-	failed bool
 }
 
 // OnResponse passes the response bytes to the responseChan and closes the channel
@@ -37,6 +35,5 @@ func (h *responseHandler) OnResponse(response []byte) {
 
 // OnFailure sets the failed flag to true and closes the channel
 func (h *responseHandler) OnFailure() {
-	h.failed = true
 	close(h.responseChan)
 }
