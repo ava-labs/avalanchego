@@ -4,6 +4,7 @@
 package p2p
 
 import (
+	"errors"
 	"math"
 	"math/rand"
 	"sync"
@@ -36,6 +37,8 @@ const (
 	randomPeerProbability = 0.2
 )
 
+var errDuplicatePeer = errors.New("connected to duplicate peer")
+
 // information we track on a given peer
 type peerInfo struct {
 	version   *version.Application
@@ -47,18 +50,22 @@ type peerInfo struct {
 // to new peers with an exponentially decaying probability.
 type PeerTracker struct {
 	// Lock to protect concurrent access to the peer tracker
-	lock sync.Mutex
+	lock sync.RWMutex
 	// All peers we are connected to
 	peers map[ids.NodeID]*peerInfo
-	// Peers that we're connected to that we've sent a request to
-	// since we most recently connected to them.
+	// Peers that we're connected to that we've sent a request to since we most
+	// recently connected to them.
 	trackedPeers set.Set[ids.NodeID]
-	// Peers that we're connected to that responded to the last request they were sent.
+	// Peers that we're connected to that responded to the last request they
+	// were sent.
 	responsivePeers set.Set[ids.NodeID]
 	// Max heap that contains the average bandwidth of peers.
-	bandwidthHeap          heap.Map[ids.NodeID, safemath.Averager]
-	averageBandwidth       safemath.Averager
+	bandwidthHeap heap.Map[ids.NodeID, safemath.Averager]
+	// average bandwidth is only used for metrics
+	averageBandwidth safemath.Averager
+
 	log                    logging.Logger
+	minVersion             *version.Application
 	numTrackedPeers        prometheus.Gauge
 	numResponsivePeers     prometheus.Gauge
 	averageBandwidthMetric prometheus.Gauge
@@ -68,6 +75,7 @@ func NewPeerTracker(
 	log logging.Logger,
 	metricsNamespace string,
 	registerer prometheus.Registerer,
+	minVersion *version.Application,
 ) (*PeerTracker, error) {
 	t := &PeerTracker{
 		peers:           make(map[ids.NodeID]*peerInfo),
@@ -78,6 +86,7 @@ func NewPeerTracker(
 		}),
 		averageBandwidth: safemath.NewAverager(0, bandwidthHalflife, time.Now()),
 		log:              log,
+		minVersion:       minVersion,
 		numTrackedPeers: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Namespace: metricsNamespace,
@@ -137,21 +146,16 @@ func (p *PeerTracker) shouldTrackNewPeer() bool {
 	return rand.Float64() < newPeerProbability // #nosec G404
 }
 
-// TODO get rid of minVersion
 // Returns a peer that we're connected to.
 // If we should track more peers, returns a random peer with version >= [minVersion], if any exist.
 // Otherwise, with probability [randomPeerProbability] returns a random peer from [p.responsivePeers].
 // With probability [1-randomPeerProbability] returns the peer in [p.bandwidthHeap] with the highest bandwidth.
-func (p *PeerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, bool) {
+func (p *PeerTracker) GetAnyPeer() (ids.NodeID, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	if p.shouldTrackNewPeer() {
 		for nodeID := range p.peers {
-			// if minVersion is specified and peer's version is less, skip
-			if minVersion != nil && p.peers[nodeID].version.Compare(minVersion) < 0 {
-				continue
-			}
 			// skip peers already tracked
 			if p.trackedPeers.Contains(nodeID) {
 				continue
@@ -193,6 +197,7 @@ func (p *PeerTracker) TrackPeer(nodeID ids.NodeID) {
 	defer p.lock.Unlock()
 
 	p.trackedPeers.Add(nodeID)
+
 	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
 }
 
@@ -202,10 +207,12 @@ func (p *PeerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	peer := p.peers[nodeID]
-	if peer == nil {
+	peer, ok := p.peers[nodeID]
+	if !ok {
 		// we're not connected to this peer, nothing to do here
-		p.log.Debug("tracking bandwidth for untracked peer", zap.Stringer("nodeID", nodeID))
+		p.log.Debug("tracking bandwidth for untracked peer",
+			zap.Stringer("nodeID", nodeID),
+		)
 		return
 	}
 
@@ -216,52 +223,36 @@ func (p *PeerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 		peer.bandwidth.Observe(bandwidth, now)
 	}
 	p.bandwidthHeap.Push(nodeID, peer.bandwidth)
+	p.averageBandwidth.Observe(bandwidth, now)
 
 	if bandwidth == 0 {
 		p.responsivePeers.Remove(nodeID)
 	} else {
 		p.responsivePeers.Add(nodeID)
-		// TODO danlaine: shouldn't we add the observation of 0
-		// to the average bandwidth in the if statement?
-		p.averageBandwidth.Observe(bandwidth, now)
-		p.averageBandwidthMetric.Set(p.averageBandwidth.Read())
 	}
+
 	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
+	p.averageBandwidthMetric.Set(p.averageBandwidth.Read())
 }
 
 // Connected should be called when [nodeID] connects to this node
-func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
+func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
+	// if minVersion is specified and peer's version is less, skip
+	if p.minVersion != nil && nodeVersion.Compare(p.minVersion) < 0 {
+		return nil
+	}
+
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	peer := p.peers[nodeID]
-	if peer == nil {
-		p.peers[nodeID] = &peerInfo{
-			version: nodeVersion,
-		}
-		return
+	if _, ok := p.peers[nodeID]; ok {
+		return errDuplicatePeer
 	}
 
-	// Peer is already connected, update the version if it has changed.
-	// Log a warning message since the consensus engine should never call Connected on a peer
-	// that we have already marked as Connected.
-	if nodeVersion.Compare(peer.version) != 0 {
-		p.peers[nodeID] = &peerInfo{
-			version:   nodeVersion,
-			bandwidth: peer.bandwidth,
-		}
-		p.log.Warn(
-			"updating node version of already connected peer",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("storedVersion", peer.version),
-			zap.Stringer("nodeVersion", nodeVersion),
-		)
-	} else {
-		p.log.Warn(
-			"ignoring peer connected event for already connected peer with identical version",
-			zap.Stringer("nodeID", nodeID),
-		)
+	p.peers[nodeID] = &peerInfo{
+		version: nodeVersion,
 	}
+	return nil
 }
 
 // Disconnected should be called when [nodeID] disconnects from this node
@@ -269,18 +260,19 @@ func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.bandwidthHeap.Remove(nodeID)
-	p.trackedPeers.Remove(nodeID)
-	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
-	p.responsivePeers.Remove(nodeID)
-	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 	delete(p.peers, nodeID)
+	p.trackedPeers.Remove(nodeID)
+	p.responsivePeers.Remove(nodeID)
+	p.bandwidthHeap.Remove(nodeID)
+
+	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
+	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 }
 
 // Returns the number of peers the node is connected to.
 func (p *PeerTracker) Size() int {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 
 	return len(p.peers)
 }
