@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -35,6 +36,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const testThreadPoolSize = 2
 
 var defaultSubnetConfig = subnets.Config{
 	GossipConfig: subnets.GossipConfig{
@@ -70,9 +73,10 @@ func TestTimeout(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(err)
@@ -120,6 +124,7 @@ func TestTimeout(t *testing.T) {
 		vdrs,
 		nil,
 		time.Hour,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -341,9 +346,10 @@ func TestReliableMessages(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -392,6 +398,7 @@ func TestReliableMessages(t *testing.T) {
 		vdrs,
 		nil,
 		1,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -488,9 +495,10 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -539,6 +547,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),

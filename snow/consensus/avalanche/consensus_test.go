@@ -15,6 +15,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -40,6 +42,11 @@ var (
 		IgnoreInvalidVotingTest,
 		IgnoreInvalidTransactionVertexVotingTest,
 		TransitiveVotingTest,
+		StopVertexVerificationUnequalBetaValuesTest,
+		StopVertexVerificationEqualBetaValuesTest,
+		AcceptParentOfPreviouslyRejectedVertexTest,
+		RejectParentOfPreviouslyRejectedVertexTest,
+		QuiesceAfterRejectedVertexTest,
 		SplitVotingTest,
 		TransitiveRejectionTest,
 		IsVirtuousTest,
@@ -1181,6 +1188,575 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 	case tx1.Status() != choices.Accepted:
 		t.Fatalf("Tx should have been accepted")
 	}
+}
+
+func StopVertexVerificationUnequalBetaValuesTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	avl := factory.New()
+
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          1,
+			BetaRogue:             2,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+	vts := []Vertex{
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+	}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	require.NoError(avl.Initialize(context.Background(), snow.DefaultConsensusContextTest(), params, vts))
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+
+	vtx0 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+	}
+	vtx1A := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts[:1],
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1},
+	}
+	vtx1B := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts[1:],
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1},
+	}
+	stopVertex := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV:      []Vertex{vtx1B},
+		HasWhitelistV: true,
+		WhitelistV: set.Set[ids.ID]{
+			vtx1B.IDV: struct{}{},
+			tx1.IDV:   struct{}{},
+		},
+		HeightV: 2,
+	}
+
+	require.NoError(avl.Add(context.Background(), vtx0))
+	require.NoError(avl.Add(context.Background(), vtx1A))
+	require.NoError(avl.Add(context.Background(), vtx1B))
+
+	sm1 := bag.UniqueBag[ids.ID]{}
+	sm1.Add(0, vtx1A.IDV, vtx1B.IDV)
+
+	// Transaction vertex for vtx1A is now accepted
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Processing, tx0.Status())
+	require.Equal(choices.Processing, tx1.Status())
+	require.Equal(choices.Processing, vtx0.Status())
+	require.Equal(choices.Processing, vtx1A.Status())
+	require.Equal(choices.Processing, vtx1B.Status())
+
+	// Because vtx1A isn't accepted, the stopVertex verification passes
+	require.NoError(avl.Add(context.Background(), stopVertex))
+
+	// Because vtx1A is now accepted, the stopVertex should be rejected.
+	// However, because BetaVirtuous < BetaRogue it is possible for the
+	// stopVertex to be processing.
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Rejected, tx0.Status())
+	require.Equal(choices.Accepted, tx1.Status())
+	require.Equal(choices.Rejected, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1A.Status())
+	require.Equal(choices.Accepted, vtx1B.Status())
+	require.Equal(choices.Processing, stopVertex.Status())
+}
+
+func StopVertexVerificationEqualBetaValuesTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	avl := factory.New()
+
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          2,
+			BetaRogue:             2,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+	vts := []Vertex{
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+	}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	require.NoError(avl.Initialize(context.Background(), snow.DefaultConsensusContextTest(), params, vts))
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+
+	vtx0 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+	}
+	vtx1A := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts[:1],
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1},
+	}
+	vtx1B := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts[1:],
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1},
+	}
+	stopVertex := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV:      []Vertex{vtx1B},
+		HasWhitelistV: true,
+		WhitelistV: set.Set[ids.ID]{
+			vtx1B.IDV: struct{}{},
+			tx1.IDV:   struct{}{},
+		},
+		HeightV: 2,
+	}
+
+	require.NoError(avl.Add(context.Background(), vtx0))
+	require.NoError(avl.Add(context.Background(), vtx1A))
+	require.NoError(avl.Add(context.Background(), vtx1B))
+
+	sm1 := bag.UniqueBag[ids.ID]{}
+	sm1.Add(0, vtx1A.IDV, vtx1B.IDV)
+
+	// Transaction vertex for vtx1A can not be accepted because BetaVirtuous is
+	// equal to BetaRogue
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Processing, tx0.Status())
+	require.Equal(choices.Processing, tx1.Status())
+	require.Equal(choices.Processing, vtx0.Status())
+	require.Equal(choices.Processing, vtx1A.Status())
+	require.Equal(choices.Processing, vtx1B.Status())
+
+	// Because vtx1A isn't accepted, the stopVertex verification passes
+	require.NoError(avl.Add(context.Background(), stopVertex))
+
+	// Because vtx1A is now accepted, the stopVertex should be rejected
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Rejected, tx0.Status())
+	require.Equal(choices.Accepted, tx1.Status())
+	require.Equal(choices.Rejected, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1A.Status())
+	require.Equal(choices.Accepted, vtx1B.Status())
+	require.Equal(choices.Rejected, stopVertex.Status())
+}
+
+func AcceptParentOfPreviouslyRejectedVertexTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	avl := factory.New()
+
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          1,
+			BetaRogue:             1,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+	vts := []Vertex{
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+	}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	require.NoError(avl.Initialize(context.Background(), snow.DefaultConsensusContextTest(), params, vts))
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[:1],
+	}
+
+	tx1A := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[1:],
+	}
+	tx1B := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[1:],
+	}
+
+	vtx1A := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1A},
+	}
+
+	vtx0 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+	}
+	vtx1B := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []Vertex{vtx0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx1B},
+	}
+
+	require.NoError(avl.Add(context.Background(), vtx0))
+	require.NoError(avl.Add(context.Background(), vtx1A))
+	require.NoError(avl.Add(context.Background(), vtx1B))
+
+	sm1 := bag.UniqueBag[ids.ID]{}
+	sm1.Add(0, vtx1A.IDV)
+
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Accepted, tx1A.Status())
+	require.Equal(choices.Accepted, vtx1A.Status())
+	require.Equal(choices.Rejected, tx1B.Status())
+	require.Equal(choices.Rejected, vtx1B.Status())
+	require.Equal(1, avl.NumProcessing())
+	require.Equal(choices.Processing, tx0.Status())
+	require.Equal(choices.Processing, vtx0.Status())
+
+	sm0 := bag.UniqueBag[ids.ID]{}
+	sm0.Add(0, vtx0.IDV)
+
+	require.NoError(avl.RecordPoll(context.Background(), sm0))
+	require.Zero(avl.NumProcessing())
+	require.Equal(choices.Accepted, tx0.Status())
+	require.Equal(choices.Accepted, vtx0.Status())
+
+	prefs := avl.Preferences()
+	require.Len(prefs, 2)
+	require.Contains(prefs, vtx0.ID())
+	require.Contains(prefs, vtx1A.ID())
+}
+
+func RejectParentOfPreviouslyRejectedVertexTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	avl := factory.New()
+
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          1,
+			BetaRogue:             1,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+	vts := []Vertex{
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+	}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	require.NoError(avl.Initialize(context.Background(), snow.DefaultConsensusContextTest(), params, vts))
+
+	tx0A := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[:1],
+	}
+	tx0B := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[:1],
+	}
+
+	tx1A := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[1:],
+	}
+	tx1B := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos[1:],
+	}
+
+	vtx0A := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0A},
+	}
+	vtx1A := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1A},
+	}
+
+	vtx0B := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0B},
+	}
+	vtx1B := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []Vertex{vtx0B},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx1B},
+	}
+
+	require.NoError(avl.Add(context.Background(), vtx0A))
+	require.NoError(avl.Add(context.Background(), vtx1A))
+	require.NoError(avl.Add(context.Background(), vtx0B))
+	require.NoError(avl.Add(context.Background(), vtx1B))
+
+	sm1 := bag.UniqueBag[ids.ID]{}
+	sm1.Add(0, vtx1A.IDV)
+
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Accepted, tx1A.Status())
+	require.Equal(choices.Accepted, vtx1A.Status())
+	require.Equal(choices.Rejected, tx1B.Status())
+	require.Equal(choices.Rejected, vtx1B.Status())
+	require.Equal(2, avl.NumProcessing())
+	require.Equal(choices.Processing, tx0A.Status())
+	require.Equal(choices.Processing, vtx0A.Status())
+	require.Equal(choices.Processing, tx0B.Status())
+	require.Equal(choices.Processing, vtx0B.Status())
+
+	sm0 := bag.UniqueBag[ids.ID]{}
+	sm0.Add(0, vtx0A.IDV)
+
+	require.NoError(avl.RecordPoll(context.Background(), sm0))
+	require.Zero(avl.NumProcessing())
+	require.Equal(choices.Accepted, tx0A.Status())
+	require.Equal(choices.Accepted, vtx0A.Status())
+	require.Equal(choices.Rejected, tx0B.Status())
+	require.Equal(choices.Rejected, vtx0B.Status())
+
+	orphans := avl.Orphans()
+	require.Empty(orphans)
+}
+
+func QuiesceAfterRejectedVertexTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	avl := factory.New()
+
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          1,
+			BetaRogue:             1,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+	vts := []Vertex{
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+	}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	require.NoError(avl.Initialize(context.Background(), snow.DefaultConsensusContextTest(), params, vts))
+
+	txA := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+	txB := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+
+	vtxA := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{txA},
+	}
+
+	vtxB0 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{txB},
+	}
+	vtxB1 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []Vertex{vtxB0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{txB},
+	}
+
+	require.NoError(avl.Add(context.Background(), vtxA))
+	require.NoError(avl.Add(context.Background(), vtxB0))
+	require.NoError(avl.Add(context.Background(), vtxB1))
+
+	sm1 := bag.UniqueBag[ids.ID]{}
+	sm1.Add(0, vtxA.IDV)
+
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Accepted, txA.Status())
+	require.Equal(choices.Accepted, vtxA.Status())
+	require.Equal(choices.Rejected, txB.Status())
+	require.Equal(choices.Rejected, vtxB0.Status())
+	require.Equal(choices.Rejected, vtxB1.Status())
+	require.Zero(avl.NumProcessing())
+	require.True(avl.Finalized())
+	require.True(avl.Quiesce())
 }
 
 func SplitVotingTest(t *testing.T, factory Factory) {

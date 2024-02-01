@@ -46,6 +46,7 @@ var (
 		AcceptingDependencyTest,
 		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
+		RejectMultipleTimesTest,
 		VacuouslyAcceptedTest,
 		ConflictsTest,
 		VirtuousDependsOnRogueTest,
@@ -1320,6 +1321,74 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 	case purple.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Rejected)
 	}
+}
+
+func RejectMultipleTimesTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	purple := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Green},
+		InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+	}
+	yellow := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(9),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: []ids.ID{ids.Empty.Prefix(8)},
+	}
+
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(graph.Initialize(snow.DefaultConsensusContextTest(), params))
+	require.NoError(graph.Add(context.Background(), Red))
+	require.NoError(graph.Add(context.Background(), yellow))
+	require.NoError(graph.Add(context.Background(), Green))
+	require.NoError(graph.Add(context.Background(), purple))
+
+	prefs := graph.Preferences()
+	require.Len(prefs, 2)
+	require.Contains(prefs, Red.ID())
+	require.Contains(prefs, yellow.ID())
+
+	y := bag.Bag[ids.ID]{}
+	y.Add(yellow.ID())
+
+	updated, err := graph.RecordPoll(context.Background(), y)
+	require.NoError(err)
+	require.True(updated)
+	require.Equal(choices.Processing, Red.Status())
+	require.Equal(choices.Accepted, yellow.Status())
+	require.Equal(choices.Processing, Green.Status())
+	require.Equal(choices.Rejected, purple.Status())
+
+	r := bag.Bag[ids.ID]{}
+	r.Add(Red.ID())
+
+	// Accepting Red rejects Green which was a dependency of purple. This
+	// results in purple being rejected for a second time.
+	updated, err = graph.RecordPoll(context.Background(), r)
+	require.NoError(err)
+	require.True(updated)
+	require.True(graph.Finalized())
+	require.Equal(choices.Accepted, Red.Status())
+	require.Equal(choices.Accepted, yellow.Status())
+	require.Equal(choices.Rejected, Green.Status())
+	require.Equal(choices.Rejected, purple.Status())
 }
 
 func VacuouslyAcceptedTest(t *testing.T, factory Factory) {

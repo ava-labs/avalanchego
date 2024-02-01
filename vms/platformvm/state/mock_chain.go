@@ -539,6 +539,21 @@ func (mr *MockChainMockRecorder) GetNotDistributedValidatorReward() *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotDistributedValidatorReward", reflect.TypeOf((*MockChain)(nil).GetNotDistributedValidatorReward))
 }
 
+// GetDelegateeReward mocks base method.
+func (m *MockChain) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDelegateeReward", arg0, arg1)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDelegateeReward indicates an expected call of GetDelegateeReward.
+func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), arg0, arg1)
+}
+
 // GetPendingDelegatorIterator mocks base method.
 func (m *MockChain) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -973,6 +988,20 @@ func (m *MockChain) SetShortIDLink(arg0 ids.ShortID, arg1 ShortLinkKey, arg2 *id
 func (mr *MockChainMockRecorder) SetShortIDLink(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetShortIDLink", reflect.TypeOf((*MockChain)(nil).SetShortIDLink), arg0, arg1, arg2)
+}
+
+// SetDelegateeReward mocks base method.
+func (m *MockChain) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDelegateeReward", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetDelegateeReward indicates an expected call of SetDelegateeReward.
+func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
 // SetTimestamp mocks base method.

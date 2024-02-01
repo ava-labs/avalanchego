@@ -24,7 +24,7 @@ import (
 
 // RPCChainVMProtocol should be bumped anytime changes are made which require
 // the plugin vm to upgrade to latest avalanchego release to be compatible.
-const RPCChainVMProtocol uint = 24
+const RPCChainVMProtocol uint = 25
 
 // These are globals that describe network upgrades and node versions
 var (
@@ -126,10 +126,9 @@ var (
 	}
 	BerlinPhaseDefaultTime = time.Date(2023, time.July, 1, 8, 0, 0, 0, time.UTC)
 
-	// TODO: update this before release
 	CortinaTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
 	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
@@ -230,6 +229,7 @@ func GetCompatibility(networkID uint32) Compatibility {
 		CurrentApp,
 		MinimumCompatibleVersion,
 		GetAthensPhaseTime(networkID).Add(-time.Minute),
+		GetCortinaTime(networkID),
 		PrevMinimumCompatibleVersion,
 	)
 }
