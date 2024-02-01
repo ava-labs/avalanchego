@@ -68,25 +68,23 @@ impl PartialPath {
     //
     /// returns a tuple of the decoded partial path and whether the path is terminal
     pub fn decode(raw: &[u8]) -> (Self, bool) {
-        let mut raw = raw.iter().copied();
-        let flags = Flags::from_bits_retain(raw.next().unwrap_or_default());
-
-        if !flags.contains(Flags::ODD_LEN) {
-            let _ = raw.next();
-        }
-
-        (Self(raw.collect()), flags.contains(Flags::TERMINAL))
+        Self::from_iter(raw.iter().copied())
     }
 
     /// returns a tuple of the decoded partial path and whether the path is terminal
-    pub fn from_nibbles<const N: usize>(mut nibbles: NibblesIterator<'_, N>) -> (Self, bool) {
-        let flags = Flags::from_bits_retain(nibbles.next().unwrap_or_default());
+    pub fn from_nibbles<const N: usize>(nibbles: NibblesIterator<'_, N>) -> (Self, bool) {
+        Self::from_iter(nibbles)
+    }
+
+    /// Assumes all bytes are nibbles, prefer to use `from_nibbles` instead.
+    fn from_iter<Iter: Iterator<Item = u8>>(mut iter: Iter) -> (Self, bool) {
+        let flags = Flags::from_bits_retain(iter.next().unwrap_or_default());
 
         if !flags.contains(Flags::ODD_LEN) {
-            let _ = nibbles.next();
+            let _ = iter.next();
         }
 
-        (Self(nibbles.collect()), flags.contains(Flags::TERMINAL))
+        (Self(iter.collect()), flags.contains(Flags::TERMINAL))
     }
 
     pub(super) fn serialized_len(&self) -> u64 {

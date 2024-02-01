@@ -1,13 +1,14 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::logger::trace;
 use crate::{
+    logger::trace,
     merkle::from_nibbles,
     shale::{disk_address::DiskAddress, CachedStore, ShaleError, ShaleStore, Storable},
 };
 use bincode::{Error, Options};
 use bitflags::bitflags;
+use bytemuck::{CheckedBitPattern, NoUninit, Pod, Zeroable};
 use enum_as_inner::EnumAsInner;
 use serde::{
     de::DeserializeOwned,
@@ -213,6 +214,8 @@ impl From<NodeType> for Node {
 }
 
 bitflags! {
+    #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
+    #[repr(transparent)]
     struct NodeAttributes: u8 {
         const HAS_ROOT_HASH           = 0b001;
         const ENCODED_LENGTH_IS_KNOWN = 0b010;
@@ -315,14 +318,13 @@ impl Node {
     }
 }
 
-const ENCODED_MAX_LEN: usize = TRIE_HASH_LEN - 1;
-
-#[repr(C)]
+#[derive(Clone, Copy, CheckedBitPattern, NoUninit)]
+#[repr(C, packed)]
 struct Meta {
     root_hash: [u8; TRIE_HASH_LEN],
     attrs: NodeAttributes,
-    encoded_len: [u8; size_of::<u64>()],
-    encoded: [u8; ENCODED_MAX_LEN],
+    encoded_len: u64,
+    encoded: [u8; TRIE_HASH_LEN],
     type_id: NodeTypeId,
 }
 
@@ -331,28 +333,31 @@ impl Meta {
 }
 
 mod type_id {
+    use super::{CheckedBitPattern, NoUninit, NodeType};
     use crate::shale::ShaleError;
 
-    const BRANCH: u8 = 0;
-    const LEAF: u8 = 1;
-    const EXTENSION: u8 = 2;
-
+    #[derive(Clone, Copy, CheckedBitPattern, NoUninit)]
     #[repr(u8)]
     pub enum NodeTypeId {
-        Branch = BRANCH,
-        Leaf = LEAF,
-        Extension = EXTENSION,
+        Branch = 0,
+        Leaf = 1,
+        Extension = 2,
     }
 
     impl TryFrom<u8> for NodeTypeId {
         type Error = ShaleError;
 
         fn try_from(value: u8) -> Result<Self, Self::Error> {
-            match value {
-                BRANCH => Ok(Self::Branch),
-                LEAF => Ok(Self::Leaf),
-                EXTENSION => Ok(Self::Extension),
-                _ => Err(ShaleError::InvalidNodeType),
+            bytemuck::checked::try_cast::<_, Self>(value).map_err(|_| ShaleError::InvalidNodeType)
+        }
+    }
+
+    impl From<&NodeType> for NodeTypeId {
+        fn from(node_type: &NodeType) -> Self {
+            match node_type {
+                NodeType::Branch(_) => NodeTypeId::Branch,
+                NodeType::Leaf(_) => NodeTypeId::Leaf,
+                NodeType::Extension(_) => NodeTypeId::Extension,
             }
         }
     }
@@ -368,46 +373,34 @@ impl Storable for Node {
                     offset,
                     size: Meta::SIZE as u64,
                 })?;
+        let meta_raw = meta_raw.as_deref();
+
+        let meta = bytemuck::checked::try_from_bytes::<Meta>(&meta_raw)
+            .map_err(|_| ShaleError::InvalidNodeMeta)?;
+
+        let Meta {
+            root_hash,
+            attrs,
+            encoded_len,
+            encoded,
+            type_id,
+        } = *meta;
 
         trace!("[{mem:p}] Deserializing node at {offset}");
 
         let offset = offset + Meta::SIZE;
 
-        #[allow(clippy::indexing_slicing)]
-        let attrs = NodeAttributes::from_bits_retain(meta_raw.as_deref()[TRIE_HASH_LEN]);
-
         let root_hash = if attrs.contains(NodeAttributes::HAS_ROOT_HASH) {
-            Some(TrieHash(
-                #[allow(clippy::indexing_slicing)]
-                meta_raw.as_deref()[..TRIE_HASH_LEN]
-                    .try_into()
-                    .expect("invalid slice"),
-            ))
+            Some(TrieHash(root_hash))
         } else {
             None
         };
 
-        let mut start_index = TRIE_HASH_LEN + 1;
-        let end_index = start_index + size_of::<u64>();
-        #[allow(clippy::indexing_slicing)]
-        let encoded_len = u64::from_le_bytes(
-            meta_raw.as_deref()[start_index..end_index]
-                .try_into()
-                .expect("invalid slice"),
-        );
-
-        start_index = end_index;
-        let mut encoded: Option<Vec<u8>> = None;
-        if encoded_len > 0 {
-            #[allow(clippy::indexing_slicing)]
-            let value: Vec<u8> =
-                meta_raw.as_deref()[start_index..start_index + encoded_len as usize].into();
-            encoded = Some(value);
-        }
-
-        start_index += ENCODED_MAX_LEN;
-        #[allow(clippy::indexing_slicing)]
-        let type_id: NodeTypeId = meta_raw.as_deref()[start_index].try_into()?;
+        let encoded = if encoded_len > 0 {
+            Some(encoded.iter().take(encoded_len as usize).copied().collect())
+        } else {
+            None
+        };
 
         let is_encoded_longer_than_hash_len =
             if attrs.contains(NodeAttributes::ENCODED_LENGTH_IS_KNOWN) {
@@ -449,10 +442,7 @@ impl Storable for Node {
     fn serialized_len(&self) -> u64 {
         Meta::SIZE as u64
             + match &self.inner {
-                NodeType::Branch(n) => {
-                    // TODO: add path
-                    n.serialized_len()
-                }
+                NodeType::Branch(n) => n.serialized_len(),
                 NodeType::Extension(n) => n.serialized_len(),
                 NodeType::Leaf(n) => n.serialized_len(),
             }
@@ -460,17 +450,11 @@ impl Storable for Node {
 
     fn serialize(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         trace!("[{self:p}] Serializing node");
-        let mut cur = Cursor::new(to);
+        let mut cursor = Cursor::new(to);
 
-        let mut attrs = match self.root_hash.get() {
-            Some(h) => {
-                cur.write_all(&h.0)?;
-                NodeAttributes::HAS_ROOT_HASH
-            }
-            None => {
-                cur.write_all(&[0; 32])?;
-                NodeAttributes::empty()
-            }
+        let (mut attrs, root_hash) = match self.root_hash.get() {
+            Some(hash) => (NodeAttributes::HAS_ROOT_HASH, hash.0),
+            None => Default::default(),
         };
 
         let encoded = self
@@ -478,7 +462,7 @@ impl Storable for Node {
             .get()
             .filter(|encoded| encoded.len() < TRIE_HASH_LEN);
 
-        let encoded_len = encoded.map(Vec::len).unwrap_or(0);
+        let encoded_len = encoded.map(Vec::len).unwrap_or(0) as u64;
 
         if let Some(&is_encoded_longer_than_hash_len) = self.is_encoded_longer_than_hash_len.get() {
             attrs.insert(if is_encoded_longer_than_hash_len {
@@ -488,45 +472,43 @@ impl Storable for Node {
             });
         }
 
-        #[allow(clippy::unwrap_used)]
-        cur.write_all(&[attrs.bits()]).unwrap();
-        cur.write_all(&(encoded_len as u64).to_le_bytes())?;
+        let encoded = std::array::from_fn({
+            let mut encoded = encoded.into_iter().flatten().copied();
+            move |_| encoded.next().unwrap_or(0)
+        });
 
-        if let Some(encoded) = encoded {
-            cur.write_all(encoded)?;
-            let remaining_len = ENCODED_MAX_LEN - encoded_len;
-            cur.write_all(&vec![0; remaining_len])?;
-        } else {
-            cur.write_all(&[0; ENCODED_MAX_LEN])?;
-        }
+        let type_id = NodeTypeId::from(&self.inner);
+
+        let meta = Meta {
+            root_hash,
+            attrs,
+            encoded_len,
+            encoded,
+            type_id,
+        };
+
+        cursor.write_all(bytemuck::bytes_of(&meta))?;
 
         match &self.inner {
             NodeType::Branch(n) => {
-                // TODO: add path
-                cur.write_all(&[type_id::NodeTypeId::Branch as u8])?;
-
-                let pos = cur.position() as usize;
+                let pos = cursor.position() as usize;
 
                 #[allow(clippy::indexing_slicing)]
-                n.serialize(&mut cur.get_mut()[pos..])
+                n.serialize(&mut cursor.get_mut()[pos..])
             }
 
             NodeType::Extension(n) => {
-                cur.write_all(&[type_id::NodeTypeId::Extension as u8])?;
-
-                let pos = cur.position() as usize;
+                let pos = cursor.position() as usize;
 
                 #[allow(clippy::indexing_slicing)]
-                n.serialize(&mut cur.get_mut()[pos..])
+                n.serialize(&mut cursor.get_mut()[pos..])
             }
 
             NodeType::Leaf(n) => {
-                cur.write_all(&[type_id::NodeTypeId::Leaf as u8])?;
-
-                let pos = cur.position() as usize;
+                let pos = cursor.position() as usize;
 
                 #[allow(clippy::indexing_slicing)]
-                n.serialize(&mut cur.get_mut()[pos..])
+                n.serialize(&mut cursor.get_mut()[pos..])
             }
         }
     }
