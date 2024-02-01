@@ -1,5 +1,59 @@
 # Release Notes
 
+## [v1.11.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0-fuji)
+
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+This upgrade consists of the following Avalanche Community Proposals (ACPs):
+
+- [ACP-23](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/23-p-chain-native-transfers.md) P-Chain Native Transfers
+- [ACP-24](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/24-shanghai-eips.md) Activate Shanghai EIPs on C-Chain
+- [ACP-25](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/25-vm-application-errors.md) Virtual Machine Application Errors
+- [ACP-30](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/30-avalanche-warp-x-evm.md) Integrate Avalanche Warp Messaging into the EVM
+- [ACP-31](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/31-enable-subnet-ownership-transfer.md) Enable Subnet Ownership Transfer
+- [ACP-41](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/41-remove-pending-stakers.md) Remove Pending Stakers
+- [ACP-62](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/62-disable-addvalidatortx-and-adddelegatortx.md) Disable AddValidatorTx and AddDelegatorTx
+
+The changes in the upgrade go into effect at 11 AM ET (4 PM UTC) on Tuesday, February 13th, 2024 on the Fuji testnet.
+
+**All Fuji nodes must upgrade before 11 AM ET, February 13th 2024.**
+
+The plugin version is updated to `32` all plugins must update to be compatible.
+
+### Configs
+
+- Deprecated:
+    - `api-auth-required`
+    - `api-auth-password`
+    - `api-auth-password-file`
+
+### Fixes
+
+- Fixed potential deadlock during P-chain shutdown
+- Updated the consensus engine to recover from previously misconfigured subnets without requiring a restart
+
+### What's Changed
+
+- `ci`: Upgrade all workflow actions to versions using Node 20 by @marun in https://github.com/ava-labs/avalanchego/pull/2677
+- `tmpnet`: Ensure restart after chain creation by @marun in https://github.com/ava-labs/avalanchego/pull/2675
+- Publish docker images with race detection by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2680
+- `vms/platformvm`: Remove `NewRewardValidatorTx` from `Builder` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2676
+- `ci`: Updated shellcheck script to support autofix by @marun in https://github.com/ava-labs/avalanchego/pull/2678
+- Unblock misconfigured subnets by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2679
+- Add transfer subnet ownership functionality to wallet by @felipemadero in https://github.com/ava-labs/avalanchego/pull/2659
+- Add ACP-62 by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2681
+- `vms/platformvm`: Add missing txs to `txs.Builder` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2663
+- `vms/platformvm`: Disable `AddValidatorTx` and `AddDelegatorTx` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2662
+- Remove chain router from node.Config by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2683
+- Deprecate the auth API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2684
+- Fix P-chain Shutdown deadlock by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2686
+- Cleanup ID initialization by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2690
+- Remove unused chains#beacons field by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2692
+- x/sync: Remove duplicated call to TrackBandwidth by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2694
+- Move VMAliaser into node from config by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2689
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.19...v1.11.0-fuji
+
 ## [v1.10.19](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.19)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
