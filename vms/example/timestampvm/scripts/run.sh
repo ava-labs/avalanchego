@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# (c) 2019-2023, Ava Labs, Inc. All rights reserved.
+# (c) 2019-2024, Ava Labs, Inc. All rights reserved.
 # See the file LICENSE for licensing terms.
 
 set -e
