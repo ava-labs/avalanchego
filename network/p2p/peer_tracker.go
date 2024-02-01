@@ -52,6 +52,9 @@ type PeerTracker struct {
 	lock sync.RWMutex
 	// All peers we are connected to
 	peers map[ids.NodeID]*peerInfo
+	// Peers that we're connected to that we haven't sent a request to since we
+	// most recently connected to them.
+	untrackedPeers set.Set[ids.NodeID]
 	// Peers that we're connected to that we've sent a request to since we most
 	// recently connected to them.
 	trackedPeers set.Set[ids.NodeID]
@@ -157,11 +160,7 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 	defer p.lock.RUnlock()
 
 	if p.shouldTrackNewPeer() {
-		for nodeID := range p.peers {
-			// skip peers already tracked
-			if p.trackedPeers.Contains(nodeID) {
-				continue
-			}
+		if nodeID, ok := p.untrackedPeers.Peek(); ok {
 			p.log.Debug("tracking peer",
 				zap.Int("trackedPeers", p.trackedPeers.Len()),
 				zap.Stringer("nodeID", nodeID),
@@ -197,6 +196,7 @@ func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	p.untrackedPeers.Remove(nodeID)
 	p.trackedPeers.Add(nodeID)
 	p.bandwidthHeap.Remove(nodeID)
 
@@ -262,6 +262,7 @@ func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Applicat
 	}
 
 	p.peers[nodeID] = &peerInfo{}
+	p.untrackedPeers.Add(nodeID)
 	return nil
 }
 
@@ -271,6 +272,7 @@ func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	defer p.lock.Unlock()
 
 	delete(p.peers, nodeID)
+	p.untrackedPeers.Remove(nodeID)
 	p.trackedPeers.Remove(nodeID)
 	p.responsivePeers.Remove(nodeID)
 	p.bandwidthHeap.Remove(nodeID)
