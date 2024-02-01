@@ -153,7 +153,6 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -195,7 +194,6 @@ func TestBlockVerify(t *testing.T) {
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -240,7 +238,6 @@ func TestBlockVerify(t *testing.T) {
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(mockParentBlock, nil)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -289,7 +286,6 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -345,7 +341,6 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
@@ -406,7 +401,6 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
@@ -494,7 +488,6 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx2.ID(), ErrConflictingBlockTxs).Times(1)
@@ -566,7 +559,6 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -624,7 +616,6 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				mockMempool := mempool.NewMockMempool(ctrl)
 				mockMempool.EXPECT().Remove([]*txs.Tx{tx})
@@ -1003,7 +994,6 @@ func TestBlockReject(t *testing.T) {
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -1067,7 +1057,6 @@ func TestBlockReject(t *testing.T) {
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				mockState.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,

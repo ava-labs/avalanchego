@@ -170,14 +170,6 @@ func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
 	return parentState.GetUnitFees()
 }
 
-func (d *diff) GetBlockUnitCaps() (commonfees.Dimensions, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return commonfees.Dimensions{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetBlockUnitCaps()
-}
-
 func (d *diff) Apply(state Chain) {
 	for utxoID, utxo := range d.modifiedUTXOs {
 		if utxo != nil {

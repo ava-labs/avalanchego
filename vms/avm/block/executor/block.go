@@ -76,12 +76,8 @@ func (b *Block) Verify(context.Context) error {
 
 	// Syntactic verification is generally pretty fast, so we verify this first
 	// before performing any possible DB reads. TODO ABENEGIA: except we do DB reads now with fees stuff?
+	feesCfg := b.manager.backend.Config.GetDynamicFeesConfig()
 	unitFees, err := b.manager.state.GetUnitFees()
-	if err != nil {
-		return err
-	}
-
-	unitCaps, err := b.manager.state.GetBlockUnitCaps()
 	if err != nil {
 		return err
 	}
@@ -91,7 +87,7 @@ func (b *Block) Verify(context.Context) error {
 		err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
 			Backend:       b.manager.backend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      unitCaps,
+			UnitCaps:      feesCfg.BlockUnitsCap,
 			BlkTimestamp:  newChainTime,
 			Tx:            tx,
 		})

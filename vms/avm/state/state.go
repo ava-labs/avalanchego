@@ -74,7 +74,6 @@ type ReadOnlyChain interface {
 
 	// at this iteration we don't need to reset these, we are just metering
 	GetUnitFees() (commonfees.Dimensions, error)
-	GetBlockUnitCaps() (commonfees.Dimensions, error)
 }
 
 type Chain interface {
@@ -107,7 +106,6 @@ type State interface {
 
 	// At this iteration these getters are helpful for UTs only
 	SetUnitFees(uf commonfees.Dimensions) error
-	SetBlockUnitCaps(caps commonfees.Dimensions) error
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -184,10 +182,7 @@ type state struct {
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
 
-	// multifees data are not persisted at this stage. We just meter for now,
-	// we'll revisit when we'll introduce dynamic fees
-	unitFees      commonfees.Dimensions
-	blockUnitCaps commonfees.Dimensions
+	unitFees commonfees.Dimensions
 
 	trackChecksum bool
 	txChecksum    ids.ID
@@ -272,8 +267,7 @@ func New(
 
 		singletonDB: singletonDB,
 
-		unitFees:      fees.DefaultUnitFees,
-		blockUnitCaps: fees.DefaultBlockMaxConsumedUnits,
+		unitFees: fees.DefaultUnitFees,
 
 		trackChecksum: trackChecksums,
 	}
@@ -525,15 +519,6 @@ func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
 
 func (s *state) SetUnitFees(uf commonfees.Dimensions) error {
 	s.unitFees = uf
-	return nil
-}
-
-func (s *state) GetBlockUnitCaps() (commonfees.Dimensions, error) {
-	return s.blockUnitCaps, nil
-}
-
-func (s *state) SetBlockUnitCaps(caps commonfees.Dimensions) error {
-	s.blockUnitCaps = caps
 	return nil
 }
 

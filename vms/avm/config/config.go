@@ -23,3 +23,8 @@ type Config struct {
 func (c *Config) IsEForkActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EForkTime)
 }
+
+// TODO ABENEGIA: consider structuring this method to handle forks (or is it YAGNI?)
+func (*Config) GetDynamicFeesConfig() DynamicFeesConfig {
+	return EForkDynamicFeesConfig
+}

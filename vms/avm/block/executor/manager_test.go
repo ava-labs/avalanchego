@@ -150,7 +150,6 @@ func TestManagerVerifyTx(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -185,7 +184,6 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -223,7 +221,6 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -261,7 +258,6 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
 				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
-				state.EXPECT().GetBlockUnitCaps().Return(fees.DefaultBlockMaxConsumedUnits, nil).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{

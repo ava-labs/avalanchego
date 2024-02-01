@@ -490,12 +490,9 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		return nil, err
 	}
 
-	unitFees, err := vm.state.GetUnitFees()
-	if err != nil {
-		return nil, err
-	}
+	feesCfg := vm.Config.GetDynamicFeesConfig()
 
-	unitCaps, err := vm.state.GetBlockUnitCaps()
+	unitFees, err := vm.state.GetUnitFees()
 	if err != nil {
 		return nil, err
 	}
@@ -503,7 +500,7 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
 		Backend:       vm.txBackend,
 		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
-		UnitCaps:      unitCaps,
+		UnitCaps:      feesCfg.BlockUnitsCap,
 		BlkTimestamp:  vm.state.GetTimestamp(),
 		Tx:            tx,
 	})
