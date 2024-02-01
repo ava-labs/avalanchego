@@ -14,8 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 const (
@@ -55,24 +53,6 @@ type SyntacticVerifier struct {
 
 func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
 	if err := tx.BaseTx.Verify(v.Ctx); err != nil {
-		return err
-	}
-
-	feeCalculator := fees.Calculator{
-		Config: v.Config,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
-	err := avax.VerifyTx(
-		feeCalculator.Fee,
-		v.FeeAssetID,
-		[][]*avax.TransferableInput{tx.Ins},
-		[][]*avax.TransferableOutput{tx.Outs},
-		v.Codec,
-	)
-	if err != nil {
 		return err
 	}
 
@@ -128,24 +108,6 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 		return err
 	}
 
-	feeCalculator := fees.Calculator{
-		Config: v.Config,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
-	err := avax.VerifyTx(
-		feeCalculator.Fee,
-		v.FeeAssetID,
-		[][]*avax.TransferableInput{tx.Ins},
-		[][]*avax.TransferableOutput{tx.Outs},
-		v.Codec,
-	)
-	if err != nil {
-		return err
-	}
-
 	for _, state := range tx.States {
 		if err := state.Verify(v.Codec, len(v.Fxs)); err != nil {
 			return err
@@ -180,24 +142,6 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 	}
 
 	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
-		return err
-	}
-
-	feeCalculator := fees.Calculator{
-		Config: v.Config,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
-	err := avax.VerifyTx(
-		feeCalculator.Fee,
-		v.FeeAssetID,
-		[][]*avax.TransferableInput{tx.Ins},
-		[][]*avax.TransferableOutput{tx.Outs},
-		v.Codec,
-	)
-	if err != nil {
 		return err
 	}
 
@@ -250,27 +194,6 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	feeCalculator := fees.Calculator{
-		Config: v.Config,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
-	err := avax.VerifyTx(
-		feeCalculator.Fee,
-		v.FeeAssetID,
-		[][]*avax.TransferableInput{
-			tx.Ins,
-			tx.ImportedIns,
-		},
-		[][]*avax.TransferableOutput{tx.Outs},
-		v.Codec,
-	)
-	if err != nil {
-		return err
-	}
-
 	for _, cred := range v.Tx.Creds {
 		if err := cred.Verify(); err != nil {
 			return err
@@ -296,27 +219,6 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
-		return err
-	}
-
-	feeCalculator := fees.Calculator{
-		Config: v.Config,
-	}
-	if err := tx.Visit(&feeCalculator); err != nil {
-		return err
-	}
-
-	err := avax.VerifyTx(
-		feeCalculator.Fee,
-		v.FeeAssetID,
-		[][]*avax.TransferableInput{tx.Ins},
-		[][]*avax.TransferableOutput{
-			tx.Outs,
-			tx.ExportedOuts,
-		},
-		v.Codec,
-	)
-	if err != nil {
 		return err
 	}
 
