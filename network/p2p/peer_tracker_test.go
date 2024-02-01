@@ -17,7 +17,7 @@ import (
 
 func TestPeerTracker(t *testing.T) {
 	require := require.New(t)
-	p, err := NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry())
+	p, err := NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry(), nil)
 	require.NoError(err)
 
 	// Connect some peers
@@ -39,7 +39,7 @@ func TestPeerTracker(t *testing.T) {
 
 	// Expect requests to go to new peers until we have desiredMinResponsivePeers responsive peers.
 	for i := 0; i < desiredMinResponsivePeers+numExtraPeers/2; i++ {
-		peer, ok := p.GetAnyPeer(nil)
+		peer, ok := p.GetAnyPeer()
 		require.True(ok)
 		require.NotNil(peer)
 
@@ -65,7 +65,7 @@ func TestPeerTracker(t *testing.T) {
 	// Expect requests to go to responsive or new peers, so long as they are available
 	numRequests := 50
 	for i := 0; i < numRequests; i++ {
-		peer, ok := p.GetAnyPeer(nil)
+		peer, ok := p.GetAnyPeer()
 		require.True(ok)
 		require.NotNil(peer)
 
@@ -89,7 +89,7 @@ func TestPeerTracker(t *testing.T) {
 	}
 
 	// Requests should fall back on non-responsive peers when no other choice is left
-	peer, ok := p.GetAnyPeer(nil)
+	peer, ok := p.GetAnyPeer()
 	require.True(ok)
 	require.NotNil(peer)
 

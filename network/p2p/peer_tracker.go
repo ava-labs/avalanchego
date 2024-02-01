@@ -41,7 +41,6 @@ var errDuplicatePeer = errors.New("connected to duplicate peer")
 
 // information we track on a given peer
 type peerInfo struct {
-	version   *version.Application
 	bandwidth safemath.Averager
 }
 
@@ -126,10 +125,10 @@ func (p *PeerTracker) shouldTrackNewPeer() bool {
 	if numResponsivePeers < desiredMinResponsivePeers {
 		return true
 	}
-	if len(p.trackedPeers) >= len(p.peers) {
-		// already tracking all the peers
-		return false
+	if p.trackedPeers.Len() >= len(p.peers) {
+		return false // already tracking all peers
 	}
+
 	// TODO danlaine: we should consider tuning this probability function.
 	// With [newPeerConnectFactor] as 0.1 the probabilities are:
 	//
@@ -160,9 +159,8 @@ func (p *PeerTracker) GetAnyPeer() (ids.NodeID, bool) {
 			if p.trackedPeers.Contains(nodeID) {
 				continue
 			}
-			p.log.Debug(
-				"tracking peer",
-				zap.Int("trackedPeers", len(p.trackedPeers)),
+			p.log.Debug("tracking peer",
+				zap.Int("trackedPeers", p.trackedPeers.Len()),
 				zap.Stringer("nodeID", nodeID),
 			)
 			return nodeID, true
@@ -249,9 +247,7 @@ func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Applicat
 		return errDuplicatePeer
 	}
 
-	p.peers[nodeID] = &peerInfo{
-		version: nodeVersion,
-	}
+	p.peers[nodeID] = &peerInfo{}
 	return nil
 }
 
@@ -269,7 +265,7 @@ func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 }
 
-// Returns the number of peers the node is connected to.
+// Returns the number of queriable peers the node is connected to.
 func (p *PeerTracker) Size() int {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

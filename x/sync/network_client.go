@@ -43,7 +43,6 @@ type NetworkClient interface {
 	// the request should be retried.
 	RequestAny(
 		ctx context.Context,
-		minVersion *version.Application,
 		request []byte,
 	) (ids.NodeID, []byte, error)
 
@@ -100,8 +99,14 @@ func NewNetworkClient(
 	log logging.Logger,
 	metricsNamespace string,
 	registerer prometheus.Registerer,
+	minVersion *version.Application,
 ) (NetworkClient, error) {
-	peerTracker, err := p2p.NewPeerTracker(log, metricsNamespace, registerer)
+	peerTracker, err := p2p.NewPeerTracker(
+		log,
+		metricsNamespace,
+		registerer,
+		minVersion,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
 	}
@@ -193,7 +198,6 @@ func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bo
 // If [errAppSendFailed] is returned this should be considered fatal.
 func (c *networkClient) RequestAny(
 	ctx context.Context,
-	minVersion *version.Application,
 	request []byte,
 ) (ids.NodeID, []byte, error) {
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
@@ -202,11 +206,10 @@ func (c *networkClient) RequestAny(
 	}
 	defer c.activeRequests.Release(1)
 
-	nodeID, ok := c.peers.GetAnyPeer(minVersion)
+	nodeID, ok := c.peers.GetAnyPeer()
 	if !ok {
-		return ids.EmptyNodeID, nil, fmt.Errorf(
-			"no peers found matching version %s out of %d peers",
-			minVersion, c.peers.Size(),
+		return ids.EmptyNodeID, nil, fmt.Errorf("no peers found from %d peers",
+			c.peers.Size(),
 		)
 	}
 

@@ -101,7 +101,6 @@ func sendRangeProofRequest(
 
 	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx
-		gomock.Any(), // min version
 		gomock.Any(), // request
 	).DoAndReturn(
 		func(_ context.Context, _ *version.Application, request []byte) (ids.NodeID, []byte, error) {
@@ -401,7 +400,6 @@ func sendChangeProofRequest(
 
 	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx
-		gomock.Any(), // min version
 		gomock.Any(), // request
 	).DoAndReturn(
 		func(_ context.Context, _ *version.Application, request []byte) (ids.NodeID, []byte, error) {
@@ -764,7 +762,6 @@ func TestAppRequestSendFailed(t *testing.T) {
 
 	// Mock failure to send app request
 	networkClient.EXPECT().RequestAny(
-		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
 	).Return(ids.EmptyNodeID, nil, errAppSendFailed).Times(2)
