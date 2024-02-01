@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -64,7 +64,7 @@ jobs:
           RELEASE: "jammy"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jammy
           path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
@@ -78,8 +78,8 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -124,7 +124,7 @@ jobs:
           RELEASE: "focal"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: focal
           path:  /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
