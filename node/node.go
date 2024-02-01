@@ -145,7 +145,15 @@ func New(
 		return nil, fmt.Errorf("problem creating vm logger: %w", err)
 	}
 
-	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+	n.VMAliaser = ids.NewAliaser()
+	for vmID, aliases := range config.VMAliases {
+		for _, alias := range aliases {
+			if err := n.VMAliaser.Alias(vmID, alias); err != nil {
+				return nil, err
+			}
+		}
+	}
+	n.VMManager = vms.NewManager(n.VMFactoryLog, n.VMAliaser)
 
 	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
 		return nil, fmt.Errorf("problem initializing node beacons: %w", err)
@@ -357,6 +365,7 @@ type Node struct {
 	MetricsRegisterer *prometheus.Registry
 	MetricsGatherer   metrics.MultiGatherer
 
+	VMAliaser ids.Aliaser
 	VMManager vms.Manager
 
 	// VM endpoint registry
@@ -1045,11 +1054,10 @@ func (n *Node) initAPIServer() error {
 // Add the default VM aliases
 func (n *Node) addDefaultVMAliases() error {
 	n.Log.Info("adding the default VM aliases")
-	vmAliases := genesis.GetVMAliases()
 
-	for vmID, aliases := range vmAliases {
+	for vmID, aliases := range genesis.VMAliases {
 		for _, alias := range aliases {
-			if err := n.Config.VMAliaser.Alias(vmID, alias); err != nil {
+			if err := n.VMAliaser.Alias(vmID, alias); err != nil {
 				return err
 			}
 		}
