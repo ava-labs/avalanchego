@@ -158,6 +158,11 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 	return c.CreateAssetTxFee
 }
 
+// TODO ABENEGIA: consider structuring this method to handle forks (or is it YAGNI?)
+func (*Config) GetDynamicFeesConfig() DynamicFeesConfig {
+	return EForkDynamicFeesConfig
+}
+
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
 func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {

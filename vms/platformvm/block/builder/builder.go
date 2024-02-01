@@ -380,13 +380,6 @@ func packBlockTxs(
 			return nil, err
 		}
 
-		// TODO ABENEGIA: this should probably be a config quantity, related to forks
-		// but not really dynamically changing much over time
-		unitCaps, err := txDiff.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
 		unitWindows, err := txDiff.GetConsumedUnitsWindows()
 		if err != nil {
 			return nil, err
@@ -395,7 +388,7 @@ func packBlockTxs(
 		executor := &txexecutor.StandardTxExecutor{
 			Backend:       backend,
 			BlkFeeManager: fees.NewManager(unitFees, unitWindows),
-			UnitCaps:      unitCaps,
+			UnitCaps:      backend.Config.GetDynamicFeesConfig().BlockUnitsCap,
 			State:         txDiff,
 			Tx:            tx,
 		}

@@ -2848,9 +2848,8 @@ func (s *Service) GetBlockUnitsCap(_ *http.Request, _ *struct{}, reply *GetBlock
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	var err error
-	reply.MaxUnits, err = s.vm.state.GetBlockUnitCaps()
-	return err
+	reply.MaxUnits = s.vm.Config.GetDynamicFeesConfig().BlockUnitsCap
+	return nil
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {

@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -103,7 +102,6 @@ type Chain interface {
 	avax.UTXODeleter
 
 	GetUnitFees() (commonfees.Dimensions, error)
-	GetBlockUnitCaps() (commonfees.Dimensions, error)
 	GetConsumedUnitsWindows() (commonfees.Windows, error)
 
 	GetTimestamp() time.Time
@@ -149,7 +147,6 @@ type State interface {
 
 	// At this iteration these getters are helpful for UTs only
 	SetUnitFees(uf commonfees.Dimensions) error
-	SetBlockUnitCaps(caps commonfees.Dimensions) error
 	SetConsumedUnitsWindows(windows commonfees.Windows) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
@@ -390,7 +387,6 @@ type state struct {
 	// TODO ABENEGIA: handle persistence of these attributes
 	// Maybe blockUnitCaps is an exception, since it should be a fork related quantity
 	unitFees             commonfees.Dimensions
-	blockUnitCaps        commonfees.Dimensions
 	consumedUnitsWindows commonfees.Windows
 }
 
@@ -722,8 +718,7 @@ func newState(
 
 		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
 
-		unitFees:      fees.DefaultUnitFees,
-		blockUnitCaps: fees.DefaultBlockMaxConsumedUnits,
+		unitFees: cfg.GetDynamicFeesConfig().InitialUnitFees,
 	}, nil
 }
 
@@ -1104,15 +1099,6 @@ func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
 
 func (s *state) SetUnitFees(uf commonfees.Dimensions) error {
 	s.unitFees = uf
-	return nil
-}
-
-func (s *state) GetBlockUnitCaps() (commonfees.Dimensions, error) {
-	return s.blockUnitCaps, nil
-}
-
-func (s *state) SetBlockUnitCaps(caps commonfees.Dimensions) error {
-	s.blockUnitCaps = caps
 	return nil
 }
 

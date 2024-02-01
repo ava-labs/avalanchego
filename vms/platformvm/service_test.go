@@ -1043,30 +1043,31 @@ func TestGetUnitFees(t *testing.T) {
 	require.Equal(updatedUnitFees, reply.UnitFees)
 }
 
-func TestGetBlockUnitsCap(t *testing.T) {
-	require := require.New(t)
-	service, _ := defaultService(t)
+// TODO ABENEGIA: rethink the way to pull up this stuff
+// func TestGetBlockUnitsCap(t *testing.T) {
+// 	require := require.New(t)
+// 	service, _ := defaultService(t)
 
-	reply := GetBlockUnitsCapReply{}
-	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
+// 	reply := GetBlockUnitsCapReply{}
+// 	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
 
-	service.vm.ctx.Lock.Lock()
+// 	service.vm.ctx.Lock.Lock()
 
-	unitCaps, err := service.vm.state.GetBlockUnitCaps()
-	require.NoError(err)
+// 	unitCaps, err := service.vm.state.GetBlockUnitCaps()
+// 	require.NoError(err)
 
-	require.Equal(unitCaps, reply.MaxUnits)
+// 	require.Equal(unitCaps, reply.MaxUnits)
 
-	updatedUnitCaps := commonfees.Dimensions{
-		123,
-		456,
-		789,
-		1011,
-	}
-	require.NoError(service.vm.state.SetBlockUnitCaps(updatedUnitCaps))
+// 	updatedUnitCaps := commonfees.Dimensions{
+// 		123,
+// 		456,
+// 		789,
+// 		1011,
+// 	}
+// 	require.NoError(service.vm.state.SetBlockUnitCaps(updatedUnitCaps))
 
-	service.vm.ctx.Lock.Unlock()
+// 	service.vm.ctx.Lock.Unlock()
 
-	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
-	require.Equal(updatedUnitCaps, reply.MaxUnits)
-}
+// 	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
+// 	require.Equal(updatedUnitCaps, reply.MaxUnits)
+// }

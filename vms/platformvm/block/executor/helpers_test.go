@@ -279,10 +279,6 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
-	unitCaps, err := env.state.GetBlockUnitCaps()
-	if err != nil {
-		panic(err)
-	}
 	unitWindows, err := env.state.GetConsumedUnitsWindows()
 	if err != nil {
 		panic(err)
@@ -291,7 +287,7 @@ func addSubnet(env *environment) {
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		BlkFeeManager: fees.NewManager(unitFees, unitWindows),
-		UnitCaps:      unitCaps,
+		UnitCaps:      env.backend.Config.GetDynamicFeesConfig().BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}

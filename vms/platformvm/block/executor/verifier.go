@@ -449,14 +449,6 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	// TODO ABENEGIA: this should probably be a config quantity, related to forks
-	// but not really dynamically changing much over time
-	unitCaps, err := state.GetBlockUnitCaps()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	unitWindows, err := state.GetConsumedUnitsWindows()
 	if err != nil {
 		return nil, nil, nil, err
@@ -468,7 +460,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      unitCaps,
+			UnitCaps:      v.txExecutorBackend.Config.GetDynamicFeesConfig().BlockUnitsCap,
 			State:         state,
 			Tx:            tx,
 		}

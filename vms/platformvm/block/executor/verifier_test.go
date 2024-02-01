@@ -288,7 +288,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees, nil)
-	parentState.EXPECT().GetBlockUnitCaps().Return(commonfees.EmptyUnitCaps, nil)
 	parentState.EXPECT().GetConsumedUnitsWindows().Return(commonfees.EmptyWindows, nil)
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
@@ -771,7 +770,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees, nil)
-	parentState.EXPECT().GetBlockUnitCaps().Return(commonfees.EmptyUnitCaps, nil)
 	parentState.EXPECT().GetConsumedUnitsWindows().Return(commonfees.EmptyWindows, nil)
 
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)

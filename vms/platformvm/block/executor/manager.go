@@ -147,14 +147,6 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return err
 	}
-
-	// TODO ABENEGIA: this should probably be a config quantity, related to forks
-	// but not really dynamically changing much over time
-	unitCaps, err := stateDiff.GetBlockUnitCaps()
-	if err != nil {
-		return err
-	}
-
 	unitWindows, err := stateDiff.GetConsumedUnitsWindows()
 	if err != nil {
 		return err
@@ -163,7 +155,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
 		BlkFeeManager: fees.NewManager(unitFees, unitWindows),
-		UnitCaps:      unitCaps,
+		UnitCaps:      m.txExecutorBackend.Config.GetDynamicFeesConfig().BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	})

@@ -11,10 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -97,15 +98,6 @@ func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
 		return commonfees.Dimensions{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetUnitFees()
-}
-
-// TODO ABENEGIA: fix method with dynamic fees
-func (d *diff) GetBlockUnitCaps() (commonfees.Dimensions, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return commonfees.Dimensions{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetBlockUnitCaps()
 }
 
 // TODO ABENEGIA: fix method with dynamic fees

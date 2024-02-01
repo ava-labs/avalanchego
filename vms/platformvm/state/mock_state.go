@@ -183,21 +183,6 @@ func (mr *MockChainMockRecorder) DeleteUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockChain)(nil).DeleteUTXO), arg0)
 }
 
-// GetBlockUnitCaps mocks base method.
-func (m *MockChain) GetBlockUnitCaps() (fees.Dimensions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockUnitCaps")
-	ret0, _ := ret[0].(fees.Dimensions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetBlockUnitCaps indicates an expected call of GetBlockUnitCaps.
-func (mr *MockChainMockRecorder) GetBlockUnitCaps() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockUnitCaps", reflect.TypeOf((*MockChain)(nil).GetBlockUnitCaps))
-}
-
 // GetConsumedUnitsWindows mocks base method.
 func (m *MockChain) GetConsumedUnitsWindows() (fees.Windows, error) {
 	m.ctrl.T.Helper()
@@ -688,21 +673,6 @@ func (m *MockDiff) DeleteUTXO(arg0 ids.ID) {
 func (mr *MockDiffMockRecorder) DeleteUTXO(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockDiff)(nil).DeleteUTXO), arg0)
-}
-
-// GetBlockUnitCaps mocks base method.
-func (m *MockDiff) GetBlockUnitCaps() (fees.Dimensions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockUnitCaps")
-	ret0, _ := ret[0].(fees.Dimensions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetBlockUnitCaps indicates an expected call of GetBlockUnitCaps.
-func (mr *MockDiffMockRecorder) GetBlockUnitCaps() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockUnitCaps", reflect.TypeOf((*MockDiff)(nil).GetBlockUnitCaps))
 }
 
 // GetConsumedUnitsWindows mocks base method.
@@ -1307,21 +1277,6 @@ func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).GetBlockIDAtHeight), arg0)
 }
 
-// GetBlockUnitCaps mocks base method.
-func (m *MockState) GetBlockUnitCaps() (fees.Dimensions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockUnitCaps")
-	ret0, _ := ret[0].(fees.Dimensions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetBlockUnitCaps indicates an expected call of GetBlockUnitCaps.
-func (mr *MockStateMockRecorder) GetBlockUnitCaps() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockUnitCaps", reflect.TypeOf((*MockState)(nil).GetBlockUnitCaps))
-}
-
 // GetChains mocks base method.
 func (m *MockState) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
 	m.ctrl.T.Helper()
@@ -1712,20 +1667,6 @@ func (m *MockState) PutPendingValidator(arg0 *Staker) {
 func (mr *MockStateMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockState)(nil).PutPendingValidator), arg0)
-}
-
-// SetBlockUnitCaps mocks base method.
-func (m *MockState) SetBlockUnitCaps(arg0 fees.Dimensions) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetBlockUnitCaps", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetBlockUnitCaps indicates an expected call of SetBlockUnitCaps.
-func (mr *MockStateMockRecorder) SetBlockUnitCaps(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlockUnitCaps", reflect.TypeOf((*MockState)(nil).SetBlockUnitCaps), arg0)
 }
 
 // SetConsumedUnitsWindows mocks base method.
