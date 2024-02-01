@@ -313,7 +313,7 @@ func (b *builder) NewImportTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
@@ -473,7 +473,7 @@ func (b *builder) NewExportTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -560,7 +560,7 @@ func (b *builder) NewCreateChainTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -636,7 +636,7 @@ func (b *builder) NewCreateSubnetTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -721,7 +721,7 @@ func (b *builder) NewAddValidatorTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -804,7 +804,7 @@ func (b *builder) NewAddDelegatorTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -888,7 +888,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -962,7 +962,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -1050,7 +1050,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{
@@ -1118,7 +1118,7 @@ func (b *builder) NewBaseTx(
 		var (
 			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
 			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetConsumedUnitsWindows()
+			unitWindows       = b.state.GetFeeWindows()
 		)
 
 		feeCalc := &fees.Calculator{

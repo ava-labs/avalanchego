@@ -155,7 +155,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
 	onParentAccept.EXPECT().GetUnitFees().Return(commonfees.EmptyUnitFees).AnyTimes()
-	onParentAccept.EXPECT().GetConsumedUnitsWindows().Return(commonfees.EmptyWindows).AnyTimes()
+	onParentAccept.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{

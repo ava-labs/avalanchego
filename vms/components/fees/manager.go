@@ -10,8 +10,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-type Windows [FeeDimensions]Window
-
 type Manager struct {
 	// Avax denominated unit fees for all fee dimensions
 	unitFees Dimensions

@@ -354,7 +354,7 @@ func packBlockTxs(
 
 	var (
 		unitFees    = stateDiff.GetUnitFees()
-		unitWindows = stateDiff.GetConsumedUnitsWindows()
+		unitWindows = stateDiff.GetFeeWindows()
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]

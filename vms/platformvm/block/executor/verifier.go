@@ -445,7 +445,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		isEForkActive    = v.txExecutorBackend.Config.IsEForkActivated(currentTimestamp)
 		feesCfg          = v.txExecutorBackend.Config.GetDynamicFeesConfig()
 		unitFees         = state.GetUnitFees()
-		unitWindows      = state.GetConsumedUnitsWindows()
+		unitWindows      = state.GetFeeWindows()
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]

@@ -10,6 +10,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMarshalUnmarshalWindows(t *testing.T) {
+	require := require.New(t)
+
+	input := Windows{
+		Window{},
+		Window{1, 2, 3, 4, 5, 4, 3, 2, 1, 0},
+		Window{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64, 0, 0, 0, 0, 0, math.MaxUint64},
+		Window{math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0},
+	}
+
+	bytes := input.Bytes()
+	var output Windows
+	require.NoError(output.FromBytes(bytes))
+	require.Equal(input, output)
+}
+
 func TestWindowRoll(t *testing.T) {
 	require := require.New(t)
 

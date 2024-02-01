@@ -276,7 +276,7 @@ func addSubnet(env *environment) {
 	}
 
 	unitFees := env.state.GetUnitFees()
-	unitWindows := env.state.GetConsumedUnitsWindows()
+	unitWindows := env.state.GetFeeWindows()
 
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,

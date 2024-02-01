@@ -4,6 +4,8 @@
 package fees
 
 import (
+	"encoding/binary"
+	"fmt"
 	"math"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -11,7 +13,37 @@ import (
 
 const WindowSize = 10
 
-type Window [WindowSize]uint64
+type (
+	Window  [WindowSize]uint64
+	Windows [FeeDimensions]Window
+)
+
+func (w *Windows) Bytes() []byte {
+	res := make([]byte, FeeDimensions*WindowSize*uint64Len)
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		for j, u := range w[i] {
+			start := (WindowSize*int(i) + j) * uint64Len
+			binary.BigEndian.PutUint64(res[start:], u)
+		}
+	}
+	return res
+}
+
+func (w *Windows) FromBytes(b []byte) error {
+	if len(b) != FeeDimensions*WindowSize*uint64Len {
+		return fmt.Errorf("unexpected bytes length: expected %d, actual %d",
+			FeeDimensions*WindowSize*uint64Len,
+			len(b),
+		)
+	}
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		for j := 0; j < WindowSize; j++ {
+			start := (WindowSize*int(i) + j) * uint64Len
+			w[i][j] = binary.BigEndian.Uint64(b[start:])
+		}
+	}
+	return nil
+}
 
 // Roll rolls the uint64s consumed units within [consumptionWindow] over by [roll] places.
 // For example, if there are 4 uint64 encoded in a 32 byte slice, rollWindow would
@@ -70,9 +102,3 @@ func Update(w *Window, idx int, unitsConsumed uint64) {
 	}
 	w[idx] = totalUnitsConsumed
 }
-
-func Last(w *Window) uint64 {
-	return w[len(w)-1]
-}
-
-// TODO ABENEGIA: add Marshal/Unmarshal to bytes, or let the codec do that?

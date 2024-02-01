@@ -146,7 +146,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	var (
 		feesCfg     = m.txExecutorBackend.Config.GetDynamicFeesConfig()
 		unitFees    = stateDiff.GetUnitFees()
-		unitWindows = stateDiff.GetConsumedUnitsWindows()
+		unitWindows = stateDiff.GetFeeWindows()
 	)
 
 	parentFeeManager := fees.NewManager(unitFees, unitWindows)

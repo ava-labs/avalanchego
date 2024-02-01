@@ -3,7 +3,12 @@
 
 package fees
 
-import "github.com/ava-labs/avalanchego/utils/math"
+import (
+	"encoding/binary"
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/utils/math"
+)
 
 const (
 	Bandwidth Dimension = 0
@@ -12,6 +17,8 @@ const (
 	Compute   Dimension = 3 // signatures checks, tx-specific
 
 	FeeDimensions = 4
+
+	uint64Len = 8
 )
 
 var (
@@ -35,4 +42,25 @@ func Add(lhs, rhs Dimensions) (Dimensions, error) {
 		res[i] = v
 	}
 	return res, nil
+}
+
+func (d *Dimensions) Bytes() []byte {
+	res := make([]byte, FeeDimensions*uint64Len)
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		binary.BigEndian.PutUint64(res[i*uint64Len:], d[i])
+	}
+	return res
+}
+
+func (d *Dimensions) FromBytes(b []byte) error {
+	if len(b) != FeeDimensions*uint64Len {
+		return fmt.Errorf("unexpected bytes length: expected %d, actual %d",
+			FeeDimensions*uint64Len,
+			len(b),
+		)
+	}
+	for i := Dimension(0); i < FeeDimensions; i++ {
+		d[i] = binary.BigEndian.Uint64(b[i*uint64Len : (i+1)*uint64Len])
+	}
+	return nil
 }

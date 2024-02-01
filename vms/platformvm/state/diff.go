@@ -102,7 +102,7 @@ func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
 	d.unitFees = uf
 }
 
-func (d *diff) GetConsumedUnitsWindows() commonfees.Windows {
+func (d *diff) GetFeeWindows() commonfees.Windows {
 	return d.consumedUnitsWindows
 }
 
@@ -422,6 +422,8 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
+	baseState.SetUnitFees(d.unitFees)
+	baseState.SetConsumedUnitsWindows(d.consumedUnitsWindows)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}

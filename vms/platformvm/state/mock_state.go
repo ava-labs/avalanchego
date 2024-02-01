@@ -183,20 +183,6 @@ func (mr *MockChainMockRecorder) DeleteUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockChain)(nil).DeleteUTXO), arg0)
 }
 
-// GetConsumedUnitsWindows mocks base method.
-func (m *MockChain) GetConsumedUnitsWindows() fees.Windows {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConsumedUnitsWindows")
-	ret0, _ := ret[0].(fees.Windows)
-	return ret0
-}
-
-// GetConsumedUnitsWindows indicates an expected call of GetConsumedUnitsWindows.
-func (mr *MockChainMockRecorder) GetConsumedUnitsWindows() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConsumedUnitsWindows", reflect.TypeOf((*MockChain)(nil).GetConsumedUnitsWindows))
-}
-
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockChain) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -270,6 +256,20 @@ func (m *MockChain) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, er
 func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), arg0, arg1)
+}
+
+// GetFeeWindows mocks base method.
+func (m *MockChain) GetFeeWindows() fees.Windows {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFeeWindows")
+	ret0, _ := ret[0].(fees.Windows)
+	return ret0
+}
+
+// GetFeeWindows indicates an expected call of GetFeeWindows.
+func (mr *MockChainMockRecorder) GetFeeWindows() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockChain)(nil).GetFeeWindows))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -697,20 +697,6 @@ func (mr *MockDiffMockRecorder) DeleteUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockDiff)(nil).DeleteUTXO), arg0)
 }
 
-// GetConsumedUnitsWindows mocks base method.
-func (m *MockDiff) GetConsumedUnitsWindows() fees.Windows {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConsumedUnitsWindows")
-	ret0, _ := ret[0].(fees.Windows)
-	return ret0
-}
-
-// GetConsumedUnitsWindows indicates an expected call of GetConsumedUnitsWindows.
-func (mr *MockDiffMockRecorder) GetConsumedUnitsWindows() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConsumedUnitsWindows", reflect.TypeOf((*MockDiff)(nil).GetConsumedUnitsWindows))
-}
-
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockDiff) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -784,6 +770,20 @@ func (m *MockDiff) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, err
 func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), arg0, arg1)
+}
+
+// GetFeeWindows mocks base method.
+func (m *MockDiff) GetFeeWindows() fees.Windows {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFeeWindows")
+	ret0, _ := ret[0].(fees.Windows)
+	return ret0
+}
+
+// GetFeeWindows indicates an expected call of GetFeeWindows.
+func (mr *MockDiffMockRecorder) GetFeeWindows() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockDiff)(nil).GetFeeWindows))
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -1336,20 +1336,6 @@ func (mr *MockStateMockRecorder) GetChains(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChains", reflect.TypeOf((*MockState)(nil).GetChains), arg0)
 }
 
-// GetConsumedUnitsWindows mocks base method.
-func (m *MockState) GetConsumedUnitsWindows() fees.Windows {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConsumedUnitsWindows")
-	ret0, _ := ret[0].(fees.Windows)
-	return ret0
-}
-
-// GetConsumedUnitsWindows indicates an expected call of GetConsumedUnitsWindows.
-func (mr *MockStateMockRecorder) GetConsumedUnitsWindows() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConsumedUnitsWindows", reflect.TypeOf((*MockState)(nil).GetConsumedUnitsWindows))
-}
-
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockState) GetCurrentDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -1423,6 +1409,20 @@ func (m *MockState) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, er
 func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), arg0, arg1)
+}
+
+// GetFeeWindows mocks base method.
+func (m *MockState) GetFeeWindows() fees.Windows {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFeeWindows")
+	ret0, _ := ret[0].(fees.Windows)
+	return ret0
+}
+
+// GetFeeWindows indicates an expected call of GetFeeWindows.
+func (mr *MockStateMockRecorder) GetFeeWindows() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockState)(nil).GetFeeWindows))
 }
 
 // GetLastAccepted mocks base method.
