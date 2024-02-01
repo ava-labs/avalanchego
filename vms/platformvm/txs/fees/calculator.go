@@ -14,7 +14,7 @@ import (
 var _ txs.Visitor = (*Calculator)(nil)
 
 type Calculator struct {
-	// setup, to be filled before visitor methods are called
+	// Pre E-fork inputs
 	Config    *config.Config
 	ChainTime time.Time
 

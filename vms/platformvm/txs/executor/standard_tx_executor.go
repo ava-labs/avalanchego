@@ -468,6 +468,13 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
+	feeCalculator := fees.Calculator{
+		Config:    e.Backend.Config,
+		ChainTime: currentTimestamp,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -478,7 +485,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {
@@ -587,9 +594,13 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+	)
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: e.State.GetTimestamp(),
+		Config:    cfg,
+		ChainTime: currentTimestamp,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
