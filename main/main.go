@@ -21,9 +21,9 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
+	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/chain4travel/camino-node/app"
-	"github.com/chain4travel/camino-node/version"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 func main() {

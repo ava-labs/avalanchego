@@ -18,7 +18,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/chain4travel/camino-node/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/e2e"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"

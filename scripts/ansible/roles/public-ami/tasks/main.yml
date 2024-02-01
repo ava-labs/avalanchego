@@ -3,7 +3,7 @@
     url: https://downloads.camino.foundation/camino-node.gpg.key
     state: present
 
-- name: Setup camino-node repo
+- name: Setup caminogo repo
   apt_repository:
     repo: deb https://downloads.camino.foundation/apt bionic main
     state: present
@@ -28,8 +28,8 @@
 
 - name: Setup systemd
   template:
-    src: templates/camino-node.service.j2
-    dest: /etc/systemd/system/camino-node.service
+    src: templates/caminogo.service.j2
+    dest: /etc/systemd/system/caminogo.service
     mode: 0755
 
 - name: Create chain4travel user
@@ -41,14 +41,14 @@
 
 - name: Create camino config dir
   file:
-    path: /etc/camino-node
+    path: /etc/caminogo
     owner: "{{ c4t_user }}"
     group: "{{ c4t_group }}"
     state: directory
 
 - name: Create camino C config dir
   file:
-    path: /etc/camino-node/C
+    path: /etc/caminogo/C
     owner: "{{ c4t_user }}"
     group: "{{ c4t_group }}"
     state: directory
@@ -75,13 +75,13 @@
     state: directory
     recurse: yes
 
-- name: Build camino-node
+- name: Build caminogo
   command: ./scripts/build.sh
   args:
     chdir: "{{ repo_folder }}"
 
-- name: Copy camino-node binaries to the correct location
-  command: cp build/camino-node /usr/local/bin/camino-node
+- name: Copy caminogo binaries to the correct location
+  command: cp build/caminogo /usr/local/bin/caminogo
   args:
     chdir: "{{ repo_folder }}"
 
@@ -91,19 +91,19 @@
     chdir: "{{ repo_folder }}"
 
 
-- name: Configure camino-node 
+- name: Configure caminogo
   template:
     src: templates/conf.json.j2
-    dest: /etc/camino-node/conf.json
+    dest: /etc/caminogo/conf.json
     mode: 0644
 
 - name: Configure camino C Chain
   template:
     src: templates/C/config.json.j2
-    dest: /etc/camino-node/C/config.json
+    dest: /etc/caminogo/C/config.json
     mode: 0644
 
 - name: Enable Camino
   systemd:
-    name: camino-node
+    name: caminogo
     enabled: yes

@@ -14,9 +14,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tools/genesis/workbook"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/chain4travel/camino-node/tools/genesis/workbook"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -65,7 +65,7 @@ func main() {
 	depositOfferRows := workbook.ParseDepositOfferRows(xls)
 
 	fmt.Println("Loaded multiSigRows groups", len(multiSigRows), "err", err)
-	msigGroups, _ := generateMSigDefinitions(genesisConfig.NetworkID, multiSigRows)
+	msigGroups := generateMSigDefinitions(genesisConfig.NetworkID, multiSigRows)
 	genesisConfig.Camino.InitialMultisigAddresses = msigGroups.MultisigAliaseas
 
 	fmt.Println("Loaded allocationRows", len(allocationRows), "err", err)

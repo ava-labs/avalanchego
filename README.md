@@ -31,36 +31,36 @@ Please refer to the official documentation available at [Camino Docs](https://do
 
 ### Native Install
 
-Clone the camino-node repository:
+Clone the caminogo repository:
 
 ```sh
-git clone git@github.com:chain4travel/camino-node.git
-cd camino-node
+git clone git@github.com:chain4travel/caminogo.git
+cd caminogo
 ```
 
 This will clone and checkout the `chain4travel` branch.
 
 #### Building the Camino Node Executable
 
-Build camino-node using the build script:
+Build caminogo using the build script:
 
 ```sh
 ./scripts/build.sh
 ```
 
-The Camino binary, named `camino-node`, is in the `build` directory.
+The Camino binary, named `caminogo`, is in the `build` directory.
 
 ### Binary Install
 
-Download the [latest build](https://github.com/chain4travel/camino-node/releases/latest) for your operating system and architecture.
+Download the [latest build](https://github.com/chain4travel/caminogo/releases/latest) for your operating system and architecture.
 
-The Camino binary to be executed is named `camino-node`.
+The Camino binary to be executed is named `caminogo`.
 
 ### Docker Install
 
 Make sure docker is installed on the machine - so commands like `docker run` etc. are available.
 
-Building the docker image of latest camino-node branch can be done by running:
+Building the docker image of latest caminogo branch can be done by running:
 
 ```sh
 ./scripts/build_local_image.sh
@@ -72,10 +72,10 @@ To check the built image, run:
 docker image ls
 ```
 
-The image should be tagged as `chain4travel/camino-node:xxxxxxxx`, where `xxxxxxxx` is the shortened commit of the Camino source it was built from. To run the Camino node, run:
+The image should be tagged as `c4tplatform/camino-node:xxxxxxxx`, where `xxxxxxxx` is the shortened commit of the Camino source it was built from. To run the Camino node, run:
 
 ```sh
-docker run -ti -p 9650:9650 -p 9651:9651 chain4travel/camino-node:xxxxxxxx /camino-node/build/camino-node
+docker run -ti -p 9650:9650 -p 9651:9651 c4tplatform/camino-node:xxxxxxxx /caminogo/build/caminogo
 ```
 
 ## Running Camino
@@ -85,7 +85,7 @@ docker run -ti -p 9650:9650 -p 9651:9651 chain4travel/camino-node:xxxxxxxx /cami
 To connect to the Columbus Testnet, run:
 
 ```sh
-./build/camino-node --network-id=columbus
+./build/caminogo --network-id=columbus
 ```
 
 You should see some pretty ASCII art and log messages.
@@ -97,7 +97,7 @@ You can use `Ctrl+C` to kill the node.
 To connect to the Mainnet, run:
 
 ```sh
-./build/camino-node
+./build/caminogo
 ```
 For detailed instructions on running a validator node on the Camino Network, please refer to the [official validator guides](https://docs.camino.network/validator-guides).
 
@@ -115,6 +115,70 @@ A node will not [report healthy](https://docs.camino.foundation/developer/apis/c
 ## Generating Code
 
 Camino-Node uses multiple tools to generate efficient and boilerplate code.
+
+### Running protobuf codegen
+
+To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the root of the repo.
+
+This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
+
+To use this script, you must have [buf](https://docs.buf.build/installation) (v1.9.0), protoc-gen-go (v1.28.0) and protoc-gen-go-grpc (v1.2.0) installed.
+
+To install the buf dependencies:
+
+```sh
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
+```
+
+If you have not already, you may need to add `$GOPATH/bin` to your `$PATH`:
+
+```sh
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
+If you extract buf to ~/software/buf/bin, the following should work:
+
+```sh
+export PATH=$PATH:~/software/buf/bin/:~/go/bin
+go get google.golang.org/protobuf/cmd/protoc-gen-go
+go get google.golang.org/protobuf/cmd/protoc-gen-go-grpc
+scripts/protobuf_codegen.sh
+```
+
+For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).
+
+### Running protobuf codegen from docker
+
+```sh
+docker build -t chain4travel:protobuf_codegen -f api/Dockerfile.buf .
+docker run -t -i -v $(pwd):/opt/chain4travel -w/opt/chain4travel chain4travel:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
+```
+
+### Running mock codegen
+
+To regenerate the [gomock](https://github.com/golang/mock) code, run `scripts/mock.gen.sh` from the root of the repo.
+
+This should only be necessary when modifying exported interfaces or after modifying `scripts/mock.mockgen.txt`.
+
+## Versioning
+
+### Version Semantics
+
+AvalancheGo is first and foremost a client for the Avalanche network. The versioning of AvalancheGo follows that of the Avalanche network.
+
+- `v0.x.x` indicates a development network version.
+- `v1.x.x` indicates a production network version.
+- `vx.[Upgrade].x` indicates the number of network upgrades that have occurred.
+- `vx.x.[Patch]` indicates the number of client upgrades that have occurred since the last network upgrade.
+
+### Library Compatibility Guarantees
+
+Because AvalancheGo's version denotes the network version, it is expected that interfaces exported by AvalancheGo's packages may change in `Patch` version updates.
+
+### API Compatibility Guarantees
+
+APIs exposed when running AvalancheGo will maintain backwards compatibility, unless the functionality is explicitly deprecated and announced when removed.
 
 ## Supported Platforms
 
@@ -151,3 +215,8 @@ To officially support a new platform, one must satisfy the following requirement
 **We take security issues seriously and encourage responsible disclosures from our community.**
 
 If you have discovered a security vulnerability, please refer to our [Security Policy](SECURITY.md) or contact us on [Discord](https://discord.gg/camino).
+
+
+**We and our community welcome responsible disclosures.**
+
+If you've discovered a security vulnerability, please report it to us via [discord](https://discord.gg/K5THjAweFB). Valid reports will be eligible for a reward (terms and conditions apply).

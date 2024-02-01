@@ -26,79 +26,79 @@ type DepositOfferRow struct {
 	Locked                  bool
 }
 
-func (offer *DepositOfferRow) Header() []string {
+func (*DepositOfferRow) Header() []string {
 	return []string{"OfferID", "Title", "interestRateNominator", "startOffset"}
 }
 
 func (offer *DepositOfferRow) FromRow(_ int, row []string) error {
 	// COLUMNS
 	const (
-		OfferID DepositOfferColumn = iota
-		Title
-		InterestRateNominator
-		StartOffset
-		EndOffset
-		MinAmount
-		MinDuration
-		MaxDuration
-		UnlockPeriodDuration
-		NoRewardsPeriodDuration
-		Locked
-		_Comment
+		offerID DepositOfferColumn = iota
+		title
+		interestRateNominator
+		startOffset
+		endOffset
+		minAmount
+		minDuration
+		maxDuration
+		unlockPeriodDuration
+		noRewardsPeriodDuration
+		locked
+		_comment
 	)
 	var err error
 
-	offer.OfferID = row[OfferID]
-	offer.Memo = row[Title]
+	offer.OfferID = row[offerID]
+	offer.Memo = row[title]
 
-	offer.InterestRateNominator, err = strconv.ParseUint(row[InterestRateNominator], 10, 64)
+	offer.InterestRateNominator, err = strconv.ParseUint(row[interestRateNominator], 10, 64)
 	if err != nil {
-		return fmt.Errorf("could not parse interest rate nominator %s, err %w", row[InterestRateNominator], err)
+		return fmt.Errorf("could not parse interest rate nominator %s, err %w", row[interestRateNominator], err)
 	}
 
-	offer.StartOffset, err = strconv.ParseUint(row[StartOffset], 10, 64)
+	offer.StartOffset, err = strconv.ParseUint(row[startOffset], 10, 64)
 	if err != nil {
-		return fmt.Errorf("could not parse start offset %s, err %w", row[StartOffset], err)
+		return fmt.Errorf("could not parse start offset %s, err %w", row[startOffset], err)
 	}
 
-	offer.EndOffset, err = strconv.ParseUint(row[EndOffset], 10, 64)
+	offer.EndOffset, err = strconv.ParseUint(row[endOffset], 10, 64)
 	if err != nil {
-		return fmt.Errorf("could not parse end offset %s, err %w", row[EndOffset], err)
+		return fmt.Errorf("could not parse end offset %s, err %w", row[endOffset], err)
 	}
 
-	offer.MinAmount, err = strconv.ParseUint(row[MinAmount], 10, 64)
+	offer.MinAmount, err = strconv.ParseUint(row[minAmount], 10, 64)
 	if err != nil {
-		return fmt.Errorf("could not parse min amount %s, err %w", row[MinAmount], err)
+		return fmt.Errorf("could not parse min amount %s, err %w", row[minAmount], err)
 	}
 
-	minDuration, err := strconv.ParseUint(row[MinDuration], 10, 32)
+	minDurationUint64, err := strconv.ParseUint(row[minDuration], 10, 32)
 	if err != nil {
-		return fmt.Errorf("could not parse min duration %s, err %w", row[MinDuration], err)
+		return fmt.Errorf("could not parse min duration %s, err %w", row[minDuration], err)
 	}
-	offer.MinDuration = uint32(minDuration)
+	offer.MinDuration = uint32(minDurationUint64)
 
-	maxDuration, err := strconv.ParseUint(row[MaxDuration], 10, 32)
+	maxDurationUint64, err := strconv.ParseUint(row[maxDuration], 10, 32)
 	if err != nil {
-		return fmt.Errorf("could not parse max duration %s, err %w", row[MaxDuration], err)
+		return fmt.Errorf("could not parse max duration %s, err %w", row[maxDuration], err)
 	}
-	offer.MaxDuration = uint32(maxDuration)
+	offer.MaxDuration = uint32(maxDurationUint64)
 
-	upd, err := strconv.ParseUint(row[UnlockPeriodDuration], 10, 32)
+	upd, err := strconv.ParseUint(row[unlockPeriodDuration], 10, 32)
 	if err != nil {
-		return fmt.Errorf("could not parse unlock period duration %s, err %w", row[UnlockPeriodDuration], err)
+		return fmt.Errorf("could not parse unlock period duration %s, err %w", row[unlockPeriodDuration], err)
 	}
 	offer.UnlockPeriodDuration = uint32(upd)
 
-	nrpd, err := strconv.ParseUint(row[NoRewardsPeriodDuration], 10, 32)
+	nrpd, err := strconv.ParseUint(row[noRewardsPeriodDuration], 10, 32)
 	if err != nil {
-		return fmt.Errorf("could not parse no rewards period duration %s, err %w", row[NoRewardsPeriodDuration], err)
+		return fmt.Errorf("could not parse no rewards period duration %s, err %w", row[noRewardsPeriodDuration], err)
 	}
 	offer.NoRewardsPeriodDuration = uint32(nrpd)
 
-	if row[Locked] != TrueValue && row[Locked] != FalseValue {
-		return fmt.Errorf("locked value must be either TRUE or FALSE, got %s", row[Locked])
+	if row[locked] != TrueValue && row[locked] != FalseValue {
+		return fmt.Errorf("locked value must be either TRUE or FALSE, got %s", row[locked])
 	}
-	offer.Locked = row[Locked] == TrueValue
+	offer.Locked = row[locked] == TrueValue
 
 	return nil
 }

@@ -25,14 +25,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/nat"
-	gonode "github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
-
-	"github.com/chain4travel/camino-node/node"
 )
 
 const (
@@ -68,7 +66,7 @@ type App interface {
 	ExitCode() (int, error)
 }
 
-func New(config gonode.Config) App {
+func New(config node.Config) App {
 	return &app{
 		config: config,
 		node:   &node.Node{},
@@ -113,7 +111,7 @@ func Run(app App) int {
 
 // app is a wrapper around a node that runs in this process
 type app struct {
-	config gonode.Config
+	config node.Config
 	node   *node.Node
 	exitWG sync.WaitGroup
 }

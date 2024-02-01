@@ -19,8 +19,8 @@ jobs:
         shell: bash
         run: .github/workflows/scripts/cleanup-net-outage-sim.sh
 
-      - name: Download camino-node:latest
-        run: docker pull chain4travel/camino-node:latest
+      - name: Download caminogo:latest
+        run: docker pull chain4travel/caminogo:latest
 
       - name: Run the internet outage simulation
         shell: bash

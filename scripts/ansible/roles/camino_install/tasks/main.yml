@@ -62,8 +62,8 @@
     state: absent
   loop:
     - path: "{{ camino_daemon_lib_dir }}/evm"
-    - path: "{{ camino_daemon_lib_dir }}/camino-node-preupgrade"
-    - path: "{{ camino_daemon_lib_dir }}/camino-node-latest"
+    - path: "{{ camino_daemon_lib_dir }}/caminogo-preupgrade"
+    - path: "{{ camino_daemon_lib_dir }}/caminogo-latest"
   notify:
     - Restart Camino service
 

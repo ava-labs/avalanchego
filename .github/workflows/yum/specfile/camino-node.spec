@@ -1,6 +1,6 @@
 %define _build_id_links none
 
-Name:           camino-node
+Name:           caminogo
 Version:        %{version}
 Release:        %{release}
 Summary:        The Camino platform binaries
@@ -12,7 +12,7 @@ AutoReqProv:    no
 Camino is a lightweight protocol which runs on moderate computer requirements.
 
 %files
-/usr/local/bin/camino-node
+/usr/local/bin/caminogo
 
 %changelog
 * Fri Apr 15 2022 devop <devop@chain4travel.com>

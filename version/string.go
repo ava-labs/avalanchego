@@ -15,28 +15,18 @@ package version
 
 import (
 	"fmt"
-
-	sdkVersion "github.com/ava-labs/avalanchego/version"
 )
 
-var (
-	// String is displayed when CLI arg --version is used
-	String string
-
-	// Following vars are set in the build script at compile time
-	GitCommit  = "unknown"
-	GitVersion = "unknown"
-)
+// String is displayed when CLI arg --version is used
+var String string
 
 func init() {
-	format := "camino-node: %s, commit: %s\ncaminogo: %s, commit: %s\n  compat: %s [database: %s]\n"
+	format := "caminogo: %s, commit: %s\ncompat: %s [database: %s]\n"
 	args := []interface{}{
 		GitVersion,
 		GitCommit,
-		sdkVersion.GitVersion,
-		sdkVersion.GitCommit,
-		sdkVersion.Current,
-		sdkVersion.CurrentDatabase,
+		Current,
+		CurrentDatabase,
 	}
 	String = fmt.Sprintf(format, args...)
 }

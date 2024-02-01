@@ -15,6 +15,7 @@ package admin
 
 import (
 	"crypto/rsa"
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"path"
@@ -26,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
@@ -63,6 +63,8 @@ type Config struct {
 	HTTPServer   server.PathAdderWithReadLock
 	VMRegistry   registry.VMRegistry
 	VMManager    vms.Manager
+
+	StakingTLSCert tls.Certificate
 }
 
 // Admin is the API service for node admin management
@@ -396,9 +398,7 @@ type GetNodeSignerReply struct {
 func (a *Admin) GetNodeSigner(_ *http.Request, args *Secret, reply *GetNodeSignerReply) error { //nolint:revive
 	a.Log.Debug("Admin: GetNodeSigner called")
 
-	config := a.Config.NodeConfig.(*node.Config)
-
-	rsaPrivKey := config.StakingTLSCert.PrivateKey.(*rsa.PrivateKey)
+	rsaPrivKey := a.Config.StakingTLSCert.PrivateKey.(*rsa.PrivateKey)
 	privKey := secp256k1.RsaPrivateKeyToSecp256PrivateKey(rsaPrivKey)
 	pubKeyBytes := hashing.PubkeyBytesToAddress(privKey.PubKey().SerializeCompressed())
 	nodeID, err := ids.ToShortID(pubKeyBytes)

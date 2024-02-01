@@ -4,14 +4,15 @@
 package workbook
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tools/genesis/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/chain4travel/camino-node/tools/genesis/utils"
 )
 
 type AllocationColumn int
@@ -34,7 +35,7 @@ type AllocationRow struct {
 	PublicKey           string
 }
 
-func (a *AllocationRow) Header() []string { return []string{"#", "Company", "First Name"} }
+func (*AllocationRow) Header() []string { return []string{"#", "Company", "First Name"} }
 
 func (a *AllocationRow) FromRow(fileRowNo int, row []string) error {
 	// COLUMNS
@@ -145,7 +146,7 @@ func (a *AllocationRow) FromRow(fileRowNo int, row []string) error {
 	}
 
 	if a.NodeID != ids.EmptyNodeID && a.ConsortiumMember != CheckedValue {
-		return fmt.Errorf("non-consortium member validator node (with NodeID) defined")
+		return errors.New("non-consortium member validator node (with NodeID) defined")
 	}
 
 	return nil

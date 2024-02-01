@@ -38,7 +38,7 @@ wait_until_healthy () {
 #remove any existing database files
 echo "removing existing database files..."
 rm /opt/mainnet-db-daily* 2>/dev/null || true # Do || true to ignore error if files dont exist yet
-rm -rf /var/lib/camino-node 2>/dev/null || true # Do || true to ignore error if files dont exist yet
+rm -rf /var/lib/caminogo 2>/dev/null || true # Do || true to ignore error if files dont exist yet
 echo "done existing database files"
 
 #download latest mainnet DB backup
@@ -51,15 +51,15 @@ echo "Done downloading database"
 
 # extract DB
 echo "Extracting database..."
-mkdir -p /var/lib/camino-node/db 
-tar -zxf /opt/$DB_FILE*-tar.gz -C /var/lib/camino-node/db 
+mkdir -p /var/lib/caminogo/db 
+tar -zxf /opt/$DB_FILE*-tar.gz -C /var/lib/caminogo/db 
 echo "Done extracting database"
 
 echo "Creating Docker network..."
 docker network create controlled-net 
 
 echo "Starting Docker container..."
-containerID=$(docker run --name="net_outage_simulation" --memory="12g" --memory-reservation="11g" --cpus="6.0" --net=controlled-net -p 9650:9650 -p 9651:9651 -v /var/lib/camino-node/db:/db -d c4tplatform/camino-node:latest /camino-node/build/camino-node --db-dir /db --http-host=0.0.0.0)
+containerID=$(docker run --name="net_outage_simulation" --memory="12g" --memory-reservation="11g" --cpus="6.0" --net=controlled-net -p 9650:9650 -p 9651:9651 -v /var/lib/caminogo/db:/db -d c4tplatform/camino-node:latest /caminogo/build/caminogo --db-dir /db --http-host=0.0.0.0)
 
 echo "Waiting 30 seconds for node to start..."
 sleep 30

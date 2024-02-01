@@ -5,17 +5,26 @@ set -o pipefail
 
 # e.g.,
 # ./scripts/build.sh
-# ./scripts/tests.e2e.sh ./build/camino-node
-# ENABLE_WHITELIST_VTX_TESTS=false ./scripts/tests.e2e.sh ./build/camino-node
+# ./scripts/tests.e2e.sh ./build/caminogo
+# ENABLE_WHITELIST_VTX_TESTS=false ./scripts/tests.e2e.sh ./build/caminogo ./tools/camino-network-runner/bin/camino-network-runner
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
 
+echo "Run caminogo e2e tests..."
+
 CAMINO_NODE_PATH="${1-}"
 if [[ -z "${CAMINO_NODE_PATH}" ]]; then
   echo "Missing CAMINO_NODE_PATH argument!"
   echo "Usage: ${0} [CAMINO_NODE_PATH]" >> /dev/stderr
+  exit 255
+fi
+
+CAMINO_NETWORK_RUNNER_PATH="${2-}"
+if [[ -z "${CAMINO_NETWORK_RUNNER_PATH}" ]]; then
+  echo "Missing CAMINO_NETWORK_RUNNER_PATH argument!"
+  echo "Usage: ${0} [CAMINO_NODE_PATH] [CAMINO_NETWORK_RUNNER_PATH]" >> /dev/stderr
   exit 255
 fi
 
@@ -28,27 +37,7 @@ if [[ ${ENABLE_WHITELIST_VTX_TESTS} == true ]]; then
 fi
 echo GINKGO_LABEL_FILTER: ${GINKGO_LABEL_FILTER}
 
-if [ ! -f /tmp/camino-network-runner ]
-then
-  #################################
-  # download camino-network-runner
-  # https://github.com/chain4travel/camino-network-runner
-  GOARCH=$(go env GOARCH)
-  GOOS=$(go env GOOS)
-  NETWORK_RUNNER_VERSION=0.4.10
-  DOWNLOAD_PATH=/tmp/camino-network-runner.tar.gz
-  DOWNLOAD_URL=https://github.com/chain4travel/camino-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/camino-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_amd64.tar.gz
-
-  rm -f ${DOWNLOAD_PATH}
-  rm -f /tmp/camino-network-runner
-
-  echo "downloading camino-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_URL}"
-  curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
-
-  echo "extracting downloaded camino-network-runner"
-  tar xzvf ${DOWNLOAD_PATH} -C /tmp
-  /tmp/camino-network-runner -h
-fi
+cp $CAMINO_NETWORK_RUNNER_PATH /tmp/camino-network-runner
 
 GOPATH="$(go env GOPATH)"
 PATH="${GOPATH}/bin:${PATH}"

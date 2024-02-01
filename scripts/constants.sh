@@ -10,8 +10,10 @@ GOPATH="$(go env GOPATH)"
 
 # Where CaminoGo binary goes
 build_dir="$CAMINO_NODE_PATH/build"
-camino_node_path="$build_dir/camino-node"
+caminogo_path="$build_dir/caminogo"
+camino_node_symlink_path="$build_dir/camino-node"
 plugin_dir="$build_dir/plugins"
+
 
 # Camino docker hub
 # c4tplatform/camino-node - defaults to local as to avoid unintentional pushes
@@ -21,17 +23,11 @@ camino_node_dockerhub_repo=${DOCKER_REPO:-"c4tplatform"}"/camino-node"
 # Current branch
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags || echo unknown)
 
+# caminogo and caminoethvm git tag and sha
 git_commit=${CAMINO_NODE_COMMIT:-$(git rev-parse --short HEAD)}
 git_tag=${CAMINO_NODE_TAG:-$(git describe --tags --abbrev=0 || echo unknown)}
-
-# caminogo and caminoethvm git tag and sha
-oldDir=$(pwd) && cd $CAMINO_NODE_PATH/dependencies/caminoethvm
-caminoethvm_commit=${CAMINOETHVM_COMMIT:-$( git rev-parse --short HEAD )}
-caminoethvm_tag=$(git describe --tags --abbrev=0 || echo unknown)
-cd $CAMINO_NODE_PATH/dependencies/caminoethvm/caminogo
-caminogo_commit=${CAMINOGO_COMMIT:-$( git rev-parse --short HEAD )}
-caminogo_tag=$(git describe --tags --abbrev=0 || echo unknown)
-cd $oldDir
+caminoethvm_tag=${CAMINO_ETHVM_VERSION:-'v1.1.0-rc4'}
+caminoethvm_commit=${CAMINOETHVM_COMMIT:-'07e50749e3c371001c92dff14dc91ef6109a368a'}
 
 # Static compilation
 static_ld_flags=''

@@ -4,9 +4,7 @@ run:
   # skip auto-generated files.
   skip-files:
     - ".*\\.pb\\.go$"
-  # skip submodule dependencies.
-  skip-dirs:
-    - "dependencies"
+    - ".*mock.*"
 
 issues:
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
@@ -40,6 +38,7 @@ linters:
     - revive
     - staticcheck
     - stylecheck
+    - typecheck
     - unconvert
     - unparam
     - unused
@@ -67,3 +66,45 @@ linters-settings:
       - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
       - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
     include-go-root: true
+  revive:
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
+      - name: bool-literal-in-expr
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
+      - name: early-return
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+      - name: empty-lines
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
+      - name: string-format
+        disabled: false
+        arguments:
+        - ["fmt.Errorf[0]", "/.*%.*/", "no format directive, use errors.New instead"]
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
+      - name: struct-tag
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-naming
+      - name: unexported-naming
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
+      - name: unhandled-error
+        disabled: false
+        arguments:
+          - "fmt.Fprint"
+          - "fmt.Fprintf"
+          - "fmt.Print"
+          - "fmt.Printf"
+          - "fmt.Println"
+          - "math/rand\\.Read"
+          - "strings\\.Builder\\.WriteString"
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
+      - name: unused-parameter
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
+      - name: unused-receiver
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
+      - name: useless-break
+        disabled: false

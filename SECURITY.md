@@ -14,4 +14,4 @@ Please refer to the [Bug Bounty Page](https://camino.network/bugbounty/) for the
 
 ## Supported Versions
 
-Please use the [most recently released version](https://github.com/chain4travel/camino-node/releases/latest) to perform testing and to validate security issues.
+Please use the [most recently released version](https://github.com/chain4travel/caminogo/releases/latest) to perform testing and to validate security issues.

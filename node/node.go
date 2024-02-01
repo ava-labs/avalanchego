@@ -56,7 +56,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -94,7 +93,6 @@ import (
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	nodeVersion "github.com/chain4travel/camino-node/version"
 )
 
 var (
@@ -170,7 +168,7 @@ type Node struct {
 	APIServer server.Server
 
 	// This node's configuration
-	Config *node.Config
+	Config *Config
 
 	tracer trace.Tracer
 
@@ -822,7 +820,6 @@ func (n *Node) initVMs() error {
 				ApricotPhase5Time:               version.GetApricotPhase5Time(n.Config.NetworkID),
 				BanffTime:                       version.GetBanffTime(n.Config.NetworkID),
 				AthensPhaseTime:                 version.GetAthensPhaseTime(n.Config.NetworkID),
-				BerlinPhaseTime:                 version.GetBerlinPhaseTime(n.Config.NetworkID),
 				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
 				UseCurrentHeight:                n.Config.UseCurrentHeight,
 			},
@@ -948,15 +945,16 @@ func (n *Node) initAdminAPI() error {
 	n.Log.Info("initializing admin API")
 	service, err := admin.NewService(
 		admin.Config{
-			Secret:       n.Config.AdminAPIEnabledSecret,
-			Log:          n.Log,
-			ChainManager: n.chainManager,
-			HTTPServer:   n.APIServer,
-			ProfileDir:   n.Config.ProfilerConfig.Dir,
-			LogFactory:   n.LogFactory,
-			NodeConfig:   n.Config,
-			VMManager:    n.VMManager,
-			VMRegistry:   n.VMRegistry,
+			Secret:         n.Config.AdminAPIEnabledSecret,
+			Log:            n.Log,
+			ChainManager:   n.chainManager,
+			HTTPServer:     n.APIServer,
+			ProfileDir:     n.Config.ProfilerConfig.Dir,
+			LogFactory:     n.LogFactory,
+			NodeConfig:     n.Config,
+			VMManager:      n.VMManager,
+			VMRegistry:     n.VMRegistry,
+			StakingTLSCert: n.Config.StakingTLSCert,
 		},
 	)
 	if err != nil {
@@ -1001,8 +999,8 @@ func (n *Node) initInfoAPI() error {
 	service, err := info.NewService(
 		info.Parameters{
 			Version:                       version.CurrentApp,
-			GitVersion:                    nodeVersion.GitVersion,
-			GitCommit:                     nodeVersion.GitCommit,
+			GitVersion:                    version.GitVersion,
+			GitCommit:                     version.GitCommit,
 			NodeID:                        n.ID,
 			NodePOP:                       signer.NewProofOfPossession(n.Config.StakingSigningKey),
 			NetworkID:                     n.Config.NetworkID,
@@ -1254,7 +1252,7 @@ func (n *Node) initDiskTargeter(
 
 // Initialize this node
 func (n *Node) Initialize(
-	config *node.Config,
+	config *Config,
 	logger logging.Logger,
 	logFactory logging.Factory,
 ) error {

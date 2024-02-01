@@ -4,13 +4,14 @@
 package workbook
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tools/genesis/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/chain4travel/camino-node/tools/genesis/utils"
 )
 
 type MultiSigGroup struct {
@@ -27,49 +28,49 @@ type MultiSigRow struct {
 	Addr         ids.ShortID
 }
 
-func (msig *MultiSigRow) Header() []string { return []string{"Control Group", "Threshold", "Company"} }
+func (*MultiSigRow) Header() []string { return []string{"Control Group", "Threshold", "Company"} }
 
 func (msig *MultiSigRow) FromRow(_ int, msigRow []string) error {
 	// COLUMNS
 	const (
-		ControlGroup MultiSigColumn = iota
-		Threshold
-		_Company
-		_FirstName
-		_LastName
-		_Kyc
-		PChainAddress
-		PublicKey
+		controlGroup MultiSigColumn = iota
+		threshold
+		_company
+		_firstName
+		_lastName
+		_kyc
+		pChainAddress
+		publicKey
 	)
 
-	msig.ControlGroup = strings.TrimSpace(msigRow[ControlGroup])
-	if msigRow[Threshold] != "" {
-		threshold, err := strconv.ParseUint(msigRow[Threshold], 10, 32)
-		msig.Threshold = uint32(threshold)
+	msig.ControlGroup = strings.TrimSpace(msigRow[controlGroup])
+	if msigRow[threshold] != "" {
+		thresholdUint64, err := strconv.ParseUint(msigRow[threshold], 10, 32)
+		msig.Threshold = uint32(thresholdUint64)
 		if err != nil {
-			return fmt.Errorf("could not parse msig threshold %s", msigRow[Threshold])
+			return fmt.Errorf("could not parse msig threshold %s", msigRow[threshold])
 		}
 	}
 
 	keyRead := false
 	var addr ids.ShortID
-	if len(msigRow) > int(PublicKey) && msigRow[PublicKey] != "" {
-		msigRow[PublicKey] = strings.TrimPrefix(strings.TrimSpace(msigRow[PublicKey]), "0x")
+	if len(msigRow) > int(publicKey) && msigRow[publicKey] != "" {
+		msigRow[publicKey] = strings.TrimPrefix(strings.TrimSpace(msigRow[publicKey]), "0x")
 
-		pk, err := utils.PublicKeyFromString(msigRow[PublicKey])
+		pk, err := utils.PublicKeyFromString(msigRow[publicKey])
 		if err != nil {
-			return fmt.Errorf("could not parse public key")
+			return errors.New("could not parse public key")
 		}
 		addr, err = utils.ToPAddress(pk)
 		if err != nil {
-			return fmt.Errorf("[X/P] could not parse public key %s, %w", msigRow[PublicKey], err)
+			return fmt.Errorf("[X/P] could not parse public key %s, %w", msigRow[publicKey], err)
 		}
 		keyRead = true
 	}
-	if !keyRead && len(msigRow[PChainAddress]) > 0 {
-		_, _, addrBytes, err := address.Parse(strings.TrimSpace(msigRow[PChainAddress]))
+	if !keyRead && len(msigRow[pChainAddress]) > 0 {
+		_, _, addrBytes, err := address.Parse(strings.TrimSpace(msigRow[pChainAddress]))
 		if err != nil {
-			return fmt.Errorf("could not parse address %s for ctrl group %s - err: %s", msigRow[PChainAddress], msig.ControlGroup, err)
+			return fmt.Errorf("could not parse address %s for ctrl group %s - err: %s", msigRow[pChainAddress], msig.ControlGroup, err)
 		}
 		addr, _ = ids.ToShortID(addrBytes)
 	}

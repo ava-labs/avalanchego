@@ -1,7 +1,7 @@
 # Ansible for Camino-Node
 
 [Ansible](https://ansible.com) playbooks, roles, & inventories to install
-[Camino-Node](https://github.com/chain4travel/camino-node) as a systemd service.
+[Caminogo](https://github.com/chain4travel/caminogo) as a systemd service.
 Target(s) can be
 
 - localhost
@@ -16,14 +16,14 @@ Target(s) can be
 To create a Camino-Node service on localhost
 
 1. Check you have Ansible 2.9+ (see [Installing](#installing))
-2. Clone the Camino-Node git repository
+2. Clone the Caminogo git repository
     ```
-    $ git clone https://github.com/chain4travel/camino-node
+    $ git clone https://github.com/chain4travel/caminogo
     ```
 
 3. Change to this directory
     ```
-    $ cd camino-node/scripts/ansible
+    $ cd caminogo/scripts/ansible
     ```
 
 4. Run the service playbook
@@ -42,13 +42,13 @@ To create a Camino-Node service on localhost
 
 5. Check the service is running
     ```
-    $ systemctl status camino-node
+    $ systemctl status caminogo
     ```
 
     The output should look similar to
     ```
-    ● camino-node.service - Camino-Node node for Camino consensus network
-    Loaded: loaded (/etc/systemd/system/camino-node.service; enabled; vendor preset: enabled)
+    ● caminogo.service - Camino node for Camino consensus network
+    Loaded: loaded (/etc/systemd/system/caminogo.service; enabled; vendor preset: enabled)
     Active: active (running) since Wed 2020-10-21 10:00:00 UTC; 32s ago
     ...
     ```
@@ -136,8 +136,8 @@ TASK [camino_download : Query releases] *************************************
 ok: [localhost]
 
 TASK [camino_download : Fetch release] **************************************
-changed: [localhost] => (item=camino-node-linux-arm64-v0.0.0.tar.gz)
-changed: [localhost] => (item=camino-node-linux-arm64-v0.0.0.tar.gz.sig)
+changed: [localhost] => (item=caminogo-linux-arm64-v0.0.0.tar.gz)
+changed: [localhost] => (item=caminogo-linux-arm64-v0.0.0.tar.gz.sig)
 
 TASK [camino_download : Create temp gnupghome] ******************************
 changed: [localhost]
@@ -152,7 +152,7 @@ TASK [camino_download : Cleanup temp gnupghome] *****************************
 changed: [localhost]
 
 TASK [camino_download : Unpack release] *************************************
-changed: [localhost] => (item=camino-node-linux-arm64-v1.5.0.tar.gz)
+changed: [localhost] => (item=caminogo-linux-arm64-v1.5.0.tar.gz)
 
 TASK [camino_user : Create Camino daemon group] **************************
 changed: [localhost]
@@ -166,22 +166,22 @@ changed: [localhost] => (item={'path': '/var/local/lib'})
 changed: [localhost] => (item={'path': '/var/local/log'})
 
 TASK [camino_install : Create Camino directories] ************************
-changed: [localhost] => (item=/var/local/lib/camino-node)
-changed: [localhost] => (item=/var/local/lib/camino-node/db)
-changed: [localhost] => (item=/var/local/lib/camino-node/staking)
-changed: [localhost] => (item=/var/local/log/camino-node)
-changed: [localhost] => (item=/usr/local/lib/camino-node)
+changed: [localhost] => (item=/var/local/lib/caminogo)
+changed: [localhost] => (item=/var/local/lib/caminogo/db)
+changed: [localhost] => (item=/var/local/lib/caminogo/staking)
+changed: [localhost] => (item=/var/local/log/caminogo)
+changed: [localhost] => (item=/usr/local/lib/caminogo)
 
 TASK [camino_install : Install Camino binary] ****************************
 changed: [localhost]
 
 TASK [camino_install : Remove outdated support files] **********************
-ok: [localhost] => (item={'path': '/usr/local/lib/camino-node/evm'})
-ok: [localhost] => (item={'path': '/usr/local/lib/camino-node/camino-node-preupgrade'})
-ok: [localhost] => (item={'path': '/usr/local/lib/camino-node/camino-node-latest'})
+ok: [localhost] => (item={'path': '/usr/local/lib/caminogo/evm'})
+ok: [localhost] => (item={'path': '/usr/local/lib/caminogo/caminogo-preupgrade'})
+ok: [localhost] => (item={'path': '/usr/local/lib/caminogo/caminogo-latest'})
 
 TASK [camino_install : Install support files] *******************************
-changed: [localhost] => (item=/usr/local/lib/camino-node/plugins)
+changed: [localhost] => (item=/usr/local/lib/caminogo/plugins)
 
 TASK [camino_staker : Create staking key] ***********************************
 changed: [localhost]

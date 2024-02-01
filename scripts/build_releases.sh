@@ -11,7 +11,7 @@ set -o pipefail
 RELEASE_TAG="$(git describe --tag)"
 RELEASE_ID=0
 
-# camino-node root folder
+# caminogo root folder
 CAMINO_NODE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Authentication
 AUTH_HEADER=""
@@ -70,11 +70,11 @@ if [ -n "$AUTH_HEADER" ]; then
 	RELEASE_ID=$id
 fi
 
-echo "Building release OS=linux and ARCH=amd64 using GOAMD64 V2 for camino-node version $RELEASE_ID"
+echo "Building release OS=linux and ARCH=amd64 using GOAMD64 V2 for caminogo version $RELEASE_ID"
 rm -rf $CAMINO_NODE_PATH/build/*
 
 DEST_PATH=$CAMINO_NODE_PATH/dist/
-ARCHIVE_PATH=camino-node-$RELEASE_TAG
+ARCHIVE_PATH=caminogo-$RELEASE_TAG
 # prepare a fresh dist folder
 rm -rf $DEST_PATH && mkdir -p $DEST_PATH
 
@@ -87,7 +87,7 @@ cp $CAMINO_NODE_PATH/LICENSE $CAMINO_NODE_PATH/build
 
 # create the package
 echo "building artifact"
-ARTIFACT=$DEST_PATH/camino-node-linux-amd64-$RELEASE_TAG.tar.gz
+ARTIFACT=$DEST_PATH/caminogo-linux-amd64-$RELEASE_TAG.tar.gz
 tar -czf $ARTIFACT -C $CAMINO_NODE_PATH build --transform "s,build,$ARCHIVE_PATH,"
 # publish the newly generated file
 publish $ARTIFACT

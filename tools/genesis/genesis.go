@@ -5,16 +5,17 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tools/genesis/workbook"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/chain4travel/camino-node/tools/genesis/workbook"
 )
 
 var EmptyETHAddress = "0x" + hex.EncodeToString(ids.ShortEmpty.Bytes())
@@ -44,7 +45,7 @@ func generateDepositOffers(depositOffersRows workbook.DepositOffersWithOrder, ge
 	return depositOffersRows, depositOffers, nil
 }
 
-func generateMSigDefinitions(networkID uint32, msigs []*workbook.MultiSigGroup) (MultisigDefs, error) {
+func generateMSigDefinitions(networkID uint32, msigs []*workbook.MultiSigGroup) MultisigDefs {
 	var (
 		msDefs   = []genesis.MultisigAlias{}
 		cgToMSig = map[string]ids.ShortID{}
@@ -80,7 +81,7 @@ func generateMSigDefinitions(networkID uint32, msigs []*workbook.MultiSigGroup) 
 		defs.MultisigAliaseas = append(defs.MultisigAliaseas, uma)
 	}
 
-	return defs, nil
+	return defs
 }
 
 type UnlockedFunds int
@@ -257,7 +258,7 @@ func msigSanityCheck(ma genesis.MultisigAlias, txID ids.ID) error {
 	}
 
 	if ma.Alias != mm.ComputeAlias(txID) {
-		return fmt.Errorf("alias mismatch between original and recreated one")
+		return errors.New("alias mismatch between original and recreated one")
 	}
 
 	internalAlias, err := genesis.MultisigAliasFromConfig(mm)

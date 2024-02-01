@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	"github.com/chain4travel/camino-node/tests"
+	"github.com/ava-labs/avalanchego/tests"
 )
 
 type ClusterType byte

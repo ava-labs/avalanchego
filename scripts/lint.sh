@@ -25,10 +25,7 @@ TESTS=${TESTS:-"golangci_lint license_header"}
 
 function test_golangci_lint {
   if ! [ -x "$(command -v golangci-lint)" ]; then
-    go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.47.0
-  fi
-  if [ ! -f dependencies/caminoethvm/.git ]; then
-    git submodule update --init --recursive
+    go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
   fi
   golangci-lint run --config .golangci.yml
 }
@@ -37,7 +34,7 @@ function test_golangci_lint {
 # all go files except generated ones
 function find_go_files {
   local target="${1}"
-  go fmt -n "${target}"  | grep -Eo "([^ ]*)$" | grep -vE "(\\.pb\\.go|\\.pb\\.gw.go)" | grep -v "/dependencies/"
+  go fmt -n "${target}"  | grep -Eo "([^ ]*)$" | grep -vE "(\\.pb\\.go|\\.pb\\.gw.go)"
 }
 
 # automatically checks license headers

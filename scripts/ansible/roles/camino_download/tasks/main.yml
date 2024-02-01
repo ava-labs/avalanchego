@@ -1,17 +1,17 @@
 - name: Query releases
   uri:
     url: "{{ repo_api_base }}/repos{{ repo_url | urlsplit('path') }}/releases"
-  register: camino-node_releases
+  register: caminogo_releases
   changed_when: false
   check_mode: false
 
 - name: Fetch release
   get_url:
-    url: "{{ repo_url }}/releases/download/{{ camino-node_version }}/{{ item.file }}"
+    url: "{{ repo_url }}/releases/download/{{ caminogo_version }}/{{ item.file }}"
     dest: ./
   loop:
-    - file: "{{ camino-node_archive }}"
-    - file: "{{ camino-node_archive }}.sig"
+    - file: "{{ caminogo_archive }}"
+    - file: "{{ caminogo_archive }}.sig"
   loop_control:
     label: "{{ item.file }}"
 
@@ -28,13 +28,13 @@
         GNUPGHOME: "{{ camino_download_gnupghome.path }}"
       command:
         cmd: gpg --import
-        stdin: "{{ camino-node_signer_pubkey }}"
+        stdin: "{{ caminogo_signer_pubkey }}"
 
     - name: Verify signature
       environment:
         GNUPGHOME: "{{ camino_download_gnupghome.path }}"
       command:
-        cmd: gpg --trusted-key "{{ camino-node_signer_keyid }}" --verify "{{ camino-node_archive }}.sig" "{{ camino-node_archive }}"
+        cmd: gpg --trusted-key "{{ caminogo_signer_keyid }}" --verify "{{ caminogo_archive }}.sig" "{{ caminogo_archive }}"
       changed_when: false
   always:
     - name: Cleanup temp gnupghome
@@ -44,10 +44,10 @@
 
 - name: Unpack release
   unarchive:
-    src: "{{ camino-node_archive }}"
+    src: "{{ caminogo_archive }}"
     dest: ./
     remote_src: true
   loop:
-    - file: "{{ camino-node_archive }}"
+    - file: "{{ caminogo_archive }}"
   loop_control:
     label: "{{ item.file }}"

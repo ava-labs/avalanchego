@@ -9,12 +9,6 @@ echo "Building Genesis Generator..."
 CAMINO_NODE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 source "$CAMINO_NODE_PATH"/scripts/constants.sh
 
-# Download dependencies
-if [ ! -f $CAMINO_NODE_PATH/dependencies/caminoethvm/.git ]; then
-    echo "Initializing git submodules..."
-    git --git-dir $CAMINO_NODE_PATH/.git submodule update --init --recursive
-fi
-
 # Load the constants
 source "$CAMINO_NODE_PATH"/scripts/constants.sh
 

@@ -12,10 +12,10 @@
 name: "CodeQL"
 
 on:
+  push:
+    branches: [chain4travel, dev]
   pull_request:
     tags-ignore: ["*"]
-    branches: [chain4travel, dev]
-  push:
     branches: [chain4travel, dev]
 
 jobs:
@@ -37,9 +37,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      - name: Submodule dependencies
-        run: git submodule update --init --recursive
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL

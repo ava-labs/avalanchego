@@ -22,13 +22,13 @@ import (
 	"github.com/onsi/gomega"
 
 	// ensure test packages are scanned by ginkgo
-	"github.com/chain4travel/camino-node/tests/e2e"
-	_ "github.com/chain4travel/camino-node/tests/e2e/banff"
-	_ "github.com/chain4travel/camino-node/tests/e2e/p"
-	_ "github.com/chain4travel/camino-node/tests/e2e/ping"
-	_ "github.com/chain4travel/camino-node/tests/e2e/static-handlers"
-	_ "github.com/chain4travel/camino-node/tests/e2e/x/transfer"
-	_ "github.com/chain4travel/camino-node/tests/e2e/x/whitelist-vtx"
+	"github.com/ava-labs/avalanchego/tests/e2e"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/x/whitelist-vtx"
 )
 
 func TestE2E(t *testing.T) {

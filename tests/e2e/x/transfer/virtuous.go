@@ -32,8 +32,8 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	"github.com/chain4travel/camino-node/tests"
-	"github.com/chain4travel/camino-node/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/e2e"
 )
 
 const (

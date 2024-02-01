@@ -11,14 +11,14 @@ sharedstatedir: "{{ localstatedir }}/lib"
 # Has no Meson builtin equivalent
 logdir: "{{ localstatedir }}/log"
 
-camino_binary: "{{ camino_binaries_dir }}/camino-node"
+camino_binary: "{{ camino_binaries_dir }}/caminogo"
 
 # These names are specific to Camino. Default values are based loosely on *nix
 # conventions.
-camino_daemon_home_dir: "{{ sharedstatedir }}/camino-node"
+camino_daemon_home_dir: "{{ sharedstatedir }}/caminogo"
 camino_daemon_db_dir: "{{ camino_daemon_home_dir }}/db"
-camino_daemon_log_dir: "{{ logdir }}/camino-node"
-camino_daemon_lib_dir: "{{ libdir }}/camino-node"
+camino_daemon_log_dir: "{{ logdir }}/caminogo"
+camino_daemon_lib_dir: "{{ libdir }}/caminogo"
 camino_daemon_staking_dir: "{{ camino_daemon_home_dir }}/staking"
 camino_daemon_staking_tls_cert: "{{ camino_daemon_staking_dir }}/staker.crt"
 camino_daemon_staking_tls_csr: "{{ camino_daemon_staking_dir }}/staker.csr"

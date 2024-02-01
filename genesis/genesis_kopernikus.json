@@ -117,7 +117,7 @@
           {
             "amount": 4000000000000,
             "nodeID": "NodeID-AK7sPBsZM9rQwse23aLhEEBPHZD5gkLrL",
-            "validatorDuration": 31536000,
+            "validatorDuration": 63072000,
             "depositDuration": 110376000,
             "timestampOffset": 0,
             "depositOfferMemo": "presale3y",
