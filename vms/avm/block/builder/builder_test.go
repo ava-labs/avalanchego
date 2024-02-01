@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
@@ -526,12 +527,13 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 		Ctx: &snow.Context{
 			Log: logging.NoLog{},
 		},
-		Codec: parser.Codec(),
+		Config: &config.Config{},
+		Codec:  parser.Codec(),
 	}
 
 	baseDB := versiondb.New(memdb.New())
 
-	state, err := state.New(baseDB, parser, registerer, trackChecksums)
+	state, err := state.New(baseDB, parser, registerer, *backend.Config, trackChecksums)
 	require.NoError(err)
 
 	clk := &mockable.Clock{}

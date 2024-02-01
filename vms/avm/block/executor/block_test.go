@@ -28,8 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestBlockVerify(t *testing.T) {
@@ -152,7 +153,8 @@ func TestBlockVerify(t *testing.T) {
 				mempool.EXPECT().MarkDropped(errTx.ID(), errTest).Times(1)
 
 				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -193,7 +195,8 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -237,7 +240,8 @@ func TestBlockVerify(t *testing.T) {
 
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(mockParentBlock, nil)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -285,7 +289,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp.Add(1))
 
 				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -340,7 +345,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
 				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
@@ -400,7 +406,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
 				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
@@ -487,7 +494,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
 				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx2.ID(), ErrConflictingBlockTxs).Times(1)
@@ -558,7 +566,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
 				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -615,7 +624,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
 				mockState := state.NewMockState(ctrl)
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				mockMempool := mempool.NewMockMempool(ctrl)
 				mockMempool.EXPECT().Remove([]*txs.Tx{tx})
@@ -993,7 +1003,8 @@ func TestBlockReject(t *testing.T) {
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,
@@ -1056,7 +1067,8 @@ func TestBlockReject(t *testing.T) {
 				mockState := state.NewMockState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
-				mockState.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				mockState.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				mockState.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &Block{
 					Block: mockBlock,

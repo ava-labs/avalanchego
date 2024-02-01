@@ -148,16 +148,15 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return ErrChainNotSynced
 	}
 
-	feesCfg := m.backend.Config.GetDynamicFeesConfig()
+	var (
+		feesCfg    = m.backend.Config.GetDynamicFeesConfig()
+		unitFees   = m.state.GetUnitFees()
+		feeWindows = m.state.GetFeeWindows()
+	)
 
-	unitFees, err := m.state.GetUnitFees()
-	if err != nil {
-		return err
-	}
-
-	err = tx.Unsigned.Visit(&executor.SyntacticVerifier{
+	err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
 		Backend:       m.backend,
-		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
+		BlkFeeManager: fees.NewManager(unitFees, feeWindows),
 		UnitCaps:      feesCfg.BlockUnitsCap,
 		BlkTimestamp:  m.state.GetTimestamp(),
 		Tx:            tx,

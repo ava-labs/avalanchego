@@ -26,8 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -57,6 +57,8 @@ var (
 	isInitializedKey = []byte{0x00}
 	timestampKey     = []byte{0x01}
 	lastAcceptedKey  = []byte{0x02}
+	unitFeesKey      = []byte{0x03}
+	feesWindowsKey   = []byte{0x04}
 
 	errStatusWithoutTx = errors.New("unexpected status without transactions")
 
@@ -72,8 +74,8 @@ type ReadOnlyChain interface {
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
 
-	// at this iteration we don't need to reset these, we are just metering
-	GetUnitFees() (commonfees.Dimensions, error)
+	GetUnitFees() commonfees.Dimensions
+	GetFeeWindows() commonfees.Windows
 }
 
 type Chain interface {
@@ -85,6 +87,9 @@ type Chain interface {
 	AddBlock(block block.Block)
 	SetLastAccepted(blkID ids.ID)
 	SetTimestamp(t time.Time)
+
+	SetUnitFees(uf commonfees.Dimensions)
+	SetConsumedUnitsWindows(windows commonfees.Windows)
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -103,9 +108,6 @@ type State interface {
 	// Invariant: After the chain is linearized, this function is expected to be
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
-
-	// At this iteration these getters are helpful for UTs only
-	SetUnitFees(uf commonfees.Dimensions) error
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -154,6 +156,7 @@ type State interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
+	cfg    config.Config
 	parser block.Parser
 	db     *versiondb.Database
 
@@ -182,7 +185,8 @@ type state struct {
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
 
-	unitFees commonfees.Dimensions
+	unitFees    commonfees.Dimensions
+	feesWindows commonfees.Windows
 
 	trackChecksum bool
 	txChecksum    ids.ID
@@ -192,6 +196,7 @@ func New(
 	db *versiondb.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
+	cfg config.Config,
 	trackChecksums bool,
 ) (State, error) {
 	utxoDB := prefixdb.New(utxoPrefix, db)
@@ -244,6 +249,7 @@ func New(
 
 	s := &state{
 		parser: parser,
+		cfg:    cfg,
 		db:     db,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
@@ -265,10 +271,7 @@ func New(
 		blockCache:  blockCache,
 		blockDB:     blockDB,
 
-		singletonDB: singletonDB,
-
-		unitFees: fees.DefaultUnitFees,
-
+		singletonDB:   singletonDB,
 		trackChecksum: trackChecksums,
 	}
 	return s, s.initTxChecksum()
@@ -486,6 +489,39 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	s.SetLastAccepted(genesis.ID())
 	s.SetTimestamp(genesis.Timestamp())
 	s.AddBlock(genesis)
+
+	switch unitFeesBytes, err := s.singletonDB.Get(unitFeesKey); err {
+	case nil:
+		if err := s.unitFees.FromBytes(unitFeesBytes); err != nil {
+			return err
+		}
+
+	case database.ErrNotFound:
+		// fork introducing dynamic fees may not be active yet,
+		// hence we may have never stored unit fees. Load from config
+		// TODO: remove once fork is active
+		s.unitFees = s.cfg.GetDynamicFeesConfig().InitialUnitFees
+
+	default:
+		return err
+	}
+
+	switch feesWindowsBytes, err := s.singletonDB.Get(feesWindowsKey); err {
+	case nil:
+		if err := s.feesWindows.FromBytes(feesWindowsBytes); err != nil {
+			return err
+		}
+
+	case database.ErrNotFound:
+		// fork introducing dynamic fees may not be active yet,
+		// hence we may have never stored fees windows. Set to nil
+		// TODO: remove once fork is active
+		s.feesWindows = commonfees.EmptyWindows
+
+	default:
+		return err
+	}
+
 	return s.Commit()
 }
 
@@ -513,13 +549,20 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
-	return s.unitFees, nil
+func (s *state) GetUnitFees() commonfees.Dimensions {
+	return s.unitFees
 }
 
-func (s *state) SetUnitFees(uf commonfees.Dimensions) error {
+func (s *state) SetUnitFees(uf commonfees.Dimensions) {
 	s.unitFees = uf
-	return nil
+}
+
+func (s *state) GetFeeWindows() commonfees.Windows {
+	return s.feesWindows
+}
+
+func (s *state) SetConsumedUnitsWindows(windows commonfees.Windows) {
+	s.feesWindows = windows
 }
 
 func (s *state) Commit() error {
@@ -632,6 +675,12 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
+	}
+	if err := s.singletonDB.Put(unitFeesKey, s.unitFees.Bytes()); err != nil {
+		return fmt.Errorf("failed to write unit fees: %w", err)
+	}
+	if err := s.singletonDB.Put(feesWindowsKey, s.feesWindows.Bytes()); err != nil {
+		return fmt.Errorf("failed to write unit fees: %w", err)
 	}
 	if s.persistedLastAccepted != s.lastAccepted {
 		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {

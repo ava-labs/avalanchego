@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -102,9 +103,10 @@ func (v *versions) GetState(blkID ids.ID) (Chain, bool) {
 func TestState(t *testing.T) {
 	require := require.New(t)
 
+	cfg := config.Config{}
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	s, err := New(vdb, parser, prometheus.NewRegistry(), cfg, trackChecksums)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -112,7 +114,7 @@ func TestState(t *testing.T) {
 	s.AddBlock(populatedBlk)
 	require.NoError(s.Commit())
 
-	s, err = New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	s, err = New(vdb, parser, prometheus.NewRegistry(), cfg, trackChecksums)
 	require.NoError(err)
 
 	ChainUTXOTest(t, s)
@@ -123,9 +125,10 @@ func TestState(t *testing.T) {
 func TestDiff(t *testing.T) {
 	require := require.New(t)
 
+	cfg := config.Config{}
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	s, err := New(vdb, parser, prometheus.NewRegistry(), cfg, trackChecksums)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -283,9 +286,10 @@ func ChainBlockTest(t *testing.T, c Chain) {
 func TestInitializeChainState(t *testing.T) {
 	require := require.New(t)
 
+	cfg := config.Config{}
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	s, err := New(vdb, parser, prometheus.NewRegistry(), cfg, trackChecksums)
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()

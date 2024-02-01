@@ -238,6 +238,7 @@ func (vm *VM) Initialize(
 		vm.db,
 		vm.parser,
 		vm.registerer,
+		vm.Config,
 		avmConfig.ChecksumsEnabled,
 	)
 	if err != nil {
@@ -490,16 +491,15 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		return nil, err
 	}
 
-	feesCfg := vm.Config.GetDynamicFeesConfig()
-
-	unitFees, err := vm.state.GetUnitFees()
-	if err != nil {
-		return nil, err
-	}
+	var (
+		feesCfg    = vm.Config.GetDynamicFeesConfig()
+		unitFees   = vm.state.GetUnitFees()
+		feeWindows = vm.state.GetFeeWindows()
+	)
 
 	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
 		Backend:       vm.txBackend,
-		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
+		BlkFeeManager: fees.NewManager(unitFees, feeWindows),
 		UnitCaps:      feesCfg.BlockUnitsCap,
 		BlkTimestamp:  vm.state.GetTimestamp(),
 		Tx:            tx,

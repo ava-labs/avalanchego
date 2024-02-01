@@ -6,7 +6,6 @@ package fees
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -18,24 +17,6 @@ import (
 
 var (
 	_ txs.Visitor = (*Calculator)(nil)
-
-	// These are the default unit fees, used upon E-fork activation
-	// TODO ABENEGIA: to be tuned
-	DefaultUnitFees = fees.Dimensions{
-		1,
-		2,
-		3,
-		4,
-	}
-
-	// These are the default caps for units consumed in a block, used upon E-fork activation
-	// TODO ABENEGIA: to be tuned
-	DefaultBlockMaxConsumedUnits = fees.Dimensions{
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-	}
 
 	errFailedFeeCalculation          = errors.New("failed fee calculation")
 	errFailedConsumedUnitsCumulation = errors.New("failed cumulating consumed units")

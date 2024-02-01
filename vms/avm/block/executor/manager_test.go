@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -149,7 +149,8 @@ func TestManagerVerifyTx(t *testing.T) {
 			managerF: func(ctrl *gomock.Controller) *manager {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
-				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -183,7 +184,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
-				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -220,7 +222,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
-				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{
@@ -257,7 +260,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
-				state.EXPECT().GetUnitFees().Return(fees.DefaultUnitFees, nil).AnyTimes()
+				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
+				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 				return &manager{
 					backend: &executor.Backend{

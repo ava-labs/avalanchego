@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -45,10 +46,11 @@ func TestBaseTxExecutor(t *testing.T) {
 	require.NoError(err)
 	codec := parser.Codec()
 
+	cfg := config.Config{}
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	state, err := state.New(vdb, parser, registerer, cfg, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -153,10 +155,11 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	require.NoError(err)
 	codec := parser.Codec()
 
+	cfg := config.Config{}
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	state, err := state.New(vdb, parser, registerer, cfg, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -299,10 +302,11 @@ func TestOperationTxExecutor(t *testing.T) {
 	require.NoError(err)
 	codec := parser.Codec()
 
+	cfg := config.Config{}
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	state, err := state.New(vdb, parser, registerer, cfg, trackChecksums)
 	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{

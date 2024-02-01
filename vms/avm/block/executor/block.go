@@ -76,13 +76,13 @@ func (b *Block) Verify(context.Context) error {
 
 	// Syntactic verification is generally pretty fast, so we verify this first
 	// before performing any possible DB reads. TODO ABENEGIA: except we do DB reads now with fees stuff?
-	feesCfg := b.manager.backend.Config.GetDynamicFeesConfig()
-	unitFees, err := b.manager.state.GetUnitFees()
-	if err != nil {
-		return err
-	}
+	var (
+		feesCfg    = b.manager.backend.Config.GetDynamicFeesConfig()
+		unitFees   = b.manager.state.GetUnitFees()
+		feeWindows = b.manager.state.GetFeeWindows()
+	)
 
-	feeManager := fees.NewManager(unitFees, fees.EmptyWindows)
+	feeManager := fees.NewManager(unitFees, feeWindows)
 	for _, tx := range txs {
 		err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
 			Backend:       b.manager.backend,
