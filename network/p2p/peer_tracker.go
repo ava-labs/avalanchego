@@ -27,8 +27,8 @@ import (
 const (
 	bandwidthHalflife = 5 * time.Minute
 
-	// controls how eagerly we connect to new peers vs. using
-	// peers with known good response bandwidth.
+	// controls how eagerly we connect to new peers vs. using peers with known
+	// good response bandwidth.
 	desiredMinResponsivePeers = 20
 	newPeerConnectFactor      = 0.1
 
@@ -117,9 +117,12 @@ func NewPeerTracker(
 	return t, err
 }
 
-// Returns true if we're not connected to enough peers.
-// Otherwise returns true probabilistically based on the number of tracked peers.
-// Assumes p.lock is held.
+// Returns true if:
+//   - We have not observed the desired minimum number of responsive peers.
+//   - Randomly with the freqeuency decreasing as the number of tracked peers
+//     increases.
+//
+// Assumes the read lock is held.
 func (p *PeerTracker) shouldTrackNewPeer() bool {
 	numResponsivePeers := p.responsivePeers.Len()
 	if numResponsivePeers < desiredMinResponsivePeers {
@@ -145,13 +148,13 @@ func (p *PeerTracker) shouldTrackNewPeer() bool {
 	return rand.Float64() < newPeerProbability // #nosec G404
 }
 
-// Returns a peer that we're connected to.
+// SelectPeer that we could send a request to.
 // If we should track more peers, returns a random peer with version >= [minVersion], if any exist.
 // Otherwise, with probability [randomPeerProbability] returns a random peer from [p.responsivePeers].
 // With probability [1-randomPeerProbability] returns the peer in [p.bandwidthHeap] with the highest bandwidth.
-func (p *PeerTracker) GetAnyPeer() (ids.NodeID, bool) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 
 	if p.shouldTrackNewPeer() {
 		for nodeID := range p.peers {
@@ -175,7 +178,7 @@ func (p *PeerTracker) GetAnyPeer() (ids.NodeID, bool) {
 	if useRand {
 		nodeID, ok = p.responsivePeers.Peek()
 	} else {
-		nodeID, _, ok = p.bandwidthHeap.Pop()
+		nodeID, _, ok = p.bandwidthHeap.Peek()
 	}
 	if !ok {
 		// if no nodes found in the bandwidth heap, return a tracked node at random
@@ -190,18 +193,29 @@ func (p *PeerTracker) GetAnyPeer() (ids.NodeID, bool) {
 }
 
 // Record that we sent a request to [nodeID].
-func (p *PeerTracker) TrackPeer(nodeID ids.NodeID) {
+func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.trackedPeers.Add(nodeID)
+	p.bandwidthHeap.Remove(nodeID)
 
 	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
 }
 
 // Record that we observed that [nodeID]'s bandwidth is [bandwidth].
 // Adds the peer's bandwidth averager to the bandwidth heap.
-func (p *PeerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
+func (p *PeerTracker) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
+	p.updateBandwidth(nodeID, bandwidth, true)
+}
+
+// Record that a request failed to [nodeID].
+// Adds the peer's bandwidth averager to the bandwidth heap.
+func (p *PeerTracker) RegisterFailure(nodeID ids.NodeID) {
+	p.updateBandwidth(nodeID, 0, false)
+}
+
+func (p *PeerTracker) updateBandwidth(nodeID ids.NodeID, bandwidth float64, responsive bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -223,10 +237,10 @@ func (p *PeerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	p.bandwidthHeap.Push(nodeID, peer.bandwidth)
 	p.averageBandwidth.Observe(bandwidth, now)
 
-	if bandwidth == 0 {
-		p.responsivePeers.Remove(nodeID)
-	} else {
+	if responsive {
 		p.responsivePeers.Add(nodeID)
+	} else {
+		p.responsivePeers.Remove(nodeID)
 	}
 
 	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
