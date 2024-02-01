@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/bimap"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
@@ -385,19 +386,68 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	return b.sendBootstrappingMessagesOrFinish(ctx)
 }
 
+var knownAcceptedContainerIDs = map[uint32]map[ids.ID][]ids.ID{
+	constants.FujiID: {
+		constants.PlatformChainID: {
+			ids.FromStringOrPanic("FtwibNbLTvczaCyEH3FqRqTqQ4bTm2ZUKg6RjdttTFCFmxXBr"),  // https://subnets-test.avax.network/p-chain/block/130000
+			ids.FromStringOrPanic("WvqDHkdLFS8LqtZrsmred5nxPYMRU3mN6pQpEp5kw1FVzV54d"),  // https://subnets-test.avax.network/p-chain/block/120000
+			ids.FromStringOrPanic("8khC8p1qYwWB5QoEXyQM4p8pRpirYMfb8HiM8k7nSbFHthRej"),  // https://subnets-test.avax.network/p-chain/block/110000
+			ids.FromStringOrPanic("2sDGZLbsjRRfLQHnsjp2fZ7bZNGihV5TJsxTAKXxna9tjQDLc"),  // https://subnets-test.avax.network/p-chain/block/100000
+			ids.FromStringOrPanic("uMvcoswATF22hc4YLNHTaEFqEz2bZdCM9q5HjVZEnhrnhRpTa"),  // https://subnets-test.avax.network/p-chain/block/090000
+			ids.FromStringOrPanic("VPV9gaqfhvggdWe8bEvPxmS5ZmsWe7Y8iFBd9mrzhdYn3GAYG"),  // https://subnets-test.avax.network/p-chain/block/080000
+			ids.FromStringOrPanic("2VmRST6sy1E9wandsgod7DH2ToenvmUaoDw54EnR2uGj6yzoY3"), // https://subnets-test.avax.network/p-chain/block/070000
+			ids.FromStringOrPanic("C6TbmVqoFhKZPB5aqqScRRvL6f3W4zKagAA7vfVdARxpJfMkU"),  // https://subnets-test.avax.network/p-chain/block/060000
+			ids.FromStringOrPanic("euNKcrcf1EeDEiRrQtdEL7kj9a6CDjZXWMys7SLNYmu6eLhyj"),  // https://subnets-test.avax.network/p-chain/block/050000
+			ids.FromStringOrPanic("27UyZ7cK8Z4hieP9v7vt8nVzUWWG8dTevG4KG8bD1tdcW1WyLg"), // https://subnets-test.avax.network/p-chain/block/040000
+			ids.FromStringOrPanic("L472PqnP7C3n6ChqhuUePDWVsspx7J1Akbywuqub22qMqkV4r"),  // https://subnets-test.avax.network/p-chain/block/030000
+			ids.FromStringOrPanic("2atCgGVNqVEPFxeXkPx5efYbzPMRHnj4oaiNJmYgTMx2sRH1S1"), // https://subnets-test.avax.network/p-chain/block/020000
+			ids.FromStringOrPanic("2JSAgjJYve7X8DGVfffpK3BcaToQhMoJZ99XjM4E2t7ddDuA9Q"), // https://subnets-test.avax.network/p-chain/block/010000
+		},
+	},
+	constants.MainnetID: {
+		constants.PlatformChainID: {
+			ids.FromStringOrPanic("eZpu3i8otKKBEt1DRcM2cwJ1b6NeZV7QRsHbG17rjmjYjERwU"),  // https://subnets.avax.network/p-chain/block/11000000
+			ids.FromStringOrPanic("2u1ccTx2BD8mrTf5dcLifCxGhUm82GD7qvW786V76S3dqe4Q9q"), // https://subnets.avax.network/p-chain/block/10500000
+			ids.FromStringOrPanic("BP6HSddREevAhZ1axVWS33kAJvz3gk1pjL2zkY548xRBvEpAg"),  // https://subnets.avax.network/p-chain/block/10000000
+			ids.FromStringOrPanic("AZz8jyYj3pfTT7TsTPBKiKB5ByxfUZu2ZsNFUYobAKyN5eFQ5"),  // https://subnets.avax.network/p-chain/block/09500000
+			ids.FromStringOrPanic("nTXX6XCNeRA7RqAY658a91tf5NjwsgZyhDshvWsjDooik6w3o"),  // https://subnets.avax.network/p-chain/block/09000000
+			ids.FromStringOrPanic("s8u9dvLEXQSjvhvo5Lp5qgDH8CiMnfimVEkjjKrLiiLgDBNB4"),  // https://subnets.avax.network/p-chain/block/08500000
+			ids.FromStringOrPanic("2pE1vB9HxPVhxgR2WS98jvcGygQzg9kaTkxyZ5E9BiTG9a5FG4"), // https://subnets.avax.network/p-chain/block/08000000
+			ids.FromStringOrPanic("7HzrVujhGqLG8tJANXtNr8brT6ByyEutN6d1eTN3ixrC7jRcS"),  // https://subnets.avax.network/p-chain/block/07500000
+			ids.FromStringOrPanic("2kLaFPNUZBcgxv7Agff2VaxwEmCeZwf1Zr99rVPU7BXc4mLzbZ"), // https://subnets.avax.network/p-chain/block/07000000
+			ids.FromStringOrPanic("tEPEYtZkM4A47xxyZRNDRAQrHN4a2Y5j65rfzDTTKdW2ovnjw"),  // https://subnets.avax.network/p-chain/block/06500000
+			ids.FromStringOrPanic("2o5CQWZY1uViNW3ejoTc6bhtoacDhH2TcEZdk1k3gqew7qtAq8"), // https://subnets.avax.network/p-chain/block/06000000
+			ids.FromStringOrPanic("2TpCtdtrMdQQSeUxbSoS7jp8EbmRhwDPuR71jLYkc6y7r5LPN"),  // https://subnets.avax.network/p-chain/block/05500000
+			ids.FromStringOrPanic("X9X4kPTriRrNb1Hui9nT7XnQAN5RdMjoBVwaWsKdM2mLpjqmk"),  // https://subnets.avax.network/p-chain/block/05000000
+			ids.FromStringOrPanic("2GF21ZWpvqaC1u1REKeDeaRHopLRiHvNN7nGrFzZwAyXVMnQtt"), // https://subnets.avax.network/p-chain/block/04500000
+			ids.FromStringOrPanic("2ute95hYkTBrcNRQW7oVbhTP8t3HqqbRfrxAt7BT8Thf48c2RD"), // https://subnets.avax.network/p-chain/block/04000000
+			ids.FromStringOrPanic("XBeyojZENqRmjWbWiMYRZJmpeZdCEryL6iLPDzs9Bp3jaQ6g6"),  // https://subnets.avax.network/p-chain/block/03500000
+			ids.FromStringOrPanic("JAykub6SHtfsAxpeCsQfkujLYwVsAm1N6wnKeMn8Dxykys7dP"),  // https://subnets.avax.network/p-chain/block/03000000
+			ids.FromStringOrPanic("2dR4yFxErqppuhWGfZD1SHjryN6A8ajR7B8DJ2b26X7Z4qTHyY"), // https://subnets.avax.network/p-chain/block/02500000
+			ids.FromStringOrPanic("2oTyxikDac4xpCdzmSBHZAgfxRhYt98NENpUqriQKJPHek6pdv"), // https://subnets.avax.network/p-chain/block/02000000
+			ids.FromStringOrPanic("9bhZfjd4jo2pgJS3sVtvwRiQzx7k4gFiabskD1Gka1Z6F4huh"),  // https://subnets.avax.network/p-chain/block/01500000
+			ids.FromStringOrPanic("2PdY2BgLwvSk8jpuyVn2j1rwDqKbUATQGDpqxuwgdpziHUPPdt"), // https://subnets.avax.network/p-chain/block/01000000
+			ids.FromStringOrPanic("vKBoQUUGnbQoHtHqxg7RVwBZxbBkPrQqrSamSevcsZKRif3Ad"),  // https://subnets.avax.network/p-chain/block/00500000
+		},
+	},
+}
+
 func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	// Initialize the fetch from set to the currently preferred peers
 	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
+	knownContainerIDs := knownAcceptedContainerIDs[b.Ctx.NetworkID][b.Ctx.ChainID]
 	pendingContainerIDs := b.Blocked.MissingIDs()
-	// Append the list of accepted container IDs to pendingContainerIDs to ensure
-	// we iterate over every container that must be traversed.
-	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
-	b.Ctx.Log.Debug("starting bootstrapping",
+	b.Ctx.Log.Warn("starting bootstrapping",
+		zap.Int("numKnownBlocks", len(knownContainerIDs)),
 		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
 		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
 	)
 
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	pendingContainerIDs = append(pendingContainerIDs, knownContainerIDs...)
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
 	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.Blocked.AddMissingID(blkID)
