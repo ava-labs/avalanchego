@@ -128,8 +128,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 				}
@@ -150,8 +150,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 				}
@@ -182,8 +182,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 					state:        state,
@@ -218,8 +218,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 					state:        state,
@@ -254,8 +254,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 					state:        state,

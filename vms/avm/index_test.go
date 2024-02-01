@@ -34,8 +34,8 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-			EForkTime:   mockable.MaxTime,
+			DurangoTime:  time.Time{},
+			EUpgradeTime: mockable.MaxTime,
 		},
 	})
 	defer func() {
@@ -81,8 +81,8 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-			EForkTime:   mockable.MaxTime,
+			DurangoTime:  time.Time{},
+			EUpgradeTime: mockable.MaxTime,
 		},
 	})
 	defer func() {
@@ -132,8 +132,8 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-			EForkTime:   mockable.MaxTime,
+			DurangoTime:  time.Time{},
+			EUpgradeTime: mockable.MaxTime,
 		},
 	})
 	defer func() {

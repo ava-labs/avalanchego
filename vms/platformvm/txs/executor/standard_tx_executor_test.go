@@ -1749,10 +1749,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1777,10 +1777,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1806,10 +1806,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1838,10 +1838,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1868,10 +1868,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1897,10 +1897,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1928,10 +1928,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1962,10 +1962,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -2120,10 +2120,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -2148,10 +2148,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:   env.latestForkTime,
-							CortinaTime: env.latestForkTime,
-							DurangoTime: env.latestForkTime,
-							EForkTime:   mockable.MaxTime,
+							BanffTime:    env.latestForkTime,
+							CortinaTime:  env.latestForkTime,
+							DurangoTime:  env.latestForkTime,
+							EUpgradeTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -2181,7 +2181,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							CortinaTime:      env.latestForkTime,
 							DurangoTime:      env.latestForkTime,
 							MaxStakeDuration: math.MaxInt64,
-							EForkTime:        mockable.MaxTime,
+							EUpgradeTime:     mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -2215,7 +2215,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.latestForkTime,
 							CortinaTime:      env.latestForkTime,
 							DurangoTime:      env.latestForkTime,
-							EForkTime:        mockable.MaxTime,
+							EUpgradeTime:     mockable.MaxTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
@@ -2255,7 +2255,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.latestForkTime,
 							CortinaTime:      env.latestForkTime,
 							DurangoTime:      env.latestForkTime,
-							EForkTime:        mockable.MaxTime,
+							EUpgradeTime:     mockable.MaxTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},

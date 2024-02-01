@@ -142,7 +142,7 @@ var (
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
 
-	EForkTimes = map[uint32]time.Time{
+	EUpgradeTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
@@ -246,8 +246,8 @@ func GetDurangoTime(networkID uint32) time.Time {
 	return DefaultUpgradeTime
 }
 
-func GetEForkTime(networkID uint32) time.Time {
-	if upgradeTime, exists := EForkTimes[networkID]; exists {
+func GetEUpgradeTime(networkID uint32) time.Time {
+	if upgradeTime, exists := EUpgradeTimes[networkID]; exists {
 		return upgradeTime
 	}
 	return DefaultUpgradeTime

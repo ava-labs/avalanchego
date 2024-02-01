@@ -625,7 +625,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		ApricotPhase5Time:      forkTime,
 		BanffTime:              forkTime,
 		CortinaTime:            forkTime,
-		EForkTime:              mockable.MaxTime,
+		EUpgradeTime:           mockable.MaxTime,
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))
 
