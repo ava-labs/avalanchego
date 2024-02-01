@@ -32,6 +32,15 @@ var EForkDynamicFeesConfig = DynamicFeesConfig{
 		4,
 	},
 
+	MinUnitFees: commonfees.Dimensions{},
+
+	FeesChangeDenominator: commonfees.Dimensions{
+		1,
+		1,
+		1,
+		1,
+	},
+
 	BlockUnitsCap: commonfees.Dimensions{
 		math.MaxUint64,
 		math.MaxUint64,
@@ -40,13 +49,6 @@ var EForkDynamicFeesConfig = DynamicFeesConfig{
 	},
 
 	BlockUnitsTarget: commonfees.Dimensions{
-		1,
-		1,
-		1,
-		1,
-	},
-
-	FeesChangeDenominator: commonfees.Dimensions{
 		1,
 		1,
 		1,

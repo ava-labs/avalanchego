@@ -468,7 +468,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,
 			BlkFeeManager: feeManager,
-			UnitCaps:      v.txExecutorBackend.Config.GetDynamicFeesConfig().BlockUnitsCap,
+			UnitCaps:      feesCfg.BlockUnitsCap,
 			State:         state,
 			Tx:            tx,
 		}

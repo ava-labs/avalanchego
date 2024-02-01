@@ -601,13 +601,13 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			var (
 				backend = tt.backendF(ctrl)
 
-				feeManager = fees.NewManager(fees.EmptyUnitFees, fees.EmptyWindows)
+				feeManager = fees.NewManager(fees.Empty, fees.EmptyWindows)
 				state      = tt.stateF(ctrl)
 				sTx        = tt.sTxF()
 				tx         = tt.txF()
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.EmptyUnitCaps, state, sTx, tx)
+			err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.Empty, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

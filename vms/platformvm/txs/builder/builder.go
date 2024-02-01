@@ -311,9 +311,9 @@ func (b *builder) NewImportTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
@@ -321,7 +321,7 @@ func (b *builder) NewImportTx(
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -471,15 +471,15 @@ func (b *builder) NewExportTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -558,15 +558,15 @@ func (b *builder) NewCreateChainTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -634,15 +634,15 @@ func (b *builder) NewCreateSubnetTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -719,15 +719,15 @@ func (b *builder) NewAddValidatorTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -802,15 +802,15 @@ func (b *builder) NewAddDelegatorTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -886,15 +886,15 @@ func (b *builder) NewAddSubnetValidatorTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -960,15 +960,15 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -1048,15 +1048,15 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -1116,15 +1116,15 @@ func (b *builder) NewBaseTx(
 	)
 	if isEForkActive {
 		var (
-			dynamicFeesConfig = b.cfg.GetDynamicFeesConfig()
-			unitFees          = b.state.GetUnitFees()
-			unitWindows       = b.state.GetFeeWindows()
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: dynamicFeesConfig.BlockUnitsCap,
+			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 

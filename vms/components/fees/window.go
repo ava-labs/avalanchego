@@ -18,6 +18,8 @@ type (
 	Windows [FeeDimensions]Window
 )
 
+var EmptyWindows = [FeeDimensions]Window{}
+
 func (w *Windows) Bytes() []byte {
 	res := make([]byte, FeeDimensions*WindowSize*uint64Len)
 	for i := Dimension(0); i < FeeDimensions; i++ {

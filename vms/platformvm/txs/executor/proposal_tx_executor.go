@@ -118,7 +118,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	onAbortOuts, err := verifyAddValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		commonfees.EmptyUnitCaps,
+		commonfees.Empty,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -167,7 +167,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		commonfees.EmptyUnitCaps,
+		commonfees.Empty,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -215,7 +215,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	onAbortOuts, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.BlkFeeManager,
-		commonfees.EmptyUnitCaps,
+		commonfees.Empty,
 		e.OnCommitState,
 		e.Tx,
 		tx,

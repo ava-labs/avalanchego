@@ -714,8 +714,6 @@ func newState(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
-
-		unitFees: cfg.GetDynamicFeesConfig().InitialUnitFees,
 	}, nil
 }
 

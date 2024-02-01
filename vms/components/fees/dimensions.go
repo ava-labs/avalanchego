@@ -21,11 +21,7 @@ const (
 	uint64Len = 8
 )
 
-var (
-	EmptyUnitFees = Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
-	EmptyUnitCaps = Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
-	EmptyWindows  = [FeeDimensions]Window{}
-)
+var Empty = Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
 
 type (
 	Dimension  int
