@@ -165,7 +165,6 @@ type chain struct {
 	Context *snow.ConsensusContext
 	VM      common.VM
 	Handler handler.Handler
-	Beacons validators.Manager
 }
 
 // ChainConfig is configuration settings for the current execution.
