@@ -59,8 +59,7 @@ func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		Config:    v.Config,
-		ChainTime: v.BlkTimestamp,
+		Config: v.Config,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -130,8 +129,7 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		Config:    v.Config,
-		ChainTime: v.BlkTimestamp,
+		Config: v.Config,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -186,8 +184,7 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		Config:    v.Config,
-		ChainTime: v.BlkTimestamp,
+		Config: v.Config,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -254,8 +251,7 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		Config:    v.Config,
-		ChainTime: v.BlkTimestamp,
+		Config: v.Config,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -304,8 +300,7 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	feeCalculator := fees.Calculator{
-		Config:    v.Config,
-		ChainTime: v.BlkTimestamp,
+		Config: v.Config,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

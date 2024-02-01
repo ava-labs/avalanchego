@@ -4,8 +4,6 @@
 package fees
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
@@ -13,9 +11,8 @@ import (
 var _ txs.Visitor = (*Calculator)(nil)
 
 type Calculator struct {
-	// setup, to be filled before visitor methods are called
-	Config    *config.Config
-	ChainTime time.Time
+	// Pre E-fork inputs
+	Config *config.Config
 
 	// outputs of visitor execution
 	Fee uint64
