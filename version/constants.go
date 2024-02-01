@@ -123,7 +123,18 @@ var (
 		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
-	CortinaXChainStopVertexID map[uint32]ids.ID
+	CortinaXChainStopVertexID = map[uint32]ids.ID{
+		// The mainnet stop vertex is well known. It can be verified on any
+		// fully synced node by looking at the parentID of the genesis block.
+		//
+		// Ref: https://subnets.avax.network/x-chain/block/0
+		constants.MainnetID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
+		// The fuji stop vertex is well known. It can be verified on any fully
+		// synced node by looking at the parentID of the genesis block.
+		//
+		// Ref: https://subnets-test.avax.network/x-chain/block/0
+		constants.FujiID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
+	}
 
 	// TODO: update this before release
 	DurangoTimes = map[uint32]time.Time{
@@ -150,29 +161,6 @@ func init() {
 			versions[i] = version
 		}
 		RPCChainVMProtocolCompatibility[rpcChainVMProtocol] = versions
-	}
-
-	// The mainnet stop vertex is well known. It can be verified on any fully
-	// synced node by looking at the parentID of the genesis block.
-	//
-	// Ref: https://subnets.avax.network/x-chain/block/0
-	mainnetXChainStopVertexID, err := ids.FromString("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga")
-	if err != nil {
-		panic(err)
-	}
-
-	// The fuji stop vertex is well known. It can be verified on any fully
-	// synced node by looking at the parentID of the genesis block.
-	//
-	// Ref: https://subnets-test.avax.network/x-chain/block/0
-	fujiXChainStopVertexID, err := ids.FromString("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ")
-	if err != nil {
-		panic(err)
-	}
-
-	CortinaXChainStopVertexID = map[uint32]ids.ID{
-		constants.MainnetID: mainnetXChainStopVertexID,
-		constants.FujiID:    fujiXChainStopVertexID,
 	}
 }
 
