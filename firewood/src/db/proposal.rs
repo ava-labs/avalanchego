@@ -218,7 +218,7 @@ impl Proposal {
         revisions.base_revision = Arc::new(rev.into());
 
         // update the rolling window of root hashes
-        revisions.root_hashes.push_front(hash.clone());
+        revisions.root_hashes.push_front(hash);
         if revisions.root_hashes.len() > max_revisions {
             revisions
                 .root_hashes

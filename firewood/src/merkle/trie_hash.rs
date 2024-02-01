@@ -10,7 +10,7 @@ use std::{
 pub const TRIE_HASH_LEN: usize = 32;
 const U64_TRIE_HASH_LEN: u64 = TRIE_HASH_LEN as u64;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct TrieHash(pub [u8; TRIE_HASH_LEN]);
 
 impl std::ops::Deref for TrieHash {

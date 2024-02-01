@@ -199,7 +199,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
             .children[0];
         Ok(if let Some(root) = root {
             let mut node = self.get_node(root)?;
-            let res = node.get_root_hash::<S>(self.store.as_ref()).clone();
+            let res = *node.get_root_hash::<S>(self.store.as_ref());
             #[allow(clippy::unwrap_used)]
             if node.is_dirty() {
                 node.write(|_| {}).unwrap();
@@ -207,7 +207,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
             }
             res
         } else {
-            Self::empty_root().clone()
+            *Self::empty_root()
         })
     }
 
@@ -1475,12 +1475,26 @@ pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
 #[cfg(test)]
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
-    use crate::merkle::node::PlainCodec;
-
     use super::*;
-    use node::tests::{extension, leaf};
+    use crate::merkle::node::PlainCodec;
     use shale::{cached::DynamicMem, compact::CompactSpace, CachedStore};
     use test_case::test_case;
+
+    fn extension(
+        path: Vec<u8>,
+        child_address: DiskAddress,
+        child_encoded: Option<Vec<u8>>,
+    ) -> Node {
+        Node::from(NodeType::Extension(ExtNode {
+            path: PartialPath(path),
+            child: child_address,
+            child_encoded,
+        }))
+    }
+
+    fn leaf(path: Vec<u8>, data: Vec<u8>) -> Node {
+        Node::from_leaf(LeafNode::new(PartialPath(path), Data(data)))
+    }
 
     #[test_case(vec![0x12, 0x34, 0x56], &[0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
     #[test_case(vec![0xc0, 0xff], &[0xc, 0x0, 0xf, 0xf])]
