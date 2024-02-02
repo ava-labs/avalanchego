@@ -985,23 +985,6 @@ func getChainAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 	return getAliases(v, "chain aliases", ChainAliasesContentKey, ChainAliasesFileKey)
 }
 
-func getVMAliaser(v *viper.Viper) (ids.Aliaser, error) {
-	vmAliases, err := getVMAliases(v)
-	if err != nil {
-		return nil, err
-	}
-
-	aliser := ids.NewAliaser()
-	for vmID, aliases := range vmAliases {
-		for _, alias := range aliases {
-			if err := aliser.Alias(vmID, alias); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return aliser, nil
-}
-
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	configDir := GetExpandedArg(v, configKey)
@@ -1475,7 +1458,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// VM Aliases
-	nodeConfig.VMAliaser, err = getVMAliaser(v)
+	nodeConfig.VMAliases, err = getVMAliases(v)
 	if err != nil {
 		return node.Config{}, err
 	}
