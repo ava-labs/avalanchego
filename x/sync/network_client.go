@@ -342,7 +342,8 @@ func (c *networkClient) Connected(
 	}
 
 	c.log.Debug("adding new peer", zap.Stringer("nodeID", nodeID))
-	return c.peers.Connected(nodeID, nodeVersion)
+	c.peers.Connected(nodeID, nodeVersion)
+	return nil
 }
 
 func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {

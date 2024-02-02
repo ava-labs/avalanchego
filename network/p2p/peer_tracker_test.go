@@ -32,7 +32,7 @@ func TestPeerTracker(t *testing.T) {
 
 	for i := range peerIDs {
 		peerIDs[i] = ids.GenerateTestNodeID()
-		require.NoError(p.Connected(peerIDs[i], peerVersion))
+		p.Connected(peerIDs[i], peerVersion)
 	}
 
 	responsivePeers := make(map[ids.NodeID]bool)
