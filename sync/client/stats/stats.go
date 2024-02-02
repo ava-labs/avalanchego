@@ -75,7 +75,6 @@ func (m *messageMetric) UpdateRequestLatency(duration time.Duration) {
 }
 
 type clientSyncerStats struct {
-	atomicTrieLeavesMetric,
 	stateTrieLeavesMetric,
 	codeRequestMetric,
 	blockRequestMetric MessageMetric
@@ -84,10 +83,9 @@ type clientSyncerStats struct {
 // NewClientSyncerStats returns stats for the client syncer
 func NewClientSyncerStats() ClientSyncerStats {
 	return &clientSyncerStats{
-		atomicTrieLeavesMetric: NewMessageMetric("sync_atomic_trie_leaves"),
-		stateTrieLeavesMetric:  NewMessageMetric("sync_state_trie_leaves"),
-		codeRequestMetric:      NewMessageMetric("sync_code"),
-		blockRequestMetric:     NewMessageMetric("sync_blocks"),
+		stateTrieLeavesMetric: NewMessageMetric("sync_state_trie_leaves"),
+		codeRequestMetric:     NewMessageMetric("sync_code"),
+		blockRequestMetric:    NewMessageMetric("sync_blocks"),
 	}
 }
 

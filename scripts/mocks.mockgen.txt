@@ -1,2 +1,2 @@
 github.com/ava-labs/subnet-evm/precompile/precompileconfig=Predicater,Config,ChainConfig,Accepter=precompile/precompileconfig/mocks.go
-github.com/ava-labs/subnet-evm/precompile/contract=BlockContext,AccessibleState=precompile/contract/mocks.go
+github.com/ava-labs/subnet-evm/precompile/contract=BlockContext,AccessibleState,StateDB=precompile/contract/mocks.go

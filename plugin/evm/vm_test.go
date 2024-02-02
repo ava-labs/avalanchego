@@ -294,6 +294,11 @@ func TestVMUpgrades(t *testing.T) {
 			genesis:          genesisJSONSubnetEVM,
 			expectedGasPrice: big.NewInt(0),
 		},
+		{
+			name:             "Durango",
+			genesis:          genesisJSONDurango,
+			expectedGasPrice: big.NewInt(0),
+		},
 	}
 	for _, test := range genesisTests {
 		t.Run(test.name, func(t *testing.T) {

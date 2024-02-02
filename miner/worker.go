@@ -195,6 +195,13 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
+	// Ensure we always stop prefetcher after block building is complete.
+	defer func() {
+		if env.state == nil {
+			return
+		}
+		env.state.StopPrefetcher()
+	}()
 	// Configure any upgrades that should go into effect during this block.
 	err = core.ApplyUpgrades(w.chainConfig, &parent.Time, types.NewBlockWithHeader(header), env.state)
 	if err != nil {
@@ -203,7 +210,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	}
 
 	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().Pending(true)
+	pending := w.eth.TxPool().PendingWithBaseFee(true, header.BaseFee)
 
 	// Split the pending transactions into locals and remotes
 	localTxs := make(map[common.Address]types.Transactions)
@@ -231,6 +238,7 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 	if err != nil {
 		return nil, err
 	}
+	state.StartPrefetcher("miner", w.eth.BlockChain().CacheConfig().TriePrefetcherParallelism)
 	return &environment{
 		signer:           types.MakeSigner(w.chainConfig, header.Number, header.Time),
 		state:            state,

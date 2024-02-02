@@ -32,7 +32,7 @@ State sync code is structured as follows:
 - `plugin/evm/`: The engine expects the VM to implement `StateSyncableVM` interface,
   - `StateSyncServer`: Contains methods executed on nodes _serving_ state sync requests.
   - `StateSyncClient`: Contains methods executed on nodes joining the network via state sync, and orchestrates the top level steps of the sync.
-- `peer`: Contains abstractions used by `sync/statesync` to send requests to peers (`AppRequest`) and receive responses from peers (`AppResponse`). 
+- `peer`: Contains abstractions used by `sync/statesync` to send requests to peers (`AppRequest`) and receive responses from peers (`AppResponse`).
 - `message`: Contains structs that are serialized and sent over the network during state sync.
 
 

@@ -549,7 +549,7 @@ var bindTests = []struct {
 				struct A {
 					bytes32 B;
 				}
-				
+
 				function F() public view returns (A[] memory a, uint256[] memory c, bool[] memory d) {
 					A[] memory a = new A[](2);
 					a[0].B = bytes32(uint256(1234) << 96);
@@ -1790,7 +1790,7 @@ var bindTests = []struct {
 			if !gotEvent {
 				t.Fatal("Expect to receive event emitted by receive")
 			}
-	
+
 			// Test fallback function
 			gotEvent = false
 			opts.Value = nil

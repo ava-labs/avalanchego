@@ -106,6 +106,7 @@ func BenchmarkFilters(b *testing.B) {
 	require.NoError(b, err)
 
 	for i := 0; i < b.N; i++ {
+		filter.begin = 0
 		logs, _ := filter.Logs(context.Background())
 		if len(logs) != 4 {
 			b.Fatal("expected 4 logs, got", len(logs))

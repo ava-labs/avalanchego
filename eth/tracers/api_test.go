@@ -87,10 +87,11 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i i
 
 	// Import the canonical chain
 	cacheConfig := &core.CacheConfig{
-		TrieCleanLimit: 256,
-		TrieDirtyLimit: 256,
-		SnapshotLimit:  128,
-		Pruning:        false, // Archive mode
+		TrieCleanLimit:            256,
+		TrieDirtyLimit:            256,
+		TriePrefetcherParallelism: 4,
+		SnapshotLimit:             128,
+		Pruning:                   false, // Archive mode
 	}
 	chain, err := core.NewBlockChain(backend.chaindb, cacheConfig, gspec, backend.engine, vm.Config{}, common.Hash{}, false)
 	if err != nil {

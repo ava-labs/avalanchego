@@ -4,10 +4,13 @@
 package message
 
 import (
+	"bytes"
+	"context"
 	"encoding/base64"
 	"math/rand"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -101,4 +104,74 @@ func TestMarshalLeafsResponse(t *testing.T) {
 	assert.Equal(t, leafsResponse.Vals, l.Vals)
 	assert.False(t, l.More) // make sure it is not serialized
 	assert.Equal(t, leafsResponse.ProofVals, l.ProofVals)
+}
+
+func TestLeafsRequestValidation(t *testing.T) {
+	mockRequestHandler := &mockHandler{}
+
+	tests := map[string]struct {
+		request        LeafsRequest
+		assertResponse func(t *testing.T)
+	}{
+		"node type StateTrieNode": {
+			request: LeafsRequest{
+				Root:  common.BytesToHash([]byte("some hash goes here")),
+				Start: bytes.Repeat([]byte{0x00}, common.HashLength),
+				End:   bytes.Repeat([]byte{0xff}, common.HashLength),
+				Limit: 10,
+			},
+			assertResponse: func(t *testing.T) {
+				assert.True(t, mockRequestHandler.handleStateTrieCalled)
+				assert.False(t, mockRequestHandler.handleBlockRequestCalled)
+				assert.False(t, mockRequestHandler.handleCodeRequestCalled)
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, _ = test.request.Handle(context.Background(), ids.GenerateTestNodeID(), 1, mockRequestHandler)
+			test.assertResponse(t)
+			mockRequestHandler.reset()
+		})
+	}
+}
+
+var _ RequestHandler = &mockHandler{}
+
+type mockHandler struct {
+	handleStateTrieCalled,
+	handleBlockRequestCalled,
+	handleCodeRequestCalled,
+	handleMessageSignatureCalled,
+	handleBlockSignatureCalled bool
+}
+
+func (m *mockHandler) HandleStateTrieLeafsRequest(context.Context, ids.NodeID, uint32, LeafsRequest) ([]byte, error) {
+	m.handleStateTrieCalled = true
+	return nil, nil
+}
+
+func (m *mockHandler) HandleBlockRequest(context.Context, ids.NodeID, uint32, BlockRequest) ([]byte, error) {
+	m.handleBlockRequestCalled = true
+	return nil, nil
+}
+
+func (m *mockHandler) HandleCodeRequest(context.Context, ids.NodeID, uint32, CodeRequest) ([]byte, error) {
+	m.handleCodeRequestCalled = true
+	return nil, nil
+}
+
+func (m *mockHandler) HandleMessageSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest MessageSignatureRequest) ([]byte, error) {
+	m.handleMessageSignatureCalled = true
+	return nil, nil
+}
+func (m *mockHandler) HandleBlockSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest BlockSignatureRequest) ([]byte, error) {
+	m.handleBlockSignatureCalled = true
+	return nil, nil
+}
+
+func (m *mockHandler) reset() {
+	m.handleStateTrieCalled = false
+	m.handleBlockRequestCalled = false
+	m.handleCodeRequestCalled = false
 }
