@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 )
 
 var (
@@ -68,7 +69,14 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(currentTimestamp)
+	feeCalculator := fees.Calculator{
+		Config:    e.Backend.Config,
+		ChainTime: e.State.GetTimestamp(),
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -76,7 +84,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createBlockchainTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return err
@@ -114,7 +122,14 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(currentTimestamp)
+	feeCalculator := fees.Calculator{
+		Config:    e.Backend.Config,
+		ChainTime: e.State.GetTimestamp(),
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -122,7 +137,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return err
@@ -194,6 +209,15 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
+		// Verify the flowcheck
+		feeCalculator := fees.Calculator{
+			Config:    e.Backend.Config,
+			ChainTime: e.State.GetTimestamp(),
+		}
+		if err := tx.Visit(&feeCalculator); err != nil {
+			return err
+		}
+
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
@@ -201,7 +225,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			tx.Outs,
 			e.Tx.Creds,
 			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.TxFee,
+				e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			},
 		); err != nil {
 			return err
@@ -250,6 +274,14 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
+	feeCalculator := fees.Calculator{
+		Config:    e.Backend.Config,
+		ChainTime: e.State.GetTimestamp(),
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -257,7 +289,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
@@ -436,6 +468,13 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
+	feeCalculator := fees.Calculator{
+		Config:    e.Backend.Config,
+		ChainTime: currentTimestamp,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -446,7 +485,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {
@@ -555,6 +594,18 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
+	var (
+		cfg              = e.Backend.Config
+		currentTimestamp = e.State.GetTimestamp()
+	)
+	feeCalculator := fees.Calculator{
+		Config:    cfg,
+		ChainTime: currentTimestamp,
+	}
+	if err := tx.Visit(&feeCalculator); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -562,7 +613,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: feeCalculator.Fee,
 		},
 	); err != nil {
 		return err
