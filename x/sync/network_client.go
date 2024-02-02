@@ -274,22 +274,23 @@ func (c *networkClient) request(
 
 	var (
 		response  []byte
+		responded bool
 		startTime = time.Now()
 	)
-
 	select {
 	case <-ctx.Done():
 		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, ctx.Err()
-	case response = <-handler.responseChan:
-		elapsedSeconds := time.Since(startTime).Seconds()
-		bandwidth := float64(len(response))/elapsedSeconds + epsilon
-		c.peers.TrackBandwidth(nodeID, bandwidth)
+	case response, responded = <-handler.responseChan:
 	}
-	if handler.failed {
+	if !responded {
 		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, errRequestFailed
 	}
+
+	elapsedSeconds := time.Since(startTime).Seconds()
+	bandwidth := float64(len(response))/elapsedSeconds + epsilon
+	c.peers.TrackBandwidth(nodeID, bandwidth)
 
 	c.log.Debug("received response from peer",
 		zap.Stringer("nodeID", nodeID),
