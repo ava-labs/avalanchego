@@ -300,7 +300,7 @@ func (c *ChainConfig) Description() string {
 	banner += "Mandatory Upgrades:\n"
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:           @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(c.SubnetEVMTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.DurangoTimestamp))
-	banner += fmt.Sprintf(" - Cancun Timestamp:              @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.CancunTime))
+	banner += fmt.Sprintf(" - Cancun Timestamp:              @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.CancunTime))
 	banner += "\n"
 
 	// Add Subnet-EVM custom fields
