@@ -187,7 +187,7 @@ type Config struct {
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 	ChainAliases map[ids.ID][]string           `json:"chainAliases"`
 
-	VMAliaser ids.Aliaser `json:"-"`
+	VMAliases map[ids.ID][]string `json:"vmAliases"`
 
 	// Halflife to use for the processing requests tracker.
 	// Larger halflife --> usage metrics change more slowly.
