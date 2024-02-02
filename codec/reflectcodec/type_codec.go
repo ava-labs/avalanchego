@@ -27,8 +27,6 @@ const (
 var (
 	_ codec.Codec = (*genericCodec)(nil)
 
-	errMarshalNil              = errors.New("can't marshal nil pointer or interface")
-	errUnmarshalNil            = errors.New("can't unmarshal nil")
 	errNeedPointer             = errors.New("argument to unmarshal must be a pointer")
 	errRecursiveInterfaceTypes = errors.New("recursive interface types")
 )
@@ -90,7 +88,7 @@ func New(typer TypeCodec, tagNames []string, durangoTime time.Time, maxSliceLen 
 
 func (c *genericCodec) Size(value interface{}) (int, error) {
 	if value == nil {
-		return 0, errMarshalNil // can't marshal nil
+		return 0, nil // can't marshal nil, we return zero size
 	}
 
 	size, _, err := c.size(reflect.ValueOf(value), nil /*=typeStack*/)
@@ -126,14 +124,14 @@ func (c *genericCodec) size(
 		return wrappers.StringLen(value.String()), false, nil
 	case reflect.Ptr:
 		if value.IsNil() {
-			return 0, false, errMarshalNil
+			return 0, false, nil // can't marshal nil, we return zero size
 		}
 
 		return c.size(value.Elem(), typeStack)
 
 	case reflect.Interface:
 		if value.IsNil() {
-			return 0, false, errMarshalNil
+			return 0, false, nil // can't marshal nil, we return zero size
 		}
 
 		underlyingValue := value.Interface()
@@ -292,7 +290,7 @@ func (c *genericCodec) size(
 // To marshal an interface, [value] must be a pointer to the interface
 func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 	if value == nil {
-		return errMarshalNil // can't marshal nil
+		return codec.ErrMarshalNil // can't marshal nil
 	}
 
 	return c.marshal(reflect.ValueOf(value), p, nil /*=typeStack*/)
@@ -339,13 +337,13 @@ func (c *genericCodec) marshal(
 		return p.Err
 	case reflect.Ptr:
 		if value.IsNil() {
-			return errMarshalNil
+			return codec.ErrMarshalNil
 		}
 
 		return c.marshal(value.Elem(), p, typeStack)
 	case reflect.Interface:
 		if value.IsNil() {
-			return errMarshalNil
+			return codec.ErrMarshalNil
 		}
 
 		underlyingValue := value.Interface()
@@ -505,7 +503,7 @@ func (c *genericCodec) marshal(
 // interface
 func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 	if dest == nil {
-		return errUnmarshalNil
+		return codec.ErrUnmarshalNil
 	}
 
 	p := wrappers.Packer{
