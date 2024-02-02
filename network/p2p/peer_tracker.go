@@ -60,6 +60,7 @@ type PeerTracker struct {
 	averageBandwidth safemath.Averager
 
 	log                    logging.Logger
+	ignoredNodes           set.Set[ids.NodeID]
 	minVersion             *version.Application
 	numTrackedPeers        prometheus.Gauge
 	numResponsivePeers     prometheus.Gauge
@@ -70,6 +71,7 @@ func NewPeerTracker(
 	log logging.Logger,
 	metricsNamespace string,
 	registerer prometheus.Registerer,
+	ignoredNodes set.Set[ids.NodeID],
 	minVersion *version.Application,
 ) (*PeerTracker, error) {
 	t := &PeerTracker{
@@ -79,6 +81,7 @@ func NewPeerTracker(
 		}),
 		averageBandwidth: safemath.NewAverager(0, bandwidthHalflife, time.Now()),
 		log:              log,
+		ignoredNodes:     ignoredNodes,
 		minVersion:       minVersion,
 		numTrackedPeers: prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -263,7 +266,12 @@ func (p *PeerTracker) updateBandwidth(nodeID ids.NodeID, bandwidth float64, resp
 
 // Connected should be called when [nodeID] connects to this node.
 func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
-	// if minVersion is specified and peer's version is less, skip
+	// If this peer should be ignored, don't mark it as connected.
+	if p.ignoredNodes.Contains(nodeID) {
+		return
+	}
+	// If minVersion is specified and peer's version is less, don't mark it as
+	// connected.
 	if p.minVersion != nil && nodeVersion.Compare(p.minVersion) < 0 {
 		return
 	}
@@ -279,6 +287,10 @@ func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	// Because of the checks performed in Connected, it's possible that this
+	// node was never marked as connected here. However, all of the below
+	// functions are noops if called with a peer that was never marked as
+	// connected.
 	p.untrackedPeers.Remove(nodeID)
 	p.trackedPeers.Remove(nodeID)
 	p.responsivePeers.Remove(nodeID)

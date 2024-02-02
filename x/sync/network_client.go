@@ -78,8 +78,6 @@ type NetworkClient interface {
 type networkClient struct {
 	lock sync.Mutex
 	log  logging.Logger
-	// This node's ID
-	myNodeID ids.NodeID
 	// requestID counter used to track outbound requests
 	requestID uint32
 	// requestID => handler for the response/failure
@@ -105,6 +103,7 @@ func NewNetworkClient(
 		log,
 		metricsNamespace,
 		registerer,
+		set.Of(myNodeID),
 		minVersion,
 	)
 	if err != nil {
@@ -113,7 +112,6 @@ func NewNetworkClient(
 
 	return &networkClient{
 		appSender:                  appSender,
-		myNodeID:                   myNodeID,
 		outstandingRequestHandlers: make(map[uint32]ResponseHandler),
 		activeRequests:             semaphore.NewWeighted(maxActiveRequests),
 		peers:                      peerTracker,
@@ -336,22 +334,12 @@ func (c *networkClient) Connected(
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
-	if nodeID == c.myNodeID {
-		c.log.Debug("skipping registering self as peer")
-		return nil
-	}
-
 	c.log.Debug("adding new peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Connected(nodeID, nodeVersion)
 	return nil
 }
 
 func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	if nodeID == c.myNodeID {
-		c.log.Debug("skipping deregistering self as peer")
-		return nil
-	}
-
 	c.log.Debug("disconnecting peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Disconnected(nodeID)
 	return nil
