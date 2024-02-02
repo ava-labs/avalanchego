@@ -40,7 +40,7 @@ impl PartialPath {
         self.0
     }
 
-    pub(super) fn encode(&self, is_terminal: bool) -> Vec<u8> {
+    pub(crate) fn encode(&self, is_terminal: bool) -> Vec<u8> {
         let mut flags = Flags::empty();
 
         if is_terminal {

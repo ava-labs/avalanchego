@@ -1,10 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::{BinarySerde, Bincode, Merkle, Node, Proof, ProofError, Ref, RefMut, TrieHash};
-use crate::shale::{
-    self, cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore,
-    ShaleStore, StoredView,
+use crate::{
+    merkle::{
+        proof::{Proof, ProofError},
+        BinarySerde, Bincode, Merkle, Node, Ref, RefMut, TrieHash,
+    },
+    shale::{
+        self, cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore,
+        ShaleStore, StoredView,
+    },
 };
 use std::num::NonZeroUsize;
 use thiserror::Error;

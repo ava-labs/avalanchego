@@ -91,6 +91,13 @@ impl<T: DeserializeOwned + AsRef<[u8]>> Encoded<T> {
             Encoded::Data(data) => bincode::DefaultOptions::new().deserialize(data.as_ref()),
         }
     }
+
+    pub fn deserialize<De: BinarySerde>(self) -> Result<T, De::DeserializeError> {
+        match self {
+            Encoded::Raw(raw) => Ok(raw),
+            Encoded::Data(data) => De::deserialize(data.as_ref()),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, EnumAsInner)]
@@ -148,9 +155,17 @@ impl NodeType {
 
     pub fn path_mut(&mut self) -> &mut PartialPath {
         match self {
-            NodeType::Branch(_u) => todo!(),
+            NodeType::Branch(u) => &mut u.path,
             NodeType::Leaf(node) => &mut node.path,
             NodeType::Extension(node) => &mut node.path,
+        }
+    }
+
+    pub fn set_data(&mut self, data: Data) {
+        match self {
+            NodeType::Branch(u) => u.value = Some(data),
+            NodeType::Leaf(node) => node.data = data,
+            NodeType::Extension(_) => (),
         }
     }
 }
@@ -233,7 +248,7 @@ impl Node {
                 is_encoded_longer_than_hash_len: OnceLock::new(),
                 inner: NodeType::Branch(
                     BranchNode {
-                        // path: vec![].into(),
+                        path: vec![].into(),
                         children: [Some(DiskAddress::null()); BranchNode::MAX_CHILDREN],
                         value: Some(Data(Vec::new())),
                         children_encoded: Default::default(),
@@ -315,6 +330,12 @@ impl Node {
 
     pub(super) fn set_dirty(&self, is_dirty: bool) {
         self.lazy_dirty.store(is_dirty, Ordering::Relaxed)
+    }
+
+    pub(crate) fn as_branch_mut(&mut self) -> &mut Box<BranchNode> {
+        self.inner_mut()
+            .as_branch_mut()
+            .expect("must be a branch node")
     }
 }
 
@@ -531,6 +552,7 @@ impl<T> EncodedNode<T> {
 pub enum EncodedNodeType {
     Leaf(LeafNode),
     Branch {
+        path: PartialPath,
         children: Box<[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>,
         value: Option<Data>,
     },
@@ -550,14 +572,19 @@ impl Serialize for EncodedNode<PlainCodec> {
     where
         S: serde::Serializer,
     {
-        let n = match &self.node {
+        let (chd, data, path) = match &self.node {
             EncodedNodeType::Leaf(n) => {
-                let data = Some(n.data.to_vec());
+                let data = Some(&*n.data);
                 let chd: Vec<(u64, Vec<u8>)> = Default::default();
-                let path = from_nibbles(&n.path.encode(true)).collect();
-                EncodedBranchNode { chd, data, path }
+                let path: Vec<_> = from_nibbles(&n.path.encode(true)).collect();
+                (chd, data, path)
             }
-            EncodedNodeType::Branch { children, value } => {
+
+            EncodedNodeType::Branch {
+                path,
+                children,
+                value,
+            } => {
                 let chd: Vec<(u64, Vec<u8>)> = children
                     .iter()
                     .enumerate()
@@ -571,19 +598,20 @@ impl Serialize for EncodedNode<PlainCodec> {
                     })
                     .collect();
 
-                let data = value.as_ref().map(|v| v.0.to_vec());
-                EncodedBranchNode {
-                    chd,
-                    data,
-                    path: Vec::new(),
-                }
+                let data = value.as_deref();
+
+                let path = from_nibbles(&path.encode(false)).collect();
+
+                (chd, data, path)
             }
         };
 
         let mut s = serializer.serialize_tuple(3)?;
-        s.serialize_element(&n.chd)?;
-        s.serialize_element(&n.data)?;
-        s.serialize_element(&n.path)?;
+
+        s.serialize_element(&chd)?;
+        s.serialize_element(&data)?;
+        s.serialize_element(&path)?;
+
         s.end()
     }
 }
@@ -593,30 +621,35 @@ impl<'de> Deserialize<'de> for EncodedNode<PlainCodec> {
     where
         D: serde::Deserializer<'de>,
     {
-        let node: EncodedBranchNode = Deserialize::deserialize(deserializer)?;
-        if node.chd.is_empty() {
-            let data = if let Some(d) = node.data {
+        let EncodedBranchNode { chd, data, path } = Deserialize::deserialize(deserializer)?;
+
+        let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter()).0;
+
+        if chd.is_empty() {
+            let data = if let Some(d) = data {
                 Data(d)
             } else {
                 Data(Vec::new())
             };
 
-            let path = PartialPath::from_nibbles(Nibbles::<0>::new(&node.path).into_iter()).0;
             let node = EncodedNodeType::Leaf(LeafNode { path, data });
+
             Ok(Self::new(node))
         } else {
             let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
-            let value = node.data.map(Data);
+            let value = data.map(Data);
 
-            for (i, chd) in node.chd {
-                #[allow(clippy::indexing_slicing)]
-                (children[i as usize] = Some(chd));
+            #[allow(clippy::indexing_slicing)]
+            for (i, chd) in chd {
+                children[i as usize] = Some(chd);
             }
 
             let node = EncodedNodeType::Branch {
+                path,
                 children: children.into(),
                 value,
             };
+
             Ok(Self::new(node))
         }
     }
@@ -639,34 +672,50 @@ impl Serialize for EncodedNode<Bincode> {
                 }
                 seq.end()
             }
-            EncodedNodeType::Branch { children, value } => {
-                let mut list = <[Encoded<Vec<u8>>; BranchNode::MAX_CHILDREN + 1]>::default();
 
-                for (i, c) in children
+            EncodedNodeType::Branch {
+                path,
+                children,
+                value,
+            } => {
+                let mut list = <[Encoded<Vec<u8>>; BranchNode::MAX_CHILDREN + 2]>::default();
+                let children = children
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, c)| c.as_ref().map(|c| (i, c)))
-                {
-                    if c.len() >= TRIE_HASH_LEN {
-                        let serialized_hash = Bincode::serialize(&Keccak256::digest(c).to_vec())
-                            .map_err(|e| S::Error::custom(format!("bincode error: {e}")))?;
-                        #[allow(clippy::indexing_slicing)]
-                        (list[i] = Encoded::Data(serialized_hash));
+                    .filter_map(|(i, c)| c.as_ref().map(|c| (i, c)));
+
+                #[allow(clippy::indexing_slicing)]
+                for (i, child) in children {
+                    if child.len() >= TRIE_HASH_LEN {
+                        let serialized_hash =
+                            Bincode::serialize(&Keccak256::digest(child).to_vec())
+                                .map_err(|e| S::Error::custom(format!("bincode error: {e}")))?;
+                        list[i] = Encoded::Data(serialized_hash);
                     } else {
-                        #[allow(clippy::indexing_slicing)]
-                        (list[i] = Encoded::Raw(c.to_vec()));
+                        list[i] = Encoded::Raw(child.to_vec());
                     }
                 }
-                if let Some(Data(val)) = &value {
+
+                list[BranchNode::MAX_CHILDREN] = if let Some(Data(val)) = &value {
                     let serialized_val = Bincode::serialize(val)
                         .map_err(|e| S::Error::custom(format!("bincode error: {e}")))?;
-                    list[BranchNode::MAX_CHILDREN] = Encoded::Data(serialized_val);
-                }
+
+                    Encoded::Data(serialized_val)
+                } else {
+                    Encoded::default()
+                };
+
+                let serialized_path = Bincode::serialize(&path.encode(false))
+                    .map_err(|e| S::Error::custom(format!("bincode error: {e}")))?;
+
+                list[BranchNode::MAX_CHILDREN + 1] = Encoded::Data(serialized_path);
 
                 let mut seq = serializer.serialize_seq(Some(list.len()))?;
+
                 for e in list {
                     seq.serialize_element(&e)?;
                 }
+
                 seq.end()
             }
         }
@@ -680,8 +729,9 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
     {
         use serde::de::Error;
 
-        let items: Vec<Encoded<Vec<u8>>> = Deserialize::deserialize(deserializer)?;
+        let mut items: Vec<Encoded<Vec<u8>>> = Deserialize::deserialize(deserializer)?;
         let len = items.len();
+
         match len {
             LEAF_NODE_SIZE => {
                 let mut items = items.into_iter();
@@ -702,10 +752,25 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                 });
                 Ok(Self::new(node))
             }
+
             BranchNode::MSIZE => {
+                let path = items
+                    .pop()
+                    .unwrap_or_default()
+                    .deserialize::<Bincode>()
+                    .map_err(D::Error::custom)?;
+                let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter()).0;
+
+                let mut value = items
+                    .pop()
+                    .unwrap_or_default()
+                    .deserialize::<Bincode>()
+                    .map_err(D::Error::custom)
+                    .map(Data)
+                    .map(Some)?
+                    .filter(|data| !data.is_empty());
+
                 let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
-                let mut value: Option<Data> = Default::default();
-                let len = items.len();
 
                 for (i, chd) in items.into_iter().enumerate() {
                     if i == len - 1 {
@@ -729,11 +794,17 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                         (children[i] = Some(chd).filter(|chd| !chd.is_empty()));
                     }
                 }
+
                 let node = EncodedNodeType::Branch {
+                    path,
                     children: children.into(),
                     value,
                 };
-                Ok(Self::new(node))
+
+                Ok(Self {
+                    node,
+                    phantom: PhantomData,
+                })
             }
             size => Err(D::Error::custom(format!("invalid size: {size}"))),
         }
@@ -847,7 +918,7 @@ mod tests {
     ) {
         let leaf = NodeType::Leaf(LeafNode::new(PartialPath(vec![1, 2, 3]), Data(vec![4, 5])));
         let branch = NodeType::Branch(Box::new(BranchNode {
-            // path: vec![].into(),
+            path: vec![].into(),
             children: [Some(DiskAddress::from(1)); BranchNode::MAX_CHILDREN],
             value: Some(Data(vec![1, 2, 3])),
             children_encoded: std::array::from_fn(|_| Some(vec![1])),
@@ -904,6 +975,7 @@ mod tests {
     }
 
     #[test_matrix(
+        [&[], &[0xf], &[0xf, 0xf]],
         [vec![], vec![1,0,0,0,0,0,0,1], vec![1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1], repeat(1).take(16).collect()],
         [Nil, 0, 15],
         [
@@ -915,10 +987,13 @@ mod tests {
         ]
     )]
     fn branch_encoding(
+        path: &[u8],
         children: Vec<usize>,
         value: impl Into<Option<u8>>,
         children_encoded: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN],
     ) {
+        let path = PartialPath(path.iter().copied().map(|x| x & 0xf).collect());
+
         let mut children = children.into_iter().map(|x| {
             if x == 0 {
                 None
@@ -934,7 +1009,7 @@ mod tests {
             .map(|x| Data(std::iter::repeat(x).take(x as usize).collect()));
 
         let node = Node::from_branch(BranchNode {
-            // path: vec![].into(),
+            path,
             children,
             value,
             children_encoded,

@@ -318,6 +318,7 @@ impl<T: Storable + 'static> StoredView<T> {
     #[inline(always)]
     fn new<U: CachedStore>(offset: usize, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
         let decoded = T::deserialize(offset, space)?;
+
         Ok(Self {
             offset,
             decoded,

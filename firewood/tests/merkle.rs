@@ -8,17 +8,19 @@ use firewood::{
     shale::{cached::DynamicMem, compact::CompactSpace},
 };
 use rand::Rng;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write};
 
 type Store = CompactSpace<Node, DynamicMem>;
 
-fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Clone>(
+fn merkle_build_test<
+    K: AsRef<[u8]> + std::cmp::Ord + Clone + std::fmt::Debug,
+    V: AsRef<[u8]> + Clone,
+>(
     items: Vec<(K, V)>,
     meta_size: u64,
     compact_size: u64,
 ) -> Result<MerkleSetup<Store, Bincode>, DataStoreError> {
     let mut merkle = new_merkle(meta_size, compact_size);
-
     for (k, v) in items.iter() {
         merkle.insert(k, v.as_ref().to_vec())?;
     }
@@ -66,10 +68,12 @@ fn test_root_hash_fuzz_insertions() -> Result<(), DataStoreError> {
 
     for _ in 0..10 {
         let mut items = Vec::new();
+
         for _ in 0..10 {
             let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
             items.push((keygen(), val));
         }
+
         merkle_build_test(items, 0x1000000, 0x1000000)?;
     }
 
@@ -97,54 +101,51 @@ fn test_root_hash_reversed_deletions() -> Result<(), DataStoreError> {
             .collect();
         key
     };
-    for i in 0..10 {
-        let mut items = std::collections::HashMap::new();
-        for _ in 0..10 {
-            let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
-            items.insert(keygen(), val);
-        }
-        let mut items: Vec<_> = items.into_iter().collect();
+
+    for _ in 0..10 {
+        let mut items: Vec<_> = (0..10)
+            .map(|_| keygen())
+            .map(|key| {
+                let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
+                (key, val)
+            })
+            .collect();
+
         items.sort();
+
         let mut merkle = new_merkle(0x100000, 0x100000);
+
         let mut hashes = Vec::new();
-        let mut dumps = Vec::new();
+
         for (k, v) in items.iter() {
-            dumps.push(merkle.dump());
+            hashes.push((merkle.root_hash()?, merkle.dump()?));
             merkle.insert(k, v.to_vec())?;
-            hashes.push(merkle.root_hash());
         }
-        hashes.pop();
-        println!("----");
-        let mut prev_dump = merkle.dump()?;
-        for (((k, _), h), d) in items
-            .iter()
-            .rev()
-            .zip(hashes.iter().rev())
-            .zip(dumps.iter().rev())
-        {
+
+        let mut new_hashes = Vec::new();
+
+        for (k, _) in items.iter().rev() {
+            let before = merkle.dump()?;
             merkle.remove(k)?;
-            let h0 = merkle.root_hash()?.0;
-            if h.as_ref().unwrap().0 != h0 {
-                for (k, _) in items.iter() {
-                    println!("{}", hex::encode(k));
-                }
-                println!(
-                    "{} != {}",
-                    hex::encode(**h.as_ref().unwrap()),
-                    hex::encode(h0)
-                );
-                println!("== before {} ===", hex::encode(k));
-                print!("{prev_dump}");
-                println!("== after {} ===", hex::encode(k));
-                print!("{}", merkle.dump()?);
-                println!("== should be ===");
-                print!("{:?}", d);
-                panic!();
-            }
-            prev_dump = merkle.dump()?;
+            new_hashes.push((merkle.root_hash()?, k, before, merkle.dump()?));
         }
-        println!("i = {i}");
+
+        hashes.reverse();
+
+        for i in 0..hashes.len() {
+            #[allow(clippy::indexing_slicing)]
+            let (new_hash, key, before_removal, after_removal) = &new_hashes[i];
+            #[allow(clippy::indexing_slicing)]
+            let (expected_hash, expected_dump) = &hashes[i];
+            let key = key.iter().fold(String::new(), |mut s, b| {
+                let _ = write!(s, "{:02x}", b);
+                s
+            });
+
+            assert_eq!(new_hash, expected_hash, "\n\nkey: {key}\nbefore:\n{before_removal}\nafter:\n{after_removal}\n\nexpected:\n{expected_dump}\n");
+        }
     }
+
     Ok(())
 }
 
@@ -169,38 +170,56 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
             .collect();
         key
     };
+
     for i in 0..10 {
         let mut items = std::collections::HashMap::new();
+
         for _ in 0..10 {
             let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
             items.insert(keygen(), val);
         }
+
         let mut items_ordered: Vec<_> = items.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         items_ordered.sort();
         items_ordered.shuffle(&mut *rng.borrow_mut());
         let mut merkle = new_merkle(0x100000, 0x100000);
+
         for (k, v) in items.iter() {
             merkle.insert(k, v.to_vec())?;
         }
+
+        for (k, v) in items.iter() {
+            assert_eq!(&*merkle.get(k)?.unwrap(), &v[..]);
+            assert_eq!(&*merkle.get_mut(k)?.unwrap().get(), &v[..]);
+        }
+
         for (k, _) in items_ordered.into_iter() {
             assert!(merkle.get(&k)?.is_some());
             assert!(merkle.get_mut(&k)?.is_some());
+
             merkle.remove(&k)?;
+
             assert!(merkle.get(&k)?.is_none());
             assert!(merkle.get_mut(&k)?.is_none());
+
             items.remove(&k);
+
             for (k, v) in items.iter() {
                 assert_eq!(&*merkle.get(k)?.unwrap(), &v[..]);
                 assert_eq!(&*merkle.get_mut(k)?.unwrap().get(), &v[..]);
             }
+
             let h = triehash::trie_root::<keccak_hasher::KeccakHasher, Vec<_>, _, _>(
                 items.iter().collect(),
             );
+
             let h0 = merkle.root_hash()?;
+
             if h[..] != *h0 {
                 println!("{} != {}", hex::encode(h), hex::encode(*h0));
             }
         }
+
         println!("i = {i}");
     }
     Ok(())
@@ -343,7 +362,7 @@ fn test_range_proof() -> Result<(), ProofError> {
         assert!(!proof.0.is_empty());
         let end_proof = merkle.prove(items[end - 1].0)?;
         assert!(!end_proof.0.is_empty());
-        proof.concat_proofs(end_proof);
+        proof.extend(end_proof);
 
         let mut keys = Vec::new();
         let mut vals = Vec::new();
@@ -379,7 +398,7 @@ fn test_bad_range_proof() -> Result<(), ProofError> {
         assert!(!proof.0.is_empty());
         let end_proof = merkle.prove(items[end - 1].0)?;
         assert!(!end_proof.0.is_empty());
-        proof.concat_proofs(end_proof);
+        proof.extend(end_proof);
 
         let mut keys: Vec<[u8; 32]> = Vec::new();
         let mut vals: Vec<[u8; 20]> = Vec::new();
@@ -476,7 +495,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
         assert!(!proof.0.is_empty());
         let end_proof = merkle.prove(last)?;
         assert!(!end_proof.0.is_empty());
-        proof.concat_proofs(end_proof);
+        proof.extend(end_proof);
 
         let mut keys: Vec<[u8; 32]> = Vec::new();
         let mut vals: Vec<[u8; 20]> = Vec::new();
@@ -495,7 +514,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     let (keys, vals): (Vec<&[u8; 32]>, Vec<&[u8; 20]>) = items.into_iter().unzip();
     merkle.verify_range_proof(&proof, &first, &last, keys, vals)?;
@@ -523,7 +542,7 @@ fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> 
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(items[end - 1].0)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     start = 105; // Gap created
     let mut keys: Vec<[u8; 32]> = Vec::new();
@@ -546,7 +565,7 @@ fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> 
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     end = 195; // Capped slice
     let mut keys: Vec<[u8; 32]> = Vec::new();
@@ -593,7 +612,7 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(items[start].0)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     merkle.verify_range_proof(
         &proof,
@@ -609,7 +628,7 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     merkle.verify_range_proof(
         &proof,
@@ -624,7 +643,7 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     merkle.verify_range_proof(
         &proof,
@@ -644,7 +663,7 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(key)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     merkle.verify_range_proof(&proof, first, key, vec![key], vec![val])?;
 
@@ -683,7 +702,7 @@ fn test_all_elements_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(items[end].0)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     merkle.verify_range_proof(
         &proof,
@@ -700,7 +719,7 @@ fn test_all_elements_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     merkle.verify_range_proof(&proof, &first, &last, keys, vals)?;
 
@@ -762,7 +781,7 @@ fn test_gapped_range_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(items[last - 1].0)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     let middle = (first + last) / 2 - first;
     let (keys, vals): (Vec<&[u8; 32]>, Vec<&[u8; 4]>) = items[first..last]
@@ -797,7 +816,7 @@ fn test_same_side_proof() -> Result<(), DataStoreError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     assert!(merkle
         .verify_range_proof(&proof, first, last, vec![*items[pos].0], vec![items[pos].1])
@@ -811,7 +830,7 @@ fn test_same_side_proof() -> Result<(), DataStoreError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     assert!(merkle
         .verify_range_proof(&proof, first, last, vec![*items[pos].0], vec![items[pos].1])
@@ -842,7 +861,7 @@ fn test_single_side_range_proof() -> Result<(), ProofError> {
             assert!(!proof.0.is_empty());
             let end_proof = merkle.prove(items[case].0)?;
             assert!(!end_proof.0.is_empty());
-            proof.concat_proofs(end_proof);
+            proof.extend(end_proof);
 
             let item_iter = items.clone().into_iter().take(case + 1);
             let keys = item_iter.clone().map(|item| *item.0).collect();
@@ -876,7 +895,7 @@ fn test_reverse_single_side_range_proof() -> Result<(), ProofError> {
             assert!(!proof.0.is_empty());
             let end_proof = merkle.prove(end)?;
             assert!(!end_proof.0.is_empty());
-            proof.concat_proofs(end_proof);
+            proof.extend(end_proof);
 
             let item_iter = items.clone().into_iter().skip(case);
             let keys = item_iter.clone().map(|item| item.0).collect();
@@ -909,7 +928,7 @@ fn test_both_sides_range_proof() -> Result<(), ProofError> {
         assert!(!proof.0.is_empty());
         let end_proof = merkle.prove(end)?;
         assert!(!end_proof.0.is_empty());
-        proof.concat_proofs(end_proof);
+        proof.extend(end_proof);
 
         let (keys, vals): (Vec<&[u8; 32]>, Vec<&[u8; 20]>) = items.into_iter().unzip();
         merkle.verify_range_proof(&proof, &start, &end, keys, vals)?;
@@ -941,7 +960,7 @@ fn test_empty_value_range_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(items[end - 1].0)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     let item_iter = items.clone().into_iter().skip(start).take(end - start);
     let keys = item_iter.clone().map(|item| item.0).collect();
@@ -977,7 +996,7 @@ fn test_all_elements_empty_value_range_proof() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(items[end].0)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     let item_iter = items.clone().into_iter();
     let keys = item_iter.clone().map(|item| item.0).collect();
@@ -1014,7 +1033,7 @@ fn test_range_proof_keys_with_shared_prefix() -> Result<(), ProofError> {
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(&end)?;
     assert!(!end_proof.0.is_empty());
-    proof.concat_proofs(end_proof);
+    proof.extend(end_proof);
 
     let item_iter = items.into_iter();
     let keys = item_iter.clone().map(|item| item.0).collect();
@@ -1051,7 +1070,7 @@ fn test_bloadted_range_proof() -> Result<(), ProofError> {
     for (i, item) in items.iter().enumerate() {
         let cur_proof = merkle.prove(item.0)?;
         assert!(!cur_proof.0.is_empty());
-        proof.concat_proofs(cur_proof);
+        proof.extend(cur_proof);
         if i == 50 {
             keys.push(item.0);
             vals.push(item.1);

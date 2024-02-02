@@ -1,6 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::logger::trace;
 use crate::merkle::Node;
 use crate::shale::ObjCache;
 use crate::storage::{StoreRevMut, StoreRevShared};
@@ -13,17 +14,18 @@ use std::io::{Cursor, Write};
 use std::num::NonZeroUsize;
 use std::sync::RwLock;
 
-use crate::logger::trace;
+type PayLoadSize = u64;
 
 #[derive(Debug)]
 pub struct CompactHeader {
-    payload_size: u64,
+    payload_size: PayLoadSize,
     is_freed: bool,
     desc_addr: DiskAddress,
 }
 
 impl CompactHeader {
     pub const MSIZE: u64 = 17;
+
     pub const fn is_freed(&self) -> bool {
         self.is_freed
     }
@@ -71,11 +73,11 @@ impl Storable for CompactHeader {
 
 #[derive(Debug)]
 struct CompactFooter {
-    payload_size: u64,
+    payload_size: PayLoadSize,
 }
 
 impl CompactFooter {
-    const MSIZE: u64 = 8;
+    const MSIZE: u64 = std::mem::size_of::<PayLoadSize>() as u64;
 }
 
 impl Storable for CompactFooter {
@@ -103,7 +105,7 @@ impl Storable for CompactFooter {
 
 #[derive(Clone, Copy, Debug)]
 struct CompactDescriptor {
-    payload_size: u64,
+    payload_size: PayLoadSize,
     haddr: usize, // disk address of the free space
 }
 

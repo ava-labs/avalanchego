@@ -3,6 +3,7 @@
 
 use super::{node::Node, BranchNode, Merkle, NodeObjRef, NodeType};
 use crate::{
+    nibbles::Nibbles,
     shale::{DiskAddress, ShaleStore},
     v2::api,
 };
@@ -18,6 +19,7 @@ enum IteratorState<'a> {
     StartAtKey(Key),
     /// Continue iterating after the last node in the `visited_node_path`
     Iterating {
+        check_child_nibble: bool,
         visited_node_path: Vec<(NodeObjRef<'a>, u8)>,
     },
 }
@@ -41,7 +43,7 @@ pub struct MerkleKeyValueStream<'a, S, T> {
 
 impl<'a, S: ShaleStore<Node> + Send + Sync, T> FusedStream for MerkleKeyValueStream<'a, S, T> {
     fn is_terminated(&self) -> bool {
-        matches!(&self.key_state, IteratorState::Iterating { visited_node_path } if visited_node_path.is_empty())
+        matches!(&self.key_state, IteratorState::Iterating { visited_node_path, .. } if visited_node_path.is_empty())
     }
 }
 
@@ -88,6 +90,8 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
                     .get_node(*merkle_root)
                     .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
+                let mut check_child_nibble = false;
+
                 // traverse the trie along each nibble until we find a node with a value
                 // TODO: merkle.iter_by_key(key) will simplify this entire code-block.
                 let (found_node, mut visited_node_path) = {
@@ -97,14 +101,51 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
                         .get_node_by_key_with_callbacks(
                             root_node,
                             &key,
-                            |node_addr, i| visited_node_path.push((node_addr, i)),
+                            |node_addr, _| visited_node_path.push(node_addr),
                             |_, _| {},
                         )
                         .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
+                    let mut nibbles = Nibbles::<1>::new(key).into_iter();
+
                     let visited_node_path = visited_node_path
                         .into_iter()
-                        .map(|(node, pos)| merkle.get_node(node).map(|node| (node, pos)))
+                        .map(|node| merkle.get_node(node))
+                        .map(|node_result| {
+                            let nibbles = &mut nibbles;
+
+                            node_result
+                                .map(|node| match node.inner() {
+                                    NodeType::Branch(branch) => {
+                                        let mut partial_path_iter = branch.path.iter();
+                                        let next_nibble = nibbles
+                                            .map(|nibble| (Some(nibble), partial_path_iter.next()))
+                                            .find(|(a, b)| a.as_ref() != *b);
+
+                                        match next_nibble {
+                                            // this case will be hit by all but the last nodes
+                                            // unless there is a deviation between the key and the path
+                                            None | Some((None, _)) => None,
+
+                                            Some((Some(key_nibble), Some(path_nibble))) => {
+                                                check_child_nibble = key_nibble < *path_nibble;
+                                                None
+                                            }
+
+                                            // path is subset of the key
+                                            Some((Some(nibble), None)) => {
+                                                check_child_nibble = true;
+                                                Some((node, nibble))
+                                            }
+                                        }
+                                    }
+                                    NodeType::Leaf(_) => Some((node, 0)),
+                                    NodeType::Extension(_) => Some((node, 0)),
+                                })
+                                .transpose()
+                        })
+                        .take_while(|node| node.is_some())
+                        .flatten()
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(|e| api::Error::InternalError(Box::new(e)))?;
 
@@ -113,7 +154,10 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
 
                 if let Some(found_node) = found_node {
                     let value = match found_node.inner() {
-                        NodeType::Branch(branch) => branch.value.as_ref(),
+                        NodeType::Branch(branch) => {
+                            check_child_nibble = true;
+                            branch.value.as_ref()
+                        }
                         NodeType::Leaf(leaf) => Some(&leaf.data),
                         NodeType::Extension(_) => None,
                     };
@@ -126,7 +170,10 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
 
                     visited_node_path.push((found_node, 0));
 
-                    self.key_state = IteratorState::Iterating { visited_node_path };
+                    self.key_state = IteratorState::Iterating {
+                        check_child_nibble,
+                        visited_node_path,
+                    };
 
                     return Poll::Ready(next_result);
                 }
@@ -135,16 +182,23 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
                 let found_key = key_from_nibble_iter(found_key);
 
                 if found_key > *key {
+                    check_child_nibble = false;
                     visited_node_path.pop();
                 }
 
-                self.key_state = IteratorState::Iterating { visited_node_path };
+                self.key_state = IteratorState::Iterating {
+                    check_child_nibble,
+                    visited_node_path,
+                };
 
                 self.poll_next(_cx)
             }
 
-            IteratorState::Iterating { visited_node_path } => {
-                let next = find_next_result(merkle, visited_node_path)
+            IteratorState::Iterating {
+                check_child_nibble,
+                visited_node_path,
+            } => {
+                let next = find_next_result(merkle, visited_node_path, check_child_nibble)
                     .map_err(|e| api::Error::InternalError(Box::new(e)))
                     .transpose();
 
@@ -184,20 +238,27 @@ impl<'a> NodeRef<'a> {
 fn find_next_result<'a, S: ShaleStore<Node>, T>(
     merkle: &'a Merkle<S, T>,
     visited_path: &mut Vec<(NodeObjRef<'a>, u8)>,
+    check_child_nibble: &mut bool,
 ) -> Result<Option<(Key, Value)>, super::MerkleError> {
-    let next = find_next_node_with_data(merkle, visited_path)?.map(|(next_node, value)| {
-        let partial_path = match next_node.inner() {
-            NodeType::Leaf(leaf) => leaf.path.iter().copied(),
-            NodeType::Extension(extension) => extension.path.iter().copied(),
-            _ => [].iter().copied(),
-        };
+    let next = find_next_node_with_data(merkle, visited_path, *check_child_nibble)?.map(
+        |(next_node, value)| {
+            let partial_path = match next_node.inner() {
+                NodeType::Leaf(leaf) => leaf.path.iter().copied(),
+                NodeType::Extension(extension) => extension.path.iter().copied(),
+                NodeType::Branch(branch) => branch.path.iter().copied(),
+            };
 
-        let key = key_from_nibble_iter(nibble_iter_from_parents(visited_path).chain(partial_path));
+            // always check the child for branch nodes with data
+            *check_child_nibble = next_node.inner().is_branch();
 
-        visited_path.push((next_node, 0));
+            let key =
+                key_from_nibble_iter(nibble_iter_from_parents(visited_path).chain(partial_path));
 
-        (key, value)
-    });
+            visited_path.push((next_node, 0));
+
+            (key, value)
+        },
+    );
 
     Ok(next)
 }
@@ -205,6 +266,7 @@ fn find_next_result<'a, S: ShaleStore<Node>, T>(
 fn find_next_node_with_data<'a, S: ShaleStore<Node>, T>(
     merkle: &'a Merkle<S, T>,
     visited_path: &mut Vec<(NodeObjRef<'a>, u8)>,
+    check_child_nibble: bool,
 ) -> Result<Option<(NodeObjRef<'a>, Vec<u8>)>, super::MerkleError> {
     use InnerNode::*;
 
@@ -244,7 +306,7 @@ fn find_next_node_with_data<'a, S: ShaleStore<Node>, T>(
             Visited(NodeType::Branch(branch)) => {
                 // if the first node that we check is a visited branch, that means that the branch had a value
                 // and we need to visit the first child, for all other cases, we need to visit the next child
-                let compare_op = if first_loop {
+                let compare_op = if first_loop && check_child_nibble {
                     <u8 as PartialOrd>::ge // >=
                 } else {
                     <u8 as PartialOrd>::gt
@@ -328,7 +390,13 @@ fn nibble_iter_from_parents<'a>(parents: &'a [(NodeObjRef, u8)]) -> impl Iterato
         .iter()
         .skip(1) // always skip the sentinal node
         .flat_map(|(parent, child_nibble)| match parent.inner() {
-            NodeType::Branch(_) => Either::Left(std::iter::once(*child_nibble)),
+            NodeType::Branch(branch) => Either::Left(
+                branch
+                    .path
+                    .iter()
+                    .copied()
+                    .chain(std::iter::once(*child_nibble)),
+            ),
             NodeType::Extension(extension) => Either::Right(extension.path.iter().copied()),
             NodeType::Leaf(leaf) => Either::Right(leaf.path.iter().copied()),
         })
@@ -700,6 +768,56 @@ mod tests {
         let keys = &keys[(missing as usize)..];
 
         let mut stream = merkle.iter_from(root, vec![missing].into_boxed_slice());
+
+        for key in keys {
+            let next = stream.next().await.unwrap().unwrap();
+
+            assert_eq!(&*next.0, &*next.1);
+            assert_eq!(&*next.0, key);
+        }
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn start_at_key_overlapping_with_extension_but_greater() {
+        let start_key = 0x0a;
+        let shared_path = 0x09;
+        // 0x0900, 0x0901, ... 0x0a0f
+        // path extension is 0x090
+        let children = (0..=0x0f).map(|val| vec![shared_path, val]);
+
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        children.for_each(|key| {
+            merkle.insert(&key, key.clone(), root).unwrap();
+        });
+
+        let stream = merkle.iter_from(root, vec![start_key].into_boxed_slice());
+
+        check_stream_is_done(stream).await;
+    }
+
+    #[tokio::test]
+    async fn start_at_key_overlapping_with_extension_but_smaller() {
+        let start_key = 0x00;
+        let shared_path = 0x09;
+        // 0x0900, 0x0901, ... 0x0a0f
+        // path extension is 0x090
+        let children = (0..=0x0f).map(|val| vec![shared_path, val]);
+
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        let keys: Vec<_> = children
+            .map(|key| {
+                merkle.insert(&key, key.clone(), root).unwrap();
+                key
+            })
+            .collect();
+
+        let mut stream = merkle.iter_from(root, vec![start_key].into_boxed_slice());
 
         for key in keys {
             let next = stream.next().await.unwrap().unwrap();
