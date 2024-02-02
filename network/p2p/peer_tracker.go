@@ -53,9 +53,10 @@ type PeerTracker struct {
 	responsivePeers set.Set[ids.NodeID]
 	// Bandwidth of peers that we have measured.
 	peerBandwidth map[ids.NodeID]safemath.Averager
-	// Max heap that contains the average bandwidth of peers.
+	// Max heap that contains the average bandwidth of peers that do not have an
+	// outstanding request.
 	bandwidthHeap heap.Map[ids.NodeID, safemath.Averager]
-	// average bandwidth is only used for metrics
+	// Average bandwidth is only used for metrics.
 	averageBandwidth safemath.Averager
 
 	log                    logging.Logger
@@ -114,7 +115,7 @@ func NewPeerTracker(
 
 // Returns true if:
 //   - We have not observed the desired minimum number of responsive peers.
-//   - Randomly with the freqeuency decreasing as the number of tracked peers
+//   - Randomly with the freqeuency decreasing as the number of responsive peers
 //     increases.
 //
 // Assumes the read lock is held.
@@ -144,9 +145,14 @@ func (p *PeerTracker) shouldSelectUntrackedPeer() bool {
 }
 
 // SelectPeer that we could send a request to.
-// If we should track more peers, returns a random peer with version >= [minVersion], if any exist.
-// Otherwise, with probability [randomPeerProbability] returns a random peer from [p.responsivePeers].
-// With probability [1-randomPeerProbability] returns the peer in [p.bandwidthHeap] with the highest bandwidth.
+//
+// If we should track more peers, returns a random untracked peer, if any exist.
+// Otherwise, with probability [randomPeerProbability] returns a random peer
+// from [p.responsivePeers].
+// With probability [1-randomPeerProbability] returns the peer in
+// [p.bandwidthHeap] with the highest bandwidth.
+//
+// Returns false if there are no connected peers.
 func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -197,6 +203,7 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 }
 
 // Record that we sent a request to [nodeID].
+//
 // Removes the peer's bandwidth averager from the bandwidth heap.
 func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
 	p.lock.Lock()
@@ -210,12 +217,14 @@ func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
 }
 
 // Record that we observed that [nodeID]'s bandwidth is [bandwidth].
+//
 // Adds the peer's bandwidth averager to the bandwidth heap.
 func (p *PeerTracker) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
 	p.updateBandwidth(nodeID, bandwidth, true)
 }
 
 // Record that a request failed to [nodeID].
+//
 // Adds the peer's bandwidth averager to the bandwidth heap.
 func (p *PeerTracker) RegisterFailure(nodeID ids.NodeID) {
 	p.updateBandwidth(nodeID, 0, false)
@@ -254,7 +263,7 @@ func (p *PeerTracker) updateBandwidth(nodeID ids.NodeID, bandwidth float64, resp
 	p.averageBandwidthMetric.Set(p.averageBandwidth.Read())
 }
 
-// Connected should be called when [nodeID] connects to this node
+// Connected should be called when [nodeID] connects to this node.
 func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
 	// if minVersion is specified and peer's version is less, skip
 	if p.minVersion != nil && nodeVersion.Compare(p.minVersion) < 0 {
@@ -267,7 +276,7 @@ func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Applicat
 	p.untrackedPeers.Add(nodeID)
 }
 
-// Disconnected should be called when [nodeID] disconnects from this node
+// Disconnected should be called when [nodeID] disconnects from this node.
 func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -282,7 +291,7 @@ func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 }
 
-// Returns the number of queriable peers the node is connected to.
+// Returns the number of peers the node is connected to.
 func (p *PeerTracker) Size() int {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
