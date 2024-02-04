@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
+
+	commonFees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -33,8 +35,10 @@ var (
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	State state.Diff // state is expected to be modified
-	Tx    *txs.Tx
+	BlkFeeManager *commonFees.Manager
+	UnitCaps      commonFees.Dimensions
+	State         state.Diff // state is expected to be modified
+	Tx            *txs.Tx
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
@@ -70,8 +74,12 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: e.State.GetTimestamp(),
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -123,8 +131,12 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: e.State.GetTimestamp(),
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -210,9 +222,17 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
+		var (
+			cfg              = e.Backend.Config
+			currentTimestamp = e.State.GetTimestamp()
+		)
 		feeCalculator := fees.Calculator{
-			Config:    e.Backend.Config,
-			ChainTime: e.State.GetTimestamp(),
+			IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
+			Config:           cfg,
+			ChainTime:        currentTimestamp,
+			FeeManager:       e.BlkFeeManager,
+			ConsumedUnitsCap: e.UnitCaps,
+			Credentials:      e.Tx.Creds,
 		}
 		if err := tx.Visit(&feeCalculator); err != nil {
 			return err
@@ -275,8 +295,12 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: e.State.GetTimestamp(),
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -346,6 +370,8 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	if _, err := verifyAddValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -375,6 +401,8 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -395,6 +423,8 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if _, err := verifyAddDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -420,6 +450,8 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -469,8 +501,12 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	feeCalculator := fees.Calculator{
-		Config:    e.Backend.Config,
-		ChainTime: currentTimestamp,
+		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
+		Config:           e.Backend.Config,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
@@ -507,6 +543,8 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -539,6 +577,8 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -563,6 +603,8 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	err := verifyTransferSubnetOwnershipTx(
 		e.Backend,
+		e.BlkFeeManager,
+		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -599,8 +641,12 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		currentTimestamp = e.State.GetTimestamp()
 	)
 	feeCalculator := fees.Calculator{
-		Config:    cfg,
-		ChainTime: currentTimestamp,
+		IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
+		Config:           cfg,
+		ChainTime:        currentTimestamp,
+		FeeManager:       e.BlkFeeManager,
+		ConsumedUnitsCap: e.UnitCaps,
+		Credentials:      e.Tx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

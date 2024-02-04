@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -274,10 +275,13 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
+	feeCfg := config.EUpgradeDynamicFeesConfig
 	executor := executor.StandardTxExecutor{
-		Backend: env.backend,
-		State:   stateDiff,
-		Tx:      testSubnet1,
+		Backend:       env.backend,
+		BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {

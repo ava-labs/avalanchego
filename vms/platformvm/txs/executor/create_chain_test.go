@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Ensure Execute fails when there are not enough control sigs
@@ -47,9 +49,11 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -86,9 +90,11 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -119,9 +125,11 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -149,9 +157,11 @@ func TestCreateChainTxValid(t *testing.T) {
 	require.NoError(err)
 
 	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       &env.backend,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
+		State:         stateDiff,
+		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 }
@@ -220,9 +230,11 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			executor := StandardTxExecutor{
-				Backend: &env.backend,
-				State:   stateDiff,
-				Tx:      tx,
+				Backend:       &env.backend,
+				BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+				UnitCaps:      commonfees.Empty,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedError)

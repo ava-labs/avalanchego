@@ -143,6 +143,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env.clk.Set(defaultGenesisTime)
 	env.config.BanffTime = time.Time{}        // activate Banff
 	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
+	env.config.EUpgradeTime = mockable.MaxTime
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime

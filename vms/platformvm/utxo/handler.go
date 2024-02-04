@@ -22,7 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -60,6 +63,20 @@ type Spender interface {
 		keys []*secp256k1.PrivateKey,
 		amount uint64,
 		fee uint64,
+		changeAddr ids.ShortID,
+	) (
+		[]*avax.TransferableInput, // inputs
+		[]*avax.TransferableOutput, // returnedOutputs
+		[]*avax.TransferableOutput, // stakedOutputs
+		[][]*secp256k1.PrivateKey, // signers
+		error,
+	)
+
+	FinanceTx(
+		utxoReader avax.UTXOReader,
+		keys []*secp256k1.PrivateKey,
+		amount uint64,
+		feeCalc *fees.Calculator,
 		changeAddr ids.ShortID,
 	) (
 		[]*avax.TransferableInput, // inputs
@@ -380,6 +397,344 @@ func (h *handler) Spend(
 		return nil, nil, nil, nil, fmt.Errorf(
 			"%w (unlocked, locked) (%d, %d) but need (%d, %d)",
 			ErrInsufficientFunds, amountBurned, amountStaked, fee, amount,
+		)
+	}
+
+	avax.SortTransferableInputsWithSigners(ins, signers)  // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, txs.Codec) // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, txs.Codec)   // sort outputs
+
+	return ins, returnedOuts, stakedOuts, signers, nil
+}
+
+func (h *handler) FinanceTx(
+	utxoReader avax.UTXOReader,
+	keys []*secp256k1.PrivateKey,
+	amount uint64,
+	feeCalc *fees.Calculator,
+	changeAddr ids.ShortID,
+) (
+	[]*avax.TransferableInput, // inputs
+	[]*avax.TransferableOutput, // returnedOutputs
+	[]*avax.TransferableOutput, // stakedOutputs
+	[][]*secp256k1.PrivateKey, // signers
+	error,
+) {
+	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
+	for _, key := range keys {
+		addrs.Add(key.PublicKey().Address())
+	}
+	utxos, err := avax.GetAllUTXOs(utxoReader, addrs) // The UTXOs controlled by [keys]
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
+	}
+
+	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
+
+	// Minimum time this transaction will be issued at
+	now := uint64(h.clk.Time().Unix())
+
+	ins := []*avax.TransferableInput{}
+	returnedOuts := []*avax.TransferableOutput{}
+	stakedOuts := []*avax.TransferableOutput{}
+	signers := [][]*secp256k1.PrivateKey{}
+
+	targetFee := feeCalc.Fee
+
+	// Amount of AVAX that has been staked
+	amountStaked := uint64(0)
+
+	// Consume locked UTXOs
+	for _, utxo := range utxos {
+		// If we have consumed more AVAX than we are trying to stake, then we
+		// have no need to consume more locked AVAX
+		if amountStaked >= amount {
+			break
+		}
+
+		if assetID := utxo.AssetID(); assetID != h.ctx.AVAXAssetID {
+			continue // We only care about staking AVAX, so ignore other assets
+		}
+
+		out, ok := utxo.Out.(*stakeable.LockOut)
+		if !ok {
+			// This output isn't locked, so it will be handled during the next
+			// iteration of the UTXO set
+			continue
+		}
+		if out.Locktime <= now {
+			// This output is no longer locked, so it will be handled during the
+			// next iteration of the UTXO set
+			continue
+		}
+
+		inner, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
+		if !ok {
+			// We only know how to clone secp256k1 outputs for now
+			continue
+		}
+
+		inIntf, inSigners, err := kc.Spend(out.TransferableOut, now)
+		if err != nil {
+			// We couldn't spend the output, so move on to the next one
+			continue
+		}
+		in, ok := inIntf.(avax.TransferableIn)
+		if !ok { // should never happen
+			h.ctx.Log.Warn("wrong input type",
+				zap.String("expectedType", "avax.TransferableIn"),
+				zap.String("actualType", fmt.Sprintf("%T", inIntf)),
+			)
+			continue
+		}
+		input := &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			In: &stakeable.LockIn{
+				Locktime:       out.Locktime,
+				TransferableIn: in,
+			},
+		}
+
+		// The remaining value is initially the full value of the input
+		remainingValue := in.Amount()
+
+		// update fees to target given the extra input added
+		insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
+		}
+		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
+		}
+		targetFee += addedFees
+
+		// Stake any value that should be staked
+		amountToStake := math.Min(
+			amount-amountStaked, // Amount we still need to stake
+			remainingValue,      // Amount available to stake
+		)
+		amountStaked += amountToStake
+		remainingValue -= amountToStake
+
+		// Add the input to the consumed inputs
+		ins = append(ins, input)
+
+		stakedOut := &avax.TransferableOutput{
+			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+			Out: &stakeable.LockOut{
+				Locktime: out.Locktime,
+				TransferableOut: &secp256k1fx.TransferOutput{
+					Amt:          amountToStake,
+					OutputOwners: inner.OutputOwners,
+				},
+			},
+		}
+
+		// update fees to target given the staked output added
+		outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{stakedOut})
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
+		}
+		addedFees, err = feeCalc.AddFeesFor(outDimensions)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+		}
+		targetFee += addedFees
+
+		// Add the output to the staked outputs
+		stakedOuts = append(stakedOuts, stakedOut)
+
+		if remainingValue > 0 {
+			// This input provided more value than was needed to be locked.
+			// Some of it must be returned
+			changeOut := &avax.TransferableOutput{
+				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+				Out: &stakeable.LockOut{
+					Locktime: out.Locktime,
+					TransferableOut: &secp256k1fx.TransferOutput{
+						Amt:          remainingValue,
+						OutputOwners: inner.OutputOwners,
+					},
+				},
+			}
+
+			// update fees to target given the change output added
+			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
+			}
+			addedFees, err = feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
+			}
+			targetFee += addedFees
+
+			returnedOuts = append(returnedOuts, changeOut)
+		}
+
+		// Add the signers needed for this input to the set of signers
+		signers = append(signers, inSigners)
+	}
+
+	// Amount of AVAX that has been burned
+	amountBurned := uint64(0)
+
+	for _, utxo := range utxos {
+		// If we have consumed more AVAX than we are trying to stake,
+		// and we have burned more AVAX than we need to,
+		// then we have no need to consume more AVAX
+		if amountBurned >= targetFee && amountStaked >= amount {
+			break
+		}
+
+		if assetID := utxo.AssetID(); assetID != h.ctx.AVAXAssetID {
+			continue // We only care about burning AVAX, so ignore other assets
+		}
+
+		out := utxo.Out
+		inner, ok := out.(*stakeable.LockOut)
+		if ok {
+			if inner.Locktime > now {
+				// This output is currently locked, so this output can't be
+				// burned. Additionally, it may have already been consumed
+				// above. Regardless, we skip to the next UTXO
+				continue
+			}
+			out = inner.TransferableOut
+		}
+
+		inIntf, inSigners, err := kc.Spend(out, now)
+		if err != nil {
+			// We couldn't spend this UTXO, so we skip to the next one
+			continue
+		}
+		in, ok := inIntf.(avax.TransferableIn)
+		if !ok {
+			// Because we only use the secp Fx right now, this should never
+			// happen
+			continue
+		}
+		input := &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			In:     in,
+		}
+
+		// The remaining value is initially the full value of the input
+		remainingValue := in.Amount()
+
+		// update fees to target given the extra input added
+		insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
+		}
+		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
+		}
+		targetFee += addedFees
+
+		// Burn any value that should be burned
+		amountToBurn := math.Min(
+			targetFee-amountBurned, // Amount we still need to burn
+			remainingValue,         // Amount available to burn
+		)
+		amountBurned += amountToBurn
+		remainingValue -= amountToBurn
+
+		// Stake any value that should be staked
+		amountToStake := math.Min(
+			amount-amountStaked, // Amount we still need to stake
+			remainingValue,      // Amount available to stake
+		)
+		amountStaked += amountToStake
+		remainingValue -= amountToStake
+
+		// Add the input to the consumed inputs
+		ins = append(ins, input)
+
+		if amountToStake > 0 {
+			// Some of this input was put for staking
+			stakedOut := &avax.TransferableOutput{
+				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amountToStake,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{changeAddr},
+					},
+				},
+			}
+
+			// update fees to target given the extra input added
+			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{stakedOut})
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
+			}
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
+			}
+			targetFee += addedFees
+
+			amountToBurn := math.Min(
+				targetFee-amountBurned, // Amount we still need to burn
+				remainingValue,         // Amount available to burn
+			)
+			amountBurned += amountToBurn
+			remainingValue -= amountToBurn
+
+			stakedOuts = append(stakedOuts, stakedOut)
+		}
+
+		if remainingValue > 0 {
+			changeOut := &avax.TransferableOutput{
+				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					// Amt: remainingValue, // SET IT AFTER CONSIDERING ITS OWN FEES
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{changeAddr},
+					},
+				},
+			}
+
+			// update fees to target given the extra input added
+			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
+			}
+			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
+			}
+
+			if remainingValue > addedFees {
+				targetFee += addedFees
+				amountBurned += addedFees
+				remainingValue -= addedFees
+
+				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = remainingValue
+				// This input had extra value, so some of it must be returned
+				returnedOuts = append(returnedOuts, changeOut)
+			}
+
+			// If this UTXO has not enough value to cover for its own taxes,
+			// we fully consume it (no output) and move to the next UTXO to pay for it.
+		}
+
+		// Add the signers needed for this input to the set of signers
+		signers = append(signers, inSigners)
+	}
+
+	if amountBurned < targetFee || amountStaked < amount {
+		return nil, nil, nil, nil, fmt.Errorf(
+			"%w (unlocked, locked) (%d, %d) but need (%d, %d)",
+			ErrInsufficientFunds, amountBurned, amountStaked, targetFee, amount,
 		)
 	}
 

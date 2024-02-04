@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -507,10 +508,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
+						AddSubnetValidatorFee: 1,
 						CortinaTime:           activeForkTime,
 						DurangoTime:           mockable.MaxTime,
 						EUpgradeTime:          mockable.MaxTime,
-						AddSubnetValidatorFee: 1,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -542,7 +543,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: ErrFutureStakeTime,
 		},
 		{
-			name: "success",
+			name: "success pre EUpgrade",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
@@ -596,12 +597,14 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 			var (
 				backend = tt.backendF(ctrl)
-				state   = tt.stateF(ctrl)
-				sTx     = tt.sTxF()
-				tx      = tt.txF()
+
+				feeManager = fees.NewManager(fees.Empty)
+				state      = tt.stateF(ctrl)
+				sTx        = tt.sTxF()
+				tx         = tt.txF()
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, state, sTx, tx)
+			err := verifyAddPermissionlessValidatorTx(backend, feeManager, fees.Empty, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

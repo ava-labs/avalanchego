@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -90,9 +91,11 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   stateDiff,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         stateDiff,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, test.expectedError)
@@ -346,9 +349,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			freshTH.config.BanffTime = onAcceptState.GetTimestamp()
 
 			executor := StandardTxExecutor{
-				Backend: &freshTH.backend,
-				State:   onAcceptState,
-				Tx:      tx,
+				Backend:       &freshTH.backend,
+				BlkFeeManager: fees.NewManager(fees.Empty),
+				UnitCaps:      fees.Empty,
+				State:         onAcceptState,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, tt.expectedExecutionErr)
@@ -384,9 +389,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrPeriodMismatch)
@@ -412,9 +419,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		require.NoError(tx.Unsigned.Visit(&executor))
 	}
@@ -454,9 +463,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrNotValidator)
@@ -497,9 +508,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrPeriodMismatch)
@@ -523,9 +536,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrPeriodMismatch)
@@ -548,9 +563,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		require.NoError(tx.Unsigned.Visit(&executor))
 	}
@@ -576,9 +593,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
@@ -632,9 +651,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      duplicateSubnetTx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrDuplicateValidator)
@@ -669,9 +690,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, secp256k1fx.ErrInputIndicesNotSortedUnique)
@@ -702,9 +725,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -733,9 +758,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, errUnauthorizedSubnetModification)
@@ -774,9 +801,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrDuplicateValidator)
@@ -809,9 +838,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
@@ -835,9 +866,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrFutureStakeTime)
@@ -874,9 +907,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.AddTx(tx, status.Committed)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrAlreadyValidator)
@@ -910,9 +945,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.AddTx(tx, status.Committed)
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrAlreadyValidator)
@@ -945,9 +982,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		}
 
 		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
+			Backend:       &env.backend,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
+			State:         onAcceptState,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		require.ErrorIs(err, ErrFlowCheckFailed)
@@ -1735,7 +1774,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
@@ -1761,8 +1800,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -1791,8 +1832,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -1822,8 +1865,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -1856,8 +1901,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -1888,8 +1935,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -1919,8 +1968,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -1952,8 +2003,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -1965,7 +2018,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).Times(2)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
@@ -1988,8 +2041,10 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -2148,8 +2203,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -2178,8 +2235,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -2210,8 +2269,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -2247,8 +2308,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
@@ -2289,8 +2352,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					Tx:    env.tx,
-					State: env.state,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
+					Tx:            env.tx,
+					State:         env.state,
 				}
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e

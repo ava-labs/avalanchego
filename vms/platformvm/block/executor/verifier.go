@@ -10,7 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -438,6 +440,8 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	error,
 ) {
 	var (
+		feesCfg = config.EUpgradeDynamicFeesConfig
+
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
 		funcs          = make([]func(), 0, len(txs))
@@ -445,9 +449,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	)
 	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
-			Backend: v.txExecutorBackend,
-			State:   state,
-			Tx:      tx,
+			Backend:       v.txExecutorBackend,
+			BlkFeeManager: fees.NewManager(feesCfg.UnitFees),
+			UnitCaps:      feesCfg.BlockUnitsCap,
+			State:         state,
+			Tx:            tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()

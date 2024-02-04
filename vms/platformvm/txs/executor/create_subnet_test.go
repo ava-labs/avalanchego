@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
@@ -76,9 +78,11 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			executor := StandardTxExecutor{
-				Backend: &env.backend,
-				State:   stateDiff,
-				Tx:      tx,
+				Backend:       &env.backend,
+				BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+				UnitCaps:      commonfees.Empty,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(err, test.expectedErr)
