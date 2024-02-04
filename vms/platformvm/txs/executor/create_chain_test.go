@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -51,8 +50,8 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-		UnitCaps:      fees.EmptyUnitCaps,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -92,8 +91,8 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-		UnitCaps:      fees.EmptyUnitCaps,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -127,8 +126,8 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-		UnitCaps:      fees.EmptyUnitCaps,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -159,8 +158,8 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-		UnitCaps:      fees.EmptyUnitCaps,
+		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+		UnitCaps:      commonfees.Empty,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -232,8 +231,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-				UnitCaps:      fees.EmptyUnitCaps,
+				BlkFeeManager: commonfees.NewManager(commonfees.Empty),
+				UnitCaps:      commonfees.Empty,
 				State:         stateDiff,
 				Tx:            tx,
 			}

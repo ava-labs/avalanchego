@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -143,20 +144,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	unitFees, err := stateDiff.GetUnitFees()
-	if err != nil {
-		return err
-	}
-
-	unitCaps, err := stateDiff.GetBlockUnitCaps()
-	if err != nil {
-		return err
-	}
-
+	feesCfg := config.EUpgradeDynamicFeesConfig
 	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
-		BlkFeeManager: fees.NewManager(unitFees),
-		UnitCaps:      unitCaps,
+		BlkFeeManager: fees.NewManager(feesCfg.UnitFees),
+		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	})

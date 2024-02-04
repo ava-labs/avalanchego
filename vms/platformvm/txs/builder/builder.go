@@ -310,26 +310,13 @@ func (b *builder) NewImportTx(
 		isEForkActive = b.cfg.IsEForkActivated(chainTime)
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
 		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
 		utx.BaseTx.Outs = outs
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -478,24 +465,11 @@ func (b *builder) NewExportTx(
 		err           error
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -573,24 +547,11 @@ func (b *builder) NewCreateChainTx(
 		signers       [][]*secp256k1.PrivateKey
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -657,24 +618,11 @@ func (b *builder) NewCreateSubnetTx(
 		err           error
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -750,24 +698,11 @@ func (b *builder) NewAddValidatorTx(
 		err           error
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -841,24 +776,11 @@ func (b *builder) NewAddDelegatorTx(
 		err           error
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -933,24 +855,11 @@ func (b *builder) NewAddSubnetValidatorTx(
 		signers       [][]*secp256k1.PrivateKey
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -1015,24 +924,11 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		signers       [][]*secp256k1.PrivateKey
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -1111,24 +1007,11 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		signers       [][]*secp256k1.PrivateKey
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 
@@ -1187,24 +1070,11 @@ func (b *builder) NewBaseTx(
 		err           error
 	)
 	if isEForkActive {
-		var (
-			unitFees commonfees.Dimensions
-			unitCaps commonfees.Dimensions
-		)
-		unitFees, err = b.state.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-
-		unitCaps, err = b.state.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
+		feeCfg := config.EUpgradeDynamicFeesConfig
 		feeCalc := &fees.Calculator{
 			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees),
-			ConsumedUnitsCap: unitCaps,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 			Credentials:      txs.EmptyCredentials(signers),
 		}
 

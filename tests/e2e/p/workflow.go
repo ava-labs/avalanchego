@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -124,12 +125,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			pChainExportFee := uint64(0)
 			ginkgo.By("export avax from P to X chain", func() {
-				unitFees, err := pChainClient.GetUnitFees(e2e.DefaultContext())
-				require.NoError(err)
-
-				unitCaps, err := pChainClient.GetBlockUnitsCap(e2e.DefaultContext())
-				require.NoError(err)
-
 				tx, err := pWallet.IssueExportTx(
 					xWallet.BlockchainID(),
 					[]*avax.TransferableOutput{
@@ -145,10 +140,11 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				require.NoError(err)
 
 				// retrieve fees paid for the tx
+				feeCfg := config.EUpgradeDynamicFeesConfig
 				feeCalc := fees.Calculator{
 					IsEForkActive:    true,
-					FeeManager:       commonfees.NewManager(unitFees),
-					ConsumedUnitsCap: unitCaps,
+					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 					Credentials:      tx.Creds,
 				}
 

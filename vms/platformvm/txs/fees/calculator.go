@@ -6,7 +6,6 @@ package fees
 import (
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -20,33 +19,12 @@ import (
 var (
 	_ txs.Visitor = (*Calculator)(nil)
 
-	EmptyUnitFees = fees.Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
-	EmptyUnitCaps = fees.Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
-
-	// These are the default unit fees, used upon E-fork activation
-	// TODO ABENEGIA: to be tuned
-	DefaultUnitFees = fees.Dimensions{
-		1,
-		2,
-		3,
-		4,
-	}
-
-	// These are the default caps for units consumed in a block, used upon E-fork activation
-	// TODO ABENEGIA: to be tuned
-	DefaultBlockMaxConsumedUnits = fees.Dimensions{
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-	}
-
 	errFailedFeeCalculation          = errors.New("failed fee calculation")
 	errFailedConsumedUnitsCumulation = errors.New("failed cumulating consumed units")
 )
 
 type Calculator struct {
-	// setup, to be filled before visitor methods are called
+	// setup
 	IsEForkActive bool
 
 	// Pre E-fork inputs
@@ -57,7 +35,7 @@ type Calculator struct {
 	FeeManager       *fees.Manager
 	ConsumedUnitsCap fees.Dimensions
 
-	// inputs, to be filled before visitor methods are called
+	// common inputs
 	Credentials []verify.Verifiable
 
 	// outputs of visitor execution

@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
@@ -233,6 +232,9 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 				BanffTime:         mockable.MaxTime, // banff is not activated
+				CortinaTime:       mockable.MaxTime,
+				DurangoTime:       mockable.MaxTime,
+				EForkTime:         mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -286,8 +288,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil)
-	parentState.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -717,6 +717,9 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 				BanffTime:         mockable.MaxTime, // banff is not activated
+				CortinaTime:       mockable.MaxTime,
+				DurangoTime:       mockable.MaxTime,
+				EForkTime:         mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -767,8 +770,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil)
-	parentState.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

@@ -44,10 +44,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -102,10 +100,6 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	// at this iteration we don't need to reset these, we are just metering
-	GetUnitFees() (commonfees.Dimensions, error)
-	GetBlockUnitCaps() (commonfees.Dimensions, error)
-
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
 
@@ -146,10 +140,6 @@ type State interface {
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	GetSubnets() ([]*txs.Tx, error)
 	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
-
-	// At this iteration these getters are helpful for UTs only
-	SetUnitFees(uf commonfees.Dimensions) error
-	SetBlockUnitCaps(caps commonfees.Dimensions) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -381,15 +371,11 @@ type state struct {
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
 	currentSupply, persistedCurrentSupply uint64
+
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
 	indexedHeights                      *heightRange
 	singletonDB                         database.Database
-
-	// multifees data are not persisted at this stage. We just meter for now,
-	// we'll revisit when we'll introduce dynamic fees
-	unitFees      commonfees.Dimensions
-	blockUnitCaps commonfees.Dimensions
 }
 
 // heightRange is used to track which heights are safe to use the native DB
@@ -719,9 +705,6 @@ func newState(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
-
-		unitFees:      fees.DefaultUnitFees,
-		blockUnitCaps: fees.DefaultBlockMaxConsumedUnits,
 	}, nil
 }
 
@@ -1094,24 +1077,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 		return time.Time{}, err
 	}
 	return staker.StartTime, nil
-}
-
-func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
-	return s.unitFees, nil
-}
-
-func (s *state) SetUnitFees(uf commonfees.Dimensions) error {
-	s.unitFees = uf
-	return nil
-}
-
-func (s *state) GetBlockUnitCaps() (commonfees.Dimensions, error) {
-	return s.blockUnitCaps, nil
-}
-
-func (s *state) SetBlockUnitCaps(caps commonfees.Dimensions) error {
-	s.blockUnitCaps = caps
-	return nil
 }
 
 func (s *state) GetTimestamp() time.Time {

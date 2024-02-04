@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -258,6 +259,8 @@ func NewWallet(
 		Backend:        backend,
 		builder:        builder,
 		dynamicBuilder: dynFeesBuilder,
+		unitFees:       config.EUpgradeDynamicFeesConfig.UnitFees,
+		unitCaps:       config.EUpgradeDynamicFeesConfig.BlockUnitsCap,
 		signer:         signer,
 		client:         client,
 	}
@@ -295,10 +298,6 @@ func (w *wallet) IssueBaseTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewBaseTx(outputs, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewBaseTx(outputs, options...)
@@ -325,10 +324,6 @@ func (w *wallet) IssueAddValidatorTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewAddValidatorTx(vdr, rewardsOwner, shares, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, options...)
@@ -353,10 +348,6 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewAddSubnetValidatorTx(vdr, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewAddSubnetValidatorTx(vdr, options...)
@@ -382,10 +373,6 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewRemoveSubnetValidatorTx(nodeID, subnetID, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, options...)
@@ -411,10 +398,6 @@ func (w *wallet) IssueAddDelegatorTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewAddDelegatorTx(vdr, rewardsOwner, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewAddDelegatorTx(vdr, rewardsOwner, options...)
@@ -443,10 +426,6 @@ func (w *wallet) IssueCreateChainTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewCreateChainTx(subnetID, genesis, vmID, fxIDs, chainName, options...)
@@ -471,10 +450,6 @@ func (w *wallet) IssueCreateSubnetTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewCreateSubnetTx(owner, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewCreateSubnetTx(owner, options...)
@@ -500,10 +475,6 @@ func (w *wallet) IssueImportTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewImportTx(sourceChainID, to, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewImportTx(sourceChainID, to, options...)
@@ -529,10 +500,6 @@ func (w *wallet) IssueExportTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewExportTx(chainID, outputs, w.unitFees, w.unitCaps, options...)
 	} else {
 		utx, err = w.builder.NewExportTx(chainID, outputs, options...)
@@ -570,10 +537,6 @@ func (w *wallet) IssueTransformSubnetTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewTransformSubnetTx(
 			subnetID,
 			assetID,
@@ -637,10 +600,6 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewAddPermissionlessValidatorTx(
 			vdr,
 			signer,
@@ -685,10 +644,6 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 		err error
 	)
 	if w.isEForkActive {
-		if err := w.refreshFeesData(options...); err != nil {
-			return nil, err
-		}
-
 		utx, err = w.dynamicBuilder.NewAddPermissionlessDelegatorTx(
 			vdr,
 			assetID,
@@ -779,24 +734,5 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 	}
 
 	w.isEForkActive = !chainTime.Before(eForkTime)
-	return nil
-}
-
-func (w *wallet) refreshFeesData(options ...common.Option) error {
-	var (
-		ops = common.NewOptions(options)
-		ctx = ops.Context()
-		err error
-	)
-
-	w.unitFees, err = w.client.GetUnitFees(ctx)
-	if err != nil {
-		return err
-	}
-
-	w.unitCaps, err = w.client.GetBlockUnitsCap(ctx)
-	if err != nil {
-		return err
-	}
 	return nil
 }

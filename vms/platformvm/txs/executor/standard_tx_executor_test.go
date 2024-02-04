@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -33,12 +34,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // This tests that the math performed during TransformSubnetTx execution can
@@ -94,8 +92,8 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         stateDiff,
 			Tx:            tx,
 		}
@@ -352,8 +350,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 			executor := StandardTxExecutor{
 				Backend:       &freshTH.backend,
-				BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-				UnitCaps:      fees.EmptyUnitCaps,
+				BlkFeeManager: fees.NewManager(fees.Empty),
+				UnitCaps:      fees.Empty,
 				State:         onAcceptState,
 				Tx:            tx,
 			}
@@ -392,8 +390,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -422,8 +420,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -466,8 +464,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -511,8 +509,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -539,8 +537,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -566,8 +564,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -596,8 +594,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -654,8 +652,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            duplicateSubnetTx,
 		}
@@ -693,8 +691,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -728,8 +726,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -761,8 +759,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -804,8 +802,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -841,8 +839,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -869,8 +867,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -910,8 +908,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -948,8 +946,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -985,8 +983,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-			UnitCaps:      fees.EmptyUnitCaps,
+			BlkFeeManager: fees.NewManager(fees.Empty),
+			UnitCaps:      fees.Empty,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -1764,8 +1762,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1796,8 +1794,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1829,8 +1827,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1865,8 +1863,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1899,8 +1897,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1932,8 +1930,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1967,8 +1965,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2005,8 +2003,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2167,8 +2165,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2199,8 +2197,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2233,8 +2231,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2272,8 +2270,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2316,8 +2314,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: commonfees.NewManager(fees.EmptyUnitFees),
-					UnitCaps:      fees.EmptyUnitCaps,
+					BlkFeeManager: fees.NewManager(fees.Empty),
+					UnitCaps:      fees.Empty,
 					Tx:            env.tx,
 					State:         env.state,
 				}

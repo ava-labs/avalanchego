@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -353,6 +354,9 @@ func packBlockTxs(
 	}
 
 	var (
+		feeCfg = config.EUpgradeDynamicFeesConfig
+		feeMan = fees.NewManager(feeCfg.UnitFees)
+
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
@@ -375,19 +379,10 @@ func packBlockTxs(
 			return nil, err
 		}
 
-		unitFees, err := txDiff.GetUnitFees()
-		if err != nil {
-			return nil, err
-		}
-		unitCaps, err := txDiff.GetBlockUnitCaps()
-		if err != nil {
-			return nil, err
-		}
-
 		executor := &txexecutor.StandardTxExecutor{
 			Backend:       backend,
-			BlkFeeManager: fees.NewManager(unitFees),
-			UnitCaps:      unitCaps,
+			BlkFeeManager: feeMan,
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         txDiff,
 			Tx:            tx,
 		}

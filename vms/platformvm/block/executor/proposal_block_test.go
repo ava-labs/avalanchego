@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -141,6 +140,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env.clk.Set(defaultGenesisTime)
 	env.config.BanffTime = time.Time{}        // activate Banff
 	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
+	env.config.EForkTime = mockable.MaxTime
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
@@ -160,8 +160,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
-	onParentAccept.EXPECT().GetUnitFees().Return(fees.EmptyUnitFees, nil).AnyTimes()
-	onParentAccept.EXPECT().GetBlockUnitCaps().Return(fees.EmptyUnitCaps, nil).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{

@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -1013,60 +1012,4 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			require.Equal(stdjson.RawMessage(expectedJSON), reply.Block)
 		})
 	}
-}
-
-func TestGetUnitFees(t *testing.T) {
-	require := require.New(t)
-	service, _ := defaultService(t)
-
-	reply := GetUnitFeesReply{}
-	require.NoError(service.GetUnitFees(nil, nil, &reply))
-
-	service.vm.ctx.Lock.Lock()
-
-	unitFees, err := service.vm.state.GetUnitFees()
-	require.NoError(err)
-
-	require.Equal(unitFees, reply.UnitFees)
-
-	updatedUnitFees := commonfees.Dimensions{
-		123,
-		456,
-		789,
-		1011,
-	}
-	require.NoError(service.vm.state.SetUnitFees(updatedUnitFees))
-
-	service.vm.ctx.Lock.Unlock()
-
-	require.NoError(service.GetUnitFees(nil, nil, &reply))
-	require.Equal(updatedUnitFees, reply.UnitFees)
-}
-
-func TestGetBlockUnitsCap(t *testing.T) {
-	require := require.New(t)
-	service, _ := defaultService(t)
-
-	reply := GetBlockUnitsCapReply{}
-	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
-
-	service.vm.ctx.Lock.Lock()
-
-	unitCaps, err := service.vm.state.GetBlockUnitCaps()
-	require.NoError(err)
-
-	require.Equal(unitCaps, reply.MaxUnits)
-
-	updatedUnitCaps := commonfees.Dimensions{
-		123,
-		456,
-		789,
-		1011,
-	}
-	require.NoError(service.vm.state.SetBlockUnitCaps(updatedUnitCaps))
-
-	service.vm.ctx.Lock.Unlock()
-
-	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
-	require.Equal(updatedUnitCaps, reply.MaxUnits)
 }

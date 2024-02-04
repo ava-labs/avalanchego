@@ -6,36 +6,8 @@ package fees
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
-
-// Fees are not dynamic yet. We'll add mechanism for fee updating iterativelly
-
-const (
-	Bandwidth Dimension = 0
-	UTXORead  Dimension = 1
-	UTXOWrite Dimension = 2 // includes delete
-	Compute   Dimension = 3 // any other cost, tx-specific
-
-	FeeDimensions = 4
-)
-
-type (
-	Dimension  int
-	Dimensions [FeeDimensions]uint64
-)
-
-func Add(lhs, rhs Dimensions) (Dimensions, error) {
-	var res Dimensions
-	for i := 0; i < FeeDimensions; i++ {
-		v, err := math.Add64(lhs[i], rhs[i])
-		if err != nil {
-			return res, err
-		}
-		res[i] = v
-	}
-	return res, nil
-}
 
 type Manager struct {
 	// Avax denominated unit fees for all fee dimensions
@@ -52,16 +24,20 @@ func NewManager(unitFees Dimensions) *Manager {
 	}
 }
 
+func (m *Manager) GetUnitFees() Dimensions {
+	return m.unitFees
+}
+
 // CalculateFee must be a stateless method
 func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	fee := uint64(0)
 
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		contribution, err := math.Mul64(m.unitFees[i], units[i])
+		contribution, err := safemath.Mul64(m.unitFees[i], units[i])
 		if err != nil {
 			return 0, err
 		}
-		fee, err = math.Add64(contribution, fee)
+		fee, err = safemath.Add64(contribution, fee)
 		if err != nil {
 			return 0, err
 		}
@@ -75,7 +51,7 @@ func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 	// Ensure we can consume (don't want partial update of values)
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := math.Add64(m.cumulatedUnits[i], units[i])
+		consumed, err := safemath.Add64(m.cumulatedUnits[i], units[i])
 		if err != nil {
 			return true, i
 		}
@@ -86,7 +62,7 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 
 	// Commit to consumption
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		consumed, err := math.Add64(m.cumulatedUnits[i], units[i])
+		consumed, err := safemath.Add64(m.cumulatedUnits[i], units[i])
 		if err != nil {
 			return true, i
 		}
@@ -100,7 +76,7 @@ func (m *Manager) CumulateUnits(units, bounds Dimensions) (bool, Dimension) {
 func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
 	var revertedUnits Dimensions
 	for i := Dimension(0); i < FeeDimensions; i++ {
-		prev, err := math.Sub(m.cumulatedUnits[i], unitsToRm[i])
+		prev, err := safemath.Sub(m.cumulatedUnits[i], unitsToRm[i])
 		if err != nil {
 			return fmt.Errorf("%w: dimension %d", err, i)
 		}
