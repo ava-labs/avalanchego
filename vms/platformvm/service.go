@@ -520,11 +520,14 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 // GetSubnetArgs are the arguments to GetSubnet
 type GetSubnetArgs struct {
 	// ID of the subnet to retrieve information about
-	ID ids.ID `json:"ids"`
+	SubnetID ids.ID `json:"subnetID"`
 }
 
 // GetSubnetResponse is the response from calling GetSubnet
 type GetSubnetResponse struct {
+	// ID of the subnet
+	SubnetID ids.ID `json:"subnetID"`
+	// whether it is permissioned or not
 	IsPermissioned bool `json:"isPermissioned"`
 	// subnet auth information for a permissioned subnet
 	ControlKeys []string    `json:"controlKeys"`
@@ -542,9 +545,9 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	subnetID := args.ID
+	response.SubnetID = args.SubnetID
 
-	if subnetID == constants.PrimaryNetworkID {
+	if response.SubnetID == constants.PrimaryNetworkID {
 		response.IsPermissioned = false
 		response.ControlKeys = []string{}
 		response.Threshold = json.Uint32(0)
@@ -552,7 +555,7 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		return nil
 	}
 
-	if subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(subnetID); err == nil {
+	if subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(response.SubnetID); err == nil {
 		response.IsPermissioned = false
 		response.ControlKeys = []string{}
 		response.Threshold = json.Uint32(0)
@@ -560,7 +563,7 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		return nil
 	}
 
-	subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
+	subnetOwner, err := s.vm.state.GetSubnetOwner(response.SubnetID)
 	if err != nil {
 		return err
 	}

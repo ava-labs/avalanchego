@@ -385,6 +385,9 @@ func (c *client) GetAtomicUTXOs(
 
 // GetSubnetClientResponse is the response from calling GetSubnet on the client
 type GetSubnetClientResponse struct {
+	// ID of the subnet
+	SubnetID ids.ID
+	// whether it is permissioned or not
 	IsPermissioned bool
 	// subnet auth information for a permissioned subnet
 	ControlKeys []ids.ShortID
@@ -395,8 +398,8 @@ type GetSubnetClientResponse struct {
 
 func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error) {
 	res := &GetSubnetResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getSubnets", &GetSubnetArgs{
-		ID: subnetID,
+	err := c.requester.SendRequest(ctx, "platform.getSubnet", &GetSubnetArgs{
+		SubnetID: subnetID,
 	}, res, options...)
 	if err != nil {
 		return GetSubnetClientResponse{}, err
@@ -407,6 +410,7 @@ func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.
 	}
 
 	return GetSubnetClientResponse{
+		SubnetID:                 res.SubnetID,
 		IsPermissioned:           res.IsPermissioned,
 		ControlKeys:              controlKeys,
 		Threshold:                uint32(res.Threshold),
