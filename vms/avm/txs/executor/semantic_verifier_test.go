@@ -24,15 +24,24 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
+
+var feeConfig = config.Config{
+	TxFee:            2,
+	CreateAssetTxFee: 3,
+	DurangoTime:      time.Time{},
+	EUpgradeTime:     mockable.MaxTime,
+}
 
 func TestSemanticVerifierBaseTx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
@@ -147,6 +156,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).Times(2)
 
@@ -171,7 +181,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "invalid output",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output := output
@@ -199,7 +211,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "unsorted outputs",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output0 := output
@@ -238,7 +252,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "invalid input",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -266,7 +282,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "duplicate inputs",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				baseTx := baseTx
@@ -290,7 +308,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "input overflow",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input0 := input
@@ -327,7 +347,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "output overflow",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output0 := output
@@ -378,6 +400,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 					Out:    &utxoOut,
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).Times(2)
 
@@ -409,7 +432,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "insufficient funds",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -437,7 +462,9 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		{
 			name: "barely insufficient funds",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -470,6 +497,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				utxo := utxo
 				utxo.Asset.ID = ids.GenerateTestID()
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 
 				return state
@@ -502,6 +530,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 					Unsigned: &unsignedCreateAssetTx,
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 
@@ -528,6 +557,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 
@@ -554,6 +584,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(nil, database.ErrNotFound)
 
 				return state
@@ -585,6 +616,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				utxo := utxo
 				utxo.Out = &utxoOut
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 
@@ -618,6 +650,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 					Unsigned: &unsignedCreateAssetTx,
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 
@@ -644,6 +677,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(nil, database.ErrNotFound)
 
@@ -676,6 +710,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 					},
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&tx, nil)
 
@@ -706,10 +741,14 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
+			feeCfg := config.EUpgradeDynamicFeesConfig
+
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend: backend,
-				State:   state,
-				Tx:      tx,
+				Backend:       backend,
+				BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+				UnitCaps:      feeCfg.BlockUnitsCap,
+				State:         state,
+				Tx:            tx,
 			})
 			require.ErrorIs(err, test.err)
 		})
@@ -834,6 +873,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).Times(2)
 
@@ -856,7 +896,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "invalid output",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output := output
@@ -886,7 +928,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "unsorted outputs",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output0 := output
@@ -927,7 +971,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "unsorted exported outputs",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output0 := output
@@ -965,7 +1011,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "invalid input",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -995,7 +1043,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "duplicate inputs",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				baseTx := baseTx
@@ -1021,7 +1071,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "input overflow",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input0 := input
@@ -1060,7 +1112,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "output overflow",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output0 := output
@@ -1113,6 +1167,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 					Out:    &utxoOut,
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).Times(2)
 
@@ -1146,7 +1201,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "insufficient funds",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -1176,7 +1233,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		{
 			name: "barely insufficient funds",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
-				return nil
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -1211,6 +1270,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				utxo := utxo
 				utxo.Asset.ID = ids.GenerateTestID()
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 
 				return state
@@ -1241,6 +1301,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 					Unsigned: &unsignedCreateAssetTx,
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 
@@ -1265,6 +1326,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 
@@ -1289,6 +1351,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(nil, database.ErrNotFound)
 
 				return state
@@ -1318,6 +1381,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				utxo := utxo
 				utxo.Out = &output
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 
@@ -1349,6 +1413,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 					Unsigned: &unsignedCreateAssetTx,
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 
@@ -1373,6 +1438,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(nil, database.ErrNotFound)
 
@@ -1401,6 +1467,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 					Unsigned: &exportTx,
 				}
 
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 				state.EXPECT().GetTx(asset.ID).Return(&tx, nil)
 
@@ -1557,6 +1624,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 
 	state := state.NewMockChain(ctrl)
 
+	state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 	state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 	state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).Times(2)
 
@@ -1734,6 +1802,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			name: "valid",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil).AnyTimes()
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
 				return state
@@ -1745,8 +1814,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "invalid output",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output := output
@@ -1773,8 +1844,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "unsorted outputs",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output0 := output
@@ -1811,8 +1884,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "invalid input",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -1838,8 +1913,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "duplicate inputs",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				utx := unsignedImportTx
@@ -1861,8 +1938,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "duplicate imported inputs",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				utx := unsignedImportTx
@@ -1883,8 +1962,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "input overflow",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input0 := input
@@ -1919,8 +2000,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "output overflow",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				output := output
@@ -1949,8 +2032,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "insufficient funds",
-			stateFunc: func(c *gomock.Controller) state.Chain {
-				return nil
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
+				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
@@ -1983,6 +2068,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				createAssetTx := txs.Tx{
 					Unsigned: &unsignedCreateAssetTx,
 				}
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil).AnyTimes()
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
 				return state
@@ -1996,6 +2082,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			name: "invalid signature",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil).AnyTimes()
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
 				return state
@@ -2023,6 +2110,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				createAssetTx := txs.Tx{
 					Unsigned: &unsignedCreateAssetTx,
 				}
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
 				return state
 			},
@@ -2047,6 +2135,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			name: "unknown asset",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil).AnyTimes()
 				state.EXPECT().GetTx(asset.ID).Return(nil, database.ErrNotFound)
 				return state
@@ -2065,6 +2154,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 						BaseTx: baseTx,
 					},
 				}
+				state.EXPECT().GetTimestamp().Return(time.Now().Truncate(time.Second))
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil).AnyTimes()
 				state.EXPECT().GetTx(asset.ID).Return(&tx, nil)
 				return state

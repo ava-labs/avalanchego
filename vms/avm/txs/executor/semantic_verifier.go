@@ -9,11 +9,14 @@ import (
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -27,20 +30,22 @@ var (
 
 type SemanticVerifier struct {
 	*Backend
-	State state.ReadOnlyChain
-	Tx    *txs.Tx
+	BlkFeeManager *commonfees.Manager
+	UnitCaps      commonfees.Dimensions
+	State         state.ReadOnlyChain
+	Tx            *txs.Tx
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
-	return v.verifyBaseTx(tx, nil, nil)
+	return v.verifyBaseTx(tx, nil, nil, v.Tx.Creds)
 }
 
 func (v *SemanticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	return v.verifyBaseTx(&tx.BaseTx, nil, nil)
+	return v.verifyBaseTx(&tx.BaseTx, nil, nil, v.Tx.Creds)
 }
 
 func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
-	if err := v.verifyBaseTx(&tx.BaseTx, nil, nil); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, nil, nil, v.Tx.Creds); err != nil {
 		return err
 	}
 
@@ -61,7 +66,7 @@ func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 }
 
 func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
-	if err := v.verifyBaseTx(&tx.BaseTx, tx.ImportedIns, nil); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, tx.ImportedIns, nil, v.Tx.Creds); err != nil {
 		return err
 	}
 
@@ -102,7 +107,7 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
-	if err := v.verifyBaseTx(&tx.BaseTx, nil, tx.ExportedOuts); err != nil {
+	if err := v.verifyBaseTx(&tx.BaseTx, nil, tx.ExportedOuts, v.Tx.Creds); err != nil {
 		return err
 	}
 
@@ -130,9 +135,15 @@ func (v *SemanticVerifier) verifyBaseTx(
 	tx *txs.BaseTx,
 	importedIns []*avax.TransferableInput,
 	exportedOuts []*avax.TransferableOutput,
+	creds []*fxs.FxCredential,
 ) error {
 	feeCalculator := fees.Calculator{
-		Config: v.Config,
+		IsEUpgradeActive: v.Config.IsEUpgradeActivated(v.State.GetTimestamp()),
+		Config:           v.Config,
+		FeeManager:       v.BlkFeeManager,
+		ConsumedUnitsCap: v.UnitCaps,
+		Codec:            v.Codec,
+		Credentials:      creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err

@@ -12,11 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -160,10 +162,15 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	feeCfg := config.EUpgradeDynamicFeesConfig
+	feeManager := fees.NewManager(feeCfg.UnitFees)
+
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend: m.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       m.backend,
+		BlkFeeManager: feeManager,
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            tx,
 	})
 	if err != nil {
 		return err

@@ -14,8 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -23,15 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	keys      = secp256k1.TestKeys()
-	feeConfig = config.Config{
-		TxFee:            2,
-		CreateAssetTxFee: 3,
-		DurangoTime:      time.Time{},
-		EUpgradeTime:     mockable.MaxTime,
-	}
-)
+var keys = secp256k1.TestKeys()
 
 func TestSyntacticVerifierBaseTx(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.XChainID)
