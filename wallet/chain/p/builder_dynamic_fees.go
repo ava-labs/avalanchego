@@ -91,56 +91,6 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 	return utx, b.initCtx(utx)
 }
 
-func (b *DynamicFeesBuilder) NewAddValidatorTx(
-	vdr *txs.Validator,
-	rewardsOwner *secp256k1fx.OutputOwners,
-	shares uint32,
-	unitFees, unitCaps commonfees.Dimensions,
-	options ...common.Option,
-) (*txs.AddValidatorTx, error) {
-	ops := common.NewOptions(options)
-	utils.Sort(rewardsOwner.Addrs)
-	utx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Memo:         ops.Memo(),
-		}},
-		Validator:        *vdr,
-		RewardsOwner:     rewardsOwner,
-		DelegationShares: shares,
-	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toStake := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): vdr.Wght,
-	}
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.AddValidatorTx(utx); err != nil {
-		return nil, err
-	}
-
-	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
-	if err != nil {
-		return nil, err
-	}
-
-	utx.Ins = inputs
-	utx.Outs = outputs
-	utx.StakeOuts = stakeOutputs
-
-	return utx, b.initCtx(utx)
-}
-
 func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	unitFees, unitCaps commonfees.Dimensions,
@@ -246,54 +196,6 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 
 	utx.Ins = inputs
 	utx.Outs = outputs
-
-	return utx, b.initCtx(utx)
-}
-
-func (b *DynamicFeesBuilder) NewAddDelegatorTx(
-	vdr *txs.Validator,
-	rewardsOwner *secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
-	options ...common.Option,
-) (*txs.AddDelegatorTx, error) {
-	ops := common.NewOptions(options)
-	utils.Sort(rewardsOwner.Addrs)
-	utx := &txs.AddDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Memo:         ops.Memo(),
-		}},
-		Validator:              *vdr,
-		DelegationRewardsOwner: rewardsOwner,
-	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toStake := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): vdr.Wght,
-	}
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.AddDelegatorTx(utx); err != nil {
-		return nil, err
-	}
-
-	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
-	if err != nil {
-		return nil, err
-	}
-
-	utx.Ins = inputs
-	utx.Outs = outputs
-	utx.StakeOuts = stakeOutputs
 
 	return utx, b.initCtx(utx)
 }

@@ -92,8 +92,6 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 // added to the staking set.
 func verifyAddValidatorTx(
 	backend *Backend,
-	feeManager *commonFees.Manager,
-	unitCaps commonFees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddValidatorTx,
@@ -175,8 +173,6 @@ func verifyAddValidatorTx(
 		IsEUpgradeActive: false,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
 		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {
@@ -399,8 +395,6 @@ func verifyRemoveSubnetValidatorTx(
 // added to the staking set.
 func verifyAddDelegatorTx(
 	backend *Backend,
-	feeManager *commonFees.Manager,
-	unitCaps commonFees.Dimensions,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddDelegatorTx,
@@ -502,8 +496,6 @@ func verifyAddDelegatorTx(
 		IsEUpgradeActive: false,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
-		FeeManager:       feeManager,
-		ConsumedUnitsCap: unitCaps,
 		Credentials:      sTx.Creds,
 	}
 	if err := tx.Visit(&feeCalculator); err != nil {

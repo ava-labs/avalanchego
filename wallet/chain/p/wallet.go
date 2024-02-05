@@ -326,19 +326,7 @@ func (w *wallet) IssueAddValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
-		return nil, err
-	}
-
-	var (
-		utx txs.UnsignedTx
-		err error
-	)
-	if w.isEForkActive {
-		utx, err = w.dynamicBuilder.NewAddValidatorTx(vdr, rewardsOwner, shares, w.unitFees, w.unitCaps, options...)
-	} else {
-		utx, err = w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, options...)
-	}
+	utx, err := w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -397,19 +385,7 @@ func (w *wallet) IssueAddDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	if err := w.refreshFork(options...); err != nil {
-		return nil, err
-	}
-
-	var (
-		utx txs.UnsignedTx
-		err error
-	)
-	if w.isEForkActive {
-		utx, err = w.dynamicBuilder.NewAddDelegatorTx(vdr, rewardsOwner, w.unitFees, w.unitCaps, options...)
-	} else {
-		utx, err = w.builder.NewAddDelegatorTx(vdr, rewardsOwner, options...)
-	}
+	utx, err := w.builder.NewAddDelegatorTx(vdr, rewardsOwner, options...)
 	if err != nil {
 		return nil, err
 	}

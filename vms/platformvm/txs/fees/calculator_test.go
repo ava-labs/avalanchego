@@ -239,37 +239,8 @@ func TestAddValidatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3719*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						741,
-						1090,
-						266,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
+				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
 			},
-		},
-		{
-			description: "post E fork, bandwidth cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.Bandwidth] = 741 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 
@@ -466,37 +437,8 @@ func TestAddDelegatorTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3715*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						737,
-						1090,
-						266,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
+				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
 			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EUpgradeTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
 		},
 	}
 

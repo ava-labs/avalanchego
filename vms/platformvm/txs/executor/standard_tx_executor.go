@@ -369,8 +369,6 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	if _, err := verifyAddValidatorTx(
 		e.Backend,
-		e.BlkFeeManager,
-		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,
@@ -422,8 +420,6 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if _, err := verifyAddDelegatorTx(
 		e.Backend,
-		e.BlkFeeManager,
-		e.UnitCaps,
 		e.State,
 		e.Tx,
 		tx,

@@ -42,23 +42,26 @@ type Calculator struct {
 	Fee uint64
 }
 
-func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
-		return nil
-	}
+func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+	// AddValidatorTx is banned following Durango activation, so we
+	// only return the pre EUpgrade fee here
+	fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
+	return nil
+}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
+func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+	// AddValidatorTx is banned following Durango activation, so we
+	// only return the pre EUpgrade fee here
+	fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+	return nil
+}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
-	if err != nil {
-		return err
-	}
+func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return nil // no fees
+}
 
-	_, err = fc.AddFeesFor(consumedUnits)
-	return err
+func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return nil // no fees
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -68,25 +71,6 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	}
 
 	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(consumedUnits)
-	return err
-}
-
-func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
-		return nil
-	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
-
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -123,14 +107,6 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	_, err = fc.AddFeesFor(consumedUnits)
 	return err
-}
-
-func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return nil // no fees
-}
-
-func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return nil // no fees
 }
 
 func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
