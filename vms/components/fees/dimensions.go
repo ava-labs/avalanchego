@@ -3,9 +3,7 @@
 
 package fees
 
-import (
-	"github.com/ava-labs/avalanchego/utils/math"
-)
+import "github.com/ava-labs/avalanchego/utils/math"
 
 const (
 	Bandwidth Dimension = 0
@@ -14,8 +12,6 @@ const (
 	Compute   Dimension = 3 // signatures checks, tx-specific
 
 	FeeDimensions = 4
-
-	uint64Len = 8
 )
 
 var Empty = Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
