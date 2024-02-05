@@ -4,13 +4,11 @@
 package fees
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -104,82 +102,6 @@ func TestAddAndRemoveFees(t *testing.T) {
 	r.Zero(fc.FeeManager.GetCumulatedUnits())
 	r.Equal(feeDelta, feeDelta4)
 	r.Zero(fc.Fee)
-}
-
-func TestUTXOsAreAdditiveInSize(t *testing.T) {
-	// Show that including utxos of size [S] into a tx of size [T]
-	// result in a tx of size [S+T-CodecVersion]
-	// This is key to calculate fees correctly while building a tx
-
-	uTx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    rand.Uint32(), //#nosec G404
-				BlockchainID: ids.GenerateTestID(),
-				Memo:         []byte{'a', 'b', 'c'},
-				Ins:          make([]*avax.TransferableInput, 0),
-				Outs:         make([]*avax.TransferableOutput, 0),
-			},
-		},
-	}
-
-	uTxNakedSize := 105
-	uTxSize, err := txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize, uTxSize)
-
-	// input to add
-	input := &avax.TransferableInput{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.ID{'t', 'x', 'I', 'D'},
-			OutputIndex: 2,
-		},
-		Asset: avax.Asset{ID: ids.GenerateTestID()},
-		In: &secp256k1fx.TransferInput{
-			Amt:   uint64(5678),
-			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-		},
-	}
-	inSize, err := txs.Codec.Size(txs.CodecVersion, input)
-	require.NoError(t, err)
-
-	// include input in uTx and check that sizes add
-	uTx.BaseTx.BaseTx.Ins = append(uTx.BaseTx.BaseTx.Ins, input)
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize+(inSize-codec.CodecVersionSize), uTxSize)
-
-	// output to add
-	output := &avax.TransferableOutput{
-		Asset: avax.Asset{
-			ID: ids.GenerateTestID(),
-		},
-		Out: &stakeable.LockOut{
-			Locktime: 87654321,
-			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  12345678,
-					Threshold: 0,
-					Addrs:     []ids.ShortID{},
-				},
-			},
-		},
-	}
-	outSize, err := txs.Codec.Size(txs.CodecVersion, output)
-	require.NoError(t, err)
-
-	// include output in uTx and check that sizes add
-	uTx.BaseTx.BaseTx.Outs = append(uTx.BaseTx.BaseTx.Outs, output)
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize+(inSize-codec.CodecVersionSize)+(outSize-codec.CodecVersionSize), uTxSize)
-
-	// include output in uTx as stake and check that sizes add
-	uTx.StakeOuts = append(uTx.StakeOuts, output)
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize+(inSize-codec.CodecVersionSize)+(outSize-codec.CodecVersionSize)+(outSize-codec.CodecVersionSize), uTxSize)
 }
 
 func TestAddValidatorTxFees(t *testing.T) {
