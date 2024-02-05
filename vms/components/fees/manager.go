@@ -28,6 +28,10 @@ func (m *Manager) GetUnitFees() Dimensions {
 	return m.unitFees
 }
 
+func (m *Manager) GetCumulatedUnits() Dimensions {
+	return m.cumulatedUnits
+}
+
 // CalculateFee must be a stateless method
 func (m *Manager) CalculateFee(units Dimensions) (uint64, error) {
 	fee := uint64(0)
@@ -85,8 +89,4 @@ func (m *Manager) RemoveUnits(unitsToRm Dimensions) error {
 
 	m.cumulatedUnits = revertedUnits
 	return nil
-}
-
-func (m *Manager) GetCumulatedUnits() Dimensions {
-	return m.cumulatedUnits
 }

@@ -283,10 +283,6 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
-
 	if e.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
 			return err
@@ -306,6 +302,9 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -460,13 +459,12 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 		return err
 	}
 
+	// Invariant: There are no permissioned subnet delegators to remove.
 	if isCurrentValidator {
 		e.State.DeleteCurrentValidator(staker)
 	} else {
 		e.State.DeletePendingValidator(staker)
 	}
-
-	// Invariant: There are no permissioned subnet delegators to remove.
 
 	txID := e.Tx.ID()
 	avax.Consume(e.State, tx.Ins)
@@ -499,7 +497,6 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	feeCalculator := fees.Calculator{
 		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
 		Config:           e.Backend.Config,
@@ -511,6 +508,8 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	if err := tx.Visit(&feeCalculator); err != nil {
 		return err
 	}
+
+	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
