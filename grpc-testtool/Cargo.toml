@@ -22,7 +22,6 @@ thiserror = "1.0.47"
 tokio = { version = "1.32.0", features = ["sync", "rt-multi-thread"] }
 tonic = { version = "0.10.0", features = ["tls"] }
 tracing = { version = "0.1.16" }
-tracing-subscriber = { version = "0.3", features = ["tracing-log", "fmt", "env-filter"] }
 clap = { version = "4.4.11", features = ["derive"] }
 tempdir = "0.3.7"
 log = "0.4.20"

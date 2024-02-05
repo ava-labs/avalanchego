@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .filter(None, args.log_level)
         .init();
 
-    tracing_subscriber::fmt::init();
+    // tracing_subscriber::fmt::init();
 
     // log to the file and to stderr
     info!("Starting up: Listening on {}", args.grpc_port);
