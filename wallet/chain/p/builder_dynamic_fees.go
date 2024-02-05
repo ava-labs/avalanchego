@@ -88,7 +88,7 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
@@ -98,7 +98,7 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 ) (*txs.AddSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
@@ -153,7 +153,7 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewCreateChainTx(
@@ -211,7 +211,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 ) (*txs.CreateChainTx, error) {
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	uTx.Ins = inputs
 	uTx.Outs = outputs
 
-	return uTx, b.initCtx(uTx)
+	return uTx, initCtx(b.backend, uTx)
 }
 
 func (b *DynamicFeesBuilder) NewCreateSubnetTx(
@@ -305,7 +305,7 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewImportTx(
@@ -422,7 +422,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	case importedAVAX == feeCalc.Fee:
 		// imported inputs match exactly the fees to be paid
 		avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-		return utx, b.initCtx(utx)
+		return utx, initCtx(b.backend, utx)
 
 	case importedAVAX < feeCalc.Fee:
 		// imported inputs can partially pay fees
@@ -451,12 +451,12 @@ func (b *DynamicFeesBuilder) NewImportTx(
 			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
 			utx.Outs = append(utx.Outs, changeOut)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-			return utx, b.initCtx(utx)
+			return utx, initCtx(b.backend, utx)
 
 		case feeCalc.Fee == importedAVAX:
 			// imported fees pays exactly the tx cost. We don't include the outputs
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-			return utx, b.initCtx(utx)
+			return utx, initCtx(b.backend, utx)
 
 		default:
 			// imported avax are not enough to pay fees
@@ -478,7 +478,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	utx.Ins = inputs
 	utx.Outs = append(utx.Outs, changeOuts...)
 	avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewExportTx(
@@ -533,7 +533,7 @@ func (b *DynamicFeesBuilder) NewExportTx(
 	utx.Ins = inputs
 	utx.Outs = changeOuts
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewTransformSubnetTx(
@@ -557,7 +557,7 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +616,7 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
@@ -674,7 +674,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
@@ -725,7 +725,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) financeTx(
@@ -1031,43 +1031,6 @@ func (b *DynamicFeesBuilder) financeTx(
 	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
 	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
 	return inputs, changeOutputs, stakeOutputs, nil
-}
-
-// TODO ABENEGIA: remove duplication with builder method
-func (b *DynamicFeesBuilder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to fetch subnet owner for %q: %w",
-			subnetID,
-			err,
-		)
-	}
-	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, errUnknownOwnerType
-	}
-
-	addrs := options.Addresses(b.addrs)
-	minIssuanceTime := options.MinIssuanceTime()
-	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
-	if !ok {
-		// We can't authorize the subnet
-		return nil, errInsufficientAuthorization
-	}
-	return &secp256k1fx.Input{
-		SigIndices: inputSigIndices,
-	}, nil
-}
-
-func (b *DynamicFeesBuilder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
-	if err != nil {
-		return err
-	}
-
-	tx.InitCtx(ctx)
-	return nil
 }
 
 func financeInput(feeCalc *fees.Calculator, input *avax.TransferableInput) (uint64, error) {

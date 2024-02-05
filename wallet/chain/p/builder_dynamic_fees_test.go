@@ -807,7 +807,7 @@ func testUTXOsList(utxosKey *secp256k1.PrivateKey) (
 		subnetAssetID = ids.Empty.Prefix(utxosOffset + 1)
 	)
 
-	return []*avax.UTXO{ // currently, the wallet scans UTXOs in the order provided here
+	return []*avax.UTXO{
 			{ // a small UTXO first, which  should not be enough to pay fees
 				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty.Prefix(utxosOffset),

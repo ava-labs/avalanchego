@@ -332,7 +332,7 @@ func (b *builder) NewBaseTx(
 		}},
 		Owner: &secp256k1fx.OutputOwners{},
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewAddValidatorTx(
@@ -368,7 +368,7 @@ func (b *builder) NewAddValidatorTx(
 		RewardsOwner:     rewardsOwner,
 		DelegationShares: shares,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
@@ -385,7 +385,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +401,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		SubnetValidator: *vdr,
 		SubnetAuth:      subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
@@ -419,7 +419,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +436,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewAddDelegatorTx(
@@ -470,7 +470,7 @@ func (b *builder) NewAddDelegatorTx(
 		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewCreateChainTx(
@@ -491,7 +491,7 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +512,7 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesis,
 		SubnetAuth:  subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewCreateSubnetTx(
@@ -540,7 +540,7 @@ func (b *builder) NewCreateSubnetTx(
 		}},
 		Owner: owner,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewTransferSubnetOwnershipTx(
@@ -558,7 +558,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +576,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		Owner:      owner,
 		SubnetAuth: subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewImportTx(
@@ -683,7 +683,7 @@ func (b *builder) NewImportTx(
 		SourceChain:    sourceChainID,
 		ImportedInputs: importedInputs,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewExportTx(
@@ -722,7 +722,7 @@ func (b *builder) NewExportTx(
 		DestinationChain: chainID,
 		ExportedOutputs:  outputs,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewTransformSubnetTx(
@@ -753,7 +753,7 @@ func (b *builder) NewTransformSubnetTx(
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -782,7 +782,7 @@ func (b *builder) NewTransformSubnetTx(
 		UptimeRequirement:        uptimeRequirement,
 		SubnetAuth:               subnetAuth,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewAddPermissionlessValidatorTx(
@@ -828,7 +828,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		DelegatorRewardsOwner: delegationRewardsOwner,
 		DelegationShares:      shares,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) NewAddPermissionlessDelegatorTx(
@@ -867,7 +867,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
 	}
-	return tx, b.initCtx(tx)
+	return tx, initCtx(b.backend, tx)
 }
 
 func (b *builder) getBalance(
@@ -1146,8 +1146,13 @@ func (b *builder) spend(
 	return inputs, changeOutputs, stakeOutputs, nil
 }
 
-func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
+func authorizeSubnet(
+	backend BuilderBackend,
+	addresses set.Set[ids.ShortID],
+	subnetID ids.ID,
+	options *common.Options,
+) (*secp256k1fx.Input, error) {
+	ownerIntf, err := backend.GetSubnetOwner(options.Context(), subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch subnet owner for %q: %w",
@@ -1160,7 +1165,7 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 		return nil, errUnknownOwnerType
 	}
 
-	addrs := options.Addresses(b.addrs)
+	addrs := options.Addresses(addresses)
 	minIssuanceTime := options.MinIssuanceTime()
 	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
 	if !ok {
@@ -1172,8 +1177,8 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 	}, nil
 }
 
-func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
+func initCtx(backend BuilderBackend, tx txs.UnsignedTx) error {
+	ctx, err := newSnowContext(backend)
 	if err != nil {
 		return err
 	}
