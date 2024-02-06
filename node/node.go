@@ -145,7 +145,15 @@ func New(
 		return nil, fmt.Errorf("problem creating vm logger: %w", err)
 	}
 
-	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+	n.VMAliaser = ids.NewAliaser()
+	for vmID, aliases := range config.VMAliases {
+		for _, alias := range aliases {
+			if err := n.VMAliaser.Alias(vmID, alias); err != nil {
+				return nil, err
+			}
+		}
+	}
+	n.VMManager = vms.NewManager(n.VMFactoryLog, n.VMAliaser)
 
 	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
 		return nil, fmt.Errorf("problem initializing node beacons: %w", err)
@@ -155,10 +163,6 @@ func New(
 	n.tracer, err = trace.New(n.Config.TraceConfig)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize tracer: %w", err)
-	}
-
-	if n.Config.TraceConfig.Enabled {
-		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
 	}
 
 	n.initMetrics()
@@ -277,6 +281,8 @@ type Node struct {
 	portMapper *nat.Mapper
 	ipUpdater  dynamicip.Updater
 
+	chainRouter router.Router
+
 	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
 
@@ -359,6 +365,7 @@ type Node struct {
 	MetricsRegisterer *prometheus.Registry
 	MetricsGatherer   metrics.MultiGatherer
 
+	VMAliaser ids.Aliaser
 	VMManager vms.Manager
 
 	// VM endpoint registry
@@ -514,14 +521,20 @@ func (n *Node) initNetworking() error {
 
 	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert, n.tlsKeyLogWriterCloser)
 
+	// Create chain router
+	n.chainRouter = &router.ChainRouter{}
+	if n.Config.TraceConfig.Enabled {
+		n.chainRouter = router.Trace(n.chainRouter, n.tracer)
+	}
+
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
-	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
+	n.Config.BenchlistConfig.Benchable = n.chainRouter
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 
-	consensusRouter := n.Config.ConsensusRouter
+	consensusRouter := n.chainRouter
 	if !n.Config.SybilProtectionEnabled {
 		// Sybil protection is disabled so we don't have a txID that added us as
 		// a validator. Because each validator needs a txID associated with it,
@@ -1041,11 +1054,10 @@ func (n *Node) initAPIServer() error {
 // Add the default VM aliases
 func (n *Node) addDefaultVMAliases() error {
 	n.Log.Info("adding the default VM aliases")
-	vmAliases := genesis.GetVMAliases()
 
-	for vmID, aliases := range vmAliases {
+	for vmID, aliases := range genesis.VMAliases {
 		for _, alias := range aliases {
-			if err := n.Config.VMAliaser.Alias(vmID, alias); err != nil {
+			if err := n.VMAliaser.Alias(vmID, alias); err != nil {
 				return err
 			}
 		}
@@ -1088,7 +1100,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	go n.Log.RecoverAndPanic(n.timeoutManager.Dispatch)
 
 	// Routes incoming messages from peers to the appropriate chain
-	err = n.Config.ConsensusRouter.Initialize(
+	err = n.chainRouter.Initialize(
 		n.ID,
 		n.Log,
 		n.timeoutManager,
@@ -1117,7 +1129,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
 		DB:                                      n.DB,
 		MsgCreator:                              n.msgCreator,
-		Router:                                  n.Config.ConsensusRouter,
+		Router:                                  n.chainRouter,
 		Net:                                     n.Net,
 		Validators:                              n.vdrs,
 		PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
@@ -1432,7 +1444,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.ApplicationTag)
+	err = healthChecker.RegisterHealthCheck("router", n.chainRouter, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}

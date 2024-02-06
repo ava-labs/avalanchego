@@ -16,7 +16,8 @@ RUN go mod download
 COPY . .
 
 # Build avalanchego
-RUN ./scripts/build.sh
+ARG RACE_FLAG=""
+RUN ./scripts/build.sh ${RACE_FLAG}
 
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution

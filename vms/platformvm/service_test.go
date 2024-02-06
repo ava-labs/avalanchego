@@ -37,6 +37,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -133,11 +135,6 @@ func TestExportKey(t *testing.T) {
 
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	reply := ExportKeyReply{}
 	require.NoError(service.ExportKey(nil, &args, &reply))
@@ -152,11 +149,6 @@ func TestImportKey(t *testing.T) {
 	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
 	service, _ := defaultService(t)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	reply := api.JSONAddress{}
 	require.NoError(service.ImportKey(nil, &args, &reply))
@@ -169,11 +161,6 @@ func TestGetTxStatus(t *testing.T) {
 	service, mutableSharedMemory := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -282,11 +269,15 @@ func TestGetTx(t *testing.T) {
 		{
 			"proposal block",
 			func(service *Service) (*txs.Tx, error) {
-				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
+				sk, err := bls.NewSecretKey()
+				require.NoError(t, err)
+
+				return service.vm.txBuilder.NewAddPermissionlessValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
+					signer.NewProofOfPossession(sk),
 					ids.GenerateTestShortID(),
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
@@ -374,10 +365,6 @@ func TestGetTx(t *testing.T) {
 					require.NoError(err)
 					require.Equal(expectedTxJSON, []byte(response.Tx))
 				}
-
-				service.vm.ctx.Lock.Lock()
-				require.NoError(service.vm.Shutdown(context.Background()))
-				service.vm.ctx.Lock.Unlock()
 			})
 		}
 	}
@@ -387,11 +374,6 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -421,11 +403,6 @@ func TestGetStake(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -597,11 +574,6 @@ func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 
@@ -701,7 +673,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 
 	// Reward the delegator
-	tx, err := service.vm.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := builder.NewRewardValidatorTx(service.vm.ctx, delTx.ID())
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
@@ -727,11 +699,6 @@ func TestGetCurrentValidators(t *testing.T) {
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t)
-	defer func() {
-		service.vm.ctx.Lock.Lock()
-		require.NoError(service.vm.Shutdown(context.Background()))
-		service.vm.ctx.Lock.Unlock()
-	}()
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -769,11 +736,6 @@ func TestGetBlock(t *testing.T) {
 			require := require.New(t)
 			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
-			defer func() {
-				service.vm.ctx.Lock.Lock()
-				require.NoError(service.vm.Shutdown(context.Background()))
-				service.vm.ctx.Lock.Unlock()
-			}()
 
 			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
