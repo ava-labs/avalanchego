@@ -1048,31 +1048,28 @@ func TestGetUnitFees(t *testing.T) {
 	require.Equal(updatedUnitFees, reply.UnitFees)
 }
 
-// TODO ABENEGIA: rethink the way to pull up this stuff
-// func TestGetBlockUnitsCap(t *testing.T) {
-// 	require := require.New(t)
-// 	service, _ := defaultService(t)
+func TestGetFeeWindows(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t)
 
-// 	reply := GetBlockUnitsCapReply{}
-// 	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
+	reply := GetFeeWindowsReply{}
+	require.NoError(service.GetFeeWindows(nil, nil, &reply))
 
-// 	service.vm.ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 
-// 	unitCaps, err := service.vm.state.GetBlockUnitCaps()
-// 	require.NoError(err)
+	feeWindows := service.vm.state.GetFeeWindows()
+	require.Equal(feeWindows, reply.FeeWindows)
 
-// 	require.Equal(unitCaps, reply.MaxUnits)
+	updatedFeeWindows := commonfees.Windows{
+		commonfees.Window{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		commonfees.Window{11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
+		commonfees.Window{math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0},
+		commonfees.Window{10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
+	}
+	service.vm.state.SetConsumedUnitsWindows(updatedFeeWindows)
 
-// 	updatedUnitCaps := commonfees.Dimensions{
-// 		123,
-// 		456,
-// 		789,
-// 		1011,
-// 	}
-// 	require.NoError(service.vm.state.SetBlockUnitCaps(updatedUnitCaps))
+	service.vm.ctx.Lock.Unlock()
 
-// 	service.vm.ctx.Lock.Unlock()
-
-// 	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
-// 	require.Equal(updatedUnitCaps, reply.MaxUnits)
-// }
+	require.NoError(service.GetFeeWindows(nil, nil, &reply))
+	require.Equal(updatedFeeWindows, reply.FeeWindows)
+}
