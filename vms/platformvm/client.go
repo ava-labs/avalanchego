@@ -268,7 +268,7 @@ type Client interface {
 	// GetUnitFees returns the current unit fees that a transaction must pay to be accepted
 	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error)
 
-	// GetFeeWindows returns the current maximal units that can be consumed in a block
+	// GetFeeWindows returns the fee window needed to calculate next block unit fees
 	GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error)
 }
 
