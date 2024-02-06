@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
@@ -140,7 +141,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				unitFees, err := pChainClient.GetUnitFees(e2e.DefaultContext())
 				require.NoError(err)
 
-				unitCaps, err := pChainClient.GetBlockUnitsCap(e2e.DefaultContext())
+				unitCaps := config.EUpgradeDynamicFeesConfig.BlockUnitsCap
+
+				feeWindows, err := pChainClient.GetFeeWindows(e2e.DefaultContext())
 				require.NoError(err)
 
 				tx, err := pWallet.IssueExportTx(
@@ -160,7 +163,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				// retrieve fees paid for the tx
 				feeCalc := fees.Calculator{
 					IsEUpgradeActive: true,
-					FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
+					FeeManager:       commonfees.NewManager(unitFees, feeWindows),
 					ConsumedUnitsCap: unitCaps,
 					Credentials:      tx.Creds,
 				}

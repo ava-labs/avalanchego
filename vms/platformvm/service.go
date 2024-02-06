@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -2833,13 +2832,13 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 }
 
 // GetBlockUnitsCapReply is the response from GetBlockUnitsCap
-type GetBlockUnitsCapReply struct {
+type GetFeeWindowsReply struct {
 	// Current timestamp
-	MaxUnits commonfees.Dimensions `json:"maxUnits"`
+	FeeWindows commonfees.Windows `json:"feeWindows"`
 }
 
 // GetTimestamp returns the current timestamp on chain.
-func (s *Service) GetBlockUnitsCap(_ *http.Request, _ *struct{}, reply *GetBlockUnitsCapReply) error {
+func (s *Service) GetFeeWindows(_ *http.Request, _ *struct{}, reply *GetFeeWindowsReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getBlockUnitsCap"),
@@ -2848,7 +2847,7 @@ func (s *Service) GetBlockUnitsCap(_ *http.Request, _ *struct{}, reply *GetBlock
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	reply.MaxUnits = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
+	reply.FeeWindows = s.vm.state.GetFeeWindows()
 	return nil
 }
 

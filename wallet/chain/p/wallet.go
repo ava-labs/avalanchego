@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -272,6 +273,7 @@ func NewWallet(
 		dynamicBuilder: dynFeesBuilder,
 		signer:         signer,
 		client:         client,
+		unitCaps:       config.EUpgradeDynamicFeesConfig.BlockUnitsCap,
 	}
 }
 
@@ -284,6 +286,7 @@ type wallet struct {
 	builder            Builder
 	dynamicBuilder     *DynamicFeesBuilder
 	unitFees, unitCaps fees.Dimensions
+	feeWindows         fees.Windows
 }
 
 func (w *wallet) Builder() Builder {
@@ -784,7 +787,7 @@ func (w *wallet) refreshFeesData(options ...common.Option) error {
 		return err
 	}
 
-	w.unitCaps, err = w.client.GetBlockUnitsCap(ctx)
+	w.feeWindows, err = w.client.GetFeeWindows(ctx)
 	if err != nil {
 		return err
 	}

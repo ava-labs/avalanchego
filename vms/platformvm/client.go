@@ -268,8 +268,8 @@ type Client interface {
 	// GetUnitFees returns the current unit fees that a transaction must pay to be accepted
 	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error)
 
-	// GetBlockUnitsCap returns the current maximal units that can be consumed in a block
-	GetBlockUnitsCap(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error)
+	// GetFeeWindows returns the current maximal units that can be consumed in a block
+	GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -905,8 +905,8 @@ func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (common
 	return res.UnitFees, err
 }
 
-func (c *client) GetBlockUnitsCap(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error) {
-	res := &GetBlockUnitsCapReply{}
-	err := c.requester.SendRequest(ctx, "platform.getBlockUnitsCap", struct{}{}, res, options...)
-	return res.MaxUnits, err
+func (c *client) GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error) {
+	res := &GetFeeWindowsReply{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeWindows", struct{}{}, res, options...)
+	return res.FeeWindows, err
 }
