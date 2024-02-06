@@ -107,7 +107,7 @@ type Chain interface {
 	SetUnitFees(uf commonfees.Dimensions)
 
 	GetFeeWindows() commonfees.Windows
-	SetConsumedUnitsWindows(windows commonfees.Windows)
+	SetFeeWindows(windows commonfees.Windows)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -1100,7 +1100,7 @@ func (s *state) GetFeeWindows() commonfees.Windows {
 	return s.feesWindows
 }
 
-func (s *state) SetConsumedUnitsWindows(windows commonfees.Windows) {
+func (s *state) SetFeeWindows(windows commonfees.Windows) {
 	s.feesWindows = windows
 }
 

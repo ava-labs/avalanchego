@@ -454,18 +454,6 @@ func (mr *MockChainMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockChain)(nil).PutPendingValidator), arg0)
 }
 
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockChain) SetConsumedUnitsWindows(arg0 fees.Windows) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
-}
-
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockChainMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockChain)(nil).SetConsumedUnitsWindows), arg0)
-}
-
 // SetCurrentSupply mocks base method.
 func (m *MockChain) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
@@ -490,6 +478,18 @@ func (m *MockChain) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64
 func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), arg0, arg1, arg2)
+}
+
+// SetFeeWindows mocks base method.
+func (m *MockChain) SetFeeWindows(arg0 fees.Windows) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeWindows", arg0)
+}
+
+// SetFeeWindows indicates an expected call of SetFeeWindows.
+func (mr *MockChainMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockChain)(nil).SetFeeWindows), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -968,18 +968,6 @@ func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), arg0)
 }
 
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockDiff) SetConsumedUnitsWindows(arg0 fees.Windows) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
-}
-
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockDiffMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockDiff)(nil).SetConsumedUnitsWindows), arg0)
-}
-
 // SetCurrentSupply mocks base method.
 func (m *MockDiff) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
@@ -1004,6 +992,18 @@ func (m *MockDiff) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64)
 func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
+}
+
+// SetFeeWindows mocks base method.
+func (m *MockDiff) SetFeeWindows(arg0 fees.Windows) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeWindows", arg0)
+}
+
+// SetFeeWindows indicates an expected call of SetFeeWindows.
+func (mr *MockDiffMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockDiff)(nil).SetFeeWindows), arg0)
 }
 
 // SetSubnetOwner mocks base method.
@@ -1711,18 +1711,6 @@ func (mr *MockStateMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockState)(nil).PutPendingValidator), arg0)
 }
 
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockState) SetConsumedUnitsWindows(arg0 fees.Windows) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
-}
-
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockStateMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockState)(nil).SetConsumedUnitsWindows), arg0)
-}
-
 // SetCurrentSupply mocks base method.
 func (m *MockState) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
@@ -1747,6 +1735,18 @@ func (m *MockState) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64
 func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), arg0, arg1, arg2)
+}
+
+// SetFeeWindows mocks base method.
+func (m *MockState) SetFeeWindows(arg0 fees.Windows) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeWindows", arg0)
+}
+
+// SetFeeWindows indicates an expected call of SetFeeWindows.
+func (mr *MockStateMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockState)(nil).SetFeeWindows), arg0)
 }
 
 // SetHeight mocks base method.

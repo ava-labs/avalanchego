@@ -1066,7 +1066,7 @@ func TestGetFeeWindows(t *testing.T) {
 		commonfees.Window{math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0, math.MaxUint64, 0},
 		commonfees.Window{10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
 	}
-	service.vm.state.SetConsumedUnitsWindows(updatedFeeWindows)
+	service.vm.state.SetFeeWindows(updatedFeeWindows)
 
 	service.vm.ctx.Lock.Unlock()
 

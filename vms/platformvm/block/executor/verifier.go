@@ -509,7 +509,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 
 	if isEForkActive {
 		state.SetUnitFees(feeManager.GetUnitFees())
-		state.SetConsumedUnitsWindows(feeManager.GetFeeWindows())
+		state.SetFeeWindows(feeManager.GetFeeWindows())
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
