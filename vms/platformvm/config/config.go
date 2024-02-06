@@ -108,7 +108,7 @@ type Config struct {
 	DurangoTime time.Time
 
 	// Time of the E network upgrade
-	EForkTime time.Time
+	EUpgradeTime time.Time
 
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
@@ -140,8 +140,8 @@ func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.DurangoTime)
 }
 
-func (c *Config) IsEForkActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.EForkTime)
+func (c *Config) IsEUpgradeActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EUpgradeTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
@@ -156,11 +156,6 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 		return c.CreateSubnetTxFee
 	}
 	return c.CreateAssetTxFee
-}
-
-// TODO ABENEGIA: consider structuring this method to handle forks (or is it YAGNI?)
-func (*Config) GetDynamicFeesConfig() DynamicFeesConfig {
-	return EForkDynamicFeesConfig
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of

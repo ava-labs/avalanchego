@@ -203,7 +203,6 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.Builder = New(
 		res.mempool,
-		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 	)
@@ -258,7 +257,7 @@ func addSubnet(t *testing.T, env *environment) {
 	var (
 		unitFees    = env.state.GetUnitFees()
 		unitWindows = env.state.GetFeeWindows()
-		unitCaps    = env.backend.Config.GetDynamicFeesConfig().BlockUnitsCap
+		unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 	)
 	executor := txexecutor.StandardTxExecutor{
 		Backend:       &env.backend,
@@ -325,7 +324,7 @@ func defaultConfig() *config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
 		DurangoTime:       time.Time{},
-		EForkTime:         mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
 	}
 }
 

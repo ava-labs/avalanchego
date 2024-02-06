@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -148,22 +147,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return ErrChainNotSynced
 	}
 
-	unitFees, err := m.state.GetUnitFees()
-	if err != nil {
-		return err
-	}
-
-	unitCaps, err := m.state.GetBlockUnitCaps()
-	if err != nil {
-		return err
-	}
-
-	err = tx.Unsigned.Visit(&executor.SyntacticVerifier{
-		Backend:       m.backend,
-		BlkFeeManager: fees.NewManager(unitFees, fees.EmptyWindows),
-		UnitCaps:      unitCaps,
-		BlkTimestamp:  m.state.GetTimestamp(),
-		Tx:            tx,
+	err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
+		Backend: m.backend,
+		Tx:      tx,
 	})
 	if err != nil {
 		return err

@@ -21,7 +21,7 @@ const (
 	uint64Len = 8
 )
 
-var Empty = Dimensions{} // helps avoiding reading unit fees from db for some pre E fork processing
+var Empty = Dimensions{}
 
 type (
 	Dimension  int

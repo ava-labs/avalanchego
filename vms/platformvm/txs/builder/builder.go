@@ -10,12 +10,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
@@ -127,6 +129,27 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
+	// stakeAmount: amount the validator stakes
+	// startTime: unix time they start validating
+	// endTime: unix time they stop validating
+	// nodeID: ID of the node we want to validate with
+	// pop: the node proof of possession
+	// rewardAddress: address to send reward to, if applicable
+	// shares: 10,000 times percentage of reward taken from delegators
+	// keys: Keys providing the staked tokens
+	// changeAddr: Address to send change to, if there is any
+	NewAddPermissionlessValidatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		pop *signer.ProofOfPossession,
+		rewardAddress ids.ShortID,
+		shares uint32,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
 	// stakeAmount: amount the delegator stakes
 	// startTime: unix time they start delegating
 	// endTime: unix time they stop delegating
@@ -135,6 +158,23 @@ type ProposalTxBuilder interface {
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		rewardAddress ids.ShortID,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
+	// stakeAmount: amount the delegator stakes
+	// startTime: unix time they start delegating
+	// endTime: unix time they stop delegating
+	// nodeID: ID of the node we are delegating to
+	// rewardAddress: address to send reward to, if applicable
+	// keys: keys providing the staked tokens
+	// changeAddr: address to send change to, if there is any
+	NewAddPermissionlessDelegatorTx(
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -184,10 +224,6 @@ type ProposalTxBuilder interface {
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
-
-	// RewardStakerTx creates a new transaction that proposes to remove the staker
-	// [validatorID] from the default validator set.
-	NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error)
 }
 
 func New(
@@ -307,19 +343,19 @@ func (b *builder) NewImportTx(
 
 		importedAVAX  = importedAmounts[b.ctx.AVAXAssetID] // the only entry left in importedAmounts
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 	)
 	if isEForkActive {
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
 		utx.BaseTx.Outs = outs
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -463,7 +499,7 @@ func (b *builder) NewExportTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		signers       [][]*secp256k1.PrivateKey
@@ -473,11 +509,11 @@ func (b *builder) NewExportTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -551,7 +587,7 @@ func (b *builder) NewCreateChainTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		signers       [][]*secp256k1.PrivateKey
@@ -560,11 +596,11 @@ func (b *builder) NewCreateChainTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -626,7 +662,7 @@ func (b *builder) NewCreateSubnetTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		signers       [][]*secp256k1.PrivateKey
@@ -636,11 +672,11 @@ func (b *builder) NewCreateSubnetTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -710,7 +746,7 @@ func (b *builder) NewAddValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		stakedOuts    []*avax.TransferableOutput
@@ -721,11 +757,11 @@ func (b *builder) NewAddValidatorTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -753,6 +789,99 @@ func (b *builder) NewAddValidatorTx(
 	utx.BaseTx.Ins = ins
 	utx.BaseTx.Outs = outs
 	utx.StakeOuts = stakedOuts
+
+	// 3. Sign the tx
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewAddPermissionlessValidatorTx(
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	nodeID ids.NodeID,
+	pop *signer.ProofOfPossession,
+	rewardAddress ids.ShortID,
+	shares uint32,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	// 1. Build core transaction without utxos
+	utx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  startTime,
+			End:    endTime,
+			Wght:   stakeAmount,
+		},
+		Subnet: constants.PrimaryNetworkID,
+		Signer: pop,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+		DelegationShares: shares,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	var (
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		stakeOuts     []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
+		err           error
+	)
+	if isEForkActive {
+		var (
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
+		)
+
+		feeCalc := &fees.Calculator{
+			IsEUpgradeActive: isEForkActive,
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			ConsumedUnitsCap: unitCaps,
+			Credentials:      txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.AddPermissionlessValidatorTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		ins, outs, stakeOuts, signers, err = b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	utx.BaseTx.Ins = ins
+	utx.BaseTx.Outs = outs
+	utx.StakeOuts = stakeOuts
 
 	// 3. Sign the tx
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
@@ -793,7 +922,7 @@ func (b *builder) NewAddDelegatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		stakedOuts    []*avax.TransferableOutput
@@ -804,11 +933,11 @@ func (b *builder) NewAddDelegatorTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -836,6 +965,90 @@ func (b *builder) NewAddDelegatorTx(
 	utx.BaseTx.Ins = ins
 	utx.BaseTx.Outs = outs
 	utx.StakeOuts = stakedOuts
+
+	// 3. Sign the tx
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewAddPermissionlessDelegatorTx(
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	nodeID ids.NodeID,
+	rewardAddress ids.ShortID,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	// 1. Build core transaction without utxos
+	utx := &txs.AddPermissionlessDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  startTime,
+			End:    endTime,
+			Wght:   stakeAmount,
+		},
+		Subnet: constants.PrimaryNetworkID,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	var (
+		chainTime     = b.state.GetTimestamp()
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
+		ins           []*avax.TransferableInput
+		outs          []*avax.TransferableOutput
+		stakeOuts     []*avax.TransferableOutput
+		signers       [][]*secp256k1.PrivateKey
+		err           error
+	)
+	if isEForkActive {
+		var (
+			unitFees    = b.state.GetUnitFees()
+			unitWindows = b.state.GetFeeWindows()
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
+		)
+
+		feeCalc := &fees.Calculator{
+			IsEUpgradeActive: isEForkActive,
+			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
+			ConsumedUnitsCap: unitCaps,
+			Credentials:      txs.EmptyCredentials(signers),
+		}
+
+		// feesMan cumulates consumed units. Let's init it with utx filled so far
+		if err = feeCalc.AddPermissionlessDelegatorTx(utx); err != nil {
+			return nil, err
+		}
+
+		ins, outs, _, signers, err = b.FinanceTx(
+			b.state,
+			keys,
+			0,
+			feeCalc,
+			changeAddr,
+		)
+	} else {
+		ins, outs, stakeOuts, signers, err = b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	utx.BaseTx.Ins = ins
+	utx.BaseTx.Outs = outs
+	utx.StakeOuts = stakeOuts
 
 	// 3. Sign the tx
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
@@ -879,7 +1092,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		signers       [][]*secp256k1.PrivateKey
@@ -888,11 +1101,11 @@ func (b *builder) NewAddSubnetValidatorTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -953,7 +1166,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		signers       [][]*secp256k1.PrivateKey
@@ -962,11 +1175,11 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -1003,16 +1216,6 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
-	utx := &txs.RewardValidatorTx{TxID: txID}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, tx.SyntacticVerify(b.ctx)
-}
-
 func (b *builder) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	threshold uint32,
@@ -1041,7 +1244,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		signers       [][]*secp256k1.PrivateKey
@@ -1050,11 +1253,11 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),
@@ -1108,7 +1311,7 @@ func (b *builder) NewBaseTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
+		isEForkActive = b.cfg.IsEUpgradeActivated(chainTime)
 		ins           []*avax.TransferableInput
 		outs          []*avax.TransferableOutput
 		signers       [][]*secp256k1.PrivateKey
@@ -1118,11 +1321,11 @@ func (b *builder) NewBaseTx(
 		var (
 			unitFees    = b.state.GetUnitFees()
 			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
+			unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 		)
 
 		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
+			IsEUpgradeActive: isEForkActive,
 			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
 			ConsumedUnitsCap: unitCaps,
 			Credentials:      txs.EmptyCredentials(signers),

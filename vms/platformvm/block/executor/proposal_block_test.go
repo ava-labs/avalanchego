@@ -16,12 +16,15 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -140,7 +143,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env.clk.Set(defaultGenesisTime)
 	env.config.BanffTime = time.Time{}        // activate Banff
 	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
-	env.config.EForkTime = mockable.MaxTime
+	env.config.EUpgradeTime = mockable.MaxTime
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
@@ -1318,11 +1321,15 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		nodeID             = ids.GenerateTestNodeID()
 	)
 
-	addValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	addValidatorTx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		10000,
 		[]*secp256k1.PrivateKey{
@@ -1389,11 +1396,15 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	validatorEndTime = validatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID = ids.GenerateTestNodeID()
 
-	addValidatorTx2, err := env.txBuilder.NewAddValidatorTx(
+	sk, err = bls.NewSecretKey()
+	require.NoError(err)
+
+	addValidatorTx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		preFundedKeys[0].PublicKey().Address(),
 		10000,
 		[]*secp256k1.PrivateKey{
@@ -1410,7 +1421,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	preferred, err = env.blkManager.GetStatelessBlock(preferredID)
 	require.NoError(err)
 
-	rewardValidatorTx, err := env.txBuilder.NewRewardValidatorTx(addValidatorTx.ID())
+	rewardValidatorTx, err := newRewardValidatorTx(t, addValidatorTx.ID())
 	require.NoError(err)
 
 	statelessProposalBlk, err := block.NewBanffProposalBlock(
@@ -1440,4 +1451,13 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	rewardUTXOs, err := env.state.GetRewardUTXOs(addValidatorTx.ID())
 	require.NoError(err)
 	require.NotEmpty(rewardUTXOs)
+}
+
+func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -101,7 +102,7 @@ func TestBaseTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -117,79 +118,6 @@ func TestBaseTx(t *testing.T) {
 	require.Equal(outputsToMove[0], outs[1])
 }
 
-func TestAddValidatorTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	be := mocks.NewMockBuilderBackend(ctrl)
-
-	var (
-		rewardKey             = testKeys[0]
-		utxosKey              = testKeys[1]
-		rewardAddr            = rewardKey.PublicKey().Address()
-		utxoAddr              = utxosKey.PublicKey().Address()
-		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
-		rewardOwner           = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardKey.Address(),
-			},
-		}
-	)
-
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, rewardAddr),
-		backend: be,
-	}
-	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
-	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
-	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
-	utx, err := b.NewAddValidatorTx(
-		&txs.Validator{
-			NodeID: ids.GenerateTestNodeID(),
-			End:    uint64(time.Now().Add(time.Hour).Unix()),
-			Wght:   2 * units.Avax,
-		},
-		rewardOwner,
-		reward.PercentDenominator,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
-	)
-	require.NoError(err)
-
-	var (
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
-	)
-
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
-
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
-	require.NoError(err)
-
-	fc := &fees.Calculator{
-		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
-		ConsumedUnitsCap: testBlockMaxConsumedUnits,
-		Credentials:      tx.Creds,
-	}
-	require.NoError(utx.Visit(fc))
-	require.Equal(12184*units.MicroAvax, fc.Fee)
-
-	ins := utx.Ins
-	staked := utx.StakeOuts
-	outs := utx.Outs
-	require.Len(ins, 4)
-	require.Len(staked, 2)
-	require.Len(outs, 2)
-	require.Equal(utx.Validator.Weight(), staked[0].Out.Amount()+staked[1].Out.Amount())
-	require.Equal(fc.Fee, ins[1].In.Amount()+ins[3].In.Amount()-outs[0].Out.Amount())
-}
-
 func TestAddSubnetValidatorTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -203,14 +131,12 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		utxoAddr              = utxosKey.PublicKey().Address()
 		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
 		subnetID              = ids.GenerateTestID()
-		subnetTx              = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				Owner: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
-				},
+		subnetOwner           = fx.Owner(
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
 			},
-		}
+		)
 	)
 
 	b := &DynamicFeesBuilder{
@@ -220,7 +146,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-	be.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	be.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
 	utx, err := b.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
@@ -244,13 +170,13 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	for _, utxo := range utxos {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
-	sbe.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -278,14 +204,13 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		utxoAddr              = utxosKey.PublicKey().Address()
 		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
 		subnetID              = ids.GenerateTestID()
-		subnetTx              = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				Owner: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
-				},
+
+		subnetOwner = fx.Owner(
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
 			},
-		}
+		)
 	)
 
 	b := &DynamicFeesBuilder{
@@ -295,7 +220,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-	be.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	be.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
 	utx, err := b.NewRemoveSubnetValidatorTx(
 		ids.GenerateTestNodeID(),
@@ -314,13 +239,13 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	for _, utxo := range utxos {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
-	sbe.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -333,78 +258,6 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	require.Len(ins, 2)
 	require.Len(outs, 1)
 	require.Equal(fc.Fee, ins[0].In.Amount()+ins[1].In.Amount()-outs[0].Out.Amount())
-}
-
-func TestAddDelegatorTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	be := mocks.NewMockBuilderBackend(ctrl)
-
-	var (
-		rewardKey             = testKeys[0]
-		utxosKey              = testKeys[1]
-		rewardAddr            = rewardKey.PublicKey().Address()
-		utxoAddr              = utxosKey.PublicKey().Address()
-		utxos, avaxAssetID, _ = testUTXOsList(utxosKey)
-		rewardOwner           = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardKey.Address(),
-			},
-		}
-	)
-
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, rewardAddr),
-		backend: be,
-	}
-	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
-	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
-	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
-	utx, err := b.NewAddDelegatorTx(
-		&txs.Validator{
-			NodeID: ids.GenerateTestNodeID(),
-			End:    uint64(time.Now().Add(time.Hour).Unix()),
-			Wght:   2 * units.Avax,
-		},
-		rewardOwner,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
-	)
-	require.NoError(err)
-
-	var (
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
-	)
-
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
-
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
-	require.NoError(err)
-
-	fc := &fees.Calculator{
-		IsEForkActive:    true,
-		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
-		ConsumedUnitsCap: testBlockMaxConsumedUnits,
-		Credentials:      tx.Creds,
-	}
-	require.NoError(utx.Visit(fc))
-	require.Equal(12180*units.MicroAvax, fc.Fee)
-
-	ins := utx.Ins
-	staked := utx.StakeOuts
-	outs := utx.Outs
-	require.Len(ins, 4)
-	require.Len(staked, 2)
-	require.Len(outs, 2)
-	require.Equal(utx.Validator.Weight(), staked[0].Out.Amount()+staked[1].Out.Amount())
-	require.Equal(fc.Fee, ins[1].In.Amount()+ins[3].In.Amount()-outs[0].Out.Amount())
 }
 
 func TestCreateChainTx(t *testing.T) {
@@ -423,14 +276,12 @@ func TestCreateChainTx(t *testing.T) {
 		vmID           = ids.GenerateTestID()
 		fxIDs          = []ids.ID{ids.GenerateTestID()}
 		chainName      = "dummyChain"
-		subnetTx       = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				Owner: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
-				},
+		subnetOwner    = fx.Owner(
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
 			},
-		}
+		)
 	)
 
 	b := &DynamicFeesBuilder{
@@ -438,7 +289,7 @@ func TestCreateChainTx(t *testing.T) {
 		backend: be,
 	}
 
-	be.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	be.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
 	utxos, avaxAssetID, _ := testUTXOsList(utxosKey)
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
@@ -465,13 +316,13 @@ func TestCreateChainTx(t *testing.T) {
 	for _, utxo := range utxos {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
-	sbe.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -534,7 +385,7 @@ func TestCreateSubnetTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -605,7 +456,7 @@ func TestImportTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -676,7 +527,7 @@ func TestExportTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -705,21 +556,19 @@ func TestTransformSubnetTx(t *testing.T) {
 		utxoAddr                          = utxosKey.PublicKey().Address()
 		subnetID                          = ids.GenerateTestID()
 		utxos, avaxAssetID, subnetAssetID = testUTXOsList(utxosKey)
-		subnetTx                          = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				Owner: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
-				},
+		subnetOwner                       = fx.Owner(
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{subnetAuthKey.PublicKey().Address()},
 			},
-		}
+		)
 	)
 
 	b := &DynamicFeesBuilder{
 		addrs:   set.Of(utxoAddr, subnetAuthAddr),
 		backend: be,
 	}
-	be.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	be.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
@@ -758,13 +607,13 @@ func TestTransformSubnetTx(t *testing.T) {
 	for _, utxo := range utxos {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
-	sbe.EXPECT().GetTx(gomock.Any(), subnetID).Return(subnetTx, nil)
+	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -850,7 +699,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -926,7 +775,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 		Credentials:      tx.Creds,
@@ -958,7 +807,7 @@ func testUTXOsList(utxosKey *secp256k1.PrivateKey) (
 		subnetAssetID = ids.Empty.Prefix(utxosOffset + 1)
 	)
 
-	return []*avax.UTXO{ // currently, the wallet scans UTXOs in the order provided here
+	return []*avax.UTXO{
 			{ // a small UTXO first, which  should not be enough to pay fees
 				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty.Prefix(utxosOffset),

@@ -278,7 +278,7 @@ func addSubnet(env *environment) {
 	var (
 		unitFees    = env.state.GetUnitFees()
 		unitWindows = env.state.GetFeeWindows()
-		unitCaps    = env.backend.Config.GetDynamicFeesConfig().BlockUnitsCap
+		unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 	)
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
@@ -352,7 +352,7 @@ func defaultConfig() *config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         mockable.MaxTime,
 		DurangoTime:       mockable.MaxTime,
-		EForkTime:         mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
 	}
 }
 

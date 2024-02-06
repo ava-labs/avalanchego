@@ -15,7 +15,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,19 +42,19 @@ func (m *MockSignerBackend) EXPECT() *MockSignerBackendMockRecorder {
 	return m.recorder
 }
 
-// GetTx mocks base method.
-func (m *MockSignerBackend) GetTx(arg0 context.Context, arg1 ids.ID) (*txs.Tx, error) {
+// GetSubnetOwner mocks base method.
+func (m *MockSignerBackend) GetSubnetOwner(arg0 context.Context, arg1 ids.ID) (fx.Owner, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTx", arg0, arg1)
-	ret0, _ := ret[0].(*txs.Tx)
+	ret := m.ctrl.Call(m, "GetSubnetOwner", arg0, arg1)
+	ret0, _ := ret[0].(fx.Owner)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetTx indicates an expected call of GetTx.
-func (mr *MockSignerBackendMockRecorder) GetTx(arg0, arg1 any) *gomock.Call {
+// GetSubnetOwner indicates an expected call of GetSubnetOwner.
+func (mr *MockSignerBackendMockRecorder) GetSubnetOwner(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTx", reflect.TypeOf((*MockSignerBackend)(nil).GetTx), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetOwner", reflect.TypeOf((*MockSignerBackend)(nil).GetSubnetOwner), arg0, arg1)
 }
 
 // GetUTXO mocks base method.

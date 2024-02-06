@@ -16,9 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -70,10 +72,13 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
 			require.NoError(err)
 
-			vdr := &txs.Validator{
-				NodeID: validatorID,
-				End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
-				Wght:   minValStake,
+			vdr := &txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: validatorID,
+					End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
+					Wght:   minValStake,
+				},
+				Subnet: constants.PrimaryNetworkID,
 			}
 			rewardOwner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -81,9 +86,16 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			}
 			shares := uint32(20000) // TODO: retrieve programmatically
 
+			sk, err := bls.NewSecretKey()
+			require.NoError(err)
+			pop := signer.NewProofOfPossession(sk)
+
 			ginkgo.By("issue add validator tx", func() {
-				_, err := pWallet.IssueAddValidatorTx(
+				_, err := pWallet.IssueAddPermissionlessValidatorTx(
 					vdr,
+					pop,
+					avaxAssetID,
+					rewardOwner,
 					rewardOwner,
 					shares,
 					e2e.WithDefaultContext(),
@@ -92,8 +104,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			})
 
 			ginkgo.By("issue add delegator tx", func() {
-				_, err := pWallet.IssueAddDelegatorTx(
+				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					vdr,
+					avaxAssetID,
 					rewardOwner,
 					e2e.WithDefaultContext(),
 				)
@@ -146,7 +159,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 				// retrieve fees paid for the tx
 				feeCalc := fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       commonfees.NewManager(unitFees, commonfees.EmptyWindows),
 					ConsumedUnitsCap: unitCaps,
 					Credentials:      tx.Creds,

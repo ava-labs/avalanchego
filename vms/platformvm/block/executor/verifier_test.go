@@ -234,7 +234,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 				BanffTime:         mockable.MaxTime, // banff is not activated
 				CortinaTime:       mockable.MaxTime,
 				DurangoTime:       mockable.MaxTime,
-				EForkTime:         mockable.MaxTime,
+				EUpgradeTime:      mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -719,7 +719,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 				BanffTime:         mockable.MaxTime, // banff is not activated
 				CortinaTime:       mockable.MaxTime,
 				DurangoTime:       mockable.MaxTime,
-				EForkTime:         mockable.MaxTime,
+				EUpgradeTime:      mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},

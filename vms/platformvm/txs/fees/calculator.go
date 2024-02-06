@@ -25,7 +25,7 @@ var (
 
 type Calculator struct {
 	// setup
-	IsEForkActive bool
+	IsEUpgradeActive bool
 
 	// Pre E-fork inputs
 	Config    *config.Config
@@ -42,27 +42,30 @@ type Calculator struct {
 	Fee uint64
 }
 
-func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	if !fc.IsEForkActive {
-		fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
-		return nil
-	}
+func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+	// AddValidatorTx is banned following Durango activation, so we
+	// only return the pre EUpgrade fee here
+	fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
+	return nil
+}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
+func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+	// AddValidatorTx is banned following Durango activation, so we
+	// only return the pre EUpgrade fee here
+	fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+	return nil
+}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
-	if err != nil {
-		return err
-	}
+func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return nil // no fees
+}
 
-	_, err = fc.AddFeesFor(consumedUnits)
-	return err
+func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return nil // no fees
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.AddSubnetValidatorFee
 		return nil
 	}
@@ -76,27 +79,8 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	return err
 }
 
-func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if !fc.IsEForkActive {
-		fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
-		return nil
-	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
-
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
-	_, err = fc.AddFeesFor(consumedUnits)
-	return err
-}
-
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
 		return nil
 	}
@@ -111,7 +95,7 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
 		return nil
 	}
@@ -125,16 +109,8 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return err
 }
 
-func (*Calculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return nil // no fees
-}
-
-func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return nil // no fees
-}
-
 func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -149,7 +125,7 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 }
 
 func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TransformSubnetTxFee
 		return nil
 	}
@@ -164,7 +140,7 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 }
 
 func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -179,7 +155,7 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 }
 
 func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetValidatorFee
 		} else {
@@ -202,7 +178,7 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 }
 
 func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetDelegatorFee
 		} else {
@@ -225,7 +201,7 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -240,7 +216,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -259,7 +235,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}

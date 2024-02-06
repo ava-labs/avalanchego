@@ -53,8 +53,7 @@ func GetOutputsDimensions(c codec.Manager, v uint16, outs []*avax.TransferableOu
 func GetCredentialsDimensions(c codec.Manager, v uint16, inputSigIndices []uint32) (Dimensions, error) {
 	var consumedUnits Dimensions
 
-	// Workaround to ensure that codec picks interface instead of the pointer to evaluate size.
-	// TODO ABENEGIA: fix this
+	// Ensure that codec picks interface instead of the pointer to evaluate size.
 	creds := make([]verify.Verifiable, 0, 1)
 	creds = append(creds, &secp256k1fx.Credential{
 		Sigs: make([][secp256k1.SignatureLen]byte, len(inputSigIndices)),

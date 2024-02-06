@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const SyncBound = 10 * time.Second
@@ -75,25 +74,11 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	// Syntactic verification is generally pretty fast, so we verify this first
-	// before performing any possible DB reads. TODO ABENEGIA: except we do DB reads now with fees stuff?
-	unitFees, err := b.manager.state.GetUnitFees()
-	if err != nil {
-		return err
-	}
-
-	unitCaps, err := b.manager.state.GetBlockUnitCaps()
-	if err != nil {
-		return err
-	}
-
-	feeManager := fees.NewManager(unitFees, fees.EmptyWindows)
+	// before performing any possible DB reads.
 	for _, tx := range txs {
 		err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
-			Backend:       b.manager.backend,
-			BlkFeeManager: feeManager,
-			UnitCaps:      unitCaps,
-			BlkTimestamp:  newChainTime,
-			Tx:            tx,
+			Backend: b.manager.backend,
+			Tx:      tx,
 		})
 		if err != nil {
 			txID := tx.ID()

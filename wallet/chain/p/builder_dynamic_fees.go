@@ -68,7 +68,7 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -88,57 +88,7 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
-}
-
-func (b *DynamicFeesBuilder) NewAddValidatorTx(
-	vdr *txs.Validator,
-	rewardsOwner *secp256k1fx.OutputOwners,
-	shares uint32,
-	unitFees, unitCaps commonfees.Dimensions,
-	options ...common.Option,
-) (*txs.AddValidatorTx, error) {
-	ops := common.NewOptions(options)
-	utils.Sort(rewardsOwner.Addrs)
-	utx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Memo:         ops.Memo(),
-		}},
-		Validator:        *vdr,
-		RewardsOwner:     rewardsOwner,
-		DelegationShares: shares,
-	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toStake := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): vdr.Wght,
-	}
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
-	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.AddValidatorTx(utx); err != nil {
-		return nil, err
-	}
-
-	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
-	if err != nil {
-		return nil, err
-	}
-
-	utx.Ins = inputs
-	utx.Outs = outputs
-	utx.StakeOuts = stakeOutputs
-
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
@@ -148,7 +98,7 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 ) (*txs.AddSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +119,7 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -192,7 +142,7 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
@@ -203,7 +153,7 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +174,7 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -247,55 +197,7 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
-}
-
-func (b *DynamicFeesBuilder) NewAddDelegatorTx(
-	vdr *txs.Validator,
-	rewardsOwner *secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
-	options ...common.Option,
-) (*txs.AddDelegatorTx, error) {
-	ops := common.NewOptions(options)
-	utils.Sort(rewardsOwner.Addrs)
-	utx := &txs.AddDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
-			Memo:         ops.Memo(),
-		}},
-		Validator:              *vdr,
-		DelegationRewardsOwner: rewardsOwner,
-	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toStake := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): vdr.Wght,
-	}
-	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
-	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
-	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err := feeCalc.AddDelegatorTx(utx); err != nil {
-		return nil, err
-	}
-
-	inputs, outputs, stakeOutputs, err := b.financeTx(toBurn, toStake, feeCalc, ops)
-	if err != nil {
-		return nil, err
-	}
-
-	utx.Ins = inputs
-	utx.Outs = outputs
-	utx.StakeOuts = stakeOutputs
-
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewCreateChainTx(
@@ -309,7 +211,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 ) (*txs.CreateChainTx, error) {
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +238,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -359,7 +261,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	uTx.Ins = inputs
 	uTx.Outs = outputs
 
-	return uTx, b.initCtx(uTx)
+	return uTx, initCtx(b.backend, uTx)
 }
 
 func (b *DynamicFeesBuilder) NewCreateSubnetTx(
@@ -385,7 +287,7 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -403,7 +305,7 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewImportTx(
@@ -500,7 +402,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -520,7 +422,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	case importedAVAX == feeCalc.Fee:
 		// imported inputs match exactly the fees to be paid
 		avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-		return utx, b.initCtx(utx)
+		return utx, initCtx(b.backend, utx)
 
 	case importedAVAX < feeCalc.Fee:
 		// imported inputs can partially pay fees
@@ -549,12 +451,12 @@ func (b *DynamicFeesBuilder) NewImportTx(
 			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
 			utx.Outs = append(utx.Outs, changeOut)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-			return utx, b.initCtx(utx)
+			return utx, initCtx(b.backend, utx)
 
 		case feeCalc.Fee == importedAVAX:
 			// imported fees pays exactly the tx cost. We don't include the outputs
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-			return utx, b.initCtx(utx)
+			return utx, initCtx(b.backend, utx)
 
 		default:
 			// imported avax are not enough to pay fees
@@ -576,7 +478,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	utx.Ins = inputs
 	utx.Outs = append(utx.Outs, changeOuts...)
 	avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewExportTx(
@@ -613,7 +515,7 @@ func (b *DynamicFeesBuilder) NewExportTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -631,7 +533,7 @@ func (b *DynamicFeesBuilder) NewExportTx(
 	utx.Ins = inputs
 	utx.Outs = changeOuts
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewTransformSubnetTx(
@@ -655,7 +557,7 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -691,7 +593,7 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -714,7 +616,7 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
@@ -753,7 +655,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -772,7 +674,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
@@ -804,7 +706,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
 
 	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
 	feeCalc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       feesMan,
 		ConsumedUnitsCap: unitCaps,
 	}
@@ -823,7 +725,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, b.initCtx(utx)
+	return utx, initCtx(b.backend, utx)
 }
 
 func (b *DynamicFeesBuilder) financeTx(
@@ -1129,48 +1031,6 @@ func (b *DynamicFeesBuilder) financeTx(
 	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
 	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
 	return inputs, changeOutputs, stakeOutputs, nil
-}
-
-// TODO ABENEGIA: remove duplication with builder method
-func (b *DynamicFeesBuilder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	subnetTx, err := b.backend.GetTx(options.Context(), subnetID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to fetch subnet %q: %w",
-			subnetID,
-			err,
-		)
-	}
-	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, errWrongTxType
-	}
-
-	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, errUnknownOwnerType
-	}
-
-	addrs := options.Addresses(b.addrs)
-	minIssuanceTime := options.MinIssuanceTime()
-	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
-	if !ok {
-		// We can't authorize the subnet
-		return nil, errInsufficientAuthorization
-	}
-	return &secp256k1fx.Input{
-		SigIndices: inputSigIndices,
-	}, nil
-}
-
-func (b *DynamicFeesBuilder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
-	if err != nil {
-		return err
-	}
-
-	tx.InitCtx(ctx)
-	return nil
 }
 
 func financeInput(feeCalc *fees.Calculator, input *avax.TransferableInput) (uint64, error) {

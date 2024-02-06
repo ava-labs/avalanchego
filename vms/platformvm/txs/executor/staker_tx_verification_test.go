@@ -116,8 +116,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 				}
 			},
@@ -138,8 +138,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
@@ -165,9 +165,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						CortinaTime: activeForkTime,
-						DurangoTime: mockable.MaxTime,
-						EForkTime:   mockable.MaxTime,
+						CortinaTime:  activeForkTime,
+						DurangoTime:  mockable.MaxTime,
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -193,8 +193,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -223,8 +223,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -253,8 +253,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -284,8 +284,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -318,8 +318,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -352,8 +352,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -388,8 +388,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -418,8 +418,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					Ctx: ctx,
 					Config: &config.Config{
-						DurangoTime: activeForkTime, // activate latest fork
-						EForkTime:   mockable.MaxTime,
+						DurangoTime:  activeForkTime, // activate latest fork
+						EUpgradeTime: mockable.MaxTime,
 					},
 					Bootstrapped: bootstrapped,
 				}
@@ -466,7 +466,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
 						DurangoTime:           activeForkTime, // activate latest fork,
-						EForkTime:             mockable.MaxTime,
+						EUpgradeTime:          mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -514,7 +514,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 						AddSubnetValidatorFee: 1,
 						CortinaTime:           activeForkTime,
 						DurangoTime:           mockable.MaxTime,
-						EForkTime:             mockable.MaxTime,
+						EUpgradeTime:          mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -546,7 +546,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: ErrFutureStakeTime,
 		},
 		{
-			name: "success pre EFork",
+			name: "success pre EUpgrade",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
@@ -566,7 +566,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
 						DurangoTime:           activeForkTime, // activate latest fork,
-						EForkTime:             mockable.MaxTime,
+						EUpgradeTime:          mockable.MaxTime,
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,

@@ -32,7 +32,7 @@ var (
 		TxFee:            2,
 		CreateAssetTxFee: 3,
 		DurangoTime:      time.Time{},
-		EForkTime:        mockable.MaxTime,
+		EUpgradeTime:     mockable.MaxTime,
 	}
 )
 

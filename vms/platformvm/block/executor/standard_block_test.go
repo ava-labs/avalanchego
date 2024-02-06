@@ -90,7 +90,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	env.clk.Set(now)
 	env.config.BanffTime = time.Time{} // activate Banff
 	env.config.DurangoTime = time.Time{}
-	env.config.EForkTime = time.Time{}
+	env.config.EUpgradeTime = time.Time{}
 
 	// setup and store parent block
 	// it's a standard block for simplicity

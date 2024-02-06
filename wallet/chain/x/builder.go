@@ -306,7 +306,7 @@ func (b *builder) NewOperationTxMintFT(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintFTs(b.addrs, b.backend, outputs, ops)
+	operations, err := b.mintFTs(outputs, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func (b *builder) NewOperationTxMintNFT(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintNFTs(b.addrs, b.backend, assetID, payload, owners, ops)
+	operations, err := b.mintNFTs(assetID, payload, owners, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +333,7 @@ func (b *builder) NewOperationTxMintProperty(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintProperty(b.addrs, b.backend, assetID, owner, ops)
+	operations, err := b.mintProperty(assetID, owner, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +345,7 @@ func (b *builder) NewOperationTxBurnProperty(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := burnProperty(b.addrs, b.backend, assetID, ops)
+	operations, err := b.burnProperty(assetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -635,21 +635,19 @@ func (b *builder) spend(
 	return inputs, outputs, nil
 }
 
-func mintFTs(
-	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+func (b *builder) mintFTs(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := b.backend.UTXOs(options.Context(), b.backend.BlockchainID())
 	if err != nil {
 		return nil, err
 	}
 
-	addrs := options.Addresses(addresses)
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {
@@ -698,9 +696,7 @@ func mintFTs(
 }
 
 // TODO: make this able to generate multiple NFT groups
-func mintNFTs(
-	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+func (b *builder) mintNFTs(
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
@@ -709,12 +705,12 @@ func mintNFTs(
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := b.backend.UTXOs(options.Context(), b.backend.BlockchainID())
 	if err != nil {
 		return nil, err
 	}
 
-	addrs := options.Addresses(addresses)
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {
@@ -758,9 +754,7 @@ func mintNFTs(
 	)
 }
 
-func mintProperty(
-	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+func (b *builder) mintProperty(
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	options *common.Options,
@@ -768,12 +762,12 @@ func mintProperty(
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := b.backend.UTXOs(options.Context(), b.backend.BlockchainID())
 	if err != nil {
 		return nil, err
 	}
 
-	addrs := options.Addresses(addresses)
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {
@@ -818,21 +812,19 @@ func mintProperty(
 	)
 }
 
-func burnProperty(
-	addresses set.Set[ids.ShortID],
-	backend BuilderBackend,
+func (b *builder) burnProperty(
 	assetID ids.ID,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
 	err error,
 ) {
-	utxos, err := backend.UTXOs(options.Context(), backend.BlockchainID())
+	utxos, err := b.backend.UTXOs(options.Context(), b.backend.BlockchainID())
 	if err != nil {
 		return nil, err
 	}
 
-	addrs := options.Addresses(addresses)
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 
 	for _, utxo := range utxos {

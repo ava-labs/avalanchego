@@ -308,7 +308,6 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			gammaDelegationRewardKey.Address(): preRewardBalances[gammaDelegationRewardKey.Address()] + expectedDelegatorReward,
 			deltaDelegationRewardKey.Address(): preRewardBalances[deltaDelegationRewardKey.Address()] + 0, // Validator didn't meet uptime requirement
 		}
-
 		for address := range expectedRewardBalances {
 			require.Equal(expectedRewardBalances[address], rewardBalances[address])
 		}

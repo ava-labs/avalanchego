@@ -13,12 +13,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -166,6 +169,9 @@ func TestVerifyFinanceTx(t *testing.T) {
 	// even if bigUtxo would be enough finance the whole tx
 	require.True(t, smallUtxoID.Compare(bigUtxoID) < 0)
 
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
 	tests := []struct {
 		description string
 		utxoReaderF func(ctrl *gomock.Controller) avax.UTXOReader
@@ -200,7 +206,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			amountToStake: units.MilliAvax,
 			uTxF: func(t *testing.T) txs.UnsignedTx {
-				uTx := &txs.AddValidatorTx{
+				uTx := &txs.AddPermissionlessValidatorTx{
 					BaseTx: txs.BaseTx{
 						BaseTx: avax.BaseTx{
 							NetworkID:    ctx.NetworkID,
@@ -216,8 +222,15 @@ func TestVerifyFinanceTx(t *testing.T) {
 						End:    uint64(time.Now().Unix()),
 						Wght:   amountToStake,
 					},
+					Subnet:    constants.PrimaryNetworkID,
+					Signer:    signer.NewProofOfPossession(sk),
 					StakeOuts: make([]*avax.TransferableOutput, 0),
-					RewardsOwner: &secp256k1fx.OutputOwners{
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -237,16 +250,16 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       fm,
 					ConsumedUnitsCap: testBlockMaxConsumedUnits,
 					Credentials:      []verify.Verifiable{},
 				}
 
-				expectedFee := 8911 * units.MicroAvax
+				expectedFee := 9131 * units.MicroAvax
 
 				// complete uTx with the utxos
-				addVal, ok := uTx.(*txs.AddValidatorTx)
+				addVal, ok := uTx.(*txs.AddPermissionlessValidatorTx)
 				r.True(ok)
 
 				addVal.Ins = ins
@@ -281,7 +294,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			amountToStake: units.MilliAvax,
 			uTxF: func(t *testing.T) txs.UnsignedTx {
-				uTx := &txs.AddValidatorTx{
+				uTx := &txs.AddPermissionlessValidatorTx{
 					BaseTx: txs.BaseTx{
 						BaseTx: avax.BaseTx{
 							NetworkID:    ctx.NetworkID,
@@ -297,8 +310,15 @@ func TestVerifyFinanceTx(t *testing.T) {
 						End:    uint64(time.Now().Unix()),
 						Wght:   amountToStake,
 					},
+					Subnet:    constants.PrimaryNetworkID,
+					Signer:    signer.NewProofOfPossession(sk),
 					StakeOuts: make([]*avax.TransferableOutput, 0),
-					RewardsOwner: &secp256k1fx.OutputOwners{
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -318,16 +338,16 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       fm,
 					ConsumedUnitsCap: testBlockMaxConsumedUnits,
 					Credentials:      []verify.Verifiable{},
 				}
 
-				expectedFee := 5999 * units.MicroAvax
+				expectedFee := 6219 * units.MicroAvax
 
 				// complete uTx with the utxos
-				addVal, ok := uTx.(*txs.AddValidatorTx)
+				addVal, ok := uTx.(*txs.AddPermissionlessValidatorTx)
 				r.True(ok)
 
 				addVal.Ins = ins
@@ -364,7 +384,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			amountToStake: units.MilliAvax,
 			uTxF: func(t *testing.T) txs.UnsignedTx {
-				uTx := &txs.AddValidatorTx{
+				uTx := &txs.AddPermissionlessValidatorTx{
 					BaseTx: txs.BaseTx{
 						BaseTx: avax.BaseTx{
 							NetworkID:    ctx.NetworkID,
@@ -380,8 +400,15 @@ func TestVerifyFinanceTx(t *testing.T) {
 						End:    uint64(time.Now().Unix()),
 						Wght:   amountToStake,
 					},
+					Subnet:    constants.PrimaryNetworkID,
+					Signer:    signer.NewProofOfPossession(sk),
 					StakeOuts: make([]*avax.TransferableOutput, 0),
-					RewardsOwner: &secp256k1fx.OutputOwners{
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -401,16 +428,16 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       fm,
 					ConsumedUnitsCap: testBlockMaxConsumedUnits,
 					Credentials:      []verify.Verifiable{},
 				}
 
-				expectedFee := 5879 * units.MicroAvax
+				expectedFee := 6099 * units.MicroAvax
 
 				// complete uTx with the utxos
-				addVal, ok := uTx.(*txs.AddValidatorTx)
+				addVal, ok := uTx.(*txs.AddPermissionlessValidatorTx)
 				r.True(ok)
 
 				addVal.Ins = ins
@@ -442,7 +469,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			amountToStake: units.MilliAvax,
 			uTxF: func(t *testing.T) txs.UnsignedTx {
-				uTx := &txs.AddValidatorTx{
+				uTx := &txs.AddPermissionlessValidatorTx{
 					BaseTx: txs.BaseTx{
 						BaseTx: avax.BaseTx{
 							NetworkID:    ctx.NetworkID,
@@ -458,8 +485,15 @@ func TestVerifyFinanceTx(t *testing.T) {
 						End:    uint64(time.Now().Unix()),
 						Wght:   amountToStake,
 					},
+					Subnet:    constants.PrimaryNetworkID,
+					Signer:    signer.NewProofOfPossession(sk),
 					StakeOuts: make([]*avax.TransferableOutput, 0),
-					RewardsOwner: &secp256k1fx.OutputOwners{
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -479,16 +513,16 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       fm,
 					ConsumedUnitsCap: testBlockMaxConsumedUnits,
 					Credentials:      []verify.Verifiable{},
 				}
 
-				expectedFee := 3341 * units.MicroAvax
+				expectedFee := 3561 * units.MicroAvax
 
 				// complete uTx with the utxos
-				addVal, ok := uTx.(*txs.AddValidatorTx)
+				addVal, ok := uTx.(*txs.AddPermissionlessValidatorTx)
 				r.True(ok)
 
 				addVal.Ins = ins
@@ -548,7 +582,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       fm,
 					ConsumedUnitsCap: testBlockMaxConsumedUnits,
 					Credentials:      []verify.Verifiable{},
@@ -618,7 +652,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       fm,
 					ConsumedUnitsCap: testBlockMaxConsumedUnits,
 					Credentials:      []verify.Verifiable{},
@@ -666,7 +700,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 				fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 				calc := &fees.Calculator{
-					IsEForkActive:    true,
+					IsEUpgradeActive: true,
 					FeeManager:       fm,
 					ConsumedUnitsCap: testBlockMaxConsumedUnits,
 					Credentials:      []verify.Verifiable{},
@@ -691,7 +725,7 @@ func TestVerifyFinanceTx(t *testing.T) {
 
 			fm := commonfees.NewManager(testUnitFees, commonfees.EmptyWindows)
 			feeCalc := &fees.Calculator{
-				IsEForkActive:    true,
+				IsEUpgradeActive: true,
 				FeeManager:       fm,
 				ConsumedUnitsCap: testBlockMaxConsumedUnits,
 				Credentials:      []verify.Verifiable{},

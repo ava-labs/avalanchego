@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -2847,7 +2848,7 @@ func (s *Service) GetBlockUnitsCap(_ *http.Request, _ *struct{}, reply *GetBlock
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	reply.MaxUnits = s.vm.Config.GetDynamicFeesConfig().BlockUnitsCap
+	reply.MaxUnits = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 	return nil
 }
 

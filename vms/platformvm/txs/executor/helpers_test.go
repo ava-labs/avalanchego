@@ -232,7 +232,7 @@ func addSubnet(
 	var (
 		unitFees    = env.state.GetUnitFees()
 		unitWindows = env.state.GetFeeWindows()
-		unitCaps    = env.backend.Config.GetDynamicFeesConfig().BlockUnitsCap
+		unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 	)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
@@ -316,7 +316,7 @@ func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,
-		EForkTime:         mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
 	}
 }
 

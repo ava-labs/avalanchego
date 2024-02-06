@@ -1449,7 +1449,7 @@ func (s *state) loadMetadata() error {
 		// fork introducing dynamic fees may not be active yet,
 		// hence we may have never stored unit fees. Load from config
 		// TODO: remove once fork is active
-		s.unitFees = s.cfg.GetDynamicFeesConfig().InitialUnitFees
+		s.unitFees = config.EUpgradeDynamicFeesConfig.InitialUnitFees
 
 	default:
 		return err

@@ -4,13 +4,11 @@
 package fees
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -19,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -61,68 +58,19 @@ var (
 )
 
 type feeTests struct {
-	description       string
-	cfgAndChainTimeF  func() (*config.Config, time.Time)
-	consumedUnitCapsF func() fees.Dimensions
-	expectedError     error
-	checksF           func(*testing.T, *Calculator)
-}
-
-func TestPartiallyFulledTransactionsSizes(t *testing.T) {
-	var uTx *txs.AddValidatorTx
-	uTxSize, err := txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 2)
-
-	uTx = &txs.AddValidatorTx{}
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 102)
-
-	// array of nil elements has size 0.
-	creds := make([]verify.Verifiable, 10)
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, creds)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 6)
-
-	creds[0] = &secp256k1fx.Credential{
-		Sigs: make([][secp256k1.SignatureLen]byte, 5),
-	}
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, creds)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 339)
-
-	var sTx *txs.Tx
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 2)
-
-	sTx = &txs.Tx{}
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 6)
-
-	sTx = &txs.Tx{
-		Unsigned: uTx,
-	}
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 110)
-
-	sTx = &txs.Tx{
-		Unsigned: uTx,
-		Creds:    creds,
-	}
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, sTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxSize, 443)
+	description         string
+	cfgAndChainTimeF    func() (*config.Config, time.Time)
+	unsignedAndSignedTx func(t *testing.T) (txs.UnsignedTx, *txs.Tx)
+	consumedUnitCapsF   func() fees.Dimensions
+	expectedError       error
+	checksF             func(*testing.T, *Calculator)
 }
 
 func TestAddAndRemoveFees(t *testing.T) {
 	r := require.New(t)
 
 	fc := &Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
 	}
@@ -157,83 +105,837 @@ func TestAddAndRemoveFees(t *testing.T) {
 	r.Zero(fc.Fee)
 }
 
-func TestUTXOsAreAdditiveInSize(t *testing.T) {
-	// Show that including utxos of size [S] into a tx of size [T]
-	// result in a tx of size [S+T-CodecVersion]
-	// This is key to calculate fees correctly while building a tx
+func TestTxFees(t *testing.T) {
+	r := require.New(t)
 
-	uTx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    rand.Uint32(), //#nosec G404
-				BlockchainID: ids.GenerateTestID(),
-				Memo:         []byte{'a', 'b', 'c'},
-				Ins:          make([]*avax.TransferableInput, 0),
-				Outs:         make([]*avax.TransferableOutput, 0),
+	tests := []feeTests{
+		{
+			description: "AddValidatorTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addValidatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
 			},
 		},
-	}
+		{
+			description: "AddValidatorTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
 
-	uTxNakedSize := 105
-	uTxSize, err := txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize, uTxSize)
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
 
-	// input to add
-	input := &avax.TransferableInput{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.ID{'t', 'x', 'I', 'D'},
-			OutputIndex: 2,
-		},
-		Asset: avax.Asset{ID: ids.GenerateTestID()},
-		In: &secp256k1fx.TransferInput{
-			Amt:   uint64(5678),
-			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-		},
-	}
-	inSize, err := txs.Codec.Size(txs.CodecVersion, input)
-	require.NoError(t, err)
-
-	// include input in uTx and check that sizes add
-	uTx.BaseTx.BaseTx.Ins = append(uTx.BaseTx.BaseTx.Ins, input)
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize+(inSize-codec.CodecVersionSize), uTxSize)
-
-	// output to add
-	output := &avax.TransferableOutput{
-		Asset: avax.Asset{
-			ID: ids.GenerateTestID(),
-		},
-		Out: &stakeable.LockOut{
-			Locktime: 87654321,
-			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  12345678,
-					Threshold: 0,
-					Addrs:     []ids.ShortID{},
-				},
+				return &cfg, chainTime
+			},
+			expectedError:       nil,
+			unsignedAndSignedTx: addValidatorTx,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
 			},
 		},
+		{
+			description: "AddSubnetValidatorTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addSubnetValidatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
+			},
+		},
+		{
+			description: "AddSubnetValidatorTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			expectedError:       nil,
+			unsignedAndSignedTx: addSubnetValidatorTx,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3345*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						649,
+						1090,
+						172,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "AddSubnetValidatorTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: addSubnetValidatorTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "AddDelegatorTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addDelegatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
+			},
+		},
+		{
+			description: "AddDelegatorTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addDelegatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
+			},
+		},
+		{
+			description: "CreateChainTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: createChainTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.CreateBlockchainTxFee, fc.Fee)
+			},
+		},
+		{
+			description: "CreateChainTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: createChainTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3388*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						692,
+						1090,
+						172,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "CreateChainTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: createChainTx,
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			expectedError: errFailedConsumedUnitsCumulation,
+			checksF:       func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "CreateSubnetTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: createSubnetTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.CreateSubnetTxFee, fc.Fee)
+			},
+		},
+		{
+			description: "CreateSubnetTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: createSubnetTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3293*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						597,
+						1090,
+						172,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "CreateSubnetTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: createSubnetTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "RemoveSubnetValidatorTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: removeSubnetValidatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
+			},
+		},
+		{
+			description: "RemoveSubnetValidatorTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: removeSubnetValidatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3321*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						625,
+						1090,
+						172,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "RemoveSubnetValidatorTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: removeSubnetValidatorTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "TransformSubnetTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: transformSubnetTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.TransformSubnetTxFee, fc.Fee)
+			},
+		},
+		{
+			description: "TransformSubnetTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: transformSubnetTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3406*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						710,
+						1090,
+						172,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "TransformSubnetTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: transformSubnetTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "TransferSubnetOwnershipTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: transferSubnetOwnershipTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
+			},
+		},
+		{
+			description: "TransferSubnetOwnershipTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: transferSubnetOwnershipTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3337*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						641,
+						1090,
+						172,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "TransferSubnetOwnershipTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: transferSubnetOwnershipTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "AddPermissionlessValidatorTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addPermissionlessValidatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
+			},
+		},
+		{
+			description: "AddPermissionlessValidatorTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addPermissionlessValidatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3939*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						961,
+						1090,
+						266,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "AddPermissionlessValidatorTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: addPermissionlessValidatorTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "AddPermissionlessDelegatorTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addPermissionlessDelegatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.AddSubnetDelegatorFee, fc.Fee)
+			},
+		},
+		{
+			description: "AddPermissionlessDelegatorTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: addPermissionlessDelegatorTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3747*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						769,
+						1090,
+						266,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "AddPermissionlessDelegatorTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: addPermissionlessDelegatorTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "BaseTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: baseTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
+			},
+		},
+		{
+			description: "BaseTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: baseTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3253*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						557,
+						1090,
+						172,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "BaseTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: baseTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "ImportTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: importTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
+			},
+		},
+		{
+			description: "ImportTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: importTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 5827*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						681,
+						2180,
+						262,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "ImportTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: importTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
+		{
+			description: "ExportTx pre E fork",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(-1 * time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: exportTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, fc.Config.TxFee, fc.Fee)
+			},
+		},
+		{
+			description: "ExportTx post E fork, success",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			unsignedAndSignedTx: exportTx,
+			expectedError:       nil,
+			checksF: func(t *testing.T, fc *Calculator) {
+				require.Equal(t, 3663*units.MicroAvax, fc.Fee)
+				require.Equal(t,
+					fees.Dimensions{
+						685,
+						1090,
+						266,
+						0,
+					},
+					fc.FeeManager.GetCumulatedUnits(),
+				)
+			},
+		},
+		{
+			description: "ExportTx post E fork, utxos read cap breached",
+			cfgAndChainTimeF: func() (*config.Config, time.Time) {
+				eForkTime := time.Now().Truncate(time.Second)
+				chainTime := eForkTime.Add(time.Second)
+
+				cfg := feeTestsDefaultCfg
+				cfg.DurangoTime = durangoTime
+				cfg.EUpgradeTime = eForkTime
+
+				return &cfg, chainTime
+			},
+			consumedUnitCapsF: func() fees.Dimensions {
+				caps := testBlockMaxConsumedUnits
+				caps[fees.UTXORead] = 1090 - 1
+				return caps
+			},
+			unsignedAndSignedTx: exportTx,
+			expectedError:       errFailedConsumedUnitsCumulation,
+			checksF:             func(t *testing.T, fc *Calculator) {},
+		},
 	}
-	outSize, err := txs.Codec.Size(txs.CodecVersion, output)
-	require.NoError(t, err)
 
-	// include output in uTx and check that sizes add
-	uTx.BaseTx.BaseTx.Outs = append(uTx.BaseTx.BaseTx.Outs, output)
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize+(inSize-codec.CodecVersionSize)+(outSize-codec.CodecVersionSize), uTxSize)
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			cfg, chainTime := tt.cfgAndChainTimeF()
 
-	// include output in uTx as stake and check that sizes add
-	uTx.StakeOuts = append(uTx.StakeOuts, output)
-	uTxSize, err = txs.Codec.Size(txs.CodecVersion, uTx)
-	require.NoError(t, err)
-	require.Equal(t, uTxNakedSize+(inSize-codec.CodecVersionSize)+(outSize-codec.CodecVersionSize)+(outSize-codec.CodecVersionSize), uTxSize)
+			consumedUnitCaps := testBlockMaxConsumedUnits
+			if tt.consumedUnitCapsF != nil {
+				consumedUnitCaps = tt.consumedUnitCapsF()
+			}
+
+			uTx, sTx := tt.unsignedAndSignedTx(t)
+
+			fc := &Calculator{
+				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				Config:           cfg,
+				ChainTime:        chainTime,
+				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
+				ConsumedUnitsCap: consumedUnitCaps,
+				Credentials:      sTx.Creds,
+			}
+			err := uTx.Visit(fc)
+			r.ErrorIs(err, tt.expectedError)
+			tt.checksF(t, fc)
+		})
+	}
 }
 
-func TestAddValidatorTxFees(t *testing.T) {
+func addValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -258,97 +960,10 @@ func TestAddValidatorTxFees(t *testing.T) {
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
 
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkValidatorFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3719*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						741,
-						1090,
-						266,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, bandwidth cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.Bandwidth] = 741 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestAddSubnetValidatorTxFees(t *testing.T) {
+func addSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -370,98 +985,10 @@ func TestAddSubnetValidatorTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3345*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						649,
-						1090,
-						172,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestAddDelegatorTxFees(t *testing.T) {
+func addDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -484,98 +1011,10 @@ func TestAddDelegatorTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddPrimaryNetworkDelegatorFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3715*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						737,
-						1090,
-						266,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestCreateChainTxFees(t *testing.T) {
+func createChainTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -592,98 +1031,10 @@ func TestCreateChainTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.CreateBlockchainTxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3388*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						692,
-						1090,
-						172,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestCreateSubnetTxFees(t *testing.T) {
+func createSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -698,98 +1049,10 @@ func TestCreateSubnetTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.CreateSubnetTxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3293*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						597,
-						1090,
-						172,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestRemoveSubnetValidatorTxFees(t *testing.T) {
+func removeSubnetValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -803,98 +1066,10 @@ func TestRemoveSubnetValidatorTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3321*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						625,
-						1090,
-						172,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestTransformSubnetTxFees(t *testing.T) {
+func transformSubnetTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -920,98 +1095,10 @@ func TestTransformSubnetTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TransformSubnetTxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3406*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						710,
-						1090,
-						172,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestTransferSubnetOwnershipTxFees(t *testing.T) {
+func transferSubnetOwnershipTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1033,98 +1120,10 @@ func TestTransferSubnetOwnershipTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3337*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						641,
-						1090,
-						172,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestAddPermissionlessValidatorTxFees(t *testing.T) {
+func addPermissionlessValidatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1155,98 +1154,10 @@ func TestAddPermissionlessValidatorTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddSubnetValidatorFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3939*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						961,
-						1090,
-						266,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
+func addPermissionlessDelegatorTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1272,98 +1183,10 @@ func TestAddPermissionlessDelegatorTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.AddSubnetDelegatorFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3747*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						769,
-						1090,
-						266,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestBaseTxFees(t *testing.T) {
+func baseTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1372,98 +1195,10 @@ func TestBaseTxFees(t *testing.T) {
 	uTx := &baseTx
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3253*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						557,
-						1090,
-						172,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestImportTxFees(t *testing.T) {
+func importTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1486,98 +1221,10 @@ func TestImportTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 5827*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						681,
-						2180,
-						262,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
-func TestExportTxFees(t *testing.T) {
+func exportTx(t *testing.T) (txs.UnsignedTx, *txs.Tx) {
 	r := require.New(t)
 
 	defaultCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1590,95 +1237,7 @@ func TestExportTxFees(t *testing.T) {
 	}
 	sTx, err := txs.NewSigned(uTx, txs.Codec, feeTestSigners)
 	r.NoError(err)
-
-	tests := []feeTests{
-		{
-			description: "pre E fork",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(-1 * time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, fc.Config.TxFee, fc.Fee)
-			},
-		},
-		{
-			description: "post E fork, success",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			expectedError: nil,
-			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3663*units.MicroAvax, fc.Fee)
-				require.Equal(t,
-					fees.Dimensions{
-						685,
-						1090,
-						266,
-						0,
-					},
-					fc.FeeManager.GetCumulatedUnits(),
-				)
-			},
-		},
-		{
-			description: "post E fork, utxos read cap breached",
-			cfgAndChainTimeF: func() (*config.Config, time.Time) {
-				eForkTime := time.Now().Truncate(time.Second)
-				chainTime := eForkTime.Add(time.Second)
-
-				cfg := feeTestsDefaultCfg
-				cfg.DurangoTime = durangoTime
-				cfg.EForkTime = eForkTime
-
-				return &cfg, chainTime
-			},
-			consumedUnitCapsF: func() fees.Dimensions {
-				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
-				return caps
-			},
-			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			cfg, chainTime := tt.cfgAndChainTimeF()
-
-			consumedUnitCaps := testBlockMaxConsumedUnits
-			if tt.consumedUnitCapsF != nil {
-				consumedUnitCaps = tt.consumedUnitCapsF()
-			}
-
-			fc := &Calculator{
-				IsEForkActive:    cfg.IsEForkActivated(chainTime),
-				Config:           cfg,
-				ChainTime:        chainTime,
-				FeeManager:       fees.NewManager(testUnitFees, fees.EmptyWindows),
-				ConsumedUnitsCap: consumedUnitCaps,
-				Credentials:      sTx.Creds,
-			}
-			err := uTx.Visit(fc)
-			r.ErrorIs(err, tt.expectedError)
-			tt.checksF(t, fc)
-		})
-	}
+	return uTx, sTx
 }
 
 func txsCreationHelpers(defaultCtx *snow.Context) (
