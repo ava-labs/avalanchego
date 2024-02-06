@@ -527,8 +527,10 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 		Ctx: &snow.Context{
 			Log: logging.NoLog{},
 		},
-		Config: &config.Config{},
-		Codec:  parser.Codec(),
+		Config: &config.Config{
+			EUpgradeTime: mockable.MaxTime,
+		},
+		Codec: parser.Codec(),
 	}
 
 	baseDB := versiondb.New(memdb.New())

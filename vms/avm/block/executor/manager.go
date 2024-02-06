@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -148,18 +149,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return ErrChainNotSynced
 	}
 
-	var (
-		feesCfg    = m.backend.Config.GetDynamicFeesConfig()
-		unitFees   = m.state.GetUnitFees()
-		feeWindows = m.state.GetFeeWindows()
-	)
-
 	err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
-		Backend:       m.backend,
-		BlkFeeManager: fees.NewManager(unitFees, feeWindows),
-		UnitCaps:      feesCfg.BlockUnitsCap,
-		BlkTimestamp:  m.state.GetTimestamp(),
-		Tx:            tx,
+		Backend: m.backend,
+		Tx:      tx,
 	})
 	if err != nil {
 		return err
@@ -170,10 +162,19 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	var (
+		feeCfg     = config.EUpgradeDynamicFeesConfig
+		unitFees   = m.state.GetUnitFees()
+		feeWindows = m.state.GetFeeWindows()
+	)
+	feeManager := fees.NewManager(unitFees, feeWindows)
+
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend: m.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       m.backend,
+		BlkFeeManager: feeManager,
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         stateDiff,
+		Tx:            tx,
 	})
 	if err != nil {
 		return err

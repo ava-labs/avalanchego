@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -143,27 +142,10 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	var (
-		feesCfg     = m.txExecutorBackend.Config.GetDynamicFeesConfig()
-		unitFees    = stateDiff.GetUnitFees()
-		unitWindows = stateDiff.GetFeeWindows()
-	)
-
-	parentFeeManager := fees.NewManager(unitFees, unitWindows)
-	feeManager := parentFeeManager.ComputeNext(
-		stateDiff.GetTimestamp().Unix(),
-		nextBlkTime.Unix(),
-		feesCfg.BlockUnitsTarget,
-		feesCfg.FeesChangeDenominator,
-		feesCfg.MinUnitFees,
-	)
-
 	err = tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend:       m.txExecutorBackend,
-		BlkFeeManager: feeManager,
-		UnitCaps:      feesCfg.BlockUnitsCap,
-		State:         stateDiff,
-		Tx:            tx,
+		Backend: m.txExecutorBackend,
+		State:   stateDiff,
+		Tx:      tx,
 	})
 	// We ignore [errFutureStakeTime] here because the time will be advanced
 	// when this transaction is issued.

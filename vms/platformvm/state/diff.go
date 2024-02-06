@@ -14,8 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -36,9 +34,6 @@ type diff struct {
 	stateVersions Versions
 
 	timestamp time.Time
-
-	unitFees             commonfees.Dimensions
-	consumedUnitsWindows commonfees.Windows
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -92,22 +87,6 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	return NewDiff(ids.Empty, stateGetter{
 		state: parentState,
 	})
-}
-
-func (d *diff) GetUnitFees() commonfees.Dimensions {
-	return d.unitFees
-}
-
-func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
-	d.unitFees = uf
-}
-
-func (d *diff) GetFeeWindows() commonfees.Windows {
-	return d.consumedUnitsWindows
-}
-
-func (d *diff) SetConsumedUnitsWindows(windows commonfees.Windows) {
-	d.consumedUnitsWindows = windows
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -422,8 +401,6 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
-	baseState.SetUnitFees(d.unitFees)
-	baseState.SetConsumedUnitsWindows(d.consumedUnitsWindows)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}

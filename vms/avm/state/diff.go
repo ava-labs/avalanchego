@@ -39,10 +39,10 @@ type diff struct {
 	addedBlockIDs map[uint64]ids.ID      // map of height -> blockID
 	addedBlocks   map[ids.ID]block.Block // map of blockID -> block
 
-	lastAccepted         ids.ID
-	timestamp            time.Time
-	unitFees             commonfees.Dimensions
-	consumedUnitsWindows commonfees.Windows
+	lastAccepted ids.ID
+	timestamp    time.Time
+	unitFees     commonfees.Dimensions
+	feesWindows  commonfees.Windows
 }
 
 func NewDiff(
@@ -173,11 +173,11 @@ func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
 }
 
 func (d *diff) GetFeeWindows() commonfees.Windows {
-	return d.consumedUnitsWindows
+	return d.feesWindows
 }
 
-func (d *diff) SetConsumedUnitsWindows(windows commonfees.Windows) {
-	d.consumedUnitsWindows = windows
+func (d *diff) SetFeeWindows(windows commonfees.Windows) {
+	d.feesWindows = windows
 }
 
 func (d *diff) Apply(state Chain) {
@@ -200,5 +200,5 @@ func (d *diff) Apply(state Chain) {
 	state.SetLastAccepted(d.lastAccepted)
 	state.SetTimestamp(d.timestamp)
 	state.SetUnitFees(d.unitFees)
-	state.SetConsumedUnitsWindows(d.consumedUnitsWindows)
+	state.SetFeeWindows(d.feesWindows)
 }

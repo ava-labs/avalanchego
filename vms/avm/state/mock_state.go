@@ -211,16 +211,16 @@ func (mr *MockChainMockRecorder) GetUnitFees() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockChain)(nil).GetUnitFees))
 }
 
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockChain) SetConsumedUnitsWindows(arg0 fees.Windows) {
+// SetFeeWindows mocks base method.
+func (m *MockChain) SetFeeWindows(arg0 fees.Windows) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
+	m.ctrl.Call(m, "SetFeeWindows", arg0)
 }
 
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockChainMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
+// SetFeeWindows indicates an expected call of SetFeeWindows.
+func (mr *MockChainMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockChain)(nil).SetConsumedUnitsWindows), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockChain)(nil).SetFeeWindows), arg0)
 }
 
 // SetLastAccepted mocks base method.
@@ -559,16 +559,16 @@ func (mr *MockStateMockRecorder) Prune(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Prune", reflect.TypeOf((*MockState)(nil).Prune), arg0, arg1)
 }
 
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockState) SetConsumedUnitsWindows(arg0 fees.Windows) {
+// SetFeeWindows mocks base method.
+func (m *MockState) SetFeeWindows(arg0 fees.Windows) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
+	m.ctrl.Call(m, "SetFeeWindows", arg0)
 }
 
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockStateMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
+// SetFeeWindows indicates an expected call of SetFeeWindows.
+func (mr *MockStateMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockState)(nil).SetConsumedUnitsWindows), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockState)(nil).SetFeeWindows), arg0)
 }
 
 // SetInitialized mocks base method.
@@ -835,16 +835,16 @@ func (mr *MockDiffMockRecorder) GetUnitFees() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockDiff)(nil).GetUnitFees))
 }
 
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockDiff) SetConsumedUnitsWindows(arg0 fees.Windows) {
+// SetFeeWindows mocks base method.
+func (m *MockDiff) SetFeeWindows(arg0 fees.Windows) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
+	m.ctrl.Call(m, "SetFeeWindows", arg0)
 }
 
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockDiffMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
+// SetFeeWindows indicates an expected call of SetFeeWindows.
+func (mr *MockDiffMockRecorder) SetFeeWindows(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockDiff)(nil).SetConsumedUnitsWindows), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeWindows", reflect.TypeOf((*MockDiff)(nil).SetFeeWindows), arg0)
 }
 
 // SetLastAccepted mocks base method.

@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -203,7 +202,6 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.Builder = New(
 		res.mempool,
-		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 	)
@@ -255,17 +253,10 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
-	var (
-		unitFees    = env.state.GetUnitFees()
-		unitWindows = env.state.GetFeeWindows()
-		unitCaps    = env.backend.Config.GetDynamicFeesConfig().BlockUnitsCap
-	)
 	executor := txexecutor.StandardTxExecutor{
-		Backend:       &env.backend,
-		BlkFeeManager: fees.NewManager(unitFees, unitWindows),
-		UnitCaps:      unitCaps,
-		State:         stateDiff,
-		Tx:            testSubnet1,
+		Backend: &env.backend,
+		State:   stateDiff,
+		Tx:      testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
@@ -325,7 +316,7 @@ func defaultConfig() *config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
 		DurangoTime:       time.Time{},
-		EForkTime:         mockable.MaxTime,
+		EUpgradeTime:      mockable.MaxTime,
 	}
 }
 

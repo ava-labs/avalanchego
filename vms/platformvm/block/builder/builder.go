@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -23,9 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -74,7 +73,6 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool
 
-	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -87,13 +85,11 @@ type builder struct {
 
 func New(
 	mempool mempool.Mempool,
-	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
 	return &builder{
 		Mempool:           mempool,
-		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
 		resetTimer:        make(chan struct{}, 1),
@@ -275,7 +271,7 @@ func buildBlock(
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
+		rewardValidatorTx, err := NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
@@ -353,9 +349,6 @@ func packBlockTxs(
 	}
 
 	var (
-		unitFees    = stateDiff.GetUnitFees()
-		unitWindows = stateDiff.GetFeeWindows()
-
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]
 	)
@@ -379,11 +372,9 @@ func packBlockTxs(
 		}
 
 		executor := &txexecutor.StandardTxExecutor{
-			Backend:       backend,
-			BlkFeeManager: fees.NewManager(unitFees, unitWindows),
-			UnitCaps:      backend.Config.GetDynamicFeesConfig().BlockUnitsCap,
-			State:         txDiff,
-			Tx:            tx,
+			Backend: backend,
+			State:   txDiff,
+			Tx:      tx,
 		}
 
 		err = tx.Unsigned.Visit(executor)
@@ -452,4 +443,13 @@ func getNextStakerToReward(
 		}
 	}
 	return ids.Empty, false, nil
+}
+
+func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(ctx)
 }

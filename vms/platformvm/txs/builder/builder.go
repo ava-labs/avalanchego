@@ -10,19 +10,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 // Max number of items allowed in a page
@@ -127,6 +126,27 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
+	// stakeAmount: amount the validator stakes
+	// startTime: unix time they start validating
+	// endTime: unix time they stop validating
+	// nodeID: ID of the node we want to validate with
+	// pop: the node proof of possession
+	// rewardAddress: address to send reward to, if applicable
+	// shares: 10,000 times percentage of reward taken from delegators
+	// keys: Keys providing the staked tokens
+	// changeAddr: Address to send change to, if there is any
+	NewAddPermissionlessValidatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		pop *signer.ProofOfPossession,
+		rewardAddress ids.ShortID,
+		shares uint32,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
 	// stakeAmount: amount the delegator stakes
 	// startTime: unix time they start delegating
 	// endTime: unix time they stop delegating
@@ -135,6 +155,23 @@ type ProposalTxBuilder interface {
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		rewardAddress ids.ShortID,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
+	// stakeAmount: amount the delegator stakes
+	// startTime: unix time they start delegating
+	// endTime: unix time they stop delegating
+	// nodeID: ID of the node we are delegating to
+	// rewardAddress: address to send reward to, if applicable
+	// keys: keys providing the staked tokens
+	// changeAddr: address to send change to, if there is any
+	NewAddPermissionlessDelegatorTx(
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -184,10 +221,6 @@ type ProposalTxBuilder interface {
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
-
-	// RewardStakerTx creates a new transaction that proposes to remove the staker
-	// [validatorID] from the default validator set.
-	NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error)
 }
 
 func New(
@@ -227,16 +260,6 @@ func (b *builder) NewImportTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
-	utx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-		}},
-		SourceChain: from,
-	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	kc := secp256k1fx.NewKeychain(keys...)
 
 	atomicUTXOs, _, _, err := b.GetAtomicUTXOs(from, kc.Addresses(), ids.ShortEmpty, ids.Empty, MaxPageSize)
@@ -244,14 +267,11 @@ func (b *builder) NewImportTx(
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
 
-	var (
-		importedInputs = []*avax.TransferableInput{}
-		signers        = [][]*secp256k1.PrivateKey{}
-		outs           = []*avax.TransferableOutput{}
+	importedInputs := []*avax.TransferableInput{}
+	signers := [][]*secp256k1.PrivateKey{}
 
-		importedAmounts = make(map[ids.ID]uint64)
-		now             = b.clk.Unix()
-	)
+	importedAmounts := make(map[ids.ID]uint64)
+	now := b.clk.Unix()
 	for _, utxo := range atomicUTXOs {
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
 		if err != nil {
@@ -273,21 +293,32 @@ func (b *builder) NewImportTx(
 		})
 		signers = append(signers, utxoSigners)
 	}
+	avax.SortTransferableInputsWithSigners(importedInputs, signers)
+
 	if len(importedAmounts) == 0 {
 		return nil, ErrNoFunds // No imported UTXOs were spendable
 	}
 
-	// Sort and add imported txs to utx. Imported txs must not be
-	// changed here in after
-	avax.SortTransferableInputsWithSigners(importedInputs, signers)
-	utx.ImportedInputs = importedInputs
+	importedAVAX := importedAmounts[b.ctx.AVAXAssetID]
 
-	// add non avax-denominated outputs. Avax-denominated utxos
-	// are used to pay fees whose amount is calculated later on
-	for assetID, amount := range importedAmounts {
-		if assetID == b.ctx.AVAXAssetID {
-			continue
+	ins := []*avax.TransferableInput{}
+	outs := []*avax.TransferableOutput{}
+	switch {
+	case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
+		var baseSigners [][]*secp256k1.PrivateKey
+		ins, outs, _, baseSigners, err = b.Spend(b.state, keys, 0, b.cfg.TxFee-importedAVAX, changeAddr)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
+		signers = append(baseSigners, signers...)
+		delete(importedAmounts, b.ctx.AVAXAssetID)
+	case importedAVAX == b.cfg.TxFee:
+		delete(importedAmounts, b.ctx.AVAXAssetID)
+	default:
+		importedAmounts[b.ctx.AVAXAssetID] -= b.cfg.TxFee
+	}
+
+	for assetID, amount := range importedAmounts {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -299,132 +330,21 @@ func (b *builder) NewImportTx(
 				},
 			},
 		})
-		delete(importedAmounts, assetID)
-	}
-
-	var (
-		ins []*avax.TransferableInput
-
-		importedAVAX  = importedAmounts[b.ctx.AVAXAssetID] // the only entry left in importedAmounts
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		// while outs are not ordered we add them to get current fees. We'll fix ordering later on
-		utx.BaseTx.Outs = outs
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.ImportTx(utx); err != nil {
-			return nil, err
-		}
-
-		if feeCalc.Fee >= importedAVAX {
-			// all imported avax will be burned to pay taxes.
-			// Fees are scaled back accordingly.
-			feeCalc.Fee -= importedAVAX
-		} else {
-			// imported inputs may be enough to pay taxes by themselves
-			changeOut := &avax.TransferableOutput{
-				Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					// Amt: importedAVAX, // SET IT AFTER CONSIDERING ITS OWN FEES
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{to},
-					},
-				},
-			}
-
-			// update fees to target given the extra input added
-			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
-			if err != nil {
-				return nil, fmt.Errorf("failed calculating output size: %w", err)
-			}
-			addedFees, err := feeCalc.AddFeesFor(outDimensions)
-			if err != nil {
-				return nil, fmt.Errorf("account for output fees: %w", err)
-			}
-
-			if addedFees >= importedAVAX {
-				// imported avax are not enough to pay fees
-				// Drop the changeOut and finance the tx
-				if _, err := feeCalc.RemoveFeesFor(outDimensions); err != nil {
-					return nil, fmt.Errorf("failed reverting change output: %w", err)
-				}
-				feeCalc.Fee -= importedAVAX
-
-				var (
-					financeOut    []*avax.TransferableOutput
-					financeSigner [][]*secp256k1.PrivateKey
-				)
-				ins, financeOut, _, financeSigner, err = b.FinanceTx(
-					b.state,
-					keys,
-					0,
-					feeCalc,
-					changeAddr,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-				}
-				outs = append(financeOut, outs...)
-				signers = append(financeSigner, signers...)
-			} else {
-				changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
-				outs = append(outs, changeOut)
-			}
-		}
-	} else {
-		switch {
-		case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
-			var (
-				baseOuts    []*avax.TransferableOutput
-				baseSigners [][]*secp256k1.PrivateKey
-			)
-			ins, baseOuts, _, baseSigners, err = b.Spend(b.state, keys, 0, b.cfg.TxFee-importedAVAX, changeAddr)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-			}
-			outs = append(baseOuts, outs...)
-			signers = append(baseSigners, signers...)
-			delete(importedAmounts, b.ctx.AVAXAssetID)
-		case importedAVAX == b.cfg.TxFee:
-			delete(importedAmounts, b.ctx.AVAXAssetID)
-		default:
-			importedAVAX -= b.cfg.TxFee
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: importedAVAX,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{to},
-					},
-				},
-			})
-		}
 	}
 
 	avax.SortTransferableOutputs(outs, txs.Codec) // sort imported outputs
 
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
+	// Create the transaction
+	utx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
+		SourceChain:    from,
+		ImportedInputs: importedInputs,
+	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -440,11 +360,22 @@ func (b *builder) NewExportTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
+	toBurn, err := math.Add64(amount, b.cfg.TxFee)
+	if err != nil {
+		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
+	}
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	// Create the transaction
 	utx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs, // Non-exported outputs
 		}},
 		DestinationChain: chainID,
 		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
@@ -459,58 +390,6 @@ func (b *builder) NewExportTx(
 			},
 		}},
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-		err           error
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.ExportTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		var toBurn uint64
-		toBurn, err = math.Add64(amount, b.cfg.TxFee)
-		if err != nil {
-			return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
-		}
-		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, toBurn, changeAddr)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -527,18 +406,29 @@ func (b *builder) NewCreateChainTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
+	timestamp := b.state.GetTimestamp()
+	createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, createBlockchainTxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
+	signers = append(signers, subnetSigners)
 
-	utils.Sort(fxIDs) // sort the provided fxIDs
+	// Sort the provided fxIDs
+	utils.Sort(fxIDs)
 
+	// Create the tx
 	utx := &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
 		}},
 		SubnetID:    subnetID,
 		ChainName:   chainName,
@@ -547,55 +437,6 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.CreateChainTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		timestamp := b.state.GetTimestamp()
-		createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
-		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, createBlockchainTxFee, changeAddr)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
-	signers = append(signers, subnetSigners)
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -609,67 +450,29 @@ func (b *builder) NewCreateSubnetTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
-	utils.Sort(ownerAddrs) // sort control addresses
+	timestamp := b.state.GetTimestamp()
+	createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(timestamp)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, createSubnetTxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
 
+	// Sort control addresses
+	utils.Sort(ownerAddrs)
+
+	// Create the tx
 	utx := &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
 		}},
 		Owner: &secp256k1fx.OutputOwners{
 			Threshold: threshold,
 			Addrs:     ownerAddrs,
 		},
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-		err           error
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err := feeCalc.CreateSubnetTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(chainTime)
-		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, createSubnetTxFee, changeAddr)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -687,11 +490,17 @@ func (b *builder) NewAddValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	// Create the tx
 	utx := &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
@@ -699,6 +508,7 @@ func (b *builder) NewAddValidatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
+		StakeOuts: stakedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
@@ -706,55 +516,57 @@ func (b *builder) NewAddValidatorTx(
 		},
 		DelegationShares: shares,
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		stakedOuts    []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-		err           error
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.AddValidatorTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		ins, outs, stakedOuts, signers, err = b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
 	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewAddPermissionlessValidatorTx(
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	nodeID ids.NodeID,
+	pop *signer.ProofOfPossession,
+	rewardAddress ids.ShortID,
+	shares uint32,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-	utx.StakeOuts = stakedOuts
-
-	// 3. Sign the tx
+	// Create the tx
+	utx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  startTime,
+			End:    endTime,
+			Wght:   stakeAmount,
+		},
+		Subnet:    constants.PrimaryNetworkID,
+		Signer:    pop,
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+		DelegationShares: shares,
+	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -771,11 +583,17 @@ func (b *builder) NewAddDelegatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	// Create the tx
 	utx := &txs.AddDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unlockedOuts,
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
@@ -783,61 +601,55 @@ func (b *builder) NewAddDelegatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
+		StakeOuts: lockedOuts,
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		stakedOuts    []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-		err           error
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.AddDelegatorTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		ins, outs, stakedOuts, signers, err = b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
 	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewAddPermissionlessDelegatorTx(
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	nodeID ids.NodeID,
+	rewardAddress ids.ShortID,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-	utx.StakeOuts = stakedOuts
-
-	// 3. Sign the tx
+	// Create the tx
+	utx := &txs.AddPermissionlessDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unlockedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  startTime,
+			End:    endTime,
+			Wght:   stakeAmount,
+		},
+		Subnet:    constants.PrimaryNetworkID,
+		StakeOuts: lockedOuts,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{rewardAddress},
+		},
+	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -854,15 +666,24 @@ func (b *builder) NewAddSubnetValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
+	signers = append(signers, subnetSigners)
+
+	// Create the tx
 	utx := &txs.AddSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
 		}},
 		SubnetValidator: txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -875,53 +696,6 @@ func (b *builder) NewAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.AddSubnetValidatorTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
-	signers = append(signers, subnetSigners)
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -935,81 +709,33 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
+	signers = append(signers, subnetSigners)
+
+	// Create the tx
 	utx := &txs.RemoveSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
 		}},
 		Subnet:     subnetID,
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
-	signers = append(signers, subnetSigners)
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
-	return tx, tx.SyntacticVerify(b.ctx)
-}
-
-func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
-	utx := &txs.RewardValidatorTx{TxID: txID}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
@@ -1020,15 +746,23 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
+	signers = append(signers, subnetSigners)
+
 	utx := &txs.TransferSubnetOwnershipTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
 		}},
 		Subnet:     subnetID,
 		SubnetAuth: subnetAuth,
@@ -1037,53 +771,6 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.TransferSubnetOwnershipTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
-	signers = append(signers, subnetSigners)
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -1097,57 +784,11 @@ func (b *builder) NewBaseTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	// 1. Build core transaction without utxos
-	utx := &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-		},
+	toBurn, err := math.Add64(amount, b.cfg.TxFee)
+	if err != nil {
+		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
 	}
-
-	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	var (
-		chainTime     = b.state.GetTimestamp()
-		isEForkActive = b.cfg.IsEForkActivated(chainTime)
-		ins           []*avax.TransferableInput
-		outs          []*avax.TransferableOutput
-		signers       [][]*secp256k1.PrivateKey
-		err           error
-	)
-	if isEForkActive {
-		var (
-			unitFees    = b.state.GetUnitFees()
-			unitWindows = b.state.GetFeeWindows()
-			unitCaps    = b.cfg.GetDynamicFeesConfig().BlockUnitsCap
-		)
-
-		feeCalc := &fees.Calculator{
-			IsEForkActive:    isEForkActive,
-			FeeManager:       commonfees.NewManager(unitFees, unitWindows),
-			ConsumedUnitsCap: unitCaps,
-			Credentials:      txs.EmptyCredentials(signers),
-		}
-
-		// feesMan cumulates consumed units. Let's init it with utx filled so far
-		if err = feeCalc.BaseTx(utx); err != nil {
-			return nil, err
-		}
-
-		ins, outs, _, signers, err = b.FinanceTx(
-			b.state,
-			keys,
-			0,
-			feeCalc,
-			changeAddr,
-		)
-	} else {
-		var toBurn uint64
-		toBurn, err = math.Add64(amount, b.cfg.TxFee)
-		if err != nil {
-			return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
-		}
-		ins, outs, _, signers, err = b.Spend(b.state, keys, 0, toBurn, changeAddr)
-	}
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -1159,12 +800,17 @@ func (b *builder) NewBaseTx(
 			OutputOwners: owner,
 		},
 	})
+
 	avax.SortTransferableOutputs(outs, txs.Codec)
 
-	utx.BaseTx.Ins = ins
-	utx.BaseTx.Outs = outs
-
-	// 3. Sign the tx
+	utx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		},
+	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err

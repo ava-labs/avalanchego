@@ -18,13 +18,13 @@ import (
 // so to have fork control over which dynamic fees is picked
 
 func init() {
-	if err := EForkDynamicFeesConfig.validate(); err != nil {
+	if err := EUpgradeDynamicFeesConfig.validate(); err != nil {
 		panic(err)
 	}
 }
 
-// EForkDynamicFeesConfig to be tuned TODO ABENEGIA
-var EForkDynamicFeesConfig = DynamicFeesConfig{
+// EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
+var EUpgradeDynamicFeesConfig = DynamicFeesConfig{
 	InitialUnitFees: commonfees.Dimensions{
 		1,
 		2,

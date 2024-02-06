@@ -20,7 +20,6 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	fees "github.com/ava-labs/avalanchego/vms/components/fees"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -258,20 +257,6 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetFeeWindows mocks base method.
-func (m *MockChain) GetFeeWindows() fees.Windows {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFeeWindows")
-	ret0, _ := ret[0].(fees.Windows)
-	return ret0
-}
-
-// GetFeeWindows indicates an expected call of GetFeeWindows.
-func (mr *MockChainMockRecorder) GetFeeWindows() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockChain)(nil).GetFeeWindows))
-}
-
 // GetPendingDelegatorIterator mocks base method.
 func (m *MockChain) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -392,20 +377,6 @@ func (mr *MockChainMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), arg0)
 }
 
-// GetUnitFees mocks base method.
-func (m *MockChain) GetUnitFees() fees.Dimensions {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnitFees")
-	ret0, _ := ret[0].(fees.Dimensions)
-	return ret0
-}
-
-// GetUnitFees indicates an expected call of GetUnitFees.
-func (mr *MockChainMockRecorder) GetUnitFees() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockChain)(nil).GetUnitFees))
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockChain) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -452,18 +423,6 @@ func (m *MockChain) PutPendingValidator(arg0 *Staker) {
 func (mr *MockChainMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockChain)(nil).PutPendingValidator), arg0)
-}
-
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockChain) SetConsumedUnitsWindows(arg0 fees.Windows) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
-}
-
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockChainMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockChain)(nil).SetConsumedUnitsWindows), arg0)
 }
 
 // SetCurrentSupply mocks base method.
@@ -514,18 +473,6 @@ func (m *MockChain) SetTimestamp(arg0 time.Time) {
 func (mr *MockChainMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), arg0)
-}
-
-// SetUnitFees mocks base method.
-func (m *MockChain) SetUnitFees(arg0 fees.Dimensions) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetUnitFees", arg0)
-}
-
-// SetUnitFees indicates an expected call of SetUnitFees.
-func (mr *MockChainMockRecorder) SetUnitFees(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUnitFees", reflect.TypeOf((*MockChain)(nil).SetUnitFees), arg0)
 }
 
 // MockDiff is a mock of Diff interface.
@@ -772,20 +719,6 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetFeeWindows mocks base method.
-func (m *MockDiff) GetFeeWindows() fees.Windows {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFeeWindows")
-	ret0, _ := ret[0].(fees.Windows)
-	return ret0
-}
-
-// GetFeeWindows indicates an expected call of GetFeeWindows.
-func (mr *MockDiffMockRecorder) GetFeeWindows() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockDiff)(nil).GetFeeWindows))
-}
-
 // GetPendingDelegatorIterator mocks base method.
 func (m *MockDiff) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -906,20 +839,6 @@ func (mr *MockDiffMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockDiff)(nil).GetUTXO), arg0)
 }
 
-// GetUnitFees mocks base method.
-func (m *MockDiff) GetUnitFees() fees.Dimensions {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnitFees")
-	ret0, _ := ret[0].(fees.Dimensions)
-	return ret0
-}
-
-// GetUnitFees indicates an expected call of GetUnitFees.
-func (mr *MockDiffMockRecorder) GetUnitFees() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockDiff)(nil).GetUnitFees))
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockDiff) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -966,18 +885,6 @@ func (m *MockDiff) PutPendingValidator(arg0 *Staker) {
 func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), arg0)
-}
-
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockDiff) SetConsumedUnitsWindows(arg0 fees.Windows) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
-}
-
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockDiffMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockDiff)(nil).SetConsumedUnitsWindows), arg0)
 }
 
 // SetCurrentSupply mocks base method.
@@ -1028,18 +935,6 @@ func (m *MockDiff) SetTimestamp(arg0 time.Time) {
 func (mr *MockDiffMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), arg0)
-}
-
-// SetUnitFees mocks base method.
-func (m *MockDiff) SetUnitFees(arg0 fees.Dimensions) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetUnitFees", arg0)
-}
-
-// SetUnitFees indicates an expected call of SetUnitFees.
-func (mr *MockDiffMockRecorder) SetUnitFees(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUnitFees", reflect.TypeOf((*MockDiff)(nil).SetUnitFees), arg0)
 }
 
 // MockState is a mock of State interface.
@@ -1411,20 +1306,6 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), arg0, arg1)
 }
 
-// GetFeeWindows mocks base method.
-func (m *MockState) GetFeeWindows() fees.Windows {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFeeWindows")
-	ret0, _ := ret[0].(fees.Windows)
-	return ret0
-}
-
-// GetFeeWindows indicates an expected call of GetFeeWindows.
-func (mr *MockStateMockRecorder) GetFeeWindows() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeWindows", reflect.TypeOf((*MockState)(nil).GetFeeWindows))
-}
-
 // GetLastAccepted mocks base method.
 func (m *MockState) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -1619,20 +1500,6 @@ func (mr *MockStateMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockState)(nil).GetUTXO), arg0)
 }
 
-// GetUnitFees mocks base method.
-func (m *MockState) GetUnitFees() fees.Dimensions {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnitFees")
-	ret0, _ := ret[0].(fees.Dimensions)
-	return ret0
-}
-
-// GetUnitFees indicates an expected call of GetUnitFees.
-func (mr *MockStateMockRecorder) GetUnitFees() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockState)(nil).GetUnitFees))
-}
-
 // GetUptime mocks base method.
 func (m *MockState) GetUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
 	m.ctrl.T.Helper()
@@ -1711,18 +1578,6 @@ func (mr *MockStateMockRecorder) PutPendingValidator(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockState)(nil).PutPendingValidator), arg0)
 }
 
-// SetConsumedUnitsWindows mocks base method.
-func (m *MockState) SetConsumedUnitsWindows(arg0 fees.Windows) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsumedUnitsWindows", arg0)
-}
-
-// SetConsumedUnitsWindows indicates an expected call of SetConsumedUnitsWindows.
-func (mr *MockStateMockRecorder) SetConsumedUnitsWindows(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsumedUnitsWindows", reflect.TypeOf((*MockState)(nil).SetConsumedUnitsWindows), arg0)
-}
-
 // SetCurrentSupply mocks base method.
 func (m *MockState) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
@@ -1795,18 +1650,6 @@ func (m *MockState) SetTimestamp(arg0 time.Time) {
 func (mr *MockStateMockRecorder) SetTimestamp(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockState)(nil).SetTimestamp), arg0)
-}
-
-// SetUnitFees mocks base method.
-func (m *MockState) SetUnitFees(arg0 fees.Dimensions) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetUnitFees", arg0)
-}
-
-// SetUnitFees indicates an expected call of SetUnitFees.
-func (mr *MockStateMockRecorder) SetUnitFees(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUnitFees", reflect.TypeOf((*MockState)(nil).SetUnitFees), arg0)
 }
 
 // SetUptime mocks base method.

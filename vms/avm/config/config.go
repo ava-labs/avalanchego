@@ -17,14 +17,9 @@ type Config struct {
 	DurangoTime time.Time
 
 	// Time of the E network upgrade
-	EForkTime time.Time
+	EUpgradeTime time.Time
 }
 
-func (c *Config) IsEForkActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.EForkTime)
-}
-
-// TODO ABENEGIA: consider structuring this method to handle forks (or is it YAGNI?)
-func (*Config) GetDynamicFeesConfig() DynamicFeesConfig {
-	return EForkDynamicFeesConfig
+func (c *Config) IsEUpgradeActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.EUpgradeTime)
 }

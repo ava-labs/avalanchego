@@ -46,7 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -89,8 +88,6 @@ var (
 	CurrentSupplyKey  = []byte("current supply")
 	LastAcceptedKey   = []byte("last accepted")
 	HeightsIndexedKey = []byte("heights indexed")
-	UnitFeesKey       = []byte("unit fees")
-	FeesWindowsKey    = []byte("fees windows")
 	InitializedKey    = []byte("initialized")
 	PrunedKey         = []byte("pruned")
 )
@@ -102,12 +99,6 @@ type Chain interface {
 	avax.UTXOAdder
 	avax.UTXOGetter
 	avax.UTXODeleter
-
-	GetUnitFees() commonfees.Dimensions
-	SetUnitFees(uf commonfees.Dimensions)
-
-	GetFeeWindows() commonfees.Windows
-	SetConsumedUnitsWindows(windows commonfees.Windows)
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -379,12 +370,11 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
-	unitFees                              commonfees.Dimensions
-	feesWindows                           commonfees.Windows
 	currentSupply, persistedCurrentSupply uint64
-	lastAccepted, persistedLastAccepted   ids.ID
-	indexedHeights                        *heightRange
-	singletonDB                           database.Database
+	// [lastAccepted] is the most recently accepted block.
+	lastAccepted, persistedLastAccepted ids.ID
+	indexedHeights                      *heightRange
+	singletonDB                         database.Database
 }
 
 // heightRange is used to track which heights are safe to use the native DB
@@ -1088,22 +1078,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetUnitFees() commonfees.Dimensions {
-	return s.unitFees
-}
-
-func (s *state) SetUnitFees(uf commonfees.Dimensions) {
-	s.unitFees = uf
-}
-
-func (s *state) GetFeeWindows() commonfees.Windows {
-	return s.feesWindows
-}
-
-func (s *state) SetConsumedUnitsWindows(windows commonfees.Windows) {
-	s.feesWindows = windows
-}
-
 func (s *state) GetTimestamp() time.Time {
 	return s.timestamp
 }
@@ -1438,38 +1412,6 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
-
-	switch unitFeesBytes, err := s.singletonDB.Get(UnitFeesKey); err {
-	case nil:
-		if err := s.unitFees.FromBytes(unitFeesBytes); err != nil {
-			return err
-		}
-
-	case database.ErrNotFound:
-		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored unit fees. Load from config
-		// TODO: remove once fork is active
-		s.unitFees = s.cfg.GetDynamicFeesConfig().InitialUnitFees
-
-	default:
-		return err
-	}
-
-	switch feesWindowsBytes, err := s.singletonDB.Get(FeesWindowsKey); err {
-	case nil:
-		if err := s.feesWindows.FromBytes(feesWindowsBytes); err != nil {
-			return err
-		}
-
-	case database.ErrNotFound:
-		// fork introducing dynamic fees may not be active yet,
-		// hence we may have never stored fees windows. Set to nil
-		// TODO: remove once fork is active
-		s.feesWindows = commonfees.EmptyWindows
-
-	default:
-		return err
-	}
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
@@ -2484,12 +2426,6 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
-	}
-	if err := s.singletonDB.Put(UnitFeesKey, s.unitFees.Bytes()); err != nil {
-		return fmt.Errorf("failed to write unit fees: %w", err)
-	}
-	if err := s.singletonDB.Put(FeesWindowsKey, s.feesWindows.Bytes()); err != nil {
-		return fmt.Errorf("failed to write unit fees: %w", err)
 	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {

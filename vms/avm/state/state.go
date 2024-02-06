@@ -89,7 +89,7 @@ type Chain interface {
 	SetTimestamp(t time.Time)
 
 	SetUnitFees(uf commonfees.Dimensions)
-	SetConsumedUnitsWindows(windows commonfees.Windows)
+	SetFeeWindows(windows commonfees.Windows)
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -500,7 +500,7 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 		// fork introducing dynamic fees may not be active yet,
 		// hence we may have never stored unit fees. Load from config
 		// TODO: remove once fork is active
-		s.unitFees = s.cfg.GetDynamicFeesConfig().InitialUnitFees
+		s.unitFees = config.EUpgradeDynamicFeesConfig.InitialUnitFees
 
 	default:
 		return err
@@ -561,7 +561,7 @@ func (s *state) GetFeeWindows() commonfees.Windows {
 	return s.feesWindows
 }
 
-func (s *state) SetConsumedUnitsWindows(windows commonfees.Windows) {
+func (s *state) SetFeeWindows(windows commonfees.Windows) {
 	s.feesWindows = windows
 }
 

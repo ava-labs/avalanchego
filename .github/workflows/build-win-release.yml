@@ -22,9 +22,9 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '~1.20.12'
           check-latest: true
@@ -33,7 +33,7 @@ jobs:
 
       - name: Install awscli
         run: |
-          msiexec.exe /passive /i /n https://awscli.amazonaws.com/AWSCLIV2.msi 
+          msiexec.exe /passive /i /n https://awscli.amazonaws.com/AWSCLIV2.msi
           aws --version
 
       - name: Configure AWS Credentials
@@ -69,9 +69,9 @@ jobs:
 
       - name: Copy to s3
         run: aws s3 cp .\build\avalanchego-win-${{ env.TAG }}-experimental.zip s3://${{ secrets.BUCKET }}/windows/avalanchego-win-${{ env.TAG }}-experimental.zip
-      
+
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build
           path: .\build\avalanchego-win-${{ env.TAG }}-experimental.zip

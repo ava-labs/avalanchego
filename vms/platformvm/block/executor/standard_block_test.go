@@ -24,8 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
@@ -89,8 +87,6 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	now := env.clk.Time()
 	env.clk.Set(now)
 	env.config.BanffTime = time.Time{} // activate Banff
-	env.config.DurangoTime = time.Time{}
-	env.config.EForkTime = time.Time{}
 
 	// setup and store parent block
 	// it's a standard block for simplicity
@@ -154,8 +150,6 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
-	onParentAccept.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
-	onParentAccept.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{

@@ -129,8 +129,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 				}
@@ -148,7 +148,7 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(ctrl *gomock.Controller) *manager {
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetTimestamp().Return(time.Time{})
+				// state.EXPECT().GetTimestamp().Return(time.Time{})
 				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
@@ -156,8 +156,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 					state: state,
@@ -183,7 +183,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
+				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
 				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
@@ -191,8 +191,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 					state:        state,
@@ -221,7 +221,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
+				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
 				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
@@ -229,8 +229,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 					state:        state,
@@ -259,7 +259,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				// These values don't matter for this test
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
-				state.EXPECT().GetTimestamp().Return(time.Time{}).Times(2)
+				state.EXPECT().GetTimestamp().Return(time.Time{}).AnyTimes()
 				state.EXPECT().GetUnitFees().Return(commonfees.Empty).AnyTimes()
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows).AnyTimes()
 
@@ -267,8 +267,8 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Bootstrapped: true,
 						Config: &config.Config{
-							DurangoTime: time.Time{},
-							EForkTime:   mockable.MaxTime,
+							DurangoTime:  time.Time{},
+							EUpgradeTime: mockable.MaxTime,
 						},
 					},
 					state:        state,

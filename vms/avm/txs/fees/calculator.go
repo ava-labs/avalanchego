@@ -24,17 +24,17 @@ var (
 
 type Calculator struct {
 	// setup, to be filled before visitor methods are called
-	IsEForkActive bool
-	Codec         codec.Manager
+	IsEUpgradeActive bool
 
-	// Pre E-fork inputs
+	// Pre E-Upgrade inputs
 	Config *config.Config
 
-	// Post E-fork inputs
+	// Post E-Upgrade inputs
 	FeeManager       *fees.Manager
 	ConsumedUnitsCap fees.Dimensions
+	Codec            codec.Manager
 
-	// inputs, to be filled before visitor methods are called
+	// common inputs
 	Credentials []*fxs.FxCredential
 
 	// outputs of visitor execution
@@ -42,7 +42,7 @@ type Calculator struct {
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -57,7 +57,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.CreateAssetTxFee
 		return nil
 	}
@@ -72,7 +72,7 @@ func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
 }
 
 func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -87,7 +87,7 @@ func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
@@ -106,7 +106,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
-	if !fc.IsEForkActive {
+	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}

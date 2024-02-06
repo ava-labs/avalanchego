@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -75,21 +76,11 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	// Syntactic verification is generally pretty fast, so we verify this first
-	// before performing any possible DB reads. TODO ABENEGIA: except we do DB reads now with fees stuff?
-	var (
-		feesCfg    = b.manager.backend.Config.GetDynamicFeesConfig()
-		unitFees   = b.manager.state.GetUnitFees()
-		feeWindows = b.manager.state.GetFeeWindows()
-	)
-
-	feeManager := fees.NewManager(unitFees, feeWindows)
+	// before performing any possible DB reads.
 	for _, tx := range txs {
 		err := tx.Unsigned.Visit(&executor.SyntacticVerifier{
-			Backend:       b.manager.backend,
-			BlkFeeManager: feeManager,
-			UnitCaps:      feesCfg.BlockUnitsCap,
-			BlkTimestamp:  newChainTime,
-			Tx:            tx,
+			Backend: b.manager.backend,
+			Tx:      tx,
 		})
 		if err != nil {
 			txID := tx.ID()
@@ -141,13 +132,22 @@ func (b *Block) Verify(context.Context) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
+	var (
+		feeCfg     = config.EUpgradeDynamicFeesConfig
+		unitFees   = stateDiff.GetUnitFees()
+		feeWindows = stateDiff.GetFeeWindows()
+		feeManager = fees.NewManager(unitFees, feeWindows)
+	)
+
 	for _, tx := range txs {
 		// Verify that the tx is valid according to the current state of the
 		// chain.
 		err := tx.Unsigned.Visit(&executor.SemanticVerifier{
-			Backend: b.manager.backend,
-			State:   stateDiff,
-			Tx:      tx,
+			Backend:       b.manager.backend,
+			BlkFeeManager: feeManager,
+			UnitCaps:      feeCfg.BlockUnitsCap,
+			State:         stateDiff,
+			Tx:            tx,
 		})
 		if err != nil {
 			txID := tx.ID()

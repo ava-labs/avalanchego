@@ -36,8 +36,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -268,11 +269,15 @@ func TestGetTx(t *testing.T) {
 		{
 			"proposal block",
 			func(service *Service) (*txs.Tx, error) {
-				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
+				sk, err := bls.NewSecretKey()
+				require.NoError(t, err)
+
+				return service.vm.txBuilder.NewAddPermissionlessValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
+					signer.NewProofOfPossession(sk),
 					ids.GenerateTestShortID(),
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
@@ -668,7 +673,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	service.vm.ctx.Lock.Lock()
 
 	// Reward the delegator
-	tx, err := service.vm.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := builder.NewRewardValidatorTx(service.vm.ctx, delTx.ID())
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
@@ -1014,59 +1019,3 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		})
 	}
 }
-
-func TestGetUnitFees(t *testing.T) {
-	require := require.New(t)
-	service, _ := defaultService(t)
-
-	reply := GetUnitFeesReply{}
-	require.NoError(service.GetUnitFees(nil, nil, &reply))
-
-	service.vm.ctx.Lock.Lock()
-
-	unitFees := service.vm.state.GetUnitFees()
-
-	require.Equal(unitFees, reply.UnitFees)
-
-	updatedUnitFees := commonfees.Dimensions{
-		123,
-		456,
-		789,
-		1011,
-	}
-	service.vm.state.SetUnitFees(updatedUnitFees)
-
-	service.vm.ctx.Lock.Unlock()
-
-	require.NoError(service.GetUnitFees(nil, nil, &reply))
-	require.Equal(updatedUnitFees, reply.UnitFees)
-}
-
-// TODO ABENEGIA: rethink the way to pull up this stuff
-// func TestGetBlockUnitsCap(t *testing.T) {
-// 	require := require.New(t)
-// 	service, _ := defaultService(t)
-
-// 	reply := GetBlockUnitsCapReply{}
-// 	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
-
-// 	service.vm.ctx.Lock.Lock()
-
-// 	unitCaps, err := service.vm.state.GetBlockUnitCaps()
-// 	require.NoError(err)
-
-// 	require.Equal(unitCaps, reply.MaxUnits)
-
-// 	updatedUnitCaps := commonfees.Dimensions{
-// 		123,
-// 		456,
-// 		789,
-// 		1011,
-// 	}
-// 	require.NoError(service.vm.state.SetBlockUnitCaps(updatedUnitCaps))
-
-// 	service.vm.ctx.Lock.Unlock()
-
-// 	require.NoError(service.GetBlockUnitsCap(nil, nil, &reply))
-// 	require.Equal(updatedUnitCaps, reply.MaxUnits)
-// }

@@ -102,7 +102,7 @@ func TestBaseTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		Codec:            Parser.Codec(),
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -214,7 +214,7 @@ func TestCreateAssetTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		Codec:            Parser.Codec(),
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -287,7 +287,7 @@ func TestImportTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		Codec:            Parser.Codec(),
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -360,7 +360,7 @@ func TestExportTx(t *testing.T) {
 	require.NoError(err)
 
 	fc := &fees.Calculator{
-		IsEForkActive:    true,
+		IsEUpgradeActive: true,
 		Codec:            Parser.Codec(),
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,

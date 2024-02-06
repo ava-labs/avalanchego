@@ -9,8 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ txs.Visitor = (*AtomicTxExecutor)(nil)
@@ -101,11 +99,9 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	e.OnAccept = onAccept
 
 	executor := StandardTxExecutor{
-		Backend:       e.Backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
-		UnitCaps:      commonfees.Empty,
-		State:         e.OnAccept,
-		Tx:            e.Tx,
+		Backend: e.Backend,
+		State:   e.OnAccept,
+		Tx:      e.Tx,
 	}
 	err = tx.Visit(&executor)
 	e.Inputs = executor.Inputs

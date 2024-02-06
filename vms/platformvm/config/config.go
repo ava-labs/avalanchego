@@ -41,31 +41,31 @@ type Config struct {
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
 
-	// Pre E Fork, fee that is burned by every non-state creating transaction
+	// Fee that is burned by every non-state creating transaction
 	TxFee uint64
 
-	// Pre E Fork, fee that must be burned by every state creating transaction before AP3
+	// Fee that must be burned by every state creating transaction before AP3
 	CreateAssetTxFee uint64
 
-	// Pre E Fork, fee that must be burned by every subnet creating transaction after AP3
+	// Fee that must be burned by every subnet creating transaction after AP3
 	CreateSubnetTxFee uint64
 
-	// Pre E Fork, fee that must be burned by every transform subnet transaction
+	// Fee that must be burned by every transform subnet transaction
 	TransformSubnetTxFee uint64
 
-	// Pre E Fork, fee that must be burned by every blockchain creating transaction after AP3
+	// Fee that must be burned by every blockchain creating transaction after AP3
 	CreateBlockchainTxFee uint64
 
-	// Pre E Fork, transaction fee for adding a primary network validator
+	// Transaction fee for adding a primary network validator
 	AddPrimaryNetworkValidatorFee uint64
 
-	// Pre E Fork, transaction fee for adding a primary network delegator
+	// Transaction fee for adding a primary network delegator
 	AddPrimaryNetworkDelegatorFee uint64
 
-	// Pre E Fork, transaction fee for adding a subnet validator
+	// Transaction fee for adding a subnet validator
 	AddSubnetValidatorFee uint64
 
-	// Pre E Fork, transaction fee for adding a subnet delegator
+	// Transaction fee for adding a subnet delegator
 	AddSubnetDelegatorFee uint64
 
 	// The minimum amount of tokens one must bond to be a validator
@@ -108,7 +108,7 @@ type Config struct {
 	DurangoTime time.Time
 
 	// Time of the E network upgrade
-	EForkTime time.Time
+	EUpgradeTime time.Time
 
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
@@ -141,7 +141,7 @@ func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 }
 
 func (c *Config) IsEForkActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.EForkTime)
+	return !timestamp.Before(c.EUpgradeTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
@@ -156,11 +156,6 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 		return c.CreateSubnetTxFee
 	}
 	return c.CreateAssetTxFee
-}
-
-// TODO ABENEGIA: consider structuring this method to handle forks (or is it YAGNI?)
-func (*Config) GetDynamicFeesConfig() DynamicFeesConfig {
-	return EForkDynamicFeesConfig
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of

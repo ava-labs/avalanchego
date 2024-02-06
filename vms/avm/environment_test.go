@@ -151,7 +151,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
 		DurangoTime:      time.Time{},
-		EForkTime:        mockable.MaxTime,
+		EUpgradeTime:     mockable.MaxTime,
 	}
 	if c.vmStaticConfig != nil {
 		vmStaticConfig = *c.vmStaticConfig

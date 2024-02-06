@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -491,18 +490,9 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		return nil, err
 	}
 
-	var (
-		feesCfg    = vm.Config.GetDynamicFeesConfig()
-		unitFees   = vm.state.GetUnitFees()
-		feeWindows = vm.state.GetFeeWindows()
-	)
-
 	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
-		Backend:       vm.txBackend,
-		BlkFeeManager: fees.NewManager(unitFees, feeWindows),
-		UnitCaps:      feesCfg.BlockUnitsCap,
-		BlkTimestamp:  vm.state.GetTimestamp(),
-		Tx:            tx,
+		Backend: vm.txBackend,
+		Tx:      tx,
 	})
 	if err != nil {
 		return nil, err
