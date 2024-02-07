@@ -81,10 +81,15 @@ func TestBaseTx(t *testing.T) {
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewBaseTx(
 		outputsToMove,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -148,6 +153,12 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 	be.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -156,8 +167,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -222,11 +232,16 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 	be.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewRemoveSubnetValidatorTx(
 		ids.GenerateTestNodeID(),
 		subnetID,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -296,14 +311,19 @@ func TestCreateChainTx(t *testing.T) {
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewCreateChainTx(
 		subnetID,
 		genesisBytes,
 		vmID,
 		fxIDs,
 		chainName,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -364,10 +384,15 @@ func TestCreateSubnetTx(t *testing.T) {
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewCreateSubnetTx(
 		subnetOwner,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -433,11 +458,16 @@ func TestImportTx(t *testing.T) {
 	be.EXPECT().UTXOs(gomock.Any(), sourceChainID).Return([]*avax.UTXO{importedUtxo}, nil)
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewImportTx(
 		sourceChainID,
 		importTo,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -505,11 +535,16 @@ func TestExportTx(t *testing.T) {
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewExportTx(
 		subnetID,
 		exportedOutputs,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -578,6 +613,12 @@ func TestTransformSubnetTx(t *testing.T) {
 		maxSupply     = 100 * units.MegaAvax
 	)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewTransformSubnetTx(
 		subnetID,
 		subnetAssetID,
@@ -593,8 +634,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		1,                             // min delegator stake
 		5,                             // max validator weight factor
 		.80*reward.PercentDenominator, // uptime requirement
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -666,6 +706,12 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -680,8 +726,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		reward.PercentDenominator,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 
@@ -745,6 +790,12 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
+	feesMan := commonfees.NewManager(testUnitFees)
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       feesMan,
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+	}
 	utx, err := b.NewAddPermissionlessDelegatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -756,8 +807,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		},
 		avaxAssetID,
 		rewardsOwner,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
 

@@ -39,7 +39,7 @@ func NewDynamicFeesBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) *
 
 func (b *DynamicFeesBuilder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
 	// 1. Build core transaction without utxos
@@ -66,13 +66,6 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.BaseTx(utx); err != nil {
 		return nil, err
@@ -93,7 +86,7 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 
 func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
@@ -116,13 +109,6 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
 	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
@@ -148,7 +134,7 @@ func (b *DynamicFeesBuilder) NewAddSubnetValidatorTx(
 func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
@@ -171,13 +157,6 @@ func (b *DynamicFeesBuilder) NewRemoveSubnetValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// update fees to account for the auth credentials to be added upon tx signing
 	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
@@ -206,7 +185,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	vmID ids.ID,
 	fxIDs []ids.ID,
 	chainName string,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
 	// 1. Build core transaction without utxos
@@ -236,13 +215,6 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
 	// update fees to account for the auth credentials to be added upon tx signing
 	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
@@ -266,7 +238,7 @@ func (b *DynamicFeesBuilder) NewCreateChainTx(
 
 func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
 	// 1. Build core transaction without utxos
@@ -284,13 +256,6 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.CreateSubnetTx(utx); err != nil {
@@ -311,7 +276,7 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 func (b *DynamicFeesBuilder) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	ops := common.NewOptions(options)
@@ -400,12 +365,6 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	}
 
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.ImportTx(utx); err != nil {
@@ -484,7 +443,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 func (b *DynamicFeesBuilder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	// 1. Build core transaction without utxos
@@ -511,13 +470,6 @@ func (b *DynamicFeesBuilder) NewExportTx(
 			return nil, err
 		}
 		toBurn[assetID] = amountToBurn
-	}
-
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
@@ -551,7 +503,7 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 	minDelegatorStake uint64,
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
 	// 1. Build core transaction without utxos
@@ -591,13 +543,6 @@ func (b *DynamicFeesBuilder) NewTransformSubnetTx(
 		assetID: maxSupply - initialSupply,
 	} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
 	// update fees to account for the auth credentials to be added upon tx signing
 	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
@@ -626,7 +571,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
 	ops := common.NewOptions(options)
@@ -653,13 +598,6 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessValidatorTx(
 	}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddPermissionlessValidatorTx(utx); err != nil {
 		return nil, err
@@ -681,7 +619,7 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
 	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.AddPermissionlessDelegatorTx, error) {
 	ops := common.NewOptions(options)
@@ -703,13 +641,6 @@ func (b *DynamicFeesBuilder) NewAddPermissionlessDelegatorTx(
 		assetID: vdr.Wght,
 	}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-
-	feesMan := commonfees.NewManager(unitFees)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddPermissionlessDelegatorTx(utx); err != nil {
