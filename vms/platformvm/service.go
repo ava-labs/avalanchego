@@ -525,13 +525,12 @@ type GetSubnetArgs struct {
 
 // GetSubnetResponse is the response from calling GetSubnet
 type GetSubnetResponse struct {
-	// ID of the subnet
-	SubnetID ids.ID `json:"subnetID"`
 	// whether it is permissioned or not
 	IsPermissioned bool `json:"isPermissioned"`
 	// subnet auth information for a permissioned subnet
 	ControlKeys []string    `json:"controlKeys"`
 	Threshold   json.Uint32 `json:"threshold"`
+	Locktime    json.Uint64 `json:"locktime"`
 	// subnet transformation tx ID for a permissionless subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
 }
@@ -542,28 +541,16 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		zap.String("method", "getSubnet"),
 	)
 
+	subnetID := args.SubnetID
+
+	if subnetID == constants.PrimaryNetworkID {
+		return fmt.Errorf("the primary network isn't a subnet")
+	}
+
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	response.SubnetID = args.SubnetID
-
-	if response.SubnetID == constants.PrimaryNetworkID {
-		response.IsPermissioned = false
-		response.ControlKeys = []string{}
-		response.Threshold = json.Uint32(0)
-		response.SubnetTransformationTxID = ids.Empty
-		return nil
-	}
-
-	if subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(response.SubnetID); err == nil {
-		response.IsPermissioned = false
-		response.ControlKeys = []string{}
-		response.Threshold = json.Uint32(0)
-		response.SubnetTransformationTxID = subnetTransformationTx.ID()
-		return nil
-	}
-
-	subnetOwner, err := s.vm.state.GetSubnetOwner(response.SubnetID)
+	subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
 	if err != nil {
 		return err
 	}
@@ -580,10 +567,20 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		controlAddrs[i] = addr
 	}
 
-	response.IsPermissioned = true
 	response.ControlKeys = controlAddrs
 	response.Threshold = json.Uint32(owner.Threshold)
-	response.SubnetTransformationTxID = ids.Empty
+	response.Locktime = json.Uint64(owner.Locktime)
+
+	switch subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(subnetID); err {
+	case nil:
+		response.IsPermissioned = false
+		response.SubnetTransformationTxID = subnetTransformationTx.ID()
+	case database.ErrNotFound:
+		response.IsPermissioned = true
+		response.SubnetTransformationTxID = ids.Empty
+	default:
+		return err
+	}
 
 	return nil
 }
