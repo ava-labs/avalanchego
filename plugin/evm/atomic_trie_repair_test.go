@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -13,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 type atomicTrieRepairTest struct {
