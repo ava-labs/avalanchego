@@ -24,6 +24,8 @@ var (
 )
 
 type Signature interface {
+	fmt.Stringer
+
 	// NumSigners is the number of [bls.PublicKeys] that participated in the
 	// [Signature]. This is exposed because users of these signatures typically
 	// impose a verification fee that is a function of the number of
@@ -163,4 +165,8 @@ func VerifyWeight(
 		)
 	}
 	return nil
+}
+
+func (s BitSetSignature) String() string {
+	return fmt.Sprintf("BitSetSignature(Signers = %x, Signature = %x)", s.Signers, s.Signature)
 }
