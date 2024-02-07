@@ -4,8 +4,6 @@
 package config
 
 import (
-	"math"
-
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
@@ -25,12 +23,7 @@ var EUpgradeDynamicFeesConfig = DynamicFeesConfig{
 		4,
 	},
 
-	BlockUnitsCap: commonfees.Dimensions{
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-	},
+	BlockUnitsCap: commonfees.Max,
 }
 
 type DynamicFeesConfig struct {

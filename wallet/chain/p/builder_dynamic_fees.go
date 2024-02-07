@@ -37,6 +37,46 @@ func NewDynamicFeesBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) *
 	}
 }
 
+func (b *DynamicFeesBuilder) newBaseTxPreEUpgrade(
+	outputs []*avax.TransferableOutput,
+	feeCalc *fees.Calculator,
+	options ...common.Option,
+) (*txs.CreateSubnetTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+
+	utx := &txs.CreateSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Outs:         outputs, // not sorted yet, we'll sort later on when we have all the outputs
+			Memo:         ops.Memo(),
+		}},
+		Owner: &secp256k1fx.OutputOwners{},
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.CreateSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, changeOutputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+	outputs = append(outputs, changeOutputs...)
+	avax.SortTransferableOutputs(outputs, txs.Codec) // sort the outputs
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, initCtx(b.backend, utx)
+}
+
 func (b *DynamicFeesBuilder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	feeCalc *fees.Calculator,
@@ -259,6 +299,55 @@ func (b *DynamicFeesBuilder) NewCreateSubnetTx(
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.CreateSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.financeTx(toBurn, toStake, feeCalc, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utx.Ins = inputs
+	utx.Outs = outputs
+
+	return utx, initCtx(b.backend, utx)
+}
+
+func (b *DynamicFeesBuilder) NewTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
+	options ...common.Option,
+) (*txs.TransferSubnetOwnershipTx, error) {
+	// 1. Build core transaction without utxos
+	ops := common.NewOptions(options)
+	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Sort(owner.Addrs)
+	utx := &txs.TransferSubnetOwnershipTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Memo:         ops.Memo(),
+		}},
+		SubnetAuth: subnetAuth,
+		Owner:      owner,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	toStake := map[ids.ID]uint64{}
+	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+
+	// update fees to account for the auth credentials to be added upon tx signing
+	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
+	}
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.TransferSubnetOwnershipTx(utx); err != nil {
 		return nil, err
 	}
 
