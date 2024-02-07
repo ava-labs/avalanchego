@@ -75,7 +75,7 @@ type Spender interface {
 	FinanceTx(
 		utxoReader avax.UTXOReader,
 		keys []*secp256k1.PrivateKey,
-		amount uint64,
+		amountToStake uint64,
 		feeCalc *fees.Calculator,
 		changeAddr ids.ShortID,
 	) (
@@ -410,7 +410,7 @@ func (h *handler) Spend(
 func (h *handler) FinanceTx(
 	utxoReader avax.UTXOReader,
 	keys []*secp256k1.PrivateKey,
-	amount uint64,
+	amountToStake uint64,
 	feeCalc *fees.Calculator,
 	changeAddr ids.ShortID,
 ) (
@@ -448,7 +448,7 @@ func (h *handler) FinanceTx(
 	for _, utxo := range utxos {
 		// If we have consumed more AVAX than we are trying to stake, then we
 		// have no need to consume more locked AVAX
-		if amountStaked >= amount {
+		if amountStaked >= amountToStake {
 			break
 		}
 
@@ -512,8 +512,8 @@ func (h *handler) FinanceTx(
 
 		// Stake any value that should be staked
 		amountToStake := math.Min(
-			amount-amountStaked, // Amount we still need to stake
-			remainingValue,      // Amount available to stake
+			amountToStake-amountStaked, // Amount we still need to stake
+			remainingValue,             // Amount available to stake
 		)
 		amountStaked += amountToStake
 		remainingValue -= amountToStake
@@ -585,7 +585,7 @@ func (h *handler) FinanceTx(
 		// If we have consumed more AVAX than we are trying to stake,
 		// and we have burned more AVAX than we need to,
 		// then we have no need to consume more AVAX
-		if amountBurned >= targetFee && amountStaked >= amount {
+		if amountBurned >= targetFee && amountStaked >= amountToStake {
 			break
 		}
 
@@ -646,8 +646,8 @@ func (h *handler) FinanceTx(
 
 		// Stake any value that should be staked
 		amountToStake := math.Min(
-			amount-amountStaked, // Amount we still need to stake
-			remainingValue,      // Amount available to stake
+			amountToStake-amountStaked, // Amount we still need to stake
+			remainingValue,             // Amount available to stake
 		)
 		amountStaked += amountToStake
 		remainingValue -= amountToStake
@@ -731,10 +731,10 @@ func (h *handler) FinanceTx(
 		signers = append(signers, inSigners)
 	}
 
-	if amountBurned < targetFee || amountStaked < amount {
+	if amountBurned < targetFee || amountStaked < amountToStake {
 		return nil, nil, nil, nil, fmt.Errorf(
 			"%w (unlocked, locked) (%d, %d) but need (%d, %d)",
-			ErrInsufficientFunds, amountBurned, amountStaked, targetFee, amount,
+			ErrInsufficientFunds, amountBurned, amountStaked, targetFee, amountToStake,
 		)
 	}
 
