@@ -10,12 +10,12 @@ description = "Straightforward Linux AIO using Futures/async/await."
 emulated-failure = []
 
 [dependencies]
-libc = "0.2.133"
+libc = "0.2.153"
 parking_lot = "0.12.1"
-crossbeam-channel = "0.5.6"
+crossbeam-channel = "0.5.11"
 
 [dev-dependencies]
-futures = "0.3.24"
+futures = "0.3.30"
 
 [lib]
 name = "aiofut"

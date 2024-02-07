@@ -5,12 +5,13 @@
 
 version: 2
 updates:
-  - package-ecosystem: cargo
+  - package-ecosystem: "cargo"
+    versioning-strategy: "increase"
     directory: "/"
     schedule:
-      interval: daily
+      interval: "daily"
       time: "05:00"
-      timezone: America/Los_Angeles
+      timezone: "America/Los_Angeles"
     open-pull-requests-limit: 10
     allow:
-      - dependency-type: all
+      - dependency-type: "all"

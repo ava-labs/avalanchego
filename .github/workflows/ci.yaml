@@ -29,7 +29,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          # We can do this now because we use specific verison and update with Dependabot
+          # We can do this now because we use specific version and update with Dependabot
           # but if we make the deps any less specifc, we'll have to fix
           key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
           # start from the previous set of cached dependencies
@@ -101,6 +101,10 @@ jobs:
         run: cargo fmt -- --check
       - name: Clippy
         run: cargo clippy --tests --examples --benches --all-features -- -D warnings
+      - name: Cargo Edit
+        run: cargo install cargo-edit
+      - name: Cargo upgrade
+        run: cargo upgrade --locked
 
   test:
     needs: build
