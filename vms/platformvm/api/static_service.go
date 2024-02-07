@@ -4,6 +4,7 @@
 package api
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"net/http"
@@ -51,10 +52,10 @@ type UTXO struct {
 
 // TODO can we define this on *UTXO?
 func (utxo UTXO) Compare(other UTXO) int {
-	if locktimeCmp := utils.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
+	if locktimeCmp := cmp.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
 		return locktimeCmp
 	}
-	if amountCmp := utils.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
+	if amountCmp := cmp.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
 		return amountCmp
 	}
 

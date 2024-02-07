@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -22,8 +23,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 
 	"go.uber.org/zap"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"

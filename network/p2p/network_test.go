@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -478,7 +477,7 @@ func TestPeersSample(t *testing.T) {
 			sampleable.Difference(tt.disconnected)
 
 			sampled := network.Peers.Sample(tt.limit)
-			require.Len(sampled, math.Min(tt.limit, len(sampleable)))
+			require.Len(sampled, min(tt.limit, len(sampleable)))
 			require.Subset(sampleable, sampled)
 		})
 	}
