@@ -510,12 +510,6 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 	return nil
 }
 
-/*
- *****************************************************
- ******************* Get Subnet **********************
- *****************************************************
- */
-
 // GetSubnetArgs are the arguments to GetSubnet
 type GetSubnetArgs struct {
 	// ID of the subnet to retrieve information about
