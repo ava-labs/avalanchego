@@ -543,7 +543,7 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 	subnetID := args.SubnetID
 
 	if subnetID == constants.PrimaryNetworkID {
-		return fmt.Errorf("the primary network isn't a subnet")
+		return errors.New("the primary network isn't a subnet")
 	}
 
 	s.vm.ctx.Lock.Lock()
