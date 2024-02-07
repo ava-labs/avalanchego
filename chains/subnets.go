@@ -70,6 +70,7 @@ func (s *Subnets) Bootstrapping() []ids.ID {
 	return subnetsBootstrapping
 }
 
+// NewSubnets returns an instance of Subnets
 func NewSubnets(
 	nodeID ids.NodeID,
 	configs map[ids.ID]subnets.Config,
