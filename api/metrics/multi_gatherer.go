@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -13,7 +14,6 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
@@ -90,6 +90,6 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 
 func sortMetrics(m []*dto.MetricFamily) {
 	slices.SortFunc(m, func(i, j *dto.MetricFamily) int {
-		return utils.Compare(*i.Name, *j.Name)
+		return cmp.Compare(*i.Name, *j.Name)
 	})
 }
