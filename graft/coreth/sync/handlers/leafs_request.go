@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
@@ -284,7 +283,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 	// segments of the data and use them in the response.
 	hasGap := false
 	for i := 0; i < len(snapKeys); i += segmentLen {
-		segmentEnd := math.Min(i+segmentLen, len(snapKeys))
+		segmentEnd := min(i+segmentLen, len(snapKeys))
 		proof, ok, _, err := rb.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
 		if err != nil {
 			rb.stats.IncProofError()
@@ -320,7 +319,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 		// all the key/vals in the segment are valid, but possibly shorten segmentEnd
 		// here to respect limit. this is necessary in case the number of leafs we read
 		// from the trie is more than the length of a segment which cannot be validated. limit
-		segmentEnd = math.Min(segmentEnd, i+int(rb.limit)-len(rb.response.Keys))
+		segmentEnd = min(segmentEnd, i+int(rb.limit)-len(rb.response.Keys))
 		rb.response.Keys = append(rb.response.Keys, snapKeys[i:segmentEnd]...)
 		rb.response.Vals = append(rb.response.Vals, snapVals[i:segmentEnd]...)
 

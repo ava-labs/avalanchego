@@ -1,10 +1,10 @@
 module github.com/ava-labs/coreth
 
-go 1.20
+go 1.21
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0
-	github.com/ava-labs/avalanchego v1.10.19-legacy-upgrade-times
+	github.com/ava-labs/avalanchego v1.11.0-rc.1.0.20240207163634-e248179ae759
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.1.0

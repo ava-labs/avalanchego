@@ -8,8 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
