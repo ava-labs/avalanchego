@@ -366,7 +366,7 @@ func (b *builder) NewBaseTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) newBaseTxPreEUpgrade(
@@ -406,7 +406,7 @@ func (b *builder) newBaseTxPreEUpgrade(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddValidatorTx(
@@ -450,7 +450,7 @@ func (b *builder) NewAddValidatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
@@ -460,7 +460,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 ) (*txs.AddSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, vdr.Subnet, ops)
+	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -497,7 +497,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
@@ -508,7 +508,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +545,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddDelegatorTx(
@@ -587,7 +587,7 @@ func (b *builder) NewAddDelegatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewCreateChainTx(
@@ -601,14 +601,14 @@ func (b *builder) NewCreateChainTx(
 ) (*txs.CreateChainTx, error) {
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
-	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
 	utils.Sort(fxIDs)
 
-	uTx := &txs.CreateChainTx{
+	utx := &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
 			BlockchainID: constants.PlatformChainID,
@@ -632,7 +632,7 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
-	if err = feeCalc.CreateChainTx(uTx); err != nil {
+	if err = feeCalc.CreateChainTx(utx); err != nil {
 		return nil, err
 	}
 
@@ -641,10 +641,10 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
-	uTx.Ins = inputs
-	uTx.Outs = outputs
+	utx.Ins = inputs
+	utx.Outs = outputs
 
-	return uTx, initCtx(b.backend, uTx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewCreateSubnetTx(
@@ -681,7 +681,7 @@ func (b *builder) NewCreateSubnetTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewTransferSubnetOwnershipTx(
@@ -692,7 +692,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 ) (*txs.TransferSubnetOwnershipTx, error) {
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
-	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -730,7 +730,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewImportTx(
@@ -841,7 +841,7 @@ func (b *builder) NewImportTx(
 	case importedAVAX == feeCalc.Fee:
 		// imported inputs match exactly the fees to be paid
 		avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-		return utx, initCtx(b.backend, utx)
+		return utx, b.initCtx(utx)
 
 	case importedAVAX < feeCalc.Fee:
 		// imported inputs can partially pay fees
@@ -870,12 +870,12 @@ func (b *builder) NewImportTx(
 			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
 			utx.Outs = append(utx.Outs, changeOut)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-			return utx, initCtx(b.backend, utx)
+			return utx, b.initCtx(utx)
 
 		case feeCalc.Fee == importedAVAX:
 			// imported fees pays exactly the tx cost. We don't include the outputs
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-			return utx, initCtx(b.backend, utx)
+			return utx, b.initCtx(utx)
 
 		default:
 			// imported avax are not enough to pay fees
@@ -897,7 +897,7 @@ func (b *builder) NewImportTx(
 	utx.Ins = inputs
 	utx.Outs = append(utx.Outs, changeOuts...)
 	avax.SortTransferableOutputs(utx.Outs, txs.Codec) // sort imported outputs
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewExportTx(
@@ -945,7 +945,7 @@ func (b *builder) NewExportTx(
 	utx.Ins = inputs
 	utx.Outs = changeOuts
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewTransformSubnetTx(
@@ -969,7 +969,7 @@ func (b *builder) NewTransformSubnetTx(
 	// 1. Build core transaction without utxos
 	ops := common.NewOptions(options)
 
-	subnetAuth, err := authorizeSubnet(b.backend, b.addrs, subnetID, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -1021,7 +1021,7 @@ func (b *builder) NewTransformSubnetTx(
 	utx.Ins = inputs
 	utx.Outs = outputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddPermissionlessValidatorTx(
@@ -1072,7 +1072,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) NewAddPermissionlessDelegatorTx(
@@ -1116,7 +1116,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	utx.Outs = outputs
 	utx.StakeOuts = stakeOutputs
 
-	return utx, initCtx(b.backend, utx)
+	return utx, b.initCtx(utx)
 }
 
 func (b *builder) getBalance(
@@ -1519,13 +1519,11 @@ func financeCredential(feeCalc *fees.Calculator, inputSigIndices []uint32) (uint
 	return addedFees, nil
 }
 
-func authorizeSubnet(
-	backend BuilderBackend,
-	addresses set.Set[ids.ShortID],
+func (b *builder) authorizeSubnet(
 	subnetID ids.ID,
 	options *common.Options,
 ) (*secp256k1fx.Input, error) {
-	ownerIntf, err := backend.GetSubnetOwner(options.Context(), subnetID)
+	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch subnet owner for %q: %w",
@@ -1538,7 +1536,7 @@ func authorizeSubnet(
 		return nil, errUnknownOwnerType
 	}
 
-	addrs := options.Addresses(addresses)
+	addrs := options.Addresses(b.addrs)
 	minIssuanceTime := options.MinIssuanceTime()
 	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
 	if !ok {
@@ -1550,8 +1548,8 @@ func authorizeSubnet(
 	}, nil
 }
 
-func initCtx(backend BuilderBackend, tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(backend)
+func (b *builder) initCtx(tx txs.UnsignedTx) error {
+	ctx, err := newSnowContext(b.backend)
 	if err != nil {
 		return err
 	}
