@@ -70,7 +70,7 @@ func (s *Subnets) Get(subnetID ids.ID) (subnets.Subnet, bool) {
 	return subnet, ok
 }
 
-// Bootstrapping returns subnets that have any chains that are still
+// Bootstrapping returns the subnetIDs of any chains that are still
 // bootstrapping.
 func (s *Subnets) Bootstrapping() []ids.ID {
 	s.lock.Lock()
