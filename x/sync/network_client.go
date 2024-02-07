@@ -204,22 +204,30 @@ func (c *networkClient) RequestAny(
 	}
 	defer c.activeRequests.Release(1)
 
-	c.lock.Lock()
-	nodeID, ok := c.peers.SelectPeer()
-	if !ok {
-		numPeers := c.peers.Size()
-		c.lock.Unlock()
-		return ids.EmptyNodeID, nil, fmt.Errorf("no peers found from %d peers", numPeers)
-	}
-
-	responseChan, err := c.sendRequest(ctx, nodeID, request)
-	c.lock.Unlock()
+	nodeID, responseChan, err := c.sendRequestAny(ctx, request)
 	if err != nil {
 		return ids.EmptyNodeID, nil, err
 	}
 
 	response, err := c.awaitResponse(ctx, nodeID, responseChan)
 	return nodeID, response, err
+}
+
+func (c *networkClient) sendRequestAny(
+	ctx context.Context,
+	request []byte,
+) (ids.NodeID, chan []byte, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	nodeID, ok := c.peers.SelectPeer()
+	if !ok {
+		numPeers := c.peers.Size()
+		return ids.EmptyNodeID, nil, fmt.Errorf("no peers found from %d peers", numPeers)
+	}
+
+	responseChan, err := c.sendRequestLocked(ctx, nodeID, request)
+	return nodeID, responseChan, err
 }
 
 // If [errAppSendFailed] is returned this should be considered fatal.
@@ -235,14 +243,23 @@ func (c *networkClient) Request(
 	}
 	defer c.activeRequests.Release(1)
 
-	c.lock.Lock()
 	responseChan, err := c.sendRequest(ctx, nodeID, request)
-	c.lock.Unlock()
 	if err != nil {
 		return nil, err
 	}
 
 	return c.awaitResponse(ctx, nodeID, responseChan)
+}
+
+func (c *networkClient) sendRequest(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	request []byte,
+) (chan []byte, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.sendRequestLocked(ctx, nodeID, request)
 }
 
 // Sends [request] to [nodeID] and returns a channel that will populate the
@@ -254,7 +271,7 @@ func (c *networkClient) Request(
 // not be added to [c.peers].
 //
 // Assumes [c.lock] is held.
-func (c *networkClient) sendRequest(
+func (c *networkClient) sendRequestLocked(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	request []byte,
