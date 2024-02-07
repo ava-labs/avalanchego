@@ -356,6 +356,20 @@ func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error 
 	return nil
 }
 
+// Restart a single node.
+func (n *Network) RestartNode(ctx context.Context, w io.Writer, node *Node) error {
+	if err := node.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
+	}
+	if err := n.StartNode(ctx, w, node); err != nil {
+		return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
+	}
+	if _, err := fmt.Fprintf(w, " waiting for node %s to report healthy\n", node.NodeID); err != nil {
+		return err
+	}
+	return WaitForHealthy(ctx, node)
+}
+
 // Waits until all nodes in the network are healthy.
 func (n *Network) WaitForHealthy(ctx context.Context, w io.Writer) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
@@ -427,16 +441,7 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 		return err
 	}
 	for _, node := range n.Nodes {
-		if err := node.Stop(ctx); err != nil {
-			return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
-		}
-		if err := n.StartNode(ctx, w, node); err != nil {
-			return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
-		}
-		if _, err := fmt.Fprintf(w, " waiting for node %s to report healthy\n", node.NodeID); err != nil {
-			return err
-		}
-		if err := WaitForHealthy(ctx, node); err != nil {
+		if err := n.RestartNode(ctx, w, node); err != nil {
 			return err
 		}
 	}
@@ -485,17 +490,26 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		}
 	}
 
-	// Ensure available subnets are tracked
+	return nil
+}
+
+// TrackedSubnetsForNode returns the subnet IDs for the given node
+func (n *Network) TrackedSubnetsForNode(nodeID ids.NodeID) string {
 	subnetIDs := make([]string, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if subnet.SubnetID == ids.Empty {
+			// Subnet has not yet been created
 			continue
 		}
-		subnetIDs = append(subnetIDs, subnet.SubnetID.String())
+		// Only track subnets that this node validates
+		for _, validatorID := range subnet.ValidatorIDs {
+			if validatorID == nodeID {
+				subnetIDs = append(subnetIDs, subnet.SubnetID.String())
+				break
+			}
+		}
 	}
-	flags[config.TrackSubnetsKey] = strings.Join(subnetIDs, ",")
-
-	return nil
+	return strings.Join(subnetIDs, ",")
 }
 
 func (n *Network) GetSubnet(name string) *Subnet {
@@ -507,10 +521,14 @@ func (n *Network) GetSubnet(name string) *Subnet {
 	return nil
 }
 
-// Ensure that each subnet on the network is created and that it is validated by all non-ephemeral nodes.
+// Ensure that each subnet on the network is created.
 func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
+		if len(subnet.ValidatorIDs) == 0 {
+			return fmt.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
+		}
+
 		if _, err := fmt.Fprintf(w, "Creating subnet %q\n", subnet.Name); err != nil {
 			return err
 		}
@@ -562,34 +580,53 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	// Reconfigure nodes for the new subnets
-	if _, err := fmt.Fprintf(w, "Configured nodes to track new subnet(s). Restart is required.\n"); err != nil {
+	if _, err := fmt.Fprintf(w, "Restarting node(s) to enable them to track the new subnet(s)\n"); err != nil {
 		return err
 	}
+	reconfiguredNodes := []*Node{}
 	for _, node := range n.Nodes {
-		if err := n.EnsureNodeConfig(node); err != nil {
+		existingTrackedSubnets, err := node.Flags.GetStringVal(config.TrackSubnetsKey)
+		if err != nil {
+			return err
+		}
+		trackedSubnets := n.TrackedSubnetsForNode(node.NodeID)
+		if existingTrackedSubnets == trackedSubnets {
+			continue
+		}
+		node.Flags[config.TrackSubnetsKey] = trackedSubnets
+		reconfiguredNodes = append(reconfiguredNodes, node)
+	}
+	for _, node := range reconfiguredNodes {
+		if err := n.RestartNode(ctx, w, node); err != nil {
 			return err
 		}
 	}
-	// Restart nodes to allow new configuration to take effect
-	// TODO(marun) Only restart the validator nodes of newly-created subnets
-	if err := n.Restart(ctx, w); err != nil {
-		return err
-	}
 
-	// Add each node as a subnet validator
+	// Add validators for the subnet
 	for _, subnet := range createdSubnets {
 		if _, err := fmt.Fprintf(w, "Adding validators for subnet %q\n", subnet.Name); err != nil {
 			return err
 		}
-		if err := subnet.AddValidators(ctx, w, n.Nodes); err != nil {
+
+		// Collect the nodes intended to validate the subnet
+		validatorIDs := set.NewSet[ids.NodeID](len(subnet.ValidatorIDs))
+		validatorIDs.Add(subnet.ValidatorIDs...)
+		validatorNodes := []*Node{}
+		for _, node := range n.Nodes {
+			if !validatorIDs.Contains(node.NodeID) {
+				continue
+			}
+			validatorNodes = append(validatorNodes, node)
+		}
+
+		if err := subnet.AddValidators(ctx, w, validatorNodes...); err != nil {
 			return err
 		}
 	}
 
 	// Wait for nodes to become subnet validators
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
-	restartRequired := false
+	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
 		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
 			return err
@@ -612,17 +649,29 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer) error {
 		// subnet's validator nodes will need to be restarted for those nodes to read
 		// the newly written chain configuration and apply it to the chain(s).
 		if subnet.HasChainConfig() {
-			restartRequired = true
+			validatorsToRestart.Add(subnet.ValidatorIDs...)
 		}
 	}
 
-	if !restartRequired {
+	if len(validatorsToRestart) == 0 {
 		return nil
 	}
 
+	if _, err := fmt.Fprintf(w, "Restarting node(s) to pick up chain configuration\n"); err != nil {
+		return err
+	}
+
 	// Restart nodes to allow configuration for the new chains to take effect
-	// TODO(marun) Only restart the validator nodes of subnets that have chains that need configuring
-	return n.Restart(ctx, w)
+	for _, node := range n.Nodes {
+		if !validatorsToRestart.Contains(node.NodeID) {
+			continue
+		}
+		if err := n.RestartNode(ctx, w, node); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (n *Network) GetURIForNodeID(nodeID ids.NodeID) (string, error) {

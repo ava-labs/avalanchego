@@ -152,7 +152,7 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 }
 
 // Add validators to the subnet
-func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes []*Node) error {
+func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes ...*Node) error {
 	apiURI := nodes[0].URI
 
 	wallet, err := s.GetWallet(ctx, apiURI)
@@ -198,8 +198,6 @@ func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, nodes []*Node) 
 		if _, err := fmt.Fprintf(w, " added %s as validator for subnet `%s`\n", node.NodeID, s.Name); err != nil {
 			return err
 		}
-
-		s.ValidatorIDs = append(s.ValidatorIDs, node.NodeID)
 	}
 
 	return nil
