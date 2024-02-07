@@ -63,22 +63,23 @@ const (
 )
 
 var (
-	errMissingDecisionBlock     = errors.New("should have a decision block within the past two blocks")
-	errNoSubnetID               = errors.New("argument 'subnetID' not provided")
-	errNoRewardAddress          = errors.New("argument 'rewardAddress' not provided")
-	errInvalidDelegationRate    = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
-	errNoAddresses              = errors.New("no addresses provided")
-	errNoKeys                   = errors.New("user has no keys or funds")
-	errStartTimeTooSoon         = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
-	errStartTimeTooLate         = errors.New("start time is too far in the future")
-	errNamedSubnetCantBePrimary = errors.New("subnet validator attempts to validate primary network")
-	errNoAmount                 = errors.New("argument 'amount' must be > 0")
-	errMissingName              = errors.New("argument 'name' not given")
-	errMissingVMID              = errors.New("argument 'vmID' not given")
-	errMissingBlockchainID      = errors.New("argument 'blockchainID' not given")
-	errMissingPrivateKey        = errors.New("argument 'privateKey' not given")
-	errStartAfterEndTime        = errors.New("start time must be before end time")
-	errStartTimeInThePast       = errors.New("start time in the past")
+	errMissingDecisionBlock       = errors.New("should have a decision block within the past two blocks")
+	errNoSubnetID                 = errors.New("argument 'subnetID' not provided")
+	errPrimaryNetworkIsNotASubnet = errors.New("the primary network isn't a subnet")
+	errNoRewardAddress            = errors.New("argument 'rewardAddress' not provided")
+	errInvalidDelegationRate      = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
+	errNoAddresses                = errors.New("no addresses provided")
+	errNoKeys                     = errors.New("user has no keys or funds")
+	errStartTimeTooSoon           = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
+	errStartTimeTooLate           = errors.New("start time is too far in the future")
+	errNamedSubnetCantBePrimary   = errors.New("subnet validator attempts to validate primary network")
+	errNoAmount                   = errors.New("argument 'amount' must be > 0")
+	errMissingName                = errors.New("argument 'name' not given")
+	errMissingVMID                = errors.New("argument 'vmID' not given")
+	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
+	errMissingPrivateKey          = errors.New("argument 'privateKey' not given")
+	errStartAfterEndTime          = errors.New("start time must be before end time")
+	errStartTimeInThePast         = errors.New("start time in the past")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -532,18 +533,17 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getSubnet"),
+		zap.Stringer("subnetID", args.SubnetID),
 	)
 
-	subnetID := args.SubnetID
-
-	if subnetID == constants.PrimaryNetworkID {
-		return errors.New("the primary network isn't a subnet")
+	if args.SubnetID == constants.PrimaryNetworkID {
+		return errPrimaryNetworkIsNotASubnet
 	}
 
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
+	subnetOwner, err := s.vm.state.GetSubnetOwner(args.SubnetID)
 	if err != nil {
 		return err
 	}
@@ -564,7 +564,7 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 	response.Threshold = json.Uint32(owner.Threshold)
 	response.Locktime = json.Uint64(owner.Locktime)
 
-	switch subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(subnetID); err {
+	switch subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(args.SubnetID); err {
 	case nil:
 		response.IsPermissioned = false
 		response.SubnetTransformationTxID = subnetTransformationTx.ID()
