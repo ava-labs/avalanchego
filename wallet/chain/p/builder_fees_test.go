@@ -86,10 +86,7 @@ func TestBaseTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -207,10 +204,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	}
 	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, subnetAuthAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr, subnetAuthAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -315,10 +309,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	}
 	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, subnetAuthAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr, subnetAuthAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -431,10 +422,7 @@ func TestCreateChainTx(t *testing.T) {
 	}
 	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, subnetAuthAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr, subnetAuthAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -544,10 +532,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -653,10 +638,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	}
 	sbe.EXPECT().GetSubnetOwner(gomock.Any(), gomock.Any()).Return(subnetOwner, nil).AnyTimes()
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, subnetAuthKey.Address()),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr, subnetAuthKey.Address()), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -768,10 +750,7 @@ func TestImportTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -885,10 +864,7 @@ func TestExportTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -1001,10 +977,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	}
 	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, subnetAuthAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr, subnetAuthAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -1145,10 +1118,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, rewardAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr, rewardAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -1284,10 +1254,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr, rewardAddr),
-		backend: be,
-	}
+	b := NewBuilder(set.Of(utxoAddr, rewardAddr), be)
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
