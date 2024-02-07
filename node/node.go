@@ -1168,8 +1168,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			TracingEnabled:                          n.Config.TraceConfig.Enabled,
 			Tracer:                                  n.tracer,
 			ChainDataDir:                            n.Config.ChainDataDir,
+			Subnets:                                 n.subnets,
 		},
-		n.subnets,
 	)
 
 	// Notify the API server when new chains are created

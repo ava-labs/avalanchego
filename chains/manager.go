@@ -233,6 +233,8 @@ type ManagerConfig struct {
 	StateSyncBeacons []ids.NodeID
 
 	ChainDataDir string
+
+	Subnets *Subnets
 }
 
 type manager struct {
@@ -268,13 +270,12 @@ type manager struct {
 }
 
 // New returns a new Manager
-func New(config *ManagerConfig, subnets *Subnets) Manager {
+func New(config *ManagerConfig) Manager {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
 		stakingSigner:          config.StakingTLSCert.PrivateKey.(crypto.Signer),
 		stakingCert:            staking.CertificateFromX509(config.StakingTLSCert.Leaf),
-		subnets:                subnets,
 		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),

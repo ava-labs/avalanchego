@@ -14,24 +14,6 @@ import (
 
 var ErrNoPrimaryNetworkConfig = errors.New("no subnet config for primary network found")
 
-func NewSubnets(
-	nodeID ids.NodeID,
-	configs map[ids.ID]subnets.Config,
-) (*Subnets, error) {
-	if _, ok := configs[constants.PrimaryNetworkID]; !ok {
-		return nil, ErrNoPrimaryNetworkConfig
-	}
-
-	s := &Subnets{
-		nodeID:  nodeID,
-		configs: configs,
-		subnets: make(map[ids.ID]subnets.Subnet),
-	}
-
-	_ = s.Add(constants.PrimaryNetworkID)
-	return s, nil
-}
-
 // Subnets holds the currently running subnets on this node
 type Subnets struct {
 	nodeID  ids.NodeID
@@ -41,7 +23,8 @@ type Subnets struct {
 	subnets map[ids.ID]subnets.Subnet
 }
 
-// Add a subnet that is being run on this node
+// Add a subnet that is being run on this node. Returns if the node was added
+// or not.
 func (s *Subnets) Add(subnetID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -61,7 +44,8 @@ func (s *Subnets) Add(subnetID ids.ID) bool {
 	return true
 }
 
-// Get returns a subnet if it is being run on this node
+// Get returns a subnet if it is being run on this node. Returns the subnet
+// if it was present.
 func (s *Subnets) Get(subnetID ids.ID) (subnets.Subnet, bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -84,4 +68,22 @@ func (s *Subnets) Bootstrapping() []ids.ID {
 	}
 
 	return subnetsBootstrapping
+}
+
+func NewSubnets(
+	nodeID ids.NodeID,
+	configs map[ids.ID]subnets.Config,
+) (*Subnets, error) {
+	if _, ok := configs[constants.PrimaryNetworkID]; !ok {
+		return nil, ErrNoPrimaryNetworkConfig
+	}
+
+	s := &Subnets{
+		nodeID:  nodeID,
+		configs: configs,
+		subnets: make(map[ids.ID]subnets.Subnet),
+	}
+
+	_ = s.Add(constants.PrimaryNetworkID)
+	return s, nil
 }
