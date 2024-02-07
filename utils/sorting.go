@@ -5,9 +5,9 @@ package utils
 
 import (
 	"bytes"
+	"slices"
 
 	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )

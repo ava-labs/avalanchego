@@ -6,11 +6,11 @@ package merkledb
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unsafe"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils"
 )

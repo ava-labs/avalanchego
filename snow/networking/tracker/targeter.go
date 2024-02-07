@@ -4,8 +4,6 @@
 package tracker
 
 import (
-	"math"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -63,8 +61,8 @@ type targeter struct {
 func (t *targeter) TargetUsage(nodeID ids.NodeID) float64 {
 	// This node's at-large allocation is min([remaining at large], [max at large for a given peer])
 	usage := t.tracker.TotalUsage()
-	baseAlloc := math.Max(0, t.maxNonVdrUsage-usage)
-	baseAlloc = math.Min(baseAlloc, t.maxNonVdrNodeUsage)
+	baseAlloc := max(0, t.maxNonVdrUsage-usage)
+	baseAlloc = min(baseAlloc, t.maxNonVdrNodeUsage)
 
 	// This node gets a stake-weighted portion of the validator allocation.
 	weight := t.vdrs.GetWeight(constants.PrimaryNetworkID, nodeID)

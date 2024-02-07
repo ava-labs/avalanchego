@@ -7,14 +7,13 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"

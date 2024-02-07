@@ -5,7 +5,7 @@ module github.com/ava-labs/avalanchego
 // Dockerfile
 // README.md
 // go.mod (here, only major.minor can be specified)
-go 1.20
+go 1.21
 
 require (
 	github.com/DataDog/zstd v1.5.2

@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"golang.org/x/sync/errgroup"
 

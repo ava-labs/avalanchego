@@ -380,7 +380,7 @@ func (vm *VM) getPreDurangoSlotTime(
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
 	// time, ProposerMinBlockDelay can be configured in the subnet config.
-	delay = math.Max(delay, vm.MinBlkDelay)
+	delay = max(delay, vm.MinBlkDelay)
 	return parentTimestamp.Add(delay), nil
 }
 
@@ -406,7 +406,7 @@ func (vm *VM) getPostDurangoSlotTime(
 	// time, ProposerMinBlockDelay can be configured in the subnet config.
 	switch {
 	case err == nil:
-		delay = math.Max(delay, vm.MinBlkDelay)
+		delay = max(delay, vm.MinBlkDelay)
 		return parentTimestamp.Add(delay), err
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return parentTimestamp.Add(vm.MinBlkDelay), err
@@ -907,7 +907,7 @@ func (vm *VM) optimalPChainHeight(ctx context.Context, minPChainHeight uint64) (
 		return 0, err
 	}
 
-	return math.Max(minimumHeight, minPChainHeight), nil
+	return max(minimumHeight, minPChainHeight), nil
 }
 
 // parseInnerBlock attempts to parse the provided bytes as an inner block. If

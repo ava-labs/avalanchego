@@ -2590,7 +2590,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// could take an extremely long period of time; which we should not
 			// delay processing for.
 			pruneDuration := now.Sub(lastCommit)
-			sleepDuration := safemath.Min(
+			sleepDuration := min(
 				pruneCommitSleepMultiplier*pruneDuration,
 				pruneCommitSleepCap,
 			)
