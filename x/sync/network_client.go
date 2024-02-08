@@ -74,6 +74,8 @@ type NetworkClient interface {
 
 	// Removes given [nodeID] from the peer list.
 	Disconnected(context.Context, ids.NodeID) error
+
+	Shutdown() // Shuts down the network client, fails all pending requests
 }
 
 type networkClient struct {
@@ -91,6 +93,8 @@ type networkClient struct {
 	peers *p2p.PeerTracker
 	// For sending messages to peers
 	appSender common.AppSender
+	// set to true on Shutdown, after which all operations are no-ops.
+	closed bool
 }
 
 func NewNetworkClient(
@@ -125,6 +129,10 @@ func (c *networkClient) AppResponse(
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	if c.closed {
+		return nil
+	}
+
 	c.log.Info(
 		"received AppResponse from peer",
 		zap.Stringer("nodeID", nodeID),
@@ -155,6 +163,10 @@ func (c *networkClient) AppRequestFailed(
 ) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	if c.closed {
+		return nil
+	}
 
 	c.log.Info(
 		"received AppRequestFailed from peer",
@@ -244,6 +256,10 @@ func (c *networkClient) request(
 	request []byte,
 ) ([]byte, error) {
 	c.lock.Lock()
+	if c.closed {
+		c.lock.Unlock()
+		return nil, nil
+	}
 	c.log.Debug("sending request to peer",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("requestLen", len(request)),
@@ -305,6 +321,13 @@ func (c *networkClient) Connected(
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.closed {
+		return nil
+	}
+
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping registering self as peer")
 		return nil
@@ -316,12 +339,34 @@ func (c *networkClient) Connected(
 }
 
 func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping deregistering self as peer")
+		return nil
+	}
+
+	if c.closed {
 		return nil
 	}
 
 	c.log.Debug("disconnecting peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Disconnected(nodeID)
 	return nil
+}
+
+// Shutdown disconnects all peers
+func (c *networkClient) Shutdown() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// clean up any pending requests
+	for requestID, handler := range c.outstandingRequestHandlers {
+		handler.OnFailure() // make sure all waiting threads are unblocked
+		delete(c.outstandingRequestHandlers, requestID)
+	}
+
+	// TODO danlaine: should we call [Disconnected] on each peer?
+	c.closed = true // mark network as closed
 }
