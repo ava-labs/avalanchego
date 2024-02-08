@@ -33,7 +33,12 @@ func (sf *unarySnowflake) RecordSuccessfulPoll() {
 	sf.finalized = sf.finalized || sf.confidence >= sf.beta
 }
 
-func (sf *unarySnowflake) RecordPollPreference() {}
+// RecordPollPreference fails to reach an alpha threshold to increase our confidence,
+// so this is a passthrough to RecordUnsuccessfulPoll to reset our confidence counter
+// towards accepting.
+func (sf *unarySnowflake) RecordPollPreference() {
+	sf.RecordUnsuccessfulPoll()
+}
 
 func (sf *unarySnowflake) RecordUnsuccessfulPoll() {
 	sf.confidence = 0

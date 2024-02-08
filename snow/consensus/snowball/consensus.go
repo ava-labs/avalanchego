@@ -111,14 +111,12 @@ type BinarySnow interface {
 type UnarySnow interface {
 	fmt.Stringer
 
-	// RecordSuccessfulPoll records a successful poll towards finalizing
+	// RecordSuccessfulPoll records a successful poll that reaches an alpha
+	// confidence threshold.
 	RecordSuccessfulPoll()
 
-	// RecordPollPreference records a poll that strengthens the preference but
-	// did not contribute towards finalizing. This is a no-op for UnarySnowflake
-	// because there is only one choice, so it's preference will not change, there
-	// is no preference confidence to increment, and it does not increment confidence
-	// towards accept. TODO: improve comment
+	// RecordPollPreference records a poll that receives an alpha preference
+	// threshold, but not an alpha confidence threshold.
 	RecordPollPreference()
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
