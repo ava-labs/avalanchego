@@ -431,7 +431,7 @@ func TestProposerDistribution(t *testing.T) {
 		maxDeviation              uint64
 	)
 	for _, sampled := range proposerFrequency {
-		maxDeviation = safemath.Max(
+		maxDeviation = max(
 			maxDeviation,
 			safemath.AbsDiff(
 				uint64(sampled),

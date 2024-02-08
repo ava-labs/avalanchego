@@ -5,6 +5,7 @@ package avax
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"strconv"
@@ -97,5 +98,5 @@ func (utxo *UTXOID) Compare(other *UTXOID) int {
 	if txIDComp := bytes.Compare(utxoID[:], otherID[:]); txIDComp != 0 {
 		return txIDComp
 	}
-	return utils.Compare(utxoIndex, otherIndex)
+	return cmp.Compare(utxoIndex, otherIndex)
 }

@@ -9,12 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	"golang.org/x/sync/semaphore"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -329,7 +328,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	}
 
 	// Add all key-value pairs back into the database.
-	opsSizeLimit := math.Max(
+	opsSizeLimit := max(
 		cacheSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)

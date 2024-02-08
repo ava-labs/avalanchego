@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -178,8 +177,8 @@ func (s *NetworkServer) HandleChangeProofRequest(
 
 	// override limits if they exceed caps
 	var (
-		keyLimit   = math.Min(req.KeyLimit, maxKeyValuesLimit)
-		bytesLimit = math.Min(int(req.BytesLimit), maxByteSizeLimit)
+		keyLimit   = min(req.KeyLimit, maxKeyValuesLimit)
+		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
 		start      = maybeBytesToMaybe(req.StartKey)
 		end        = maybeBytesToMaybe(req.EndKey)
 	)
@@ -295,8 +294,8 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	}
 
 	// override limits if they exceed caps
-	req.KeyLimit = math.Min(req.KeyLimit, maxKeyValuesLimit)
-	req.BytesLimit = math.Min(req.BytesLimit, maxByteSizeLimit)
+	req.KeyLimit = min(req.KeyLimit, maxKeyValuesLimit)
+	req.BytesLimit = min(req.BytesLimit, maxByteSizeLimit)
 
 	proofBytes, err := getRangeProof(
 		ctx,
