@@ -419,7 +419,7 @@ func verifyAddDelegatorTx(
 	}
 
 	if backend.Config.IsApricotPhase3Activated(currentTimestamp) {
-		maximumWeight = safemath.Min(maximumWeight, backend.Config.MaxValidatorStake)
+		maximumWeight = min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
 	if !txs.BoundedBy(
@@ -672,7 +672,7 @@ func verifyAddPermissionlessDelegatorTx(
 	if err != nil {
 		maximumWeight = math.MaxUint64
 	}
-	maximumWeight = safemath.Min(maximumWeight, delegatorRules.maxValidatorStake)
+	maximumWeight = min(maximumWeight, delegatorRules.maxValidatorStake)
 
 	if !txs.BoundedBy(
 		startTime,
