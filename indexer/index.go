@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -222,7 +221,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	}
 
 	// Calculate the last index we will fetch
-	lastIndex := math.Min(startIndex+numToFetch-1, lastAcceptedIndex)
+	lastIndex := min(startIndex+numToFetch-1, lastAcceptedIndex)
 	// [lastIndex] is always >= [startIndex] so this is safe.
 	// [numToFetch] is limited to [MaxFetchedByRange] so [containers] is bounded in size.
 	containers := make([]Container, int(lastIndex)-int(startIndex)+1)
