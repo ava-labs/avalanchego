@@ -34,8 +34,7 @@ func (sf *unarySnowflake) RecordSuccessfulPoll() {
 }
 
 // RecordPollPreference fails to reach an alpha threshold to increase our confidence,
-// so this is a passthrough to RecordUnsuccessfulPoll to reset our confidence counter
-// towards accepting.
+// so this calls RecordUnsuccessfulPoll to reset the confidence counter.
 func (sf *unarySnowflake) RecordPollPreference() {
 	sf.RecordUnsuccessfulPoll()
 }
