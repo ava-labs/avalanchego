@@ -138,10 +138,8 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 	}
 
 	// Attach credentials
-	tx.Creds = EmptyCredentials(signers)
-
 	hash := hashing.ComputeHash256(unsignedBytes)
-	for i, keys := range signers {
+	for _, keys := range signers {
 		cred := &secp256k1fx.Credential{
 			Sigs: make([][secp256k1.SignatureLen]byte, len(keys)),
 		}
@@ -152,7 +150,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		tx.Creds[i] = cred // Attach credential
+		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
 	signedBytes, err := c.Marshal(CodecVersion, tx)
@@ -161,14 +159,4 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 	}
 	tx.SetBytes(unsignedBytes, signedBytes)
 	return nil
-}
-
-func EmptyCredentials(signers [][]*secp256k1.PrivateKey) []verify.Verifiable {
-	creds := make([]verify.Verifiable, 0, len(signers))
-	for i := 0; i < len(signers); i++ {
-		creds = append(creds, &secp256k1fx.Credential{
-			Sigs: make([][secp256k1.SignatureLen]byte, len(signers)),
-		})
-	}
-	return creds
 }
