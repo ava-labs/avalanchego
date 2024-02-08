@@ -308,6 +308,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
 		keys[0].PublicKey().Address(),    // change addr
+		nil,
 	)
 	require.NoError(err)
 	vm.ctx.Lock.Unlock()
@@ -410,6 +411,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -454,6 +456,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -507,6 +510,7 @@ func TestAddValidatorReject(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -555,6 +559,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -589,6 +594,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -636,6 +642,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -822,6 +829,7 @@ func TestCreateChain(t *testing.T) {
 		"name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -872,6 +880,7 @@ func TestCreateSubnet(t *testing.T) {
 		},
 		[]*secp256k1.PrivateKey{keys[0]}, // payer
 		keys[0].PublicKey().Address(),    // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -915,6 +924,7 @@ func TestCreateSubnet(t *testing.T) {
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -978,6 +988,7 @@ func TestAtomicImport(t *testing.T) {
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.ErrorIs(err, txbuilder.ErrNoFunds)
 
@@ -1017,6 +1028,7 @@ func TestAtomicImport(t *testing.T) {
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -2022,6 +2034,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2041,6 +2054,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		[]ids.ShortID{id},
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2063,6 +2077,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[1]},
 		keys[1].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2071,6 +2086,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},
 		keys[2].Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2108,6 +2124,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		[]ids.ShortID{keys[0].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].Address(),
+		nil,
 	)
 	require.NoError(err)
 	subnetID := createSubnetTx.ID()
@@ -2143,6 +2160,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		[]ids.ShortID{keys[1].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -2191,6 +2209,7 @@ func TestBaseTx(t *testing.T) {
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2266,6 +2285,7 @@ func TestPruneMempool(t *testing.T) {
 		},
 		[]*secp256k1.PrivateKey{keys[0]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2297,6 +2317,7 @@ func TestPruneMempool(t *testing.T) {
 		20000,
 		[]*secp256k1.PrivateKey{keys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 

@@ -84,6 +84,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -124,6 +125,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			reward.PercentDenominator,            // Shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -154,6 +156,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			reward.PercentDenominator,            // Shared
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -337,6 +340,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				tt.rewardAddress,
 				tt.feeKeys,
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -384,6 +388,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -415,6 +420,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -447,6 +453,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		reward.PercentDenominator,    // shares
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -460,6 +467,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -506,6 +514,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -535,6 +544,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -564,6 +574,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -595,6 +606,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -626,6 +638,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		testSubnet1.ID(),                        // subnet ID
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -654,6 +667,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(),                      // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -687,6 +701,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -723,6 +738,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -759,6 +775,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -794,6 +811,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			testSubnet1.ID(), // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -846,6 +864,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -875,6 +894,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -904,7 +924,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			ids.ShortEmpty,
 			reward.PercentDenominator, // shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr // key
+			ids.ShortEmpty, // change addr
+			nil,            // key
 		)
 		require.NoError(err)
 
@@ -945,8 +966,9 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator, // shares
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr // key
+			[]*secp256k1.PrivateKey{preFundedKeys[0]}, // key
+			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -986,6 +1008,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
+			nil,
 		)
 		require.NoError(err)
 
@@ -1391,6 +1414,7 @@ func TestDurangoMemoField(t *testing.T) {
 					testSubnet1.ID(),
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(t, err)
 

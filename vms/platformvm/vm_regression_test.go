@@ -73,6 +73,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -107,6 +108,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		changeAddr,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -143,6 +145,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		changeAddr,
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[3]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -169,6 +172,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		changeAddr,
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[4]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -241,6 +245,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -265,6 +270,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -289,6 +295,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -313,6 +320,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -337,6 +345,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -415,6 +424,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr0},
 		[]*secp256k1.PrivateKey{key0},
 		addr0,
+		nil,
 	)
 	require.NoError(err)
 
@@ -423,6 +433,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
 		addr1,
+		nil,
 	)
 	require.NoError(err)
 
@@ -431,6 +442,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
 		addr0,
+		nil,
 	)
 	require.NoError(err)
 
@@ -504,6 +516,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -712,6 +725,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -884,6 +898,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1039,6 +1054,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.GenerateTestShortID(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1160,6 +1176,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1184,6 +1201,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1208,6 +1226,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1245,6 +1264,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1264,6 +1284,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1286,6 +1307,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1313,6 +1335,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1366,6 +1389,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1385,6 +1409,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1407,6 +1432,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1426,6 +1452,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1490,6 +1517,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		nil,
 	)
 	require.NoError(err)
 	uPrimaryTx := primaryTx.Unsigned.(*txs.AddPermissionlessValidatorTx)
@@ -1520,6 +1548,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1594,6 +1623,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		nil,
 	)
 	require.NoError(err)
 	uPrimaryRestartTx := primaryRestartTx.Unsigned.(*txs.AddPermissionlessValidatorTx)
@@ -1701,6 +1731,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1762,6 +1793,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		nil,
 	)
 	require.NoError(err)
 
@@ -1832,6 +1864,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1861,6 +1894,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1934,6 +1968,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		keys,
 		addr, // change address
+		nil,
 	)
 	require.NoError(err)
 
@@ -2011,6 +2046,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2037,6 +2073,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 

@@ -52,6 +52,7 @@ type AtomicTxBuilder interface {
 		to ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// amount: amount of tokens to export
@@ -65,6 +66,7 @@ type AtomicTxBuilder interface {
 		to ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 }
 
@@ -84,6 +86,7 @@ type DecisionTxBuilder interface {
 		chainName string,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// threshold: [threshold] of [ownerAddrs] needed to manage this subnet
@@ -95,6 +98,7 @@ type DecisionTxBuilder interface {
 		ownerAddrs []ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// amount: amount the sender is sending
@@ -106,6 +110,7 @@ type DecisionTxBuilder interface {
 		owner secp256k1fx.OutputOwners,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 }
 
@@ -127,6 +132,7 @@ type ProposalTxBuilder interface {
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// stakeAmount: amount the validator stakes
@@ -148,6 +154,7 @@ type ProposalTxBuilder interface {
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// stakeAmount: amount the delegator stakes
@@ -165,6 +172,7 @@ type ProposalTxBuilder interface {
 		rewardAddress ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// stakeAmount: amount the delegator stakes
@@ -182,6 +190,7 @@ type ProposalTxBuilder interface {
 		rewardAddress ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// weight: sampling weight of the new validator
@@ -199,6 +208,7 @@ type ProposalTxBuilder interface {
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// Creates a transaction that removes [nodeID]
@@ -210,6 +220,7 @@ type ProposalTxBuilder interface {
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 
 	// Creates a transaction that transfers ownership of [subnetID]
@@ -223,6 +234,7 @@ type ProposalTxBuilder interface {
 		ownerAddrs []ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
+		memo []byte,
 	) (*txs.Tx, error)
 }
 
@@ -262,12 +274,14 @@ func (b *builder) NewImportTx(
 	to ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Memo:         memo,
 		}},
 		SourceChain: from,
 	}
@@ -440,12 +454,14 @@ func (b *builder) NewExportTx(
 	to ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Memo:         memo,
 		}},
 		DestinationChain: chainID,
 		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
@@ -512,6 +528,7 @@ func (b *builder) NewCreateChainTx(
 	chainName string,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
@@ -525,6 +542,7 @@ func (b *builder) NewCreateChainTx(
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Memo:         memo,
 		}},
 		SubnetID:    subnetID,
 		ChainName:   chainName,
@@ -582,6 +600,7 @@ func (b *builder) NewCreateSubnetTx(
 	ownerAddrs []ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utils.Sort(ownerAddrs) // sort control addresses
@@ -590,6 +609,7 @@ func (b *builder) NewCreateSubnetTx(
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Memo:         memo,
 		}},
 		Owner: &secp256k1fx.OutputOwners{
 			Threshold: threshold,
@@ -648,12 +668,16 @@ func (b *builder) NewAddValidatorTx(
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID: b.ctx.NetworkID,
-		}},
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID: b.ctx.NetworkID,
+				Memo:      memo,
+			},
+		},
 		Validator: txs.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
@@ -721,12 +745,14 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utx := &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Memo:         memo,
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
@@ -800,12 +826,14 @@ func (b *builder) NewAddDelegatorTx(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utx := &txs.AddDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Memo:         memo,
 		}},
 		Validator: txs.Validator{
 			NodeID: nodeID,
@@ -871,13 +899,17 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utx := &txs.AddPermissionlessDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-		}},
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.ctx.NetworkID,
+				BlockchainID: b.ctx.ChainID,
+				Memo:         memo,
+			},
+		},
 		Validator: txs.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
@@ -943,6 +975,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
@@ -953,6 +986,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
+			Memo:         memo,
 		}},
 		SubnetValidator: txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -1014,6 +1048,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
@@ -1021,10 +1056,13 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
 	utx := &txs.RemoveSubnetValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-		}},
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.ctx.NetworkID,
+				BlockchainID: b.ctx.ChainID,
+				Memo:         memo,
+			},
+		},
 		Subnet:     subnetID,
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
@@ -1079,6 +1117,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	ownerAddrs []ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
@@ -1086,10 +1125,13 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
 	utx := &txs.TransferSubnetOwnershipTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-		}},
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.ctx.NetworkID,
+				BlockchainID: b.ctx.ChainID,
+				Memo:         memo,
+			},
+		},
 		Subnet:     subnetID,
 		SubnetAuth: subnetAuth,
 		Owner: &secp256k1fx.OutputOwners{
@@ -1146,6 +1188,7 @@ func (b *builder) NewBaseTx(
 	owner secp256k1fx.OutputOwners,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
+	memo []byte,
 ) (*txs.Tx, error) {
 	// 1. Build core transaction without utxos
 	utx := &txs.BaseTx{
@@ -1159,6 +1202,7 @@ func (b *builder) NewBaseTx(
 					OutputOwners: owner,
 				},
 			}}, // not sorted yet, we'll sort later on when we have all the outputs
+			Memo: memo,
 		},
 	}
 

@@ -40,6 +40,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -76,6 +77,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -119,6 +121,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -154,6 +157,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
