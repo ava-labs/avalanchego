@@ -34,7 +34,7 @@ func NewTree(cf ConsensusFactory, params Parameters, choice ids.ID) Consensus {
 	return t
 }
 
-// Tree implements the snow interface by using a modified patricia tree.
+// Tree implements the Consensus interface by using a modified patricia tree.
 type Tree struct {
 	// node is the root that represents the first snow instance in the tree,
 	// and contains references to all the other snow instances in the tree.
