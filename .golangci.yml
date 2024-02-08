@@ -69,6 +69,7 @@ linters:
     - prealloc
     - predeclared
     - revive
+    - spancheck
     - staticcheck
     - stylecheck
     - tagalign
@@ -170,6 +171,23 @@ linters-settings:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
       - name: useless-break
         disabled: false
+  spancheck:
+    # Checks to enable.
+    # Options include:
+    # - `end`: check that `span.End()` is called
+    # - `record-error`: check that `span.RecordError(err)` is called when an error is returned
+    # - `set-status`: check that `span.SetStatus(codes.Error, msg)` is called when an error is returned
+    # Default: ["end"]
+    checks:
+      - end
+      # - record-error
+      # - set-status
+    # A list of regexes for function signatures that silence `record-error` and `set-status` reports
+    # if found in the call path to a returned error.
+    # https://github.com/jjti/go-spancheck#ignore-check-signatures
+    # Default: []
+    ignore-check-signatures:
+      - "telemetry.RecordError"
   staticcheck:
     # https://staticcheck.io/docs/options#checks
     checks:
