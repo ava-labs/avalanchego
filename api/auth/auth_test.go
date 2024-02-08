@@ -228,7 +228,7 @@ func TestWrapHandlerNoAuthToken(t *testing.T) {
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(http.StatusUnauthorized, rr.Code)

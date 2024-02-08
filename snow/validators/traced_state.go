@@ -5,7 +5,6 @@ package validators
 
 import (
 	"context"
-	"fmt"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -29,10 +28,10 @@ type tracedState struct {
 func Trace(s State, name string, tracer trace.Tracer) State {
 	return &tracedState{
 		s:                   s,
-		getMinimumHeightTag: fmt.Sprintf("%s.GetMinimumHeight", name),
-		getCurrentHeightTag: fmt.Sprintf("%s.GetCurrentHeight", name),
-		getSubnetIDTag:      fmt.Sprintf("%s.GetSubnetID", name),
-		getValidatorSetTag:  fmt.Sprintf("%s.GetValidatorSet", name),
+		getMinimumHeightTag: name + ".GetMinimumHeight",
+		getCurrentHeightTag: name + ".GetCurrentHeight",
+		getSubnetIDTag:      name + ".GetSubnetID",
+		getValidatorSetTag:  name + ".GetValidatorSet",
 		tracer:              tracer,
 	}
 }

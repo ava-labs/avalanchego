@@ -4,7 +4,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -25,7 +24,7 @@ type tracedHandler struct {
 func TraceHandler(h http.Handler, name string, tracer trace.Tracer) http.Handler {
 	return &tracedHandler{
 		h:            h,
-		serveHTTPTag: fmt.Sprintf("%s.ServeHTTP", name),
+		serveHTTPTag: name + ".ServeHTTP",
 		tracer:       tracer,
 	}
 }

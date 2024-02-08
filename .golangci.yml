@@ -65,7 +65,7 @@ linters:
     - nakedret
     - noctx
     - nolintlint
-    # - perfsprint
+    - perfsprint
     - prealloc
     - predeclared
     - revive
@@ -129,6 +129,8 @@ linters-settings:
     alias:
       - pkg: github.com/ava-labs/avalanchego/utils/math
         alias: safemath
+      - pkg: github.com/ava-labs/avalanchego/utils/json
+        alias: avajson
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
