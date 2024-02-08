@@ -28,8 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -723,7 +721,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			// could take an extremely long period of time; which we should not
 			// delay processing for.
 			pruneDuration := now.Sub(lastCommit)
-			sleepDuration := safemath.Min(
+			sleepDuration := min(
 				pruneCommitSleepMultiplier*pruneDuration,
 				pruneCommitSleepCap,
 			)

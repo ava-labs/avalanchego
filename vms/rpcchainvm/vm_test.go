@@ -9,14 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"

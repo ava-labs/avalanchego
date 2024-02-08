@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, banffFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 

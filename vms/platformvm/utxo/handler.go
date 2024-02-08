@@ -253,7 +253,7 @@ func (h *handler) FinanceTx(
 		targetFee += addedFees
 
 		// Stake any value that should be staked
-		amountToStake := math.Min(
+		amountToStake := min(
 			amountToStake-amountStaked, // Amount we still need to stake
 			remainingValue,             // Amount available to stake
 		)
@@ -379,7 +379,7 @@ func (h *handler) FinanceTx(
 		targetFee += addedFees
 
 		// Burn any value that should be burned
-		amountToBurn := math.Min(
+		amountToBurn := min(
 			targetFee-amountBurned, // Amount we still need to burn
 			remainingValue,         // Amount available to burn
 		)
@@ -387,7 +387,7 @@ func (h *handler) FinanceTx(
 		remainingValue -= amountToBurn
 
 		// Stake any value that should be staked
-		amountToStake := math.Min(
+		amountToStake := min(
 			amountToStake-amountStaked, // Amount we still need to stake
 			remainingValue,             // Amount available to stake
 		)
@@ -422,7 +422,7 @@ func (h *handler) FinanceTx(
 			}
 			targetFee += addedFees
 
-			amountToBurn := math.Min(
+			amountToBurn := min(
 				targetFee-amountBurned, // Amount we still need to burn
 				remainingValue,         // Amount available to burn
 			)

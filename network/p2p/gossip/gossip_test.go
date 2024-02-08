@@ -11,11 +11,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/require"
+
 	"golang.org/x/exp/maps"
 
 	"google.golang.org/protobuf/proto"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"

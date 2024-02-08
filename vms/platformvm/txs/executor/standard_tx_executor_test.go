@@ -46,7 +46,7 @@ var errTest = errors.New("non-nil error")
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -174,7 +174,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		require.NoError(t, target.state.Commit())
 	}
 
-	dummyH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	dummyH := newEnvironment(t, apricotPhase5)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -328,7 +328,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			freshTH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+			freshTH := newEnvironment(t, apricotPhase5)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
@@ -368,7 +368,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -846,7 +846,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, banffFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -1108,7 +1108,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
+			env := newEnvironment(t, durangoFork)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -1479,7 +1479,7 @@ func TestDurangoMemoField(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, true /*=postDurango*/)
+			env := newEnvironment(t, durangoFork)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 

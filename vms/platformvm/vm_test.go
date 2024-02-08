@@ -80,6 +80,7 @@ const (
 	banffFork
 	cortinaFork
 	durangoFork
+	eUpgradeFork
 
 	latestFork activeFork = durangoFork
 
@@ -210,12 +211,16 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
 		durangoTime       = mockable.MaxTime
+		eUpgradeTime      = mockable.MaxTime
 	)
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch fork {
+	case eUpgradeFork:
+		eUpgradeTime = latestForkTime
+		fallthrough
 	case durangoFork:
 		durangoTime = latestForkTime
 		fallthrough
@@ -254,7 +259,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
 		DurangoTime:            durangoTime,
-		EUpgradeTime:           mockable.MaxTime,
+		EUpgradeTime:           eUpgradeTime,
 	}}
 
 	db := memdb.New()

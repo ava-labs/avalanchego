@@ -1285,7 +1285,7 @@ func (b *builder) financeTx(
 		inputs = append(inputs, input)
 
 		// Stake any value that should be staked
-		amountToStake := math.Min(
+		amountToStake := min(
 			amountsToStake[assetID], // Amount we still need to stake
 			out.Amt,                 // Amount available to stake
 		)
@@ -1392,7 +1392,7 @@ func (b *builder) financeTx(
 		inputs = append(inputs, input)
 
 		// Burn any value that should be burned
-		amountToBurn := math.Min(
+		amountToBurn := min(
 			amountsToBurn[assetID], // Amount we still need to burn
 			out.Amt,                // Amount available to burn
 		)
@@ -1400,7 +1400,7 @@ func (b *builder) financeTx(
 
 		amountAvalibleToStake := out.Amt - amountToBurn
 		// Burn any value that should be burned
-		amountToStake := math.Min(
+		amountToStake := min(
 			amountsToStake[assetID], // Amount we still need to stake
 			amountAvalibleToStake,   // Amount available to stake
 		)

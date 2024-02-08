@@ -5,6 +5,7 @@ package builder
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -59,7 +60,16 @@ import (
 const (
 	defaultWeight = 10000
 	trackChecksum = false
+
+	apricotPhase3 activeFork = iota
+	apricotPhase5
+	banffFork
+	cortinaFork
+	durangoFork
+	eUpgradeFork
 )
+
+type activeFork uint8
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -112,12 +122,12 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T) *environment {
+func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unparam
 	require := require.New(t)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
+		config:         defaultConfig(t, fork),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -298,7 +308,38 @@ func defaultState(
 	return state
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(t *testing.T, fork activeFork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
+		eUpgradeTime      = mockable.MaxTime
+	)
+
+	switch fork {
+	case eUpgradeFork:
+		eUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
+	case durangoFork:
+		durangoTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
+	case cortinaFork:
+		cortinaTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
+	case banffFork:
+		banffTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
+	case apricotPhase5:
+		apricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		apricotPhase3Time = defaultValidateEndTime
+	default:
+		require.NoError(t, fmt.Errorf("unhandled fork %d", fork))
+	}
+
 	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -317,11 +358,12 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
-		DurangoTime:       time.Time{},
-		EUpgradeTime:      mockable.MaxTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DurangoTime:       durangoTime,
+		EUpgradeTime:      eUpgradeTime,
 	}
 }
 
