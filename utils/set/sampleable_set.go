@@ -7,12 +7,12 @@ import (
 	"bytes"
 	"slices"
 
-	stdjson "encoding/json"
-
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+
+	stdjson "encoding/json"
 )
 
 var _ stdjson.Marshaler = (*Set[int])(nil)

@@ -10,14 +10,9 @@ import (
 	"testing"
 	"time"
 
-	stdjson "encoding/json"
-
 	"github.com/btcsuite/btcd/btcutil/bech32"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -45,6 +40,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	stdjson "encoding/json"
 )
 
 func TestServiceIssueTx(t *testing.T) {

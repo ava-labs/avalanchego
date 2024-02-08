@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -64,16 +63,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
-	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-
+	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
-
-	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 )
 
 const (

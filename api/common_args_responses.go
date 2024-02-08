@@ -4,11 +4,11 @@
 package api
 
 import (
-	stdjson "encoding/json"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+
+	stdjson "encoding/json"
 )
 
 // This file contains structs used in arguments and responses in services

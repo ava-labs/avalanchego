@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	stdjson "encoding/json"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -23,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	stdjson "encoding/json"
 )
 
 var (

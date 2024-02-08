@@ -12,8 +12,6 @@ import (
 	"net/http"
 	"time"
 
-	stdjson "encoding/json"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -42,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	stdjson "encoding/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )

@@ -47,12 +47,12 @@ linters:
     - errorlint
     - exportloopref
     - forbidigo
+    - gci
     - goconst
     - gocritic
     # - goerr113
     - gofmt
     - gofumpt
-    - goimports
     # - gomnd
     - goprintffuncname
     - gosec
@@ -65,7 +65,7 @@ linters:
     - nakedret
     - noctx
     - nolintlint
-    - perfsprint
+    # - perfsprint
     - prealloc
     - predeclared
     - revive
@@ -105,8 +105,16 @@ linters-settings:
       - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
     # Exclude godoc examples from forbidigo checks.
     exclude_godoc_examples: false
-  goimports:
-    local-prefixes: github.com/ava-labs/avalanchego
+  gci:
+    sections:
+      - standard
+      - default
+      - blank
+      - dot
+      - prefix(github.com/ava-labs/avalanchego)
+      - alias
+    skip-generated: true
+    custom-order: true
   gosec:
     excludes:
       - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107

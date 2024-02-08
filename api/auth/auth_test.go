@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt/v4"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 var (

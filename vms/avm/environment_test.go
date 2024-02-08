@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	stdjson "encoding/json"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -37,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	stdjson "encoding/json"
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 

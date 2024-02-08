@@ -12,10 +12,7 @@ import (
 	"testing"
 	"time"
 
-	stdjson "encoding/json"
-
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -44,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	stdjson "encoding/json"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
