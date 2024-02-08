@@ -965,7 +965,7 @@ func TestBlockStatus(t *testing.T) {
 	tests := []test{
 		{
 			name: "block is rejected",
-			blockFunc: func(ctrl *gomock.Controller) *Block {
+			blockFunc: func(*gomock.Controller) *Block {
 				return &Block{
 					rejected: true,
 				}

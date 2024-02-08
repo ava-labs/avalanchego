@@ -70,14 +70,14 @@ func Test_Key_Has_Prefix(t *testing.T) {
 	tests := []test{
 		{
 			name:           "equal keys",
-			keyA:           func(ts int) Key { return ToKey([]byte(key)) },
-			keyB:           func(ts int) Key { return ToKey([]byte(key)) },
+			keyA:           func(int) Key { return ToKey([]byte(key)) },
+			keyB:           func(int) Key { return ToKey([]byte(key)) },
 			isPrefix:       true,
 			isStrictPrefix: false,
 		},
 		{
 			name: "one key has one fewer token",
-			keyA: func(ts int) Key { return ToKey([]byte(key)) },
+			keyA: func(int) Key { return ToKey([]byte(key)) },
 			keyB: func(ts int) Key {
 				return ToKey([]byte(key)).Take(len(key)*8 - ts)
 			},
@@ -97,8 +97,8 @@ func Test_Key_Has_Prefix(t *testing.T) {
 		},
 		{
 			name:           "different keys",
-			keyA:           func(ts int) Key { return ToKey([]byte{0xF7}) },
-			keyB:           func(ts int) Key { return ToKey([]byte{0xF0}) },
+			keyA:           func(int) Key { return ToKey([]byte{0xF7}) },
+			keyB:           func(int) Key { return ToKey([]byte{0xF0}) },
 			isPrefix:       false,
 			isStrictPrefix: false,
 		},

@@ -380,7 +380,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	postActivationTime := activationTime.Add(time.Second)
 	proVM.Set(postActivationTime)
 
-	coreVM.SetPreferenceF = func(_ context.Context, id ids.ID) error {
+	coreVM.SetPreferenceF = func(context.Context, ids.ID) error {
 		return nil
 	}
 	require.NoError(proVM.SetPreference(context.Background(), preForkChild.ID()))

@@ -1338,7 +1338,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		return nil
 	}
 
-	partialSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
+	partialSyncCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		// Note: The health check is skipped during bootstrapping to allow a
 		// node to sync the network even if it was previously a validator.
 		if !m.IsBootstrapped(constants.PlatformChainID) {

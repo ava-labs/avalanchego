@@ -2705,7 +2705,7 @@ func TestServiceGetBlock(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, interface{}) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -2871,7 +2871,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, interface{}) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -3076,7 +3076,7 @@ func TestServiceGetHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceFunc: func(ctrl *gomock.Controller) *Service {
+			serviceFunc: func(*gomock.Controller) *Service {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{

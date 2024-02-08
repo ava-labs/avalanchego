@@ -37,7 +37,7 @@ func init() {
 }
 
 // Always returns 200 (http.StatusOK)
-var dummyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+var dummyHandler = http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 
 func TestNewTokenWrongPassword(t *testing.T) {
 	require := require.New(t)

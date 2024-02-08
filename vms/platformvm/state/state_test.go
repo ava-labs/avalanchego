@@ -259,8 +259,7 @@ func TestPersistStakers(t *testing.T) {
 				r.Equal(valOut.NodeID, staker.NodeID)
 				r.Equal(valOut.Weight, val.Weight+staker.Weight)
 			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-			},
+			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 				// validator's weight must increase of delegator's weight amount
 				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
@@ -387,12 +386,8 @@ func TestPersistStakers(t *testing.T) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Empty(valsMap)
 			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-				// nothing to do here
-			},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// nothing to do here
-			},
+			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
+			checkDiffs:            func(*require.Assertions, *state, *Staker, uint64) {},
 		},
 		"delete current validator": {
 			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
@@ -539,9 +534,7 @@ func TestPersistStakers(t *testing.T) {
 				r.Equal(valOut.NodeID, staker.NodeID)
 				r.Equal(valOut.Weight, val.Weight)
 			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-				// nothing to do here
-			},
+			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
 			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
 				// validator's weight must decrease of delegator's weight amount
 				weightDiffBytes, err := s.flatValidatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
@@ -666,10 +659,8 @@ func TestPersistStakers(t *testing.T) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
 				r.Empty(valsMap)
 			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-			},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-			},
+			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
+			checkDiffs:            func(*require.Assertions, *state, *Staker, uint64) {},
 		},
 	}
 

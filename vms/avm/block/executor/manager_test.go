@@ -121,7 +121,7 @@ func TestManagerVerifyTx(t *testing.T) {
 			txF: func(*gomock.Controller) *txs.Tx {
 				return &txs.Tx{}
 			},
-			managerF: func(ctrl *gomock.Controller) *manager {
+			managerF: func(*gomock.Controller) *manager {
 				return &manager{
 					backend: &executor.Backend{},
 				}

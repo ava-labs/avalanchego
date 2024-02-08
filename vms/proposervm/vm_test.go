@@ -1379,7 +1379,7 @@ func TestInnerVMRollback(t *testing.T) {
 	// Restart the node and have the inner VM rollback state.
 	require.NoError(proVM.Shutdown(context.Background()))
 	coreBlk.StatusV = choices.Processing
-	coreVM.VerifyHeightIndexF = func(ctx context.Context) error {
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
 		return nil
 	}
 
