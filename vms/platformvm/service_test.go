@@ -406,7 +406,7 @@ func TestGetStake(t *testing.T) {
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	addrsStrs := []string{}
 	for i, validator := range genesis.Validators {
-		addr := "P-%s" + validator.RewardOwner.Addresses[0]
+		addr := "P-" + validator.RewardOwner.Addresses[0]
 		addrsStrs = append(addrsStrs, addr)
 
 		args := GetStakeArgs{
