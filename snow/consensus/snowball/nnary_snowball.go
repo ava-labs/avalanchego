@@ -11,6 +11,7 @@ import (
 
 var (
 	_ NnarySnow = (*nnarySnowball)(nil)
+	_ ConsensusFactory = SnowballFactory{}
 )
 
 type SnowballFactory struct{}
