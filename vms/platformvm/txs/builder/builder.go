@@ -6,6 +6,7 @@ package builder
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -96,6 +97,26 @@ type DecisionTxBuilder interface {
 	NewCreateSubnetTx(
 		threshold uint32,
 		ownerAddrs []ids.ShortID,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+		memo []byte,
+	) (*txs.Tx, error)
+
+	NewTransformSubnetTx(
+		subnetID ids.ID,
+		assetID ids.ID,
+		initialSupply uint64,
+		maxSupply uint64,
+		minConsumptionRate uint64,
+		maxConsumptionRate uint64,
+		minValidatorStake uint64,
+		maxValidatorStake uint64,
+		minStakeDuration time.Duration,
+		maxStakeDuration time.Duration,
+		minDelegationFee uint32,
+		minDelegatorStake uint64,
+		maxValidatorWeightFactor byte,
+		uptimeRequirement uint32,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 		memo []byte,
@@ -652,6 +673,99 @@ func (b *builder) NewCreateSubnetTx(
 	utx.BaseTx.Outs = outs
 
 	// 3. Sign the tx
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewTransformSubnetTx(
+	subnetID ids.ID,
+	assetID ids.ID,
+	initialSupply uint64,
+	maxSupply uint64,
+	minConsumptionRate uint64,
+	maxConsumptionRate uint64,
+	minValidatorStake uint64,
+	maxValidatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
+	minDelegatorStake uint64,
+	maxValidatorWeightFactor byte,
+	uptimeRequirement uint32,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+	memo []byte,
+) (*txs.Tx, error) {
+	// 1. Build core transaction without utxos
+	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
+	}
+
+	utx := &txs.TransformSubnetTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.ctx.NetworkID,
+				BlockchainID: b.ctx.ChainID,
+				Memo:         memo,
+			},
+		},
+		Subnet:                   subnetID,
+		AssetID:                  assetID,
+		InitialSupply:            initialSupply,
+		MaximumSupply:            maxSupply,
+		MinConsumptionRate:       minConsumptionRate,
+		MaxConsumptionRate:       maxConsumptionRate,
+		MinValidatorStake:        minValidatorStake,
+		MaxValidatorStake:        maxValidatorStake,
+		MinStakeDuration:         uint32(minStakeDuration / time.Second),
+		MaxStakeDuration:         uint32(maxStakeDuration / time.Second),
+		MinDelegationFee:         minDelegationFee,
+		MinDelegatorStake:        minDelegatorStake,
+		MaxValidatorWeightFactor: maxValidatorWeightFactor,
+		UptimeRequirement:        uptimeRequirement,
+		SubnetAuth:               subnetAuth,
+	}
+
+	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	var (
+		chainTime        = b.state.GetTimestamp()
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
+		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
+
+		feeCalc = &fees.Calculator{
+			IsEUpgradeActive: isEUpgradeActive,
+			Config:           b.cfg,
+			ChainTime:        chainTime,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+		}
+	)
+
+	// feesMan cumulates consumed units. Let's init it with utx filled so far
+	if err := feeCalc.TransformSubnetTx(utx); err != nil {
+		return nil, err
+	}
+
+	ins, outs, _, signers, err := b.FinanceTx(
+		b.state,
+		keys,
+		0,
+		feeCalc,
+		changeAddr,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	utx.BaseTx.Ins = ins
+	utx.BaseTx.Outs = outs
+
+	// 3. Sign the tx
+	signers = append(signers, subnetSigners)
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
