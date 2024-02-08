@@ -751,7 +751,7 @@ func (b *builder) NewImportTx(
 	}
 
 	// 2. Add imported inputs first
-	utxos, err := b.backend.UTXOs(ops.Context(), sourceChainID)
+	importedUtxos, err := b.backend.UTXOs(ops.Context(), sourceChainID)
 	if err != nil {
 		return nil, err
 	}
@@ -761,12 +761,12 @@ func (b *builder) NewImportTx(
 		minIssuanceTime = ops.MinIssuanceTime()
 		avaxAssetID     = b.backend.AVAXAssetID()
 
-		importedInputs     = make([]*avax.TransferableInput, 0, len(utxos))
+		importedInputs     = make([]*avax.TransferableInput, 0, len(importedUtxos))
 		importedSigIndices = make([][]uint32, 0)
 		importedAmounts    = make(map[ids.ID]uint64)
 	)
 
-	for _, utxo := range utxos {
+	for _, utxo := range importedUtxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			continue

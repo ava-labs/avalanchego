@@ -90,10 +90,11 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		stateDiff, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         stateDiff,
 			Tx:            tx,
 		}
@@ -348,10 +349,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 			freshTH.config.BanffTime = onAcceptState.GetTimestamp()
 
+			feeCfg := freshTH.config.GetDynamicFeesConfig(freshTH.state.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &freshTH.backend,
-				BlkFeeManager: fees.NewManager(fees.Empty),
-				UnitCaps:      fees.Empty,
+				BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+				UnitCaps:      feeCfg.BlockUnitsCap,
 				State:         onAcceptState,
 				Tx:            tx,
 			}
@@ -388,10 +390,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -418,10 +421,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -462,10 +466,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -507,10 +512,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -535,10 +541,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -562,10 +569,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
+
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -592,10 +601,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -650,10 +660,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            duplicateSubnetTx,
 		}
@@ -689,10 +700,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -724,10 +736,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -757,10 +770,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -800,10 +814,11 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -837,10 +852,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -865,10 +881,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -906,10 +923,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.PutCurrentValidator(staker)
 		onAcceptState.AddTx(tx, status.Committed)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -944,10 +962,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.PutPendingValidator(staker)
 		onAcceptState.AddTx(tx, status.Committed)
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -981,10 +1000,11 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			onAcceptState.DeleteUTXO(utxoID)
 		}
 
+		feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 		executor := StandardTxExecutor{
 			Backend:       &env.backend,
-			BlkFeeManager: fees.NewManager(fees.Empty),
-			UnitCaps:      fees.Empty,
+			BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+			UnitCaps:      feeCfg.BlockUnitsCap,
 			State:         onAcceptState,
 			Tx:            tx,
 		}
@@ -1774,7 +1794,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes().AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
@@ -1792,6 +1812,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1800,8 +1821,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1824,6 +1845,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+
+				feeCfg := cfg.GetDynamicFeesConfig(time.Time{}) // pre E upgrade
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1832,8 +1855,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1847,7 +1870,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 
@@ -1857,6 +1880,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1865,8 +1889,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1884,7 +1908,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
 
 				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 
 				cfg := &config.Config{
@@ -1893,6 +1917,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1901,8 +1926,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1918,7 +1943,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 
 				cfg := &config.Config{
@@ -1927,6 +1952,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1935,8 +1961,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1950,7 +1976,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 
@@ -1960,6 +1986,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1968,8 +1995,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -1983,7 +2010,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
@@ -1995,6 +2022,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2003,8 +2031,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2018,7 +2046,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
@@ -2033,6 +2061,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2041,8 +2070,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2195,6 +2224,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
+				feeCfg := cfg.GetDynamicFeesConfig(time.Time{}) // pre E-upgrade
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2203,8 +2233,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2226,7 +2256,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					DurangoTime:  env.latestForkTime,
 					EUpgradeTime: mockable.MaxTime,
 				}
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2235,8 +2266,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2260,7 +2291,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					EUpgradeTime:     mockable.MaxTime,
 					MaxStakeDuration: math.MaxInt64,
 				}
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2269,8 +2301,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2285,7 +2317,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				subnetOwner := fx.NewMockOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
@@ -2300,6 +2332,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					EUpgradeTime:     mockable.MaxTime,
 					MaxStakeDuration: math.MaxInt64,
 				}
+
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2308,8 +2342,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}
@@ -2325,7 +2359,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
@@ -2344,6 +2378,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					EUpgradeTime:     mockable.MaxTime,
 					MaxStakeDuration: math.MaxInt64,
 				}
+
+				feeCfg := cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2352,8 +2388,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					BlkFeeManager: fees.NewManager(fees.Empty),
-					UnitCaps:      fees.Empty,
+					BlkFeeManager: fees.NewManager(feeCfg.UnitFees),
+					UnitCaps:      feeCfg.BlockUnitsCap,
 					Tx:            env.tx,
 					State:         env.state,
 				}

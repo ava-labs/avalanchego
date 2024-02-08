@@ -341,29 +341,22 @@ func (b *builder) NewImportTx(
 	var (
 		importedAVAX     = importedAmounts[b.ctx.AVAXAssetID] // the only entry left in importedAmounts
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
+
+		feeCalc = &fees.Calculator{
+			IsEUpgradeActive: isEUpgradeActive,
+			Config:           b.cfg,
+			ChainTime:        chainTime,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+		}
 
 		ins []*avax.TransferableInput
 	)
 
 	// while outs are not ordered we add them to get current fees. We'll fix ordering later on
 	utx.BaseTx.Outs = outs
-
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
-		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
-			Config:           b.cfg,
-			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
-		}
-	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.ImportTx(utx); err != nil {
@@ -404,8 +397,8 @@ func (b *builder) NewImportTx(
 			}
 			feeCalc.Fee -= importedAVAX
 		} else {
-			feeCalc.Fee = 0
 			changeOut.Out.(*secp256k1fx.TransferOutput).Amt = importedAVAX - feeCalc.Fee
+			feeCalc.Fee = 0
 			outs = append(outs, changeOut)
 		}
 	}
@@ -471,23 +464,17 @@ func (b *builder) NewExportTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.ExportTx(utx); err != nil {
@@ -550,23 +537,17 @@ func (b *builder) NewCreateChainTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.CreateChainTx(utx); err != nil {
@@ -619,23 +600,17 @@ func (b *builder) NewCreateSubnetTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.CreateSubnetTx(utx); err != nil {
@@ -696,23 +671,17 @@ func (b *builder) NewAddValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddValidatorTx(utx); err != nil {
@@ -783,23 +752,17 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddPermissionlessValidatorTx(utx); err != nil {
@@ -860,23 +823,17 @@ func (b *builder) NewAddDelegatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddDelegatorTx(utx); err != nil {
@@ -938,23 +895,17 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.AddPermissionlessDelegatorTx(utx); err != nil {
@@ -1018,23 +969,17 @@ func (b *builder) NewAddSubnetValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.AddSubnetValidatorTx(utx); err != nil {
@@ -1088,23 +1033,17 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
@@ -1162,23 +1101,17 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
+
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.TransferSubnetOwnershipTx(utx); err != nil {
@@ -1232,24 +1165,17 @@ func (b *builder) NewBaseTx(
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	var (
 		chainTime        = b.state.GetTimestamp()
-		feeCfg           = config.EUpgradeDynamicFeesConfig
+		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-	)
 
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
-		ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-	}
-	if !isEUpgradeActive {
 		feeCalc = &fees.Calculator{
-			IsEUpgradeActive: false,
+			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
-			FeeManager:       commonfees.NewManager(commonfees.Empty),
-			ConsumedUnitsCap: commonfees.Max,
+			FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 		}
-	}
+	)
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.BaseTx(utx); err != nil {

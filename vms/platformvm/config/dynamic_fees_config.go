@@ -15,16 +15,23 @@ import (
 // so to have fork control over which dynamic fees is picked
 
 // EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
-var EUpgradeDynamicFeesConfig = DynamicFeesConfig{
-	UnitFees: commonfees.Dimensions{
-		1,
-		2,
-		3,
-		4,
-	},
+var (
+	EUpgradeDynamicFeesConfig = DynamicFeesConfig{
+		UnitFees: commonfees.Dimensions{
+			1,
+			2,
+			3,
+			4,
+		},
 
-	BlockUnitsCap: commonfees.Max,
-}
+		BlockUnitsCap: commonfees.Max,
+	}
+
+	PreEUpgradeDynamicFeesConfig = DynamicFeesConfig{
+		UnitFees:      commonfees.Empty,
+		BlockUnitsCap: commonfees.Max,
+	}
+)
 
 type DynamicFeesConfig struct {
 	// UnitFees contains, per each fee dimension, the

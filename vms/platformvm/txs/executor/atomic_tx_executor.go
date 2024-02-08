@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -100,10 +101,11 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	}
 	e.OnAccept = onAccept
 
+	feesCfg := config.PreEUpgradeDynamicFeesConfig
 	executor := StandardTxExecutor{
 		Backend:       e.Backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feesCfg.UnitFees),
+		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         e.OnAccept,
 		Tx:            e.Tx,
 	}

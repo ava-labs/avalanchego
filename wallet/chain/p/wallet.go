@@ -762,8 +762,8 @@ func (w *wallet) refreshFork(options ...common.Option) error {
 		w.unitFees = config.EUpgradeDynamicFeesConfig.UnitFees
 		w.unitCaps = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
 	} else {
-		w.unitFees = commonfees.Empty
-		w.unitCaps = commonfees.Max
+		w.unitFees = config.PreEUpgradeDynamicFeesConfig.UnitFees
+		w.unitCaps = config.PreEUpgradeDynamicFeesConfig.BlockUnitsCap
 	}
 
 	return nil

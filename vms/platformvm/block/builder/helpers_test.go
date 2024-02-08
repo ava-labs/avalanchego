@@ -254,7 +254,7 @@ func addSubnet(t *testing.T, env *environment) {
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
-	feeCfg := config.EUpgradeDynamicFeesConfig
+	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	executor := txexecutor.StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: fees.NewManager(feeCfg.UnitFees),

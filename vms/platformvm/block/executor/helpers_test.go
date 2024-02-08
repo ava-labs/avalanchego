@@ -275,7 +275,7 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	feeCfg := config.EUpgradeDynamicFeesConfig
+	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		BlkFeeManager: fees.NewManager(feeCfg.UnitFees),

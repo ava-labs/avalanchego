@@ -49,10 +49,11 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -90,10 +91,11 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -125,10 +127,11 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -157,10 +160,11 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -201,12 +205,13 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
 			env.config.ApricotPhase3Time = ap3Time
 
+			feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 			feeCalc := &fees.Calculator{
 				IsEUpgradeActive: false,
 				Config:           env.config,
 				ChainTime:        test.time,
-				FeeManager:       commonfees.NewManager(commonfees.Empty),
-				ConsumedUnitsCap: commonfees.Max,
+				FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
+				ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 
 				Fee: test.fee,
 			}
@@ -240,10 +245,11 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
+			feeCfg = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(commonfees.Empty),
-				UnitCaps:      commonfees.Empty,
+				BlkFeeManager: commonfees.NewManager(feeCfg.UnitFees),
+				UnitCaps:      feeCfg.BlockUnitsCap,
 				State:         stateDiff,
 				Tx:            tx,
 			}
