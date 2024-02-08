@@ -5,7 +5,7 @@ package snowball
 
 import "fmt"
 
-var _ UnarySnowflake = (*unarySnowflake)(nil)
+var _ UnarySnow = (*unarySnowflake)(nil)
 
 func newUnarySnowflake(beta int) unarySnowflake {
 	return unarySnowflake{
@@ -33,6 +33,8 @@ func (sf *unarySnowflake) RecordSuccessfulPoll() {
 	sf.finalized = sf.finalized || sf.confidence >= sf.beta
 }
 
+func (sf *unarySnowflake) RecordPollPreference() {}
+
 func (sf *unarySnowflake) RecordUnsuccessfulPoll() {
 	sf.confidence = 0
 }
@@ -41,7 +43,7 @@ func (sf *unarySnowflake) Finalized() bool {
 	return sf.finalized
 }
 
-func (sf *unarySnowflake) Extend(beta int, choice int) BinarySnowflake {
+func (sf *unarySnowflake) Extend(beta int, choice int) BinarySnow {
 	return &binarySnowflake{
 		binarySlush: binarySlush{preference: choice},
 		confidence:  sf.confidence,
@@ -50,7 +52,7 @@ func (sf *unarySnowflake) Extend(beta int, choice int) BinarySnowflake {
 	}
 }
 
-func (sf *unarySnowflake) Clone() UnarySnowflake {
+func (sf *unarySnowflake) Clone() UnarySnow {
 	newSnowflake := *sf
 	return &newSnowflake
 }

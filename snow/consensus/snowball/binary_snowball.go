@@ -5,8 +5,6 @@ package snowball
 
 import "fmt"
 
-var _ BinarySnowball = (*binarySnowball)(nil)
-
 func newBinarySnowball(beta, choice int) binarySnowball {
 	return binarySnowball{
 		binarySnowflake: newBinarySnowflake(beta, choice),

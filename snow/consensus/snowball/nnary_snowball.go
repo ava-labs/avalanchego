@@ -9,7 +9,21 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySnowball = (*nnarySnowball)(nil)
+var (
+	_ NnarySnow = (*nnarySnowball)(nil)
+)
+
+type SnowballFactory struct{}
+
+func (SnowballFactory) New(params Parameters, choice ids.ID) NnarySnow {
+	sb := newNnarySnowball(params.BetaVirtuous, params.BetaRogue, choice)
+	return &sb
+}
+
+func (SnowballFactory) NewUnary(params Parameters) UnarySnow {
+	sb := newUnarySnowball(params.BetaVirtuous)
+	return &sb
+}
 
 func newNnarySnowball(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowball {
 	return nnarySnowball{
