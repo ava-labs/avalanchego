@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	_ NnarySnow = (*nnarySnowball)(nil)
+	_ NnarySnow        = (*nnarySnowball)(nil)
 	_ ConsensusFactory = SnowballFactory{}
 )
 

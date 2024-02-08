@@ -48,7 +48,7 @@ type ConsensusFactory interface {
 
 // NnarySnow is a snow instance deciding between an unbounded number
 // of values.
-// After the caller performs a sample of k nodes, it will call
+// The caller samples k nodes and then calls
 // 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
 // 2. RecordPollPreference if choice collects >= alphaPreference votes
 // 3. RecordUnsuccessfulPoll otherwise
@@ -78,7 +78,7 @@ type NnarySnow interface {
 }
 
 // BinarySnow is a snow instance deciding between two values.
-// After the caller performs a sample of k nodes, it will call
+// The caller samples k nodes and then calls
 // 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
 // 2. RecordPollPreference if choice collects >= alphaPreference votes
 // 3. RecordUnsuccessfulPoll otherwise
@@ -103,8 +103,8 @@ type BinarySnow interface {
 	Finalized() bool
 }
 
-// UnarySnow is a snow instance deciding on one value. After
-// After the caller performs a sample of k nodes, it will call
+// UnarySnow is a snow instance deciding on one value.
+// The caller samples k nodes and then calls
 // 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
 // 2. RecordPollPreference if choice collects >= alphaPreference votes
 // 3. RecordUnsuccessfulPoll otherwise
