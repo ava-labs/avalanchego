@@ -824,7 +824,7 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 
 	var parsedReply GetValidatorsAtReply
 	require.NoError(parsedReply.UnmarshalJSON(replyJSON))
-	require.Equal(reply, &parsedReply)
+	require.Equal(&parsedReply, reply)
 }
 
 func TestServiceGetBlockByHeight(t *testing.T) {

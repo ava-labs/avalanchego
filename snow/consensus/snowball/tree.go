@@ -322,7 +322,7 @@ func (u *unaryNode) DecidedPrefix() int {
 //     |                   | |                   |
 //     +-------------------+ +-------------------+
 //
-//nolint:gofmt,gofumpt,goimports // this comment is formatted as intended
+//nolint:goimports // this comment is formatted as intended
 func (u *unaryNode) Add(newChoice ids.ID) node {
 	if u.Finalized() {
 		return u // Only happens if the tree is finalized, or it's a leaf node

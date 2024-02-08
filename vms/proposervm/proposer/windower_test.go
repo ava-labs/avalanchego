@@ -42,7 +42,7 @@ func TestWindowerNoValidators(t *testing.T) {
 
 	expectedProposer, err := w.ExpectedProposer(context.Background(), chainHeight, pChainHeight, slot)
 	require.ErrorIs(err, ErrAnyoneCanPropose)
-	require.Equal(ids.EmptyNodeID, expectedProposer)
+	require.Equal(expectedProposer, ids.EmptyNodeID)
 
 	delay, err = w.MinDelayForProposer(context.Background(), chainHeight, pChainHeight, nodeID, slot)
 	require.ErrorIs(err, ErrAnyoneCanPropose)

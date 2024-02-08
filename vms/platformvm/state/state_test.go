@@ -151,11 +151,11 @@ func TestPersistStakers(t *testing.T) {
 				r.Len(valsMap, 1)
 				valOut, found := valsMap[staker.NodeID]
 				r.True(found)
-				r.Equal(valOut, &validators.GetValidatorOutput{
+				r.Equal(&validators.GetValidatorOutput{
 					NodeID:    staker.NodeID,
 					PublicKey: staker.PublicKey,
 					Weight:    staker.Weight,
-				})
+				}, valOut)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 				upDuration, lastUpdated, err := s.GetUptime(staker.NodeID, staker.SubnetID)
@@ -168,10 +168,10 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
-				r.Equal(weightDiff, &ValidatorWeightDiff{
+				r.Equal(&ValidatorWeightDiff{
 					Decrease: false,
 					Amount:   staker.Weight,
-				})
+				}, weightDiff)
 
 				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				if staker.SubnetID == constants.PrimaryNetworkID {
@@ -267,10 +267,10 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
-				r.Equal(weightDiff, &ValidatorWeightDiff{
+				r.Equal(&ValidatorWeightDiff{
 					Decrease: false,
 					Amount:   staker.Weight,
-				})
+				}, weightDiff)
 			},
 		},
 		"add pending validator": {
@@ -310,7 +310,7 @@ func TestPersistStakers(t *testing.T) {
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				// pending validators are not showed in validators set
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 0)
+				r.Empty(valsMap)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 				// pending validators uptime is not tracked
@@ -385,7 +385,7 @@ func TestPersistStakers(t *testing.T) {
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 0)
+				r.Empty(valsMap)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 				// nothing to do here
@@ -436,7 +436,7 @@ func TestPersistStakers(t *testing.T) {
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				// deleted validators are not showed in the validators set anymore
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 0)
+				r.Empty(valsMap)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 				// uptimes of delete validators are dropped
@@ -448,10 +448,10 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
-				r.Equal(weightDiff, &ValidatorWeightDiff{
+				r.Equal(&ValidatorWeightDiff{
 					Decrease: true,
 					Amount:   staker.Weight,
-				})
+				}, weightDiff)
 
 				blsDiffBytes, err := s.flatValidatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
 				if staker.SubnetID == constants.PrimaryNetworkID {
@@ -548,10 +548,10 @@ func TestPersistStakers(t *testing.T) {
 				r.NoError(err)
 				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
 				r.NoError(err)
-				r.Equal(weightDiff, &ValidatorWeightDiff{
+				r.Equal(&ValidatorWeightDiff{
 					Decrease: true,
 					Amount:   staker.Weight,
-				})
+				}, weightDiff)
 			},
 		},
 		"delete pending validator": {
@@ -593,7 +593,7 @@ func TestPersistStakers(t *testing.T) {
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 0)
+				r.Empty(valsMap)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 				_, _, err := s.GetUptime(staker.NodeID, staker.SubnetID)
@@ -664,7 +664,7 @@ func TestPersistStakers(t *testing.T) {
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 0)
+				r.Empty(valsMap)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 			},

@@ -164,7 +164,7 @@ func Test_Key_Skip(t *testing.T) {
 func Test_Key_Take(t *testing.T) {
 	require := require.New(t)
 
-	require.Equal(ToKey([]byte{0}).Take(0), Key{})
+	require.Equal(Key{}, ToKey([]byte{0}).Take(0))
 
 	for _, ts := range validTokenSizes {
 		if ts == 8 {

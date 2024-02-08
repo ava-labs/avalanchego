@@ -72,6 +72,7 @@ linters:
     - staticcheck
     - stylecheck
     - tagalign
+    - testifylint
     - typecheck
     - unconvert
     - unparam
@@ -181,3 +182,29 @@ linters-settings:
     strict: true
     order:
       - serialize
+  testifylint:
+    # Disable all checkers (https://github.com/Antonboom/testifylint#checkers).
+    # Default: false
+    disable-all: true
+    # Enable checkers by name
+    # (in addition to default
+    #   blank-import, bool-compare, compares, empty, error-is-as, error-nil, expected-actual, go-require, float-compare,
+    #   len, nil-compare, require-error, suite-dont-use-pkg, suite-extra-assert-call, useless-assert
+    # ).
+    enable:
+      - blank-import
+      - bool-compare
+      - compares
+      - empty
+      - error-is-as
+      - error-nil
+      - expected-actual
+      # - go-require
+      # - float-compare
+      - len
+      - nil-compare
+      - require-error
+      - suite-dont-use-pkg
+      - suite-extra-assert-call
+      - suite-thelper
+      - useless-assert

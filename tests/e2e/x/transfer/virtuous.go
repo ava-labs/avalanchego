@@ -226,14 +226,14 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					xc := avm.NewClient(u, "X")
 					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
 					require.NoError(err)
-					require.Equal(status, choices.Accepted)
+					require.Equal(choices.Accepted, status)
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
 					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
 					require.NoError(err)
-					require.Equal(status, choices.Accepted)
+					require.Equal(choices.Accepted, status)
 
 					mm, err := tests.GetNodeMetrics(u, allMetrics...)
 					require.NoError(err)

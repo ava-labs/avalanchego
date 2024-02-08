@@ -306,9 +306,9 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
 
-			require.Nil(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
-			require.Nil(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
-			require.Nil(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, tt.msg))
+			require.NoError(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
+			require.NoError(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
+			require.NoError(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, tt.msg))
 		})
 	}
 }

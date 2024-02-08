@@ -549,7 +549,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
@@ -632,7 +632,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
@@ -722,7 +722,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
@@ -843,7 +843,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
@@ -945,7 +945,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
@@ -1080,7 +1080,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
@@ -1186,7 +1186,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
@@ -1329,7 +1329,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
@@ -1432,7 +1432,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
 	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)

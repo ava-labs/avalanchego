@@ -163,7 +163,7 @@ func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction)
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 	return receipt
 }
 
