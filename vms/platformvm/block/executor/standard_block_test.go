@@ -520,6 +520,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 					subnetID,      // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -610,6 +611,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,                           // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -638,6 +640,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -708,6 +711,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 				subnetID,                           // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -803,6 +807,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 

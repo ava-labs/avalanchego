@@ -262,6 +262,7 @@ func addSubnet(env *environment) {
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	if err != nil {
 		panic(err)
@@ -468,6 +469,7 @@ func addPendingValidator(
 		reward.PercentDenominator,
 		keys,
 		ids.ShortEmpty,
+		nil,
 	)
 	if err != nil {
 		return nil, err

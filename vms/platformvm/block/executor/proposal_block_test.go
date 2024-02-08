@@ -566,6 +566,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -589,6 +590,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					subnetID,         // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -618,6 +620,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -718,6 +721,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,                           // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -746,6 +750,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -777,6 +782,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -860,6 +866,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				subnetID,                           // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -889,6 +896,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -975,6 +983,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1043,6 +1052,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1069,6 +1079,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1159,6 +1170,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1226,6 +1238,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1252,6 +1265,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1337,6 +1351,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1412,6 +1427,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 

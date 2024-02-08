@@ -578,7 +578,6 @@ func (b *builder) NewTransformSubnetTx(
 		SubnetAuth:               subnetAuth,
 	}
 
-	signers = append(signers, subnetSigners)
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
@@ -930,6 +929,7 @@ func (b *builder) NewBaseTx(
 			BlockchainID: b.ctx.ChainID,
 			Ins:          ins,
 			Outs:         outs,
+			Memo:         memo,
 		},
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

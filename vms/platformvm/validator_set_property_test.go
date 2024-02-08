@@ -260,6 +260,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create AddSubnetValidatorTx: %w", err)
@@ -285,6 +286,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx: %w", err)
@@ -679,6 +681,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		[]ids.ShortID{keys[0].PublicKey().Address()},
 		[]*secp256k1.PrivateKey{keys[len(keys)-1]}, // pays tx fee
 		keys[0].PublicKey().Address(),              // change addr
+		nil,
 	)
 	if err != nil {
 		return nil, ids.Empty, err
