@@ -586,4 +586,3 @@ func (b *binaryNode) Printable() (string, []node) {
 	}
 	return s, []node{b.children[1], b.children[0]}
 }
-

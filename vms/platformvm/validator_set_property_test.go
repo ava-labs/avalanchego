@@ -91,7 +91,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			// random events sequence received as test input
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return "failed building events sequence:" + err.Error()
+				return "failed building events sequence: " + err.Error()
 			}
 
 			validatorSetByHeightAndSubnet := make(map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
