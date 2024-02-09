@@ -5,7 +5,7 @@
 ARG AVALANCHE_VERSION
 
 # ============= Compilation Stage ================
-FROM golang:1.20.12-bullseye AS builder
+FROM golang:1.21.7-bullseye AS builder
 
 WORKDIR /build
 
@@ -14,7 +14,7 @@ WORKDIR /build
 COPY go.mod go.sum avalanchego* ./
 
 # Download avalanche dependencies using go mod
-RUN go mod download && go mod tidy -compat=1.20
+RUN go mod download && go mod tidy -compat=1.21
 
 # Copy the code into the container
 COPY . .
