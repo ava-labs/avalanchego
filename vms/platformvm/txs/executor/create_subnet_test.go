@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -51,12 +52,23 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+			env := newEnvironment(t, apricotPhase5)
 			env.config.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
+			feeCalc := &fees.Calculator{
+				IsEUpgradeActive: false,
+				Config:           env.config,
+				ChainTime:        test.time,
+				FeeManager:       commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+				ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+
+				Fee: test.fee,
+			}
+
+			ins, outs, _, signers, err := env.utxosHandler.FinanceTx(env.state, preFundedKeys, 0, feeCalc, ids.ShortEmpty)
 			require.NoError(err)
 
 			// Create the tx
@@ -77,10 +89,11 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
+			feeCfg = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
-				UnitCaps:      commonfees.Empty,
+				BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+				UnitCaps:      feeCfg.BlockUnitsCap,
 				State:         stateDiff,
 				Tx:            tx,
 			}

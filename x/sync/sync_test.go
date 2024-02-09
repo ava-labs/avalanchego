@@ -7,14 +7,13 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -441,7 +440,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	// next key at prefix of newly added point
 	nextKey, err := syncer.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
-	require.NotNil(nextKey)
+	require.True(nextKey.HasValue())
 
 	require.True(isPrefix(midPointVal, nextKey.Value()))
 
@@ -455,7 +454,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	// next key at prefix of newly added point
 	nextKey, err = syncer.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
-	require.NotNil(nextKey)
+	require.True(nextKey.HasValue())
 
 	// deal with odd length key
 	require.True(isPrefix(midPointVal, nextKey.Value()))
@@ -572,7 +571,8 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 	nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
-	require.Equal(nextKey.Value(), lastKey)
+	require.True(nextKey.HasValue())
+	require.Equal(lastKey, nextKey.Value())
 }
 
 // Test findNextKey by computing the expected result in a naive, inefficient

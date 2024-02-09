@@ -131,7 +131,7 @@ func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 
 	source.Seed(w.chainSource ^ blockHeight)
 
-	numToSample := int(math.Min(uint64(maxWindows), totalWeight))
+	numToSample := int(min(uint64(maxWindows), totalWeight))
 	indices, err := sampler.Sample(numToSample)
 	if err != nil {
 		return nil, err

@@ -35,7 +35,7 @@ func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -135,7 +135,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -229,7 +229,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -248,6 +248,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -262,6 +263,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
+		nil,
 	)
 	require.NoError(err)
 
@@ -350,7 +352,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, cortinaFork)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -369,6 +371,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
+		nil,
 	)
 	require.NoError(err)
 
@@ -383,6 +386,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
+		nil,
 	)
 	require.NoError(err)
 
@@ -566,7 +570,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, true /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, cortinaFork)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -585,6 +589,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -599,6 +604,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
+		nil,
 	)
 	require.NoError(err)
 
@@ -725,7 +731,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, apricotPhase5)
 	dummyHeight := uint64(1)
 
 	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
@@ -747,6 +753,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -760,6 +767,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 

@@ -52,7 +52,16 @@ import (
 const (
 	defaultWeight = 5 * units.MilliAvax
 	trackChecksum = false
+
+	apricotPhase3 activeFork = iota
+	apricotPhase5
+	banffFork
+	cortinaFork
+	durangoFork
+	eUpgradeFork
 )
+
+type activeFork uint8
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -113,12 +122,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *environment {
+func newEnvironment(t *testing.T, fork activeFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina, postDurango)
-	clk := defaultClock(postBanff || postCortina || postDurango)
+	config := defaultConfig(t, fork)
+	clk := defaultClock(fork)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -222,6 +231,7 @@ func addSubnet(
 		},
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -232,12 +242,12 @@ func addSubnet(
 	var (
 		unitFees    = env.state.GetUnitFees()
 		unitWindows = env.state.GetFeeWindows()
-		unitCaps    = config.EUpgradeDynamicFeesConfig.BlockUnitsCap
+		feeCfg      = env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
 		BlkFeeManager: fees.NewManager(unitFees, unitWindows),
-		UnitCaps:      unitCaps,
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            testSubnet1,
 	}
@@ -279,18 +289,36 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
-	}
-	durangoTime := mockable.MaxTime
-	if postDurango {
+func defaultConfig(t *testing.T, fork activeFork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
+		eUpgradeTime      = mockable.MaxTime
+	)
+
+	switch fork {
+	case eUpgradeFork:
+		eUpgradeTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case durangoFork:
 		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case cortinaFork:
+		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case banffFork:
+		banffTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case apricotPhase5:
+		apricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		apricotPhase3Time = defaultValidateEndTime
+	default:
+		require.NoError(t, fmt.Errorf("unhandled fork %d", fork))
 	}
 
 	return &config.Config{
@@ -311,18 +339,18 @@ func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,
-		EUpgradeTime:      mockable.MaxTime,
+		EUpgradeTime:      eUpgradeTime,
 	}
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
+func defaultClock(fork activeFork) *mockable.Clock {
 	now := defaultGenesisTime
-	if postFork {
+	if fork == eUpgradeFork || fork == durangoFork || fork == cortinaFork || fork == banffFork {
 		// 1 second after Banff fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}

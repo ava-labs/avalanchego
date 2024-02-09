@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -27,7 +28,7 @@ import (
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, banffFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -39,6 +40,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -48,10 +50,11 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -62,7 +65,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, banffFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -74,6 +77,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -89,10 +93,11 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -104,7 +109,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, banffFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -116,6 +121,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -124,10 +130,11 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -138,7 +145,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+	env := newEnvironment(t, banffFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -150,16 +157,18 @@ func TestCreateChainTxValid(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
-		UnitCaps:      commonfees.Empty,
+		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
 	}
@@ -197,10 +206,21 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/, false /*=postDurango*/)
+			env := newEnvironment(t, banffFork)
 			env.config.ApricotPhase3Time = ap3Time
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
+			feeCalc := &fees.Calculator{
+				IsEUpgradeActive: false,
+				Config:           env.config,
+				ChainTime:        test.time,
+				FeeManager:       commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+				ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+
+				Fee: test.fee,
+			}
+
+			ins, outs, _, signers, err := env.utxosHandler.FinanceTx(env.state, preFundedKeys, 0, feeCalc, ids.ShortEmpty)
 			require.NoError(err)
 
 			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
@@ -229,10 +249,11 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			stateDiff.SetTimestamp(test.time)
 
+			feeCfg = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 			executor := StandardTxExecutor{
 				Backend:       &env.backend,
-				BlkFeeManager: commonfees.NewManager(commonfees.Empty, commonfees.EmptyWindows),
-				UnitCaps:      commonfees.Empty,
+				BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+				UnitCaps:      feeCfg.BlockUnitsCap,
 				State:         stateDiff,
 				Tx:            tx,
 			}

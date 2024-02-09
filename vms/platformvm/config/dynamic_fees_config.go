@@ -5,7 +5,6 @@ package config
 
 import (
 	"fmt"
-	"math"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -24,37 +23,21 @@ func init() {
 }
 
 // EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
-var EUpgradeDynamicFeesConfig = DynamicFeesConfig{
-	InitialUnitFees: commonfees.Dimensions{
-		1,
-		2,
-		3,
-		4,
-	},
+var (
+	EUpgradeDynamicFeesConfig = DynamicFeesConfig{
+		InitialUnitFees:       commonfees.Dimensions{1, 2, 3, 4},
+		MinUnitFees:           commonfees.Dimensions{},
+		FeesChangeDenominator: commonfees.Dimensions{1, 1, 1, 1},
+		BlockUnitsCap:         commonfees.Max,
+		BlockUnitsTarget:      commonfees.Dimensions{1, 1, 1, 1},
+	}
 
-	MinUnitFees: commonfees.Dimensions{},
-
-	FeesChangeDenominator: commonfees.Dimensions{
-		1,
-		1,
-		1,
-		1,
-	},
-
-	BlockUnitsCap: commonfees.Dimensions{
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-		math.MaxUint64,
-	},
-
-	BlockUnitsTarget: commonfees.Dimensions{
-		1,
-		1,
-		1,
-		1,
-	},
-}
+	// TODO ABENEGIA: decide if and how to validate PreEUpgradeDynamicFeesConfig
+	PreEUpgradeDynamicFeesConfig = DynamicFeesConfig{
+		InitialUnitFees: commonfees.Empty,
+		BlockUnitsCap:   commonfees.Max,
+	}
+)
 
 type DynamicFeesConfig struct {
 	// InitialUnitFees contains, per each fee dimension, the
