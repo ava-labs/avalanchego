@@ -38,7 +38,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/bitutil"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkBloomBits512(b *testing.B) {
@@ -147,8 +146,7 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 		var addr common.Address
 		addr[0] = byte(i)
 		addr[1] = byte(i / 256)
-		filter, err := sys.NewRangeFilter(0, int64(cnt*sectionSize-1), []common.Address{addr}, nil)
-		require.NoError(b, err)
+		filter := sys.NewRangeFilter(0, int64(cnt*sectionSize-1), []common.Address{addr}, nil)
 		if _, err := filter.Logs(context.Background()); err != nil {
 			b.Error("filter.Logs error:", err)
 		}
@@ -191,8 +189,7 @@ func BenchmarkNoBloomBits(b *testing.B) {
 
 	b.Log("Running filter benchmarks...")
 	start := time.Now()
-	filter, err := sys.NewRangeFilter(0, int64(*headNum), []common.Address{{}}, nil)
-	require.NoError(b, err)
+	filter := sys.NewRangeFilter(0, int64(*headNum), []common.Address{{}}, nil)
 	filter.Logs(context.Background())
 	d := time.Since(start)
 	b.Log("Finished running filter benchmarks")
