@@ -400,12 +400,8 @@ func (b *builder) NewImportTx(
 
 	// account for imported inputs credentials
 	for _, signer := range signers {
-		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(signer))
-		if err != nil {
-			return nil, fmt.Errorf("failed calculating credentials size: %w", err)
-		}
-		if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-			return nil, fmt.Errorf("account for credentials fees: %w", err)
+		if _, err = fees.FinanceCredential(feeCalc, len(signer)); err != nil {
+			return nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 	}
 
@@ -427,11 +423,8 @@ func (b *builder) NewImportTx(
 		}
 
 		// update fees to target given the extra output added
-		outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+		_, outDimensions, err := fees.FinanceOutput(feeCalc, changeOut)
 		if err != nil {
-			return nil, fmt.Errorf("failed calculating output size: %w", err)
-		}
-		if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
 			return nil, fmt.Errorf("account for output fees: %w", err)
 		}
 
@@ -605,12 +598,8 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	// account for subnet authorization credentials
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for credentials fees: %w", err)
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetSigners)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
@@ -771,12 +760,8 @@ func (b *builder) NewTransformSubnetTx(
 	}
 
 	// account for subnet authorization credentials
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for credentials fees: %w", err)
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetSigners)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
@@ -1164,12 +1149,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	// account for subnet authorization credentials
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for credentials fees: %w", err)
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetSigners)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
@@ -1241,12 +1222,8 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	// account for subnet authorization credentials
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for credentials fees: %w", err)
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetSigners)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
@@ -1322,12 +1299,8 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	// account for subnet authorization credentials
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
-	if err != nil {
-		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
-	}
-	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
-		return nil, fmt.Errorf("account for credentials fees: %w", err)
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetSigners)); err != nil {
+		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
