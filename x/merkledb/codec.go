@@ -10,10 +10,10 @@ import (
 	"io"
 	"math"
 	"math/bits"
+	"slices"
 	"sync"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"

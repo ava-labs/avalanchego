@@ -8,13 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/cockroachdb/pebble"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"golang.org/x/exp/slices"
 
 	"go.uber.org/zap"
 
