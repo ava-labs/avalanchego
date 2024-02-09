@@ -238,6 +238,16 @@ func (h *handler) FinanceTx(
 			},
 		}
 
+		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(inSigners))
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating credentials size: %w", err)
+		}
+		addedFees, err := feeCalc.AddFeesFor(credsDimensions)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for credentials fees: %w", err)
+		}
+		targetFee += addedFees
+
 		// The remaining value is initially the full value of the input
 		remainingValue := in.Amount()
 
@@ -246,7 +256,7 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		addedFees, err = feeCalc.AddFeesFor(insDimensions)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
@@ -364,6 +374,16 @@ func (h *handler) FinanceTx(
 			In:     in,
 		}
 
+		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(inSigners))
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed calculating credentials size: %w", err)
+		}
+		addedFees, err := feeCalc.AddFeesFor(credsDimensions)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("account for credentials fees: %w", err)
+		}
+		targetFee += addedFees
+
 		// The remaining value is initially the full value of the input
 		remainingValue := in.Amount()
 
@@ -372,7 +392,7 @@ func (h *handler) FinanceTx(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
 		}
-		addedFees, err := feeCalc.AddFeesFor(insDimensions)
+		addedFees, err = feeCalc.AddFeesFor(insDimensions)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}

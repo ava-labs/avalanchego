@@ -1508,7 +1508,7 @@ func financeOutput(feeCalc *fees.Calculator, output *avax.TransferableOutput) (u
 }
 
 func financeCredential(feeCalc *fees.Calculator, inputSigIndices []uint32) (uint64, error) {
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, inputSigIndices)
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(inputSigIndices))
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}

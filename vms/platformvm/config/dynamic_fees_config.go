@@ -4,6 +4,7 @@
 package config
 
 import (
+	"github.com/ava-labs/avalanchego/utils/units"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
@@ -18,10 +19,10 @@ import (
 var (
 	EUpgradeDynamicFeesConfig = DynamicFeesConfig{
 		UnitFees: commonfees.Dimensions{
-			1,
-			2,
-			3,
-			4,
+			1 * units.NanoAvax,
+			2 * units.NanoAvax,
+			3 * units.NanoAvax,
+			4 * units.NanoAvax,
 		},
 
 		BlockUnitsCap: commonfees.Max,
