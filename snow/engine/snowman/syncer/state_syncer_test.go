@@ -25,8 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -248,7 +246,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// check that vdrs are reached out for frontiers
-	require.Len(contactedFrontiersProviders, safemath.Min(beacons.Count(ctx.SubnetID), maxOutstandingBroadcastRequests))
+	require.Len(contactedFrontiersProviders, min(beacons.Count(ctx.SubnetID), maxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		require.Contains(syncer.pendingSeeders, beaconID)

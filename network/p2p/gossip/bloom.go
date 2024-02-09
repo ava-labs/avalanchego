@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 // NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
@@ -94,7 +93,7 @@ func ResetBloomFilterIfNeeded(
 		return false, nil
 	}
 
-	targetElements = math.Max(bloomFilter.minTargetElements, targetElements)
+	targetElements = max(bloomFilter.minTargetElements, targetElements)
 	err := resetBloomFilter(
 		bloomFilter,
 		targetElements,

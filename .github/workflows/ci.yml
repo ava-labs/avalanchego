@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  go_version: '~1.20.12'
+  go_version: '~1.21.7'
   tmpnet_data_path: ~/.tmpnet/networks/1000
 
 jobs:

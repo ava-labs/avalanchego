@@ -5,11 +5,11 @@ package set
 
 import (
 	"bytes"
+	"slices"
 
 	stdjson "encoding/json"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -111,7 +111,7 @@ func (s *Set[T]) Remove(elts ...T) {
 
 // Clear empties this set
 func (s *Set[_]) Clear() {
-	maps.Clear(*s)
+	clear(*s)
 }
 
 // List converts this set into a list
