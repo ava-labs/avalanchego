@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -70,7 +73,7 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -85,7 +88,7 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -100,7 +103,7 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -115,7 +118,7 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -130,7 +133,7 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -145,7 +148,7 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -168,7 +171,7 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -191,7 +194,7 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -206,7 +209,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -225,7 +228,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, ins)
 	if err != nil {
 		return err
 	}
@@ -244,7 +247,7 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -253,7 +256,7 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	return err
 }
 
-func (fc *Calculator) commonConsumedUnits(
+func (fc *Calculator) meterTx(
 	uTx txs.UnsignedTx,
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
@@ -264,13 +267,28 @@ func (fc *Calculator) commonConsumedUnits(
 	if err != nil {
 		return consumedUnits, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	credsSize, err := txs.Codec.Size(txs.CodecVersion, fc.Credentials)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of credentials: %w", err)
-	}
-	consumedUnits[fees.Bandwidth] = uint64(uTxSize + credsSize)
+	consumedUnits[fees.Bandwidth] = uint64(uTxSize)
 
-	inputDimensions, err := fees.GetInputsDimensions(txs.Codec, txs.CodecVersion, allIns)
+	// meter credentials, one by one. Then account for the extra bytes needed to
+	// serialize a slice of credentials (codec version bytes + slice size bytes)
+	for i, cred := range fc.Credentials {
+		c, ok := cred.(*secp256k1fx.Credential)
+		if !ok {
+			return consumedUnits, fmt.Errorf("don't know how to calculate complexity of %T", cred)
+		}
+		credDimensions, err := fees.MeterSingleCredential(txs.Codec, txs.CodecVersion, len(c.Sigs))
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding credential %d: %w", i, err)
+		}
+		consumedUnits, err = fees.Add(consumedUnits, credDimensions)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding credentials: %w", err)
+		}
+	}
+	consumedUnits[fees.Bandwidth] += wrappers.IntLen // length of the credentials slice
+	consumedUnits[fees.Bandwidth] += codec.CodecVersionSize
+
+	inputDimensions, err := fees.MeterInputs(txs.Codec, txs.CodecVersion, allIns)
 	if err != nil {
 		return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
 	}
@@ -280,7 +298,7 @@ func (fc *Calculator) commonConsumedUnits(
 		return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
 	}
 
-	outputDimensions, err := fees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, allOuts)
+	outputDimensions, err := fees.MeterOutputs(txs.Codec, txs.CodecVersion, allOuts)
 	if err != nil {
 		return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
 	}

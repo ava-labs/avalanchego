@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func GetInputsDimensions(c codec.Manager, v uint16, ins []*avax.TransferableInput) (Dimensions, error) {
+func MeterInputs(c codec.Manager, v uint16, ins []*avax.TransferableInput) (Dimensions, error) {
 	var consumedUnits Dimensions
 	for _, in := range ins {
 		cost, err := in.In.Cost()
@@ -35,7 +35,7 @@ func GetInputsDimensions(c codec.Manager, v uint16, ins []*avax.TransferableInpu
 	return consumedUnits, nil
 }
 
-func GetOutputsDimensions(c codec.Manager, v uint16, outs []*avax.TransferableOutput) (Dimensions, error) {
+func MeterOutputs(c codec.Manager, v uint16, outs []*avax.TransferableOutput) (Dimensions, error) {
 	var consumedUnits Dimensions
 	for _, out := range outs {
 		outSize, err := c.Size(v, out)
@@ -50,7 +50,7 @@ func GetOutputsDimensions(c codec.Manager, v uint16, outs []*avax.TransferableOu
 	return consumedUnits, nil
 }
 
-func GetCredentialsDimensions(c codec.Manager, v uint16, keysCount int) (Dimensions, error) {
+func MeterSingleCredential(c codec.Manager, v uint16, keysCount int) (Dimensions, error) {
 	var consumedUnits Dimensions
 
 	// Ensure that codec picks interface instead of the pointer to evaluate size.
