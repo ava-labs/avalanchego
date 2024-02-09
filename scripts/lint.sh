@@ -47,9 +47,14 @@ function test_license_header {
   local files=()
   while IFS= read -r line; do files+=("$line"); done < <(find_go_files "${target}")
 
+  # ignore 3rd party code
   addlicense \
   -f ./LICENSE.header \
   ${_addlicense_flags} \
+  --ignore 'utils/ip_test.go' \
+  --ignore 'utils/logging/highlight.go' \
+  --ignore 'utils/ulimit/ulimit_non_unix.go.go' \
+  --ignore 'utils/ulimit/ulimit_unix.go' \
   "${files[@]}"
 }
 

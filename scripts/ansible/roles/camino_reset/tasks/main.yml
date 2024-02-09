@@ -1,0 +1,9 @@
+- name: Remove previous database
+  file:
+    path: "{{ db_dir }}"
+    state: absent
+
+- name: Remove previous logs
+  file:
+    path: "{{ log_dir }}"
+    state: absent

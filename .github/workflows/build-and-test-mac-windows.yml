@@ -1,6 +1,9 @@
-name: Unit Tests Mac-Windows
+name: Build + Test Mac-Windows
 
 on:
+  pull_request:
+    tags-ignore: ["*"]
+    branches: [chain4travel, dev]
   push:
     branches: [chain4travel, dev]
   workflow_dispatch:
@@ -17,6 +20,6 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: "1.19" # The Go version to download (if necessary) and use.
-      - name: test
+      - name: build_test
         shell: bash
-        run: scripts/test.sh
+        run: scripts/build_and_test.sh

@@ -1,0 +1,33 @@
+name: Test e2e
+
+on:
+  pull_request:
+    branches: [chain4travel, dev]
+  push:
+    tags-ignore: ["*"]
+    branches: [chain4travel, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  test_e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+      - name: Build the caminogo binaries
+        shell: bash
+        run: ./scripts/build.sh
+      - name: Run e2e tests
+        shell: bash
+        run: scripts/tests.e2e.sh ./build/camino-node ./tools/camino-network-runner/bin/camino-network-runner
+      - name: Run e2e tests for whitelist vtx
+        shell: bash
+        run: ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/camino-node ./tools/camino-network-runner/bin/camino-network-runner

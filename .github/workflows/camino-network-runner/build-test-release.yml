@@ -1,0 +1,70 @@
+name: CNR - Build + test + release
+
+on:
+  push:
+    branches:
+      - chain4travel
+      - dev
+  pull_request:
+    branches:
+      - chain4travel
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  lint_test:
+    name: Lint tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: update dependencies
+        run: git submodule update --init --recursive
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+      - name: Run static analysis tests
+        working-directory: ./tools/camino-network-runner
+        shell: bash
+        run: scripts/lint.sh
+
+  unit_test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: update dependencies
+        run: git submodule update --init --recursive
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+        
+      - name: run unit tests
+        run: go test -v -timeout 10m -race ./...
+        working-directory: ./tools/camino-network-runner
+  e2e_test:
+    name: e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: update dependencies
+        run: git submodule update --init --recursive
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.19'
+      
+      - name: build camino node
+        shell: bash
+        run: scripts/build.sh
+
+      - name: Run cnr e2e tests
+        working-directory: ./tools/camino-network-runner
+        shell: bash
+        run: scripts/tests.e2e.sh ${{ github.workspace }}/build/caminogo

@@ -1,0 +1,5 @@
+camino_nodes:
+    hosts:
+      raspberrypi.local:
+    vars:
+      ansible_user: "pi"

@@ -37,7 +37,7 @@ var (
 	errWrongMisgAliasAddr = errors.New("wrong msig alias addr")
 )
 
-// ValidateConfig validates the generated config. Exposed for camino-node/tools/genesis generator
+// ValidateConfig validates the generated config. Exposed for caminogo/tools/genesis generator
 // It's not used in caminogo itself. Please don't delete.
 func ValidateConfig(config *Config, stakingCfg *StakingConfig) error {
 	return validateConfig(config.NetworkID, config, stakingCfg)
