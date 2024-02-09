@@ -52,6 +52,6 @@ func (m *Message) Bytes() []byte {
 	return m.bytes
 }
 
-func (m Message) String() string {
-	return fmt.Sprintf("WarpMessage(%s, %s)", m.UnsignedMessage, m.Signature)
+func (m *Message) String() string {
+	return fmt.Sprintf("WarpMessage(%s, %s)", &m.UnsignedMessage, m.Signature)
 }
