@@ -42,7 +42,7 @@ var (
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
 
-// TODO: Stake and Authorize should be replaced by similar methods in the
+// TODO: FinanceTx and Authorize should be replaced by similar methods in the
 // P-chain wallet
 type Spender interface {
 	// FinanceTx the provided amount while calculating and deducting the provided fee.

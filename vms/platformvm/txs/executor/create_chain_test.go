@@ -109,7 +109,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banffFork)
+	env := newEnvironment(t, eUpgradeFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -145,7 +145,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banffFork)
+	env := newEnvironment(t, eUpgradeFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -229,7 +229,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			signers = append(signers, subnetSigners)
 
 			// Create the tx
-
 			utx := &txs.CreateChainTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    env.ctx.NetworkID,

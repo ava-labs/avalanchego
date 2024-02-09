@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -48,6 +49,7 @@ import (
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 )
 
 var (
@@ -394,7 +396,23 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
-			balance = defaultBalance - service.vm.Config.GetCreateSubnetTxFee(service.vm.clock.Time())
+			var (
+				chainTime = service.vm.state.GetTimestamp()
+				feeCfg    = service.vm.Config.GetDynamicFeesConfig(chainTime)
+				feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+				feeCalc   = &fees.Calculator{
+					IsEUpgradeActive: service.vm.IsEUpgradeActivated(chainTime),
+					Config:           &service.vm.Config,
+					ChainTime:        chainTime,
+					FeeManager:       feeMan,
+					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					Credentials:      testSubnet1.Creds,
+				}
+			)
+
+			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
+
+			balance = defaultBalance - feeCalc.Fee
 		}
 		require.Equal(json.Uint64(balance), reply.Balance)
 		require.Equal(json.Uint64(balance), reply.Unlocked)

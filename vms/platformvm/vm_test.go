@@ -66,10 +66,12 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 )
 
 type activeFork uint8
@@ -82,7 +84,7 @@ const (
 	durangoFork
 	eUpgradeFork
 
-	latestFork activeFork = durangoFork
+	latestFork activeFork = eUpgradeFork
 
 	defaultWeight uint64 = 10000
 )
@@ -371,7 +373,25 @@ func TestGenesis(t *testing.T) {
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
-			require.Equal(uint64(utxo.Amount)-vm.CreateSubnetTxFee, out.Amount())
+
+			// we use the first key to fund a subnet creation in [defaultGenesis].
+			// As such we need to account for the subnet creation fee
+			var (
+				chainTime = vm.state.GetTimestamp()
+				feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
+				feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+				feeCalc   = &fees.Calculator{
+					IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+					Config:           &vm.Config,
+					ChainTime:        chainTime,
+					FeeManager:       feeMan,
+					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+					Credentials:      testSubnet1.Creds,
+				}
+			)
+
+			require.NoError(testSubnet1.Unsigned.Visit(feeCalc))
+			require.Equal(uint64(utxo.Amount)-feeCalc.Fee, out.Amount())
 		}
 	}
 
@@ -2252,7 +2272,22 @@ func TestBaseTx(t *testing.T) {
 	}
 	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
 
-	require.Equal(vm.TxFee, totalInputAmt-totalOutputAmt)
+	var (
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
+			ChainTime:        chainTime,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Credentials:      baseTx.Creds,
+		}
+	)
+
+	require.NoError(baseTx.Unsigned.Visit(feeCalc))
+	require.Equal(feeCalc.Fee, totalInputAmt-totalOutputAmt)
 	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
