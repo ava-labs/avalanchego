@@ -599,7 +599,7 @@ func (b *DynamicFeesBuilder) financeTx(
 		inputs = append(inputs, input)
 
 		// Burn any value that should be burned
-		amountToBurn := math.Min(
+		amountToBurn := min(
 			amountsToBurn[assetID], // Amount we still need to burn
 			out.Amt,                // Amount available to burn
 		)

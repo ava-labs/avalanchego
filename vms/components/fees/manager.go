@@ -156,7 +156,7 @@ func computeNextPriceWindow(
 	case totalUnitsConsumed > target:
 		// If the parent block used more units than its target, the baseFee should increase.
 		rawDelta := currentUnitFee * (totalUnitsConsumed - target) / target
-		delta := safemath.Max(rawDelta/changeDenom, 1) * changeDenom // price must change in increments on changeDenom
+		delta := max(rawDelta/changeDenom, 1) * changeDenom // price must change in increments on changeDenom
 
 		var over error
 		nextUnitFee, over = safemath.Add64(nextUnitFee, delta)
@@ -167,7 +167,7 @@ func computeNextPriceWindow(
 	case totalUnitsConsumed < target:
 		// Otherwise if the parent block used less units than its target, the baseFee should decrease.
 		rawDelta := currentUnitFee * (target - totalUnitsConsumed) / target
-		delta := safemath.Max(rawDelta/changeDenom, 1) * changeDenom // price must change in increments on changeDenom
+		delta := max(rawDelta/changeDenom, 1) * changeDenom // price must change in increments on changeDenom
 
 		// if we had no blocks for more than [WindowSize] seconds, we reduce fees even more,
 		// to try and account for all the low activity interval
@@ -182,6 +182,6 @@ func computeNextPriceWindow(
 		}
 	}
 
-	nextUnitFee = safemath.Max(nextUnitFee, minUnitFee)
+	nextUnitFee = max(nextUnitFee, minUnitFee)
 	return nextUnitFee, newRollupWindow
 }

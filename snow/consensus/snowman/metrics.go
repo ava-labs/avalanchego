@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -199,7 +198,7 @@ func (m *metrics) Issued(blkID ids.ID, pollNumber uint64) {
 }
 
 func (m *metrics) Verified(height uint64) {
-	m.currentMaxVerifiedHeight = math.Max(m.currentMaxVerifiedHeight, height)
+	m.currentMaxVerifiedHeight = max(m.currentMaxVerifiedHeight, height)
 	m.maxVerifiedHeight.Set(float64(m.currentMaxVerifiedHeight))
 }
 
