@@ -1310,31 +1310,6 @@ func TestDurangoMemoField(t *testing.T) {
 					memoField,
 				)
 				require.NoError(t, err)
-
-				// ins, unstakedOuts, _, signers, err := env.utxosHandler.Spend(
-				// 	env.state,
-				// 	preFundedKeys,
-				// 	defaultMinValidatorStake,
-				// 	env.config.TxFee,
-				// 	ids.ShortEmpty,
-				// )
-				// require.NoError(t, err)
-
-				// subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.TxID, preFundedKeys)
-				// require.NoError(t, err)
-				// signers = append(signers, subnetSigners)
-
-				// tx := &txs.RemoveSubnetValidatorTx{
-				// 	BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				// 		NetworkID:    env.ctx.NetworkID,
-				// 		BlockchainID: env.ctx.ChainID,
-				// 		Ins:          ins,
-				// 		Outs:         unstakedOuts,
-				// 	}},
-				// 	Subnet:     testSubnet1.ID(),
-				// 	NodeID:     primaryValidator.NodeID,
-				// 	SubnetAuth: subnetAuth,
-				// }
 				return tx, onAcceptState
 			},
 		},

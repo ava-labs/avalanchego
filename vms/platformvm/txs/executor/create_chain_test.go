@@ -109,7 +109,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banffFork)
+	env := newEnvironment(t, eUpgradeFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -130,10 +130,14 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+	var (
+		feeCfg     = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+		unitFees   = env.state.GetUnitFees()
+		feeWindows = env.state.GetFeeWindows()
+	)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+		BlkFeeManager: commonfees.NewManager(unitFees, feeWindows),
 		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
@@ -145,7 +149,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banffFork)
+	env := newEnvironment(t, eUpgradeFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -164,10 +168,14 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+	var (
+		feeCfg     = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+		unitFees   = env.state.GetUnitFees()
+		feeWindows = env.state.GetFeeWindows()
+	)
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+		BlkFeeManager: commonfees.NewManager(unitFees, feeWindows),
 		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
@@ -229,7 +237,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			signers = append(signers, subnetSigners)
 
 			// Create the tx
-
 			utx := &txs.CreateChainTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    env.ctx.NetworkID,

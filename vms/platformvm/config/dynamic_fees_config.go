@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/utils/units"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
@@ -25,11 +26,21 @@ func init() {
 // EUpgradeDynamicFeesConfig to be tuned TODO ABENEGIA
 var (
 	EUpgradeDynamicFeesConfig = DynamicFeesConfig{
-		InitialUnitFees:       commonfees.Dimensions{1, 2, 3, 4},
-		MinUnitFees:           commonfees.Dimensions{},
-		FeesChangeDenominator: commonfees.Dimensions{1, 1, 1, 1},
-		BlockUnitsCap:         commonfees.Max,
-		BlockUnitsTarget:      commonfees.Dimensions{1, 1, 1, 1},
+		InitialUnitFees: commonfees.Dimensions{
+			1 * units.NanoAvax,
+			2 * units.NanoAvax,
+			3 * units.NanoAvax,
+			4 * units.NanoAvax,
+		},
+		MinUnitFees: commonfees.Dimensions{},
+		FeesChangeDenominator: commonfees.Dimensions{
+			units.NanoAvax,
+			units.NanoAvax,
+			units.NanoAvax,
+			units.NanoAvax,
+		},
+		BlockUnitsCap:    commonfees.Max,
+		BlockUnitsTarget: commonfees.Dimensions{1, 1, 1, 1},
 	}
 
 	// TODO ABENEGIA: decide if and how to validate PreEUpgradeDynamicFeesConfig

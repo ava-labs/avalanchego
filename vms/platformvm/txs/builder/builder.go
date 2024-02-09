@@ -400,6 +400,17 @@ func (b *builder) NewImportTx(
 		return nil, err
 	}
 
+	// account for imported inputs credentials
+	for _, signer := range signers {
+		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(signer))
+		if err != nil {
+			return nil, fmt.Errorf("failed calculating credentials size: %w", err)
+		}
+		if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+			return nil, fmt.Errorf("account for credentials fees: %w", err)
+		}
+	}
+
 	if feeCalc.Fee >= importedAVAX {
 		// all imported avax will be burned to pay taxes.
 		// Fees are scaled back accordingly.
@@ -600,6 +611,15 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
+	// account for subnet authorization credentials
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
+	}
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for credentials fees: %w", err)
+	}
+
 	ins, outs, _, signers, err := b.FinanceTx(
 		b.state,
 		keys,
@@ -760,6 +780,15 @@ func (b *builder) NewTransformSubnetTx(
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.TransformSubnetTx(utx); err != nil {
 		return nil, err
+	}
+
+	// account for subnet authorization credentials
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
+	}
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for credentials fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
@@ -1159,6 +1188,15 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
+	// account for subnet authorization credentials
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
+	}
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for credentials fees: %w", err)
+	}
+
 	ins, outs, _, signers, err := b.FinanceTx(
 		b.state,
 		keys,
@@ -1227,6 +1265,15 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.RemoveSubnetValidatorTx(utx); err != nil {
 		return nil, err
+	}
+
+	// account for subnet authorization credentials
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
+	}
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for credentials fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
@@ -1301,6 +1348,15 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err = feeCalc.TransferSubnetOwnershipTx(utx); err != nil {
 		return nil, err
+	}
+
+	// account for subnet authorization credentials
+	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(subnetSigners))
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating credentials size: %w", err)
+	}
+	if _, err := feeCalc.AddFeesFor(credsDimensions); err != nil {
+		return nil, fmt.Errorf("account for credentials fees: %w", err)
 	}
 
 	ins, outs, _, signers, err := b.FinanceTx(
