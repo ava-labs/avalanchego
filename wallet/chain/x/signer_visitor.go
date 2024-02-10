@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	stdcontext "context"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
@@ -20,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	stdcontext "context"
 )
 
 var (

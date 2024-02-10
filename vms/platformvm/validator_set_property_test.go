@@ -15,7 +15,6 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
-
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -52,6 +51,9 @@ import (
 const (
 	startPrimaryWithBLS uint8 = iota
 	startSubnetValidator
+
+	failedValidatorSnapshotString = "could not take validators snapshot: "
+	failedBuildingEventSeqString  = "failed building events sequence: "
 )
 
 var errEmptyEventsList = errors.New("empty events list")
@@ -72,7 +74,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 		func(events []uint8) string {
 			vm, subnetID, err := buildVM(t)
 			if err != nil {
-				return fmt.Sprintf("failed building vm: %s", err.Error())
+				return "failed building vm: " + err.Error()
 			}
 			vm.ctx.Lock.Lock()
 			defer func() {
@@ -89,12 +91,12 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			// random events sequence received as test input
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return fmt.Sprintf("failed building events sequence: %s", err.Error())
+				return "failed building events sequence: " + err.Error()
 			}
 
 			validatorSetByHeightAndSubnet := make(map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
 			if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-				return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
+				return failedValidatorSnapshotString + err.Error()
 			}
 
 			// insert validator sequence
@@ -107,12 +109,12 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				if currentSubnetValidator != nil {
 					err := terminateSubnetValidator(vm, currentSubnetValidator)
 					if err != nil {
-						return fmt.Sprintf("could not terminate current subnet validator: %s", err.Error())
+						return "could not terminate current subnet validator: " + err.Error()
 					}
 					currentSubnetValidator = nil
 
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
+						return failedValidatorSnapshotString + err.Error()
 					}
 				}
 
@@ -120,10 +122,10 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				case startSubnetValidator:
 					currentSubnetValidator, err = addSubnetValidator(vm, ev, subnetID)
 					if err != nil {
-						return fmt.Sprintf("could not add subnet validator: %s", err.Error())
+						return "could not add subnet validator: " + err.Error()
 					}
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
+						return failedValidatorSnapshotString + err.Error()
 					}
 
 				case startPrimaryWithBLS:
@@ -132,21 +134,21 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					if currentPrimaryValidator != nil {
 						err := terminatePrimaryValidator(vm, currentPrimaryValidator)
 						if err != nil {
-							return fmt.Sprintf("could not terminate current primary validator: %s", err.Error())
+							return "could not terminate current primary validator: " + err.Error()
 						}
 						// no need to nil current primary validator, we'll
 						// reassign immediately
 
 						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-							return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
+							return failedValidatorSnapshotString + err.Error()
 						}
 					}
 					currentPrimaryValidator, err = addPrimaryValidatorWithBLSKey(vm, ev)
 					if err != nil {
-						return fmt.Sprintf("could not add primary validator with BLS key: %s", err.Error())
+						return "could not add primary validator with BLS key: " + err.Error()
 					}
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
+						return failedValidatorSnapshotString + err.Error()
 					}
 
 				default:
@@ -466,7 +468,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return fmt.Sprintf("failed building events sequence: %s", err.Error())
+				return failedBuildingEventSeqString + err.Error()
 			}
 
 			if len(validatorsTimes) == 0 {
@@ -517,7 +519,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return fmt.Sprintf("failed building events sequence: %s", err.Error())
+				return failedBuildingEventSeqString + err.Error()
 			}
 
 			if len(validatorsTimes) == 0 {
@@ -568,7 +570,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return fmt.Sprintf("failed building events sequence: %s", err.Error())
+				return failedBuildingEventSeqString + err.Error()
 			}
 
 			if len(validatorsTimes) == 0 {

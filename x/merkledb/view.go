@@ -6,18 +6,17 @@ package merkledb
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (

@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -24,7 +23,7 @@ func (r *requests) GetPeers(context.Context) set.Set[ids.NodeID] {
 		return nil
 	}
 
-	numToSend := math.Min(
+	numToSend := min(
 		r.maxOutstanding-numPending,
 		r.pendingSend.Len(),
 	)

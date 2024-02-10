@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -59,12 +58,18 @@ type PeerTracker struct {
 	// Average bandwidth is only used for metrics.
 	averageBandwidth safemath.Averager
 
-	log                    logging.Logger
-	ignoredNodes           set.Set[ids.NodeID]
-	minVersion             *version.Application
-	numTrackedPeers        prometheus.Gauge
-	numResponsivePeers     prometheus.Gauge
-	averageBandwidthMetric prometheus.Gauge
+	// The below fields are assumed to be constant and are not protected by the
+	// lock.
+	log          logging.Logger
+	ignoredNodes set.Set[ids.NodeID]
+	minVersion   *version.Application
+	metrics      peerTrackerMetrics
+}
+
+type peerTrackerMetrics struct {
+	numTrackedPeers    prometheus.Gauge
+	numResponsivePeers prometheus.Gauge
+	averageBandwidth   prometheus.Gauge
 }
 
 func NewPeerTracker(
@@ -83,40 +88,42 @@ func NewPeerTracker(
 		log:              log,
 		ignoredNodes:     ignoredNodes,
 		minVersion:       minVersion,
-		numTrackedPeers: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: metricsNamespace,
-				Name:      "num_tracked_peers",
-				Help:      "number of tracked peers",
-			},
-		),
-		numResponsivePeers: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: metricsNamespace,
-				Name:      "num_responsive_peers",
-				Help:      "number of responsive peers",
-			},
-		),
-		averageBandwidthMetric: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: metricsNamespace,
-				Name:      "average_bandwidth",
-				Help:      "average sync bandwidth used by peers",
-			},
-		),
+		metrics: peerTrackerMetrics{
+			numTrackedPeers: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricsNamespace,
+					Name:      "num_tracked_peers",
+					Help:      "number of tracked peers",
+				},
+			),
+			numResponsivePeers: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricsNamespace,
+					Name:      "num_responsive_peers",
+					Help:      "number of responsive peers",
+				},
+			),
+			averageBandwidth: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricsNamespace,
+					Name:      "average_bandwidth",
+					Help:      "average sync bandwidth used by peers",
+				},
+			),
+		},
 	}
 
 	err := utils.Err(
-		registerer.Register(t.numTrackedPeers),
-		registerer.Register(t.numResponsivePeers),
-		registerer.Register(t.averageBandwidthMetric),
+		registerer.Register(t.metrics.numTrackedPeers),
+		registerer.Register(t.metrics.numResponsivePeers),
+		registerer.Register(t.metrics.averageBandwidth),
 	)
 	return t, err
 }
 
 // Returns true if:
 //   - We have not observed the desired minimum number of responsive peers.
-//   - Randomly with the freqeuency decreasing as the number of responsive peers
+//   - Randomly with the frequency decreasing as the number of responsive peers
 //     increases.
 //
 // Assumes the read lock is held.
@@ -214,7 +221,7 @@ func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
 	p.trackedPeers.Add(nodeID)
 	p.bandwidthHeap.Remove(nodeID)
 
-	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
+	p.metrics.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
 }
 
 // Record that we observed that [nodeID]'s bandwidth is [bandwidth].
@@ -260,8 +267,8 @@ func (p *PeerTracker) updateBandwidth(nodeID ids.NodeID, bandwidth float64, resp
 		p.responsivePeers.Remove(nodeID)
 	}
 
-	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
-	p.averageBandwidthMetric.Set(p.averageBandwidth.Read())
+	p.metrics.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
+	p.metrics.averageBandwidth.Set(p.averageBandwidth.Read())
 }
 
 // Connected should be called when [nodeID] connects to this node.
@@ -297,8 +304,8 @@ func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	delete(p.peerBandwidth, nodeID)
 	p.bandwidthHeap.Remove(nodeID)
 
-	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
-	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
+	p.metrics.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
+	p.metrics.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 }
 
 // Returns the number of peers the node is connected to.

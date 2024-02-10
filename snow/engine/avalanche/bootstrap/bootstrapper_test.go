@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -711,7 +709,7 @@ func TestBootstrapperUnexpectedVertex(t *testing.T) {
 	require.Contains(requestIDs, vtxID1)
 
 	reqID := requestIDs[vtxID1]
-	maps.Clear(requestIDs)
+	clear(requestIDs)
 	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes0}))
 	require.Contains(requestIDs, vtxID1)
 

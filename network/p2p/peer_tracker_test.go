@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -47,7 +46,7 @@ func TestPeerTracker(t *testing.T) {
 	for i := 0; i < desiredMinResponsivePeers+numExtraPeers/2; i++ {
 		peer, ok := p.SelectPeer()
 		require.True(ok)
-		require.NotNil(peer)
+		require.NotZero(peer)
 
 		_, exists := responsivePeers[peer]
 		require.Falsef(exists, "expected connecting to a new peer, but got the same peer twice: peer %s iteration %d", peer, i)
@@ -73,7 +72,7 @@ func TestPeerTracker(t *testing.T) {
 	for i := 0; i < numRequests; i++ {
 		peer, ok := p.SelectPeer()
 		require.True(ok)
-		require.NotNil(peer)
+		require.NotZero(peer)
 
 		responsive, ok := responsivePeers[peer]
 		if ok {
@@ -97,7 +96,7 @@ func TestPeerTracker(t *testing.T) {
 	// Requests should fall back on non-responsive peers when no other choice is left
 	peer, ok := p.SelectPeer()
 	require.True(ok)
-	require.NotNil(peer)
+	require.NotZero(peer)
 
 	responsive, ok := responsivePeers[peer]
 	require.True(ok)

@@ -4,6 +4,8 @@
 package sampler
 
 import (
+	"cmp"
+
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
@@ -20,7 +22,7 @@ type weightedArrayElement struct {
 
 // Note that this sorts in order of decreasing weight.
 func (e weightedArrayElement) Compare(other weightedArrayElement) int {
-	return utils.Compare(other.cumulativeWeight, e.cumulativeWeight)
+	return cmp.Compare(other.cumulativeWeight, e.cumulativeWeight)
 }
 
 // Sampling is performed by executing a modified binary search over the provided
