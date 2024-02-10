@@ -41,7 +41,6 @@ type NetworkClient interface {
 	// the request should be retried.
 	RequestAny(
 		ctx context.Context,
-		minVersion *version.Application,
 		request []byte,
 	) (ids.NodeID, []byte, error)
 
@@ -77,8 +76,6 @@ type NetworkClient interface {
 type networkClient struct {
 	lock sync.Mutex
 	log  logging.Logger
-	// This node's ID
-	myNodeID ids.NodeID
 	// requestID counter used to track outbound requests
 	requestID uint32
 	// requestID => handler for the response/failure
@@ -98,15 +95,21 @@ func NewNetworkClient(
 	log logging.Logger,
 	metricsNamespace string,
 	registerer prometheus.Registerer,
+	minVersion *version.Application,
 ) (NetworkClient, error) {
-	peerTracker, err := p2p.NewPeerTracker(log, metricsNamespace, registerer)
+	peerTracker, err := p2p.NewPeerTracker(
+		log,
+		metricsNamespace,
+		registerer,
+		set.Of(myNodeID),
+		minVersion,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
 	}
 
 	return &networkClient{
 		appSender:                  appSender,
-		myNodeID:                   myNodeID,
 		outstandingRequestHandlers: make(map[uint32]ResponseHandler),
 		activeRequests:             semaphore.NewWeighted(maxActiveRequests),
 		peers:                      peerTracker,
@@ -191,7 +194,6 @@ func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bo
 // If [errAppSendFailed] is returned this should be considered fatal.
 func (c *networkClient) RequestAny(
 	ctx context.Context,
-	minVersion *version.Application,
 	request []byte,
 ) (ids.NodeID, []byte, error) {
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
@@ -200,16 +202,30 @@ func (c *networkClient) RequestAny(
 	}
 	defer c.activeRequests.Release(1)
 
-	nodeID, ok := c.peers.GetAnyPeer(minVersion)
-	if !ok {
-		return ids.EmptyNodeID, nil, fmt.Errorf(
-			"no peers found matching version %s out of %d peers",
-			minVersion, c.peers.Size(),
-		)
+	nodeID, responseChan, err := c.sendRequestAny(ctx, request)
+	if err != nil {
+		return ids.EmptyNodeID, nil, err
 	}
 
-	response, err := c.request(ctx, nodeID, request)
+	response, err := c.awaitResponse(ctx, nodeID, responseChan)
 	return nodeID, response, err
+}
+
+func (c *networkClient) sendRequestAny(
+	ctx context.Context,
+	request []byte,
+) (ids.NodeID, chan []byte, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	nodeID, ok := c.peers.SelectPeer()
+	if !ok {
+		numPeers := c.peers.Size()
+		return ids.EmptyNodeID, nil, fmt.Errorf("no peers found from %d peers", numPeers)
+	}
+
+	responseChan, err := c.sendRequestLocked(ctx, nodeID, request)
+	return nodeID, responseChan, err
 }
 
 // If [errAppSendFailed] is returned this should be considered fatal.
@@ -225,40 +241,56 @@ func (c *networkClient) Request(
 	}
 	defer c.activeRequests.Release(1)
 
-	return c.request(ctx, nodeID, request)
+	responseChan, err := c.sendRequest(ctx, nodeID, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.awaitResponse(ctx, nodeID, responseChan)
 }
 
-// Sends [request] to [nodeID] and returns the response.
-// Returns an error if the request failed or [ctx] is canceled.
-// If [errAppSendFailed] is returned this should be considered fatal.
-// Blocks until a response is received or the [ctx] is canceled fails.
-// Releases active requests semaphore if there was an error in sending the request.
-// Assumes [nodeID] is never [c.myNodeID] since we guarantee
-// [c.myNodeID] will not be added to [c.peers].
-// Assumes [c.lock] is not held and unlocks [c.lock] before returning.
-func (c *networkClient) request(
+func (c *networkClient) sendRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	request []byte,
-) ([]byte, error) {
+) (chan []byte, error) {
 	c.lock.Lock()
-	c.log.Debug("sending request to peer",
-		zap.Stringer("nodeID", nodeID),
-		zap.Int("requestLen", len(request)),
-	)
-	c.peers.TrackPeer(nodeID)
+	defer c.lock.Unlock()
 
+	return c.sendRequestLocked(ctx, nodeID, request)
+}
+
+// Sends [request] to [nodeID] and returns a channel that will populate the
+// response.
+//
+// If [errAppSendFailed] is returned this should be considered fatal.
+//
+// Assumes [nodeID] is never [c.myNodeID] since we guarantee [c.myNodeID] will
+// not be added to [c.peers].
+//
+// Assumes [c.lock] is held.
+func (c *networkClient) sendRequestLocked(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	request []byte,
+) (chan []byte, error) {
 	requestID := c.requestID
 	c.requestID++
 
-	nodeIDs := set.Of(nodeID)
+	c.log.Debug("sending request to peer",
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+		zap.Int("requestLen", len(request)),
+	)
+	c.peers.RegisterRequest(nodeID)
 
 	// Send an app request to the peer.
+	nodeIDs := set.Of(nodeID)
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
 		c.lock.Unlock()
-		c.log.Fatal(
-			"failed to send app request",
+		c.log.Fatal("failed to send app request",
 			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
 			zap.Int("requestLen", len(request)),
 			zap.Error(err),
 		)
@@ -267,9 +299,24 @@ func (c *networkClient) request(
 
 	handler := newResponseHandler()
 	c.outstandingRequestHandlers[requestID] = handler
+	return handler.responseChan, nil
+}
 
-	c.lock.Unlock() // unlock so response can be received
-
+// awaitResponse from [nodeID] and returns the response.
+//
+// Returns an error if the request failed or [ctx] is canceled.
+//
+// Blocks until a response is received or the [ctx] is canceled fails.
+//
+// Assumes [nodeID] is never [c.myNodeID] since we guarantee [c.myNodeID] will
+// not be added to [c.peers].
+//
+// Assumes [c.lock] is not held.
+func (c *networkClient) awaitResponse(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	responseChan chan []byte,
+) ([]byte, error) {
 	var (
 		response  []byte
 		responded bool
@@ -277,22 +324,21 @@ func (c *networkClient) request(
 	)
 	select {
 	case <-ctx.Done():
-		c.peers.TrackBandwidth(nodeID, 0)
+		c.peers.RegisterFailure(nodeID)
 		return nil, ctx.Err()
-	case response, responded = <-handler.responseChan:
+	case response, responded = <-responseChan:
 	}
 	if !responded {
-		c.peers.TrackBandwidth(nodeID, 0)
+		c.peers.RegisterFailure(nodeID)
 		return nil, errRequestFailed
 	}
 
 	elapsedSeconds := time.Since(startTime).Seconds()
-	bandwidth := float64(len(response))/elapsedSeconds + epsilon
-	c.peers.TrackBandwidth(nodeID, bandwidth)
+	bandwidth := float64(len(response)) / (elapsedSeconds + epsilon)
+	c.peers.RegisterResponse(nodeID, bandwidth)
 
 	c.log.Debug("received response from peer",
 		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID),
 		zap.Int("responseLen", len(response)),
 	)
 	return response, nil
@@ -303,22 +349,12 @@ func (c *networkClient) Connected(
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
-	if nodeID == c.myNodeID {
-		c.log.Debug("skipping registering self as peer")
-		return nil
-	}
-
 	c.log.Debug("adding new peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Connected(nodeID, nodeVersion)
 	return nil
 }
 
 func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	if nodeID == c.myNodeID {
-		c.log.Debug("skipping deregistering self as peer")
-		return nil
-	}
-
 	c.log.Debug("disconnecting peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Disconnected(nodeID)
 	return nil

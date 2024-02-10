@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -67,22 +66,20 @@ type Client interface {
 }
 
 type client struct {
-	networkClient       NetworkClient
-	stateSyncNodes      []ids.NodeID
-	stateSyncNodeIdx    uint32
-	stateSyncMinVersion *version.Application
-	log                 logging.Logger
-	metrics             SyncMetrics
-	tokenSize           int
+	networkClient    NetworkClient
+	stateSyncNodes   []ids.NodeID
+	stateSyncNodeIdx uint32
+	log              logging.Logger
+	metrics          SyncMetrics
+	tokenSize        int
 }
 
 type ClientConfig struct {
-	NetworkClient       NetworkClient
-	StateSyncNodeIDs    []ids.NodeID
-	StateSyncMinVersion *version.Application
-	Log                 logging.Logger
-	Metrics             SyncMetrics
-	BranchFactor        merkledb.BranchFactor
+	NetworkClient    NetworkClient
+	StateSyncNodeIDs []ids.NodeID
+	Log              logging.Logger
+	Metrics          SyncMetrics
+	BranchFactor     merkledb.BranchFactor
 }
 
 func NewClient(config *ClientConfig) (Client, error) {
@@ -90,12 +87,11 @@ func NewClient(config *ClientConfig) (Client, error) {
 		return nil, err
 	}
 	return &client{
-		networkClient:       config.NetworkClient,
-		stateSyncNodes:      config.StateSyncNodeIDs,
-		stateSyncMinVersion: config.StateSyncMinVersion,
-		log:                 config.Log,
-		metrics:             config.Metrics,
-		tokenSize:           merkledb.BranchFactorToTokenSize[config.BranchFactor],
+		networkClient:  config.NetworkClient,
+		stateSyncNodes: config.StateSyncNodeIDs,
+		log:            config.Log,
+		metrics:        config.Metrics,
+		tokenSize:      merkledb.BranchFactorToTokenSize[config.BranchFactor],
 	}, nil
 }
 
@@ -365,7 +361,7 @@ func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, e
 	c.metrics.RequestMade()
 
 	if len(c.stateSyncNodes) == 0 {
-		nodeID, response, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, request)
+		nodeID, response, err = c.networkClient.RequestAny(ctx, request)
 	} else {
 		// Get the next nodeID to query using the [nodeIdx] offset.
 		// If we're out of nodes, loop back to 0.

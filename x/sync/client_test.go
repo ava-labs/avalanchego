@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -98,10 +97,9 @@ func sendRangeProofRequest(
 
 	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx
-		gomock.Any(), // min version
 		gomock.Any(), // request
 	).DoAndReturn(
-		func(_ context.Context, _ *version.Application, request []byte) (ids.NodeID, []byte, error) {
+		func(_ context.Context, request []byte) (ids.NodeID, []byte, error) {
 			go func() {
 				// Get response from server
 				require.NoError(server.AppRequest(context.Background(), clientNodeID, 0, time.Now().Add(time.Hour), request))
@@ -398,10 +396,9 @@ func sendChangeProofRequest(
 
 	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx
-		gomock.Any(), // min version
 		gomock.Any(), // request
 	).DoAndReturn(
-		func(_ context.Context, _ *version.Application, request []byte) (ids.NodeID, []byte, error) {
+		func(_ context.Context, request []byte) (ids.NodeID, []byte, error) {
 			go func() {
 				// Get response from server
 				require.NoError(server.AppRequest(context.Background(), clientNodeID, 0, time.Now().Add(time.Hour), request))
@@ -761,7 +758,6 @@ func TestAppRequestSendFailed(t *testing.T) {
 
 	// Mock failure to send app request
 	networkClient.EXPECT().RequestAny(
-		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
 	).Return(ids.EmptyNodeID, nil, errAppSendFailed).Times(2)
