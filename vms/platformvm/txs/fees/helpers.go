@@ -12,11 +12,11 @@ import (
 )
 
 func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, error) {
-	insDimensions, err := fees.MeterInputs(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
+	inDimensions, err := fees.MeterInput(txs.Codec, txs.CodecVersion, input)
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(insDimensions)
+	addedFees, err := feeCalc.AddFeesFor(inDimensions)
 	if err != nil {
 		return 0, fmt.Errorf("account for input fees: %w", err)
 	}
@@ -24,7 +24,7 @@ func FinanceInput(feeCalc *Calculator, input *avax.TransferableInput) (uint64, e
 }
 
 func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64, fees.Dimensions, error) {
-	outDimensions, err := fees.MeterOutputs(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{output})
+	outDimensions, err := fees.MeterOutput(txs.Codec, txs.CodecVersion, output)
 	if err != nil {
 		return 0, fees.Empty, fmt.Errorf("failed calculating changeOut size: %w", err)
 	}
@@ -36,11 +36,11 @@ func FinanceOutput(feeCalc *Calculator, output *avax.TransferableOutput) (uint64
 }
 
 func FinanceCredential(feeCalc *Calculator, keysCount int) (uint64, error) {
-	credsDimensions, err := fees.MeterSingleCredential(txs.Codec, txs.CodecVersion, keysCount)
+	credDimensions, err := fees.MeterCredential(txs.Codec, txs.CodecVersion, keysCount)
 	if err != nil {
 		return 0, fmt.Errorf("failed calculating input size: %w", err)
 	}
-	addedFees, err := feeCalc.AddFeesFor(credsDimensions)
+	addedFees, err := feeCalc.AddFeesFor(credDimensions)
 	if err != nil {
 		return 0, fmt.Errorf("account for input fees: %w", err)
 	}

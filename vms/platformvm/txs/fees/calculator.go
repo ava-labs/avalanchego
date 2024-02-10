@@ -276,7 +276,7 @@ func (fc *Calculator) meterTx(
 		if !ok {
 			return consumedUnits, fmt.Errorf("don't know how to calculate complexity of %T", cred)
 		}
-		credDimensions, err := fees.MeterSingleCredential(txs.Codec, txs.CodecVersion, len(c.Sigs))
+		credDimensions, err := fees.MeterCredential(txs.Codec, txs.CodecVersion, len(c.Sigs))
 		if err != nil {
 			return consumedUnits, fmt.Errorf("failed adding credential %d: %w", i, err)
 		}
@@ -288,24 +288,28 @@ func (fc *Calculator) meterTx(
 	consumedUnits[fees.Bandwidth] += wrappers.IntLen // length of the credentials slice
 	consumedUnits[fees.Bandwidth] += codec.CodecVersionSize
 
-	inputDimensions, err := fees.MeterInputs(txs.Codec, txs.CodecVersion, allIns)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
-	}
-	inputDimensions[fees.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
-	consumedUnits, err = fees.Add(consumedUnits, inputDimensions)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
+	for _, in := range allIns {
+		inputDimensions, err := fees.MeterInput(txs.Codec, txs.CodecVersion, in)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
+		}
+		inputDimensions[fees.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
+		consumedUnits, err = fees.Add(consumedUnits, inputDimensions)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
+		}
 	}
 
-	outputDimensions, err := fees.MeterOutputs(txs.Codec, txs.CodecVersion, allOuts)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
-	}
-	outputDimensions[fees.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
-	consumedUnits, err = fees.Add(consumedUnits, outputDimensions)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed adding outputs: %w", err)
+	for _, out := range allOuts {
+		outputDimensions, err := fees.MeterOutput(txs.Codec, txs.CodecVersion, out)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
+		}
+		outputDimensions[fees.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
+		consumedUnits, err = fees.Add(consumedUnits, outputDimensions)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding outputs: %w", err)
+		}
 	}
 
 	return consumedUnits, nil
