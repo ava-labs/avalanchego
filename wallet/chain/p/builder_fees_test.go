@@ -110,7 +110,7 @@ func TestBaseTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5930*units.MicroAvax, fc.Fee)
+		require.Equal(9930*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -228,7 +228,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5765*units.MicroAvax, fc.Fee)
+		require.Equal(9765*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -334,7 +334,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5741*units.MicroAvax, fc.Fee)
+		require.Equal(9741*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -450,7 +450,7 @@ func TestCreateChainTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5808*units.MicroAvax, fc.Fee)
+		require.Equal(9808*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -556,7 +556,7 @@ func TestCreateSubnetTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5644*units.MicroAvax, fc.Fee)
+		require.Equal(9644*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -663,7 +663,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5761*units.MicroAvax, fc.Fee)
+		require.Equal(9761*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -775,7 +775,7 @@ func TestImportTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5640*units.MicroAvax, fc.Fee)
+		require.Equal(9640*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -889,7 +889,7 @@ func TestExportTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(5966*units.MicroAvax, fc.Fee)
+		require.Equal(9966*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -1014,7 +1014,7 @@ func TestTransformSubnetTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(8763*units.MicroAvax, fc.Fee)
+		require.Equal(14763*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		outs := utx.Outs
@@ -1154,7 +1154,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(12404*units.MicroAvax, fc.Fee)
+		require.Equal(20404*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		staked := utx.StakeOuts
@@ -1287,7 +1287,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 			Credentials:      tx.Creds,
 		}
 		require.NoError(utx.Visit(fc))
-		require.Equal(12212*units.MicroAvax, fc.Fee)
+		require.Equal(20212*units.MicroAvax, fc.Fee)
 
 		ins := utx.Ins
 		staked := utx.StakeOuts

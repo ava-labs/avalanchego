@@ -29,8 +29,9 @@ func MeterInputs(c codec.Manager, v uint16, ins []*avax.TransferableInput) (Dime
 		uInSize := uint64(inSize)
 
 		consumedUnits[Bandwidth] += uInSize - codec.CodecVersionSize
-		consumedUnits[UTXORead] += cost + uInSize // inputs are read
-		consumedUnits[UTXOWrite] += uInSize       // inputs are deleted
+		consumedUnits[UTXORead] += uInSize  // inputs are read
+		consumedUnits[UTXOWrite] += uInSize // inputs are deleted
+		consumedUnits[Compute] += cost
 	}
 	return consumedUnits, nil
 }
