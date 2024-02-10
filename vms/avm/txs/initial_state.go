@@ -5,6 +5,7 @@ package txs
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"sort"
 
@@ -60,7 +61,7 @@ func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 }
 
 func (is *InitialState) Compare(other *InitialState) int {
-	return utils.Compare(is.FxIndex, other.FxIndex)
+	return cmp.Compare(is.FxIndex, other.FxIndex)
 }
 
 func (is *InitialState) Sort(c codec.Manager) {

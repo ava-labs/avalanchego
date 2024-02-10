@@ -4,14 +4,14 @@
 package x
 
 import (
-	stdcontext "context"
-
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
+
+	stdcontext "context"
 )
 
 const Alias = "X"

@@ -5,11 +5,10 @@ package archivedb
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"golang.org/x/exp/slices"
 )
 
 func TestNaturalDescSortingForSameKey(t *testing.T) {

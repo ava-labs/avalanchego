@@ -8,10 +8,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -20,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -382,7 +378,7 @@ func (i *ipTracker) resetBloom() error {
 		return err
 	}
 
-	count := math.Max(maxIPEntriesPerValidator*i.validators.Len(), minCountEstimate)
+	count := max(maxIPEntriesPerValidator*i.validators.Len(), minCountEstimate)
 	numHashes, numEntries := bloom.OptimalParameters(
 		count,
 		targetFalsePositiveProbability,
@@ -393,7 +389,7 @@ func (i *ipTracker) resetBloom() error {
 	}
 
 	i.bloom = newFilter
-	maps.Clear(i.bloomAdditions)
+	clear(i.bloomAdditions)
 	i.bloomSalt = newSalt
 	i.maxBloomCount = bloom.EstimateCount(numHashes, numEntries, maxFalsePositiveProbability)
 

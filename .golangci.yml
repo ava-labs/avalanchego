@@ -47,12 +47,12 @@ linters:
     - errorlint
     - exportloopref
     - forbidigo
+    - gci
     - goconst
     - gocritic
     # - goerr113
     - gofmt
     - gofumpt
-    - goimports
     # - gomnd
     - goprintffuncname
     - gosec
@@ -69,9 +69,11 @@ linters:
     - prealloc
     - predeclared
     - revive
+    - spancheck
     - staticcheck
     - stylecheck
     - tagalign
+    - testifylint
     - typecheck
     - unconvert
     - unparam
@@ -105,8 +107,16 @@ linters-settings:
       - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
     # Exclude godoc examples from forbidigo checks.
     exclude_godoc_examples: false
-  goimports:
-    local-prefixes: github.com/ava-labs/avalanchego
+  gci:
+    sections:
+      - standard
+      - default
+      - blank
+      - dot
+      - prefix(github.com/ava-labs/avalanchego)
+      - alias
+    skip-generated: true
+    custom-order: true
   gosec:
     excludes:
       - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
@@ -119,6 +129,8 @@ linters-settings:
     alias:
       - pkg: github.com/ava-labs/avalanchego/utils/math
         alias: safemath
+      - pkg: github.com/ava-labs/avalanchego/utils/json
+        alias: avajson
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
@@ -161,6 +173,12 @@ linters-settings:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
       - name: useless-break
         disabled: false
+  spancheck:
+    # https://github.com/jjti/go-spancheck#checks
+    checks:
+      - end
+      # - record-error # check that `span.RecordError(err)` is called when an error is returned
+      # - set-status   # check that `span.SetStatus(codes.Error, msg)` is called when an error is returned
   staticcheck:
     # https://staticcheck.io/docs/options#checks
     checks:
@@ -173,3 +191,14 @@ linters-settings:
     strict: true
     order:
       - serialize
+  testifylint:
+    # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+    # Default: false
+    enable-all: true
+    # Disable checkers by name
+    # (in addition to default
+    #   suite-thelper
+    # ).
+    disable:
+      - go-require
+      - float-compare
