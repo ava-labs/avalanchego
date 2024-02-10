@@ -8,11 +8,11 @@ import (
 	"math/big"
 	"time"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const defaultPollFrequency = 100 * time.Millisecond
