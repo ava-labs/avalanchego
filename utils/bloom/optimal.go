@@ -3,11 +3,7 @@
 
 package bloom
 
-import (
-	"math"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
-)
+import "math"
 
 const ln2Squared = math.Ln2 * math.Ln2
 
@@ -44,7 +40,7 @@ func OptimalHashes(numEntries, count int) int {
 	if numHashes >= maxHashes {
 		return maxHashes
 	}
-	return safemath.Max(int(numHashes), minHashes)
+	return max(int(numHashes), minHashes)
 }
 
 // OptimalEntries calculates the optimal number of entries to use when creating
@@ -75,7 +71,7 @@ func OptimalEntries(count int, falsePositiveProbability float64) int {
 	if entries >= math.MaxInt {
 		return math.MaxInt
 	}
-	return safemath.Max(int(entries), minEntries)
+	return max(int(entries), minEntries)
 }
 
 // EstimateCount estimates the number of additions a bloom filter with

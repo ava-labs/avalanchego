@@ -3,8 +3,6 @@
 
 package sampler
 
-import "golang.org/x/exp/maps"
-
 // uniformResample allows for sampling over a uniform distribution without
 // replacement.
 //
@@ -40,7 +38,7 @@ func (s *uniformResample) Sample(count int) ([]uint64, error) {
 }
 
 func (s *uniformResample) Reset() {
-	maps.Clear(s.drawn)
+	clear(s.drawn)
 }
 
 func (s *uniformResample) Next() (uint64, error) {

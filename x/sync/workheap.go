@@ -7,7 +7,6 @@ import (
 	"bytes"
 
 	"github.com/ava-labs/avalanchego/utils/heap"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	"github.com/google/btree"
@@ -106,7 +105,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
 				// merged into [beforeItem.start, item.end]
 				beforeItem.end = item.end
-				beforeItem.priority = math.Max(item.priority, beforeItem.priority)
+				beforeItem.priority = max(item.priority, beforeItem.priority)
 				wh.innerHeap.Fix(beforeItem)
 				mergedBefore = beforeItem
 			}
@@ -123,7 +122,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
 				// [item.start, afterItem.end].
 				afterItem.start = item.start
-				afterItem.priority = math.Max(item.priority, afterItem.priority)
+				afterItem.priority = max(item.priority, afterItem.priority)
 				wh.innerHeap.Fix(afterItem)
 				mergedAfter = afterItem
 			}
@@ -138,7 +137,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 		// remove the second range since it is now covered by the first
 		wh.remove(mergedAfter)
 		// update the priority
-		mergedBefore.priority = math.Max(mergedBefore.priority, mergedAfter.priority)
+		mergedBefore.priority = max(mergedBefore.priority, mergedAfter.priority)
 		wh.innerHeap.Fix(mergedBefore)
 	}
 

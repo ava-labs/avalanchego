@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -15,9 +16,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -1019,7 +1017,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 			for key, value := range uncommittedKeyValues {
 				values[key] = value
 			}
-			maps.Clear(uncommittedKeyValues)
+			clear(uncommittedKeyValues)
 
 			for key := range uncommittedDeletes {
 				delete(values, key)
