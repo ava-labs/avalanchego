@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"

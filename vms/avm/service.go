@@ -4,12 +4,11 @@
 package avm
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
-
-	stdjson "encoding/json"
 
 	"go.uber.org/zap"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -30,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -106,7 +105,7 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 		}
 	}
 
-	reply.Block, err = stdjson.Marshal(result)
+	reply.Block, err = json.Marshal(result)
 	return err
 }
 
@@ -161,7 +160,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 		}
 	}
 
-	reply.Block, err = stdjson.Marshal(result)
+	reply.Block, err = json.Marshal(result)
 	return err
 }
 
@@ -189,7 +188,7 @@ func (s *Service) GetHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightRe
 		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
 	}
 
-	reply.Height = json.Uint64(block.Height())
+	reply.Height = avajson.Uint64(block.Height())
 	return nil
 }
 
@@ -226,9 +225,9 @@ type GetTxStatusReply struct {
 type GetAddressTxsArgs struct {
 	api.JSONAddress
 	// Cursor used as a page index / offset
-	Cursor json.Uint64 `json:"cursor"`
+	Cursor avajson.Uint64 `json:"cursor"`
 	// PageSize num of items per page
-	PageSize json.Uint64 `json:"pageSize"`
+	PageSize avajson.Uint64 `json:"pageSize"`
 	// AssetID defaulted to AVAX if omitted or left blank
 	AssetID string `json:"assetID"`
 }
@@ -236,7 +235,7 @@ type GetAddressTxsArgs struct {
 type GetAddressTxsReply struct {
 	TxIDs []ids.ID `json:"txIDs"`
 	// Cursor used as a page index / offset
-	Cursor json.Uint64 `json:"cursor"`
+	Cursor avajson.Uint64 `json:"cursor"`
 }
 
 // GetAddressTxs returns list of transactions for a given address
@@ -293,7 +292,7 @@ func (s *Service) GetAddressTxs(_ *http.Request, args *GetAddressTxsArgs, reply 
 	// To get the next set of tx IDs, the user should provide this cursor.
 	// e.g. if they provided cursor 5, and read 6 tx IDs, they should start
 	// next time from index (cursor) 11.
-	reply.Cursor = json.Uint64(cursor + uint64(len(reply.TxIDs)))
+	reply.Cursor = avajson.Uint64(cursor + uint64(len(reply.TxIDs)))
 	return nil
 }
 
@@ -364,7 +363,7 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, reply *api.GetTxRe
 		return err
 	}
 
-	reply.Tx, err = stdjson.Marshal(result)
+	reply.Tx, err = json.Marshal(result)
 	return err
 }
 
@@ -466,7 +465,7 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, reply *api.G
 
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
-	reply.NumFetched = json.Uint64(len(utxos))
+	reply.NumFetched = avajson.Uint64(len(utxos))
 	reply.Encoding = args.Encoding
 	return nil
 }
@@ -479,9 +478,9 @@ type GetAssetDescriptionArgs struct {
 // GetAssetDescriptionReply defines the GetAssetDescription replies returned from the API
 type GetAssetDescriptionReply struct {
 	FormattedAssetID
-	Name         string     `json:"name"`
-	Symbol       string     `json:"symbol"`
-	Denomination json.Uint8 `json:"denomination"`
+	Name         string        `json:"name"`
+	Symbol       string        `json:"symbol"`
+	Denomination avajson.Uint8 `json:"denomination"`
 }
 
 // GetAssetDescription creates an empty account with the name passed in
@@ -512,7 +511,7 @@ func (s *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescription
 	reply.AssetID = assetID
 	reply.Name = createAssetTx.Name
 	reply.Symbol = createAssetTx.Symbol
-	reply.Denomination = json.Uint8(createAssetTx.Denomination)
+	reply.Denomination = avajson.Uint8(createAssetTx.Denomination)
 
 	return nil
 }
@@ -526,8 +525,8 @@ type GetBalanceArgs struct {
 
 // GetBalanceReply defines the GetBalance replies returned from the API
 type GetBalanceReply struct {
-	Balance json.Uint64   `json:"balance"`
-	UTXOIDs []avax.UTXOID `json:"utxoIDs"`
+	Balance avajson.Uint64 `json:"balance"`
+	UTXOIDs []avax.UTXOID  `json:"utxoIDs"`
 }
 
 // GetBalance returns the balance of an asset held by an address.
@@ -582,7 +581,7 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, reply *GetBa
 		if err != nil {
 			return err
 		}
-		reply.Balance = json.Uint64(amt)
+		reply.Balance = avajson.Uint64(amt)
 		reply.UTXOIDs = append(reply.UTXOIDs, utxo.UTXOID)
 	}
 
@@ -590,8 +589,8 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, reply *GetBa
 }
 
 type Balance struct {
-	AssetID string      `json:"asset"`
-	Balance json.Uint64 `json:"balance"`
+	AssetID string         `json:"asset"`
+	Balance avajson.Uint64 `json:"balance"`
 }
 
 type GetAllBalancesArgs struct {
@@ -663,7 +662,7 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 		alias := s.vm.PrimaryAliasOrDefault(assetID)
 		reply.Balances[i] = Balance{
 			AssetID: alias,
-			Balance: json.Uint64(balances[assetID]),
+			Balance: avajson.Uint64(balances[assetID]),
 		}
 		i++
 	}
@@ -673,14 +672,14 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 
 // Holder describes how much an address owns of an asset
 type Holder struct {
-	Amount  json.Uint64 `json:"amount"`
-	Address string      `json:"address"`
+	Amount  avajson.Uint64 `json:"amount"`
+	Address string         `json:"address"`
 }
 
 // Owners describes who can perform an action
 type Owners struct {
-	Threshold json.Uint32 `json:"threshold"`
-	Minters   []string    `json:"minters"`
+	Threshold avajson.Uint32 `json:"threshold"`
+	Minters   []string       `json:"minters"`
 }
 
 // CreateAssetArgs are arguments for passing into CreateAsset
@@ -1145,7 +1144,7 @@ func (s *Service) ImportKey(_ *http.Request, args *ImportKeyArgs, reply *api.JSO
 // SendOutput specifies that [Amount] of asset [AssetID] be sent to [To]
 type SendOutput struct {
 	// The amount of funds to send
-	Amount json.Uint64 `json:"amount"`
+	Amount avajson.Uint64 `json:"amount"`
 
 	// ID of the asset being sent
 	AssetID string `json:"assetID"`
@@ -1343,10 +1342,10 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 
 // MintArgs are arguments for passing into Mint requests
 type MintArgs struct {
-	api.JSONSpendHeader             // User, password, from addrs, change addr
-	Amount              json.Uint64 `json:"amount"`
-	AssetID             string      `json:"assetID"`
-	To                  string      `json:"to"`
+	api.JSONSpendHeader                // User, password, from addrs, change addr
+	Amount              avajson.Uint64 `json:"amount"`
+	AssetID             string         `json:"assetID"`
+	To                  string         `json:"to"`
 }
 
 // Mint issues a transaction that mints more of the asset
@@ -1476,10 +1475,10 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 
 // SendNFTArgs are arguments for passing into SendNFT requests
 type SendNFTArgs struct {
-	api.JSONSpendHeader             // User, password, from addrs, change addr
-	AssetID             string      `json:"assetID"`
-	GroupID             json.Uint32 `json:"groupID"`
-	To                  string      `json:"to"`
+	api.JSONSpendHeader                // User, password, from addrs, change addr
+	AssetID             string         `json:"assetID"`
+	GroupID             avajson.Uint32 `json:"groupID"`
+	To                  string         `json:"to"`
 }
 
 // SendNFT sends an NFT
@@ -1859,7 +1858,7 @@ type ExportArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
 	// Amount of nAVAX to send
-	Amount json.Uint64 `json:"amount"`
+	Amount avajson.Uint64 `json:"amount"`
 
 	// Chain the funds are going to. Optional. Used if To address does not include the chainID.
 	TargetChain string `json:"targetChain"`

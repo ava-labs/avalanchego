@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"go.uber.org/zap"
-
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/node"

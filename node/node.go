@@ -22,10 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"go.uber.org/zap"
-
-	coreth "github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -88,6 +85,7 @@ import (
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
