@@ -36,7 +36,7 @@ var (
 		3000,
 		3500,
 		1000,
-		1000,
+		2000,
 	}
 
 	feeTestsDefaultCfg = config.Config{
@@ -178,13 +178,13 @@ func TestTxFees(t *testing.T) {
 			expectedError:       nil,
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3345*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5345*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						649,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -204,7 +204,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
@@ -280,13 +280,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createChainTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3388*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5388*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						692,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -307,7 +307,7 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createChainTx,
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
@@ -346,13 +346,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3293*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5293*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						597,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -372,7 +372,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: createSubnetTx,
@@ -412,13 +412,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3321*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5321*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						625,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -438,7 +438,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
@@ -478,13 +478,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3406*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5406*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						710,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -504,7 +504,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: transformSubnetTx,
@@ -544,13 +544,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3337*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5337*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						641,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -570,7 +570,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
@@ -610,13 +610,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addPermissionlessValidatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3939*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5939*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						961,
-						1090,
+						90,
 						266,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -636,7 +636,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: addPermissionlessValidatorTx,
@@ -676,13 +676,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: addPermissionlessDelegatorTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3747*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5747*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						769,
-						1090,
+						90,
 						266,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -702,7 +702,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: addPermissionlessDelegatorTx,
@@ -742,13 +742,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: baseTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3253*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5253*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						557,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -768,7 +768,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: baseTx,
@@ -808,13 +808,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: importTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 5827*units.MicroAvax, fc.Fee)
+				require.Equal(t, 9827*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						681,
-						2180,
+						180,
 						262,
-						0,
+						2000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -834,7 +834,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 180 - 1
 				return caps
 			},
 			unsignedAndSignedTx: importTx,
@@ -874,13 +874,13 @@ func TestTxFees(t *testing.T) {
 			unsignedAndSignedTx: exportTx,
 			expectedError:       nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3663*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5663*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						685,
-						1090,
+						90,
 						266,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -900,7 +900,7 @@ func TestTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			unsignedAndSignedTx: exportTx,

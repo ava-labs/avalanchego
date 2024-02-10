@@ -25,8 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -480,7 +478,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -528,7 +526,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -627,7 +625,7 @@ func (b *builder) NewCreateChainTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -713,7 +711,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -832,7 +830,7 @@ func (b *builder) NewImportTx(
 	}
 
 	for _, sigIndices := range importedSigIndices {
-		if _, err = financeCredential(feeCalc, sigIndices); err != nil {
+		if _, err = fees.FinanceCredential(feeCalc, len(sigIndices)); err != nil {
 			return nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 	}
@@ -857,11 +855,8 @@ func (b *builder) NewImportTx(
 		}
 
 		// update fees to target given the extra output added
-		outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+		_, outDimensions, err := fees.FinanceOutput(feeCalc, changeOut)
 		if err != nil {
-			return nil, fmt.Errorf("failed calculating output size: %w", err)
-		}
-		if _, err := feeCalc.AddFeesFor(outDimensions); err != nil {
 			return nil, fmt.Errorf("account for output fees: %w", err)
 		}
 
@@ -1004,7 +999,7 @@ func (b *builder) NewTransformSubnetTx(
 	} // fees are calculated in financeTx
 
 	// update fees to account for the auth credentials to be added upon tx signing
-	if _, err = financeCredential(feeCalc, subnetAuth.SigIndices); err != nil {
+	if _, err = fees.FinanceCredential(feeCalc, len(subnetAuth.SigIndices)); err != nil {
 		return nil, fmt.Errorf("account for credential fees: %w", err)
 	}
 
@@ -1270,13 +1265,13 @@ func (b *builder) financeTx(
 			},
 		}
 
-		addedFees, err := financeInput(feeCalc, input)
+		addedFees, err := fees.FinanceInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		addedFees, err = financeCredential(feeCalc, inputSigIndices)
+		addedFees, err = fees.FinanceCredential(feeCalc, len(inputSigIndices))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
@@ -1302,7 +1297,7 @@ func (b *builder) financeTx(
 			},
 		}
 
-		addedFees, err = financeOutput(feeCalc, stakeOut)
+		addedFees, _, err = fees.FinanceOutput(feeCalc, stakeOut)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 		}
@@ -1325,7 +1320,7 @@ func (b *builder) financeTx(
 			}
 
 			// update fees to account for the change output
-			addedFees, err = financeOutput(feeCalc, changeOut)
+			addedFees, _, err = fees.FinanceOutput(feeCalc, changeOut)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
@@ -1377,13 +1372,13 @@ func (b *builder) financeTx(
 			},
 		}
 
-		addedFees, err := financeInput(feeCalc, input)
+		addedFees, err := fees.FinanceInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		addedFees, err = financeCredential(feeCalc, inputSigIndices)
+		addedFees, err = fees.FinanceCredential(feeCalc, len(inputSigIndices))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
 		}
@@ -1417,7 +1412,7 @@ func (b *builder) financeTx(
 
 			stakeOutputs = append(stakeOutputs, stakeOut)
 
-			addedFees, err = financeOutput(feeCalc, stakeOut)
+			addedFees, _, err = fees.FinanceOutput(feeCalc, stakeOut)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
@@ -1434,7 +1429,7 @@ func (b *builder) financeTx(
 			}
 
 			// update fees to account for the change output
-			addedFees, err = financeOutput(feeCalc, changeOut)
+			addedFees, _, err = fees.FinanceOutput(feeCalc, changeOut)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
@@ -1481,42 +1476,6 @@ func (b *builder) financeTx(
 	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
 	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
 	return inputs, changeOutputs, stakeOutputs, nil
-}
-
-func financeInput(feeCalc *fees.Calculator, input *avax.TransferableInput) (uint64, error) {
-	insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
-	if err != nil {
-		return 0, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	addedFees, err := feeCalc.AddFeesFor(insDimensions)
-	if err != nil {
-		return 0, fmt.Errorf("account for input fees: %w", err)
-	}
-	return addedFees, nil
-}
-
-func financeOutput(feeCalc *fees.Calculator, output *avax.TransferableOutput) (uint64, error) {
-	outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{output})
-	if err != nil {
-		return 0, fmt.Errorf("failed calculating changeOut size: %w", err)
-	}
-	addedFees, err := feeCalc.AddFeesFor(outDimensions)
-	if err != nil {
-		return 0, fmt.Errorf("account for stakedOut fees: %w", err)
-	}
-	return addedFees, nil
-}
-
-func financeCredential(feeCalc *fees.Calculator, inputSigIndices []uint32) (uint64, error) {
-	credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(inputSigIndices))
-	if err != nil {
-		return 0, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	addedFees, err := feeCalc.AddFeesFor(credsDimensions)
-	if err != nil {
-		return 0, fmt.Errorf("account for input fees: %w", err)
-	}
-	return addedFees, nil
 }
 
 func (b *builder) authorizeSubnet(

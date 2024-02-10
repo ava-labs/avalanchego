@@ -24,8 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -238,13 +236,9 @@ func (h *handler) FinanceTx(
 			},
 		}
 
-		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(inSigners))
+		addedFees, err := fees.FinanceCredential(feeCalc, len(inSigners))
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed calculating credentials size: %w", err)
-		}
-		addedFees, err := feeCalc.AddFeesFor(credsDimensions)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("account for credentials fees: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 		targetFee += addedFees
 
@@ -252,11 +246,7 @@ func (h *handler) FinanceTx(
 		remainingValue := in.Amount()
 
 		// update fees to target given the extra input added
-		insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
-		}
-		addedFees, err = feeCalc.AddFeesFor(insDimensions)
+		addedFees, err = fees.FinanceInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
@@ -285,11 +275,7 @@ func (h *handler) FinanceTx(
 		}
 
 		// update fees to target given the staked output added
-		outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{stakedOut})
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed calculating stakedOut size: %w", err)
-		}
-		addedFees, err = feeCalc.AddFeesFor(outDimensions)
+		addedFees, _, err = fees.FinanceOutput(feeCalc, stakedOut)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 		}
@@ -313,11 +299,7 @@ func (h *handler) FinanceTx(
 			}
 
 			// update fees to target given the change output added
-			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("failed calculating changeOut size: %w", err)
-			}
-			addedFees, err = feeCalc.AddFeesFor(outDimensions)
+			addedFees, _, err := fees.FinanceOutput(feeCalc, changeOut)
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for stakedOut fees: %w", err)
 			}
@@ -374,13 +356,9 @@ func (h *handler) FinanceTx(
 			In:     in,
 		}
 
-		credsDimensions, err := commonfees.GetCredentialsDimensions(txs.Codec, txs.CodecVersion, len(inSigners))
+		addedFees, err := fees.FinanceCredential(feeCalc, len(inSigners))
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed calculating credentials size: %w", err)
-		}
-		addedFees, err := feeCalc.AddFeesFor(credsDimensions)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("account for credentials fees: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 		targetFee += addedFees
 
@@ -388,11 +366,7 @@ func (h *handler) FinanceTx(
 		remainingValue := in.Amount()
 
 		// update fees to target given the extra input added
-		insDimensions, err := commonfees.GetInputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableInput{input})
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed calculating input size: %w", err)
-		}
-		addedFees, err = feeCalc.AddFeesFor(insDimensions)
+		addedFees, err = fees.FinanceInput(feeCalc, input)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
@@ -432,11 +406,7 @@ func (h *handler) FinanceTx(
 			}
 
 			// update fees to target given the extra input added
-			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{stakedOut})
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
-			}
-			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			addedFees, _, err := fees.FinanceOutput(feeCalc, stakedOut)
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
@@ -466,11 +436,7 @@ func (h *handler) FinanceTx(
 			}
 
 			// update fees to target given the extra input added
-			outDimensions, err := commonfees.GetOutputsDimensions(txs.Codec, txs.CodecVersion, []*avax.TransferableOutput{changeOut})
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("failed calculating output size: %w", err)
-			}
-			addedFees, err := feeCalc.AddFeesFor(outDimensions)
+			addedFees, _, err := fees.FinanceOutput(feeCalc, changeOut)
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
