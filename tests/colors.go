@@ -4,9 +4,9 @@
 package tests
 
 import (
-	ginkgo "github.com/onsi/ginkgo/v2"
-
 	"github.com/onsi/ginkgo/v2/formatter"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 // Outputs to stdout.

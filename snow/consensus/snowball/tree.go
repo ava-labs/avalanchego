@@ -173,7 +173,7 @@ func (u *unaryNode) DecidedPrefix() int {
 	return u.decidedPrefix
 }
 
-//nolint:gofmt,gofumpt,goimports // this comment is formatted as intended
+//nolint:gci,gofmt,gofumpt // this comment is formatted as intended
 //
 // This is by far the most complicated function in this algorithm.
 // The intuition is that this instance represents a series of consecutive unary

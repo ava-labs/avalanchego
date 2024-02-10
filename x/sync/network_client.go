@@ -11,9 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
-
 	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/ids"

@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -80,12 +78,10 @@ func TestNetworkAppGossip(t *testing.T) {
 			msgBytesFunc: func() []byte {
 				return []byte{0x00}
 			},
-			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				// Unused in this test
+			mempoolFunc: func(*gomock.Controller) mempool.Mempool {
 				return nil
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Unused in this test
+			appSenderFunc: func(*gomock.Controller) common.AppSender {
 				return nil
 			},
 		},
@@ -101,11 +97,9 @@ func TestNetworkAppGossip(t *testing.T) {
 				return msgBytes
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
-				// Unused in this test
 				return mempool.NewMockMempool(ctrl)
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Unused in this test
 				return common.NewMockSender(ctrl)
 			},
 		},
@@ -154,7 +148,6 @@ func TestNetworkAppGossip(t *testing.T) {
 				return mempool
 			},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Unused in this test
 				return common.NewMockSender(ctrl)
 			},
 		},
