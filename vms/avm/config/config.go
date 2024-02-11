@@ -23,3 +23,11 @@ type Config struct {
 func (c *Config) IsEUpgradeActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.EUpgradeTime)
 }
+
+func (c *Config) GetDynamicFeesConfig(timestamp time.Time) DynamicFeesConfig {
+	if !c.IsEUpgradeActivated(timestamp) {
+		return PreEUpgradeDynamicFeesConfig
+	}
+
+	return EUpgradeDynamicFeesConfig
+}
