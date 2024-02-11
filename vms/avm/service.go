@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -31,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -754,32 +756,6 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.CreateAssetTxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.CreateAssetTxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.CreateAssetTxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	initialState := &txs.InitialState{
 		FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
 		Outs:    make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
@@ -816,18 +792,62 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
 
-	tx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+
+	uTx := &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    s.vm.ctx.NetworkID,
 			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
 		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: args.Denomination,
 		States:       []*txs.InitialState{initialState},
-	}}
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	amountsSpent, ins, keys, err := s.vm.Spend(
+		utxos,
+		kc,
+		map[ids.ID]uint64{
+			s.vm.feeAssetID: feeCalc.Fee,
+		},
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: s.vm.feeAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - feeCalc.Fee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
 
@@ -919,31 +939,18 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.CreateAssetTxFee,
-		},
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
 	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.CreateAssetTxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.CreateAssetTxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
 
 	initialState := &txs.InitialState{
 		FxIndex: 1, // TODO: Should lookup nftfx FxID
@@ -968,18 +975,49 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
 
-	tx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
+	uTx := &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    s.vm.ctx.NetworkID,
 			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
 		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: 0, // NFTs are non-fungible
 		States:       []*txs.InitialState{initialState},
-	}}
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	amountsSpent, ins, keys, err := s.vm.Spend(
+		utxos,
+		kc,
+		map[ids.ID]uint64{
+			s.vm.feeAssetID: feeCalc.Fee,
+		},
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: s.vm.feeAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - feeCalc.Fee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+	uTx.Ins = ins
+	uTx.Outs = outs
+
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
 
@@ -1243,6 +1281,29 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+	uTx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    s.vm.ctx.NetworkID,
+			BlockchainID: s.vm.ctx.ChainID,
+			Memo:         memoBytes,
+		},
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
 	// Calculate required input amounts and create the desired outputs
 	// String repr. of asset ID --> asset ID
 	assetIDs := make(map[string]ids.ID)
@@ -1294,7 +1355,7 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		amountsWithFee[assetID] = amount
 	}
 
-	amountWithFee, err := safemath.Add64(amounts[s.vm.feeAssetID], s.vm.TxFee)
+	amountWithFee, err := safemath.Add64(amounts[s.vm.feeAssetID], feeCalc.Fee)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
@@ -1331,13 +1392,9 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 	codec := s.vm.parser.Codec()
 	avax.SortTransferableOutputs(outs, codec)
 
-	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    s.vm.ctx.NetworkID,
-		BlockchainID: s.vm.ctx.ChainID,
-		Outs:         outs,
-		Ins:          ins,
-		Memo:         memoBytes,
-	}}}
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
 
@@ -1417,32 +1474,6 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
-		feeUTXOs,
-		feeKc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.TxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.TxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	// Get all UTXOs/keys for the user
 	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
@@ -1460,17 +1491,62 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-	keys = append(keys, opKeys...)
 
-	tx := &txs.Tx{Unsigned: &txs.OperationTx{
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+
+	uTx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    s.vm.ctx.NetworkID,
 			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
 		}},
 		Ops: ops,
-	}}
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	amountsSpent, ins, keys, err := s.vm.Spend(
+		feeUTXOs,
+		feeKc,
+		map[ids.ID]uint64{
+			s.vm.feeAssetID: feeCalc.Fee,
+		},
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: s.vm.feeAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - feeCalc.Fee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	keys = append(keys, opKeys...)
+
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
 }
 
@@ -1533,41 +1609,6 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	// Parse the change address.
-	if len(kc.Keys) == 0 {
-		return nil, ids.ShortEmpty, errNoKeys
-	}
-	changeAddr, err := s.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	amountsSpent, ins, secpKeys, err := s.vm.Spend(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.TxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.TxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	ops, nftKeys, err := s.vm.SpendNFT(
 		utxos,
 		kc,
@@ -1579,15 +1620,67 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx := &txs.Tx{Unsigned: &txs.OperationTx{
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+
+	uTx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    s.vm.ctx.NetworkID,
 			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
 		}},
 		Ops: ops,
-	}}
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	amountsSpent, ins, secpKeys, err := s.vm.Spend(
+		utxos,
+		kc,
+		map[ids.ID]uint64{
+			s.vm.feeAssetID: feeCalc.Fee,
+		},
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return nil, ids.ShortEmpty, errNoKeys
+	}
+	changeAddr, err := s.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: s.vm.feeAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - feeCalc.Fee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
 
 	codec := s.vm.parser.Codec()
 	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
@@ -1659,47 +1752,11 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	// Parse the change address.
-	if len(feeKc.Keys) == 0 {
-		return nil, ids.ShortEmpty, errNoKeys
-	}
-	changeAddr, err := s.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	amountsSpent, ins, secpKeys, err := s.vm.Spend(
-		feeUTXOs,
-		feeKc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.TxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.TxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	// Get all UTXOs/keys
 	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-
 	ops, nftKeys, err := s.vm.MintNFT(
 		utxos,
 		kc,
@@ -1711,15 +1768,67 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx := &txs.Tx{Unsigned: &txs.OperationTx{
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+
+	uTx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    s.vm.ctx.NetworkID,
 			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
 		}},
 		Ops: ops,
-	}}
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	amountsSpent, ins, secpKeys, err := s.vm.Spend(
+		feeUTXOs,
+		feeKc,
+		map[ids.ID]uint64{
+			s.vm.feeAssetID: feeCalc.Fee,
+		},
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	// Parse the change address.
+	outs := []*avax.TransferableOutput{}
+	if len(feeKc.Keys) == 0 {
+		return nil, ids.ShortEmpty, errNoKeys
+	}
+	changeAddr, err := s.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: s.vm.feeAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - feeCalc.Fee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+	uTx.Ins = ins
+	uTx.Outs = outs
+
+	tx := &txs.Tx{Unsigned: uTx}
 
 	codec := s.vm.parser.Codec()
 	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
@@ -1793,16 +1902,41 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		return nil, err
 	}
 
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+
+	uTx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    s.vm.ctx.NetworkID,
+			BlockchainID: s.vm.ctx.ChainID,
+		}},
+		SourceChain: chainID,
+		ImportedIns: importInputs,
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, err
+	}
+
 	ins := []*avax.TransferableInput{}
 	keys := [][]*secp256k1.PrivateKey{}
 
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent < s.vm.TxFee {
+	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent < feeCalc.Fee {
 		var localAmountsSpent map[ids.ID]uint64
 		localAmountsSpent, ins, keys, err = s.vm.Spend(
 			utxos,
 			kc,
 			map[ids.ID]uint64{
-				s.vm.feeAssetID: s.vm.TxFee - amountSpent,
+				s.vm.feeAssetID: feeCalc.Fee - amountSpent,
 			},
 		)
 		if err != nil {
@@ -1819,7 +1953,7 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 
 	// Because we ensured that we had enough inputs for the fee, we can
 	// safely just remove it without concern for underflow.
-	amountsSpent[s.vm.feeAssetID] -= s.vm.TxFee
+	amountsSpent[s.vm.feeAssetID] -= feeCalc.Fee
 
 	keys = append(keys, importKeys...)
 
@@ -1841,16 +1975,9 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 	}
 	avax.SortTransferableOutputs(outs, s.vm.parser.Codec())
 
-	tx := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		SourceChain: chainID,
-		ImportedIns: importInputs,
-	}}
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
 }
 
@@ -1944,23 +2071,6 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	amounts := map[ids.ID]uint64{}
-	if assetID == s.vm.feeAssetID {
-		amountWithFee, err := safemath.Add64(uint64(args.Amount), s.vm.TxFee)
-		if err != nil {
-			return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
-		}
-		amounts[s.vm.feeAssetID] = amountWithFee
-	} else {
-		amounts[s.vm.feeAssetID] = s.vm.TxFee
-		amounts[assetID] = uint64(args.Amount)
-	}
-
-	amountsSpent, ins, keys, err := s.vm.Spend(utxos, kc, amounts)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
 	exportOuts := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
@@ -1972,6 +2082,48 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 			},
 		},
 	}}
+
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+
+	uTx := &txs.ExportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    s.vm.ctx.NetworkID,
+			BlockchainID: s.vm.ctx.ChainID,
+		}},
+		DestinationChain: chainID,
+		ExportedOuts:     exportOuts,
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	amounts := map[ids.ID]uint64{}
+	if assetID == s.vm.feeAssetID {
+		amountWithFee, err := safemath.Add64(uint64(args.Amount), feeCalc.Fee)
+		if err != nil {
+			return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
+		}
+		amounts[s.vm.feeAssetID] = amountWithFee
+	} else {
+		amounts[s.vm.feeAssetID] = feeCalc.Fee
+		amounts[assetID] = uint64(args.Amount)
+	}
+
+	amountsSpent, ins, keys, err := s.vm.Spend(utxos, kc, amounts)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
 
 	outs := []*avax.TransferableOutput{}
 	for assetID, amountSpent := range amountsSpent {
@@ -1994,15 +2146,8 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 	codec := s.vm.parser.Codec()
 	avax.SortTransferableOutputs(outs, codec)
 
-	tx := &txs.Tx{Unsigned: &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		DestinationChain: chainID,
-		ExportedOuts:     exportOuts,
-	}}
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
