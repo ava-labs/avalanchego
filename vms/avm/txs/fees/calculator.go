@@ -8,11 +8,13 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -47,7 +49,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -62,7 +64,7 @@ func (fc *Calculator) CreateAssetTx(tx *txs.CreateAssetTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -77,7 +79,7 @@ func (fc *Calculator) OperationTx(tx *txs.OperationTx) error {
 		return nil
 	}
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -96,7 +98,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedIns)
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, tx.Outs, ins)
+	consumedUnits, err := fc.meterTx(tx, tx.Outs, ins)
 	if err != nil {
 		return err
 	}
@@ -115,7 +117,7 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOuts)
 
-	consumedUnits, err := fc.commonConsumedUnits(tx, outs, tx.Ins)
+	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
 	}
@@ -124,7 +126,7 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	return err
 }
 
-func (fc *Calculator) commonConsumedUnits(
+func (fc *Calculator) meterTx(
 	uTx txs.UnsignedTx,
 	allOuts []*avax.TransferableOutput,
 	allIns []*avax.TransferableInput,
@@ -135,30 +137,49 @@ func (fc *Calculator) commonConsumedUnits(
 	if err != nil {
 		return consumedUnits, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	credsSize, err := fc.Codec.Size(txs.CodecVersion, fc.Credentials)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of credentials: %w", err)
-	}
-	consumedUnits[fees.Bandwidth] = uint64(uTxSize + credsSize)
+	consumedUnits[fees.Bandwidth] = uint64(uTxSize)
 
-	inputDimensions, err := fees.GetInputsDimensions(fc.Codec, txs.CodecVersion, allIns)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
+	// meter credentials, one by one. Then account for the extra bytes needed to
+	// serialize a slice of credentials (codec version bytes + slice size bytes)
+	for i, cred := range fc.Credentials {
+		c, ok := cred.Credential.(*secp256k1fx.Credential)
+		if !ok {
+			return consumedUnits, fmt.Errorf("don't know how to calculate complexity of %T", cred)
+		}
+		credDimensions, err := fees.MeterCredential(fc.Codec, txs.CodecVersion, len(c.Sigs))
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding credential %d: %w", i, err)
+		}
+		consumedUnits, err = fees.Add(consumedUnits, credDimensions)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding credentials: %w", err)
+		}
 	}
-	inputDimensions[fees.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
-	consumedUnits, err = fees.Add(consumedUnits, inputDimensions)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
+	consumedUnits[fees.Bandwidth] += wrappers.IntLen // length of the credentials slice
+	consumedUnits[fees.Bandwidth] += codec.CodecVersionSize
+
+	for _, in := range allIns {
+		inputDimensions, err := fees.MeterInput(fc.Codec, txs.CodecVersion, in)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of inputs: %w", err)
+		}
+		inputDimensions[fees.Bandwidth] = 0 // inputs bandwidth is already accounted for above, so we zero it
+		consumedUnits, err = fees.Add(consumedUnits, inputDimensions)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding inputs: %w", err)
+		}
 	}
 
-	outputDimensions, err := fees.GetOutputsDimensions(fc.Codec, txs.CodecVersion, allOuts)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
-	}
-	outputDimensions[fees.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
-	consumedUnits, err = fees.Add(consumedUnits, outputDimensions)
-	if err != nil {
-		return consumedUnits, fmt.Errorf("failed adding outputs: %w", err)
+	for _, out := range allOuts {
+		outputDimensions, err := fees.MeterOutput(fc.Codec, txs.CodecVersion, out)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed retrieving size of outputs: %w", err)
+		}
+		outputDimensions[fees.Bandwidth] = 0 // outputs bandwidth is already accounted for above, so we zero it
+		consumedUnits, err = fees.Add(consumedUnits, outputDimensions)
+		if err != nil {
+			return consumedUnits, fmt.Errorf("failed adding outputs: %w", err)
+		}
 	}
 
 	return consumedUnits, nil

@@ -109,7 +109,7 @@ func TestBaseTx(t *testing.T) {
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
-	require.Equal(5930*units.MicroAvax, fc.Fee)
+	require.Equal(9930*units.MicroAvax, fc.Fee)
 
 	ins := utx.Ins
 	outs := utx.Outs
@@ -221,7 +221,7 @@ func TestCreateAssetTx(t *testing.T) {
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
-	require.Equal(5898*units.MicroAvax, fc.Fee)
+	require.Equal(9898*units.MicroAvax, fc.Fee)
 
 	ins := utx.Ins
 	outs := utx.Outs
@@ -294,7 +294,7 @@ func TestImportTx(t *testing.T) {
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
-	require.Equal(5640*units.MicroAvax, fc.Fee)
+	require.Equal(9640*units.MicroAvax, fc.Fee)
 
 	ins := utx.Ins
 	outs := utx.Outs
@@ -367,7 +367,7 @@ func TestExportTx(t *testing.T) {
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
-	require.Equal(5966*units.MicroAvax, fc.Fee)
+	require.Equal(9966*units.MicroAvax, fc.Fee)
 
 	ins := utx.Ins
 	outs := utx.Outs

@@ -378,7 +378,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	}
 
 	for _, sigIndices := range importedSigIndices {
-		if _, err = financeCredential(feeCalc, sigIndices); err != nil {
+		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(sigIndices)); err != nil {
 			return nil, fmt.Errorf("account for credential fees: %w", err)
 		}
 	}
@@ -403,7 +403,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 		}
 
 		// update fees to target given the extra output added
-		outDimensions, err := commonfees.GetOutputsDimensions(Parser.Codec(), txs.CodecVersion, []*avax.TransferableOutput{changeOut})
+		outDimensions, err := commonfees.MeterOutput(Parser.Codec(), txs.CodecVersion, changeOut)
 		if err != nil {
 			return nil, fmt.Errorf("failed calculating output size: %w", err)
 		}
@@ -584,13 +584,13 @@ func (b *DynamicFeesBuilder) financeTx(
 			},
 		}
 
-		addedFees, err := financeInput(feeCalc, input)
+		addedFees, err := fees.FinanceInput(feeCalc, Parser.Codec(), input)
 		if err != nil {
 			return nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
 		amountsToBurn[avaxAssetID] += addedFees
 
-		addedFees, err = financeCredential(feeCalc, inputSigIndices)
+		addedFees, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices))
 		if err != nil {
 			return nil, nil, fmt.Errorf("account for credential fees: %w", err)
 		}
@@ -616,7 +616,7 @@ func (b *DynamicFeesBuilder) financeTx(
 			}
 
 			// update fees to account for the change output
-			addedFees, err = financeOutput(feeCalc, changeOut)
+			addedFees, _, err = fees.FinanceOutput(feeCalc, Parser.Codec(), changeOut)
 			if err != nil {
 				return nil, nil, fmt.Errorf("account for output fees: %w", err)
 			}
@@ -662,40 +662,4 @@ func (b *DynamicFeesBuilder) initCtx(tx txs.UnsignedTx) error {
 
 	tx.InitCtx(ctx)
 	return nil
-}
-
-func financeInput(feeCalc *fees.Calculator, input *avax.TransferableInput) (uint64, error) {
-	insDimensions, err := commonfees.GetInputsDimensions(Parser.Codec(), txs.CodecVersion, []*avax.TransferableInput{input})
-	if err != nil {
-		return 0, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	addedFees, err := feeCalc.AddFeesFor(insDimensions)
-	if err != nil {
-		return 0, fmt.Errorf("account for input fees: %w", err)
-	}
-	return addedFees, nil
-}
-
-func financeOutput(feeCalc *fees.Calculator, output *avax.TransferableOutput) (uint64, error) {
-	outDimensions, err := commonfees.GetOutputsDimensions(Parser.Codec(), txs.CodecVersion, []*avax.TransferableOutput{output})
-	if err != nil {
-		return 0, fmt.Errorf("failed calculating changeOut size: %w", err)
-	}
-	addedFees, err := feeCalc.AddFeesFor(outDimensions)
-	if err != nil {
-		return 0, fmt.Errorf("account for stakedOut fees: %w", err)
-	}
-	return addedFees, nil
-}
-
-func financeCredential(feeCalc *fees.Calculator, inputSigIndices []uint32) (uint64, error) {
-	credsDimensions, err := commonfees.GetCredentialsDimensions(Parser.Codec(), txs.CodecVersion, inputSigIndices)
-	if err != nil {
-		return 0, fmt.Errorf("failed calculating input size: %w", err)
-	}
-	addedFees, err := feeCalc.AddFeesFor(credsDimensions)
-	if err != nil {
-		return 0, fmt.Errorf("account for input fees: %w", err)
-	}
-	return addedFees, nil
 }

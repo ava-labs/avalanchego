@@ -3,7 +3,11 @@
 
 package fees
 
-import "github.com/ava-labs/avalanchego/utils/math"
+import (
+	"math"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
+)
 
 const (
 	Bandwidth Dimension = 0
@@ -14,7 +18,15 @@ const (
 	FeeDimensions = 4
 )
 
-var Empty = Dimensions{}
+var (
+	Empty = Dimensions{}
+	Max   = Dimensions{
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
+		math.MaxUint64,
+	}
+)
 
 type (
 	Dimension  int
@@ -24,7 +36,7 @@ type (
 func Add(lhs, rhs Dimensions) (Dimensions, error) {
 	var res Dimensions
 	for i := 0; i < FeeDimensions; i++ {
-		v, err := math.Add64(lhs[i], rhs[i])
+		v, err := safemath.Add64(lhs[i], rhs[i])
 		if err != nil {
 			return res, err
 		}
