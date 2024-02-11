@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
@@ -129,7 +128,7 @@ func TestManagerVerifyTx(t *testing.T) {
 					backend: &executor.Backend{
 						Config: &config.Config{
 							DurangoTime:  time.Time{},
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 					},
 				}
@@ -151,7 +150,7 @@ func TestManagerVerifyTx(t *testing.T) {
 						Bootstrapped: true,
 						Config: &config.Config{
 							DurangoTime:  time.Time{},
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 					},
 				}
@@ -183,7 +182,7 @@ func TestManagerVerifyTx(t *testing.T) {
 						Bootstrapped: true,
 						Config: &config.Config{
 							DurangoTime:  time.Time{},
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 					},
 					state:        state,
@@ -219,7 +218,7 @@ func TestManagerVerifyTx(t *testing.T) {
 						Bootstrapped: true,
 						Config: &config.Config{
 							DurangoTime:  time.Time{},
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 					},
 					state:        state,
@@ -255,7 +254,7 @@ func TestManagerVerifyTx(t *testing.T) {
 						Bootstrapped: true,
 						Config: &config.Config{
 							DurangoTime:  time.Time{},
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 					},
 					state:        state,

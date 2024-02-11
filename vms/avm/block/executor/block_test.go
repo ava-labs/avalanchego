@@ -50,7 +50,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{},
@@ -75,7 +75,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 					},
@@ -100,7 +100,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						clk: clk,
@@ -123,7 +123,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{},
@@ -155,7 +155,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						mempool:      mempool,
@@ -193,7 +193,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						state:        mockState,
@@ -235,7 +235,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						state:        mockState,
@@ -280,7 +280,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -333,7 +333,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						mempool: mempool,
@@ -391,7 +391,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -474,7 +474,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -537,7 +537,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -594,7 +594,7 @@ func TestBlockVerify(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -676,7 +676,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{},
@@ -714,7 +714,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -762,7 +762,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -814,7 +814,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -869,7 +869,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -970,7 +970,7 @@ func TestBlockReject(t *testing.T) {
 							Bootstrapped: true,
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
@@ -1035,7 +1035,7 @@ func TestBlockReject(t *testing.T) {
 							},
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						state: mockState,
@@ -1089,7 +1089,7 @@ func TestBlockStatus(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						lastAccepted: blockID,
@@ -1110,7 +1110,7 @@ func TestBlockStatus(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{
@@ -1137,7 +1137,7 @@ func TestBlockStatus(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{},
@@ -1163,7 +1163,7 @@ func TestBlockStatus(t *testing.T) {
 						backend: &executor.Backend{
 							Config: &config.Config{
 								DurangoTime:  time.Time{},
-								EUpgradeTime: mockable.MaxTime,
+								EUpgradeTime: time.Time{},
 							},
 						},
 						blkIDToState: map[ids.ID]*blockState{},

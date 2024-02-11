@@ -145,7 +145,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Config: &config.Config{
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -193,7 +193,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Config: &config.Config{
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -242,7 +242,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Config: &config.Config{
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -338,7 +338,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 					&txexecutor.Backend{
 						Codec: codec,
 						Config: &config.Config{
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -413,7 +413,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 					&txexecutor.Backend{
 						Codec: codec,
 						Config: &config.Config{
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -490,7 +490,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 					&txexecutor.Backend{
 						Codec: codec,
 						Config: &config.Config{
-							EUpgradeTime: mockable.MaxTime,
+							EUpgradeTime: time.Time{},
 						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -546,7 +546,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 		Config: &config.Config{
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 		Codec: parser.Codec(),
 	}
