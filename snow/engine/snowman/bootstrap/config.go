@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
@@ -23,6 +24,8 @@ type Config struct {
 	Sender           common.Sender
 	BootstrapTracker common.BootstrapTracker
 	Timer            common.Timer
+
+	PeerTracker *p2p.PeerTracker
 
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.

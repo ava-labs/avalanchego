@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -63,6 +63,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
@@ -583,7 +584,7 @@ func (m *manager) createAvalancheChain(
 	defer ctx.Lock.Unlock()
 
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		State: snow.Initializing,
 	})
 
@@ -618,7 +619,7 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		sb,
 	)
 	if err != nil {
@@ -646,7 +647,7 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
 	)
 	if err != nil {
@@ -813,6 +814,17 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error creating peer tracker: %w", err)
 	}
 	vdrs.RegisterCallbackListener(ctx.SubnetID, connectedValidators)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		ctx.Registerer,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -986,7 +998,7 @@ func (m *manager) createSnowmanChain(
 	defer ctx.Lock.Unlock()
 
 	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Initializing,
 	})
 
@@ -1010,7 +1022,7 @@ func (m *manager) createSnowmanChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
 	)
 	if err != nil {
