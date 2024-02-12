@@ -23,7 +23,7 @@ type Subnets struct {
 	subnets map[ids.ID]subnets.Subnet
 }
 
-// Add a subnet that is being run on this node. Returns if the node was added
+// Add a subnet that is being run on this node. Returns if the subnet was added
 // or not.
 func (s *Subnets) Add(subnetID ids.ID) bool {
 	s.lock.Lock()
