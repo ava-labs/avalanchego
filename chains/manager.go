@@ -258,8 +258,6 @@ type manager struct {
 	chainCreatorShutdownCh chan struct{}
 	chainCreatorExited     sync.WaitGroup
 
-	subnets *Subnets
-
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
@@ -286,8 +284,8 @@ func New(config *ManagerConfig) Manager {
 // QueueChainCreation queues a chain creation request
 // Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
-	_ = m.subnets.Add(chainParams.SubnetID)
-	if sb, _ := m.subnets.Get(chainParams.SubnetID); !sb.AddChain(chainParams.ID) {
+	_ = m.Subnets.Add(chainParams.SubnetID)
+	if sb, _ := m.Subnets.Get(chainParams.SubnetID); !sb.AddChain(chainParams.ID) {
 		m.Log.Debug("skipping chain creation",
 			zap.String("reason", "chain already staged"),
 			zap.Stringer("subnetID", chainParams.SubnetID),
@@ -318,7 +316,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	sb, _ := m.subnets.Get(chainParams.SubnetID)
+	sb, _ := m.Subnets.Get(chainParams.SubnetID)
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -1291,7 +1289,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 
 func (m *manager) registerBootstrappedHealthChecks() error {
 	bootstrappedCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
-		if subnetIDs := m.subnets.Bootstrapping(); len(subnetIDs) != 0 {
+		if subnetIDs := m.Subnets.Bootstrapping(); len(subnetIDs) != 0 {
 			return subnetIDs, errNotBootstrapped
 		}
 		return []ids.ID{}, nil
@@ -1334,7 +1332,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// Add the P-Chain to the Primary Network
-	sb, ok := m.subnets.Get(constants.PrimaryNetworkID)
+	sb, ok := m.Subnets.Get(constants.PrimaryNetworkID)
 	if !ok {
 		return errPrimaryNetworkNotRunning
 	}
