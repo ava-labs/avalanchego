@@ -4,7 +4,6 @@
 package grpcutils
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -62,7 +61,7 @@ var DefaultDialOptions = []grpc.DialOption{
 // Dial returns a gRPC ClientConn with the dial options as defined by
 // DefaultDialOptions. DialOption can also optionally be passed.
 func Dial(addr string, opts ...DialOption) (*grpc.ClientConn, error) {
-	return grpc.Dial(fmt.Sprintf("passthrough:///%s", addr), newDialOpts(opts...)...)
+	return grpc.Dial("passthrough:///"+addr, newDialOpts(opts...)...)
 }
 
 // DialOptions are options which can be applied to a gRPC client in addition to

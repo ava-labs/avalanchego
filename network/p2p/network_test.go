@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -307,9 +306,9 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
 
-			require.Nil(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
-			require.Nil(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
-			require.Nil(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, tt.msg))
+			require.NoError(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
+			require.NoError(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
+			require.NoError(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, tt.msg))
 		})
 	}
 }
@@ -541,7 +540,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 		{
 			name:  "default",
 			peers: []ids.NodeID{nodeID0, nodeID1, nodeID2},
-			option: func(_ *testing.T, n *Network) ClientOption {
+			option: func(*testing.T, *Network) ClientOption {
 				return clientOptionFunc(func(*clientOptions) {})
 			},
 			expected: []ids.NodeID{nodeID0, nodeID1, nodeID2},
@@ -549,7 +548,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 		{
 			name:  "validator connected",
 			peers: []ids.NodeID{nodeID0, nodeID1},
-			option: func(t *testing.T, n *Network) ClientOption {
+			option: func(_ *testing.T, n *Network) ClientOption {
 				state := &validators.TestState{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
@@ -569,7 +568,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 		{
 			name:  "validator disconnected",
 			peers: []ids.NodeID{nodeID0},
-			option: func(t *testing.T, n *Network) ClientOption {
+			option: func(_ *testing.T, n *Network) ClientOption {
 				state := &validators.TestState{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
