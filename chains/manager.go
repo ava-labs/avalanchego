@@ -94,11 +94,10 @@ var (
 	// Bootstrapping prefixes for ChainVMs
 	ChainBootstrappingDBPrefix = []byte("bs")
 
-	errUnknownVMType            = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
-	errCreatePlatformVM         = errors.New("attempted to create a chain running the PlatformVM")
-	errNotBootstrapped          = errors.New("subnets not bootstrapped")
-	errPrimaryNetworkNotRunning = errors.New("node is not running the primary network")
-	errPartialSyncAsAValidator  = errors.New("partial sync should not be configured for a validator")
+	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped         = errors.New("subnets not bootstrapped")
+	errPartialSyncAsAValidator = errors.New("partial sync should not be configured for a validator")
 
 	fxs = map[ids.ID]fx.Factory{
 		secp256k1fx.ID: &secp256k1fx.Factory{},
