@@ -34,7 +34,7 @@ var (
 
 	Current = &Semantic{
 		Major: 1,
-		Minor: 0,
+		Minor: 1,
 		Patch: 0,
 	}
 	CurrentApp = &Application{
@@ -44,13 +44,13 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 0,
+		Minor: 1,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
-		Major: 0,
-		Minor: 4,
-		Patch: 9,
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
 	}
 
 	CurrentDatabase = DatabaseVersion1_4_5
@@ -119,6 +119,7 @@ var (
 	}
 	AthensPhaseDefaultTime = time.Date(2023, time.July, 1, 8, 0, 0, 0, time.UTC)
 
+	// TODO: update this before release
 	BerlinPhaseTimes = map[uint32]time.Time{
 		constants.KopernikusID: time.Date(2023, time.July, 4, 13, 0, 0, 0, time.UTC),
 		constants.ColumbusID:   time.Date(2023, time.July, 7, 8, 0, 0, 0, time.UTC),
@@ -126,7 +127,7 @@ var (
 	}
 	BerlinPhaseDefaultTime = time.Date(2023, time.July, 1, 8, 0, 0, 0, time.UTC)
 
-	// TODO: update this before release
+	// TODO: update this before release, must be exactly the same as Berlin
 	CortinaTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
@@ -229,7 +230,7 @@ func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetAthensPhaseTime(networkID).Add(-time.Minute),
+		GetBerlinPhaseTime(networkID).Add(-time.Minute),
 		PrevMinimumCompatibleVersion,
 	)
 }
