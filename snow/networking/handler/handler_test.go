@@ -11,9 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -178,7 +176,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(context.Context, ids.NodeID, uint32) error {
 		return errFatal
 	}
 
@@ -266,7 +264,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(context.Context, ids.NodeID, uint32) error {
 		closed <- struct{}{}
 		return nil
 	}

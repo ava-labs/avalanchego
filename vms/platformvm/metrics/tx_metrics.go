@@ -65,7 +65,7 @@ func newTxMetric(
 ) prometheus.Counter {
 	txMetric := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_txs_accepted", txName),
+		Name:      txName + "_txs_accepted",
 		Help:      fmt.Sprintf("Number of %s transactions accepted", txName),
 	})
 	errs.Add(registerer.Register(txMetric))
