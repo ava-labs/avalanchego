@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  go_version: '~1.20.12'
+  go_version: '~1.21.7'
   tmpnet_data_path: ~/.tmpnet/networks/1000
 
 jobs:
@@ -139,7 +139,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bufbuild/buf-setup-action@v1.26.1
+      - uses: bufbuild/buf-setup-action@v1.29.0
         with:
           github_token: ${{ github.token }}
       - uses: bufbuild/buf-lint-action@v1
@@ -154,7 +154,7 @@ jobs:
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
-      - uses: bufbuild/buf-setup-action@v1.26.1
+      - uses: bufbuild/buf-setup-action@v1.29.0
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash

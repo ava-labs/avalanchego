@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	_ "embed"
-
 	"github.com/stretchr/testify/require"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"

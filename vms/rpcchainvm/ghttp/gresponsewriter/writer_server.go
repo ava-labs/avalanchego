@@ -8,8 +8,6 @@ import (
 	"errors"
 	"net/http"
 
-	"golang.org/x/exp/maps"
-
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
@@ -48,7 +46,7 @@ func (s *Server) Write(
 	req *responsewriterpb.WriteRequest,
 ) (*responsewriterpb.WriteResponse, error) {
 	headers := s.writer.Header()
-	maps.Clear(headers)
+	clear(headers)
 	for _, header := range req.Headers {
 		headers[header.Key] = header.Values
 	}
@@ -67,7 +65,7 @@ func (s *Server) WriteHeader(
 	req *responsewriterpb.WriteHeaderRequest,
 ) (*emptypb.Empty, error) {
 	headers := s.writer.Header()
-	maps.Clear(headers)
+	clear(headers)
 	for _, header := range req.Headers {
 		headers[header.Key] = header.Values
 	}

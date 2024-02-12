@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -566,6 +565,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -589,6 +589,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					subnetID,         // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -618,6 +619,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -718,6 +720,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,                           // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -746,6 +749,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -777,6 +781,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -838,7 +843,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
-		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
+		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, nil)
 			env.config.BanffTime = time.Time{} // activate Banff
@@ -860,6 +865,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				subnetID,                           // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -889,6 +895,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -975,6 +982,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1043,6 +1051,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1069,6 +1078,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1159,6 +1169,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1226,6 +1237,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1252,6 +1264,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1337,6 +1350,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1412,6 +1426,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
