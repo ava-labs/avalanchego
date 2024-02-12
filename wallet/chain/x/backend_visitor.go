@@ -4,11 +4,11 @@
 package x
 
 import (
-	stdcontext "context"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	stdcontext "context"
 )
 
 var _ txs.Visitor = (*backendVisitor)(nil)

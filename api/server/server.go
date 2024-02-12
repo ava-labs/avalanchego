@@ -13,13 +13,9 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/rs/cors"
-
 	"go.uber.org/zap"
-
 	"golang.org/x/net/http2"
 
 	"github.com/ava-labs/avalanchego/api"

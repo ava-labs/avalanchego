@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -838,7 +837,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
-		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
+		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, nil)
 			env.config.BanffTime = time.Time{} // activate Banff
