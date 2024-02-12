@@ -19,7 +19,7 @@ type Subnets struct {
 	nodeID  ids.NodeID
 	configs map[ids.ID]subnets.Config
 
-	lock    sync.Mutex
+	lock    sync.RWMutex
 	subnets map[ids.ID]subnets.Subnet
 }
 
@@ -47,8 +47,8 @@ func (s *Subnets) Add(subnetID ids.ID) bool {
 // Get returns a subnet if it is being run on this node. Returns the subnet
 // if it was present.
 func (s *Subnets) Get(subnetID ids.ID) (subnets.Subnet, bool) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	subnet, ok := s.subnets[subnetID]
 	return subnet, ok
@@ -57,8 +57,8 @@ func (s *Subnets) Get(subnetID ids.ID) (subnets.Subnet, bool) {
 // Bootstrapping returns the subnetIDs of any chains that are still
 // bootstrapping.
 func (s *Subnets) Bootstrapping() []ids.ID {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	subnetsBootstrapping := make([]ids.ID, 0, len(s.subnets))
 	for subnetID, subnet := range s.subnets {
