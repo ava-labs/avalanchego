@@ -1857,7 +1857,6 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		return nil, err
 	}
 	keys = append(keys, importKeys...)
-	avax.SortTransferableOutputs(outs, s.vm.parser.Codec())
 
 	uTx.Ins = ins
 	uTx.Outs = outs
@@ -2008,7 +2007,6 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 	}
 
 	codec := s.vm.parser.Codec()
-	avax.SortTransferableOutputs(outs, codec)
 
 	uTx.Ins = ins
 	uTx.Outs = outs

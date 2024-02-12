@@ -158,10 +158,7 @@ func (s *spender) FinanceTx(
 			continue
 		}
 
-		amountToBurn := min(
-			input.Amount(),
-			toSpend[assetID],
-		)
+		amountToBurn := min(input.Amount(), toSpend[assetID])
 		toSpend[assetID] -= amountToBurn // no overflow here
 
 		in := &avax.TransferableInput{
@@ -177,7 +174,6 @@ func (s *spender) FinanceTx(
 		}
 		toSpendWithFees, err := math.Add64(toSpend[feeAssetID], addedFees)
 		if err != nil {
-			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
 		toSpend[feeAssetID] = toSpendWithFees
@@ -189,7 +185,6 @@ func (s *spender) FinanceTx(
 		}
 		toSpendWithFees, err = math.Add64(toSpend[feeAssetID], addedFees)
 		if err != nil {
-			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
 		toSpend[feeAssetID] = toSpendWithFees
@@ -252,6 +247,7 @@ func (s *spender) FinanceTx(
 	}
 
 	avax.SortTransferableInputsWithSigners(ins, keys)
+	avax.SortTransferableOutputs(outs, s.codec)
 	return ins, outs, keys, nil
 }
 
