@@ -108,7 +108,7 @@ func rotate(name string, maxNumFiles int) error {
 			return err
 		}
 	}
-	destFilename := fmt.Sprintf("%s.1", name)
+	destFilename := name + ".1"
 	_, err := filesystem.RenameIfExists(name, destFilename)
 	return err
 }

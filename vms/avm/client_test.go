@@ -27,7 +27,7 @@ func (mc *mockClient) SendRequest(
 	_ interface{},
 	_ ...rpc.Option,
 ) error {
-	mc.require.Equal(inData, mc.expectedInData)
+	mc.require.Equal(mc.expectedInData, inData)
 	return nil
 }
 

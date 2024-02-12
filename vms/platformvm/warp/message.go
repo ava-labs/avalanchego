@@ -3,6 +3,8 @@
 
 package warp
 
+import "fmt"
+
 // Message defines the standard format for a Warp message.
 type Message struct {
 	UnsignedMessage `serialize:"true"`
@@ -48,4 +50,8 @@ func (m *Message) Initialize() error {
 // Initialize.
 func (m *Message) Bytes() []byte {
 	return m.bytes
+}
+
+func (m *Message) String() string {
+	return fmt.Sprintf("WarpMessage(%s, %s)", &m.UnsignedMessage, m.Signature)
 }

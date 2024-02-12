@@ -6,10 +6,10 @@ package sync
 import (
 	"bytes"
 
+	"github.com/google/btree"
+
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-
-	"github.com/google/btree"
 )
 
 // A priority queue of syncWorkItems.

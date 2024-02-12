@@ -20,7 +20,7 @@ func TestMessageQueue(t *testing.T) {
 
 	expectFail := false
 	q := NewBlockingMessageQueue(
-		SendFailedFunc(func(msg message.OutboundMessage) {
+		SendFailedFunc(func(message.OutboundMessage) {
 			require.True(expectFail)
 		}),
 		logging.NoLog{},

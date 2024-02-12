@@ -39,7 +39,7 @@ func TestEncodingUnmarshalJSON(t *testing.T) {
 
 func TestEncodingString(t *testing.T) {
 	enc := Hex
-	require.Equal(t, enc.String(), "hex")
+	require.Equal(t, "hex", enc.String())
 }
 
 // Test encoding bytes to a string and decoding back to bytes
