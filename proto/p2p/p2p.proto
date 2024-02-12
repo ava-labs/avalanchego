@@ -112,8 +112,9 @@ message Handshake {
   string my_version = 5;
   // Timestamp of the IP
   uint64 ip_signing_time = 6;
-  // Signature of the peer IP port pair at a provided timestamp
-  bytes sig = 7;
+  // Signature of the peer IP port pair at a provided timestamp with the TLS
+  // key.
+  bytes ip_node_id_sig = 7;
   // Subnets the peer is tracking
   repeated bytes tracked_subnets = 8;
   Client client = 9;

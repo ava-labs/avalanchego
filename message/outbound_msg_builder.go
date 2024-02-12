@@ -243,7 +243,7 @@ func (b *outMsgBuilder) Handshake(
 	minor uint32,
 	patch uint32,
 	ipSigningTime uint64,
-	sig []byte,
+	ipNodeIDSig []byte,
 	trackedSubnets []ids.ID,
 	supportedACPs []uint32,
 	objectedACPs []uint32,
@@ -262,7 +262,7 @@ func (b *outMsgBuilder) Handshake(
 					IpPort:         uint32(ip.Port),
 					MyVersion:      myVersion,
 					IpSigningTime:  ipSigningTime,
-					Sig:            sig,
+					IpNodeIdSig:    ipNodeIDSig,
 					TrackedSubnets: subnetIDBytes,
 					Client: &p2p.Client{
 						Name:  client,

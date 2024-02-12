@@ -1076,7 +1076,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			},
 			Timestamp: msg.IpSigningTime,
 		},
-		Signature: msg.Sig,
+		Signature: msg.IpNodeIdSig,
 	}
 	maxTimestamp := myTime.Add(p.MaxClockDifference)
 	if err := p.ip.Verify(p.cert, maxTimestamp); err != nil {

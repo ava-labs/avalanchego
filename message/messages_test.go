@@ -131,7 +131,7 @@ func TestMessage(t *testing.T) {
 						IpPort:         9651,
 						MyVersion:      "v1.2.3",
 						IpSigningTime:  uint64(nowUnix),
-						Sig:            []byte{'y', 'e', 'e', 't'},
+						IpNodeIdSig:    []byte{'y', 'e', 'e', 't'},
 						TrackedSubnets: [][]byte{testID[:]},
 					},
 				},
