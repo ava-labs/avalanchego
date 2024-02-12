@@ -11,17 +11,17 @@ import (
 
 var (
 	_ NnarySnow        = (*nnarySnowflake)(nil)
-	_ ConsensusFactory = (snowflakeFactory{})
+	_ ConsensusFactory = (SnowflakeFactory{})
 )
 
-type snowflakeFactory struct{}
+type SnowflakeFactory struct{}
 
-func (snowflakeFactory) New(params Parameters, choice ids.ID) NnarySnow {
+func (SnowflakeFactory) New(params Parameters, choice ids.ID) NnarySnow {
 	sf := newNnarySnowflake(params.BetaVirtuous, params.BetaRogue, choice)
 	return &sf
 }
 
-func (snowflakeFactory) NewUnary(params Parameters) UnarySnow {
+func (SnowflakeFactory) NewUnary(params Parameters) UnarySnow {
 	sf := newUnarySnowflake(params.BetaVirtuous)
 	return &sf
 }
