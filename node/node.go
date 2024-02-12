@@ -304,8 +304,6 @@ type Node struct {
 	// Manages network timeouts
 	timeoutManager timeout.Manager
 
-	subnets *chains.Subnets
-
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
 
@@ -1119,7 +1117,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	n.subnets, err = chains.NewSubnets(n.ID, n.Config.SubnetConfigs)
+	subnets, err := chains.NewSubnets(n.ID, n.Config.SubnetConfigs)
 	if err != nil {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
@@ -1168,7 +1166,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			TracingEnabled:                          n.Config.TraceConfig.Enabled,
 			Tracer:                                  n.tracer,
 			ChainDataDir:                            n.Config.ChainDataDir,
-			Subnets:                                 n.subnets,
+			Subnets:                                 subnets,
 		},
 	)
 
