@@ -540,7 +540,7 @@ func (b *builder) NewTransformSubnetTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, unstakedOuts, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TransformSubnetTxFee, changeAddr)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TransformSubnetTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -557,7 +557,7 @@ func (b *builder) NewTransformSubnetTx(
 				NetworkID:    b.ctx.NetworkID,
 				BlockchainID: b.ctx.ChainID,
 				Ins:          ins,
-				Outs:         unstakedOuts,
+				Outs:         outs,
 				Memo:         memo,
 			},
 		},

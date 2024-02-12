@@ -161,7 +161,13 @@ func TestNewImportTx(t *testing.T) {
 
 // Returns a shared memory where GetDatabase returns a database
 // where [recipientKey] has a balance of [amt]
-func fundedSharedMemory(t *testing.T, env *environment, sourceKey *secp256k1.PrivateKey, peerChain ids.ID, assets map[ids.ID]uint64) atomic.SharedMemory {
+func fundedSharedMemory(
+	t *testing.T,
+	env *environment,
+	sourceKey *secp256k1.PrivateKey,
+	peerChain ids.ID,
+	assets map[ids.ID]uint64,
+) atomic.SharedMemory {
 	fundedSharedMemoryCalls++
 	m := atomic.NewMemory(prefixdb.New([]byte{fundedSharedMemoryCalls}, env.baseDB))
 
