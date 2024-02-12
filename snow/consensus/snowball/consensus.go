@@ -46,8 +46,7 @@ type Factory interface {
 	NewUnary(params Parameters) Unary
 }
 
-// Nnary is a snow instance deciding between an unbounded number
-// of values.
+// Nnary is a snow instance deciding between an unbounded number of values.
 // The caller samples k nodes and then calls
 // 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
 // 2. RecordPollPreference if choice collects >= alphaPreference votes
