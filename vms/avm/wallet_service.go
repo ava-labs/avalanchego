@@ -20,9 +20,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var errMissingUTXO = errors.New("missing utxo")
@@ -257,52 +260,48 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	amountsWithFee := maps.Clone(amounts)
-
-	amountWithFee, err := math.Add64(amounts[w.vm.feeAssetID], w.vm.TxFee)
-	if err != nil {
-		return fmt.Errorf("problem calculating required spend amount: %w", err)
+	var (
+		chainTime = w.vm.state.GetTimestamp()
+		feeCfg    = w.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: w.vm.IsEUpgradeActivated(chainTime),
+			Config:           &w.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            w.vm.parser.Codec(),
+		}
+	)
+	uTx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    w.vm.ctx.NetworkID,
+			BlockchainID: w.vm.ctx.ChainID,
+			Memo:         memoBytes,
+			Outs:         outs,
+		},
 	}
-	amountsWithFee[w.vm.feeAssetID] = amountWithFee
+	if err := uTx.Visit(feeCalc); err != nil {
+		return err
+	}
 
-	amountsSpent, ins, keys, err := w.vm.Spend(
+	toSpend := make(map[ids.ID]uint64)
+	ins, outs, keys, err := w.vm.FinanceTx(
 		utxos,
+		w.vm.feeAssetID,
 		kc,
-		amountsWithFee,
+		toSpend,
+		feeCalc,
+		changeAddr,
 	)
 	if err != nil {
 		return err
 	}
 
-	// Add the required change outputs
-	for assetID, amountWithFee := range amountsWithFee {
-		amountSpent := amountsSpent[assetID]
-
-		if amountSpent > amountWithFee {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amountSpent - amountWithFee,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
-	}
-
 	codec := w.vm.parser.Codec()
 	avax.SortTransferableOutputs(outs, codec)
 
-	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    w.vm.ctx.NetworkID,
-		BlockchainID: w.vm.ctx.ChainID,
-		Outs:         outs,
-		Ins:          ins,
-		Memo:         memoBytes,
-	}}}
+	uTx.Ins = ins
+	tx := &txs.Tx{Unsigned: uTx}
 	if err := tx.SignSECP256K1Fx(codec, keys); err != nil {
 		return err
 	}

@@ -819,30 +819,17 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
+	toSpend := make(map[ids.ID]uint64)
+	ins, outs, keys, err := s.vm.FinanceTx(
 		utxos,
+		s.vm.feeAssetID,
 		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: feeCalc.Fee,
-		},
+		toSpend,
+		feeCalc,
+		changeAddr,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - feeCalc.Fee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
 	}
 
 	uTx.Ins = ins
@@ -989,34 +976,21 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
+	toSpend := make(map[ids.ID]uint64)
+	ins, outs, keys, err := s.vm.FinanceTx(
 		utxos,
+		s.vm.feeAssetID,
 		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: feeCalc.Fee,
-		},
+		toSpend,
+		feeCalc,
+		changeAddr,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - feeCalc.Fee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
 	uTx.Ins = ins
 	uTx.Outs = outs
-
 	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
@@ -1281,29 +1255,6 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
-		}
-	)
-	uTx := &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Memo:         memoBytes,
-		},
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
 	// Calculate required input amounts and create the desired outputs
 	// String repr. of asset ID --> asset ID
 	assetIDs := make(map[string]ids.ID)
@@ -1350,50 +1301,51 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		})
 	}
 
-	amountsWithFee := make(map[ids.ID]uint64, len(amounts)+1)
+	var (
+		chainTime = s.vm.state.GetTimestamp()
+		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
+			Config:           &s.vm.Config,
+			FeeManager:       feeMan,
+			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			Codec:            s.vm.parser.Codec(),
+		}
+	)
+	uTx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    s.vm.ctx.NetworkID,
+			BlockchainID: s.vm.ctx.ChainID,
+			Memo:         memoBytes,
+			Outs:         outs,
+		},
+	}
+	if err := uTx.Visit(feeCalc); err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	toSpend := make(map[ids.ID]uint64)
 	for assetID, amount := range amounts {
-		amountsWithFee[assetID] = amount
+		toSpend[assetID] = amount
 	}
-
-	amountWithFee, err := safemath.Add64(amounts[s.vm.feeAssetID], feeCalc.Fee)
-	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
-	}
-	amountsWithFee[s.vm.feeAssetID] = amountWithFee
-
-	amountsSpent, ins, keys, err := s.vm.Spend(
+	ins, feeOuts, keys, err := s.vm.FinanceTx(
 		utxos,
+		s.vm.feeAssetID,
 		kc,
-		amountsWithFee,
+		toSpend,
+		feeCalc,
+		changeAddr,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	// Add the required change outputs
-	for assetID, amountWithFee := range amountsWithFee {
-		amountSpent := amountsSpent[assetID]
-
-		if amountSpent > amountWithFee {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amountSpent - amountWithFee,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
-	}
-
-	codec := s.vm.parser.Codec()
-	avax.SortTransferableOutputs(outs, codec)
-
 	uTx.Ins = ins
-	uTx.Outs = outs
+	uTx.Outs = append(uTx.Outs, feeOuts...)
+	codec := s.vm.parser.Codec()
+	avax.SortTransferableOutputs(uTx.Outs, codec)
+
 	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
@@ -1516,37 +1468,23 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
+	toSpend := make(map[ids.ID]uint64)
+	ins, outs, keys, err := s.vm.FinanceTx(
 		feeUTXOs,
+		s.vm.feeAssetID,
 		feeKc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: feeCalc.Fee,
-		},
+		toSpend,
+		feeCalc,
+		changeAddr,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - feeCalc.Fee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
-	keys = append(keys, opKeys...)
-
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
+	keys = append(keys, opKeys...)
 	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
 }
 
@@ -1609,6 +1547,15 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
+	// Parse the change address.
+	if len(kc.Keys) == 0 {
+		return nil, ids.ShortEmpty, errNoKeys
+	}
+	changeAddr, err := s.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
 	ops, nftKeys, err := s.vm.SpendNFT(
 		utxos,
 		kc,
@@ -1644,38 +1591,17 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, secpKeys, err := s.vm.Spend(
+	toSpend := make(map[ids.ID]uint64)
+	ins, outs, secpKeys, err := s.vm.FinanceTx(
 		utxos,
+		s.vm.feeAssetID,
 		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: feeCalc.Fee,
-		},
+		toSpend,
+		feeCalc,
+		changeAddr,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
-	}
-
-	// Parse the change address.
-	if len(kc.Keys) == 0 {
-		return nil, ids.ShortEmpty, errNoKeys
-	}
-	changeAddr, err := s.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - feeCalc.Fee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
 	}
 
 	uTx.Ins = ins
@@ -1752,6 +1678,15 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
+	// Parse the change address.
+	if len(feeKc.Keys) == 0 {
+		return nil, ids.ShortEmpty, errNoKeys
+	}
+	changeAddr, err := s.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
 	// Get all UTXOs/keys
 	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
@@ -1792,42 +1727,21 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, secpKeys, err := s.vm.Spend(
+	toSpend := make(map[ids.ID]uint64)
+	ins, outs, secpKeys, err := s.vm.FinanceTx(
 		feeUTXOs,
+		s.vm.feeAssetID,
 		feeKc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: feeCalc.Fee,
-		},
+		toSpend,
+		feeCalc,
+		changeAddr,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	// Parse the change address.
-	outs := []*avax.TransferableOutput{}
-	if len(feeKc.Keys) == 0 {
-		return nil, ids.ShortEmpty, errNoKeys
-	}
-	changeAddr, err := s.vm.selectChangeAddr(feeKc.Keys[0].PublicKey().Address(), args.ChangeAddr)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > feeCalc.Fee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - feeCalc.Fee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
 	uTx.Ins = ins
 	uTx.Outs = outs
-
 	tx := &txs.Tx{Unsigned: uTx}
 
 	codec := s.vm.parser.Codec()
@@ -1927,52 +1841,22 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		return nil, err
 	}
 
-	ins := []*avax.TransferableInput{}
-	keys := [][]*secp256k1.PrivateKey{}
-
 	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent < feeCalc.Fee {
-		var localAmountsSpent map[ids.ID]uint64
-		localAmountsSpent, ins, keys, err = s.vm.Spend(
-			utxos,
-			kc,
-			map[ids.ID]uint64{
-				s.vm.feeAssetID: feeCalc.Fee - amountSpent,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		for asset, amount := range localAmountsSpent {
-			newAmount, err := safemath.Add64(amountsSpent[asset], amount)
-			if err != nil {
-				return nil, fmt.Errorf("problem calculating required spend amount: %w", err)
-			}
-			amountsSpent[asset] = newAmount
-		}
+		feeCalc.Fee -= amountSpent
 	}
-
-	// Because we ensured that we had enough inputs for the fee, we can
-	// safely just remove it without concern for underflow.
-	amountsSpent[s.vm.feeAssetID] -= feeCalc.Fee
-
+	toSpend := make(map[ids.ID]uint64)
+	ins, outs, keys, err := s.vm.FinanceTx(
+		utxos,
+		s.vm.feeAssetID,
+		kc,
+		toSpend,
+		feeCalc,
+		to,
+	)
+	if err != nil {
+		return nil, err
+	}
 	keys = append(keys, importKeys...)
-
-	outs := []*avax.TransferableOutput{}
-	for assetID, amount := range amountsSpent {
-		if amount > 0 {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amount,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{to},
-					},
-				},
-			})
-		}
-	}
 	avax.SortTransferableOutputs(outs, s.vm.parser.Codec())
 
 	uTx.Ins = ins
@@ -2108,39 +1992,19 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	amounts := map[ids.ID]uint64{}
-	if assetID == s.vm.feeAssetID {
-		amountWithFee, err := safemath.Add64(uint64(args.Amount), feeCalc.Fee)
-		if err != nil {
-			return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
-		}
-		amounts[s.vm.feeAssetID] = amountWithFee
-	} else {
-		amounts[s.vm.feeAssetID] = feeCalc.Fee
-		amounts[assetID] = uint64(args.Amount)
+	toSpend := map[ids.ID]uint64{
+		assetID: uint64(args.Amount),
 	}
-
-	amountsSpent, ins, keys, err := s.vm.Spend(utxos, kc, amounts)
+	ins, outs, keys, err := s.vm.FinanceTx(
+		utxos,
+		s.vm.feeAssetID,
+		kc,
+		toSpend,
+		feeCalc,
+		changeAddr,
+	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	for assetID, amountSpent := range amountsSpent {
-		amountToSend := amounts[assetID]
-		if amountSpent > amountToSend {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amountSpent - amountToSend,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
 	}
 
 	codec := s.vm.parser.Codec()

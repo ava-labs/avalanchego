@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -25,7 +26,7 @@ var (
 )
 
 type Spender interface {
-	// Spend the provided amount while deducting the provided fee.
+	// FinanceTx the provided amount while deducting the provided fee.
 	// Arguments:
 	// - [utxos] contains assets ID and amount to be spend for each assestID
 	// - [kc] are the owners of the funds
@@ -33,14 +34,18 @@ type Spender interface {
 	// Returns:
 	// - [amountsSpent] the amount of funds that are spent
 	// - [inputs] the inputs that should be consumed to fund the outputs
+	// - [outputs] the outputs that should be generated
 	// - [signers] the proof of ownership of the funds being moved
-	Spend(
+	FinanceTx(
 		utxos []*avax.UTXO,
+		feeAssetID ids.ID,
 		kc *secp256k1fx.Keychain,
 		amounts map[ids.ID]uint64,
+		feeCalc *fees.Calculator,
+		changeAddr ids.ShortID,
 	) (
-		map[ids.ID]uint64, // amountsSpent
 		[]*avax.TransferableInput, // inputs
+		[]*avax.TransferableOutput, // outputs
 		[][]*secp256k1.PrivateKey, // signers
 		error,
 	)
@@ -106,25 +111,34 @@ type spender struct {
 	codec codec.Manager
 }
 
-func (s *spender) Spend(
+func (s *spender) FinanceTx(
 	utxos []*avax.UTXO,
+	feeAssetID ids.ID,
 	kc *secp256k1fx.Keychain,
-	amounts map[ids.ID]uint64,
+	toSpend map[ids.ID]uint64,
+	feeCalc *fees.Calculator,
+	changeAddr ids.ShortID,
 ) (
-	map[ids.ID]uint64, // amountsSpent
 	[]*avax.TransferableInput, // inputs
+	[]*avax.TransferableOutput, // outputs
 	[][]*secp256k1.PrivateKey, // signers
 	error,
 ) {
-	amountsSpent := make(map[ids.ID]uint64, len(amounts))
+	amountWithFee, err := math.Add64(toSpend[feeAssetID], feeCalc.Fee)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("problem calculating required spend amount: %w", err)
+	}
+	toSpend[feeAssetID] = amountWithFee
+
+	spent := make(map[ids.ID]uint64, len(toSpend))
 	time := s.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*secp256k1.PrivateKey{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		amount := amounts[assetID]
-		amountSpent := amountsSpent[assetID]
+		amount := toSpend[assetID]
+		amountSpent := spent[assetID]
 
 		if amountSpent >= amount {
 			// we already have enough inputs allocated to this asset
@@ -146,7 +160,7 @@ func (s *spender) Spend(
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
-		amountsSpent[assetID] = newAmountSpent
+		spent[assetID] = newAmountSpent
 
 		// add the new input to the array
 		ins = append(ins, &avax.TransferableInput{
@@ -158,18 +172,36 @@ func (s *spender) Spend(
 		keys = append(keys, signers)
 	}
 
-	for asset, amount := range amounts {
-		if amountsSpent[asset] < amount {
+	for asset, amount := range toSpend {
+		if spent[asset] < amount {
 			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
 				amount,
 				asset,
-				amountsSpent[asset],
+				spent[asset],
 			)
 		}
 	}
 
+	outs := []*avax.TransferableOutput{}
+	for assetID, amountSpent := range spent {
+		amountToSend := toSpend[assetID]
+		if amountSpent > amountToSend {
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: assetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amountSpent - amountToSend,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{changeAddr},
+					},
+				},
+			})
+		}
+	}
+
 	avax.SortTransferableInputsWithSigners(ins, keys)
-	return amountsSpent, ins, keys, nil
+	return ins, outs, keys, nil
 }
 
 func (s *spender) SpendNFT(
