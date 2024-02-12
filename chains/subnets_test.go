@@ -22,12 +22,12 @@ func TestNewSubnets(t *testing.T) {
 	subnets, err := NewSubnets(ids.EmptyNodeID, config)
 	require.NoError(err)
 
-	subnet, ok := subnets.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-	require.Equal(subnet.Config(), config[constants.PrimaryNetworkID])
+	subnet, ok := subnets.GetOrCreate(constants.PrimaryNetworkID)
+	require.False(ok)
+	require.Equal(config[constants.PrimaryNetworkID], subnet.Config())
 }
 
-func TestNewSubnets_NoPrimaryNetworkConfig(t *testing.T) {
+func TestNewSubnetsNoPrimaryNetworkConfig(t *testing.T) {
 	require := require.New(t)
 	config := map[ids.ID]subnets.Config{}
 
@@ -35,21 +35,21 @@ func TestNewSubnets_NoPrimaryNetworkConfig(t *testing.T) {
 	require.ErrorIs(err, ErrNoPrimaryNetworkConfig)
 }
 
-func TestSubnetsAdd(t *testing.T) {
+func TestSubnetsGetOrCreate(t *testing.T) {
 	testSubnetID := ids.GenerateTestID()
 
-	type add struct {
+	type args struct {
 		subnetID ids.ID
 		want     bool
 	}
 
 	tests := []struct {
 		name string
-		adds []add
+		args []args
 	}{
 		{
 			name: "adding duplicate subnet is a noop",
-			adds: []add{
+			args: []args{
 				{
 					subnetID: testSubnetID,
 					want:     true,
@@ -61,7 +61,7 @@ func TestSubnetsAdd(t *testing.T) {
 		},
 		{
 			name: "adding unique subnets succeeds",
-			adds: []add{
+			args: []args{
 				{
 					subnetID: ids.GenerateTestID(),
 					want:     true,
@@ -87,9 +87,9 @@ func TestSubnetsAdd(t *testing.T) {
 			subnets, err := NewSubnets(ids.EmptyNodeID, config)
 			require.NoError(err)
 
-			for _, add := range tt.adds {
-				got := subnets.Add(add.subnetID)
-				require.Equal(got, add.want)
+			for _, arg := range tt.args {
+				_, got := subnets.GetOrCreate(arg.subnetID)
+				require.Equal(arg.want, got)
 			}
 		})
 	}
@@ -138,10 +138,7 @@ func TestSubnetConfigs(t *testing.T) {
 			subnets, err := NewSubnets(ids.EmptyNodeID, tt.config)
 			require.NoError(err)
 
-			ok := subnets.Add(tt.subnetID)
-			require.True(ok)
-
-			subnet, ok := subnets.Get(tt.subnetID)
+			subnet, ok := subnets.GetOrCreate(tt.subnetID)
 			require.True(ok)
 
 			require.Equal(tt.want, subnet.Config())
@@ -162,8 +159,7 @@ func TestSubnetsBootstrapping(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
 
-	subnets.Add(subnetID)
-	subnet, ok := subnets.Get(subnetID)
+	subnet, ok := subnets.GetOrCreate(subnetID)
 	require.True(ok)
 
 	// Start bootstrapping

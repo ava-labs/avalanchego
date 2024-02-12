@@ -23,14 +23,14 @@ type Subnets struct {
 	subnets map[ids.ID]subnets.Subnet
 }
 
-// Add a subnet that is being run on this node. Returns if the subnet was added
-// or not.
-func (s *Subnets) Add(subnetID ids.ID) bool {
+// GetOrCreate returns a subnet running on this node, or creates one if it was
+// not running before. Returns the subnet and if the subnet was created.
+func (s *Subnets) GetOrCreate(subnetID ids.ID) (subnets.Subnet, bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if _, ok := s.subnets[subnetID]; ok {
-		return false
+	if subnet, ok := s.subnets[subnetID]; ok {
+		return subnet, false
 	}
 
 	// Default to the primary network config if a subnet config was not
@@ -40,18 +40,10 @@ func (s *Subnets) Add(subnetID ids.ID) bool {
 		config = s.configs[constants.PrimaryNetworkID]
 	}
 
-	s.subnets[subnetID] = subnets.New(s.nodeID, config)
-	return true
-}
+	subnet := subnets.New(s.nodeID, config)
+	s.subnets[subnetID] = subnet
 
-// Get returns a subnet if it is being run on this node. Returns the subnet
-// if it was present.
-func (s *Subnets) Get(subnetID ids.ID) (subnets.Subnet, bool) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	subnet, ok := s.subnets[subnetID]
-	return subnet, ok
+	return subnet, true
 }
 
 // Bootstrapping returns the subnetIDs of any chains that are still
@@ -85,6 +77,6 @@ func NewSubnets(
 		subnets: make(map[ids.ID]subnets.Subnet),
 	}
 
-	_ = s.Add(constants.PrimaryNetworkID)
+	_, _ = s.GetOrCreate(constants.PrimaryNetworkID)
 	return s, nil
 }

@@ -284,8 +284,7 @@ func New(config *ManagerConfig) Manager {
 // QueueChainCreation queues a chain creation request
 // Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
-	_ = m.Subnets.Add(chainParams.SubnetID)
-	if sb, _ := m.Subnets.Get(chainParams.SubnetID); !sb.AddChain(chainParams.ID) {
+	if sb, _ := m.Subnets.GetOrCreate(chainParams.SubnetID); !sb.AddChain(chainParams.ID) {
 		m.Log.Debug("skipping chain creation",
 			zap.String("reason", "chain already staged"),
 			zap.Stringer("subnetID", chainParams.SubnetID),
@@ -316,7 +315,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	sb, _ := m.Subnets.Get(chainParams.SubnetID)
+	sb, _ := m.Subnets.GetOrCreate(chainParams.SubnetID)
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -1332,10 +1331,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// Add the P-Chain to the Primary Network
-	sb, ok := m.Subnets.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return errPrimaryNetworkNotRunning
-	}
+	sb, _ := m.Subnets.GetOrCreate(constants.PrimaryNetworkID)
 	sb.AddChain(platformParams.ID)
 
 	// The P-chain is created synchronously to ensure that `VM.Initialize` has
