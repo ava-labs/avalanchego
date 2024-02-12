@@ -45,6 +45,7 @@ func TestBuildBlockBasic(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -118,6 +119,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -238,6 +240,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -305,6 +308,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -325,6 +329,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[1]},
 		preFundedKeys[1].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -345,6 +350,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
 		preFundedKeys[2].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx3))
@@ -411,6 +417,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -434,6 +441,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[2]},
 		preFundedKeys[2].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -479,6 +487,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()

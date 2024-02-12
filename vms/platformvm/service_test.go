@@ -209,6 +209,7 @@ func TestGetTxStatus(t *testing.T) {
 		ids.ShortEmpty,
 		[]*secp256k1.PrivateKey{recipientKey},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -261,6 +262,7 @@ func TestGetTx(t *testing.T) {
 					"chain name",
 					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 					keys[0].PublicKey().Address(), // change addr
+					nil,
 				)
 			},
 		},
@@ -280,6 +282,7 @@ func TestGetTx(t *testing.T) {
 					0,
 					[]*secp256k1.PrivateKey{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
+					nil,
 				)
 			},
 		},
@@ -292,6 +295,7 @@ func TestGetTx(t *testing.T) {
 					ids.GenerateTestShortID(),
 					[]*secp256k1.PrivateKey{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
+					nil,
 				)
 			},
 		},
@@ -480,6 +484,7 @@ func TestGetStake(t *testing.T) {
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -535,6 +540,7 @@ func TestGetStake(t *testing.T) {
 		0,
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -613,6 +619,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
+		nil,
 	)
 	require.NoError(err)
 
@@ -746,6 +753,7 @@ func TestGetBlock(t *testing.T) {
 				"chain name",
 				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 				keys[0].PublicKey().Address(), // change addr
+				nil,
 			)
 			require.NoError(err)
 
