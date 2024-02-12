@@ -10,21 +10,19 @@ import (
 
 var _ Consensus = (*Flat)(nil)
 
-func NewFlat(factory ConsensusFactory, params Parameters, choice ids.ID) Consensus {
-	sf := factory.New(params, choice)
-
+func NewFlat(factory Factory, params Parameters, choice ids.ID) Consensus {
 	return &Flat{
-		NnarySnow: sf,
-		params:    params,
+		Nnary:  factory.NewNnary(params, choice),
+		params: params,
 	}
 }
 
 // Flat is a naive implementation of a multi-choice snow instance
 type Flat struct {
-	// wraps the n-nary snowball logic
-	NnarySnow
+	// wraps the n-nary snow logic
+	Nnary
 
-	// params contains all the configurations of a snowball instance
+	// params contains all the configurations of a snow instance
 	params Parameters
 }
 

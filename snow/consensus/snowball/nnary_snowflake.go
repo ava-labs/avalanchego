@@ -9,22 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	_ NnarySnow        = (*nnarySnowflake)(nil)
-	_ ConsensusFactory = (SnowflakeFactory{})
-)
-
-type SnowflakeFactory struct{}
-
-func (SnowflakeFactory) New(params Parameters, choice ids.ID) NnarySnow {
-	sf := newNnarySnowflake(params.BetaVirtuous, params.BetaRogue, choice)
-	return &sf
-}
-
-func (SnowflakeFactory) NewUnary(params Parameters) UnarySnow {
-	sf := newUnarySnowflake(params.BetaVirtuous)
-	return &sf
-}
+var _ Nnary = (*nnarySnowflake)(nil)
 
 func newNnarySnowflake(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowflake {
 	return nnarySnowflake{

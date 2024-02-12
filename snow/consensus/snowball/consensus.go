@@ -40,19 +40,19 @@ type Consensus interface {
 	Finalized() bool
 }
 
-// ConsensusFactory produces NnarySnowflake instances
-type ConsensusFactory interface {
-	New(params Parameters, choice ids.ID) NnarySnow
-	NewUnary(params Parameters) UnarySnow
+// Factory produces Nnary and Unary decision instances
+type Factory interface {
+	NewNnary(params Parameters, choice ids.ID) Nnary
+	NewUnary(params Parameters) Unary
 }
 
-// NnarySnow is a snow instance deciding between an unbounded number
+// Nnary is a snow instance deciding between an unbounded number
 // of values.
 // The caller samples k nodes and then calls
 // 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
 // 2. RecordPollPreference if choice collects >= alphaPreference votes
 // 3. RecordUnsuccessfulPoll otherwise
-type NnarySnow interface {
+type Nnary interface {
 	fmt.Stringer
 
 	// Adds a new possible choice
@@ -77,12 +77,12 @@ type NnarySnow interface {
 	Finalized() bool
 }
 
-// BinarySnow is a snow instance deciding between two values.
+// Binary is a snow instance deciding between two values.
 // The caller samples k nodes and then calls
 // 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
 // 2. RecordPollPreference if choice collects >= alphaPreference votes
 // 3. RecordUnsuccessfulPoll otherwise
-type BinarySnow interface {
+type Binary interface {
 	fmt.Stringer
 
 	// Returns the currently preferred choice to be finalized
@@ -103,12 +103,12 @@ type BinarySnow interface {
 	Finalized() bool
 }
 
-// UnarySnow is a snow instance deciding on one value.
+// Unary is a snow instance deciding on one value.
 // The caller samples k nodes and then calls
 // 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
 // 2. RecordPollPreference if choice collects >= alphaPreference votes
 // 3. RecordUnsuccessfulPoll otherwise
-type UnarySnow interface {
+type Unary interface {
 	fmt.Stringer
 
 	// RecordSuccessfulPoll records a successful poll that reaches an alpha
@@ -127,8 +127,8 @@ type UnarySnow interface {
 
 	// Returns a new binary snowball instance with the agreement parameters
 	// transferred. Takes in the new beta value and the original choice
-	Extend(beta, originalPreference int) BinarySnow
+	Extend(beta, originalPreference int) Binary
 
 	// Returns a new unary snowflake instance with the same state
-	Clone() UnarySnow
+	Clone() Unary
 }

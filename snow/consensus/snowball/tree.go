@@ -17,18 +17,16 @@ var (
 	_ node      = (*binaryNode)(nil)
 )
 
-func NewTree(cf ConsensusFactory, params Parameters, choice ids.ID) Consensus {
-	sf := cf.NewUnary(params)
-
+func NewTree(factory Factory, params Parameters, choice ids.ID) Consensus {
 	t := &Tree{
-		params: params,
-		cf:     cf,
+		params:  params,
+		factory: factory,
 	}
 	t.node = &unaryNode{
 		tree:         t,
 		preference:   choice,
 		commonPrefix: ids.NumBits, // The initial state has no conflicts
-		snow:         sf,
+		snow:         factory.NewUnary(params),
 	}
 
 	return t
@@ -54,8 +52,8 @@ type Tree struct {
 	// RecordUnsuccessfulPoll before performing any other action.
 	shouldReset bool
 
-	// cf is used to produce new snow instances as needed
-	cf ConsensusFactory
+	// factory is used to produce new snow instances as needed
+	factory Factory
 }
 
 func (t *Tree) Add(choice ids.ID) {
@@ -157,8 +155,8 @@ type unaryNode struct {
 	// references
 	commonPrefix int // Will be in the range (decidedPrefix, 256)
 
-	// snow wraps the snow logic
-	snow UnarySnow
+	// snow wraps the unary decision logic
+	snow Unary
 
 	// shouldReset is used as an optimization to prevent needless tree
 	// traversals. It is the continuation of shouldReset in the Tree struct.
@@ -358,7 +356,7 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	b.preferences[bit] = u.preference
 	b.preferences[1-bit] = newChoice
 
-	newChildSnow := u.tree.cf.NewUnary(u.tree.params)
+	newChildSnow := u.tree.factory.NewUnary(u.tree.params)
 	newChild := &unaryNode{
 		tree:          u.tree,
 		preference:    newChoice,
@@ -484,8 +482,8 @@ type binaryNode struct {
 	// bit is the index in the id of the choice this node is deciding on
 	bit int // Will be in the range [0, 256)
 
-	// snow wraps the snow logic
-	snow BinarySnow
+	// snow wraps the binary decision logic
+	snow Binary
 
 	// shouldReset is used as an optimization to prevent needless tree
 	// traversals. It is the continuation of shouldReset in the Tree struct.
