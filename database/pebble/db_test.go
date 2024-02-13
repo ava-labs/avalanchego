@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -64,8 +63,6 @@ func BenchmarkInterface(b *testing.B) {
 }
 
 func TestKeyRange(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		start         []byte
 		prefix        []byte
@@ -150,6 +147,7 @@ func TestKeyRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.start)+" "+string(tt.prefix), func(t *testing.T) {
+			require := require.New(t)
 			bounds := keyRange(tt.start, tt.prefix)
 			require.Equal(tt.expectedLower, bounds.LowerBound)
 			require.Equal(tt.expectedUpper, bounds.UpperBound)

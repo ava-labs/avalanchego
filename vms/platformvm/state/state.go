@@ -12,10 +12,8 @@ import (
 	"time"
 
 	"github.com/google/btree"
-
-	"go.uber.org/zap"
-
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"

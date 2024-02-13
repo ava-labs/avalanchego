@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/units"
+
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 

@@ -197,7 +197,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, accepted ids.ID) {
+	sender.SendChitsF = func(_ context.Context, _ ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, accepted ids.ID) {
 		require.False(*chitted)
 		*chitted = true
 		require.Equal(uint32(15), requestID)
@@ -705,7 +705,7 @@ func TestEngineBuildBlock(t *testing.T) {
 		}
 	}
 
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
+	sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64) {
 		require.FailNow("should not be sending pulls when we are the block producer")
 	}
 

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -924,7 +923,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			reward.PercentDenominator, // shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
-			nil,            // key
+			nil,
 		)
 		require.NoError(err)
 
@@ -965,7 +964,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator, // shares
-			[]*secp256k1.PrivateKey{preFundedKeys[0]}, // key
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 			nil,
 		)

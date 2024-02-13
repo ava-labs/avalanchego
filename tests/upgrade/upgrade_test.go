@@ -9,9 +9,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-
 	"github.com/onsi/gomega"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"

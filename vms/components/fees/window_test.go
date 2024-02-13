@@ -47,7 +47,7 @@ func TestWindowRoll(t *testing.T) {
 
 	// check that overolling wipes all window out
 	overRolledWin := Roll(win, WindowSize+1)
-	require.Equal(overRolledWin, Window{})
+	require.Equal(Window{}, overRolledWin)
 }
 
 func TestSum(t *testing.T) {

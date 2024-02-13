@@ -13,13 +13,9 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/semaphore"
-
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (

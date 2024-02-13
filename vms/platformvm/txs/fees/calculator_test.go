@@ -209,7 +209,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: addSubnetValidatorTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "AddDelegatorTx pre E fork",
@@ -311,7 +311,7 @@ func TestTxFees(t *testing.T) {
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "CreateSubnetTx pre E fork",
@@ -377,7 +377,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: createSubnetTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "RemoveSubnetValidatorTx pre E fork",
@@ -443,7 +443,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: removeSubnetValidatorTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "TransformSubnetTx pre E fork",
@@ -509,7 +509,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: transformSubnetTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "TransferSubnetOwnershipTx pre E fork",
@@ -575,7 +575,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: transferSubnetOwnershipTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "AddPermissionlessValidatorTx pre E fork",
@@ -641,7 +641,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: addPermissionlessValidatorTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "AddPermissionlessDelegatorTx pre E fork",
@@ -707,7 +707,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: addPermissionlessDelegatorTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "BaseTx pre E fork",
@@ -773,7 +773,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: baseTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "ImportTx pre E fork",
@@ -839,7 +839,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: importTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 		{
 			description: "ExportTx pre E fork",
@@ -905,7 +905,7 @@ func TestTxFees(t *testing.T) {
 			},
 			unsignedAndSignedTx: exportTx,
 			expectedError:       errFailedConsumedUnitsCumulation,
-			checksF:             func(t *testing.T, fc *Calculator) {},
+			checksF:             func(*testing.T, *Calculator) {},
 		},
 	}
 
