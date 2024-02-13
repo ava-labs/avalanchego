@@ -5,7 +5,7 @@ package snowball
 
 import "fmt"
 
-var _ UnarySnowflake = (*unarySnowflake)(nil)
+var _ Unary = (*unarySnowflake)(nil)
 
 func newUnarySnowflake(beta int) unarySnowflake {
 	return unarySnowflake{
@@ -33,6 +33,13 @@ func (sf *unarySnowflake) RecordSuccessfulPoll() {
 	sf.finalized = sf.finalized || sf.confidence >= sf.beta
 }
 
+// RecordPollPreference fails to reach an alpha threshold to increase our
+// confidence, so this calls RecordUnsuccessfulPoll to reset the confidence
+// counter.
+func (sf *unarySnowflake) RecordPollPreference() {
+	sf.RecordUnsuccessfulPoll()
+}
+
 func (sf *unarySnowflake) RecordUnsuccessfulPoll() {
 	sf.confidence = 0
 }
@@ -41,7 +48,7 @@ func (sf *unarySnowflake) Finalized() bool {
 	return sf.finalized
 }
 
-func (sf *unarySnowflake) Extend(beta int, choice int) BinarySnowflake {
+func (sf *unarySnowflake) Extend(beta int, choice int) Binary {
 	return &binarySnowflake{
 		binarySlush: binarySlush{preference: choice},
 		confidence:  sf.confidence,
@@ -50,7 +57,7 @@ func (sf *unarySnowflake) Extend(beta int, choice int) BinarySnowflake {
 	}
 }
 
-func (sf *unarySnowflake) Clone() UnarySnowflake {
+func (sf *unarySnowflake) Clone() Unary {
 	newSnowflake := *sf
 	return &newSnowflake
 }

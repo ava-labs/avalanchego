@@ -15,9 +15,7 @@ import (
 	"time"
 
 	"github.com/pires/go-proxyproto"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"

@@ -12,9 +12,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	dto "github.com/prometheus/client_model/go"
-
 	"github.com/ava-labs/avalanchego/utils/metric"
+
+	dto "github.com/prometheus/client_model/go"
 )
 
 var (

@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySnowball = (*nnarySnowball)(nil)
+var _ Nnary = (*nnarySnowball)(nil)
 
 func newNnarySnowball(betaVirtuous, betaRogue int, choice ids.ID) nnarySnowball {
 	return nnarySnowball{
