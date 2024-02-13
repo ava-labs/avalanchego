@@ -136,7 +136,7 @@ func TestBaseTxFees(t *testing.T) {
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -257,7 +257,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -378,7 +378,7 @@ func TestOperationTxFees(t *testing.T) {
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -495,7 +495,7 @@ func TestImportTxFees(t *testing.T) {
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -602,7 +602,7 @@ func TestExportTxFees(t *testing.T) {
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 

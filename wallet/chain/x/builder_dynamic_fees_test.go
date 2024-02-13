@@ -4,7 +4,6 @@
 package x
 
 import (
-	stdcontext "context"
 	"math"
 	"testing"
 	"time"
@@ -26,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/x/mocks"
 
+	stdcontext "context"
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 

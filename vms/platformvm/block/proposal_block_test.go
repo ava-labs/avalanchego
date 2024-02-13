@@ -98,7 +98,7 @@ func TestNewApricotProposalBlock(t *testing.T) {
 	expectedTxs := []*txs.Tx{proposalTx}
 
 	blkTxs := blk.Txs()
-	require.Equal(blkTxs, expectedTxs)
+	require.Equal(expectedTxs, blkTxs)
 	for i, blkTx := range blkTxs {
 		expectedTx := expectedTxs[i]
 		require.NotEmpty(blkTx.Bytes())
