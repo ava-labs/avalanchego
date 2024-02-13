@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -30,15 +31,17 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer) (*SignedIP, error) {
+func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer, blsSigner *bls.SecretKey) (*SignedIP, error) {
+	ipBytes := ip.bytes()
 	tlsSignature, err := tlsSigner.Sign(
 		rand.Reader,
-		hashing.ComputeHash256(ip.bytes()),
+		hashing.ComputeHash256(ipBytes),
 		crypto.SHA256,
 	)
 	return &SignedIP{
 		UnsignedIP:   *ip,
 		TLSSignature: tlsSignature,
+		BLSSignature: bls.SignProofOfPossession(blsSigner, ipBytes),
 	}, err
 }
 
@@ -55,6 +58,7 @@ func (ip *UnsignedIP) bytes() []byte {
 type SignedIP struct {
 	UnsignedIP
 	TLSSignature []byte
+	BLSSignature *bls.Signature
 }
 
 // Returns nil if:

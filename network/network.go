@@ -268,7 +268,7 @@ func NewNetwork(
 		ObjectedACPs:         config.ObjectedACPs.List(),
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),
+		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
 	}
 
 	// Invariant: We delay the activation of durango during the TLS handshake to
