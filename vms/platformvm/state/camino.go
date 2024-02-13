@@ -72,7 +72,7 @@ var (
 )
 
 type CaminoApply interface {
-	ApplyCaminoState(State)
+	ApplyCaminoState(State) error
 }
 
 type CaminoDiff interface {

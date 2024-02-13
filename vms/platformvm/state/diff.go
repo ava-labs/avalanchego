@@ -550,6 +550,5 @@ func (d *diff) Apply(baseState State) error {
 			baseState.DeleteUTXO(utxoID)
 		}
 	}
-	d.ApplyCaminoState(baseState)
-	return nil
+	return d.ApplyCaminoState(baseState)
 }

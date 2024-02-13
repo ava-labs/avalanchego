@@ -1516,7 +1516,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name+" On abort", func(t *testing.T) {
 			txExecutor, tx := execute(t, tt)
-			txExecutor.OnAbortState.Apply(env.state)
+			require.NoError(t, txExecutor.OnAbortState.Apply(env.state))
 			env.state.SetHeight(uint64(1))
 			err = env.state.Commit()
 			require.NoError(t, err)
@@ -1524,7 +1524,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 		})
 		t.Run(name+" On commit", func(t *testing.T) {
 			txExecutor, tx := execute(t, tt)
-			txExecutor.OnCommitState.Apply(env.state)
+			require.NoError(t, txExecutor.OnCommitState.Apply(env.state))
 			env.state.SetHeight(uint64(1))
 			err = env.state.Commit()
 			require.NoError(t, err)
@@ -1549,7 +1549,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 
 	t.Run("Happy path on commit", func(t *testing.T) {
 		txExecutor, tx := execute(t, happyPathTest)
-		txExecutor.OnCommitState.Apply(env.state)
+		require.NoError(t, txExecutor.OnCommitState.Apply(env.state))
 		env.state.SetHeight(uint64(1))
 		err = env.state.Commit()
 		require.NoError(t, err)
@@ -1571,7 +1571,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 			}
 		}
 		txExecutor, tx := execute(t, happyPathTest)
-		txExecutor.OnAbortState.Apply(env.state)
+		require.NoError(t, txExecutor.OnAbortState.Apply(env.state))
 		env.state.SetHeight(uint64(1))
 		err = env.state.Commit()
 		require.NoError(t, err)

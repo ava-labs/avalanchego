@@ -147,9 +147,11 @@ func (mr *MockDiffMockRecorder) Apply(arg0 interface{}) *gomock.Call {
 }
 
 // ApplyCaminoState mocks base method.
-func (m *MockDiff) ApplyCaminoState(arg0 State) {
+func (m *MockDiff) ApplyCaminoState(arg0 State) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ApplyCaminoState", arg0)
+	ret := m.ctrl.Call(m, "ApplyCaminoState", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // ApplyCaminoState indicates an expected call of ApplyCaminoState.
