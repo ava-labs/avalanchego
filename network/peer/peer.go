@@ -700,7 +700,7 @@ func (p *peer) sendNetworkMessages() {
 				return
 			}
 
-			if !p.finishedHandshake.Get() {
+			if p.finishedHandshake.Get() {
 				if err := p.VersionCompatibility.Compatible(p.version); err != nil {
 					p.Log.Debug("disconnecting from peer",
 						zap.String("reason", "version not compatible"),
