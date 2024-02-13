@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -41,8 +42,8 @@ import (
 )
 
 const (
-	testTxFee    uint64 = 1000
-	startBalance uint64 = 50000
+	testTxFee    uint64 = units.MicroAvax
+	startBalance uint64 = 50 * units.MicroAvax
 
 	username       = "bobby"
 	password       = "StrnasfqewiurPasswdn56d" //#nosec G101

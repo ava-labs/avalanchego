@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -142,11 +144,18 @@ func (fc *Calculator) meterTx(
 	// meter credentials, one by one. Then account for the extra bytes needed to
 	// serialize a slice of credentials (codec version bytes + slice size bytes)
 	for i, cred := range fc.Credentials {
-		c, ok := cred.Credential.(*secp256k1fx.Credential)
-		if !ok {
+		var keysCount int
+		switch c := cred.Credential.(type) {
+		case *secp256k1fx.Credential:
+			keysCount = len(c.Sigs)
+		case *propertyfx.Credential:
+			keysCount = len(c.Sigs)
+		case *nftfx.Credential:
+			keysCount = len(c.Sigs)
+		default:
 			return consumedUnits, fmt.Errorf("don't know how to calculate complexity of %T", cred)
 		}
-		credDimensions, err := fees.MeterCredential(fc.Codec, txs.CodecVersion, len(c.Sigs))
+		credDimensions, err := fees.MeterCredential(fc.Codec, txs.CodecVersion, keysCount)
 		if err != nil {
 			return consumedUnits, fmt.Errorf("failed adding credential %d: %w", i, err)
 		}
