@@ -1150,6 +1150,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
+	// TODO: After v1.11.x is activated, require the key to be provided.
 	if len(msg.IpBlsSig) > 0 {
 		signature, err := bls.SignatureFromBytes(msg.IpBlsSig)
 		if err != nil {
