@@ -299,7 +299,8 @@ type Node struct {
 	chainFactory *chains.Factory
 
 	// Manages creation of blockchains and routing messages to them
-	chainManager chains.Manager
+	chainManager            chains.Manager
+	unblockChainCreatorChan chan struct{}
 
 	// Manages validator benching
 	benchlistManager benchlist.Manager
@@ -875,12 +876,14 @@ func (n *Node) initPlatformChain() error {
 		vdrs = validators.NewManager()
 	}
 
-	platformvmFactory := &platformvm.Factory{
+	platformVM := &platformvm.VM{
 		Config: platformconfig.Config{
 			Chains:                        n.chainManager,
 			Validators:                    vdrs,
 			UptimeLockedCalculator:        n.uptimeCalculator,
 			SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
+			TracingEnabled:                n.Config.TraceConfig.Enabled,
+			Tracer:                        n.tracer,
 			PartialSyncPrimaryNetwork:     n.Config.PartialSyncPrimaryNetwork,
 			TrackedSubnets:                n.Config.TrackedSubnets,
 			TxFee:                         n.Config.TxFee,
@@ -909,6 +912,23 @@ func (n *Node) initPlatformChain() error {
 		},
 	}
 
+	platformvmFactory := &platformvm.Factory{
+		VM: platformVM,
+	}
+
+	validatorState := validators.State(platformVM)
+	if n.Config.TraceConfig.Enabled {
+		validatorState = validators.Trace(platformVM, "platformvm", n.tracer)
+	}
+
+	if !n.Config.SybilProtectionEnabled {
+		validatorState = validators.NewNoValidatorsState(validatorState)
+	}
+
+	onPlatformVMBootstrapped := func() {
+		close(n.unblockChainCreatorChan)
+	}
+
 	platformChain, err := n.chainFactory.New(
 		constants.PlatformChainID,
 		constants.PrimaryNetworkID,
@@ -917,6 +937,9 @@ func (n *Node) initPlatformChain() error {
 		n.Config.GenesisBytes,
 		n.bootstrappers,
 		platformvmFactory,
+		validatorState,
+		onPlatformVMBootstrapped,
+		platformVM,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to build platform chain: %w", err)
@@ -1108,7 +1131,7 @@ func (n *Node) initChainManager() error {
 	}
 
 	chainAliases := ids.NewAliaser()
-	unblockChainCreatorChan := make(chan struct{})
+	n.unblockChainCreatorChan = make(chan struct{})
 	n.chainFactory = chains.NewFactory(
 		chains.FactoryConfig{
 			NetworkID:                               n.Config.NetworkID,
@@ -1154,7 +1177,7 @@ func (n *Node) initChainManager() error {
 		n.MetricsGatherer,
 		n.resourceTracker,
 		n.subnets,
-		unblockChainCreatorChan,
+		n.unblockChainCreatorChan,
 	)
 
 	n.chainManager = chains.New(
@@ -1173,7 +1196,7 @@ func (n *Node) initChainManager() error {
 			Aliaser:                   chainAliases,
 			Subnets:                   n.subnets,
 			Factory:                   n.chainFactory,
-			UnblockChainCreatorCh:     unblockChainCreatorChan,
+			UnblockChainCreatorCh:     n.unblockChainCreatorChan,
 		},
 	)
 

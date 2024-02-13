@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/chaincreator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -16,6 +17,7 @@ import (
 
 type Backend struct {
 	Config       *config.Config
+	ChainCreator chaincreator.Interface
 	Ctx          *snow.Context
 	Clk          *mockable.Clock
 	Fx           fx.Fx

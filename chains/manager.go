@@ -142,6 +142,8 @@ type ChainParameters struct {
 	VMID ids.ID
 	// The IDs of the feature extensions this chain is running.
 	FxIDs []ids.ID
+	// The validator set the VM uses
+	Validators validators.State
 }
 
 type Chain struct {
@@ -259,6 +261,9 @@ func (m *manager) createChain(chainParams ChainParameters) (*Chain, error) {
 		chainParams.GenesisData,
 		m.Validators,
 		vmFactory,
+		chainParams.Validators,
+		nil,
+		validators.UnhandledSubnetConnector,
 	)
 }
 
@@ -312,6 +317,9 @@ func (f *Factory) New(
 	genesis []byte,
 	beacons validators.Manager,
 	vmFactory vms.Factory,
+	validators validators.State,
+	bootstrapFunc func(),
+	subnetConnector validators.SubnetConnector,
 ) (*Chain, error) {
 	if chainID != constants.PlatformChainID && vmID == constants.PlatformVMID {
 		return nil, errCreatePlatformVM
@@ -373,7 +381,7 @@ func (f *Factory) New(
 
 			WarpSigner: warp.NewSigner(f.stakingBLSKey, f.config.NetworkID, chainID),
 
-			ValidatorState: f.validatorState,
+			ValidatorState: validators,
 			ChainDataDir:   chainDataDir,
 		},
 		BlockAcceptor:       f.blockAcceptorGroup,
@@ -413,6 +421,8 @@ func (f *Factory) New(
 			vm,
 			chainFxs,
 			sb,
+			bootstrapFunc,
+			subnetConnector,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
@@ -426,6 +436,8 @@ func (f *Factory) New(
 			vm,
 			chainFxs,
 			sb,
+			bootstrapFunc,
+			subnetConnector,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
@@ -454,6 +466,8 @@ func (f *Factory) createAvalancheChain(
 	vm vertex.LinearizableVMWithEngine,
 	fxs []*common.Fx,
 	sb subnets.Subnet,
+	bootstrapFunc func(),
+	subnetConnector validators.SubnetConnector,
 ) (*Chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -698,7 +712,7 @@ func (f *Factory) createAvalancheChain(
 		f.config.FrontierPollFrequency,
 		f.config.ConsensusAppConcurrency,
 		f.resourceTracker,
-		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
+		subnetConnector,
 		sb,
 		connectedValidators,
 	)
@@ -761,6 +775,7 @@ func (f *Factory) createAvalancheChain(
 		AncestorsMaxContainersReceived: f.config.BootstrapAncestorsMaxContainersReceived,
 		Blocked:                        blockBlocker,
 		VM:                             vmWrappingProposerVM,
+		Bootstrapped:                   bootstrapFunc,
 	}
 	var snowmanBootstrapper common.BootstrapableEngine
 	snowmanBootstrapper, err = smbootstrap.New(
@@ -857,6 +872,8 @@ func (f *Factory) createSnowmanChain(
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	sb subnets.Subnet,
+	bootstrapFunc func(),
+	subnetConnector validators.SubnetConnector,
 ) (*Chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -905,54 +922,6 @@ func (f *Factory) createSnowmanChain(
 	)
 	if err != nil { // Set up the event dispatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
-	}
-
-	var (
-		bootstrapFunc   func()
-		subnetConnector = validators.UnhandledSubnetConnector
-	)
-	// If [f.validatorState] is nil then we are creating the P-Chain. Since the
-	// P-Chain is the first chain to be created, we can use it to initialize
-	// required interfaces for the other chains
-	if f.validatorState == nil {
-		valState, ok := vm.(validators.State)
-		if !ok {
-			return nil, fmt.Errorf("expected validators.State but got %T", vm)
-		}
-
-		if f.config.TracingEnabled {
-			valState = validators.Trace(valState, "platformvm", f.tracer)
-		}
-
-		// Notice that this context is left unlocked. This is because the
-		// lock will already be held when accessing these values on the
-		// P-chain.
-		ctx.ValidatorState = valState
-
-		// Initialize the validator state for future chains.
-		f.validatorState = validators.NewLockedState(&ctx.Lock, valState)
-		if f.config.TracingEnabled {
-			f.validatorState = validators.Trace(f.validatorState, "lockedState", f.tracer)
-		}
-
-		if !f.config.SybilProtectionEnabled {
-			f.validatorState = validators.NewNoValidatorsState(f.validatorState)
-			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
-		}
-
-		// Set this func only for platform
-		//
-		// The snowman bootstrapper ensures this function is only executed once, so
-		// we don't need to be concerned about closing this channel multiple times.
-		bootstrapFunc = func() {
-			close(f.unblockChainCreatorCh)
-		}
-
-		// Set up the subnet connector for the P-Chain
-		subnetConnector, ok = vm.(validators.SubnetConnector)
-		if !ok {
-			return nil, fmt.Errorf("expected validators.SubnetConnector but got %T", vm)
-		}
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it

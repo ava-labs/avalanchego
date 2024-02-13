@@ -10,10 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Struct collecting all foundational parameters of PlatformVM
@@ -34,6 +33,10 @@ type Config struct {
 
 	// True if the node is being run with staking enabled
 	SybilProtectionEnabled bool
+
+	TracingEnabled bool
+	// Should not be used unless TracingEnabled is true
+	Tracer trace.Tracer
 
 	// If true, only the P-chain will be instantiated on the primary network.
 	PartialSyncPrimaryNetwork bool
@@ -149,24 +152,4 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 		return c.CreateSubnetTxFee
 	}
 	return c.CreateAssetTxFee
-}
-
-// Create the blockchain described in [tx], but only if this node is a member of
-// the subnet that validates the chain
-func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
-	if c.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains
-		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
-		!c.TrackedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
-		return
-	}
-
-	chainParams := chains.ChainParameters{
-		ID:          chainID,
-		SubnetID:    tx.SubnetID,
-		GenesisData: tx.GenesisData,
-		VMID:        tx.VMID,
-		FxIDs:       tx.FxIDs,
-	}
-
-	c.Chains.QueueChainCreation(chainParams)
 }
