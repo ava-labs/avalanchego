@@ -133,9 +133,6 @@ type peer struct {
 
 	// ip is the claimed IP the peer gave us in the Handshake message.
 	ip *SignedIP
-	// txIDOfVerifiedBLSKey is the txID that added the BLS key that was most
-	// recently verified to have signed the IP.
-	txIDOfVerifiedBLSKey ids.ID
 	// version is the claimed version the peer is running that we received in
 	// the Handshake message.
 	version *version.Application
@@ -145,6 +142,14 @@ type peer struct {
 	// options of ACPs provided in the Handshake message.
 	supportedACPs set.Set[uint32]
 	objectedACPs  set.Set[uint32]
+
+	// txIDOfVerifiedBLSKey is the txID that added the BLS key that was most
+	// recently verified to have signed the IP.
+	//
+	// Invaraint: Prior to the handshake being completed, this can only be
+	// accessed by the reader goroutine. After the handshake has been completed,
+	// this can only be accessed by the message sender goroutine.
+	txIDOfVerifiedBLSKey ids.ID
 
 	observedUptimesLock sync.RWMutex
 	// [observedUptimesLock] must be held while accessing [observedUptime]
