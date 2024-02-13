@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -28,13 +28,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var utxoAmt = 10 * units.MilliAvax
+
 func TestIndexTransaction_Ordered(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
 			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 	})
 	defer func() {
@@ -81,7 +83,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
 			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 	})
 	defer func() {
@@ -132,7 +134,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
 			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 	})
 	defer func() {
@@ -269,7 +271,7 @@ func buildUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax
 		UTXOID: utxoID,
 		Asset:  txAssetID,
 		Out: &secp256k1fx.TransferOutput{
-			Amt: 1000,
+			Amt: utxoAmt,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
@@ -287,14 +289,14 @@ func buildTX(chainID ids.ID, utxoID avax.UTXOID, txAssetID avax.Asset, address .
 				UTXOID: utxoID,
 				Asset:  txAssetID,
 				In: &secp256k1fx.TransferInput{
-					Amt:   1000,
+					Amt:   utxoAmt,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
 				Out: &secp256k1fx.TransferOutput{
-					Amt: 1000,
+					Amt: units.MilliAvax, // TODO ABENEGIA: fix this to pay the exact amount of fees needed
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     address,
