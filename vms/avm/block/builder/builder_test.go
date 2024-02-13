@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -144,6 +142,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				return New(
 					&txexecutor.Backend{
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -189,6 +190,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				return New(
 					&txexecutor.Backend{
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -235,6 +239,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				return New(
 					&txexecutor.Backend{
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -328,6 +335,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Codec: codec,
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -400,6 +410,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Codec: codec,
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -474,6 +487,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Codec: codec,
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -528,7 +544,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 		Config: &config.Config{
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 		Codec: parser.Codec(),
 	}

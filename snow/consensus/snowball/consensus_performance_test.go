@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"gonum.org/v1/gonum/mathext/prng"
 )
 
@@ -30,10 +29,10 @@ func TestDualAlphaOptimization(t *testing.T) {
 		source        = prng.NewMT19937()
 	)
 
-	singleAlphaNetwork := NewNetwork(params, numColors, source)
+	singleAlphaNetwork := NewNetwork(SnowballFactory, params, numColors, source)
 
 	params.AlphaPreference = params.K/2 + 1
-	dualAlphaNetwork := NewNetwork(params, numColors, source)
+	dualAlphaNetwork := NewNetwork(SnowballFactory, params, numColors, source)
 
 	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
@@ -63,8 +62,8 @@ func TestTreeConvergenceOptimization(t *testing.T) {
 		source           = prng.NewMT19937()
 	)
 
-	treeNetwork := NewNetwork(params, numColors, source)
-	flatNetwork := NewNetwork(params, numColors, source)
+	treeNetwork := NewNetwork(SnowballFactory, params, numColors, source)
+	flatNetwork := NewNetwork(SnowballFactory, params, numColors, source)
 
 	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {

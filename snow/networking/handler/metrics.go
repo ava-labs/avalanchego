@@ -49,13 +49,13 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 			processingTime: metric.NewAveragerWithErrs(
 				namespace,
 				opStr,
-				fmt.Sprintf("time (in ns) spent handling a %s", opStr),
+				"time (in ns) spent handling a "+opStr,
 				reg,
 				&errs,
 			),
 			msgHandlingTime: metric.NewAveragerWithErrs(
 				namespace,
-				fmt.Sprintf("%s_msg_handling", opStr),
+				opStr+"_msg_handling",
 				fmt.Sprintf("time (in ns) spent handling a %s after grabbing the lock", opStr),
 				reg,
 				&errs,

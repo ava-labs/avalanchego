@@ -6,11 +6,8 @@ package x
 import (
 	"math/big"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -21,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {

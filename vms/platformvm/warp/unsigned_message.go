@@ -69,3 +69,7 @@ func (m *UnsignedMessage) Bytes() []byte {
 func (m *UnsignedMessage) ID() ids.ID {
 	return m.id
 }
+
+func (m *UnsignedMessage) String() string {
+	return fmt.Sprintf("UnsignedMessage(NetworkID = %d, SourceChainID = %s, Payload = %x)", m.NetworkID, m.SourceChainID, m.Payload)
+}

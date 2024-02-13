@@ -39,7 +39,7 @@ var (
 		3000,
 		3500,
 		1000,
-		1000,
+		2000,
 	}
 
 	feeTestsDefaultCfg = config.Config{
@@ -107,13 +107,13 @@ func TestBaseTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 2920*units.MicroAvax, fc.Fee)
+				require.Equal(t, 4920*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						224,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -132,11 +132,11 @@ func TestBaseTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -228,13 +228,13 @@ func TestCreateAssetTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 2985*units.MicroAvax, fc.Fee)
+				require.Equal(t, 4985*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						289,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -257,7 +257,7 @@ func TestCreateAssetTxFees(t *testing.T) {
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -349,13 +349,13 @@ func TestOperationTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3041*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5041*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						345,
-						1090,
+						90,
 						172,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -374,11 +374,11 @@ func TestOperationTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -466,13 +466,13 @@ func TestImportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 5494*units.MicroAvax, fc.Fee)
+				require.Equal(t, 9494*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						348,
-						2180,
+						180,
 						262,
-						0,
+						2000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -491,11 +491,11 @@ func TestImportTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 180 - 1
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 
@@ -573,13 +573,13 @@ func TestExportTxFees(t *testing.T) {
 			},
 			expectedError: nil,
 			checksF: func(t *testing.T, fc *Calculator) {
-				require.Equal(t, 3282*units.MicroAvax, fc.Fee)
+				require.Equal(t, 5282*units.MicroAvax, fc.Fee)
 				require.Equal(t,
 					fees.Dimensions{
 						340,
-						1090,
+						90,
 						254,
-						0,
+						1000,
 					},
 					fc.FeeManager.GetCumulatedUnits(),
 				)
@@ -598,11 +598,11 @@ func TestExportTxFees(t *testing.T) {
 			},
 			consumedUnitCapsF: func() fees.Dimensions {
 				caps := testBlockMaxConsumedUnits
-				caps[fees.UTXORead] = 1090 - 1
+				caps[fees.UTXORead] = 90 - 1
 				return caps
 			},
 			expectedError: errFailedConsumedUnitsCumulation,
-			checksF:       func(t *testing.T, fc *Calculator) {},
+			checksF:       func(*testing.T, *Calculator) {},
 		},
 	}
 

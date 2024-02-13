@@ -136,7 +136,7 @@ func (n *Network) readChainConfigs() error {
 			// No config file present
 			continue
 		}
-		chainConfig, err := ReadFlagsMap(configPath, fmt.Sprintf("%s chain config", chainAlias))
+		chainConfig, err := ReadFlagsMap(configPath, chainAlias+" chain config")
 		if err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ func (n *Network) writeChainConfigs() error {
 
 		// Write the file
 		path := filepath.Join(chainConfigDir, defaultConfigFilename)
-		if err := chainConfig.Write(path, fmt.Sprintf("%s chain config", chainAlias)); err != nil {
+		if err := chainConfig.Write(path, chainAlias+" chain config"); err != nil {
 			return err
 		}
 	}

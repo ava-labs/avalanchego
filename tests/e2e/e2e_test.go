@@ -6,12 +6,7 @@ package e2e_test
 import (
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
 	"github.com/onsi/gomega"
-
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
@@ -20,6 +15,11 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 func TestE2E(t *testing.T) {

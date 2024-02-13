@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt/v4"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -23,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 const (

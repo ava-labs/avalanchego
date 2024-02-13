@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
@@ -94,7 +93,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 
-		feeCfg     = config.EUpgradeDynamicFeesConfig
+		feeCfg     = b.backend.Config.GetDynamicFeesConfig(nextTimestamp)
 		feeManager = fees.NewManager(feeCfg.InitialUnitFees, fees.EmptyWindows)
 	)
 	for {

@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -133,7 +132,7 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	var (
-		feeCfg     = config.EUpgradeDynamicFeesConfig
+		feeCfg     = b.manager.backend.Config.GetDynamicFeesConfig(b.Timestamp())
 		unitFees   = stateDiff.GetUnitFees()
 		feeWindows = stateDiff.GetFeeWindows()
 		feeManager = fees.NewManager(unitFees, feeWindows)
