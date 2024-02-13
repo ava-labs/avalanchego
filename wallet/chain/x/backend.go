@@ -4,10 +4,10 @@
 package x
 
 import (
-	stdcontext "context"
-
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	stdcontext "context"
 )
 
 var _ Backend = (*backend)(nil)

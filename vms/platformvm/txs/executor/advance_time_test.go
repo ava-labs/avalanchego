@@ -383,6 +383,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 					subnetID,      // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
+					nil,
 				)
 				require.NoError(err)
 
@@ -477,6 +478,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		subnetID,                           // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -506,6 +508,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		subnetID,         // Subnet ID
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]}, // Keys
 		ids.ShortEmpty, // reward address
+		nil,
 	)
 	require.NoError(err)
 
@@ -582,6 +585,7 @@ func TestTrackedSubnet(t *testing.T) {
 				subnetID,                           // Subnet ID
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
+				nil,
 			)
 			require.NoError(err)
 
@@ -688,6 +692,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 			preFundedKeys[4],
 		},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -782,6 +787,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 		preFundedKeys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -895,6 +901,7 @@ func addPendingValidator(
 		reward.PercentDenominator,
 		keys,
 		ids.ShortEmpty,
+		nil,
 	)
 	if err != nil {
 		return nil, err

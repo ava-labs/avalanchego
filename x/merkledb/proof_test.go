@@ -56,7 +56,7 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 	tests := []test{
 		{
 			name:        "happyPath",
-			malform:     func(proof *Proof) {},
+			malform:     func(*Proof) {},
 			expectedErr: nil,
 		},
 		{
@@ -183,7 +183,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 	tests := []test{
 		{
 			name:        "happyPath",
-			malform:     func(proof *RangeProof) {},
+			malform:     func(*RangeProof) {},
 			expectedErr: nil,
 		},
 		{
@@ -828,7 +828,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 	tests := []test{
 		{
 			name:        "happyPath",
-			malform:     func(proof *ChangeProof) {},
+			malform:     func(*ChangeProof) {},
 			expectedErr: nil,
 		},
 		{

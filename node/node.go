@@ -22,10 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"go.uber.org/zap"
-
-	coreth "github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -88,6 +85,7 @@ import (
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
@@ -1117,51 +1115,58 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	n.chainManager = chains.New(&chains.ManagerConfig{
-		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
-		StakingTLSCert:                          n.Config.StakingTLSCert,
-		StakingBLSKey:                           n.Config.StakingSigningKey,
-		Log:                                     n.Log,
-		LogFactory:                              n.LogFactory,
-		VMManager:                               n.VMManager,
-		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
-		TxAcceptorGroup:                         n.TxAcceptorGroup,
-		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
-		DB:                                      n.DB,
-		MsgCreator:                              n.msgCreator,
-		Router:                                  n.chainRouter,
-		Net:                                     n.Net,
-		Validators:                              n.vdrs,
-		PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
-		NodeID:                                  n.ID,
-		NetworkID:                               n.Config.NetworkID,
-		Server:                                  n.APIServer,
-		Keystore:                                n.keystore,
-		AtomicMemory:                            n.sharedMemory,
-		AVAXAssetID:                             avaxAssetID,
-		XChainID:                                xChainID,
-		CChainID:                                cChainID,
-		CriticalChains:                          criticalChains,
-		TimeoutManager:                          n.timeoutManager,
-		Health:                                  n.health,
-		ShutdownNodeFunc:                        n.Shutdown,
-		MeterVMEnabled:                          n.Config.MeterVMEnabled,
-		Metrics:                                 n.MetricsGatherer,
-		SubnetConfigs:                           n.Config.SubnetConfigs,
-		ChainConfigs:                            n.Config.ChainConfigs,
-		FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
-		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
-		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
-		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
-		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
-		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
-		ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
-		ResourceTracker:                         n.resourceTracker,
-		StateSyncBeacons:                        n.Config.StateSyncIDs,
-		TracingEnabled:                          n.Config.TraceConfig.Enabled,
-		Tracer:                                  n.tracer,
-		ChainDataDir:                            n.Config.ChainDataDir,
-	})
+	subnets, err := chains.NewSubnets(n.ID, n.Config.SubnetConfigs)
+	if err != nil {
+		return fmt.Errorf("failed to initialize subnets: %w", err)
+	}
+	n.chainManager = chains.New(
+		&chains.ManagerConfig{
+			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
+			StakingTLSCert:                          n.Config.StakingTLSCert,
+			StakingBLSKey:                           n.Config.StakingSigningKey,
+			Log:                                     n.Log,
+			LogFactory:                              n.LogFactory,
+			VMManager:                               n.VMManager,
+			BlockAcceptorGroup:                      n.BlockAcceptorGroup,
+			TxAcceptorGroup:                         n.TxAcceptorGroup,
+			VertexAcceptorGroup:                     n.VertexAcceptorGroup,
+			DB:                                      n.DB,
+			MsgCreator:                              n.msgCreator,
+			Router:                                  n.chainRouter,
+			Net:                                     n.Net,
+			Validators:                              n.vdrs,
+			PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
+			NodeID:                                  n.ID,
+			NetworkID:                               n.Config.NetworkID,
+			Server:                                  n.APIServer,
+			Keystore:                                n.keystore,
+			AtomicMemory:                            n.sharedMemory,
+			AVAXAssetID:                             avaxAssetID,
+			XChainID:                                xChainID,
+			CChainID:                                cChainID,
+			CriticalChains:                          criticalChains,
+			TimeoutManager:                          n.timeoutManager,
+			Health:                                  n.health,
+			ShutdownNodeFunc:                        n.Shutdown,
+			MeterVMEnabled:                          n.Config.MeterVMEnabled,
+			Metrics:                                 n.MetricsGatherer,
+			SubnetConfigs:                           n.Config.SubnetConfigs,
+			ChainConfigs:                            n.Config.ChainConfigs,
+			FrontierPollFrequency:                   n.Config.FrontierPollFrequency,
+			ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
+			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
+			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
+			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
+			ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
+			ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
+			ResourceTracker:                         n.resourceTracker,
+			StateSyncBeacons:                        n.Config.StateSyncIDs,
+			TracingEnabled:                          n.Config.TraceConfig.Enabled,
+			Tracer:                                  n.tracer,
+			ChainDataDir:                            n.Config.ChainDataDir,
+			Subnets:                                 subnets,
+		},
+	)
 
 	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(n.APIServer)

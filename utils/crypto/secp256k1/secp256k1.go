@@ -8,16 +8,15 @@ import (
 	"fmt"
 	"strings"
 
-	stdecdsa "crypto/ecdsa"
-
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-
-	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+
+	stdecdsa "crypto/ecdsa"
+	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 const (
