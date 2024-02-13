@@ -35,6 +35,7 @@ type Config struct {
 	VersionCompatibility version.Compatibility
 	MySubnets            set.Set[ids.ID]
 	Beacons              validators.Manager
+	Validators           validators.Manager
 	NetworkID            uint32
 	PingFrequency        time.Duration
 	PongTimeout          time.Duration

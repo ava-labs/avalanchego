@@ -646,6 +646,7 @@ func (p *peer) sendNetworkMessages() {
 		p.close()
 	}()
 
+	var txIDOfVerifiedBLSKey ids.ID
 	for {
 		select {
 		case <-p.peerListChan:
@@ -699,7 +700,7 @@ func (p *peer) sendNetworkMessages() {
 				return
 			}
 
-			if p.finishedHandshake.Get() {
+			if !p.finishedHandshake.Get() {
 				if err := p.VersionCompatibility.Compatible(p.version); err != nil {
 					p.Log.Debug("disconnecting from peer",
 						zap.String("reason", "version not compatible"),
@@ -708,6 +709,42 @@ func (p *peer) sendNetworkMessages() {
 						zap.Error(err),
 					)
 					return
+				}
+
+				// Enforce that all validators that have registered a BLS key
+				// are signing their IP with it after the activation of Durango.
+				vdr, ok := p.Validators.GetValidator(constants.PrimaryNetworkID, p.id)
+				if ok && vdr.TxID != txIDOfVerifiedBLSKey && vdr.PublicKey != nil {
+					postDurango := p.Clock.Time().After(version.GetDurangoTime(constants.MainnetID))
+					if postDurango && p.ip.BLSSignature == nil {
+						p.Log.Debug("disconnecting from peer",
+							zap.String("reason", "missing BLS signature"),
+							zap.Stringer("nodeID", p.id),
+						)
+						return
+					}
+
+					// If Durango hasn't activated on mainnet yet, we don't
+					// require BLS signatures to be provided. However, if they
+					// are provided, verify that they are correct.
+					if p.ip.BLSSignature != nil {
+						validSignature := bls.VerifyProofOfPossession(
+							vdr.PublicKey,
+							p.ip.BLSSignature,
+							p.ip.UnsignedIP.bytes(),
+						)
+						if !validSignature {
+							p.Log.Debug("disconnecting from peer",
+								zap.String("reason", "invalid BLS signature"),
+								zap.Stringer("nodeID", p.id),
+							)
+							return
+						}
+
+						// Avoid unnecessary signature verifications by only
+						// verify the signature once per validation period.
+						txIDOfVerifiedBLSKey = vdr.TxID
+					}
 				}
 			}
 
@@ -1079,7 +1116,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			Timestamp: msg.IpSigningTime,
 		},
 		TLSSignature: msg.IpNodeIdSig,
-		// TODO: Populate the BLS Signature here.
 	}
 	maxTimestamp := myTime.Add(p.MaxClockDifference)
 	if err := p.ip.Verify(p.cert, maxTimestamp); err != nil {
