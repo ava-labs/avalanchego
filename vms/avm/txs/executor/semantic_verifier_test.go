@@ -169,7 +169,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "invalid output",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -197,7 +197,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "unsorted outputs",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -236,7 +236,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "invalid input",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -264,7 +264,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "duplicate inputs",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -288,7 +288,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "input overflow",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -325,7 +325,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "output overflow",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -407,7 +407,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "insufficient funds",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -435,7 +435,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 		{
 			name: "barely insufficient funds",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -854,7 +854,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "invalid output",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -884,7 +884,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "unsorted outputs",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -925,7 +925,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "unsorted exported outputs",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -963,7 +963,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "invalid input",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -993,7 +993,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "duplicate inputs",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1019,7 +1019,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "input overflow",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1058,7 +1058,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "output overflow",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1144,7 +1144,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "insufficient funds",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1174,7 +1174,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		},
 		{
 			name: "barely insufficient funds",
-			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1744,7 +1744,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "invalid output",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1772,7 +1772,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "unsorted outputs",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1810,7 +1810,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "invalid input",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1837,7 +1837,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "duplicate inputs",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1860,7 +1860,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "duplicate imported inputs",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1882,7 +1882,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "input overflow",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1918,7 +1918,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "output overflow",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
@@ -1948,7 +1948,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 		{
 			name: "insufficient funds",
-			stateFunc: func(c *gomock.Controller) state.Chain {
+			stateFunc: func(*gomock.Controller) state.Chain {
 				return nil
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
