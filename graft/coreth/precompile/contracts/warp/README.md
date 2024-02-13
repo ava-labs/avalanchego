@@ -1,18 +1,16 @@
-# Avalanche Warp Messaging
+# Integrating Avalanche Warp Messaging into the EVM
 
 Avalanche Warp Messaging offers a basic primitive to enable Cross-Subnet communication on the Avalanche Network.
 
 It is intended to allow communication between arbitrary Custom Virtual Machines (including, but not limited to Subnet-EVM and Coreth).
 
-## How does Avalanche Warp Messaging Work
+## How does Avalanche Warp Messaging Work?
 
 Avalanche Warp Messaging uses BLS Multi-Signatures with Public-Key Aggregation where every Avalanche validator registers a public key alongside its NodeID on the Avalanche P-Chain.
 
 Every node tracking a Subnet has read access to the Avalanche P-Chain. This provides weighted sets of BLS Public Keys that correspond to the validator sets of each Subnet on the Avalanche Network. Avalanche Warp Messaging provides a basic primitive for signing and verifying messages between Subnets: the receiving network can verify whether an aggregation of signatures from a set of source Subnet validators represents a threshold of stake large enough for the receiving network to process the message.
 
-For more details on Avalanche Warp Messaging, see the AvalancheGo [Warp README](https://github.com/ava-labs/avalanchego/blob/warp-readme/vms/platformvm/warp/README.md).
-
-## Integrating Avalanche Warp Messaging into the EVM
+For more details on Avalanche Warp Messaging, see the AvalancheGo [Warp README](https://docs.avax.network/build/cross-chain/awm/deep-dive).
 
 ### Flow of Sending / Receiving a Warp Message within the EVM
 
@@ -46,7 +44,7 @@ Additionally, the `SourceChainID` is excluded because anyone parsing the chain c
 - `sender`
 - The `messageID` of the unsigned message (sha256 of the unsigned message)
 
-The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including an [AddressedCall](https://github.com/ava-labs/avalanchego/tree/v1.10.15/vms/platformvm/warp/payload). The unsigned message is emitted as the unindexed data in the log.
+The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including an [AddressedCall](https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/warp/payload#readme). The unsigned message is emitted as the unindexed data in the log.
 
 #### getVerifiedMessage
 
@@ -73,11 +71,11 @@ The `blockchainID` in Avalanche refers to the txID that created the blockchain o
 
 ### Predicate Encoding
 
-Avalanche Warp Messages are encoded as a signed Avalanche [Warp Message](https://github.com/ava-labs/avalanchego/blob/v1.10.4/vms/platformvm/warp/message.go#L7) where the [UnsignedMessage](https://github.com/ava-labs/avalanchego/blob/v1.10.4/vms/platformvm/warp/unsigned_message.go#L14)'s payload includes an [AddressedPayload](../../../warp/payload/payload.go).
+Avalanche Warp Messages are encoded as a signed Avalanche [Warp Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/message.go) where the [UnsignedMessage](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go)'s payload includes an [AddressedPayload](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/payload/payload.go).
 
 Since the predicate is encoded into the [Transaction Access List](https://eips.ethereum.org/EIPS/eip-2930), it is packed into 32 byte hashes intended to declare storage slots that should be pre-warmed into the cache prior to transaction execution.
 
-Therefore, we use the [Predicate Utils](../../../utils/predicate/README.md) package to encode the actual byte slice of size N into the access list.
+Therefore, we use the [Predicate Utils](https://github.com/ava-labs/coreth/blob/master/predicate/Predicate.md) package to encode the actual byte slice of size N into the access list.
 
 ### Performance Optimization: C-Chain to Subnet
 
