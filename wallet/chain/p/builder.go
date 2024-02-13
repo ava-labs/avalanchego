@@ -6,11 +6,8 @@ package p
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
-
-	stdcontext "context"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -25,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	stdcontext "context"
 )
 
 var (

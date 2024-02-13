@@ -5,17 +5,17 @@ package set
 
 import (
 	"bytes"
+	"encoding/json"
 	"slices"
 
-	stdjson "encoding/json"
-
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var _ stdjson.Marshaler = (*Set[int])(nil)
+var _ json.Marshaler = (*Set[int])(nil)
 
 // SampleableSet is a set of elements that supports sampling.
 type SampleableSet[T comparable] struct {
@@ -149,11 +149,11 @@ func (s SampleableSet[T]) Sample(numToSample int) []T {
 
 func (s *SampleableSet[T]) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == json.Null {
+	if str == avajson.Null {
 		return nil
 	}
 	var elements []T
-	if err := stdjson.Unmarshal(b, &elements); err != nil {
+	if err := json.Unmarshal(b, &elements); err != nil {
 		return err
 	}
 	s.Clear()
@@ -167,7 +167,7 @@ func (s *SampleableSet[_]) MarshalJSON() ([]byte, error) {
 		err          error
 	)
 	for i, e := range s.elements {
-		elementBytes[i], err = stdjson.Marshal(e)
+		elementBytes[i], err = json.Marshal(e)
 		if err != nil {
 			return nil, err
 		}

@@ -501,7 +501,7 @@ func TestStateSummaryAccept(t *testing.T) {
 	statelessSummary, err := summary.Build(innerSummary.Height()-1, slb.Bytes(), innerSummary.Bytes())
 	require.NoError(err)
 
-	innerVM.ParseStateSummaryF = func(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
+	innerVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		require.Equal(innerSummary.BytesV, summaryBytes)
 		return innerSummary, nil
 	}

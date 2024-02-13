@@ -163,6 +163,5 @@ func TestMarshalJSONDoesNotRequireCtx(t *testing.T) {
 	b, err := out.MarshalJSON()
 	require.NoError(err)
 
-	jsonData := string(b)
-	require.Equal(jsonData, `{"addresses":["6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt","111111111111111111116DBWJs"],"locktime":2,"threshold":1}`)
+	require.Equal(`{"addresses":["6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt","111111111111111111116DBWJs"],"locktime":2,"threshold":1}`, string(b))
 }

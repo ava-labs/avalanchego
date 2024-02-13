@@ -12,13 +12,10 @@ import (
 	"strings"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/interfaces"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
@@ -26,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -164,7 +163,7 @@ func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction)
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 	return receipt
 }
 

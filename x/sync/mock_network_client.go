@@ -113,9 +113,9 @@ func (mr *MockNetworkClientMockRecorder) Request(arg0, arg1, arg2 any) *gomock.C
 }
 
 // RequestAny mocks base method.
-func (m *MockNetworkClient) RequestAny(arg0 context.Context, arg1 *version.Application, arg2 []byte) (ids.NodeID, []byte, error) {
+func (m *MockNetworkClient) RequestAny(arg0 context.Context, arg1 []byte) (ids.NodeID, []byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RequestAny", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "RequestAny", arg0, arg1)
 	ret0, _ := ret[0].(ids.NodeID)
 	ret1, _ := ret[1].([]byte)
 	ret2, _ := ret[2].(error)
@@ -123,7 +123,7 @@ func (m *MockNetworkClient) RequestAny(arg0 context.Context, arg1 *version.Appli
 }
 
 // RequestAny indicates an expected call of RequestAny.
-func (mr *MockNetworkClientMockRecorder) RequestAny(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockNetworkClientMockRecorder) RequestAny(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestAny", reflect.TypeOf((*MockNetworkClient)(nil).RequestAny), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestAny", reflect.TypeOf((*MockNetworkClient)(nil).RequestAny), arg0, arg1)
 }
