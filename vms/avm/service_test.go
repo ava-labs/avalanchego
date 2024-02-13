@@ -701,8 +701,9 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
-			DurangoTime:  time.Time{},
-			EUpgradeTime: time.Time{},
+			CreateAssetTxFee: testTxFee,
+			DurangoTime:      time.Time{},
+			EUpgradeTime:     mockable.MaxTime,
 		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
@@ -734,7 +735,20 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 49000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
 		"inputs": [
 			{
 				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
@@ -823,7 +837,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x43bb27c41f425b3236c463c807c4760cae98ca267422372bf09928af60fd9c5617edfad974c94ac1555ef9f2fe88c59541a2a278ce9adeebc3b081ebdc1ebec700"
+					"0xa036832b708b377ef9719ffbc834a3fb933191a467994f844c23f4a44350e86a7151cdbbbfa479d93a4906cc22254dcc5ccc2a6099492e7a9f9e8b575048d69701"
 				]
 			}
 		}
@@ -1609,14 +1623,76 @@ func newAvaxExportTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 
 func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 	var (
-		key          = keys[0]
-		genesisBytes = env.genesisBytes
-		chainID      = env.vm.ctx.ChainID
-		parser       = env.vm.parser
+		key = keys[0]
+		kc  = secp256k1fx.NewKeychain()
 	)
-	avaxTx := getCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
-	tx := buildCreateAssetTx(avaxTx, chainID, key)
-	require.NoError(t, tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(t, err)
+	tx, _, err := buildCreateAssetTx(
+		env.vm,
+		"Team Rocket", // name
+		"TR",          // symbol
+		0,             // denomination
+		[]*txs.InitialState{
+			{
+				FxIndex: 0,
+				Outs: []verify.State{
+					&secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					}, &secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					},
+				},
+			},
+			{
+				FxIndex: 1,
+				Outs: []verify.State{
+					&nftfx.MintOutput{
+						GroupID: 1,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					},
+					&nftfx.MintOutput{
+						GroupID: 2,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					},
+				},
+			},
+			{
+				FxIndex: 2,
+				Outs: []verify.State{
+					&propertyfx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+					&propertyfx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+				},
+			},
+		},
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(t, err)
 	return tx
 }
 
@@ -1685,83 +1761,6 @@ func buildExportTx(avaxTx *txs.Tx, chainID ids.ID, key *secp256k1.PrivateKey) *t
 				},
 			},
 		}},
-	}}
-}
-
-func buildCreateAssetTx(avaxTx *txs.Tx, chainID ids.ID, key *secp256k1.PrivateKey) *txs.Tx {
-	return &txs.Tx{Unsigned: &txs.CreateAssetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        avaxTx.ID(),
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: avaxTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt:   startBalance,
-					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-				},
-			}},
-		}},
-		Name:         "Team Rocket",
-		Symbol:       "TR",
-		Denomination: 0,
-		States: []*txs.InitialState{
-			{
-				FxIndex: 0,
-				Outs: []verify.State{
-					&secp256k1fx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					}, &secp256k1fx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-				},
-			},
-			{
-				FxIndex: 1,
-				Outs: []verify.State{
-					&nftfx.MintOutput{
-						GroupID: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-					&nftfx.MintOutput{
-						GroupID: 2,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-				},
-			},
-			{
-				FxIndex: 2,
-				Outs: []verify.State{
-					&propertyfx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
-					&propertyfx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
-				},
-			},
-		},
 	}}
 }
 

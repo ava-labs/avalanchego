@@ -791,37 +791,58 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
 
+	return buildCreateAssetTx(
+		s.vm,
+		args.Name,
+		args.Symbol,
+		args.Denomination,
+		[]*txs.InitialState{initialState},
+		utxos,
+		kc,
+		changeAddr,
+	)
+}
+
+func buildCreateAssetTx(
+	vm *VM,
+	name, symbol string,
+	denomination byte,
+	initialStates []*txs.InitialState,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
 	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
 		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 
 	uTx := &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: args.Denomination,
-		States:       []*txs.InitialState{initialState},
+		Name:         name,
+		Symbol:       symbol,
+		Denomination: denomination,
+		States:       initialStates,
 	}
 	if err := uTx.Visit(feeCalc); err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
 	toSpend := make(map[ids.ID]uint64)
-	ins, outs, keys, err := s.vm.FinanceTx(
+	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
-		s.vm.feeAssetID,
+		vm.feeAssetID,
 		kc,
 		toSpend,
 		feeCalc,
@@ -834,7 +855,7 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
+	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // CreateFixedCapAsset returns ID of the newly created asset
@@ -925,19 +946,6 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
-		}
-	)
-
 	initialState := &txs.InitialState{
 		FxIndex: 1, // TODO: Should lookup nftfx FxID
 		Outs:    make([]verify.State, 0, len(args.MinterSets)),
@@ -961,37 +969,50 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
 
-	uTx := &txs.CreateAssetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-		}},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: 0, // NFTs are non-fungible
-		States:       []*txs.InitialState{initialState},
+	return buildCreateNFTAsset(s.vm, args.Name, args.Symbol, args.MinterSets, utxos, kc, changeAddr)
+}
+
+func buildCreateNFTAsset(
+	vm *VM,
+	name, symbol string,
+	minterSets []Owners,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	initialState := &txs.InitialState{
+		FxIndex: 1, // TODO: Should lookup nftfx FxID
+		Outs:    make([]verify.State, 0, len(minterSets)),
 	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
+	for i, owner := range minterSets {
+		minter := &nftfx.MintOutput{
+			GroupID: uint32(i),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: uint32(owner.Threshold),
+			},
+		}
+		minterAddrsSet, err := avax.ParseServiceAddresses(vm, owner.Minters)
+		if err != nil {
+			return nil, ids.ShortEmpty, err
+		}
+		minter.Addrs = minterAddrsSet.List()
+		utils.Sort(minter.Addrs)
+		initialState.Outs = append(initialState.Outs, minter)
 	}
 
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, keys, err := s.vm.FinanceTx(
+	codec := vm.parser.Codec()
+	initialState.Sort(codec)
+
+	return buildCreateAssetTx(
+		vm,
+		name,
+		symbol,
+		0, // NFTs are non-fungible
+		[]*txs.InitialState{initialState},
 		utxos,
-		s.vm.feeAssetID,
 		kc,
-		toSpend,
-		feeCalc,
 		changeAddr,
 	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
 
 // CreateAddress creates an address for the user [args.Username]
