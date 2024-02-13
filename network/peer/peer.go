@@ -133,6 +133,9 @@ type peer struct {
 
 	// ip is the claimed IP the peer gave us in the Handshake message.
 	ip *SignedIP
+	// txIDOfVerifiedBLSKey is the txID that added the BLS key that was most
+	// recently verified to have signed the IP.
+	txIDOfVerifiedBLSKey ids.ID
 	// version is the claimed version the peer is running that we received in
 	// the Handshake message.
 	version *version.Application
@@ -646,7 +649,6 @@ func (p *peer) sendNetworkMessages() {
 		p.close()
 	}()
 
-	var txIDOfVerifiedBLSKey ids.ID
 	for {
 		select {
 		case <-p.peerListChan:
@@ -700,52 +702,11 @@ func (p *peer) sendNetworkMessages() {
 				return
 			}
 
-			if p.finishedHandshake.Get() {
-				if err := p.VersionCompatibility.Compatible(p.version); err != nil {
-					p.Log.Debug("disconnecting from peer",
-						zap.String("reason", "version not compatible"),
-						zap.Stringer("nodeID", p.id),
-						zap.Stringer("peerVersion", p.version),
-						zap.Error(err),
-					)
-					return
-				}
-
-				// Enforce that all validators that have registered a BLS key
-				// are signing their IP with it after the activation of Durango.
-				vdr, ok := p.Validators.GetValidator(constants.PrimaryNetworkID, p.id)
-				if ok && vdr.TxID != txIDOfVerifiedBLSKey && vdr.PublicKey != nil {
-					postDurango := p.Clock.Time().After(version.GetDurangoTime(constants.MainnetID))
-					if postDurango && p.ip.BLSSignature == nil {
-						p.Log.Debug("disconnecting from peer",
-							zap.String("reason", "missing BLS signature"),
-							zap.Stringer("nodeID", p.id),
-						)
-						return
-					}
-
-					// If Durango hasn't activated on mainnet yet, we don't
-					// require BLS signatures to be provided. However, if they
-					// are provided, verify that they are correct.
-					if p.ip.BLSSignature != nil {
-						validSignature := bls.VerifyProofOfPossession(
-							vdr.PublicKey,
-							p.ip.BLSSignature,
-							p.ip.UnsignedIP.bytes(),
-						)
-						if !validSignature {
-							p.Log.Debug("disconnecting from peer",
-								zap.String("reason", "invalid BLS signature"),
-								zap.Stringer("nodeID", p.id),
-							)
-							return
-						}
-
-						// Avoid unnecessary signature verifications by only
-						// verify the signature once per validation period.
-						txIDOfVerifiedBLSKey = vdr.TxID
-					}
-				}
+			// Only check if we should disconnect after the handshake is
+			// finished to avoid race conditions and accessing uninitialized
+			// values.
+			if p.finishedHandshake.Get() && p.shouldDisconnect() {
+				return
 			}
 
 			primaryUptime, subnetUptimes := p.getUptimes()
@@ -764,6 +725,59 @@ func (p *peer) sendNetworkMessages() {
 			return
 		}
 	}
+}
+
+func (p *peer) shouldDisconnect() bool {
+	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "version not compatible"),
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("peerVersion", p.version),
+			zap.Error(err),
+		)
+		return true
+	}
+
+	// Enforce that all validators that have registered a BLS key are signing
+	// their IP with it after the activation of Durango.
+	vdr, ok := p.Validators.GetValidator(constants.PrimaryNetworkID, p.id)
+	if !ok || vdr.PublicKey == nil || vdr.TxID == p.txIDOfVerifiedBLSKey {
+		return false
+	}
+
+	postDurango := p.Clock.Time().After(version.GetDurangoTime(constants.MainnetID))
+	if postDurango && p.ip.BLSSignature == nil {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "missing BLS signature"),
+			zap.Stringer("nodeID", p.id),
+		)
+		return true
+	}
+
+	// If Durango hasn't activated on mainnet yet, we don't require BLS
+	// signatures to be provided. However, if they are provided, verify that
+	// they are correct.
+	if p.ip.BLSSignature == nil {
+		return false
+	}
+
+	validSignature := bls.VerifyProofOfPossession(
+		vdr.PublicKey,
+		p.ip.BLSSignature,
+		p.ip.UnsignedIP.bytes(),
+	)
+	if !validSignature {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "invalid BLS signature"),
+			zap.Stringer("nodeID", p.id),
+		)
+		return true
+	}
+
+	// Avoid unnecessary signature verifications by only verifing the signature
+	// once per validation period.
+	p.txIDOfVerifiedBLSKey = vdr.TxID
+	return false
 }
 
 func (p *peer) handle(msg message.InboundMessage) {
@@ -1004,16 +1018,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		}
 	}
 
-	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
-		p.Log.Verbo("peer version not compatible",
-			zap.Stringer("nodeID", p.id),
-			zap.Stringer("peerVersion", p.version),
-			zap.Error(err),
-		)
-		p.StartClose()
-		return
-	}
-
 	// handle subnet IDs
 	for _, subnetIDBytes := range msg.TrackedSubnets {
 		subnetID, err := ids.ToID(subnetIDBytes)
@@ -1155,6 +1159,14 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 		p.ip.BLSSignature = signature
 		p.ip.BLSSignatureBytes = msg.IpBlsSig
+	}
+
+	// If the peer is running an incompatible version or has an invalid BLS
+	// signature, disconnect from them prior to marking the handshake as
+	// completed.
+	if p.shouldDisconnect() {
+		p.StartClose()
+		return
 	}
 
 	p.gotHandshake.Set(true)
