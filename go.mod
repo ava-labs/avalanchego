@@ -25,6 +25,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/huin/goupnp v1.0.3
+	github.com/inconshreveable/log15 v2.16.0+incompatible
 	github.com/jackpal/gateway v1.0.6
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/leanovate/gopter v0.2.9
