@@ -888,7 +888,8 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintNFTTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildNFTxMintOp(createAssetTx, key, 2, 1))
+	op := buildNFTxMintOp(createAssetTx, key, 2, 1)
+	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{op}, nil)
 	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
@@ -907,8 +908,8 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [],
+		"inputs": [],
 		"memo": "0x",
 		"operations": [
 			{
@@ -992,8 +993,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
-	mintNFTTx := buildOperationTxWithOp(env.vm.ctx.ChainID, mintOp1, mintOp2)
-
+	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{mintOp1, mintOp2}, nil)
 	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
@@ -1012,8 +1012,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [],
+		"inputs": [],
 		"memo": "0x",
 		"operations": [
 			{
@@ -1131,8 +1131,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintSecpOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildSecpMintOp(createAssetTx, key, 0))
-	require.NoError(mintSecpOpTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	op := buildSecpMintOp(createAssetTx, key, 0)
+	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op}, [][]*secp256k1.PrivateKey{{key}})
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
@@ -1150,8 +1150,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [],
+		"inputs": [],
 		"memo": "0x",
 		"operations": [
 			{
@@ -1239,9 +1239,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
 	op2 := buildSecpMintOp(createAssetTx, key, 1)
-	mintSecpOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, op1, op2)
-
-	require.NoError(mintSecpOpTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
+	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2}, [][]*secp256k1.PrivateKey{{key}, {key}})
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
@@ -1259,8 +1257,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [],
+		"inputs": [],
 		"memo": "0x",
 		"operations": [
 			{
@@ -1386,7 +1384,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintPropertyFxOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildPropertyFxMintOp(createAssetTx, key, 4))
+	op := buildPropertyFxMintOp(createAssetTx, key, 4)
+	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op}, nil)
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
@@ -1405,8 +1404,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [],
+		"inputs": [],
 		"memo": "0x",
 		"operations": [
 			{
@@ -1491,8 +1490,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
-	mintPropertyFxOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, op1, op2)
-
+	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2}, nil)
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
@@ -1511,8 +1509,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [],
+		"inputs": [],
 		"memo": "0x",
 		"operations": [
 			{
@@ -1834,14 +1832,25 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 	}
 }
 
-func buildOperationTxWithOp(chainID ids.ID, op ...*txs.Operation) *txs.Tx {
-	return &txs.Tx{Unsigned: &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-		}},
-		Ops: op,
-	}}
+func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation, opsKeys [][]*secp256k1.PrivateKey) *txs.Tx {
+	var (
+		key = keys[0]
+		kc  = secp256k1fx.NewKeychain()
+	)
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(t, err)
+
+	tx, _, err := buildOperation(
+		env.vm,
+		ops,
+		opsKeys,
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(t, err)
+	return tx
 }
 
 func TestServiceGetNilTx(t *testing.T) {

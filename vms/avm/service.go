@@ -1477,23 +1477,34 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
+	return buildOperation(s.vm, ops, opKeys, feeUTXOs, feeKc, changeAddr)
+}
+
+func buildOperation(
+	vm *VM,
+	ops []*txs.Operation,
+	opsKeys [][]*secp256k1.PrivateKey,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
 	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
 		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 
 	uTx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
 		Ops: ops,
 	}
@@ -1502,10 +1513,10 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 	}
 
 	toSpend := make(map[ids.ID]uint64)
-	ins, outs, keys, err := s.vm.FinanceTx(
-		feeUTXOs,
-		s.vm.feeAssetID,
-		feeKc,
+	ins, outs, keys, err := vm.FinanceTx(
+		utxos,
+		vm.feeAssetID,
+		kc,
 		toSpend,
 		feeCalc,
 		changeAddr,
@@ -1517,8 +1528,8 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
-	keys = append(keys, opKeys...)
-	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
+	keys = append(keys, opsKeys...)
+	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // SendNFTArgs are arguments for passing into SendNFT requests
@@ -1600,52 +1611,12 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-		}},
-		Ops: ops,
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, secpKeys, err := s.vm.FinanceTx(
-		utxos,
-		s.vm.feeAssetID,
-		kc,
-		toSpend,
-		feeCalc,
-		changeAddr,
-	)
+	tx, _, err := buildOperation(s.vm, ops, nil, utxos, kc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-
-	codec := s.vm.parser.Codec()
-	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	return tx, changeAddr, tx.SignNFTFx(codec, nftKeys)
+	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
 }
 
 // MintNFTArgs are arguments for passing into MintNFT requests
@@ -1736,52 +1707,11 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-		}},
-		Ops: ops,
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, secpKeys, err := s.vm.FinanceTx(
-		feeUTXOs,
-		s.vm.feeAssetID,
-		feeKc,
-		toSpend,
-		feeCalc,
-		changeAddr,
-	)
+	tx, _, err := buildOperation(s.vm, ops, nil, feeUTXOs, feeKc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-
-	codec := s.vm.parser.Codec()
-	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	return tx, changeAddr, tx.SignNFTFx(codec, nftKeys)
+	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
 }
 
 // ImportArgs are arguments for passing into Import requests
