@@ -55,6 +55,7 @@ func BenchmarkMarshalHandshake(b *testing.B) {
 				IpSigningTime:  uint64(time.Now().Unix()),
 				IpNodeIdSig:    []byte{'y', 'e', 'e', 't'},
 				TrackedSubnets: [][]byte{id[:]},
+				IpBlsSig:       []byte{'y', 'e', 'e', 't', '2'},
 			},
 		},
 	}
@@ -111,6 +112,7 @@ func BenchmarkUnmarshalHandshake(b *testing.B) {
 				IpSigningTime:  uint64(time.Now().Unix()),
 				IpNodeIdSig:    []byte{'y', 'e', 'e', 't'},
 				TrackedSubnets: [][]byte{id[:]},
+				IpBlsSig:       []byte{'y', 'e', 'e', 't', '2'},
 			},
 		},
 	}

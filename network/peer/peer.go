@@ -551,6 +551,7 @@ func (p *peer) writeMessages() {
 		uint32(myVersion.Patch),
 		mySignedIP.Timestamp,
 		mySignedIP.Signature,
+		nil, // TODO: Populate this with the BLS signature
 		p.MySubnets.List(),
 		p.SupportedACPs,
 		p.ObjectedACPs,
