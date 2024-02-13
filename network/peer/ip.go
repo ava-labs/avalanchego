@@ -38,10 +38,12 @@ func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer, blsSigner *bls.SecretKey) (*
 		hashing.ComputeHash256(ipBytes),
 		crypto.SHA256,
 	)
+	blsSignature := bls.SignProofOfPossession(blsSigner, ipBytes)
 	return &SignedIP{
-		UnsignedIP:   *ip,
-		TLSSignature: tlsSignature,
-		BLSSignature: bls.SignProofOfPossession(blsSigner, ipBytes),
+		UnsignedIP:        *ip,
+		TLSSignature:      tlsSignature,
+		BLSSignature:      blsSignature,
+		BLSSignatureBytes: bls.SignatureToBytes(blsSignature),
 	}, err
 }
 
@@ -57,8 +59,9 @@ func (ip *UnsignedIP) bytes() []byte {
 // SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
 type SignedIP struct {
 	UnsignedIP
-	TLSSignature []byte
-	BLSSignature *bls.Signature
+	TLSSignature      []byte
+	BLSSignature      *bls.Signature
+	BLSSignatureBytes []byte
 }
 
 // Returns nil if:
