@@ -555,7 +555,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 					staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
 					ip.IPPort,
 					ip.Timestamp,
-					ip.Signature,
+					ip.TLSSignature,
 				),
 			})
 			require.NoError(err)

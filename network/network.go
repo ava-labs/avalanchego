@@ -435,7 +435,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		peer.Cert(),
 		peerIP.IPPort,
 		peerIP.Timestamp,
-		peerIP.Signature,
+		peerIP.TLSSignature,
 	)
 	n.ipTracker.Connected(newIP)
 
@@ -621,7 +621,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 			IPPort:    ip.IPPort,
 			Timestamp: ip.Timestamp,
 		},
-		Signature: ip.Signature,
+		TLSSignature: ip.Signature,
 	}
 	maxTimestamp := n.peerConfig.Clock.Time().Add(n.peerConfig.MaxClockDifference)
 	if err := signedIP.Verify(ip.Cert, maxTimestamp); err != nil {

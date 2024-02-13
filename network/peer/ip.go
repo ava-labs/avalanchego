@@ -18,7 +18,7 @@ import (
 
 var (
 	errTimestampTooFarInFuture = errors.New("timestamp too far in the future")
-	errInvalidSignature        = errors.New("invalid signature")
+	errInvalidTLSSignature     = errors.New("invalid TLS signature")
 )
 
 // UnsignedIP is used for a validator to claim an IP. The [Timestamp] is used to
@@ -30,15 +30,15 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer crypto.Signer) (*SignedIP, error) {
-	sig, err := signer.Sign(
+func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer) (*SignedIP, error) {
+	tlsSignature, err := tlsSigner.Sign(
 		rand.Reader,
 		hashing.ComputeHash256(ip.bytes()),
 		crypto.SHA256,
 	)
 	return &SignedIP{
-		UnsignedIP: *ip,
-		Signature:  sig,
+		UnsignedIP:   *ip,
+		TLSSignature: tlsSignature,
 	}, err
 }
 
@@ -54,12 +54,12 @@ func (ip *UnsignedIP) bytes() []byte {
 // SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
 type SignedIP struct {
 	UnsignedIP
-	Signature []byte
+	TLSSignature []byte
 }
 
 // Returns nil if:
 // * [ip.Timestamp] is not after [maxTimestamp].
-// * [ip.Signature] is a valid signature over [ip.UnsignedIP] from [cert].
+// * [ip.TLSSignature] is a valid signature over [ip.UnsignedIP] from [cert].
 func (ip *SignedIP) Verify(
 	cert *staking.Certificate,
 	maxTimestamp time.Time,
@@ -72,9 +72,9 @@ func (ip *SignedIP) Verify(
 	if err := staking.CheckSignature(
 		cert,
 		ip.UnsignedIP.bytes(),
-		ip.Signature,
+		ip.TLSSignature,
 	); err != nil {
-		return fmt.Errorf("%w: %w", errInvalidSignature, err)
+		return fmt.Errorf("%w: %w", errInvalidTLSSignature, err)
 	}
 	return nil
 }

@@ -92,7 +92,7 @@ func TestSignedIpVerify(t *testing.T) {
 				Timestamp: uint64(now.Unix()),
 			},
 			maxTimestamp: now,
-			expectedErr:  errInvalidSignature,
+			expectedErr:  errInvalidTLSSignature,
 		},
 	}
 
