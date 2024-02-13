@@ -146,7 +146,7 @@ type peer struct {
 	// txIDOfVerifiedBLSKey is the txID that added the BLS key that was most
 	// recently verified to have signed the IP.
 	//
-	// Invaraint: Prior to the handshake being completed, this can only be
+	// Invariant: Prior to the handshake being completed, this can only be
 	// accessed by the reader goroutine. After the handshake has been completed,
 	// this can only be accessed by the message sender goroutine.
 	txIDOfVerifiedBLSKey ids.ID
