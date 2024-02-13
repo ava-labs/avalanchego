@@ -1917,49 +1917,60 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	exportOuts := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: uint64(args.Amount),
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
-			},
-		},
-	}}
+	return buildExportTx(s.vm, chainID, to, assetID, uint64(args.Amount), utxos, kc, changeAddr)
+}
 
+func buildExportTx(
+	vm *VM,
+	destinationChain ids.ID,
+	to ids.ShortID,
+	exportedAssetID ids.ID,
+	exportedAmt uint64,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
 	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
 		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 
 	uTx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
-		DestinationChain: chainID,
-		ExportedOuts:     exportOuts,
+		DestinationChain: destinationChain,
+		ExportedOuts: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: exportedAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: exportedAmt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{to},
+				},
+			},
+		}},
 	}
 	if err := uTx.Visit(feeCalc); err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
 	toSpend := map[ids.ID]uint64{
-		assetID: uint64(args.Amount),
+		exportedAssetID: exportedAmt,
 	}
-	ins, outs, keys, err := s.vm.FinanceTx(
+	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
-		s.vm.feeAssetID,
+		vm.feeAssetID,
 		kc,
 		toSpend,
 		feeCalc,
@@ -1969,7 +1980,7 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	codec := s.vm.parser.Codec()
+	codec := vm.parser.Codec()
 
 	uTx.Ins = ins
 	uTx.Outs = outs
