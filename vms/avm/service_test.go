@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -566,7 +567,19 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 25000,
+					"amount": 1000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			},
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd"
+					],
+					"amount": 48000,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1597,14 +1610,33 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 	var (
-		key          = keys[0]
-		genesisBytes = env.genesisBytes
-		chainID      = env.vm.ctx.ChainID
-		parser       = env.vm.parser
+		memo      = []byte{1, 2, 3, 4, 5, 6, 7, 8}
+		key       = keys[0]
+		changeKey = keys[1]
+		kc        = secp256k1fx.NewKeychain()
 	)
-	avaxTx := getCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
-	tx := buildBaseTx(avaxTx, chainID, key)
-	require.NoError(t, tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(t, err)
+
+	tx, _, err := buildBaseTx(
+		env.vm,
+		[]*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: env.vm.feeAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: units.MicroAvax,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+		memo,
+		utxos,
+		kc,
+		changeKey.PublicKey().Address(),
+	)
+	require.NoError(t, err)
 	return tx
 }
 
@@ -1694,41 +1726,6 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 	)
 	require.NoError(t, err)
 	return tx
-}
-
-func buildBaseTx(avaxTx *txs.Tx, chainID ids.ID, key *secp256k1.PrivateKey) *txs.Tx {
-	return &txs.Tx{Unsigned: &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        avaxTx.ID(),
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: avaxTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: startBalance,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
-					},
-				},
-			}},
-			Outs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: avaxTx.ID()},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance / 2, // TODO ABENEGIA: find a way to pay the exact amount of fees
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
-			}},
-		},
-	}}
 }
 
 func buildExportTx(avaxTx *txs.Tx, chainID ids.ID, key *secp256k1.PrivateKey) *txs.Tx {
@@ -2606,6 +2603,10 @@ func TestSendMultiple(t *testing.T) {
 					password:    password,
 					initialKeys: keys,
 				}},
+				vmStaticConfig: &config.Config{
+					DurangoTime:  time.Time{},
+					EUpgradeTime: mockable.MaxTime,
+				},
 			})
 			env.vm.ctx.Lock.Unlock()
 

@@ -1275,13 +1275,15 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	// Calculate required input amounts and create the desired outputs
-	// String repr. of asset ID --> asset ID
-	assetIDs := make(map[string]ids.ID)
-	// Asset ID --> amount of that asset being sent
-	amounts := make(map[ids.ID]uint64)
-	// Outputs of our tx
-	outs := []*avax.TransferableOutput{}
+	var (
+		// Calculate required input amounts and create the desired outputs
+		// String repr. of asset ID --> asset ID
+		assetIDs = make(map[string]ids.ID)
+		// Asset ID --> amount of that asset being sent
+		amounts = make(map[ids.ID]uint64)
+		// Outputs of our tx
+		outs = []*avax.TransferableOutput{}
+	)
 	for _, output := range args.Outputs {
 		if output.Amount == 0 {
 			return nil, ids.ShortEmpty, errZeroAmount
@@ -1321,23 +1323,34 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		})
 	}
 
+	return buildBaseTx(s.vm, outs, memoBytes, utxos, kc, changeAddr)
+}
+
+func buildBaseTx(
+	vm *VM,
+	outs []*avax.TransferableOutput,
+	memo []byte,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
 	var (
-		chainTime = s.vm.state.GetTimestamp()
-		feeCfg    = s.vm.GetDynamicFeesConfig(chainTime)
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
 		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 	uTx := &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Memo:         memoBytes,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Memo:         memo,
 			Outs:         outs,
 		},
 	}
@@ -1346,12 +1359,12 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 	}
 
 	toSpend := make(map[ids.ID]uint64)
-	for assetID, amount := range amounts {
-		toSpend[assetID] = amount
+	for _, out := range outs {
+		toSpend[out.AssetID()] += out.Out.Amount()
 	}
-	ins, feeOuts, keys, err := s.vm.FinanceTx(
+	ins, feeOuts, keys, err := vm.FinanceTx(
 		utxos,
-		s.vm.feeAssetID,
+		vm.feeAssetID,
 		kc,
 		toSpend,
 		feeCalc,
@@ -1363,7 +1376,7 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 
 	uTx.Ins = ins
 	uTx.Outs = append(uTx.Outs, feeOuts...)
-	codec := s.vm.parser.Codec()
+	codec := vm.parser.Codec()
 	avax.SortTransferableOutputs(uTx.Outs, codec)
 
 	tx := &txs.Tx{Unsigned: uTx}
