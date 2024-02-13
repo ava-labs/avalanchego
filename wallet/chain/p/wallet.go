@@ -34,8 +34,6 @@ type Wallet interface {
 	Signer() Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
-	// Because the P-chain doesn't intend for balance transfers to occur, this
-	// method is expensive and abuses the creation of subnets.
 	//
 	// - [outputs] specifies all the recipients and amounts that should be sent
 	//   from this transaction.
