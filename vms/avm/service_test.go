@@ -5,19 +5,14 @@ package avm
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
-	stdjson "encoding/json"
-
 	"github.com/btcsuite/btcd/btcutil/bech32"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -32,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
@@ -46,6 +40,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 func TestServiceIssueTx(t *testing.T) {
@@ -526,7 +522,7 @@ func TestServiceGetTx(t *testing.T) {
 	}, &reply))
 
 	var txStr string
-	require.NoError(stdjson.Unmarshal(reply.Tx, &txStr))
+	require.NoError(json.Unmarshal(reply.Tx, &txStr))
 
 	txBytes, err := formatting.Decode(reply.Encoding, txStr)
 	require.NoError(err)
@@ -553,9 +549,9 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -636,8 +632,8 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	require.Equal(formatting.JSON, reply.Encoding)
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -729,9 +725,9 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -853,9 +849,9 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -958,9 +954,9 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -1096,9 +1092,9 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -1205,9 +1201,9 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -1351,9 +1347,9 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -1457,9 +1453,9 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		Encoding: formatting.JSON,
 	}, &reply))
 
-	require.Equal(reply.Encoding, formatting.JSON)
+	require.Equal(formatting.JSON, reply.Encoding)
 
-	replyTxBytes, err := stdjson.MarshalIndent(reply.Tx, "", "\t")
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
 	require.NoError(err)
 
 	expectedReplyTxString := `{
@@ -1962,7 +1958,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			label:       "invalid address: '<ChainID>-'",
 			expectedErr: bech32.ErrInvalidLength(0),
 			args: &api.GetUTXOsArgs{
-				Addresses: []string{fmt.Sprintf("%s-", env.vm.ctx.ChainID.String())},
+				Addresses: []string{env.vm.ctx.ChainID.String() + "-"},
 			},
 		},
 		{
@@ -2003,7 +1999,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 				Addresses: []string{
 					xAddr,
 				},
-				Limit: json.Uint32(numUTXOs + 1),
+				Limit: avajson.Uint32(numUTXOs + 1),
 			},
 		},
 		{
@@ -2731,7 +2727,7 @@ func TestServiceGetBlock(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, interface{}) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -2873,10 +2869,10 @@ func TestServiceGetBlock(t *testing.T) {
 			}
 			require.Equal(tt.encoding, reply.Encoding)
 
-			expectedJSON, err := stdjson.Marshal(expected)
+			expectedJSON, err := json.Marshal(expected)
 			require.NoError(err)
 
-			require.Equal(stdjson.RawMessage(expectedJSON), reply.Block)
+			require.Equal(json.RawMessage(expectedJSON), reply.Block)
 		})
 	}
 }
@@ -2897,7 +2893,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, interface{}) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -3068,7 +3064,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			service, expected := tt.serviceAndExpectedBlockFunc(t, ctrl)
 
 			args := &api.GetBlockByHeightArgs{
-				Height:   json.Uint64(blockHeight),
+				Height:   avajson.Uint64(blockHeight),
 				Encoding: tt.encoding,
 			}
 			reply := &api.GetBlockResponse{}
@@ -3079,10 +3075,10 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			}
 			require.Equal(tt.encoding, reply.Encoding)
 
-			expectedJSON, err := stdjson.Marshal(expected)
+			expectedJSON, err := json.Marshal(expected)
 			require.NoError(err)
 
-			require.Equal(stdjson.RawMessage(expectedJSON), reply.Block)
+			require.Equal(json.RawMessage(expectedJSON), reply.Block)
 		})
 	}
 }
@@ -3102,7 +3098,7 @@ func TestServiceGetHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceFunc: func(ctrl *gomock.Controller) *Service {
+			serviceFunc: func(*gomock.Controller) *Service {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -3169,7 +3165,7 @@ func TestServiceGetHeight(t *testing.T) {
 			if tt.expectedErr != nil {
 				return
 			}
-			require.Equal(json.Uint64(blockHeight), reply.Height)
+			require.Equal(avajson.Uint64(blockHeight), reply.Height)
 		})
 	}
 }

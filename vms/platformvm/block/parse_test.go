@@ -199,7 +199,7 @@ func TestCommitBlock(t *testing.T) {
 		// compare content
 		require.Equal(banffCommitBlk.ID(), parsed.ID())
 		require.Equal(banffCommitBlk.Bytes(), parsed.Bytes())
-		require.Equal(banffCommitBlk.Parent(), banffCommitBlk.Parent())
+		require.Equal(banffCommitBlk.Parent(), parsed.Parent())
 		require.Equal(banffCommitBlk.Height(), parsed.Height())
 
 		// timestamp check for banff blocks only
@@ -242,7 +242,7 @@ func TestAbortBlock(t *testing.T) {
 		// compare content
 		require.Equal(banffAbortBlk.ID(), parsed.ID())
 		require.Equal(banffAbortBlk.Bytes(), parsed.Bytes())
-		require.Equal(banffAbortBlk.Parent(), banffAbortBlk.Parent())
+		require.Equal(banffAbortBlk.Parent(), parsed.Parent())
 		require.Equal(banffAbortBlk.Height(), parsed.Height())
 
 		// timestamp check for banff blocks only

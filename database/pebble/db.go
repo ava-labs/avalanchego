@@ -12,9 +12,7 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
