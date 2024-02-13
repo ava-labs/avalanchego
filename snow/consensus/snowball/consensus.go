@@ -40,15 +40,18 @@ type Consensus interface {
 	Finalized() bool
 }
 
-// NnarySnowball augments NnarySnowflake with a counter that tracks the total
-// number of positive responses from a network sample.
-type NnarySnowball interface{ NnarySnowflake }
+// Factory produces Nnary and Unary decision instances
+type Factory interface {
+	NewNnary(params Parameters, choice ids.ID) Nnary
+	NewUnary(params Parameters) Unary
+}
 
-// NnarySnowflake is a snowflake instance deciding between an unbounded number
-// of values. After performing a network sample of k nodes, if you have alpha
-// votes for one of the choices, you should vote for that choice. Otherwise, you
-// should reset.
-type NnarySnowflake interface {
+// Nnary is a snow instance deciding between an unbounded number of values.
+// The caller samples k nodes and then calls
+// 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
+// 2. RecordPollPreference if choice collects >= alphaPreference votes
+// 3. RecordUnsuccessfulPoll otherwise
+type Nnary interface {
 	fmt.Stringer
 
 	// Adds a new possible choice
@@ -73,29 +76,12 @@ type NnarySnowflake interface {
 	Finalized() bool
 }
 
-// NnarySlush is a slush instance deciding between an unbounded number of
-// values. After performing a network sample of k nodes, if you have alpha
-// votes for one of the choices, you should vote for that choice.
-type NnarySlush interface {
-	fmt.Stringer
-
-	// Returns the currently preferred choice to be finalized
-	Preference() ids.ID
-
-	// RecordSuccessfulPoll records a successful poll towards finalizing the
-	// specified choice. Assumes the choice was previously added.
-	RecordSuccessfulPoll(choice ids.ID)
-}
-
-// BinarySnowball augments BinarySnowflake with a counter that tracks the total
-// number of positive responses from a network sample.
-type BinarySnowball interface{ BinarySnowflake }
-
-// BinarySnowflake is a snowball instance deciding between two values
-// After performing a network sample of k nodes, if you have alpha votes for
-// one of the choices, you should vote for that choice. Otherwise, you should
-// reset.
-type BinarySnowflake interface {
+// Binary is a snow instance deciding between two values.
+// The caller samples k nodes and then calls
+// 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
+// 2. RecordPollPreference if choice collects >= alphaPreference votes
+// 3. RecordUnsuccessfulPoll otherwise
+type Binary interface {
 	fmt.Stringer
 
 	// Returns the currently preferred choice to be finalized
@@ -116,31 +102,20 @@ type BinarySnowflake interface {
 	Finalized() bool
 }
 
-// BinarySlush is a slush instance deciding between two values. After performing
-// a network sample of k nodes, if you have alpha votes for one of the choices,
-// you should vote for that choice.
-type BinarySlush interface {
+// Unary is a snow instance deciding on one value.
+// The caller samples k nodes and then calls
+// 1. RecordSuccessfulPoll if choice collects >= alphaConfidence votes
+// 2. RecordPollPreference if choice collects >= alphaPreference votes
+// 3. RecordUnsuccessfulPoll otherwise
+type Unary interface {
 	fmt.Stringer
 
-	// Returns the currently preferred choice to be finalized
-	Preference() int
-
-	// RecordSuccessfulPoll records a successful poll towards finalizing the
-	// specified choice
-	RecordSuccessfulPoll(choice int)
-}
-
-// UnarySnowball is a snowball instance deciding on one value. After performing
-// a network sample of k nodes, if you have alpha votes for the choice, you
-// should vote. Otherwise, you should reset.
-type UnarySnowball interface {
-	fmt.Stringer
-
-	// RecordSuccessfulPoll records a successful poll towards finalizing
+	// RecordSuccessfulPoll records a successful poll that reaches an alpha
+	// confidence threshold.
 	RecordSuccessfulPoll()
 
-	// RecordPollPreference records a poll that strengthens the preference but
-	// did not contribute towards finalizing
+	// RecordPollPreference records a poll that receives an alpha preference
+	// threshold, but not an alpha confidence threshold.
 	RecordPollPreference()
 
 	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
@@ -151,31 +126,8 @@ type UnarySnowball interface {
 
 	// Returns a new binary snowball instance with the agreement parameters
 	// transferred. Takes in the new beta value and the original choice
-	Extend(beta, originalPreference int) BinarySnowball
-
-	// Returns a new unary snowball instance with the same state
-	Clone() UnarySnowball
-}
-
-// UnarySnowflake is a snowflake instance deciding on one value. After
-// performing a network sample of k nodes, if you have alpha votes for the
-// choice, you should vote. Otherwise, you should reset.
-type UnarySnowflake interface {
-	fmt.Stringer
-
-	// RecordSuccessfulPoll records a successful poll towards finalizing
-	RecordSuccessfulPoll()
-
-	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
-	RecordUnsuccessfulPoll()
-
-	// Return whether a choice has been finalized
-	Finalized() bool
-
-	// Returns a new binary snowball instance with the agreement parameters
-	// transferred. Takes in the new beta value and the original choice
-	Extend(beta, originalPreference int) BinarySnowflake
+	Extend(beta, originalPreference int) Binary
 
 	// Returns a new unary snowflake instance with the same state
-	Clone() UnarySnowflake
+	Clone() Unary
 }

@@ -1251,6 +1251,7 @@ func (s *Service) buildAddValidatorTx(args *AddValidatorArgs) (*txs.Tx, ids.Shor
 		uint32(10000*args.DelegationFeeRate), // Shares
 		privKeys.Keys,                        // Keys providing the staked tokens
 		changeAddr,
+		nil,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
@@ -1369,6 +1370,7 @@ func (s *Service) buildAddDelegatorTx(args *AddDelegatorArgs) (*txs.Tx, ids.Shor
 		rewardAddress,          // Reward Address
 		privKeys.Keys,          // Private keys
 		changeAddr,             // Change address
+		nil,                    // Memo
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
@@ -1483,6 +1485,7 @@ func (s *Service) buildAddSubnetValidatorTx(args *AddSubnetValidatorArgs) (*txs.
 		subnetID,               // Subnet ID
 		keys.Keys,
 		changeAddr,
+		nil,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
@@ -1567,6 +1570,7 @@ func (s *Service) buildCreateSubnetTx(args *CreateSubnetArgs) (*txs.Tx, ids.Shor
 		controlKeys.List(),     // Control Addresses
 		privKeys.Keys,          // Private keys
 		changeAddr,
+		nil,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
@@ -1671,6 +1675,7 @@ func (s *Service) buildExportAVAX(args *ExportAVAXArgs) (*txs.Tx, ids.ShortID, e
 		to,                  // Address
 		privKeys.Keys,       // Private keys
 		changeAddr,          // Change address
+		nil,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
@@ -1764,6 +1769,7 @@ func (s *Service) buildImportAVAXTx(args *ImportAVAXArgs) (*txs.Tx, ids.ShortID,
 		to,
 		privKeys.Keys,
 		changeAddr,
+		nil,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
@@ -1896,6 +1902,7 @@ func (s *Service) buildCreateBlockchainTx(args *CreateBlockchainArgs) (*txs.Tx, 
 		args.Name,
 		keys.Keys,
 		changeAddr, // Change address
+		nil,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err

@@ -54,6 +54,7 @@ func TestNewExportTx(t *testing.T) {
 				to,
 				tt.sourceKeys,
 				ids.ShortEmpty, // Change address
+				nil,
 			)
 			require.NoError(err)
 
