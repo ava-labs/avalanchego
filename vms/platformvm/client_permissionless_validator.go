@@ -39,13 +39,14 @@ type ClientOwner struct {
 // over client
 type ClientPermissionlessValidator struct {
 	ClientStaker
-	ValidationRewardOwner *ClientOwner
-	DelegationRewardOwner *ClientOwner
-	PotentialReward       *uint64
-	DelegationFee         float32
-	Uptime                *float32
-	Connected             *bool
-	Signer                *signer.ProofOfPossession
+	ValidationRewardOwner  *ClientOwner
+	DelegationRewardOwner  *ClientOwner
+	PotentialReward        *uint64
+	AccruedDelegateeReward *uint64
+	DelegationFee          float32
+	Uptime                 *float32
+	Connected              *bool
+	Signer                 *signer.ProofOfPossession
 	// The delegators delegating to this validator
 	DelegatorCount  *uint64
 	DelegatorWeight *uint64
@@ -125,17 +126,18 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 		}
 
 		clientValidators[i] = ClientPermissionlessValidator{
-			ClientStaker:          apiStakerToClientStaker(apiValidator.Staker),
-			ValidationRewardOwner: validationRewardOwner,
-			DelegationRewardOwner: delegationRewardOwner,
-			PotentialReward:       (*uint64)(apiValidator.PotentialReward),
-			DelegationFee:         float32(apiValidator.DelegationFee),
-			Uptime:                (*float32)(apiValidator.Uptime),
-			Connected:             &apiValidator.Connected,
-			Signer:                apiValidator.Signer,
-			DelegatorCount:        (*uint64)(apiValidator.DelegatorCount),
-			DelegatorWeight:       (*uint64)(apiValidator.DelegatorWeight),
-			Delegators:            clientDelegators,
+			ClientStaker:           apiStakerToClientStaker(apiValidator.Staker),
+			ValidationRewardOwner:  validationRewardOwner,
+			DelegationRewardOwner:  delegationRewardOwner,
+			PotentialReward:        (*uint64)(apiValidator.PotentialReward),
+			AccruedDelegateeReward: (*uint64)(apiValidator.AccruedDelegateeReward),
+			DelegationFee:          float32(apiValidator.DelegationFee),
+			Uptime:                 (*float32)(apiValidator.Uptime),
+			Connected:              &apiValidator.Connected,
+			Signer:                 apiValidator.Signer,
+			DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
+			DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
+			Delegators:             clientDelegators,
 		}
 	}
 	return clientValidators, nil

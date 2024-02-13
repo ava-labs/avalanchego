@@ -2681,6 +2681,7 @@ func TestServiceGetBlock(t *testing.T) {
 			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
+				block.EXPECT().Txs().Return(nil)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2865,6 +2866,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
+				block.EXPECT().Txs().Return(nil)
 
 				state := states.NewMockState(ctrl)
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)

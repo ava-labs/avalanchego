@@ -109,6 +109,9 @@ type Config struct {
 	// Time of the Banff network upgrade
 	BanffTime time.Time
 
+	// Time of the Cortina network upgrade
+	CortinaTime time.Time
+
 	// Time of the Athens Phase network upgrade
 	AthensPhaseTime time.Time
 

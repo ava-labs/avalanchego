@@ -25,10 +25,10 @@ func main() {
 		nextIndex uint64
 	)
 	for {
-		log.Printf("polling for next accepted block\n")
 		container, err := client.GetContainerByIndex(ctx, nextIndex)
 		if err != nil {
 			time.Sleep(time.Second)
+			log.Printf("polling for next accepted block\n")
 			continue
 		}
 

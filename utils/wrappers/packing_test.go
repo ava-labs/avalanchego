@@ -4,7 +4,6 @@
 package wrappers
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,524 +18,347 @@ const (
 )
 
 func TestPackerCheckSpace(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{Offset: -1}
 	p.checkSpace(1)
-	if !p.Errored() {
-		t.Fatal("Expected errNegativeOffset")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errNegativeOffset)
 
 	p = Packer{}
 	p.checkSpace(-1)
-	if !p.Errored() {
-		t.Fatal("Expected errInvalidInput")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errInvalidInput)
 
 	p = Packer{Bytes: []byte{0x01}, Offset: 1}
 	p.checkSpace(1)
-	if !p.Errored() {
-		t.Fatal("Expected errBadLength")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 
 	p = Packer{Bytes: []byte{0x01}, Offset: 2}
 	p.checkSpace(0)
-	if !p.Errored() {
-		t.Fatal("Expected errBadLength, due to out of bounds offset")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerExpand(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{Bytes: []byte{0x01}, Offset: 2}
 	p.expand(1)
-	if !p.Errored() {
-		t.Fatal("packer.Expand didn't notice packer had out of bounds offset")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 
 	p = Packer{Bytes: []byte{0x01, 0x02, 0x03}, Offset: 0}
 	p.expand(1)
-	if p.Errored() {
-		t.Fatalf("packer.Expand unexpectedly had error %s", p.Err)
-	} else if len(p.Bytes) != 3 {
-		t.Fatalf("packer.Expand modified byte array, when it didn't need to")
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x01, 0x02, 0x03}, p.Bytes)
 }
 
 func TestPackerPackByte(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 1}
-
 	p.PackByte(0x01)
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 1 {
-		t.Fatalf("Packer.PackByte wrote %d byte(s) but expected %d byte(s)", size, 1)
-	}
-
-	expected := []byte{0x01}
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackByte wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x01}, p.Bytes)
 
 	p.PackByte(0x02)
-	if !p.Errored() {
-		t.Fatal("Packer.PackByte did not fail when attempt was beyond p.MaxSize")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerUnpackByte(t *testing.T) {
-	var (
-		p                = Packer{Bytes: []byte{0x01}, Offset: 0}
-		actual           = p.UnpackByte()
-		expected    byte = 1
-		expectedLen      = ByteLen
-	)
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackByte unexpectedly raised %s", p.Err)
-	case actual != expected:
-		t.Fatalf("Packer.UnpackByte returned %d, but expected %d", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackByte left Offset %d, expected %d", p.Offset, expectedLen)
-	}
+	require := require.New(t)
 
-	actual = p.UnpackByte()
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackByte should have set error, due to attempted out of bounds read")
-	} else if actual != ByteSentinel {
-		t.Fatalf("Packer.UnpackByte returned %d, expected sentinel value %d", actual, ByteSentinel)
-	}
+	p := Packer{Bytes: []byte{0x01}, Offset: 0}
+	require.Equal(uint8(1), p.UnpackByte())
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(ByteLen, p.Offset)
+
+	require.Equal(uint8(ByteSentinel), p.UnpackByte())
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerPackShort(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 2}
-
 	p.PackShort(0x0102)
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 2 {
-		t.Fatalf("Packer.PackShort wrote %d byte(s) but expected %d byte(s)", size, 2)
-	}
-
-	expected := []byte{0x01, 0x02}
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackShort wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x01, 0x02}, p.Bytes)
 }
 
 func TestPackerUnpackShort(t *testing.T) {
-	var (
-		p                  = Packer{Bytes: []byte{0x01, 0x02}, Offset: 0}
-		actual             = p.UnpackShort()
-		expected    uint16 = 0x0102
-		expectedLen        = ShortLen
-	)
+	require := require.New(t)
 
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackShort unexpectedly raised %s", p.Err)
-	case actual != expected:
-		t.Fatalf("Packer.UnpackShort returned %d, but expected %d", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackShort left Offset %d, expected %d", p.Offset, expectedLen)
-	}
+	p := Packer{Bytes: []byte{0x01, 0x02}, Offset: 0}
+	require.Equal(uint16(0x0102), p.UnpackShort())
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(ShortLen, p.Offset)
 
-	actual = p.UnpackShort()
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackShort should have set error, due to attempted out of bounds read")
-	} else if actual != ShortSentinel {
-		t.Fatalf("Packer.UnpackShort returned %d, expected sentinel value %d", actual, ShortSentinel)
-	}
+	require.Equal(uint16(ShortSentinel), p.UnpackShort())
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerPackInt(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 4}
-
 	p.PackInt(0x01020304)
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 4 {
-		t.Fatalf("Packer.PackInt wrote %d byte(s) but expected %d byte(s)", size, 4)
-	}
-
-	expected := []byte{0x01, 0x02, 0x03, 0x04}
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackInt wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x01, 0x02, 0x03, 0x04}, p.Bytes)
 
 	p.PackInt(0x05060708)
-	if !p.Errored() {
-		t.Fatal("Packer.PackInt did not fail when attempt was beyond p.MaxSize")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerUnpackInt(t *testing.T) {
-	var (
-		p                  = Packer{Bytes: []byte{0x01, 0x02, 0x03, 0x04}, Offset: 0}
-		actual             = p.UnpackInt()
-		expected    uint32 = 0x01020304
-		expectedLen        = IntLen
-	)
+	require := require.New(t)
 
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackInt unexpectedly raised %s", p.Err)
-	case actual != expected:
-		t.Fatalf("Packer.UnpackInt returned %d, but expected %d", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackInt left Offset %d, expected %d", p.Offset, expectedLen)
-	}
+	p := Packer{Bytes: []byte{0x01, 0x02, 0x03, 0x04}, Offset: 0}
+	require.Equal(uint32(0x01020304), p.UnpackInt())
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(IntLen, p.Offset)
 
-	actual = p.UnpackInt()
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackInt should have set error, due to attempted out of bounds read")
-	} else if actual != IntSentinel {
-		t.Fatalf("Packer.UnpackInt returned %d, expected sentinel value %d", actual, IntSentinel)
-	}
+	require.Equal(uint32(IntSentinel), p.UnpackInt())
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerPackLong(t *testing.T) {
-	maxSize := 8
-	p := Packer{MaxSize: maxSize}
+	require := require.New(t)
 
+	p := Packer{MaxSize: 8}
 	p.PackLong(0x0102030405060708)
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != maxSize {
-		t.Fatalf("Packer.PackLong wrote %d byte(s) but expected %d byte(s)", size, maxSize)
-	}
-
-	expected := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackLong wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, p.Bytes)
 
 	p.PackLong(0x090a0b0c0d0e0f00)
-	if !p.Errored() {
-		t.Fatal("Packer.PackLong did not fail when attempt was beyond p.MaxSize")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerUnpackLong(t *testing.T) {
-	var (
-		p                  = Packer{Bytes: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, Offset: 0}
-		actual             = p.UnpackLong()
-		expected    uint64 = 0x0102030405060708
-		expectedLen        = LongLen
-	)
+	require := require.New(t)
 
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackLong unexpectedly raised %s", p.Err)
-	case actual != expected:
-		t.Fatalf("Packer.UnpackLong returned %d, but expected %d", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackLong left Offset %d, expected %d", p.Offset, expectedLen)
-	}
+	p := Packer{Bytes: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, Offset: 0}
+	require.Equal(uint64(0x0102030405060708), p.UnpackLong())
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(LongLen, p.Offset)
 
-	actual = p.UnpackLong()
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackLong should have set error, due to attempted out of bounds read")
-	} else if actual != LongSentinel {
-		t.Fatalf("Packer.UnpackLong returned %d, expected sentinel value %d", actual, LongSentinel)
-	}
+	require.Equal(uint64(LongSentinel), p.UnpackLong())
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerPackFixedBytes(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 4}
+	p.PackFixedBytes([]byte("Avax"))
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte("Avax"), p.Bytes)
 
 	p.PackFixedBytes([]byte("Avax"))
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 4 {
-		t.Fatalf("Packer.PackFixedBytes wrote %d byte(s) but expected %d byte(s)", size, 4)
-	}
-
-	expected := []byte("Avax")
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackFixedBytes wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
-
-	p.PackFixedBytes([]byte("Avax"))
-	if !p.Errored() {
-		t.Fatal("Packer.PackFixedBytes did not fail when attempt was beyond p.MaxSize")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerUnpackFixedBytes(t *testing.T) {
-	var (
-		p           = Packer{Bytes: []byte("Avax")}
-		actual      = p.UnpackFixedBytes(4)
-		expected    = []byte("Avax")
-		expectedLen = 4
-	)
+	require := require.New(t)
 
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackFixedBytes unexpectedly raised %s", p.Err)
-	case !bytes.Equal(actual, expected):
-		t.Fatalf("Packer.UnpackFixedBytes returned %d, but expected %d", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackFixedBytes left Offset %d, expected %d", p.Offset, expectedLen)
-	}
+	p := Packer{Bytes: []byte("Avax")}
+	require.Equal([]byte("Avax"), p.UnpackFixedBytes(4))
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(4, p.Offset)
 
-	actual = p.UnpackFixedBytes(4)
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackFixedBytes should have set error, due to attempted out of bounds read")
-	} else if actual != nil {
-		t.Fatalf("Packer.UnpackFixedBytes returned %v, expected sentinel value %v", actual, nil)
-	}
+	require.Nil(p.UnpackFixedBytes(4))
+	require.True(p.Errored())
+	require.Error(p.Err, errBadLength)
 }
 
 func TestPackerPackBytes(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 8}
+	p.PackBytes([]byte("Avax"))
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte("\x00\x00\x00\x04Avax"), p.Bytes)
 
 	p.PackBytes([]byte("Avax"))
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 8 {
-		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 8)
-	}
-
-	expected := []byte("\x00\x00\x00\x04Avax")
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackBytes wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
-
-	p.PackBytes([]byte("Avax"))
-	if !p.Errored() {
-		t.Fatal("Packer.PackBytes did not fail when attempt was beyond p.MaxSize")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerUnpackBytes(t *testing.T) {
-	var (
-		p           = Packer{Bytes: []byte("\x00\x00\x00\x04Avax")}
-		actual      = p.UnpackBytes()
-		expected    = []byte("Avax")
-		expectedLen = 8
-	)
+	require := require.New(t)
 
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackBytes unexpectedly raised %s", p.Err)
-	case !bytes.Equal(actual, expected):
-		t.Fatalf("Packer.UnpackBytes returned %x, but expected %x", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackBytes left Offset %d, expected %d", p.Offset, expectedLen)
-	}
+	p := Packer{Bytes: []byte("\x00\x00\x00\x04Avax")}
+	require.Equal([]byte("Avax"), p.UnpackBytes())
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(8, p.Offset)
 
-	actual = p.UnpackBytes()
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackBytes should have set error, due to attempted out of bounds read")
-	} else if actual != nil {
-		t.Fatalf("Packer.UnpackBytes returned %v, expected sentinel value %v", actual, nil)
-	}
+	require.Nil(p.UnpackBytes())
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerUnpackLimitedBytes(t *testing.T) {
-	var (
-		p           = Packer{Bytes: []byte("\x00\x00\x00\x04Avax")}
-		actual      = p.UnpackLimitedBytes(10)
-		expected    = []byte("Avax")
-		expectedLen = 8
-		require     = require.New(t)
-	)
-	require.NoError(p.Err)
-	require.False(p.Errored())
-	require.Equal(expected, actual)
-	require.Equal(expectedLen, p.Offset)
+	require := require.New(t)
 
-	actual = p.UnpackLimitedBytes(10)
+	p := Packer{Bytes: []byte("\x00\x00\x00\x04Avax")}
+	require.Equal([]byte("Avax"), p.UnpackLimitedBytes(10))
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(8, p.Offset)
+
+	require.Nil(p.UnpackLimitedBytes(10))
+	require.True(p.Errored())
 	require.ErrorIs(p.Err, errBadLength)
-	require.Nil(actual)
 
 	// Reset and don't allow enough bytes
 	p = Packer{Bytes: p.Bytes}
-	actual = p.UnpackLimitedBytes(2)
+	require.Nil(p.UnpackLimitedBytes(2))
+	require.True(p.Errored())
 	require.ErrorIs(p.Err, errOversized)
-	require.Nil(actual)
 }
 
 func TestPackerString(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 6}
 
 	p.PackStr("Avax")
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 6 {
-		t.Fatalf("Packer.PackStr wrote %d byte(s) but expected %d byte(s)", size, 5)
-	}
-
-	expected := []byte{0x00, 0x04, 0x41, 0x76, 0x61, 0x78}
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackStr wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x00, 0x04, 0x41, 0x76, 0x61, 0x78}, p.Bytes)
 }
 
 func TestPackerUnpackString(t *testing.T) {
-	var (
-		p           = Packer{Bytes: []byte("\x00\x04Avax")}
-		actual      = p.UnpackStr()
-		expected    = "Avax"
-		expectedLen = 6
-		require     = require.New(t)
-	)
-	require.NoError(p.Err)
-	require.False(p.Errored())
-	require.Equal(expected, actual)
-	require.Equal(expectedLen, p.Offset)
+	require := require.New(t)
 
-	actual = p.UnpackStr()
+	p := Packer{Bytes: []byte("\x00\x04Avax")}
+
+	require.Equal("Avax", p.UnpackStr())
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(6, p.Offset)
+
+	require.Equal("", p.UnpackStr())
+	require.True(p.Errored())
 	require.ErrorIs(p.Err, errBadLength)
-	require.Equal("", actual)
 }
 
 func TestPackerUnpackLimitedString(t *testing.T) {
-	var (
-		p           = Packer{Bytes: []byte("\x00\x04Avax")}
-		actual      = p.UnpackLimitedStr(10)
-		expected    = "Avax"
-		expectedLen = 6
-		require     = require.New(t)
-	)
-	require.NoError(p.Err)
-	require.False(p.Errored())
-	require.Equal(expected, actual)
-	require.Equal(expectedLen, p.Offset)
+	require := require.New(t)
 
-	actual = p.UnpackLimitedStr(10)
+	p := Packer{Bytes: []byte("\x00\x04Avax")}
+	require.Equal("Avax", p.UnpackLimitedStr(10))
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(6, p.Offset)
+
+	require.Equal("", p.UnpackLimitedStr(10))
+	require.True(p.Errored())
 	require.ErrorIs(p.Err, errBadLength)
-	require.Equal("", actual)
 
 	// Reset and don't allow enough bytes
 	p = Packer{Bytes: p.Bytes}
-	actual = p.UnpackLimitedStr(2)
+	require.Equal("", p.UnpackLimitedStr(2))
+	require.True(p.Errored())
 	require.ErrorIs(p.Err, errOversized)
-	require.Equal("", actual)
 }
 
 func TestPacker(t *testing.T) {
-	packer := Packer{
-		MaxSize: 3,
-	}
+	require := require.New(t)
 
-	if packer.Errored() {
-		t.Fatalf("Packer has error %s", packer.Err)
-	}
+	p := Packer{MaxSize: 3}
 
-	packer.PackShort(17)
-	if len(packer.Bytes) != 2 {
-		t.Fatalf("Wrong byte length")
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
 
-	packer.PackShort(1)
-	if !packer.Errored() {
-		t.Fatalf("Packer should have error")
-	}
+	p.PackShort(17)
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x0, 0x11}, p.Bytes)
 
-	newPacker := Packer{
-		Bytes: packer.Bytes,
-	}
+	p.PackShort(1)
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 
-	if newPacker.UnpackShort() != 17 {
-		t.Fatalf("Unpacked wrong value")
-	}
+	p = Packer{Bytes: p.Bytes}
+	require.Equal(uint16(17), p.UnpackShort())
+	require.False(p.Errored())
+	require.NoError(p.Err)
 }
 
 func TestPackBool(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 3}
 	p.PackBool(false)
 	p.PackBool(true)
 	p.PackBool(false)
-	if p.Errored() {
-		t.Fatal("should have been able to pack 3 bools")
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
 
-	p2 := Packer{Bytes: p.Bytes}
-	bool1, bool2, bool3 := p2.UnpackBool(), p2.UnpackBool(), p2.UnpackBool()
-
-	if p.Errored() {
-		t.Fatalf("errors while unpacking bools: %v", p.Errs)
-	}
-
-	if bool1 || !bool2 || bool3 {
-		t.Fatal("got back wrong values")
-	}
+	p = Packer{Bytes: p.Bytes}
+	bool1, bool2, bool3 := p.UnpackBool(), p.UnpackBool(), p.UnpackBool()
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.False(bool1)
+	require.True(bool2)
+	require.False(bool3)
 }
 
 func TestPackerPackBool(t *testing.T) {
+	require := require.New(t)
+
 	p := Packer{MaxSize: 1}
 
 	p.PackBool(true)
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 1 {
-		t.Fatalf("Packer.PackBool wrote %d byte(s) but expected %d byte(s)", size, 1)
-	}
-
-	expected := []byte{0x01}
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackBool wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0x01}, p.Bytes)
 
 	p.PackBool(false)
-	if !p.Errored() {
-		t.Fatal("Packer.PackLong did not fail when attempt was beyond p.MaxSize")
-	}
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerUnpackBool(t *testing.T) {
-	var (
-		p           = Packer{Bytes: []byte{0x01}, Offset: 0}
-		actual      = p.UnpackBool()
-		expected    = true
-		expectedLen = BoolLen
-	)
+	require := require.New(t)
 
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackBool unexpectedly raised %s", p.Err)
-	case actual != expected:
-		t.Fatalf("Packer.UnpackBool returned %t, but expected %t", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackBool left Offset %d, expected %d", p.Offset, expectedLen)
-	}
+	p := Packer{Bytes: []byte{0x01}, Offset: 0}
 
-	actual = p.UnpackBool()
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackBool should have set error, due to attempted out of bounds read")
-	} else if actual != BoolSentinel {
-		t.Fatalf("Packer.UnpackBool returned %t, expected sentinel value %t", actual, BoolSentinel)
-	}
+	require.Equal(true, p.UnpackBool())
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal(BoolLen, p.Offset)
+
+	require.Equal(BoolSentinel, p.UnpackBool())
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadLength)
 
 	p = Packer{Bytes: []byte{0x42}, Offset: 0}
-	expected = false
-	actual = p.UnpackBool()
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackBool id not raise error for invalid boolean value %v", p.Bytes)
-	} else if actual != expected {
-		t.Fatalf("Packer.UnpackBool returned %t, expected sentinel value %t", actual, BoolSentinel)
-	}
+	require.Equal(false, p.UnpackBool())
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, errBadBool)
 }
