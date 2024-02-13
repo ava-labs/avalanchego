@@ -49,7 +49,7 @@ func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer, blsSigner *bls.SecretKey) (*
 
 func (ip *UnsignedIP) bytes() []byte {
 	p := wrappers.Packer{
-		Bytes: make([]byte, wrappers.IPLen+wrappers.LongLen),
+		Bytes: make([]byte, ips.IPPortLen+wrappers.LongLen),
 	}
 	ips.PackIP(&p, ip.IPPort)
 	p.PackLong(ip.Timestamp)
