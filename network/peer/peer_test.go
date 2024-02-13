@@ -384,6 +384,65 @@ func TestPingUptimes(t *testing.T) {
 	}
 }
 
+// Test that a peer using the wrong BLS key is disconnected from.
+func TestInvalidBLSKeyDisconnects(t *testing.T) {
+	require := require.New(t)
+
+	rawPeer0, rawPeer1 := makeRawTestPeers(t, nil)
+	require.NoError(rawPeer0.config.Validators.AddStaker(
+		constants.PrimaryNetworkID,
+		rawPeer1.nodeID,
+		bls.PublicFromSecretKey(rawPeer1.config.IPSigner.blsSigner),
+		ids.GenerateTestID(),
+		1,
+	))
+
+	bogusBLSKey, err := bls.NewSecretKey()
+	require.NoError(err)
+	require.NoError(rawPeer1.config.Validators.AddStaker(
+		constants.PrimaryNetworkID,
+		rawPeer0.nodeID,
+		bls.PublicFromSecretKey(bogusBLSKey), // This is the wrong BLS key for this peer
+		ids.GenerateTestID(),
+		1,
+	))
+	peer0 := &testPeer{
+		Peer: Start(
+			rawPeer0.config,
+			rawPeer0.conn,
+			rawPeer1.cert,
+			rawPeer1.nodeID,
+			NewThrottledMessageQueue(
+				rawPeer0.config.Metrics,
+				rawPeer1.nodeID,
+				logging.NoLog{},
+				throttling.NewNoOutboundThrottler(),
+			),
+		),
+		inboundMsgChan: rawPeer0.inboundMsgChan,
+	}
+	peer1 := &testPeer{
+		Peer: Start(
+			rawPeer1.config,
+			rawPeer1.conn,
+			rawPeer0.cert,
+			rawPeer0.nodeID,
+			NewThrottledMessageQueue(
+				rawPeer1.config.Metrics,
+				rawPeer0.nodeID,
+				logging.NoLog{},
+				throttling.NewNoOutboundThrottler(),
+			),
+		),
+		inboundMsgChan: rawPeer1.inboundMsgChan,
+	}
+
+	// Because peer1 thinks that peer0 is using the wrong BLS key, they should
+	// disconnect from each other.
+	require.NoError(peer0.AwaitClosed(context.Background()))
+	require.NoError(peer1.AwaitClosed(context.Background()))
+}
+
 // Helper to send a message from sender to receiver and assert that the
 // receiver receives the message. This can be used to test a prior message
 // was handled by the peer.
