@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -1085,6 +1086,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			p.Log.Warn("beacon has invalid signature or is out of sync",
 				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "tls"),
 				zap.Uint64("peerTime", msg.MyTime),
 				zap.Uint64("myTime", myTimeUnix),
 				zap.Error(err),
@@ -1092,6 +1094,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		} else {
 			p.Log.Debug("peer has invalid signature or is out of sync",
 				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "tls"),
 				zap.Uint64("peerTime", msg.MyTime),
 				zap.Uint64("myTime", myTimeUnix),
 				zap.Error(err),
@@ -1100,6 +1103,22 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 		p.StartClose()
 		return
+	}
+
+	if len(msg.IpBlsSig) > 0 {
+		signature, err := bls.SignatureFromBytes(msg.IpBlsSig)
+		if err != nil {
+			p.Log.Debug("peer has malformed signature",
+				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "bls"),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
+
+		p.ip.BLSSignature = signature
+		p.ip.BLSSignatureBytes = msg.IpBlsSig
 	}
 
 	p.gotHandshake.Set(true)
