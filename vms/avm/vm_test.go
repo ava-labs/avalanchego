@@ -377,51 +377,47 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	}()
 
 	// send second asset
-	feeAssetCreateTx := getCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
-	createTx := getCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
+	var (
+		key = keys[0]
+		kc  = secp256k1fx.NewKeychain()
 
-	tx := &txs.Tx{Unsigned: &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-			Ins: []*avax.TransferableInput{
-				// fee asset
-				{
-					UTXOID: avax.UTXOID{
-						TxID:        feeAssetCreateTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: feeAssetCreateTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
-						},
+		feeAssetCreateTx = getCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
+		createTx         = getCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
+	)
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+
+	tx, _, err := buildBaseTx(
+		env.vm,
+		[]*avax.TransferableOutput{
+			{ // fee asset
+				Asset: avax.Asset{ID: feeAssetCreateTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - env.vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
 					},
 				},
-				// issued asset
-				{
-					UTXOID: avax.UTXOID{
-						TxID:        createTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: createTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
-						},
+			},
+			{ // issued asset
+				Asset: avax.Asset{ID: createTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - env.vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
 					},
 				},
 			},
 		},
-	}}
-	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}, {keys[0]}}))
-
+		nil, // memo
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -455,6 +451,9 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+		},
 		notLinearized: true,
 	})
 	defer func() {
@@ -462,40 +461,34 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	key := keys[0]
-	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        env.genesisTx.ID(),
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: env.genesisTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: startBalance,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
-					},
-				},
-			}},
-			Outs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: env.genesisTx.ID()},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - env.vm.TxFee,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
-			}},
-		},
-	}}
-	require.NoError(firstTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	var (
+		key = keys[0]
+		kc  = secp256k1fx.NewKeychain()
+	)
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
 
+	firstTx, _, err := buildBaseTx(
+		env.vm,
+		[]*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: env.genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: startBalance - env.vm.TxFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+		nil, // memo
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
+
+	// let secondTx spend firstTx outputs
 	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,

@@ -1268,55 +1268,52 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		})
 	}
 
-	amountsWithFee := make(map[ids.ID]uint64, len(amounts)+1)
-	for assetID, amount := range amounts {
-		amountsWithFee[assetID] = amount
+	return buildBaseTx(s.vm, outs, memoBytes, utxos, kc, changeAddr)
+}
+
+func buildBaseTx(
+	vm *VM,
+	outs []*avax.TransferableOutput,
+	memo []byte,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	uTx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Memo:         memo,
+			Outs:         outs,
+		},
 	}
 
-	amountWithFee, err := safemath.Add64(amounts[s.vm.feeAssetID], s.vm.TxFee)
+	toBurn := make(map[ids.ID]uint64) // UTXOs to move + fees
+	for _, out := range outs {
+		toBurn[out.AssetID()] += out.Out.Amount()
+	}
+	amountWithFee, err := safemath.Add64(toBurn[vm.feeAssetID], vm.TxFee)
 	if err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
-	amountsWithFee[s.vm.feeAssetID] = amountWithFee
+	toBurn[vm.feeAssetID] = amountWithFee
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
+	ins, feeOuts, keys, err := vm.NewSpend(
 		utxos,
 		kc,
-		amountsWithFee,
+		toBurn,
+		changeAddr,
 	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	// Add the required change outputs
-	for assetID, amountWithFee := range amountsWithFee {
-		amountSpent := amountsSpent[assetID]
+	uTx.Ins = ins
+	uTx.Outs = append(uTx.Outs, feeOuts...)
+	codec := vm.parser.Codec()
+	avax.SortTransferableOutputs(uTx.Outs, codec)
 
-		if amountSpent > amountWithFee {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amountSpent - amountWithFee,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
-	}
-
-	codec := s.vm.parser.Codec()
-	avax.SortTransferableOutputs(outs, codec)
-
-	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    s.vm.ctx.NetworkID,
-		BlockchainID: s.vm.ctx.ChainID,
-		Outs:         outs,
-		Ins:          ins,
-		Memo:         memoBytes,
-	}}}
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
 
