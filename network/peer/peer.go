@@ -732,6 +732,15 @@ func (p *peer) sendNetworkMessages() {
 	}
 }
 
+// shouldDisconnect is called both during receipt of the Handshake message and
+// periodically when sending a Ping message (after finishing the handshake!).
+//
+// It is called during the Handshake to prevent marking a peer as connected and
+// then immediately disconnecting from them.
+//
+// It is called when sending a Ping message to account for validator set
+// changes. It's called when sending a Ping rather than in a validator set
+// callback to avoid signature verification on the P-chain accept path.
 func (p *peer) shouldDisconnect() bool {
 	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
 		p.Log.Debug("disconnecting from peer",
