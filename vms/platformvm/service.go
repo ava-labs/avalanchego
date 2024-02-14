@@ -521,9 +521,9 @@ type GetSubnetResponse struct {
 	// whether it is permissioned or not
 	IsPermissioned bool `json:"isPermissioned"`
 	// subnet auth information for a permissioned subnet
-	ControlKeys []string    `json:"controlKeys"`
-	Threshold   json.Uint32 `json:"threshold"`
-	Locktime    json.Uint64 `json:"locktime"`
+	ControlKeys []string       `json:"controlKeys"`
+	Threshold   avajson.Uint32 `json:"threshold"`
+	Locktime    avajson.Uint64 `json:"locktime"`
 	// subnet transformation tx ID for a permissionless subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
 }
@@ -560,8 +560,8 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 	}
 
 	response.ControlKeys = controlAddrs
-	response.Threshold = json.Uint32(owner.Threshold)
-	response.Locktime = json.Uint64(owner.Locktime)
+	response.Threshold = avajson.Uint32(owner.Threshold)
+	response.Locktime = avajson.Uint64(owner.Locktime)
 
 	switch subnetTransformationTx, err := s.vm.state.GetSubnetTransformation(args.SubnetID); err {
 	case nil:
