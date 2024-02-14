@@ -179,6 +179,9 @@ type Config struct {
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
 	// Gossip a container in the accepted frontier every [ConsensusGossipFrequency]
 	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
+	// ConsensusAppConcurrency defines the maximum number of goroutines to
+	// handle App messages per chain.
+	ConsensusAppConcurrency int `json:"consensusAppConcurrency"`
 
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 

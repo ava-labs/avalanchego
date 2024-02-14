@@ -265,7 +265,7 @@ func TestDeferredStakers(t *testing.T) {
 					Tx:            tx,
 				}
 				require.NoError(tx.Unsigned.Visit(&executor))
-				executor.OnCommitState.Apply(env.state)
+				require.NoError(executor.OnCommitState.Apply(env.state))
 
 				env.state.SetHeight(dummyHeight)
 				require.NoError(env.state.Commit())
@@ -400,7 +400,9 @@ func deferValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *s
 		return nil, err
 	}
 
-	executor.State.Apply(env.state)
+	if err := executor.State.Apply(env.state); err != nil {
+		return nil, err
+	}
 
 	if err := env.state.Commit(); err != nil {
 		return nil, err

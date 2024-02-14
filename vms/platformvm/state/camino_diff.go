@@ -652,7 +652,7 @@ func (d *diff) SetFeeDistribution(feeDistribution [dac.FeeDistributionFractionsC
 }
 
 // Finally apply all changes
-func (d *diff) ApplyCaminoState(baseState State) {
+func (d *diff) ApplyCaminoState(baseState State) error {
 	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
 		baseState.SetNotDistributedValidatorReward(*d.caminoDiff.modifiedNotDistributedValidatorReward)
 	}
@@ -724,4 +724,5 @@ func (d *diff) ApplyCaminoState(baseState State) {
 			}
 		}
 	}
+	return nil
 }

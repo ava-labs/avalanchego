@@ -5129,6 +5129,7 @@ func TestDiffApplyCaminoState(t *testing.T) {
 		diff         *diff
 		state        func(*gomock.Controller, *diff) *MockState
 		expectedDiff *diff
+		expectedErr  error
 	}{
 		"OK": {
 			diff: &diff{caminoDiff: &caminoDiff{
@@ -5300,7 +5301,8 @@ func TestDiffApplyCaminoState(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			tt.diff.ApplyCaminoState(tt.state(ctrl, tt.diff))
+			err := tt.diff.ApplyCaminoState(tt.state(ctrl, tt.diff))
+			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedDiff, tt.diff)
 		})
 	}

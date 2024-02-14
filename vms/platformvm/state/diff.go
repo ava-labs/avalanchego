@@ -34,7 +34,7 @@ var (
 type Diff interface {
 	Chain
 
-	Apply(State)
+	Apply(State) error
 	CaminoApply
 }
 
@@ -48,7 +48,9 @@ type diff struct {
 	currentSupply map[ids.ID]uint64
 
 	currentStakerDiffs diffStakers
-	pendingStakerDiffs diffStakers
+	// map of subnetID -> nodeID -> total accrued delegatee rewards
+	modifiedDelegateeRewards map[ids.ID]map[ids.NodeID]uint64
+	pendingStakerDiffs       diffStakers
 
 	addedSubnets []*txs.Tx
 	// Subnet ID --> Tx that transforms the subnet
@@ -134,6 +136,31 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		}
 		return parentState.GetCurrentValidator(subnetID, nodeID)
 	}
+}
+
+func (d *diff) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error {
+	if d.modifiedDelegateeRewards == nil {
+		d.modifiedDelegateeRewards = make(map[ids.ID]map[ids.NodeID]uint64)
+	}
+	nodes, ok := d.modifiedDelegateeRewards[subnetID]
+	if !ok {
+		nodes = make(map[ids.NodeID]uint64)
+		d.modifiedDelegateeRewards[subnetID] = nodes
+	}
+	nodes[nodeID] = amount
+	return nil
+}
+
+func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
+	amount, modified := d.modifiedDelegateeRewards[subnetID][nodeID]
+	if modified {
+		return amount, nil
+	}
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.GetDelegateeReward(subnetID, nodeID)
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) {
@@ -445,7 +472,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 	}
 }
 
-func (d *diff) Apply(baseState State) {
+func (d *diff) Apply(baseState State) error {
 	baseState.SetTimestamp(d.timestamp)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
@@ -467,6 +494,13 @@ func (d *diff) Apply(baseState State) {
 
 			for _, delegator := range validatorDiff.deletedDelegators {
 				baseState.DeleteCurrentDelegator(delegator)
+			}
+		}
+	}
+	for subnetID, nodes := range d.modifiedDelegateeRewards {
+		for nodeID, amount := range nodes {
+			if err := baseState.SetDelegateeReward(subnetID, nodeID, amount); err != nil {
+				return err
 			}
 		}
 	}
@@ -516,5 +550,5 @@ func (d *diff) Apply(baseState State) {
 			baseState.DeleteUTXO(utxoID)
 		}
 	}
-	d.ApplyCaminoState(baseState)
+	return d.ApplyCaminoState(baseState)
 }

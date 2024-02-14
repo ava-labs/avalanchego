@@ -6,6 +6,7 @@ package snowstorm
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -182,12 +183,26 @@ func (dg *Directed) Finalized() bool {
 func (dg *Directed) HealthCheck(context.Context) (interface{}, error) {
 	numOutstandingTxs := dg.Latency.NumProcessing()
 	isOutstandingTxs := numOutstandingTxs <= dg.params.MaxOutstandingItems
+	healthy := isOutstandingTxs
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-	if !isOutstandingTxs {
-		errorReason := fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, dg.params.MaxOutstandingItems)
-		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", errorReason)
+
+	// check for long running transactions
+	oldestProcessingDuration := dg.Latency.MeasureAndGetOldestDuration()
+	processingTimeOK := oldestProcessingDuration <= dg.params.MaxItemProcessingTime
+	healthy = healthy && processingTimeOK
+	details["longestRunningTransaction"] = oldestProcessingDuration.String()
+
+	if !healthy {
+		var errorReasons []string
+		if !isOutstandingTxs {
+			errorReasons = append(errorReasons, fmt.Sprintf("number outstanding transactions %d > %d", numOutstandingTxs, dg.params.MaxOutstandingItems))
+		}
+		if !processingTimeOK {
+			errorReasons = append(errorReasons, fmt.Sprintf("transaction processing time %s > %s", oldestProcessingDuration, dg.params.MaxItemProcessingTime))
+		}
+		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }
@@ -567,6 +582,11 @@ func (dg *Directed) reject(ctx context.Context, conflictIDs set.Set[ids.ID]) err
 	for conflictKey := range conflictIDs {
 		conflict, exists := dg.txs[conflictKey]
 		if !exists {
+			// Transaction dependencies are cleaned up when the dependency is
+			// either accepted or rejected. However, a transaction may have
+			// already been rejected due to a conflict of its own. In this case,
+			// the transaction has already been cleaned up from memory and there
+			// is nothing more to be done.
 			continue
 		}
 		// This tx is no longer an option for consuming the UTXOs from its
