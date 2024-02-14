@@ -5,11 +5,11 @@ package metrics
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"strings"
+	"os"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/client_golang/prometheus"
@@ -108,22 +108,32 @@ func (ms *MetricsServer) Shutdown() {
 	<-ms.stopCh
 }
 
-func (ms *MetricsServer) Print() {
-	// Get response from server
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%s%s", ms.metricsPort, ms.metricsEndpoint))
+func (m *Metrics) Print(outputFile string) error {
+	metrics, err := m.reg.Gather()
 	if err != nil {
-		log.Error("cannot get response from metrics servers", "err", err)
-		return
+		return err
 	}
-	// Read response body
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Error("cannot read response body", "err", err)
-		return
+
+	if outputFile == "" {
+		// Printout to stdout
+		fmt.Println("*** Metrics ***")
+		for _, mf := range metrics {
+			for _, m := range mf.GetMetric() {
+				fmt.Printf("Type: %s, Name: %s, Description: %s, Values: %s\n", mf.GetType().String(), mf.GetName(), mf.GetHelp(), m.String())
+			}
+		}
+		fmt.Println("***************")
+	} else {
+		jsonFile, err := os.Create(outputFile)
+		if err != nil {
+			return err
+		}
+		defer jsonFile.Close()
+
+		if err := json.NewEncoder(jsonFile).Encode(metrics); err != nil {
+			return err
+		}
 	}
-	// Print out formatted individual metrics
-	parts := strings.Split(string(respBody), "\n")
-	for _, s := range parts {
-		fmt.Printf("       \t\t\t%s\n", s)
-	}
+
+	return nil
 }

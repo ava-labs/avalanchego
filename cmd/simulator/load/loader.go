@@ -150,7 +150,8 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 	}()
 
 	m := metrics.NewDefaultMetrics()
-	ms := m.Serve(ctx, strconv.Itoa(int(config.MetricsPort)), MetricsEndpoint)
+	metricsCtx := context.Background()
+	ms := m.Serve(metricsCtx, strconv.Itoa(int(config.MetricsPort)), MetricsEndpoint)
 	defer ms.Shutdown()
 
 	// Construct the arguments for the load simulator
@@ -186,13 +187,13 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 	// to fund gas for all of their transactions.
 	maxFeeCap := new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(config.MaxFeeCap))
 	minFundsPerAddr := new(big.Int).Mul(maxFeeCap, big.NewInt(int64(config.TxsPerWorker*params.TxGas)))
-
+	fundStart := time.Now()
 	log.Info("Distributing funds", "numTxsPerWorker", config.TxsPerWorker, "minFunds", minFundsPerAddr)
 	keys, err = DistributeFunds(ctx, clients[0], keys, config.Workers, minFundsPerAddr, m)
 	if err != nil {
 		return err
 	}
-	log.Info("Distributed funds successfully")
+	log.Info("Distributed funds successfully", "time", time.Since(fundStart))
 
 	pks := make([]*ecdsa.PrivateKey, 0, len(keys))
 	senders := make([]common.Address, 0, len(keys))
@@ -225,11 +226,12 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 			Value:     common.Big0,
 		})
 	}
-
+	txSequenceStart := time.Now()
 	txSequences, err := txs.GenerateTxSequences(ctx, txGenerator, clients[0], pks, config.TxsPerWorker, false)
 	if err != nil {
 		return err
 	}
+	log.Info("Created transaction sequences successfully", "time", time.Since(txSequenceStart))
 
 	workers := make([]txs.Worker[*types.Transaction], 0, len(clients))
 	for i, client := range clients {
@@ -237,6 +239,9 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 	}
 	loader := New(workers, txSequences, config.BatchSize, m)
 	err = loader.Execute(ctx)
-	ms.Print() // Print regardless of execution error
+	prerr := m.Print(config.MetricsOutput) // Print regardless of execution error
+	if prerr != nil {
+		log.Warn("Failed to print metrics", "error", prerr)
+	}
 	return err
 }

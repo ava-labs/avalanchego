@@ -28,6 +28,7 @@ const (
 	TimeoutKey        = "timeout"
 	BatchSizeKey      = "batch-size"
 	MetricsPortKey    = "metrics-port"
+	MetricsOutputKey  = "metrics-output"
 )
 
 var (
@@ -37,28 +38,30 @@ var (
 )
 
 type Config struct {
-	Endpoints    []string      `json:"endpoints"`
-	MaxFeeCap    int64         `json:"max-fee-cap"`
-	MaxTipCap    int64         `json:"max-tip-cap"`
-	Workers      int           `json:"workers"`
-	TxsPerWorker uint64        `json:"txs-per-worker"`
-	KeyDir       string        `json:"key-dir"`
-	Timeout      time.Duration `json:"timeout"`
-	BatchSize    uint64        `json:"batch-size"`
-	MetricsPort  uint64        `json:"metrics-port"`
+	Endpoints     []string      `json:"endpoints"`
+	MaxFeeCap     int64         `json:"max-fee-cap"`
+	MaxTipCap     int64         `json:"max-tip-cap"`
+	Workers       int           `json:"workers"`
+	TxsPerWorker  uint64        `json:"txs-per-worker"`
+	KeyDir        string        `json:"key-dir"`
+	Timeout       time.Duration `json:"timeout"`
+	BatchSize     uint64        `json:"batch-size"`
+	MetricsPort   uint64        `json:"metrics-port"`
+	MetricsOutput string        `json:"metrics-output"`
 }
 
 func BuildConfig(v *viper.Viper) (Config, error) {
 	c := Config{
-		Endpoints:    v.GetStringSlice(EndpointsKey),
-		MaxFeeCap:    v.GetInt64(MaxFeeCapKey),
-		MaxTipCap:    v.GetInt64(MaxTipCapKey),
-		Workers:      v.GetInt(WorkersKey),
-		TxsPerWorker: v.GetUint64(TxsPerWorkerKey),
-		KeyDir:       v.GetString(KeyDirKey),
-		Timeout:      v.GetDuration(TimeoutKey),
-		BatchSize:    v.GetUint64(BatchSizeKey),
-		MetricsPort:  v.GetUint64(MetricsPortKey),
+		Endpoints:     v.GetStringSlice(EndpointsKey),
+		MaxFeeCap:     v.GetInt64(MaxFeeCapKey),
+		MaxTipCap:     v.GetInt64(MaxTipCapKey),
+		Workers:       v.GetInt(WorkersKey),
+		TxsPerWorker:  v.GetUint64(TxsPerWorkerKey),
+		KeyDir:        v.GetString(KeyDirKey),
+		Timeout:       v.GetDuration(TimeoutKey),
+		BatchSize:     v.GetUint64(BatchSizeKey),
+		MetricsPort:   v.GetUint64(MetricsPortKey),
+		MetricsOutput: v.GetString(MetricsOutputKey),
 	}
 	if len(c.Endpoints) == 0 {
 		return c, ErrNoEndpoints
@@ -122,4 +125,5 @@ func addSimulatorFlags(fs *pflag.FlagSet) {
 	fs.String(LogLevelKey, "info", "Specify the log level to use in the simulator")
 	fs.Uint64(BatchSizeKey, 100, "Specify the batchsize for the worker to issue and confirm txs")
 	fs.Uint64(MetricsPortKey, 8082, "Specify the port to use for the metrics server")
+	fs.String(MetricsOutputKey, "", "Specify the file to write metrics in json format, or empy to write to stdout (defaults to stdout)")
 }
