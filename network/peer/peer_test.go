@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -441,6 +442,390 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	// disconnect from each other.
 	require.NoError(peer0.AwaitClosed(context.Background()))
 	require.NoError(peer1.AwaitClosed(context.Background()))
+}
+
+func TestShouldDisconnect(t *testing.T) {
+	peerID := ids.GenerateTestNodeID()
+	txID := ids.GenerateTestID()
+	blsKey, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                     string
+		initialPeer              *peer
+		expectedPeer             *peer
+		expectedShouldDisconnect bool
+	}{
+		{
+			name: "peer is reporting old version",
+			initialPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+				},
+				version: &version.Application{
+					Name:  version.Client,
+					Major: 0,
+					Minor: 0,
+					Patch: 0,
+				},
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+				},
+				version: &version.Application{
+					Name:  version.Client,
+					Major: 0,
+					Minor: 0,
+					Patch: 0,
+				},
+			},
+			expectedShouldDisconnect: true,
+		},
+		{
+			name: "peer is not a validator",
+			initialPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators:           validators.NewManager(),
+				},
+				version: version.CurrentApp,
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators:           validators.NewManager(),
+				},
+				version: version.CurrentApp,
+			},
+			expectedShouldDisconnect: false,
+		},
+		{
+			name: "peer is a validator without a BLS key",
+			initialPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							nil,
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							nil,
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+			},
+			expectedShouldDisconnect: false,
+		},
+		{
+			name: "already verified peer",
+			initialPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:                   peerID,
+				version:              version.CurrentApp,
+				txIDOfVerifiedBLSKey: txID,
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:                   peerID,
+				version:              version.CurrentApp,
+				txIDOfVerifiedBLSKey: txID,
+			},
+			expectedShouldDisconnect: false,
+		},
+		{
+			name: "past durango without a signature",
+			initialPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(mockable.MaxTime)
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip:      &SignedIP{},
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(mockable.MaxTime)
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip:      &SignedIP{},
+			},
+			expectedShouldDisconnect: true,
+		},
+		{
+			name: "pre durango without a signature",
+			initialPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(time.Time{})
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip:      &SignedIP{},
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(time.Time{})
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip:      &SignedIP{},
+			},
+			expectedShouldDisconnect: false,
+		},
+		{
+			name: "pre durango with an invalid signature",
+			initialPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(time.Time{})
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip: &SignedIP{
+					BLSSignature: bls.SignProofOfPossession(blsKey, []byte("wrong message")),
+				},
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(time.Time{})
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip: &SignedIP{
+					BLSSignature: bls.SignProofOfPossession(blsKey, []byte("wrong message")),
+				},
+			},
+			expectedShouldDisconnect: true,
+		},
+		{
+			name: "pre durango with a valid signature",
+			initialPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(time.Time{})
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip: &SignedIP{
+					BLSSignature: bls.SignProofOfPossession(blsKey, (&UnsignedIP{}).bytes()),
+				},
+			},
+			expectedPeer: &peer{
+				Config: &Config{
+					Clock: func() mockable.Clock {
+						clk := mockable.Clock{}
+						clk.Set(time.Time{})
+						return clk
+					}(),
+					Log:                  logging.NoLog{},
+					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					Validators: func() validators.Manager {
+						vdrs := validators.NewManager()
+						require.NoError(t, vdrs.AddStaker(
+							constants.PrimaryNetworkID,
+							peerID,
+							bls.PublicFromSecretKey(blsKey),
+							txID,
+							1,
+						))
+						return vdrs
+					}(),
+				},
+				id:      peerID,
+				version: version.CurrentApp,
+				ip: &SignedIP{
+					BLSSignature: bls.SignProofOfPossession(blsKey, (&UnsignedIP{}).bytes()),
+				},
+				txIDOfVerifiedBLSKey: txID,
+			},
+			expectedShouldDisconnect: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			shouldDisconnect := test.initialPeer.shouldDisconnect()
+			require.Equal(test.expectedPeer, test.initialPeer)
+			require.Equal(test.expectedShouldDisconnect, shouldDisconnect)
+		})
+	}
 }
 
 // Helper to send a message from sender to receiver and assert that the
