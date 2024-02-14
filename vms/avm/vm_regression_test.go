@@ -6,6 +6,7 @@ package avm
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +25,9 @@ func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			DurangoTime: time.Time{},
+		},
 	})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
@@ -33,15 +36,20 @@ func TestVerifyFxUsage(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-		}},
-		Name:         "Team Rocket",
-		Symbol:       "TR",
-		Denomination: 0,
-		States: []*txs.InitialState{
+	var (
+		key = keys[0]
+		kc  = secp256k1fx.NewKeychain()
+	)
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+
+	createAssetTx, _, err := buildCreateAssetTx(
+		env.vm,
+		"Team Rocket", // name
+		"TR",          // symbol
+		0,             // denomination
+		[]*txs.InitialState{
 			{
 				FxIndex: 0,
 				Outs: []verify.State{
@@ -67,8 +75,11 @@ func TestVerifyFxUsage(t *testing.T) {
 				},
 			},
 		},
-	}}
-	require.NoError(createAssetTx.Initialize(env.vm.parser.Codec()))
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{

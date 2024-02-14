@@ -753,32 +753,6 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.CreateAssetTxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.CreateAssetTxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.CreateAssetTxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	initialState := &txs.InitialState{
 		FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
 		Outs:    make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
@@ -815,19 +789,55 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
 
-	tx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
+	return buildCreateAssetTx(
+		s.vm,
+		args.Name,
+		args.Symbol,
+		args.Denomination,
+		[]*txs.InitialState{initialState},
+		utxos,
+		kc,
+		changeAddr,
+	)
+}
+
+func buildCreateAssetTx(
+	vm *VM,
+	name, symbol string,
+	denomination byte,
+	initialStates []*txs.InitialState,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	uTx := &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: args.Denomination,
-		States:       []*txs.InitialState{initialState},
-	}}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
+		Name:         name,
+		Symbol:       symbol,
+		Denomination: denomination,
+		States:       initialStates,
+	}
+
+	toBurn := map[ids.ID]uint64{
+		vm.feeAssetID: vm.CreateAssetTxFee,
+	}
+	ins, outs, keys, err := vm.NewSpend(
+		utxos,
+		kc,
+		toBurn,
+		changeAddr,
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
+	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // CreateFixedCapAsset returns ID of the newly created asset
@@ -918,32 +928,6 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.CreateAssetTxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.CreateAssetTxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.CreateAssetTxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	initialState := &txs.InitialState{
 		FxIndex: 1, // TODO: Should lookup nftfx FxID
 		Outs:    make([]verify.State, 0, len(args.MinterSets)),
@@ -966,20 +950,16 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
-
-	tx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: 0, // NFTs are non-fungible
-		States:       []*txs.InitialState{initialState},
-	}}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
+	return buildCreateAssetTx(
+		s.vm,
+		args.Name,
+		args.Symbol,
+		0, // NFTs are non-fungible
+		[]*txs.InitialState{initialState},
+		utxos,
+		kc,
+		changeAddr,
+	)
 }
 
 // CreateAddress creates an address for the user [args.Username]

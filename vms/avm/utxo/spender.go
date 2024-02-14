@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -41,6 +42,18 @@ type Spender interface {
 	) (
 		map[ids.ID]uint64, // amountsSpent
 		[]*avax.TransferableInput, // inputs
+		[][]*secp256k1.PrivateKey, // signers
+		error,
+	)
+
+	NewSpend(
+		utxos []*avax.UTXO,
+		kc *secp256k1fx.Keychain,
+		toSpend map[ids.ID]uint64,
+		changeAddr ids.ShortID,
+	) (
+		[]*avax.TransferableInput, // inputs
+		[]*avax.TransferableOutput, // outputs
 		[][]*secp256k1.PrivateKey, // signers
 		error,
 	)
@@ -170,6 +183,96 @@ func (s *spender) Spend(
 
 	avax.SortTransferableInputsWithSigners(ins, keys)
 	return amountsSpent, ins, keys, nil
+}
+
+func (s *spender) NewSpend(
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	amountsToBurn map[ids.ID]uint64,
+	changeAddr ids.ShortID,
+) (
+	inputs []*avax.TransferableInput,
+	outputs []*avax.TransferableOutput,
+	signers [][]*secp256k1.PrivateKey,
+	err error,
+) {
+	var (
+		minIssuanceTime = s.clock.Unix()
+		changeOwner     = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		}
+	)
+
+	// Iterate over the UTXOs
+	for _, utxo := range utxos {
+		assetID := utxo.AssetID()
+		remainingAmountToBurn := amountsToBurn[assetID]
+
+		// If we have consumed enough of the asset, then we have no need burn
+		// more.
+		if remainingAmountToBurn == 0 {
+			continue
+		}
+
+		outIntf := utxo.Out
+		out, ok := outIntf.(*secp256k1fx.TransferOutput)
+		if !ok {
+			// We only support burning [secp256k1fx.TransferOutput]s.
+			continue
+		}
+
+		inputIntf, keys, err := kc.Spend(utxo.Out, minIssuanceTime)
+		if err != nil {
+			// this utxo can't be spent with the current keys right now
+			continue
+		}
+		input, ok := inputIntf.(avax.TransferableIn)
+		if !ok {
+			// this input doesn't have an amount, so I don't care about it here
+			continue
+		}
+
+		inputs = append(inputs, &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  avax.Asset{ID: assetID},
+			In:     input,
+		})
+		signers = append(signers, keys)
+
+		// Burn any value that should be burned
+		amountToBurn := min(
+			remainingAmountToBurn, // Amount we still need to burn
+			out.Amt,               // Amount available to burn
+		)
+		amountsToBurn[assetID] -= amountToBurn
+		if remainingAmount := out.Amt - amountToBurn; remainingAmount > 0 {
+			// This input had extra value, so some of it must be returned
+			outputs = append(outputs, &avax.TransferableOutput{
+				Asset: utxo.Asset,
+				FxID:  secp256k1fx.ID,
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          remainingAmount,
+					OutputOwners: *changeOwner,
+				},
+			})
+		}
+	}
+
+	for assetID, amount := range amountsToBurn {
+		if amount != 0 {
+			return nil, nil, nil, fmt.Errorf(
+				"%w: provided UTXOs need %d more units of asset %q",
+				errInsufficientFunds,
+				amount,
+				assetID,
+			)
+		}
+	}
+
+	utils.Sort(inputs)                             // sort inputs
+	avax.SortTransferableOutputs(outputs, s.codec) // sort the change outputs
+	return inputs, outputs, signers, nil
 }
 
 func (s *spender) SpendNFT(

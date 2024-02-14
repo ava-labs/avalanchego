@@ -699,7 +699,10 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: &config.Config{
+			CreateAssetTxFee: testTxFee,
+			DurangoTime:      time.Time{},
+		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -712,7 +715,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.ctx.ChainID, env.vm.parser)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	reply := api.GetTxReply{}
@@ -730,8 +733,34 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 49000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"outputIndex": 2,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 50000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
 		"memo": "0x",
 		"name": "Team Rocket",
 		"symbol": "TR",
@@ -801,7 +830,16 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			}
 		]
 	},
-	"credentials": null,
+	"credentials": [
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"0xa036832b708b377ef9719ffbc834a3fb933191a467994f844c23f4a44350e86a7151cdbbbfa479d93a4906cc22254dcc5ccc2a6099492e7a9f9e8b575048d69701"
+				]
+			}
+		}
+	],
 	"id": "PLACEHOLDER_TX_ID"
 }`
 
@@ -829,7 +867,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.ctx.ChainID, env.vm.parser)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildNFTxMintOp(createAssetTx, key, 2, 1))
@@ -928,7 +966,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.ctx.ChainID, env.vm.parser)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
@@ -1066,7 +1104,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.ctx.ChainID, env.vm.parser)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintSecpOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildSecpMintOp(createAssetTx, key, 0))
@@ -1169,7 +1207,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.ctx.ChainID, env.vm.parser)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
@@ -1315,7 +1353,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.ctx.ChainID, env.vm.parser)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintPropertyFxOpTx := buildOperationTxWithOp(env.vm.ctx.ChainID, buildPropertyFxMintOp(createAssetTx, key, 4))
@@ -1415,7 +1453,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env.vm.ctx.ChainID, env.vm.parser)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
@@ -1553,10 +1591,78 @@ func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, chainID ids.I
 	return tx
 }
 
-func newAvaxCreateAssetTxWithOutputs(t *testing.T, chainID ids.ID, parser txs.Parser) *txs.Tx {
-	key := keys[0]
-	tx := buildCreateAssetTx(chainID, key)
-	require.NoError(t, tx.Initialize(parser.Codec()))
+func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
+	var (
+		key = keys[0]
+		kc  = secp256k1fx.NewKeychain()
+	)
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(t, err)
+	tx, _, err := buildCreateAssetTx(
+		env.vm,
+		"Team Rocket", // name
+		"TR",          // symbol
+		0,             // denomination
+		[]*txs.InitialState{
+			{
+				FxIndex: 0,
+				Outs: []verify.State{
+					&secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					}, &secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					},
+				},
+			},
+			{
+				FxIndex: 1,
+				Outs: []verify.State{
+					&nftfx.MintOutput{
+						GroupID: 1,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					},
+					&nftfx.MintOutput{
+						GroupID: 2,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					},
+				},
+			},
+			{
+				FxIndex: 2,
+				Outs: []verify.State{
+					&propertyfx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+					&propertyfx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+				},
+			},
+		},
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(t, err)
 	return tx
 }
 
@@ -1625,72 +1731,6 @@ func buildExportTx(avaxTx *txs.Tx, chainID ids.ID, fee uint64, key *secp256k1.Pr
 				},
 			},
 		}},
-	}}
-}
-
-func buildCreateAssetTx(chainID ids.ID, key *secp256k1.PrivateKey) *txs.Tx {
-	return &txs.Tx{Unsigned: &txs.CreateAssetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-		}},
-		Name:         "Team Rocket",
-		Symbol:       "TR",
-		Denomination: 0,
-		States: []*txs.InitialState{
-			{
-				FxIndex: 0,
-				Outs: []verify.State{
-					&secp256k1fx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					}, &secp256k1fx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-				},
-			},
-			{
-				FxIndex: 1,
-				Outs: []verify.State{
-					&nftfx.MintOutput{
-						GroupID: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-					&nftfx.MintOutput{
-						GroupID: 2,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-				},
-			},
-			{
-				FxIndex: 2,
-				Outs: []verify.State{
-					&propertyfx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
-					&propertyfx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
-				},
-			},
-		},
 	}}
 }
 
@@ -2536,6 +2576,9 @@ func TestSendMultiple(t *testing.T) {
 					password:    password,
 					initialKeys: keys,
 				}},
+				vmStaticConfig: &config.Config{
+					DurangoTime: time.Time{},
+				},
 			})
 			env.vm.ctx.Lock.Unlock()
 
