@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
-	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -169,13 +168,6 @@ func TestIssueNFT(t *testing.T) {
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
 					},
 				},
-				&nftfx.MintOutput{
-					GroupID: 2,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
 			},
 		}},
 		utxos,
@@ -185,59 +177,52 @@ func TestIssueNFT(t *testing.T) {
 	require.NoError(err)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-		}},
-		Ops: []*txs.Operation{{
-			Asset: avax.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*avax.UTXOID{{
-				TxID:        createAssetTx.ID(),
-				OutputIndex: 0,
-			}},
-			Op: &nftfx.MintOperation{
-				MintInput: secp256k1fx.Input{
-					SigIndices: []uint32{0},
-				},
-				GroupID: 1,
-				Payload: []byte{'h', 'e', 'l', 'l', 'o'},
-				Outputs: []*secp256k1fx.OutputOwners{{}},
-			},
-		}},
-	}}
-	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	// Mint the NFT
+	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+	mintOp, nftKeys, err := env.vm.MintNFT(
+		utxos,
+		kc,
+		createAssetTx.ID(),
+		[]byte{'h', 'e', 'l', 'l', 'o'}, // payload
+		key.Address(),
+	)
+	require.NoError(err)
+
+	mintNFTTx, _, err := buildOperation(
+		env.vm,
+		mintOp,
+		nil,
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
+	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), nftKeys))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
-	transferNFTTx := &txs.Tx{
-		Unsigned: &txs.OperationTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    constants.UnitTestID,
-				BlockchainID: env.vm.ctx.XChainID,
-			}},
-			Ops: []*txs.Operation{{
-				Asset: avax.Asset{ID: createAssetTx.ID()},
-				UTXOIDs: []*avax.UTXOID{{
-					TxID:        mintNFTTx.ID(),
-					OutputIndex: 0,
-				}},
-				Op: &nftfx.TransferOperation{
-					Input: secp256k1fx.Input{},
-					Output: nftfx.TransferOutput{
-						GroupID:      1,
-						Payload:      []byte{'h', 'e', 'l', 'l', 'o'},
-						OutputOwners: secp256k1fx.OutputOwners{},
-					},
-				},
-			}},
-		},
-		Creds: []*fxs.FxCredential{
-			{
-				Credential: &nftfx.Credential{},
-			},
-		},
-	}
-	require.NoError(transferNFTTx.Initialize(env.vm.parser.Codec()))
+	// Move the NFT
+	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+	transferOp, moveNftKeys, err := env.vm.SpendNFT(
+		utxos,
+		kc,
+		createAssetTx.ID(),
+		1,
+		keys[2].Address(),
+	)
+	require.NoError(err)
+
+	transferNFTTx, _, err := buildOperation(
+		env.vm,
+		transferOp,
+		nil,
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
+	require.NoError(transferNFTTx.SignNFTFx(env.vm.parser.Codec(), moveNftKeys))
 	issueAndAccept(require, env.vm, env.issuer, transferNFTTx)
 }
 
@@ -262,13 +247,15 @@ func TestIssueProperty(t *testing.T) {
 	}()
 
 	var (
-		key = keys[0]
-		kc  = secp256k1fx.NewKeychain()
+		key   = keys[0]
+		kc    = secp256k1fx.NewKeychain()
+		codec = env.vm.parser.Codec()
 	)
 	kc.Add(key)
+
+	// create the asset
 	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
-
 	createAssetTx, _, err := buildCreateAssetTx(
 		env.vm,
 		"Team Rocket", // name
@@ -292,53 +279,64 @@ func TestIssueProperty(t *testing.T) {
 	require.NoError(err)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
+	// mint the property
+	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+	mintPropertyOp := &txs.Operation{
+		Asset: avax.Asset{ID: createAssetTx.ID()},
+		UTXOIDs: []*avax.UTXOID{{
+			TxID:        createAssetTx.ID(),
+			OutputIndex: 0,
 		}},
-		Ops: []*txs.Operation{{
-			Asset: avax.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*avax.UTXOID{{
-				TxID:        createAssetTx.ID(),
-				OutputIndex: 0,
-			}},
-			Op: &propertyfx.MintOperation{
-				MintInput: secp256k1fx.Input{
-					SigIndices: []uint32{0},
-				},
-				MintOutput: propertyfx.MintOutput{
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-					},
-				},
-				OwnedOutput: propertyfx.OwnedOutput{},
+		Op: &propertyfx.MintOperation{
+			MintInput: secp256k1fx.Input{
+				SigIndices: []uint32{0},
 			},
-		}},
-	}}
+			MintOutput: propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+			OwnedOutput: propertyfx.OwnedOutput{},
+		},
+	}
 
-	codec := env.vm.parser.Codec()
+	mintPropertyTx, _, err := buildOperation(
+		env.vm,
+		[]*txs.Operation{mintPropertyOp},
+		nil,
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
 	require.NoError(mintPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{keys[0]},
 	}))
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyTx)
 
-	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
+	// burn the property
+	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+	burnPropertyOp := &txs.Operation{
+		Asset: avax.Asset{ID: createAssetTx.ID()},
+		UTXOIDs: []*avax.UTXOID{{
+			TxID:        mintPropertyTx.ID(),
+			OutputIndex: 1,
 		}},
-		Ops: []*txs.Operation{{
-			Asset: avax.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*avax.UTXOID{{
-				TxID:        mintPropertyTx.ID(),
-				OutputIndex: 1,
-			}},
-			Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
-		}},
-	}}
+		Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
+	}
 
+	burnPropertyTx, _, err := buildOperation(
+		env.vm,
+		[]*txs.Operation{burnPropertyOp},
+		nil,
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
 	require.NoError(burnPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{},
 	}))

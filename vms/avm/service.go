@@ -1393,32 +1393,6 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, keys, err := s.vm.Spend(
-		feeUTXOs,
-		feeKc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.TxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.TxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	// Get all UTXOs/keys for the user
 	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
@@ -1436,18 +1410,44 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-	keys = append(keys, opKeys...)
 
-	tx := &txs.Tx{Unsigned: &txs.OperationTx{
+	return buildOperation(s.vm, ops, opKeys, feeUTXOs, feeKc, changeAddr)
+}
+
+func buildOperation(
+	vm *VM,
+	ops []*txs.Operation,
+	opsKeys [][]*secp256k1.PrivateKey,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	uTx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
 		Ops: ops,
-	}}
-	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
+	}
+
+	toBurn := map[ids.ID]uint64{
+		vm.feeAssetID: vm.TxFee,
+	}
+	ins, outs, keys, err := vm.NewSpend(
+		utxos,
+		kc,
+		toBurn,
+		changeAddr,
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
+	keys = append(keys, opsKeys...)
+	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // SendNFTArgs are arguments for passing into SendNFT requests
@@ -1518,32 +1518,6 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, secpKeys, err := s.vm.Spend(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.TxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.TxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	ops, nftKeys, err := s.vm.SpendNFT(
 		utxos,
 		kc,
@@ -1555,21 +1529,12 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx := &txs.Tx{Unsigned: &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		Ops: ops,
-	}}
-
-	codec := s.vm.parser.Codec()
-	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
+	tx, _, err := buildOperation(s.vm, ops, nil, utxos, kc, changeAddr)
+	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-	return tx, changeAddr, tx.SignNFTFx(codec, nftKeys)
+
+	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
 }
 
 // MintNFTArgs are arguments for passing into MintNFT requests
@@ -1644,38 +1609,11 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	amountsSpent, ins, secpKeys, err := s.vm.Spend(
-		feeUTXOs,
-		feeKc,
-		map[ids.ID]uint64{
-			s.vm.feeAssetID: s.vm.TxFee,
-		},
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent > s.vm.TxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: s.vm.feeAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - s.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
 	// Get all UTXOs/keys
 	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-
 	ops, nftKeys, err := s.vm.MintNFT(
 		utxos,
 		kc,
@@ -1687,21 +1625,11 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx := &txs.Tx{Unsigned: &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		Ops: ops,
-	}}
-
-	codec := s.vm.parser.Codec()
-	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
+	tx, _, err := buildOperation(s.vm, ops, nil, feeUTXOs, feeKc, changeAddr)
+	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-	return tx, changeAddr, tx.SignNFTFx(codec, nftKeys)
+	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
 }
 
 // ImportArgs are arguments for passing into Import requests

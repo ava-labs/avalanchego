@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -44,6 +42,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
 
+	// Create the asset
 	createAssetTx, _, err := buildCreateAssetTx(
 		env.vm,
 		"Team Rocket", // name
@@ -82,31 +81,31 @@ func TestVerifyFxUsage(t *testing.T) {
 	require.NoError(err)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-		}},
-		Ops: []*txs.Operation{{
-			Asset: avax.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*avax.UTXOID{{
-				TxID:        createAssetTx.ID(),
-				OutputIndex: 1,
-			}},
-			Op: &nftfx.MintOperation{
-				MintInput: secp256k1fx.Input{
-					SigIndices: []uint32{0},
-				},
-				GroupID: 1,
-				Payload: []byte{'h', 'e', 'l', 'l', 'o'},
-				Outputs: []*secp256k1fx.OutputOwners{{}},
-			},
-		}},
-	}}
-	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	// Mint the NFT
+	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+	mintOp, nftKeys, err := env.vm.MintNFT(
+		utxos,
+		kc,
+		createAssetTx.ID(),
+		[]byte{'h', 'e', 'l', 'l', 'o'}, // payload
+		key.Address(),
+	)
+	require.NoError(err)
+
+	mintNFTTx, _, err := buildOperation(
+		env.vm,
+		mintOp,
+		nil,
+		utxos,
+		kc,
+		key.Address(),
+	)
+	require.NoError(err)
+	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), nftKeys))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
-	// refresh the UTXOs set
+	// move the NFT
 	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
 
