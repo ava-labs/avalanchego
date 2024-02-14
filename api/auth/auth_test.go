@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt/v4"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 var (
@@ -37,7 +37,7 @@ func init() {
 }
 
 // Always returns 200 (http.StatusOK)
-var dummyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+var dummyHandler = http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 
 func TestNewTokenWrongPassword(t *testing.T) {
 	require := require.New(t)
@@ -228,7 +228,7 @@ func TestWrapHandlerNoAuthToken(t *testing.T) {
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(http.StatusUnauthorized, rr.Code)

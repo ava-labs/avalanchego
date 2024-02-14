@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -966,7 +965,7 @@ func TestBlockStatus(t *testing.T) {
 	tests := []test{
 		{
 			name: "block is rejected",
-			blockFunc: func(ctrl *gomock.Controller) *Block {
+			blockFunc: func(*gomock.Controller) *Block {
 				return &Block{
 					rejected: true,
 				}
