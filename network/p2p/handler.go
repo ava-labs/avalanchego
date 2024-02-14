@@ -5,7 +5,7 @@ package p2p
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,8 +17,6 @@ import (
 )
 
 var (
-	ErrNotValidator = errors.New("not a validator")
-
 	_ Handler = (*NoOpHandler)(nil)
 	_ Handler = (*TestHandler)(nil)
 	_ Handler = (*ValidatorHandler)(nil)
@@ -39,7 +37,7 @@ type Handler interface {
 		nodeID ids.NodeID,
 		deadline time.Time,
 		requestBytes []byte,
-	) ([]byte, error)
+	) ([]byte, *common.AppError)
 	// CrossChainAppRequest is called when handling a CrossChainAppRequest
 	// message.
 	// Returns the bytes for the response corresponding to [requestBytes]
@@ -48,7 +46,7 @@ type Handler interface {
 		chainID ids.ID,
 		deadline time.Time,
 		requestBytes []byte,
-	) ([]byte, error)
+	) ([]byte, *common.AppError)
 }
 
 // NoOpHandler drops all messages
@@ -56,11 +54,11 @@ type NoOpHandler struct{}
 
 func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 	return nil, nil
 }
 
-func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, *common.AppError) {
 	return nil, nil
 }
 
@@ -96,15 +94,18 @@ func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, goss
 	v.handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
-func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	if !v.validatorSet.Has(ctx, nodeID) {
-		return nil, ErrNotValidator
+		return nil, &common.AppError{
+			Code:    ErrNotValidator.Code,
+			Message: fmt.Sprintf("%s is not a validator", nodeID),
+		}
 	}
 
 	return v.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
 
-func (v ValidatorHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+func (v ValidatorHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	return v.handler.CrossChainAppRequest(ctx, chainID, deadline, requestBytes)
 }
 
@@ -155,8 +156,8 @@ func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 
 type TestHandler struct {
 	AppGossipF            func(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte)
-	AppRequestF           func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error)
-	CrossChainAppRequestF func(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error)
+	AppRequestF           func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError)
+	CrossChainAppRequestF func(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError)
 }
 
 func (t TestHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
@@ -167,7 +168,7 @@ func (t TestHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipByt
 	t.AppGossipF(ctx, nodeID, gossipBytes)
 }
 
-func (t TestHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+func (t TestHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	if t.AppRequestF == nil {
 		return nil, nil
 	}
@@ -175,7 +176,7 @@ func (t TestHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline
 	return t.AppRequestF(ctx, nodeID, deadline, requestBytes)
 }
 
-func (t TestHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+func (t TestHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	if t.CrossChainAppRequestF == nil {
 		return nil, nil
 	}

@@ -5,13 +5,13 @@ package gossip
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -47,10 +47,10 @@ type Handler[T Gossipable] struct {
 	targetResponseSize int
 }
 
-func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
+func (h Handler[T]) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	filter, salt, err := ParseAppRequest(requestBytes)
 	if err != nil {
-		return nil, err
+		return nil, p2p.ErrUnexpected
 	}
 
 	responseSize := 0
@@ -78,23 +78,28 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, p2p.ErrUnexpected
 	}
 
 	sentCountMetric, err := h.metrics.sentCount.GetMetricWith(pullLabels)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sent count metric: %w", err)
+		return nil, p2p.ErrUnexpected
 	}
 
 	sentBytesMetric, err := h.metrics.sentBytes.GetMetricWith(pullLabels)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sent bytes metric: %w", err)
+		return nil, p2p.ErrUnexpected
 	}
 
 	sentCountMetric.Add(float64(len(gossipBytes)))
 	sentBytesMetric.Add(float64(responseSize))
 
-	return MarshalAppResponse(gossipBytes)
+	bytes, err := MarshalAppResponse(gossipBytes)
+	if err != nil {
+		return nil, p2p.ErrUnexpected
+	}
+
+	return bytes, nil
 }
 
 func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {

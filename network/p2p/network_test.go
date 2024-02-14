@@ -5,6 +5,7 @@ package p2p
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,13 +44,13 @@ func TestMessageRouting(t *testing.T) {
 			require.Equal(wantNodeID, nodeID)
 			require.Equal(wantMsg, msg)
 		},
-		AppRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, msg []byte) ([]byte, error) {
+		AppRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, msg []byte) ([]byte, *common.AppError) {
 			appRequestCalled = true
 			require.Equal(wantNodeID, nodeID)
 			require.Equal(wantMsg, msg)
 			return nil, nil
 		},
-		CrossChainAppRequestF: func(_ context.Context, chainID ids.ID, _ time.Time, msg []byte) ([]byte, error) {
+		CrossChainAppRequestF: func(_ context.Context, chainID ids.ID, _ time.Time, msg []byte) ([]byte, *common.AppError) {
 			crossChainAppRequestCalled = true
 			require.Equal(wantChainID, chainID)
 			require.Equal(wantMsg, msg)
@@ -266,7 +267,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 }
 
 // Messages for unregistered handlers should be dropped gracefully
-func TestMessageForUnregisteredHandler(t *testing.T) {
+func TestAppGossipMessageForUnregisteredHandler(t *testing.T) {
 	tests := []struct {
 		name string
 		msg  []byte
@@ -293,22 +294,126 @@ func TestMessageForUnregisteredHandler(t *testing.T) {
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
 				},
-				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
-					require.Fail("should not be called")
-					return nil, nil
-				},
-				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
-					require.Fail("should not be called")
-					return nil, nil
-				},
 			}
 			network, err := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
-
-			require.NoError(network.AppRequest(ctx, ids.EmptyNodeID, 0, time.Time{}, tt.msg))
 			require.NoError(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
-			require.NoError(network.CrossChainAppRequest(ctx, ids.Empty, 0, time.Time{}, tt.msg))
+		})
+	}
+}
+
+// An unregistered handler should gracefully drop messages by responding
+// to the requester with a common.AppError
+func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  []byte
+	}{
+		{
+			name: "nil",
+			msg:  nil,
+		},
+		{
+			name: "empty",
+			msg:  []byte{},
+		},
+		{
+			name: "non-empty",
+			msg:  []byte("foobar"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+			handler := &TestHandler{
+				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+					require.Fail("should not be called")
+					return nil, nil
+				},
+			}
+
+			wantNodeID := ids.GenerateTestNodeID()
+			wantRequestID := uint32(111)
+
+			wg := &sync.WaitGroup{}
+			sender := &common.SenderTest{}
+			sender.SendAppErrorF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+				defer wg.Done()
+
+				require.Equal(wantNodeID, nodeID)
+				require.Equal(wantRequestID, requestID)
+				require.Equal(ErrUnregisteredHandler.Code, errorCode)
+				require.Equal(ErrUnregisteredHandler.Message, errorMessage)
+
+				return nil
+			}
+			network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+			require.NoError(err)
+			require.NoError(network.AddHandler(handlerID, handler))
+
+			wg.Add(1)
+			require.NoError(network.AppRequest(ctx, wantNodeID, wantRequestID, time.Time{}, tt.msg))
+			wg.Wait()
+		})
+	}
+}
+
+// An unregistered handler should gracefully drop messages by responding
+// to the requester with a common.AppError
+func TestCrossChainAppRequestMessageForUnregisteredHandler(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  []byte
+	}{
+		{
+			name: "nil",
+			msg:  nil,
+		},
+		{
+			name: "empty",
+			msg:  []byte{},
+		},
+		{
+			name: "non-empty",
+			msg:  []byte("foobar"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+			handler := &TestHandler{
+				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, *common.AppError) {
+					require.Fail("should not be called")
+					return nil, nil
+				},
+			}
+
+			wantChainID := ids.GenerateTestID()
+			wantRequestID := uint32(111)
+
+			wg := &sync.WaitGroup{}
+			sender := &common.SenderTest{}
+			sender.SendCrossChainAppErrorF = func(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
+				defer wg.Done()
+
+				require.Equal(wantChainID, chainID)
+				require.Equal(wantRequestID, requestID)
+				require.Equal(ErrUnregisteredHandler.Code, errorCode)
+				require.Equal(ErrUnregisteredHandler.Message, errorMessage)
+			}
+
+			network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+			require.NoError(err)
+			require.NoError(network.AddHandler(handlerID, handler))
+
+			wg.Add(1)
+			require.NoError(network.CrossChainAppRequest(ctx, wantChainID, wantRequestID, time.Time{}, tt.msg))
+			wg.Wait()
 		})
 	}
 }
@@ -341,11 +446,11 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
 				},
-				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 					require.Fail("should not be called")
 					return nil, nil
 				},
-				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+				CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, *common.AppError) {
 					require.Fail("should not be called")
 					return nil, nil
 				},

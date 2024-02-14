@@ -180,7 +180,7 @@ type NetworkAppSender interface {
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
 	SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error
-	// SendAppError sends an application-level error to an AppRequest
+	// SendAppError sends an application-level error to a AppRequest
 	SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error
 	// Gossip an application-level message.
 	SendAppGossip(ctx context.Context, appGossipBytes []byte) error

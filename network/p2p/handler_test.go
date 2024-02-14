@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -79,7 +80,7 @@ func TestValidatorHandlerAppRequest(t *testing.T) {
 		name         string
 		validatorSet ValidatorSet
 		nodeID       ids.NodeID
-		expected     error
+		expected     *common.AppError
 	}{
 		{
 			name:         "message dropped",

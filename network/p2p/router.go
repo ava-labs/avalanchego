@@ -25,6 +25,11 @@ var (
 	ErrExistingAppProtocol = errors.New("existing app protocol")
 	ErrUnrequestedResponse = errors.New("unrequested response")
 
+	ErrUnregisteredHandler = &common.AppError{
+		Code:    -1,
+		Message: "unregistered handler",
+	}
+
 	_ common.AppHandler = (*router)(nil)
 )
 
@@ -124,14 +129,15 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(request)
 	if !ok {
-		r.log.Debug("failed to process message",
+		r.log.Debug("received message for unregistered handler",
 			zap.Stringer("messageOp", message.AppRequestOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
 			zap.Binary("message", request),
 		)
-		return nil
+
+		return r.sender.SendAppError(ctx, nodeID, requestID, ErrUnregisteredHandler.Code, ErrUnregisteredHandler.Message)
 	}
 
 	// call the corresponding handler and send back a response to nodeID
@@ -284,14 +290,15 @@ func (r *router) CrossChainAppRequest(
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(msg)
 	if !ok {
-		r.log.Debug("failed to process message",
+		r.log.Debug("received message for unregistered handler",
 			zap.Stringer("messageOp", message.CrossChainAppRequestOp),
 			zap.Stringer("chainID", chainID),
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
 			zap.Binary("message", msg),
 		)
-		return nil
+
+		return r.sender.SendCrossChainAppError(ctx, chainID, requestID, ErrUnregisteredHandler.Code, ErrUnregisteredHandler.Message)
 	}
 
 	if err := handler.CrossChainAppRequest(ctx, chainID, requestID, deadline, parsedMsg); err != nil {
