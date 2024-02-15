@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -142,6 +143,8 @@ type Config struct {
 
 	// TLSKey is this node's TLS key that is used to sign IPs.
 	TLSKey crypto.Signer `json:"-"`
+	// BLSKey is this node's BLS key that is used to sign IPs.
+	BLSKey *bls.SecretKey `json:"-"`
 
 	// TrackedSubnets of the node.
 	TrackedSubnets set.Set[ids.ID]    `json:"-"`

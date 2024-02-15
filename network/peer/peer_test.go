@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -113,7 +114,10 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 
 	ip0 := ips.NewDynamicIPPort(net.IPv6loopback, 1)
 	tls0 := tlsCert0.PrivateKey.(crypto.Signer)
-	peerConfig0.IPSigner = NewIPSigner(ip0, tls0)
+	bls0, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	peerConfig0.IPSigner = NewIPSigner(ip0, tls0, bls0)
 
 	peerConfig0.Network = TestNetwork
 	inboundMsgChan0 := make(chan message.InboundMessage)
@@ -123,7 +127,10 @@ func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPee
 
 	ip1 := ips.NewDynamicIPPort(net.IPv6loopback, 2)
 	tls1 := tlsCert1.PrivateKey.(crypto.Signer)
-	peerConfig1.IPSigner = NewIPSigner(ip1, tls1)
+	bls1, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	peerConfig1.IPSigner = NewIPSigner(ip1, tls1, bls1)
 
 	peerConfig1.Network = TestNetwork
 	inboundMsgChan1 := make(chan message.InboundMessage)
