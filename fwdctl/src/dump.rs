@@ -21,6 +21,16 @@ pub struct Options {
         help = "Name of the database"
     )]
     pub db: String,
+
+    /// The key to start dumping from (if no key is provided, start from the beginning).
+    /// Defaults to None.
+    #[arg(
+        required = false,
+        value_name = "START_KEY",
+        value_parser = key_parser,
+        help = "Start dumping from this key (inclusive)."
+    )]
+    pub start_key: Option<Box<[u8]>>,
 }
 
 pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
@@ -32,7 +42,8 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     let db = Db::new(opts.db.clone(), &cfg.build()).await?;
     let latest_hash = db.root_hash().await?;
     let latest_rev = db.revision(latest_hash).await?;
-    let mut stream = latest_rev.stream();
+    let start_key = opts.start_key.clone().unwrap_or(Box::new([]));
+    let mut stream = latest_rev.stream_from(start_key);
     loop {
         match stream.next().await {
             None => break,
@@ -44,6 +55,11 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     }
     Ok(())
 }
+
 fn u8_to_string(data: &[u8]) -> Cow<'_, str> {
     String::from_utf8_lossy(data)
+}
+
+fn key_parser(s: &str) -> Result<Box<[u8]>, std::io::Error> {
+    return Ok(Box::from(s.as_bytes()));
 }
