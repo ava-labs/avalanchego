@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -171,11 +172,15 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		ip, listener := dialer.NewListener()
 		nodeID, tlsCert, tlsConfig := getTLS(t, i)
 
+		blsKey, err := bls.NewSecretKey()
+		require.NoError(t, err)
+
 		config := defaultConfig
 		config.TLSConfig = tlsConfig
 		config.MyNodeID = nodeID
 		config.MyIPPort = ip
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
+		config.BLSKey = blsKey
 
 		listeners[i] = listener
 		nodeIDs[i] = nodeID
@@ -542,7 +547,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	}
 
 	config := configs[0]
-	signer := peer.NewIPSigner(config.MyIPPort, config.TLSKey)
+	signer := peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey)
 	ip, err := signer.GetSignedIP()
 	require.NoError(err)
 
@@ -555,7 +560,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 					staking.CertificateFromX509(config.TLSConfig.Certificates[0].Leaf),
 					ip.IPPort,
 					ip.Timestamp,
-					ip.Signature,
+					ip.TLSSignature,
 				),
 			})
 			require.NoError(err)
