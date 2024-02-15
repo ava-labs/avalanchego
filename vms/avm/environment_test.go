@@ -43,7 +43,7 @@ import (
 
 const (
 	testTxFee    uint64 = units.MicroAvax
-	startBalance uint64 = 50 * units.MicroAvax
+	startBalance uint64 = 1000 * units.MicroAvax
 
 	username       = "bobby"
 	password       = "StrnasfqewiurPasswdn56d" //#nosec G101

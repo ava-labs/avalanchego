@@ -561,7 +561,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
@@ -573,13 +573,13 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 				}
 			},
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd"
 					],
-					"amount": 48000,
+					"amount": 998000,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -587,12 +587,12 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"txID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"outputIndex": 2,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 50000,
+					"amount": 1000000,
 					"signatureIndices": [
 						0
 					]
@@ -655,13 +655,13 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 998000,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -669,12 +669,12 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"txID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"outputIndex": 2,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 50000,
+					"amount": 1000000,
 					"signatureIndices": [
 						0
 					]
@@ -685,7 +685,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		"destinationChain": "2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w",
 		"exportedOutputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
@@ -763,13 +763,13 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 49000,
+					"amount": 999000,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -777,12 +777,12 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"txID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"outputIndex": 2,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 50000,
+					"amount": 1000000,
 					"signatureIndices": [
 						0
 					]
@@ -863,7 +863,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xa036832b708b377ef9719ffbc834a3fb933191a467994f844c23f4a44350e86a7151cdbbbfa479d93a4906cc22254dcc5ccc2a6099492e7a9f9e8b575048d69701"
+					"0xc40f6ce7b28f2b45e2383cd8a04a739f6280328e98497b49be720201297c8a1a580e3f8a37967a1869199fb3e67c3e2006950c2396292c2e1dadcabb7f789c5f00"
 				]
 			}
 		}

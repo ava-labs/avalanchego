@@ -135,7 +135,7 @@ func TestIssueNFT(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
 			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 	})
 	env.vm.ctx.Lock.Unlock()
