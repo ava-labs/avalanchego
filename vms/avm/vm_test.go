@@ -385,13 +385,14 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
 
+	expectedFee := uint64(10256)
 	tx, _, err := buildBaseTx(
 		env.vm,
 		[]*avax.TransferableOutput{
 			{ // fee asset
 				Asset: avax.Asset{ID: feeAssetCreateTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - env.vm.TxFee,
+					Amt: startBalance - expectedFee,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -401,7 +402,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 			{ // issued asset
 				Asset: avax.Asset{ID: createTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - env.vm.TxFee,
+					Amt: startBalance - expectedFee,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -732,7 +733,7 @@ func TestIssueExportTx(t *testing.T) {
 		constants.PlatformChainID,
 		to, // to
 		avaxID,
-		startBalance-env.vm.TxFee,
+		5000,
 		utxos,
 		kc,
 		changeAddr,
@@ -795,12 +796,13 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
 
+	expectedFee := uint64(5355)
 	tx, _, err := buildExportTx(
 		env.vm,
 		constants.PlatformChainID,
 		to, // to
 		avaxID,
-		startBalance-env.vm.TxFee,
+		startBalance-expectedFee,
 		utxos,
 		kc,
 		changeAddr,

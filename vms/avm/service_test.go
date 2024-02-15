@@ -579,7 +579,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 					"addresses": [
 						"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd"
 					],
-					"amount": 998000,
+					"amount": 993673,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -661,7 +661,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 998000,
+					"amount": 993645,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -2400,7 +2400,8 @@ func TestNFTWorkflow(t *testing.T) {
 			}
 
 			fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
-			require.Equal(fromAddrsStartBalance-env.vm.TxFee, fromAddrsTotalBalance)
+			expectedFee := uint64(5066)
+			require.Equal(fromAddrsStartBalance-expectedFee, fromAddrsTotalBalance)
 
 			assetID := createReply.AssetID
 			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})

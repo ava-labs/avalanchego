@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -151,7 +150,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
 		DurangoTime:      time.Time{},
-		EUpgradeTime:     mockable.MaxTime,
+		EUpgradeTime:     time.Time{},
 	}
 	if c.vmStaticConfig != nil {
 		vmStaticConfig = *c.vmStaticConfig
