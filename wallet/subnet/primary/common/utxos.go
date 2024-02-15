@@ -19,20 +19,20 @@ var (
 	_ ChainUTXOs = (*chainUTXOs)(nil)
 )
 
-type ChainUTXOs interface {
-	AddUTXO(ctx context.Context, destinationChainID ids.ID, utxo *avax.UTXO) error
-	RemoveUTXO(ctx context.Context, sourceChainID, utxoID ids.ID) error
-
-	UTXOs(ctx context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetUTXO(ctx context.Context, sourceChainID, utxoID ids.ID) (*avax.UTXO, error)
-}
-
 type UTXOs interface {
 	AddUTXO(ctx context.Context, sourceChainID, destinationChainID ids.ID, utxo *avax.UTXO) error
 	RemoveUTXO(ctx context.Context, sourceChainID, destinationChainID, utxoID ids.ID) error
 
 	UTXOs(ctx context.Context, sourceChainID, destinationChainID ids.ID) ([]*avax.UTXO, error)
 	GetUTXO(ctx context.Context, sourceChainID, destinationChainID, utxoID ids.ID) (*avax.UTXO, error)
+}
+
+type ChainUTXOs interface {
+	AddUTXO(ctx context.Context, destinationChainID ids.ID, utxo *avax.UTXO) error
+	RemoveUTXO(ctx context.Context, sourceChainID, utxoID ids.ID) error
+
+	UTXOs(ctx context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
+	GetUTXO(ctx context.Context, sourceChainID, utxoID ids.ID) (*avax.UTXO, error)
 }
 
 func NewUTXOs() UTXOs {
