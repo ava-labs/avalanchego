@@ -718,38 +718,30 @@ func TestIssueExportTx(t *testing.T) {
 	}()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
-	avaxID := genesisTx.ID()
 
-	key := keys[0]
-	tx := &txs.Tx{Unsigned: &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        avaxID,
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: avaxID},
-				In: &secp256k1fx.TransferInput{
-					Amt:   startBalance,
-					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-				},
-			}},
-		}},
-		DestinationChain: constants.PlatformChainID,
-		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: avaxID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - env.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-		}},
-	}}
-	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	var (
+		avaxID     = genesisTx.ID()
+		key        = keys[0]
+		kc         = secp256k1fx.NewKeychain()
+		to         = key.PublicKey().Address()
+		changeAddr = to
+	)
+
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+
+	tx, _, err := buildExportTx(
+		env.vm,
+		constants.PlatformChainID,
+		to, // to
+		avaxID,
+		startBalance-env.vm.TxFee,
+		utxos,
+		kc,
+		changeAddr,
+	)
+	require.NoError(err)
 
 	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
 	utxoBytes, _, _, err := peerSharedMemory.Indexed(
@@ -793,39 +785,31 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
-	avaxID := genesisTx.ID()
 
-	key := keys[0]
-	assetID := avax.Asset{ID: avaxID}
-	tx := &txs.Tx{Unsigned: &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        avaxID,
-					OutputIndex: 2,
-				},
-				Asset: assetID,
-				In: &secp256k1fx.TransferInput{
-					Amt:   startBalance,
-					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-				},
-			}},
-		}},
-		DestinationChain: constants.PlatformChainID,
-		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: assetID,
-			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - env.vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-		}},
-	}}
-	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	var (
+		avaxID     = genesisTx.ID()
+		assetID    = avax.Asset{ID: avaxID}
+		key        = keys[0]
+		kc         = secp256k1fx.NewKeychain()
+		to         = key.PublicKey().Address()
+		changeAddr = to
+	)
+
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	require.NoError(err)
+
+	tx, _, err := buildExportTx(
+		env.vm,
+		constants.PlatformChainID,
+		to, // to
+		avaxID,
+		startBalance-env.vm.TxFee,
+		utxos,
+		kc,
+		changeAddr,
+	)
+	require.NoError(err)
 
 	utxo := avax.UTXOID{
 		TxID:        tx.ID(),
@@ -840,7 +824,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		},
 	}))
 
-	_, err := peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
+	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 
 	env.vm.ctx.Lock.Unlock()

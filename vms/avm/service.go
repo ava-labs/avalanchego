@@ -1848,65 +1848,62 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	amounts := map[ids.ID]uint64{}
-	if assetID == s.vm.feeAssetID {
-		amountWithFee, err := safemath.Add64(uint64(args.Amount), s.vm.TxFee)
+	return buildExportTx(s.vm, chainID, to, assetID, uint64(args.Amount), utxos, kc, changeAddr)
+}
+
+func buildExportTx(
+	vm *VM,
+	destinationChain ids.ID,
+	to ids.ShortID,
+	exportedAssetID ids.ID,
+	exportedAmt uint64,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	uTx := &txs.ExportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+		}},
+		DestinationChain: destinationChain,
+		ExportedOuts: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: exportedAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: exportedAmt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{to},
+				},
+			},
+		}},
+	}
+	toBurn := map[ids.ID]uint64{}
+	if exportedAssetID == vm.feeAssetID {
+		amountWithFee, err := safemath.Add64(exportedAmt, vm.TxFee)
 		if err != nil {
 			return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
-		amounts[s.vm.feeAssetID] = amountWithFee
+		toBurn[vm.feeAssetID] = amountWithFee
 	} else {
-		amounts[s.vm.feeAssetID] = s.vm.TxFee
-		amounts[assetID] = uint64(args.Amount)
+		toBurn[exportedAssetID] = exportedAmt
+		toBurn[vm.feeAssetID] = vm.TxFee
 	}
-
-	amountsSpent, ins, keys, err := s.vm.Spend(utxos, kc, amounts)
+	ins, outs, keys, err := vm.NewSpend(
+		utxos,
+		kc,
+		toBurn,
+		changeAddr,
+	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	exportOuts := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: uint64(args.Amount),
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
-			},
-		},
-	}}
+	codec := vm.parser.Codec()
 
-	outs := []*avax.TransferableOutput{}
-	for assetID, amountSpent := range amountsSpent {
-		amountToSend := amounts[assetID]
-		if amountSpent > amountToSend {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amountSpent - amountToSend,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
-	}
-
-	codec := s.vm.parser.Codec()
-	avax.SortTransferableOutputs(outs, codec)
-
-	tx := &txs.Tx{Unsigned: &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		DestinationChain: chainID,
-		ExportedOuts:     exportOuts,
-	}}
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
 	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
