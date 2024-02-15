@@ -4,11 +4,11 @@
 package p
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -53,15 +53,21 @@ var (
 // in the tx are exactly necessary to pay fees for it
 
 func TestBaseTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		backend    = NewBackend(testCtx, chainUTXOs, nil)
+		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
 		utxoAddr = utxosKey.Address()
@@ -84,9 +90,6 @@ func TestBaseTx(t *testing.T) {
 		}}
 	)
 
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
 	utx, err := builder.NewBaseTx(outputsToMove)
 	require.NoError(err)
 
@@ -101,27 +104,26 @@ func TestBaseTx(t *testing.T) {
 	require.Equal(expectedConsumed, consumed)
 	require.Equal(outputsToMove[0], outs[1])
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestAddSubnetValidatorTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -157,9 +159,6 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		}
 	)
 
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
 	// build the transaction
 	utx, err := builder.NewAddSubnetValidatorTx(subnetValidator)
 	require.NoError(err)
@@ -174,27 +173,26 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestRemoveSubnetValidatorTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -221,9 +219,6 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		signer = NewSigner(kc, backend)
 	)
 
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
 	// build the transaction
 	utx, err := builder.NewRemoveSubnetValidatorTx(
 		ids.GenerateTestNodeID(),
@@ -241,27 +236,26 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestCreateChainTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -293,9 +287,6 @@ func TestCreateChainTx(t *testing.T) {
 		chainName    = "dummyChain"
 	)
 
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
 	// build the transaction
 	utx, err := builder.NewCreateChainTx(
 		subnetID,
@@ -316,27 +307,26 @@ func TestCreateChainTx(t *testing.T) {
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestCreateSubnetTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -362,9 +352,6 @@ func TestCreateSubnetTx(t *testing.T) {
 		kc     = secp256k1fx.NewKeychain(utxosKey)
 		signer = NewSigner(kc, backend)
 	)
-
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
 	// build the transaction
 	utx, err := builder.NewCreateSubnetTx(subnetOwner)
@@ -380,27 +367,26 @@ func TestCreateSubnetTx(t *testing.T) {
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestTransferSubnetOwnershipTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -426,9 +412,6 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		kc     = secp256k1fx.NewKeychain(utxosKey)
 		signer = NewSigner(kc, backend)
 	)
-
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
 	// build the transaction
 	utx, err := builder.NewTransferSubnetOwnershipTx(
@@ -447,27 +430,29 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestImportTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey    = testKeys[1]
+		utxos       = makeTestUTXOs(utxosKey)
+		globalUTXOs = common.NewUTXOs()
+		chainUTXOs  = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, globalUTXOs))
+	)
+	for _, utxo := range utxos {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		backend    = NewBackend(testCtx, chainUTXOs, nil)
+		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
 		utxoAddr = utxosKey.Address()
@@ -490,7 +475,9 @@ func TestImportTx(t *testing.T) {
 		}
 	)
 
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), sourceChainID).Return([]*avax.UTXO{importedUTXO}, nil)
+	require.NoError(
+		globalUTXOs.AddUTXO(stdcontext.Background(), sourceChainID, constants.PlatformChainID, importedUTXO),
+	)
 
 	// build the transaction
 	utx, err := builder.NewImportTx(
@@ -511,35 +498,35 @@ func TestImportTx(t *testing.T) {
 	consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	chainUTXOs.EXPECT().GetUTXO(gomock.Any(), sourceChainID, importedUTXO.InputID()).Return(importedUTXO, nil)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestExportTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		backend    = NewBackend(testCtx, chainUTXOs, nil)
+		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
 
 		// signer
-		kc = secp256k1fx.NewKeychain(utxosKey)
-		s  = NewSigner(kc, backend)
+		kc     = secp256k1fx.NewKeychain(utxosKey)
+		signer = NewSigner(kc, backend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -554,9 +541,6 @@ func TestExportTx(t *testing.T) {
 			},
 		}}
 	)
-
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
 	// build the transaction
 	utx, err := builder.NewExportTx(
@@ -576,27 +560,26 @@ func TestExportTx(t *testing.T) {
 	require.Equal(expectedConsumed, consumed)
 	require.Equal(utx.ExportedOutputs, exportedOutputs)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = s.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestTransformSubnetTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -626,9 +609,6 @@ func TestTransformSubnetTx(t *testing.T) {
 		initialSupply = 40 * units.MegaAvax
 		maxSupply     = 100 * units.MegaAvax
 	)
-
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
 	// build the transaction
 	utx, err := builder.NewTransformSubnetTx(
@@ -662,27 +642,27 @@ func TestTransformSubnetTx(t *testing.T) {
 	consumed := ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
 }
 
 func TestAddPermissionlessValidatorTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		backend    = NewBackend(testCtx, chainUTXOs, nil)
+		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
 		utxoAddr   = utxosKey.Address()
@@ -711,9 +691,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
-
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
 	// build the transaction
 	utx, err := builder.NewAddPermissionlessValidatorTx(
@@ -748,27 +725,27 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = txSigner.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), txSigner, utx)
 	require.NoError(err)
 }
 
 func TestAddPermissionlessDelegatorTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	var (
+		require = require.New(t)
+
+		utxosKey   = testKeys[1]
+		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
+	)
+	for _, utxo := range makeTestUTXOs(utxosKey) {
+		require.NoError(
+			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
+		)
+	}
 
 	var (
 		// backend
-		chainUTXOs = common.NewMockChainUTXOs(ctrl)
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		backend    = NewBackend(testCtx, chainUTXOs, nil)
+		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
 		utxoAddr   = utxosKey.Address()
@@ -788,9 +765,6 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 			},
 		}
 	)
-
-	// set building expectations
-	chainUTXOs.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 
 	// build the transaction
 	utx, err := builder.NewAddPermissionlessDelegatorTx(
@@ -822,15 +796,31 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 
-	// ensure that all existing calls have already been satisfied
-	require.True(ctrl.Satisfied())
-
-	// set signing expectations
-	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
-
 	// sign the transaction
-	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
+	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
 	require.NoError(err)
+}
+
+func newDeterministicChainUTXOs(utxos common.ChainUTXOs) common.ChainUTXOs {
+	return &deterministicChainUTXOs{
+		ChainUTXOs: utxos,
+	}
+}
+
+type deterministicChainUTXOs struct {
+	common.ChainUTXOs
+}
+
+func (c *deterministicChainUTXOs) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+	utxos, err := c.ChainUTXOs.UTXOs(ctx, sourceChainID)
+	if err != nil {
+		return nil, err
+	}
+
+	slices.SortFunc(utxos, func(a, b *avax.UTXO) int {
+		return a.Compare(&b.UTXOID)
+	})
+	return utxos, nil
 }
 
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
@@ -919,16 +909,5 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 				},
 			},
 		},
-	}
-}
-
-func expectFetchingPChainUTXOs(chainUTXOs *common.MockChainUTXOs, utxoIDs set.Set[ids.ID], utxos []*avax.UTXO) {
-	for _, utxo := range utxos {
-		utxoID := utxo.InputID()
-		if !utxoIDs.Contains(utxoID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, utxoID).Return(utxo, nil)
 	}
 }
