@@ -30,23 +30,12 @@ type Spender interface {
 	// Arguments:
 	// - [utxos] contains assets ID and amount to be spend for each assestID
 	// - [kc] are the owners of the funds
-	// - [amounts] is the amount of funds that are available to be spent for each assetID
+	// - [toSpend] is the amount of funds that are available to be spent for each assetID
 	// Returns:
-	// - [amountsSpent] the amount of funds that are spent
 	// - [inputs] the inputs that should be consumed to fund the outputs
+	// - [outputs] the outputs produced
 	// - [signers] the proof of ownership of the funds being moved
 	Spend(
-		utxos []*avax.UTXO,
-		kc *secp256k1fx.Keychain,
-		amounts map[ids.ID]uint64,
-	) (
-		map[ids.ID]uint64, // amountsSpent
-		[]*avax.TransferableInput, // inputs
-		[][]*secp256k1.PrivateKey, // signers
-		error,
-	)
-
-	NewSpend(
 		utxos []*avax.UTXO,
 		kc *secp256k1fx.Keychain,
 		toSpend map[ids.ID]uint64,
@@ -120,72 +109,6 @@ type spender struct {
 }
 
 func (s *spender) Spend(
-	utxos []*avax.UTXO,
-	kc *secp256k1fx.Keychain,
-	amounts map[ids.ID]uint64,
-) (
-	map[ids.ID]uint64, // amountsSpent
-	[]*avax.TransferableInput, // inputs
-	[][]*secp256k1.PrivateKey, // signers
-	error,
-) {
-	amountsSpent := make(map[ids.ID]uint64, len(amounts))
-	time := s.clock.Unix()
-
-	ins := []*avax.TransferableInput{}
-	keys := [][]*secp256k1.PrivateKey{}
-	for _, utxo := range utxos {
-		assetID := utxo.AssetID()
-		amount := amounts[assetID]
-		amountSpent := amountsSpent[assetID]
-
-		if amountSpent >= amount {
-			// we already have enough inputs allocated to this asset
-			continue
-		}
-
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
-		if err != nil {
-			// this utxo can't be spent with the current keys right now
-			continue
-		}
-		input, ok := inputIntf.(avax.TransferableIn)
-		if !ok {
-			// this input doesn't have an amount, so I don't care about it here
-			continue
-		}
-		newAmountSpent, err := math.Add64(amountSpent, input.Amount())
-		if err != nil {
-			// there was an error calculating the consumed amount, just error
-			return nil, nil, nil, errSpendOverflow
-		}
-		amountsSpent[assetID] = newAmountSpent
-
-		// add the new input to the array
-		ins = append(ins, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: assetID},
-			In:     input,
-		})
-		// add the required keys to the array
-		keys = append(keys, signers)
-	}
-
-	for asset, amount := range amounts {
-		if amountsSpent[asset] < amount {
-			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
-				amount,
-				asset,
-				amountsSpent[asset],
-			)
-		}
-	}
-
-	avax.SortTransferableInputsWithSigners(ins, keys)
-	return amountsSpent, ins, keys, nil
-}
-
-func (s *spender) NewSpend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	amountsToBurn map[ids.ID]uint64,

@@ -546,63 +546,50 @@ func TestIssueImportTx(t *testing.T) {
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 
-	key := keys[0]
-	utxoID := avax.UTXOID{
-		TxID: ids.ID{
-			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-		},
-	}
+	var (
+		key = keys[0]
+		kc  = secp256k1fx.NewKeychain()
 
-	txAssetID := avax.Asset{ID: avaxID}
-	tx := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-			Outs: []*avax.TransferableOutput{{
-				Asset: txAssetID,
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 1000,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-					},
-				},
-			}},
-		}},
-		SourceChain: constants.PlatformChainID,
-		ImportedIns: []*avax.TransferableInput{{
+		utxoID = avax.UTXOID{
+			TxID: ids.ID{
+				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+				0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+				0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+			},
+		}
+		txAssetID    = avax.Asset{ID: avaxID}
+		importedUtxo = &avax.UTXO{
 			UTXOID: utxoID,
 			Asset:  txAssetID,
-			In: &secp256k1fx.TransferInput{
+			Out: &secp256k1fx.TransferOutput{
 				Amt: 1010,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{0},
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
 				},
 			},
-		}},
-	}}
-	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	// Provide the platform UTXO:
-	utxo := &avax.UTXO{
-		UTXOID: utxoID,
-		Asset:  txAssetID,
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1010,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{key.PublicKey().Address()},
-			},
-		},
-	}
-
-	utxoBytes, err := env.vm.parser.Codec().Marshal(txs.CodecVersion, utxo)
+		}
+	)
+	kc.Add(key)
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
 
-	inputID := utxo.InputID()
+	tx, err := buildImportTx(
+		env.vm,
+		constants.PlatformChainID,  // source chain
+		[]*avax.UTXO{importedUtxo}, // atomicUTXOs
+		key.Address(),
+		utxos,
+		kc,
+	)
+	require.NoError(err)
+
+	// Provide the platform UTXO:
+	utxoBytes, err := env.vm.parser.Codec().Marshal(txs.CodecVersion, importedUtxo)
+	require.NoError(err)
+
+	inputID := importedUtxo.InputID()
 	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		env.vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{{

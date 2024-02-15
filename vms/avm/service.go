@@ -824,7 +824,7 @@ func buildCreateAssetTx(
 	toBurn := map[ids.ID]uint64{
 		vm.feeAssetID: vm.CreateAssetTxFee,
 	}
-	ins, outs, keys, err := vm.NewSpend(
+	ins, outs, keys, err := vm.Spend(
 		utxos,
 		kc,
 		toBurn,
@@ -1298,7 +1298,7 @@ func buildBaseTx(
 	}
 	toBurn[vm.feeAssetID] = amountWithFee
 
-	ins, feeOuts, keys, err := vm.NewSpend(
+	ins, feeOuts, keys, err := vm.Spend(
 		utxos,
 		kc,
 		toBurn,
@@ -1433,7 +1433,7 @@ func buildOperation(
 	toBurn := map[ids.ID]uint64{
 		vm.feeAssetID: vm.TxFee,
 	}
-	ins, outs, keys, err := vm.NewSpend(
+	ins, outs, keys, err := vm.Spend(
 		utxos,
 		kc,
 		toBurn,
@@ -1722,7 +1722,7 @@ func buildImportTx(
 	} else {
 		toBurn[vm.feeAssetID] = importedAmt - vm.TxFee
 	}
-	ins, outs, keys, err := vm.NewSpend(
+	ins, outs, keys, err := vm.Spend(
 		utxos,
 		kc,
 		toBurn,
@@ -1871,7 +1871,7 @@ func buildExportTx(
 		toBurn[exportedAssetID] = exportedAmt
 		toBurn[vm.feeAssetID] = vm.TxFee
 	}
-	ins, outs, keys, err := vm.NewSpend(
+	ins, outs, keys, err := vm.Spend(
 		utxos,
 		kc,
 		toBurn,

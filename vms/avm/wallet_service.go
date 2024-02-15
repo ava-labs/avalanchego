@@ -256,52 +256,40 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	amountsWithFee := maps.Clone(amounts)
+	uTx := &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    w.vm.ctx.NetworkID,
+			BlockchainID: w.vm.ctx.ChainID,
+			Memo:         memoBytes,
+		},
+	}
 
-	amountWithFee, err := math.Add64(amounts[w.vm.feeAssetID], w.vm.TxFee)
+	toBurn := make(map[ids.ID]uint64) // UTXOs to move + fees
+	for _, out := range outs {
+		toBurn[out.AssetID()] += out.Out.Amount()
+	}
+	amountWithFee, err := math.Add64(toBurn[w.vm.feeAssetID], w.vm.TxFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
-	amountsWithFee[w.vm.feeAssetID] = amountWithFee
+	toBurn[w.vm.feeAssetID] = amountWithFee
 
-	amountsSpent, ins, keys, err := w.vm.Spend(
+	ins, feeOuts, keys, err := w.vm.Spend(
 		utxos,
 		kc,
-		amountsWithFee,
+		toBurn,
+		changeAddr,
 	)
 	if err != nil {
 		return err
 	}
 
-	// Add the required change outputs
-	for assetID, amountWithFee := range amountsWithFee {
-		amountSpent := amountsSpent[assetID]
-
-		if amountSpent > amountWithFee {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amountSpent - amountWithFee,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
-	}
-
+	uTx.Ins = ins
+	uTx.Outs = append(uTx.Outs, feeOuts...)
 	codec := w.vm.parser.Codec()
-	avax.SortTransferableOutputs(outs, codec)
+	avax.SortTransferableOutputs(uTx.Outs, codec)
 
-	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    w.vm.ctx.NetworkID,
-		BlockchainID: w.vm.ctx.ChainID,
-		Outs:         outs,
-		Ins:          ins,
-		Memo:         memoBytes,
-	}}}
+	tx := &txs.Tx{Unsigned: uTx}
 	if err := tx.SignSECP256K1Fx(codec, keys); err != nil {
 		return err
 	}
