@@ -41,10 +41,10 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	builtBlock.Signature = []byte{0}
 
 	err = builtBlock.Verify(false, ids.Empty)
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedProposer)
 
 	err = builtBlock.Verify(true, ids.Empty)
-	require.Error(err)
+	require.ErrorIs(err, errMissingProposer)
 }
 
 func TestBlockSizeLimit(t *testing.T) {

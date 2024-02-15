@@ -132,7 +132,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 
 	// Page size too large
 	_, err = idx.GetContainerRange(0, MaxFetchedByRange+1)
-	require.Error(err)
+	require.ErrorIs(err, errNumToFetchInvalid)
 
 	// Make sure data is right
 	containers, err := idx.GetContainerRange(0, MaxFetchedByRange)
@@ -170,7 +170,7 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	require.NoError(idx.Accept(ctx, containerID, []byte{1, 2, 3}))
 	require.NoError(idx.Accept(ctx, containerID, []byte{4, 5, 6}))
 	_, err = idx.GetContainerByIndex(1)
-	require.Error(err, "should not have accepted same container twice")
+	require.ErrorIs(err, errNoContainerAtIndex)
 	gotContainer, err := idx.GetContainerByID(containerID)
 	require.NoError(err)
 	require.EqualValues(gotContainer.Bytes, []byte{1, 2, 3}, "should not have accepted same container twice")

@@ -15,7 +15,7 @@ import (
 var (
 	_ UnsignedTx = (*RemoveSubnetValidatorTx)(nil)
 
-	errRemovePrimaryNetworkValidator = errors.New("can't remove primary network validator with RemoveSubnetValidatorTx")
+	ErrRemovePrimaryNetworkValidator = errors.New("can't remove primary network validator with RemoveSubnetValidatorTx")
 )
 
 // Removes a validator from a subnet.
@@ -37,7 +37,7 @@ func (tx *RemoveSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		// already passed syntactic verification
 		return nil
 	case tx.Subnet == constants.PrimaryNetworkID:
-		return errRemovePrimaryNetworkValidator
+		return ErrRemovePrimaryNetworkValidator
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

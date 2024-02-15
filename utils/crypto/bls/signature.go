@@ -12,7 +12,7 @@ import (
 const SignatureLen = blst.BLST_P2_COMPRESS_BYTES
 
 var (
-	errFailedSignatureDecompress  = errors.New("couldn't decompress signature")
+	ErrFailedSignatureDecompress  = errors.New("couldn't decompress signature")
 	errInvalidSignature           = errors.New("invalid signature")
 	errNoSignatures               = errors.New("no signatures")
 	errFailedSignatureAggregation = errors.New("couldn't aggregate signatures")
@@ -33,7 +33,7 @@ func SignatureToBytes(sig *Signature) []byte {
 func SignatureFromBytes(sigBytes []byte) (*Signature, error) {
 	sig := new(Signature).Uncompress(sigBytes)
 	if sig == nil {
-		return nil, errFailedSignatureDecompress
+		return nil, ErrFailedSignatureDecompress
 	}
 	if !sig.SigValidate(false) {
 		return nil, errInvalidSignature

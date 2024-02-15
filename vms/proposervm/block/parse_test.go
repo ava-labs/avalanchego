@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 )
@@ -79,7 +80,7 @@ func TestParseDuplicateExtension(t *testing.T) {
 	require.NoError(err)
 
 	_, err = Parse(blockBytes)
-	require.Error(err) // Do not check for errDuplicateExtension to support g1.19
+	require.ErrorIs(err, errInvalidCertificate)
 }
 
 func TestParseHeader(t *testing.T) {
@@ -149,5 +150,5 @@ func TestParseGibberish(t *testing.T) {
 	bytes := []byte{0, 1, 2, 3, 4, 5}
 
 	_, err := Parse(bytes)
-	require.Error(err)
+	require.ErrorIs(err, codec.ErrUnknownVersion)
 }

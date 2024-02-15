@@ -5,6 +5,7 @@ package chain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -194,14 +195,17 @@ func NewMeteredState(
 	return c, nil
 }
 
-// SetLastAcceptedBlock sets the last accepted block to [lastAcceptedBlock]. This should be called
-// with an internal block - not a wrapped block returned from state.
+var errSetAcceptedWithProcessing = errors.New("cannot set last accepted block with blocks processing")
+
+// SetLastAcceptedBlock sets the last accepted block to [lastAcceptedBlock].
+// This should be called with an internal block - not a wrapped block returned
+// from state.
 //
-// This also flushes [lastAcceptedBlock] from missingBlocks and unverifiedBlocks to
-// ensure that their contents stay valid.
+// This also flushes [lastAcceptedBlock] from missingBlocks and unverifiedBlocks
+// to ensure that their contents stay valid.
 func (s *State) SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error {
 	if len(s.verifiedBlocks) != 0 {
-		return fmt.Errorf("cannot set chain state last accepted block with non-zero number of verified blocks in processing: %d", len(s.verifiedBlocks))
+		return fmt.Errorf("%w: %d", errSetAcceptedWithProcessing, len(s.verifiedBlocks))
 	}
 
 	// [lastAcceptedBlock] is no longer missing or unverified, so we evict it from the corresponding

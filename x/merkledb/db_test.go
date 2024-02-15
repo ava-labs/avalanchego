@@ -374,21 +374,22 @@ func Test_MerkleDB_InsertNil(t *testing.T) {
 }
 
 func Test_MerkleDB_InsertAndRetrieve(t *testing.T) {
+	require := require.New(t)
+
 	db, err := getBasicDB()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// value hasn't been inserted so shouldn't exist
 	value, err := db.Get([]byte("key"))
-	require.Error(t, err)
-	require.Equal(t, database.ErrNotFound, err)
-	require.Nil(t, value)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(value)
 
 	err = db.Put([]byte("key"), []byte("value"))
-	require.NoError(t, err)
+	require.NoError(err)
 
 	value, err = db.Get([]byte("key"))
-	require.NoError(t, err)
-	require.Equal(t, []byte("value"), value)
+	require.NoError(err)
+	require.Equal([]byte("value"), value)
 }
 
 func Test_MerkleDB_HealthCheck(t *testing.T) {
@@ -819,7 +820,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				root,
 			)
 			require.NoError(err)
-			require.LessOrEqual(len(changeProof.KeyValues)+len(changeProof.DeletedKeys), 100)
+			require.LessOrEqual(len(changeProof.KeyChanges), 100)
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)

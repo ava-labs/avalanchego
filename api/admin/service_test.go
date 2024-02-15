@@ -76,7 +76,7 @@ func TestLoadVMsSuccess(t *testing.T) {
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
 	require.Equal(t, expectedVMRegistry, reply.NewVMs)
-	require.Equal(t, err, nil)
+	require.NoError(t, err)
 }
 
 // Tests behavior for LoadVMs if we fail to reload vms.
@@ -90,8 +90,7 @@ func TestLoadVMsReloadFails(t *testing.T) {
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-
-	require.Equal(t, err, errTest)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Tests behavior for LoadVMs if we fail to fetch our aliases
@@ -115,6 +114,5 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-
-	require.Equal(t, err, errTest)
+	require.ErrorIs(t, err, errTest)
 }

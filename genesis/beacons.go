@@ -67,7 +67,7 @@ func SampleBeacons(networkID uint32, count int) ([]string, []string) {
 	sampledIDs := make([]string, 0, count)
 
 	s := sampler.NewUniform()
-	_ = s.Initialize(uint64(len(beacons)))
+	s.Initialize(uint64(len(beacons)))
 	indices, _ := s.Sample(count)
 	for _, index := range indices {
 		sampledIPs = append(sampledIPs, beacons[int(index)].ip)

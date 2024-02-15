@@ -148,7 +148,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				return state.NewMockChain(ctrl)
 			},
-			expectedErr: errEndOfTime,
+			expectedErr: ErrEndOfTime,
 		},
 		{
 			name:      "no stakers",
@@ -304,11 +304,10 @@ func TestGetNextStakerToReward(t *testing.T) {
 			mockState.EXPECT().GetDeferredStakerIterator().Return(deferredStakerIter, nil).AnyTimes()
 
 			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, mockState)
+			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
-				require.Equal(tt.expectedErr, err)
 				return
 			}
-			require.NoError(err)
 			require.Equal(tt.expectedTxID, txID)
 			require.Equal(tt.expectedShouldReward, shouldReward)
 		})
@@ -509,7 +508,7 @@ func TestBuildBlock(t *testing.T) {
 			expectedBlkF: func(*require.Assertions) blocks.Block {
 				return nil
 			},
-			expectedErr: errNoPendingBlocks,
+			expectedErr: ErrNoPendingBlocks,
 		},
 		{
 			name: "should advance time",

@@ -49,7 +49,7 @@ func TestMintOperationVerify(t *testing.T) {
 				MintOutput:     validMintOutput,
 				TransferOutput: validTransferOutput,
 			},
-			expectedErr: errNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name: "invalid mint output",
@@ -63,7 +63,7 @@ func TestMintOperationVerify(t *testing.T) {
 				},
 				TransferOutput: validTransferOutput,
 			},
-			expectedErr: errOutputUnspendable,
+			expectedErr: ErrOutputUnspendable,
 		},
 		{
 			name: "invalid transfer output",
@@ -78,7 +78,7 @@ func TestMintOperationVerify(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: errOutputUnoptimized,
+			expectedErr: ErrOutputUnoptimized,
 		},
 		{
 			name: "addresses not unique",
@@ -93,7 +93,7 @@ func TestMintOperationVerify(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: errAddrsNotSortedUnique,
+			expectedErr: ErrAddrsNotSortedUnique,
 		},
 		{
 			name: "addresses not sorted",
@@ -108,7 +108,7 @@ func TestMintOperationVerify(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: errAddrsNotSortedUnique,
+			expectedErr: ErrAddrsNotSortedUnique,
 		},
 		{
 			name: "passes verification",

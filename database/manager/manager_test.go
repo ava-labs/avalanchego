@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -102,7 +103,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	require.NoError(err)
 
 	_, err = NewLevelDB(dir, nil, logging.NoLog{}, v2, "", prometheus.NewRegistry())
-	require.Error(err, "expected to error creating the manager due to an open db")
+	require.ErrorIs(err, leveldb.ErrCouldNotOpen)
 
 	err = db1.Close()
 	require.NoError(err)
@@ -314,7 +315,7 @@ func TestMeterDBManager(t *testing.T) {
 
 	// Confirm that the error from a name conflict is handled correctly
 	_, err = m.NewMeterDBManager("", registry)
-	require.Error(err)
+	require.ErrorIs(err, metric.ErrFailedRegistering)
 }
 
 func TestCompleteMeterDBManager(t *testing.T) {
@@ -363,7 +364,7 @@ func TestCompleteMeterDBManager(t *testing.T) {
 
 	// Confirm that the error from a name conflict is handled correctly
 	_, err = m.NewCompleteMeterDBManager("", registry)
-	require.Error(err)
+	require.ErrorIs(err, metric.ErrFailedRegistering)
 }
 
 func TestNewManagerFromDBs(t *testing.T) {
@@ -414,7 +415,7 @@ func TestNewManagerFromNoDBs(t *testing.T) {
 	require := require.New(t)
 	// Should error if no dbs are given
 	_, err := NewManagerFromDBs(nil)
-	require.Error(err)
+	require.ErrorIs(err, errNoDBs)
 }
 
 func TestNewManagerFromNonUniqueDBs(t *testing.T) {
@@ -447,5 +448,5 @@ func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 				},
 			},
 		})
-	require.Error(err)
+	require.ErrorIs(err, errNonSortedAndUniqueDBs)
 }

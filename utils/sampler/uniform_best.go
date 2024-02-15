@@ -4,18 +4,13 @@
 package sampler
 
 import (
-	"errors"
 	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var (
-	errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
-
-	_ Uniform = (*uniformBest)(nil)
-)
+var _ Uniform = (*uniformBest)(nil)
 
 // Sampling is performed by using another implementation of the Uniform
 // interface.
@@ -42,7 +37,7 @@ func NewBestUniform(expectedSampleSize int) Uniform {
 	}
 }
 
-func (s *uniformBest) Initialize(length uint64) error {
+func (s *uniformBest) Initialize(length uint64) {
 	s.Uniform = nil
 	bestDuration := time.Duration(math.MaxInt64)
 
@@ -53,9 +48,7 @@ func (s *uniformBest) Initialize(length uint64) error {
 
 samplerLoop:
 	for _, sampler := range s.samplers {
-		if err := sampler.Initialize(length); err != nil {
-			continue
-		}
+		sampler.Initialize(length)
 
 		start := s.clock.Time()
 		for i := 0; i < s.benchmarkIterations; i++ {
@@ -71,9 +64,5 @@ samplerLoop:
 		}
 	}
 
-	if s.Uniform == nil {
-		return errNoValidUniformSamplers
-	}
 	s.Uniform.Reset()
-	return nil
 }

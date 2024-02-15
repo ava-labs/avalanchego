@@ -782,105 +782,6 @@ func Test_RangeProof_Marshal_Errors(t *testing.T) {
 	}
 }
 
-func TestChangeProofGetLargestKey(t *testing.T) {
-	type test struct {
-		name     string
-		proof    ChangeProof
-		end      []byte
-		expected []byte
-	}
-
-	tests := []test{
-		{
-			name:     "empty proof",
-			proof:    ChangeProof{},
-			end:      []byte{0},
-			expected: []byte{0},
-		},
-		{
-			name: "1 KV no deleted keys",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{1},
-					},
-				},
-			},
-			end:      []byte{0},
-			expected: []byte{1},
-		},
-		{
-			name: "2 KV no deleted keys",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{1},
-					},
-					{
-						Key: []byte{2},
-					},
-				},
-			},
-			end:      []byte{0},
-			expected: []byte{2},
-		},
-		{
-			name: "no KVs 1 deleted key",
-			proof: ChangeProof{
-				DeletedKeys: [][]byte{{1}},
-			},
-			end:      []byte{0},
-			expected: []byte{1},
-		},
-		{
-			name: "no KVs 2 deleted keys",
-			proof: ChangeProof{
-				DeletedKeys: [][]byte{{1}, {2}},
-			},
-			end:      []byte{0},
-			expected: []byte{2},
-		},
-		{
-			name: "KV and deleted keys; KV larger",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{1},
-					},
-					{
-						Key: []byte{3},
-					},
-				},
-				DeletedKeys: [][]byte{{0}, {2}},
-			},
-			end:      []byte{5},
-			expected: []byte{3},
-		},
-		{
-			name: "KV and deleted keys; deleted key larger",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{0},
-					},
-					{
-						Key: []byte{2},
-					},
-				},
-				DeletedKeys: [][]byte{{1}, {3}},
-			},
-			end:      []byte{5},
-			expected: []byte{3},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.proof.getLargestKey(tt.end))
-		})
-	}
-}
-
 func Test_ChangeProof_Marshal(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
@@ -945,9 +846,9 @@ func Test_ChangeProof_Marshal(t *testing.T) {
 	verifyPath(t, proof.StartProof, parsedProof.StartProof)
 	verifyPath(t, proof.EndProof, parsedProof.EndProof)
 
-	for index, kv := range proof.KeyValues {
-		require.True(t, bytes.Equal(kv.Key, parsedProof.KeyValues[index].Key))
-		require.True(t, bytes.Equal(kv.Value, parsedProof.KeyValues[index].Value))
+	for index, kv := range proof.KeyChanges {
+		require.True(t, bytes.Equal(kv.Key, parsedProof.KeyChanges[index].Key))
+		require.True(t, bytes.Equal(kv.Value.value, parsedProof.KeyChanges[index].Value.value))
 	}
 }
 
@@ -980,8 +881,7 @@ func Test_ChangeProof_Marshal_Errors(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 	require.True(t, proof.HadRootsInHistory)
-	require.Len(t, proof.KeyValues, 8)
-	require.Len(t, proof.DeletedKeys, 2)
+	require.Len(t, proof.KeyChanges, 10)
 
 	proofBytes, err := Codec.EncodeChangeProof(Version, proof)
 	require.NoError(t, err)
@@ -1169,7 +1069,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 		{
 			name: "missing key/value",
 			malform: func(proof *ChangeProof) {
-				proof.KeyValues = proof.KeyValues[1:]
+				proof.KeyChanges = proof.KeyChanges[1:]
 			},
 			expectedErr: ErrProofValueDoesntMatch,
 		},
@@ -1225,7 +1125,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "no roots in history and non-empty key-values",
 			proof: &ChangeProof{
 				HadRootsInHistory: false,
-				KeyValues:         []KeyValue{{Key: []byte{1}, Value: []byte{1}}},
+				KeyChanges:        []KeyChange{{Key: []byte{1}, Value: Some([]byte{1})}},
 			},
 			start:       []byte{0},
 			end:         nil, // Also tests start can be after end if end is nil
@@ -1235,7 +1135,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "no roots in history and non-empty deleted keys",
 			proof: &ChangeProof{
 				HadRootsInHistory: false,
-				DeletedKeys:       [][]byte{{1}},
+				KeyChanges:        []KeyChange{{Key: []byte{1}}},
 			},
 			start:       nil,
 			end:         nil,
@@ -1293,7 +1193,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "no start proof",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				DeletedKeys:       [][]byte{{1}},
+				KeyChanges:        []KeyChange{{Key: []byte{1}}},
 			},
 			start:       []byte{1},
 			end:         nil,
@@ -1303,7 +1203,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "non-increasing key-values",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				KeyValues: []KeyValue{
+				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
 					{Key: []byte{0}},
 				},
@@ -1317,7 +1217,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				StartProof:        []ProofNode{{}},
-				KeyValues: []KeyValue{
+				KeyChanges: []KeyChange{
 					{Key: []byte{0}},
 				},
 			},
@@ -1330,7 +1230,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				EndProof:          []ProofNode{{}},
-				KeyValues: []KeyValue{
+				KeyChanges: []KeyChange{
 					{Key: []byte{2}},
 				},
 			},
@@ -1339,43 +1239,17 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
-			name: "non-increasing deleted keys",
+			name: "duplicate key",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				DeletedKeys: [][]byte{
-					{1},
-					{1},
+				KeyChanges: []KeyChange{
+					{Key: []byte{1}},
+					{Key: []byte{1}},
 				},
 			},
 			start:       nil,
 			end:         nil,
 			expectedErr: ErrNonIncreasingValues,
-		},
-		{
-			name: "deleted key too low",
-			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				StartProof:        []ProofNode{{}},
-				DeletedKeys: [][]byte{
-					{0},
-				},
-			},
-			start:       []byte{1},
-			end:         nil,
-			expectedErr: ErrStateFromOutsideOfRange,
-		},
-		{
-			name: "deleted key too great",
-			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				EndProof:          []ProofNode{{}},
-				DeletedKeys: [][]byte{
-					{1},
-				},
-			},
-			start:       nil,
-			end:         []byte{0},
-			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
 			name: "start proof node has wrong prefix",
@@ -1407,8 +1281,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "end proof node has wrong prefix",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				KeyValues: []KeyValue{
-					{Key: []byte{1, 2}}, // Also tests [end] set to greatest key-value/deleted key
+				KeyChanges: []KeyChange{
+					{Key: []byte{1, 2}, Value: Some([]byte{0})},
 				},
 				EndProof: []ProofNode{
 					{KeyPath: newPath([]byte{2}).Serialize()},
@@ -1423,8 +1297,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "end proof non-increasing",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				DeletedKeys: [][]byte{
-					{1, 2, 3}, // Also tests [end] set to greatest key-value/deleted key
+				KeyChanges: []KeyChange{
+					{Key: []byte{1, 2, 3}},
 				},
 				EndProof: []ProofNode{
 					{KeyPath: newPath([]byte{1}).Serialize()},

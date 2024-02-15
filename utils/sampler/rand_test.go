@@ -1,0 +1,210 @@
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package sampler
+
+import (
+	"fmt"
+	"math"
+	"math/rand"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/thepudds/fzgen/fuzzer"
+)
+
+type testSource struct {
+	onInvalid func()
+	nums      []uint64
+}
+
+func (s *testSource) Seed(uint64) {
+	s.onInvalid()
+}
+
+func (s *testSource) Uint64() uint64 {
+	if len(s.nums) == 0 {
+		s.onInvalid()
+	}
+	num := s.nums[0]
+	s.nums = s.nums[1:]
+	return num
+}
+
+type testSTDSource struct {
+	onInvalid func()
+	nums      []uint64
+}
+
+func (s *testSTDSource) Seed(int64) {
+	s.onInvalid()
+}
+
+func (s *testSTDSource) Int63() int64 {
+	return int64(s.Uint64() & (1<<63 - 1))
+}
+
+func (s *testSTDSource) Uint64() uint64 {
+	if len(s.nums) == 0 {
+		s.onInvalid()
+	}
+	num := s.nums[0]
+	s.nums = s.nums[1:]
+	return num
+}
+
+func TestRNG(t *testing.T) {
+	tests := []struct {
+		max      uint64
+		nums     []uint64
+		expected uint64
+	}{
+		{
+			max: math.MaxUint64,
+			nums: []uint64{
+				0x01,
+			},
+			expected: 0x01,
+		},
+		{
+			max: math.MaxUint64,
+			nums: []uint64{
+				0x0102030405060708,
+			},
+			expected: 0x0102030405060708,
+		},
+		{
+			max: math.MaxUint64,
+			nums: []uint64{
+				0xF102030405060708,
+			},
+			expected: 0xF102030405060708,
+		},
+		{
+			max: math.MaxInt64,
+			nums: []uint64{
+				0x01,
+			},
+			expected: 0x01,
+		},
+		{
+			max: math.MaxInt64,
+			nums: []uint64{
+				0x0102030405060708,
+			},
+			expected: 0x0102030405060708,
+		},
+		{
+			max: math.MaxInt64,
+			nums: []uint64{
+				0x8102030405060708,
+			},
+			expected: 0x0102030405060708,
+		},
+		{
+			max: 15,
+			nums: []uint64{
+				0x810203040506071a,
+			},
+			expected: 0x0a,
+		},
+		{
+			max: math.MaxInt64 + 1,
+			nums: []uint64{
+				math.MaxInt64 + 1,
+			},
+			expected: math.MaxInt64 + 1,
+		},
+		{
+			max: math.MaxInt64 + 1,
+			nums: []uint64{
+				math.MaxInt64 + 2,
+				0,
+			},
+			expected: 0,
+		},
+		{
+			max: math.MaxInt64 + 1,
+			nums: []uint64{
+				math.MaxInt64 + 2,
+				0x0102030405060708,
+			},
+			expected: 0x0102030405060708,
+		},
+		{
+			max: 2,
+			nums: []uint64{
+				math.MaxInt64 - 2,
+			},
+			expected: 0x02,
+		},
+		{
+			max: 2,
+			nums: []uint64{
+				math.MaxInt64 - 1,
+				0x01,
+			},
+			expected: 0x01,
+		},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			require := require.New(t)
+
+			source := &testSource{
+				onInvalid: t.FailNow,
+				nums:      test.nums,
+			}
+			r := &rng{rng: source}
+			val := r.Uint64Inclusive(test.max)
+			require.Equal(test.expected, val)
+			require.Empty(source.nums)
+
+			if test.max >= math.MaxInt64 {
+				return
+			}
+
+			stdSource := &testSTDSource{
+				onInvalid: t.FailNow,
+				nums:      test.nums,
+			}
+			mathRNG := rand.New(stdSource) //#nosec G404
+			stdVal := mathRNG.Int63n(int64(test.max + 1))
+			require.Equal(test.expected, uint64(stdVal))
+			require.Empty(source.nums)
+		})
+	}
+}
+
+func FuzzRNG(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		var (
+			max        uint64
+			sourceNums []uint64
+		)
+		fz := fuzzer.NewFuzzer(data)
+		fz.Fill(&max, &sourceNums)
+		if max >= math.MaxInt64 {
+			t.SkipNow()
+		}
+
+		source := &testSource{
+			onInvalid: t.SkipNow,
+			nums:      sourceNums,
+		}
+		r := &rng{rng: source}
+		val := r.Uint64Inclusive(max)
+
+		stdSource := &testSTDSource{
+			onInvalid: t.SkipNow,
+			nums:      sourceNums,
+		}
+		mathRNG := rand.New(stdSource) //#nosec G404
+		stdVal := mathRNG.Int63n(int64(max + 1))
+		require.Equal(val, uint64(stdVal))
+		require.Equal(len(source.nums), len(stdSource.nums))
+	})
+}

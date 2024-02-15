@@ -251,53 +251,59 @@ func Test_Trie_Partial_Commit_Leaves_Valid_Tries(t *testing.T) {
 }
 
 func Test_Trie_WriteToDB(t *testing.T) {
+	require := require.New(t)
+
 	dbTrie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, dbTrie)
+	require.NoError(err)
+	require.NotNil(dbTrie)
+
 	trie, err := dbTrie.NewView()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// value hasn't been inserted so shouldn't exist
 	value, err := trie.GetValue(context.Background(), []byte("key"))
-	require.Error(t, err)
-	require.Equal(t, database.ErrNotFound, err)
-	require.Nil(t, value)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(value)
 
 	err = trie.Insert(context.Background(), []byte("key"), []byte("value"))
-	require.NoError(t, err)
+	require.NoError(err)
 
 	value, err = getNodeValue(trie, "key")
-	require.NoError(t, err)
-	require.Equal(t, []byte("value"), value)
+	require.NoError(err)
+	require.Equal([]byte("value"), value)
 
 	err = trie.CommitToDB(context.Background())
-	require.NoError(t, err)
+	require.NoError(err)
+
 	p := newPath([]byte("key"))
 	rawBytes, err := dbTrie.nodeDB.Get(p.Bytes())
-	require.NoError(t, err)
+	require.NoError(err)
+
 	node, err := parseNode(p, rawBytes)
-	require.NoError(t, err)
-	require.Equal(t, []byte("value"), node.value.value)
+	require.NoError(err)
+	require.Equal([]byte("value"), node.value.value)
 }
 
 func Test_Trie_InsertAndRetrieve(t *testing.T) {
+	require := require.New(t)
+
 	dbTrie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, dbTrie)
+	require.NoError(err)
+	require.NotNil(dbTrie)
+
 	trie := Trie(dbTrie)
 
 	// value hasn't been inserted so shouldn't exist
 	value, err := dbTrie.Get([]byte("key"))
-	require.Error(t, err)
-	require.Equal(t, database.ErrNotFound, err)
-	require.Nil(t, value)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(value)
 
 	err = trie.Insert(context.Background(), []byte("key"), []byte("value"))
-	require.NoError(t, err)
+	require.NoError(err)
 
 	value, err = getNodeValue(trie, "key")
-	require.NoError(t, err)
-	require.Equal(t, []byte("value"), value)
+	require.NoError(err)
+	require.Equal([]byte("value"), value)
 }
 
 func Test_Trie_Overwrite(t *testing.T) {
@@ -637,32 +643,30 @@ func Test_Trie_CommitChanges(t *testing.T) {
 }
 
 func Test_Trie_BatchApply(t *testing.T) {
-	dbTrie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView()
-	require.NoError(t, err)
+	require := require.New(t)
 
-	err = trie.Insert(context.Background(), []byte("key1"), []byte("value1"))
-	require.NoError(t, err)
-	err = trie.Insert(context.Background(), []byte("key12"), []byte("value12"))
-	require.NoError(t, err)
-	err = trie.Insert(context.Background(), []byte("key134"), []byte("value134"))
-	require.NoError(t, err)
-	err = trie.Remove(context.Background(), []byte("key1"))
-	require.NoError(t, err)
+	dbTrie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(dbTrie)
+
+	trie, err := dbTrie.NewView()
+	require.NoError(err)
+
+	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value1")))
+	require.NoError(trie.Insert(context.Background(), []byte("key12"), []byte("value12")))
+	require.NoError(trie.Insert(context.Background(), []byte("key134"), []byte("value134")))
+	require.NoError(trie.Remove(context.Background(), []byte("key1")))
 
 	value, err := getNodeValue(trie, "key12")
-	require.NoError(t, err)
-	require.Equal(t, []byte("value12"), value)
+	require.NoError(err)
+	require.Equal([]byte("value12"), value)
 
 	value, err = getNodeValue(trie, "key134")
-	require.NoError(t, err)
-	require.Equal(t, []byte("value134"), value)
+	require.NoError(err)
+	require.Equal([]byte("value134"), value)
 
 	_, err = getNodeValue(trie, "key1")
-	require.Error(t, err)
-	require.Equal(t, database.ErrNotFound, err)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func Test_Trie_ChainDeletion(t *testing.T) {

@@ -26,14 +26,14 @@ const (
 	minCodecVersionLen   = minVarIntLen
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
-	minDeletedKeyLen     = minByteSliceLen
 	minMaybeByteSliceLen = boolLen
 	minProofPathLen      = minVarIntLen
 	minKeyValueLen       = 2 * minByteSliceLen
+	minKeyChangeLen      = minByteSliceLen + minMaybeByteSliceLen
 	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
 	minProofLen          = minCodecVersionLen + minProofPathLen + minByteSliceLen
-	minChangeProofLen    = minCodecVersionLen + +boolLen + 2*minProofPathLen + 2*minVarIntLen
-	minRangeProofLen     = minCodecVersionLen + +2*minProofPathLen + minVarIntLen
+	minChangeProofLen    = minCodecVersionLen + boolLen + 2*minProofPathLen + minVarIntLen
+	minRangeProofLen     = minCodecVersionLen + 2*minProofPathLen + minVarIntLen
 	minDBNodeLen         = minCodecVersionLen + minMaybeByteSliceLen + minVarIntLen
 	minHashValuesLen     = minCodecVersionLen + minVarIntLen + minMaybeByteSliceLen + minSerializedPathLen
 	minProofNodeChildLen = minVarIntLen + idLen
@@ -150,20 +150,11 @@ func (c *codecImpl) EncodeChangeProof(version uint16, proof *ChangeProof) ([]byt
 	if err := c.encodeProofPath(buf, proof.EndProof); err != nil {
 		return nil, err
 	}
-	if err := c.encodeInt(buf, len(proof.KeyValues)); err != nil {
+	if err := c.encodeInt(buf, len(proof.KeyChanges)); err != nil {
 		return nil, err
 	}
-	for _, kv := range proof.KeyValues {
-		if err := c.encodeKeyValue(kv, buf); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := c.encodeInt(buf, len(proof.DeletedKeys)); err != nil {
-		return nil, err
-	}
-	for _, key := range proof.DeletedKeys {
-		if err := c.encodeByteSlice(buf, key); err != nil {
+	for _, kv := range proof.KeyChanges {
+		if err := c.encodeKeyChange(kv, buf); err != nil {
 			return nil, err
 		}
 	}
@@ -343,36 +334,19 @@ func (c *codecImpl) DecodeChangeProof(b []byte, proof *ChangeProof) (uint16, err
 		return 0, err
 	}
 
-	numKeyValues, err := c.decodeInt(src)
+	numKeyChanges, err := c.decodeInt(src)
 	if err != nil {
 		return 0, err
 	}
-	if numKeyValues < 0 {
+	if numKeyChanges < 0 {
 		return 0, errNegativeNumKeyValues
 	}
-	if numKeyValues > src.Len()/minKeyValueLen {
+	if numKeyChanges > src.Len()/minKeyChangeLen {
 		return 0, io.ErrUnexpectedEOF
 	}
-	proof.KeyValues = make([]KeyValue, numKeyValues)
-	for i := range proof.KeyValues {
-		if proof.KeyValues[i], err = c.decodeKeyValue(src); err != nil {
-			return 0, err
-		}
-	}
-
-	numDeletedKeys, err := c.decodeInt(src)
-	if err != nil {
-		return 0, err
-	}
-	if numDeletedKeys < 0 {
-		return 0, errNegativeNumKeyValues
-	}
-	if numDeletedKeys > src.Len()/minDeletedKeyLen {
-		return 0, io.ErrUnexpectedEOF
-	}
-	proof.DeletedKeys = make([][]byte, numDeletedKeys)
-	for i := range proof.DeletedKeys {
-		if proof.DeletedKeys[i], err = c.decodeByteSlice(src); err != nil {
+	proof.KeyChanges = make([]KeyChange, numKeyChanges)
+	for i := range proof.KeyChanges {
+		if proof.KeyChanges[i], err = c.decodeKeyChange(src); err != nil {
 			return 0, err
 		}
 	}
@@ -499,6 +473,24 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
 	return codecVersion, err
 }
 
+func (c *codecImpl) decodeKeyChange(src *bytes.Reader) (KeyChange, error) {
+	if minKeyChangeLen > src.Len() {
+		return KeyChange{}, io.ErrUnexpectedEOF
+	}
+
+	var (
+		result KeyChange
+		err    error
+	)
+	if result.Key, err = c.decodeByteSlice(src); err != nil {
+		return result, err
+	}
+	if result.Value, err = c.decodeMaybeByteSlice(src); err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
 func (c *codecImpl) decodeKeyValue(src *bytes.Reader) (KeyValue, error) {
 	if minKeyValueLen > src.Len() {
 		return KeyValue{}, io.ErrUnexpectedEOF
@@ -515,6 +507,16 @@ func (c *codecImpl) decodeKeyValue(src *bytes.Reader) (KeyValue, error) {
 		return result, err
 	}
 	return result, nil
+}
+
+func (c *codecImpl) encodeKeyChange(kv KeyChange, dst io.Writer) error {
+	if err := c.encodeByteSlice(dst, kv.Key); err != nil {
+		return err
+	}
+	if err := c.encodeMaybeByteSlice(dst, kv.Value); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *codecImpl) encodeKeyValue(kv KeyValue, dst io.Writer) error {

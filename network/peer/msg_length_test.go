@@ -120,7 +120,10 @@ func TestReadMsgLen(t *testing.T) {
 
 		msgLenBytes, err := writeMsgLen(msgLen, tv.msgLimit)
 		require.NoError(err)
-		require.Equal(tv.msgLenBytes, msgLenBytes[:])
+
+		msgLenAfterWrite, err := readMsgLen(msgLenBytes[:], tv.msgLimit)
+		require.NoError(err)
+		require.Equal(tv.expectedMsgLen, msgLenAfterWrite)
 	}
 }
 

@@ -42,13 +42,15 @@ const (
 var (
 	_ txs.Visitor = (*ProposalTxExecutor)(nil)
 
-	errChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
-	errInvalidState                  = errors.New("generated output isn't valid state")
-	errShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
-	errWrongTxType                   = errors.New("wrong transaction type")
-	errInvalidID                     = errors.New("invalid ID")
-	errProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
-	errAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
+	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
+	ErrChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
+	ErrInvalidState                  = errors.New("generated output isn't valid state")
+	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
+	ErrWrongTxType                   = errors.New("wrong transaction type")
+	ErrInvalidID                     = errors.New("invalid ID")
+	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
+	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 )
 
 type ProposalTxExecutor struct {
@@ -74,35 +76,35 @@ type ProposalTxExecutor struct {
 }
 
 func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*ProposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
@@ -113,7 +115,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
+			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.Config.BanffTime,
 		)
@@ -162,7 +164,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
+			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.Config.BanffTime,
 		)
@@ -210,7 +212,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
+			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.Config.BanffTime,
 		)
@@ -264,7 +266,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	if e.Config.IsBanffActivated(newChainTime) {
 		return fmt.Errorf(
 			"%w: proposed timestamp (%s) >= Banff fork time (%s)",
-			errAdvanceTimeTxIssuedAfterBanff,
+			ErrAdvanceTimeTxIssuedAfterBanff,
 			newChainTime,
 			e.Config.BanffTime,
 		)
@@ -274,7 +276,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	if !newChainTime.After(parentChainTime) {
 		return fmt.Errorf(
 			"%w, proposed timestamp (%s), chain time (%s)",
-			errChildBlockNotAfterParent,
+			ErrChildBlockNotAfterParent,
 			parentChainTime,
 			parentChainTime,
 		)
@@ -316,7 +318,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	case tx == nil:
 		return txs.ErrNilTx
 	case tx.TxID == ids.Empty:
-		return errInvalidID
+		return ErrInvalidID
 	case len(e.Tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
@@ -333,9 +335,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	if stakerToRemove.TxID != tx.TxID {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s. Should be removing %s",
-			tx.TxID,
+			"%w: %s != %s",
+			ErrRemoveWrongStaker,
 			stakerToRemove.TxID,
+			tx.TxID,
 		)
 	}
 
@@ -343,8 +346,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	currentChainTime := e.OnCommitState.GetTimestamp()
 	if !stakerToRemove.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s before their end time %s",
+			"%w: TxID = %s with %s < %s",
+			ErrRemoveStakerTooEarly,
 			tx.TxID,
+			currentChainTime,
 			stakerToRemove.EndTime,
 		)
 	}
@@ -399,7 +404,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return errInvalidState
+				return ErrInvalidState
 			}
 
 			utxo := &avax.UTXO{
@@ -434,7 +439,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return errInvalidState
+				return ErrInvalidState
 			}
 
 			onCommitUtxo := &avax.UTXO{
@@ -514,7 +519,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		//            AddSubnetValidatorTx.
 		vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
 		if !ok {
-			return errWrongTxType
+			return ErrWrongTxType
 		}
 
 		// Calculate split of reward between delegator/delegatee
@@ -539,7 +544,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return errInvalidState
+				return ErrInvalidState
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
@@ -592,7 +597,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				}
 				out, ok := outIntf.(verify.State)
 				if !ok {
-					return errInvalidState
+					return ErrInvalidState
 				}
 				utxo := &avax.UTXO{
 					UTXOID: avax.UTXOID{
@@ -612,7 +617,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		//            time and the current chain timestamp is == this staker's
 		//            EndTime. This means only permissionless stakers should be
 		//            left in the staker set.
-		return errShouldBePermissionlessStaker
+		return ErrShouldBePermissionlessStaker
 	}
 
 	// If the reward is aborted, then the current supply should be decreased.
@@ -634,7 +639,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
 		if !ok {
-			return errIsNotTransformSubnetTx
+			return ErrIsNotTransformSubnetTx
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator

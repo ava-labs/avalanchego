@@ -685,20 +685,20 @@ func (t *trieView) updateParent(newParent TrieView) {
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) invalidateChildrenExcept(exception *trieView) {
 	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
-
-	for _, childView := range t.childViews {
-		if childView != exception {
-			childView.invalidate()
-		}
-	}
+	childrenToInvalidate := t.childViews
 
 	// after invalidating the children, they no longer need to be tracked
 	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
-
 	// add back in the exception view since it is still valid
 	if exception != nil {
 		t.childViews = append(t.childViews, exception)
+	}
+	t.validityTrackingLock.Unlock()
+
+	for _, childView := range childrenToInvalidate {
+		if childView != exception {
+			childView.invalidate()
+		}
 	}
 }
 
@@ -902,7 +902,7 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
-	value, err := t.getParentTrie().getValue(key, true)
+	value, err := t.getParentTrie().getValue(key, true /*lock*/)
 	if err != nil {
 		return nil, err
 	}
@@ -1304,7 +1304,7 @@ func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
-	before, err := t.getParentTrie().getValue(key, true)
+	before, err := t.getParentTrie().getValue(key, true /*lock*/)
 	switch err {
 	case nil:
 		beforeMaybe = Some(before)

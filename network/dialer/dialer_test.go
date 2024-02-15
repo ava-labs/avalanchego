@@ -64,7 +64,7 @@ func TestDialerCancelDial(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = dialer.Dial(ctx, myIP)
-	require.Error(err)
+	require.ErrorIs(err, context.Canceled)
 
 	// Make an outgoing connection with a non-cancelled context
 	conn, err := dialer.Dial(context.Background(), myIP)

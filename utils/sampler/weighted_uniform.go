@@ -63,7 +63,7 @@ func (s *weightedUniform) Initialize(weights []uint64) error {
 
 func (s *weightedUniform) Sample(value uint64) (int, error) {
 	if uint64(len(s.indices)) <= value {
-		return 0, errOutOfRange
+		return 0, ErrOutOfRange
 	}
 	return s.indices[int(value)], nil
 }

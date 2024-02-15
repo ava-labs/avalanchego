@@ -22,6 +22,7 @@ var (
 	_ DelegatorTx = (*AddDelegatorTx)(nil)
 
 	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
+	errStakeMustBeAVAX         = errors.New("stake must be AVAX")
 )
 
 // AddDelegatorTx is an unsigned addDelegatorTx
@@ -105,7 +106,7 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 		assetID := out.AssetID()
 		if assetID != ctx.AVAXAssetID {
-			return fmt.Errorf("stake output must be AVAX but is %q", assetID)
+			return fmt.Errorf("%w but is %q", errStakeMustBeAVAX, assetID)
 		}
 	}
 

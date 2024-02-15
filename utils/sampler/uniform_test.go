@@ -36,8 +36,8 @@ var (
 		test func(*testing.T, Uniform)
 	}{
 		{
-			name: "initialize overflow",
-			test: UniformInitializeOverflowTest,
+			name: "can sample large values",
+			test: UniformInitializeMaxUint64Test,
 		},
 		{
 			name: "out of range",
@@ -76,31 +76,36 @@ func TestAllUniform(t *testing.T) {
 	}
 }
 
-func UniformInitializeOverflowTest(t *testing.T, s Uniform) {
-	err := s.Initialize(math.MaxUint64)
-	require.Error(t, err, "should have reported an overflow error")
+func UniformInitializeMaxUint64Test(t *testing.T, s Uniform) {
+	s.Initialize(math.MaxUint64)
+
+	for {
+		val, err := s.Next()
+		require.NoError(t, err)
+
+		if val > math.MaxInt64 {
+			break
+		}
+	}
 }
 
 func UniformOutOfRangeTest(t *testing.T, s Uniform) {
-	err := s.Initialize(0)
-	require.NoError(t, err)
+	s.Initialize(0)
 
-	_, err = s.Sample(1)
-	require.Error(t, err, "should have reported an out of range error")
+	_, err := s.Sample(1)
+	require.ErrorIs(t, err, ErrOutOfRange)
 }
 
 func UniformEmptyTest(t *testing.T, s Uniform) {
-	err := s.Initialize(1)
-	require.NoError(t, err)
+	s.Initialize(1)
 
 	val, err := s.Sample(0)
 	require.NoError(t, err)
-	require.Len(t, val, 0, "shouldn't have selected any element")
+	require.Empty(t, val)
 }
 
 func UniformSingletonTest(t *testing.T, s Uniform) {
-	err := s.Initialize(1)
-	require.NoError(t, err)
+	s.Initialize(1)
 
 	val, err := s.Sample(1)
 	require.NoError(t, err)
@@ -108,8 +113,7 @@ func UniformSingletonTest(t *testing.T, s Uniform) {
 }
 
 func UniformDistributionTest(t *testing.T, s Uniform) {
-	err := s.Initialize(3)
-	require.NoError(t, err)
+	s.Initialize(3)
 
 	val, err := s.Sample(3)
 	require.NoError(t, err)
@@ -124,16 +128,14 @@ func UniformDistributionTest(t *testing.T, s Uniform) {
 }
 
 func UniformOverSampleTest(t *testing.T, s Uniform) {
-	err := s.Initialize(3)
-	require.NoError(t, err)
+	s.Initialize(3)
 
-	_, err = s.Sample(4)
-	require.Error(t, err, "should have returned an out of range error")
+	_, err := s.Sample(4)
+	require.ErrorIs(t, err, ErrOutOfRange)
 }
 
 func UniformLazilySample(t *testing.T, s Uniform) {
-	err := s.Initialize(3)
-	require.NoError(t, err)
+	s.Initialize(3)
 
 	for j := 0; j < 2; j++ {
 		sampled := map[uint64]bool{}
@@ -145,8 +147,8 @@ func UniformLazilySample(t *testing.T, s Uniform) {
 			sampled[val] = true
 		}
 
-		_, err = s.Next()
-		require.Error(t, err, "should have returned an out of range error")
+		_, err := s.Next()
+		require.ErrorIs(t, err, ErrOutOfRange)
 
 		s.Reset()
 	}
@@ -158,11 +160,8 @@ func TestSeeding(t *testing.T) {
 	s1 := NewBestUniform(30)
 	s2 := NewBestUniform(30)
 
-	err := s1.Initialize(50)
-	require.NoError(err)
-
-	err = s2.Initialize(50)
-	require.NoError(err)
+	s1.Initialize(50)
+	s2.Initialize(50)
 
 	s1.Seed(0)
 
@@ -189,8 +188,7 @@ func TestSeedingProducesTheSame(t *testing.T) {
 
 	s := NewBestUniform(30)
 
-	err := s.Initialize(50)
-	require.NoError(err)
+	s.Initialize(50)
 
 	s.Seed(0)
 	s.Reset()

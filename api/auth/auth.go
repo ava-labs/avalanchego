@@ -50,7 +50,6 @@ var (
 	errTokenInsufficientPermission = errors.New("the provided auth token does not allow access to this endpoint")
 	errWrongPassword               = errors.New("incorrect password")
 	errSamePassword                = errors.New("new password can't be same as old password")
-	errNoPassword                  = errors.New("no password")
 	errNoEndpoints                 = errors.New("must name at least one endpoint")
 	errTooManyEndpoints            = fmt.Errorf("can only name at most %d endpoints", maxEndpoints)
 
@@ -121,7 +120,7 @@ func NewFromHash(log logging.Logger, endpoint string, pw password.Hash) Auth {
 
 func (a *auth) NewToken(pw string, duration time.Duration, endpoints []string) (string, error) {
 	if pw == "" {
-		return "", errNoPassword
+		return "", password.ErrEmptyPassword
 	}
 	if l := len(endpoints); l == 0 {
 		return "", errNoEndpoints
@@ -170,7 +169,7 @@ func (a *auth) RevokeToken(tokenStr, pw string) error {
 		return errNoToken
 	}
 	if pw == "" {
-		return errNoPassword
+		return password.ErrEmptyPassword
 	}
 
 	a.lock.Lock()

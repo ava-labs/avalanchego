@@ -124,8 +124,6 @@ const (
 	SnowQuorumSizeKey                                  = "snow-quorum-size"
 	SnowVirtuousCommitThresholdKey                     = "snow-virtuous-commit-threshold"
 	SnowRogueCommitThresholdKey                        = "snow-rogue-commit-threshold"
-	SnowAvalancheNumParentsKey                         = "snow-avalanche-num-parents"
-	SnowAvalancheBatchSizeKey                          = "snow-avalanche-batch-size"
 	SnowConcurrentRepollsKey                           = "snow-concurrent-repolls"
 	SnowOptimalProcessingKey                           = "snow-optimal-processing"
 	SnowMaxProcessingKey                               = "snow-max-processing"

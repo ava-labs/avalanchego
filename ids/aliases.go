@@ -4,21 +4,36 @@
 package ids
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
 
+var (
+	errNoIDWithAlias      = errors.New("there is no ID with alias")
+	errNoAliasForID       = errors.New("there is no alias for ID")
+	errAliasAlreadyMapped = errors.New("alias already mapped to an ID")
+)
+
 // AliaserReader allows one to lookup the aliases given to an ID.
 type AliaserReader interface {
+	// Lookup returns the ID associated with alias
 	Lookup(alias string) (ID, error)
+
+	// PrimaryAlias returns the first alias of [id]
 	PrimaryAlias(id ID) (string, error)
+
+	// Aliases returns the aliases of an ID
 	Aliases(id ID) ([]string, error)
 }
 
-// Aliaser allows one to give an ID aliases. An ID can have arbitrarily many
-// aliases; two IDs may not have the same alias.
+// AliaserWriter allows one to give an ID aliases. An ID can have arbitrarily
+// many aliases; two IDs may not have the same alias.
 type AliaserWriter interface {
+	// Alias gives [id] the alias [alias]
 	Alias(id ID, alias string) error
+
+	// RemoveAliases of the provided ID
 	RemoveAliases(id ID)
 }
 
@@ -27,6 +42,9 @@ type AliaserWriter interface {
 type Aliaser interface {
 	AliaserReader
 	AliaserWriter
+
+	// PrimaryAliasOrDefault returns the first alias of [id], or ID string as a
+	// default if no alias exists
 	PrimaryAliasOrDefault(id ID) string
 }
 
@@ -43,7 +61,6 @@ func NewAliaser() Aliaser {
 	}
 }
 
-// Lookup returns the ID associated with alias
 func (a *aliaser) Lookup(alias string) (ID, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -51,22 +68,20 @@ func (a *aliaser) Lookup(alias string) (ID, error) {
 	if id, ok := a.dealias[alias]; ok {
 		return id, nil
 	}
-	return ID{}, fmt.Errorf("there is no ID with alias %s", alias)
+	return ID{}, fmt.Errorf("%w: %s", errNoIDWithAlias, alias)
 }
 
-// PrimaryAlias returns the first alias of [id]
 func (a *aliaser) PrimaryAlias(id ID) (string, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
 	aliases := a.aliases[id]
 	if len(aliases) == 0 {
-		return "", fmt.Errorf("there is no alias for ID %s", id)
+		return "", fmt.Errorf("%w: %s", errNoAliasForID, id)
 	}
 	return aliases[0], nil
 }
 
-// PrimaryAliasOrDefault returns the first alias of [id], or ID string as default
 func (a *aliaser) PrimaryAliasOrDefault(id ID) string {
 	alias, err := a.PrimaryAlias(id)
 	if err != nil {
@@ -75,7 +90,6 @@ func (a *aliaser) PrimaryAliasOrDefault(id ID) string {
 	return alias
 }
 
-// Aliases returns the aliases of an ID
 func (a *aliaser) Aliases(id ID) ([]string, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -83,13 +97,12 @@ func (a *aliaser) Aliases(id ID) ([]string, error) {
 	return a.aliases[id], nil
 }
 
-// Alias gives [id] the alias [alias]
 func (a *aliaser) Alias(id ID, alias string) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	if _, exists := a.dealias[alias]; exists {
-		return fmt.Errorf("%s is already used as an alias for an ID", alias)
+		return fmt.Errorf("%w: %s", errAliasAlreadyMapped, alias)
 	}
 
 	a.dealias[alias] = id
@@ -97,7 +110,6 @@ func (a *aliaser) Alias(id ID, alias string) error {
 	return nil
 }
 
-// RemoveAliases of the provided ID
 func (a *aliaser) RemoveAliases(id ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()

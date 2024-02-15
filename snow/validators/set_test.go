@@ -4,13 +4,16 @@
 package validators
 
 import (
-	"math"
 	"testing"
+
+	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -42,8 +45,8 @@ func TestSetAddOverflow(t *testing.T) {
 	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(err)
 
-	err = s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, math.MaxUint64)
-	require.Error(err)
+	err = s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64)
+	require.ErrorIs(err, math.ErrOverflow)
 
 	weight := s.Weight()
 	require.EqualValues(1, weight)
@@ -74,8 +77,8 @@ func TestSetAddWeightOverflow(t *testing.T) {
 	err = s.Add(nodeID, nil, ids.Empty, 1)
 	require.NoError(err)
 
-	err = s.AddWeight(nodeID, math.MaxUint64-1)
-	require.Error(err)
+	err = s.AddWeight(nodeID, stdmath.MaxUint64-1)
+	require.ErrorIs(err, math.ErrOverflow)
 
 	weight := s.Weight()
 	require.EqualValues(2, weight)
@@ -166,7 +169,7 @@ func TestSetRemoveWeightUnderflow(t *testing.T) {
 	require.NoError(err)
 
 	err = s.RemoveWeight(nodeID, 2)
-	require.Error(err)
+	require.ErrorIs(err, math.ErrUnderflow)
 
 	weight := s.Weight()
 	require.EqualValues(2, weight)
@@ -384,10 +387,10 @@ func TestSetSample(t *testing.T) {
 	require.Equal([]ids.NodeID{nodeID0}, sampled)
 
 	_, err = s.Sample(2)
-	require.Error(err)
+	require.ErrorIs(err, sampler.ErrOutOfRange)
 
 	nodeID1 := ids.GenerateTestNodeID()
-	err = s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1)
+	err = s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1)
 	require.NoError(err)
 
 	sampled, err = s.Sample(1)
@@ -416,7 +419,7 @@ func TestSetString(t *testing.T) {
 	err := s.Add(nodeID0, nil, ids.Empty, 1)
 	require.NoError(err)
 
-	err = s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1)
+	err = s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1)
 	require.NoError(err)
 
 	expected := "Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +

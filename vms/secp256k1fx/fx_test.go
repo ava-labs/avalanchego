@@ -260,7 +260,7 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errOutputUnoptimized)
+	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrOutputUnoptimized)
 }
 
 func TestFxVerifyTransferWrongAmounts(t *testing.T) {
@@ -296,7 +296,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 		},
 	}
 
-	require.Error(fx.VerifyTransfer(tx, in, cred, out))
+	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrMismatchedAmounts)
 }
 
 func TestFxVerifyTransferTimelocked(t *testing.T) {
@@ -479,7 +479,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 
 	require.NoError(fx.VerifyTransfer(tx, in, cred, out))
 	require.NoError(fx.Bootstrapped())
-	require.Error(fx.VerifyTransfer(tx, in, cred, out), errAddrsNotSortedUnique)
+	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), secp256k1.ErrInvalidSig)
 }
 
 func TestFxVerifyTransferWrongSigner(t *testing.T) {
@@ -518,7 +518,7 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 
 	require.NoError(fx.VerifyTransfer(tx, in, cred, out))
 	require.NoError(fx.Bootstrapped())
-	require.Error(fx.VerifyTransfer(tx, in, cred, out))
+	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrWrongSig)
 }
 
 func TestFxVerifyTransferSigIndexOOB(t *testing.T) {
@@ -881,7 +881,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errOutputUnspendable)
+	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), ErrOutputUnspendable)
 }
 
 func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
@@ -962,7 +962,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 0,
 				Addrs:     []ids.ShortID{addr},
 			},
-			errOutputUnoptimized,
+			ErrOutputUnoptimized,
 		},
 		{
 			"threshold 0, no sigs, no addrs",
@@ -995,7 +995,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 0,
 				Addrs:     []ids.ShortID{addr},
 			},
-			errOutputUnoptimized,
+			ErrOutputUnoptimized,
 		},
 		{
 			"threshold 1, 0 sigs (too few sigs)",
@@ -1028,7 +1028,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
-			errNotSortedUnique,
+			ErrInputIndicesNotSortedUnique,
 		},
 		{
 			"threshold 2, repeated address and repeated sig",
@@ -1039,7 +1039,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr},
 			},
-			errAddrsNotSortedUnique,
+			ErrAddrsNotSortedUnique,
 		},
 		{
 			"threshold 2, 2 sigs",
@@ -1061,7 +1061,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
-			errNotSortedUnique,
+			ErrInputIndicesNotSortedUnique,
 		},
 		{
 			"threshold 1, 1 sig, index out of bounds",

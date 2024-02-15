@@ -5,6 +5,7 @@ package logging
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -44,6 +45,8 @@ const (
 	unknownLowStr = "unkno"
 )
 
+var ErrUnknownLevel = errors.New("unknown log level")
+
 // Inverse of Level.String()
 func ToLevel(l string) (Level, error) {
 	switch strings.ToUpper(l) {
@@ -64,7 +67,7 @@ func ToLevel(l string) (Level, error) {
 	case verboStr:
 		return Verbo, nil
 	default:
-		return Off, fmt.Errorf("unknown log level: %q", l)
+		return Off, fmt.Errorf("%w: %q", ErrUnknownLevel, l)
 	}
 }
 

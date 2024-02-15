@@ -28,7 +28,6 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/x/whitelist-vtx"
 )
 
 func TestE2E(t *testing.T) {

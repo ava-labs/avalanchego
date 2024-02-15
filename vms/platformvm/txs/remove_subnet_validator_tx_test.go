@@ -22,12 +22,9 @@ var errInvalidSubnetAuth = errors.New("invalid subnet auth")
 
 func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	type test struct {
-		name      string
-		txFunc    func(*gomock.Controller) *RemoveSubnetValidatorTx
-		shouldErr bool
-		// If [shouldErr] and [requireSpecificErr] != nil,
-		// require that the error we get is [requireSpecificErr].
-		requireSpecificErr error
+		name        string
+		txFunc      func(*gomock.Controller) *RemoveSubnetValidatorTx
+		expectedErr error
 	}
 
 	var (
@@ -61,8 +58,6 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
-	// Sanity check.
-	require.Error(t, invalidBaseTx.SyntacticVerify(ctx))
 
 	tests := []test{
 		{
@@ -70,14 +65,14 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
 				return nil
 			},
-			shouldErr: true,
+			expectedErr: ErrNilTx,
 		},
 		{
 			name: "already verified",
 			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
 				return &RemoveSubnetValidatorTx{BaseTx: verifiedBaseTx}
 			},
-			shouldErr: false,
+			expectedErr: nil,
 		},
 		{
 			name: "invalid BaseTx",
@@ -90,7 +85,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					BaseTx: invalidBaseTx,
 				}
 			},
-			shouldErr: true,
+			expectedErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "invalid subnetID",
@@ -102,8 +97,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					Subnet: constants.PrimaryNetworkID,
 				}
 			},
-			shouldErr:          true,
-			requireSpecificErr: errRemovePrimaryNetworkValidator,
+			expectedErr: ErrRemovePrimaryNetworkValidator,
 		},
 		{
 			name: "invalid subnetAuth",
@@ -120,8 +114,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					SubnetAuth: invalidSubnetAuth,
 				}
 			},
-			shouldErr:          true,
-			requireSpecificErr: errInvalidSubnetAuth,
+			expectedErr: errInvalidSubnetAuth,
 		},
 		{
 			name: "passes verification",
@@ -138,7 +131,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					SubnetAuth: validSubnetAuth,
 				}
 			},
-			shouldErr: false,
+			expectedErr: nil,
 		},
 	}
 
@@ -150,15 +143,10 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			if tt.shouldErr {
-				require.Error(err)
-				if tt.requireSpecificErr != nil {
-					require.ErrorIs(err, tt.requireSpecificErr)
-				}
-				return
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr == nil {
+				require.True(tx.SyntacticallyVerified)
 			}
-			require.NoError(err)
-			require.True(tx.SyntacticallyVerified)
 		})
 	}
 }

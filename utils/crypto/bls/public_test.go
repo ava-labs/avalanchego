@@ -16,7 +16,7 @@ func TestPublicKeyFromBytesWrongSize(t *testing.T) {
 
 	pkBytes := utils.RandomBytes(PublicKeyLen + 1)
 	_, err := PublicKeyFromBytes(pkBytes)
-	require.ErrorIs(err, errFailedPublicKeyDecompress)
+	require.ErrorIs(err, ErrFailedPublicKeyDecompress)
 }
 
 func TestPublicKeyBytes(t *testing.T) {

@@ -10,15 +10,17 @@ import (
 )
 
 func TestTypeString(t *testing.T) {
+	require := require.New(t)
+
 	for _, compressionType := range []Type{TypeNone, TypeGzip, TypeZstd} {
 		s := compressionType.String()
 		parsedType, err := TypeFromString(s)
-		require.NoError(t, err)
-		require.Equal(t, compressionType, parsedType)
+		require.NoError(err)
+		require.Equal(compressionType, parsedType)
 	}
 
 	_, err := TypeFromString("unknown")
-	require.Error(t, err)
+	require.ErrorIs(err, errUnknownCompressionType)
 }
 
 func TestTypeMarshalJSON(t *testing.T) {
