@@ -95,10 +95,9 @@ func TestVerifyFxUsage(t *testing.T) {
 	)
 	require.NoError(err)
 
-	mintNFTTx, _, err := buildOperation(
+	mintNFTTx, err := buildOperation(
 		env.vm,
 		mintOp,
-		nil,
 		utxos,
 		kc,
 		key.Address(),

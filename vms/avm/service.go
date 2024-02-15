@@ -839,12 +839,12 @@ func buildCreateAssetTx(
 		return nil, ids.ShortEmpty, err
 	}
 
-	toSpend := make(map[ids.ID]uint64)
+	toBurn := make(map[ids.ID]uint64)
 	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
 		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)
@@ -1240,15 +1240,13 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		// Calculate required input amounts and create the desired outputs
-		// String repr. of asset ID --> asset ID
-		assetIDs = make(map[string]ids.ID)
-		// Asset ID --> amount of that asset being sent
-		amounts = make(map[ids.ID]uint64)
-		// Outputs of our tx
-		outs = []*avax.TransferableOutput{}
-	)
+	// Calculate required input amounts and create the desired outputs
+	// String repr. of asset ID --> asset ID
+	assetIDs := make(map[string]ids.ID)
+	// Asset ID --> amount of that asset being sent
+	amounts := make(map[ids.ID]uint64)
+	// Outputs of our tx
+	outs := []*avax.TransferableOutput{}
 	for _, output := range args.Outputs {
 		if output.Amount == 0 {
 			return nil, ids.ShortEmpty, errZeroAmount
@@ -1323,15 +1321,15 @@ func buildBaseTx(
 		return nil, ids.ShortEmpty, err
 	}
 
-	toSpend := make(map[ids.ID]uint64)
+	toBurn := make(map[ids.ID]uint64)
 	for _, out := range outs {
-		toSpend[out.AssetID()] += out.Out.Amount()
+		toBurn[out.AssetID()] += out.Out.Amount()
 	}
 	ins, feeOuts, keys, err := vm.FinanceTx(
 		utxos,
 		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)
@@ -1442,17 +1440,20 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	return buildOperation(s.vm, ops, opKeys, feeUTXOs, feeKc, changeAddr)
+	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), opKeys)
 }
 
 func buildOperation(
 	vm *VM,
 	ops []*txs.Operation,
-	opsKeys [][]*secp256k1.PrivateKey,
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
+) (*txs.Tx, error) {
 	var (
 		chainTime = vm.state.GetTimestamp()
 		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
@@ -1474,27 +1475,26 @@ func buildOperation(
 		Ops: ops,
 	}
 	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 
-	toSpend := make(map[ids.ID]uint64)
+	toBurn := make(map[ids.ID]uint64)
 	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
 		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
-	keys = append(keys, opsKeys...)
-	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
+	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // SendNFTArgs are arguments for passing into SendNFT requests
@@ -1576,7 +1576,7 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx, _, err := buildOperation(s.vm, ops, nil, utxos, kc, changeAddr)
+	tx, err := buildOperation(s.vm, ops, utxos, kc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1672,7 +1672,7 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx, _, err := buildOperation(s.vm, ops, nil, feeUTXOs, feeKc, changeAddr)
+	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1944,14 +1944,14 @@ func buildExportTx(
 		return nil, ids.ShortEmpty, err
 	}
 
-	toSpend := map[ids.ID]uint64{
+	toBurn := map[ids.ID]uint64{
 		exportedAssetID: exportedAmt,
 	}
 	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
 		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)

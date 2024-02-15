@@ -191,10 +191,9 @@ func TestIssueNFT(t *testing.T) {
 	)
 	require.NoError(err)
 
-	mintNFTTx, _, err := buildOperation(
+	mintNFTTx, err := buildOperation(
 		env.vm,
 		mintOp,
-		nil,
 		utxos,
 		kc,
 		key.Address(),
@@ -215,10 +214,9 @@ func TestIssueNFT(t *testing.T) {
 	)
 	require.NoError(err)
 
-	transferNFTTx, _, err := buildOperation(
+	transferNFTTx, err := buildOperation(
 		env.vm,
 		transferOp,
-		nil,
 		utxos,
 		kc,
 		key.Address(),
@@ -305,10 +303,9 @@ func TestIssueProperty(t *testing.T) {
 		},
 	}
 
-	mintPropertyTx, _, err := buildOperation(
+	mintPropertyTx, err := buildOperation(
 		env.vm,
 		[]*txs.Operation{mintPropertyOp},
-		nil,
 		utxos,
 		kc,
 		key.Address(),
@@ -331,10 +328,9 @@ func TestIssueProperty(t *testing.T) {
 		Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
 	}
 
-	burnPropertyTx, _, err := buildOperation(
+	burnPropertyTx, err := buildOperation(
 		env.vm,
 		[]*txs.Operation{burnPropertyOp},
-		nil,
 		utxos,
 		kc,
 		key.Address(),
