@@ -105,7 +105,7 @@ func TestBaseTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -178,7 +178,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -245,7 +245,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -320,7 +320,7 @@ func TestCreateChainTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -384,7 +384,7 @@ func TestCreateSubnetTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -451,7 +451,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -580,7 +580,7 @@ func TestExportTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = s.SignUnsigned(stdcontext.Background(), utx)
@@ -666,7 +666,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -752,7 +752,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = txSigner.SignUnsigned(stdcontext.Background(), utx)
@@ -826,7 +826,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	require.True(ctrl.Satisfied())
 
 	// set signing expectations
-	expectFetchingUTXOs(chainUTXOs, utx.InputIDs(), utxos)
+	expectFetchingPChainUTXOs(chainUTXOs, utx.InputIDs(), utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -922,7 +922,7 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	}
 }
 
-func expectFetchingUTXOs(chainUTXOs *common.MockChainUTXOs, utxoIDs set.Set[ids.ID], utxos []*avax.UTXO) {
+func expectFetchingPChainUTXOs(chainUTXOs *common.MockChainUTXOs, utxoIDs set.Set[ids.ID], utxos []*avax.UTXO) {
 	for _, utxo := range utxos {
 		utxoID := utxo.InputID()
 		if !utxoIDs.Contains(utxoID) {
