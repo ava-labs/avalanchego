@@ -1823,15 +1823,15 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(t, err)
 
-	tx, _, err := buildOperation(
+	tx, err := buildOperation(
 		env.vm,
 		ops,
-		opsKeys,
 		utxos,
 		kc,
 		key.Address(),
 	)
 	require.NoError(t, err)
+	require.NoError(t, tx.SignSECP256K1Fx(env.vm.parser.Codec(), opsKeys))
 	return tx
 }
 

@@ -1411,17 +1411,20 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	return buildOperation(s.vm, ops, opKeys, feeUTXOs, feeKc, changeAddr)
+	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), opKeys)
 }
 
 func buildOperation(
 	vm *VM,
 	ops []*txs.Operation,
-	opsKeys [][]*secp256k1.PrivateKey,
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
+) (*txs.Tx, error) {
 	uTx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
@@ -1440,14 +1443,13 @@ func buildOperation(
 		changeAddr,
 	)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
-	keys = append(keys, opsKeys...)
-	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
+	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // SendNFTArgs are arguments for passing into SendNFT requests
@@ -1529,7 +1531,7 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx, _, err := buildOperation(s.vm, ops, nil, utxos, kc, changeAddr)
+	tx, err := buildOperation(s.vm, ops, utxos, kc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1625,7 +1627,7 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx, _, err := buildOperation(s.vm, ops, nil, feeUTXOs, feeKc, changeAddr)
+	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
