@@ -60,7 +60,7 @@ func TestBaseTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 		backend    = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -106,14 +106,7 @@ func TestBaseTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -128,7 +121,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
@@ -187,14 +180,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -209,7 +195,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
@@ -262,14 +248,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -284,7 +263,7 @@ func TestCreateChainTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
@@ -345,14 +324,7 @@ func TestCreateChainTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -367,7 +339,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
@@ -417,14 +389,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -439,7 +404,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
@@ -492,14 +457,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -514,7 +472,7 @@ func TestImportTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 		backend    = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -578,7 +536,7 @@ func TestExportTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 		backend    = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -629,14 +587,7 @@ func TestExportTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = s.SignUnsigned(stdcontext.Background(), utx)
@@ -651,7 +602,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
@@ -723,14 +674,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
@@ -745,7 +689,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 		backend    = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -817,14 +761,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = txSigner.SignUnsigned(stdcontext.Background(), utx)
@@ -839,7 +776,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		// backend
 		chainUTXOs = common.NewMockChainUTXOs(ctrl)
 		utxosKey   = testKeys[1]
-		utxos      = testUTXOsList(utxosKey)
+		utxos      = makeTestUTXOs(utxosKey)
 		backend    = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -899,21 +836,14 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 	// set signing expectations
 	inputIDs := utx.InputIDs()
-	for _, utxo := range utxos {
-		inputID := utxo.InputID()
-		if !inputIDs.Contains(inputID) {
-			continue
-		}
-
-		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, inputID).Return(utxo, nil)
-	}
+	expectFetchingUTXOs(chainUTXOs, inputIDs, utxos)
 
 	// sign the transaction
 	_, err = signer.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
 }
 
-func testUTXOsList(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
+func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	// Note: we avoid ids.GenerateTestNodeID here to make sure that UTXO IDs won't change
 	// run by run. This simplifies checking what utxos are included in the built txs.
 	const utxosOffset uint64 = 2024
@@ -999,5 +929,16 @@ func testUTXOsList(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 				},
 			},
 		},
+	}
+}
+
+func expectFetchingUTXOs(chainUTXOs *common.MockChainUTXOs, utxoIDs set.Set[ids.ID], utxos []*avax.UTXO) {
+	for _, utxo := range utxos {
+		utxoID := utxo.InputID()
+		if !utxoIDs.Contains(utxoID) {
+			continue
+		}
+
+		chainUTXOs.EXPECT().GetUTXO(gomock.Any(), constants.PlatformChainID, utxoID).Return(utxo, nil)
 	}
 }
