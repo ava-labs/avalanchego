@@ -30,17 +30,16 @@ type Spender interface {
 	// Arguments:
 	// - [utxos] contains assets ID and amount to be spend for each assestID
 	// - [kc] are the owners of the funds
-	// - [amounts] is the amount of funds that are available to be spent for each assetID
+	// - [toSpend] is the amount of funds that are available to be spent for each assetID
 	// Returns:
-	// - [amountsSpent] the amount of funds that are spent
 	// - [inputs] the inputs that should be consumed to fund the outputs
-	// - [outputs] the outputs that should be generated
+	// - [outputs] the outputs produced
 	// - [signers] the proof of ownership of the funds being moved
 	FinanceTx(
 		utxos []*avax.UTXO,
 		feeAssetID ids.ID,
 		kc *secp256k1fx.Keychain,
-		amounts map[ids.ID]uint64,
+		toSpend map[ids.ID]uint64,
 		feeCalc *fees.Calculator,
 		changeAddr ids.ShortID,
 	) (
@@ -132,22 +131,25 @@ func (s *spender) FinanceTx(
 	toSpend[feeAssetID] = amountWithFee
 
 	var (
-		time = s.clock.Unix()
+		minIssuanceTime = s.clock.Unix()
 
 		ins  = []*avax.TransferableInput{}
 		outs = []*avax.TransferableOutput{}
 		keys = [][]*secp256k1.PrivateKey{}
 	)
 
+	// Iterate over the UTXOs
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
+		remainingAmountToBurn := toSpend[assetID]
 
-		if toSpend[assetID] == 0 {
-			// we have enough inputs allocated to this asset
+		// If we have consumed enough of the asset, then we have no need burn
+		// more.
+		if remainingAmountToBurn == 0 {
 			continue
 		}
 
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		inputIntf, signers, err := kc.Spend(utxo.Out, minIssuanceTime)
 		if err != nil {
 			// this utxo can't be spent with the current keys right now
 			continue

@@ -1747,37 +1747,6 @@ func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 	)
 	require.NoError(t, err)
 	return tx
-
-	// return &txs.Tx{Unsigned: &txs.ExportTx{
-	// 	BaseTx: txs.BaseTx{
-	// 		BaseTx: avax.BaseTx{
-	// 			NetworkID:    constants.UnitTestID,
-	// 			BlockchainID: chainID,
-	// 			Ins: []*avax.TransferableInput{{
-	// 				UTXOID: avax.UTXOID{
-	// 					TxID:        avaxTx.ID(),
-	// 					OutputIndex: 2,
-	// 				},
-	// 				Asset: avax.Asset{ID: avaxTx.ID()},
-	// 				In: &secp256k1fx.TransferInput{
-	// 					Amt:   startBalance,
-	// 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-	// 				},
-	// 			}},
-	// 		},
-	// 	},
-	// 	DestinationChain: constants.PlatformChainID,
-	// 	ExportedOuts: []*avax.TransferableOutput{{
-	// 		Asset: avax.Asset{ID: avaxTx.ID()},
-	// 		Out: &secp256k1fx.TransferOutput{
-	// 			Amt: startBalance / 2, // TODO ABENEGIA: find a way to pay the exact amount of fees
-	// 			OutputOwners: secp256k1fx.OutputOwners{
-	// 				Threshold: 1,
-	// 				Addrs:     []ids.ShortID{key.PublicKey().Address()},
-	// 			},
-	// 		},
-	// 	}},
-	// }}
 }
 
 func buildNFTxMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputIndex, groupID uint32) *txs.Operation {
