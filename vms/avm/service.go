@@ -1692,70 +1692,51 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		return nil, fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
 
-	amountsSpent, importInputs, importKeys, err := s.vm.SpendAll(atomicUTXOs, kc)
+	return buildImportTx(s.vm, chainID, atomicUTXOs, to, utxos, kc)
+}
+
+func buildImportTx(
+	vm *VM,
+	sourceChain ids.ID,
+	atomicUTXOs []*avax.UTXO,
+	to ids.ShortID,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+) (*txs.Tx, error) {
+	toBurn, importInputs, importKeys, err := vm.SpendAll(atomicUTXOs, kc)
 	if err != nil {
 		return nil, err
 	}
 
-	ins := []*avax.TransferableInput{}
-	keys := [][]*secp256k1.PrivateKey{}
-
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent < s.vm.TxFee {
-		var localAmountsSpent map[ids.ID]uint64
-		localAmountsSpent, ins, keys, err = s.vm.Spend(
-			utxos,
-			kc,
-			map[ids.ID]uint64{
-				s.vm.feeAssetID: s.vm.TxFee - amountSpent,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		for asset, amount := range localAmountsSpent {
-			newAmount, err := safemath.Add64(amountsSpent[asset], amount)
-			if err != nil {
-				return nil, fmt.Errorf("problem calculating required spend amount: %w", err)
-			}
-			amountsSpent[asset] = newAmount
-		}
+	uTx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+		}},
+		SourceChain: sourceChain,
+		ImportedIns: importInputs,
 	}
 
-	// Because we ensured that we had enough inputs for the fee, we can
-	// safely just remove it without concern for underflow.
-	amountsSpent[s.vm.feeAssetID] -= s.vm.TxFee
-
+	if importedAmt := toBurn[vm.feeAssetID]; importedAmt < vm.TxFee {
+		toBurn[vm.feeAssetID] = vm.TxFee - importedAmt
+	} else {
+		toBurn[vm.feeAssetID] = importedAmt - vm.TxFee
+	}
+	ins, outs, keys, err := vm.NewSpend(
+		utxos,
+		kc,
+		toBurn,
+		to,
+	)
+	if err != nil {
+		return nil, err
+	}
 	keys = append(keys, importKeys...)
 
-	outs := []*avax.TransferableOutput{}
-	for assetID, amount := range amountsSpent {
-		if amount > 0 {
-			outs = append(outs, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amount,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{to},
-					},
-				},
-			})
-		}
-	}
-	avax.SortTransferableOutputs(outs, s.vm.parser.Codec())
-
-	tx := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		SourceChain: chainID,
-		ImportedIns: importInputs,
-	}}
-	return tx, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
+	uTx.Ins = ins
+	uTx.Outs = outs
+	tx := &txs.Tx{Unsigned: uTx}
+	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // ExportArgs are arguments for passing into ExportAVA requests
