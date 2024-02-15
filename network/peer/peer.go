@@ -550,7 +550,8 @@ func (p *peer) writeMessages() {
 		uint32(myVersion.Minor),
 		uint32(myVersion.Patch),
 		mySignedIP.Timestamp,
-		mySignedIP.Signature,
+		mySignedIP.TLSSignature,
+		mySignedIP.BLSSignatureBytes,
 		p.MySubnets.List(),
 		p.SupportedACPs,
 		p.ObjectedACPs,
@@ -1076,7 +1077,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			},
 			Timestamp: msg.IpSigningTime,
 		},
-		Signature: msg.Sig,
+		TLSSignature: msg.IpNodeIdSig,
+		// TODO: Populate the BLS Signature here.
 	}
 	maxTimestamp := myTime.Add(p.MaxClockDifference)
 	if err := p.ip.Verify(p.cert, maxTimestamp); err != nil {

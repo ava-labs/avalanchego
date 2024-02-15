@@ -112,14 +112,18 @@ message Handshake {
   string my_version = 5;
   // Timestamp of the IP
   uint64 ip_signing_time = 6;
-  // Signature of the peer IP port pair at a provided timestamp
-  bytes sig = 7;
+  // Signature of the peer IP port pair at a provided timestamp with the TLS
+  // key.
+  bytes ip_node_id_sig = 7;
   // Subnets the peer is tracking
   repeated bytes tracked_subnets = 8;
   Client client = 9;
   repeated uint32 supported_acps = 10;
   repeated uint32 objected_acps = 11;
   BloomFilter known_peers = 12;
+  // Signature of the peer IP port pair at a provided timestamp with the BLS
+  // key.
+  bytes ip_bls_sig = 13;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility
