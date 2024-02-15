@@ -14,9 +14,9 @@ import (
 
 func TestVerify(t *testing.T) {
 	tests := map[string]struct {
-		alias               Alias
-		message             string
-		expectedErrorString string
+		alias       Alias
+		message     string
+		expectedErr error
 	}{
 		"MemoSizeShouldBeLowerThanMaxMemoSize": {
 			alias: Alias{
@@ -24,19 +24,14 @@ func TestVerify(t *testing.T) {
 				Memo:   make([]byte, avax.MaxMemoSize+1),
 				ID:     hashing.ComputeHash160Array(ids.Empty[:]),
 			},
-			message:             "memo size should be lower than max memo size",
-			expectedErrorString: "msig alias memo is larger (257 bytes) than max of 256 bytes",
+			message:     "memo size should be lower than max memo size",
+			expectedErr: errMemoIsToBig,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			err := tt.alias.Verify()
-			if tt.expectedErrorString != "" {
-				require.Error(t, err, tt.message)
-				require.Equal(t, err.Error(), tt.expectedErrorString)
-			} else {
-				require.NoError(t, err, tt.message)
-			}
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

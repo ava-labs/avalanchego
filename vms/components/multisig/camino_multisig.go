@@ -4,6 +4,7 @@
 package multisig
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,6 +16,8 @@ import (
 
 // MaxMemoSize is the maximum number of bytes in the memo field
 const MaxMemoSize = 256
+
+var errMemoIsToBig = errors.New("msig alias memo is to big")
 
 type Alias struct {
 	ID     ids.ShortID         `serialize:"true" json:"id"`
@@ -35,7 +38,7 @@ func (ma *Alias) InitCtx(ctx *snow.Context) {
 
 func (ma *Alias) Verify() error {
 	if len(ma.Memo) > MaxMemoSize {
-		return fmt.Errorf("msig alias memo is larger (%d bytes) than max of %d bytes", len(ma.Memo), MaxMemoSize)
+		return fmt.Errorf("%w: expected not greater than %d bytes, got %d bytes", errMemoIsToBig, MaxMemoSize, len(ma.Memo))
 	}
 
 	return ma.Owners.Verify()

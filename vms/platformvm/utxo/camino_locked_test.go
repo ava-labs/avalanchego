@@ -5,7 +5,6 @@ package utxo
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -567,7 +566,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			ins:              generateTestInsFromUTXOs,
 			creds:            []verify.Verifiable{cred1},
 			appliedLockState: locked.StateUnlocked,
-			expectedErr:      errAssetIDMismatch,
+			expectedErr:      errUnexpectedAssetID,
 		},
 		"Fail: Invalid input assetID": {
 			state: noMsigState,
@@ -581,7 +580,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			},
 			creds:            []verify.Verifiable{cred1},
 			appliedLockState: locked.StateUnlocked,
-			expectedErr:      errAssetIDMismatch,
+			expectedErr:      errUnexpectedAssetID,
 		},
 		"Fail: Invalid output assetID": {
 			state: noMsigState,
@@ -594,7 +593,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			},
 			creds:            []verify.Verifiable{cred1},
 			appliedLockState: locked.StateUnlocked,
-			expectedErr:      errAssetIDMismatch,
+			expectedErr:      errUnexpectedAssetID,
 		},
 		"Fail: Stakable utxo output": {
 			state: noMsigState,
@@ -954,9 +953,9 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 		addresses    set.Set[ids.ShortID]
 	}
 	tests := map[string]struct {
-		args args
-		want map[ids.ID]uint64
-		err  error
+		args        args
+		want        map[ids.ID]uint64
+		expectedErr error
 	}{
 		"Success retrieval of all unlockable amounts": {
 			args: args{
@@ -1017,7 +1016,7 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 				depositTxIDs: depositTxSet,
 				currentTime:  uint64(now.Unix()),
 			},
-			err: database.ErrNotFound,
+			expectedErr: database.ErrNotFound,
 		},
 		"Failed to get deposit": {
 			args: args{
@@ -1029,20 +1028,14 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 				depositTxIDs: depositTxSet,
 				currentTime:  uint64(now.Unix()),
 			},
-			err: fmt.Errorf("%w: %s", errFailToGetDeposit, "some_error"),
+			expectedErr: errFailToGetDeposit,
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			got, err := getDepositUnlockableAmounts(test.args.state(ctrl), test.args.depositTxIDs, test.args.currentTime)
-
-			if test.err != nil {
-				require.ErrorContains(t, err, test.err.Error())
-				return
-			}
-
-			require.NoError(t, err)
+			require.ErrorIs(t, err, test.expectedErr)
 			require.Equal(t, test.want, got)
 		})
 	}
@@ -1062,6 +1055,7 @@ func TestUnlockDeposit(t *testing.T) {
 	}
 
 	nowMinus10m := uint64(testHandler.clk.Time().Add(-10 * time.Minute).Unix())
+	testErr := errors.New("test err")
 
 	type args struct {
 		state        func(*gomock.Controller) state.Chain
@@ -1071,11 +1065,11 @@ func TestUnlockDeposit(t *testing.T) {
 	sigIndices := []uint32{0}
 
 	tests := map[string]struct {
-		args  args
-		want  []*avax.TransferableInput
-		want1 []*avax.TransferableOutput
-		want2 [][]*secp256k1.PrivateKey
-		err   error
+		args        args
+		want        []*avax.TransferableInput
+		want1       []*avax.TransferableOutput
+		want2       [][]*secp256k1.PrivateKey
+		expectedErr error
 	}{
 		"Error retrieving unlockable amounts": {
 			args: args{
@@ -1094,13 +1088,13 @@ func TestUnlockDeposit(t *testing.T) {
 						Start:                nowMinus10m,
 						UnlockPeriodDuration: uint32((10 * time.Minute).Seconds()),
 					}, nil)
-					s.EXPECT().LockedUTXOs(depositTxSet, gomock.Any(), locked.StateDeposited).Return(nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, testID))
+					s.EXPECT().LockedUTXOs(depositTxSet, gomock.Any(), locked.StateDeposited).Return(nil, testErr)
 					return s
 				},
 				keys:         preFundedKeys,
 				depositTxIDs: []ids.ID{testID},
 			},
-			err: fmt.Errorf("%w: %s", state.ErrMissingParentState, testID),
+			expectedErr: testErr,
 		},
 		"Successful unlock of 50% deposited funds": {
 			args: args{
@@ -1174,12 +1168,7 @@ func TestUnlockDeposit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			got, got1, got2, err := testHandler.UnlockDeposit(tt.args.state(ctrl), tt.args.keys, tt.args.depositTxIDs)
-			if tt.err != nil {
-				require.ErrorContains(t, err, tt.err.Error())
-				return
-			}
-
-			require.NoError(t, err)
+			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.want, got, "Error asserting TransferableInputs: got = %v, want %v", got, tt.want)
 			require.Equal(t, tt.want1, got1, "Error asserting TransferableOutputs: got = %v, want %v", got1, tt.want2)
 			require.Equal(t, tt.want2, got2, "UnlockDeposit() got = %v, want %v", got2, tt.want2)
@@ -1259,7 +1248,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				assetID: assetID,
 			},
-			expectedErr: errAssetIDMismatch,
+			expectedErr: errUnexpectedAssetID,
 		},
 		"Input AssetID mismatch": {
 			handlerState: noMsigState,
@@ -1272,7 +1261,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				assetID: assetID,
 			},
-			expectedErr: errAssetIDMismatch,
+			expectedErr: errUnexpectedAssetID,
 		},
 		"UTXO locked, but not deposited (e.g. just bonded)": {
 			handlerState: noMsigState,

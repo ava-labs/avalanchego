@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -290,9 +291,9 @@ func TestDeferredStakers(t *testing.T) {
 					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
 				case expired:
 					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
-					require.Error(err)
+					require.ErrorIs(err, database.ErrNotFound)
 					_, err = env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
-					require.Error(err)
+					require.ErrorIs(err, database.ErrNotFound)
 				}
 			}
 
@@ -308,9 +309,9 @@ func TestDeferredStakers(t *testing.T) {
 					require.True(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
 				case expired:
 					_, err := env.state.GetCurrentValidator(subnetID, stakerNodeID)
-					require.Error(err)
+					require.ErrorIs(err, database.ErrNotFound)
 					_, err = env.state.GetPendingValidator(subnetID, stakerNodeID)
-					require.Error(err)
+					require.ErrorIs(err, database.ErrNotFound)
 				}
 			}
 		})

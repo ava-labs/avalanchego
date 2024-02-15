@@ -130,7 +130,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
 			},
-			expectedErr: errTimestampNotBeforeStartTime,
+			expectedErr: ErrTimestampNotBeforeStartTime,
 		},
 		"Validator's start time too far in the future": {
 			generateArgs: func() args {
@@ -149,7 +149,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
 			},
-			expectedErr: errFutureStakeTime,
+			expectedErr: ErrFutureStakeTime,
 		},
 		"Validator already validating primary network": {
 			generateArgs: func() args {
@@ -252,7 +252,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					env.state.DeleteUTXO(utxoID)
 				}
 			},
-			expectedErr: errFlowCheckFailed,
+			expectedErr: ErrFlowCheckFailed,
 		},
 		"Not signed by node owner": {
 			generateArgs: func() args {
@@ -419,12 +419,9 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 		changeAddr ids.ShortID
 	}
 	tests := map[string]struct {
-		generateArgs        func() args
-		preExecute          func(*testing.T, *txs.Tx)
-		expectedSpecificErr error
-		// In some checks, avalanche implementation is not returning a specific error or this error is private
-		// So in order not to change avalanche files we should just assert that we have some error
-		expectedGeneralErr bool
+		generateArgs func() args
+		preExecute   func(*testing.T, *txs.Tx)
+		expectedErr  error
 	}{
 		"Happy path validator in current set of primary network": {
 			generateArgs: func() args {
@@ -438,8 +435,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:          func(t *testing.T, tx *txs.Tx) {},
-			expectedSpecificErr: nil,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: nil,
 		},
 		"Validator stops validating subnet after stops validating primary network": {
 			generateArgs: func() args {
@@ -453,8 +450,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:          func(t *testing.T, tx *txs.Tx) {},
-			expectedSpecificErr: errValidatorSubset,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: ErrValidatorSubset,
 		},
 		"Validator not in pending or current validator set": {
 			generateArgs: func() args {
@@ -468,8 +465,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:          func(t *testing.T, tx *txs.Tx) {},
-			expectedSpecificErr: database.ErrNotFound,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: ErrNotValidator,
 		},
 		"Validator in pending set but starts validating before primary network": {
 			generateArgs: func() args {
@@ -483,8 +480,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:          func(t *testing.T, tx *txs.Tx) {},
-			expectedSpecificErr: errValidatorSubset,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: ErrValidatorSubset,
 		},
 		"Validator in pending set but stops after primary network": {
 			generateArgs: func() args {
@@ -498,8 +495,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:          func(t *testing.T, tx *txs.Tx) {},
-			expectedSpecificErr: errValidatorSubset,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: ErrValidatorSubset,
 		},
 		"Happy path validator in pending set": {
 			generateArgs: func() args {
@@ -513,8 +510,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:          func(t *testing.T, tx *txs.Tx) {},
-			expectedSpecificErr: nil,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: nil,
 		},
 		"Validator starts at current timestamp": {
 			generateArgs: func() args {
@@ -528,8 +525,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:          func(t *testing.T, tx *txs.Tx) {},
-			expectedSpecificErr: errTimestampNotBeforeStartTime,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: ErrTimestampNotBeforeStartTime,
 		},
 		"Validator is already a subnet validator": {
 			generateArgs: func() args {
@@ -543,8 +540,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 					changeAddr: ids.ShortEmpty,
 				}
 			},
-			preExecute:         func(t *testing.T, tx *txs.Tx) {},
-			expectedGeneralErr: true,
+			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			expectedErr: ErrDuplicateValidator,
 		},
 		"Too few signatures": {
 			generateArgs: func() args {
@@ -563,7 +560,7 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 				input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
 				input.SigIndices = input.SigIndices[1:]
 			},
-			expectedSpecificErr: errUnauthorizedSubnetModification,
+			expectedErr: errUnauthorizedSubnetModification,
 		},
 		"Control signature from invalid key": {
 			generateArgs: func() args {
@@ -583,7 +580,7 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 				require.NoError(t, err)
 				copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 			},
-			expectedSpecificErr: errFlowCheckFailed,
+			expectedErr: ErrFlowCheckFailed,
 		},
 	}
 	for name, tt := range tests {
@@ -613,11 +610,7 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 				},
 			}
 			err = tx.Unsigned.Visit(&executor)
-			if tt.expectedGeneralErr {
-				require.Error(t, err)
-			} else {
-				require.ErrorIs(t, err, tt.expectedSpecificErr)
-			}
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -697,7 +690,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
 				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, locked.ThisTxID),
 			},
-			expectedErr: errFlowCheckFailed,
+			expectedErr: ErrFlowCheckFailed,
 		},
 		"Fee burning bonded UTXO": {
 			utxos: []*avax.UTXO{
@@ -708,7 +701,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, locked.ThisTxID),
 				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, existingTxID),
 			},
-			expectedErr: errFlowCheckFailed,
+			expectedErr: ErrFlowCheckFailed,
 		},
 		"Fee burning deposited UTXO": {
 			utxos: []*avax.UTXO{
@@ -719,7 +712,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-defaultTxFee, outputOwners, existingTxID, ids.Empty),
 				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, existingTxID, locked.ThisTxID),
 			},
-			expectedErr: errFlowCheckFailed,
+			expectedErr: ErrFlowCheckFailed,
 		},
 	}
 	for name, tt := range tests {
@@ -1541,7 +1534,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 		generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
 			return []*avax.UTXO{
 				generateTestUTXO(txID, env.ctx.AVAXAssetID, defaultCaminoValidatorWeight, stakeOwners, ids.Empty, ids.Empty),
-				generateTestUTXOWithIndex(unlockedUTXOTxID, 2, env.ctx.AVAXAssetID, defaultCaminoBalance, stakeOwners, ids.Empty, ids.Empty, true),
+				generateTestUTXOWithIndex(unlockedUTXOTxID, 1, env.ctx.AVAXAssetID, defaultCaminoBalance, stakeOwners, ids.Empty, ids.Empty, true),
 			}
 		},
 		expectedErr: nil,
@@ -2323,7 +2316,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				}
 			},
 			chaintime:   offer.StartTime(),
-			expectedErr: []error{errFlowCheckFailed, errFlowCheckFailed},
+			expectedErr: []error{ErrFlowCheckFailed, ErrFlowCheckFailed},
 		},
 		"Inputs and credentials length mismatch": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2354,7 +2347,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			},
 			chaintime:   offer.StartTime(),
 			signers:     [][]*secp256k1.PrivateKey{{utxoOwnerKey}, {utxoOwnerKey}},
-			expectedErr: []error{errFlowCheckFailed, errFlowCheckFailed},
+			expectedErr: []error{ErrFlowCheckFailed, ErrFlowCheckFailed},
 		},
 		"Owned offer, bad offer permission credential (wrong deposit creator addr)": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -6127,7 +6120,7 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
 			},
-			expectedErr: errInvalidProposal,
+			expectedErr: ErrInvalidProposal,
 		},
 		"OK": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddProposalTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
@@ -6409,7 +6402,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
-			expectedErr: errProposalInactive,
+			expectedErr: ErrProposalInactive,
 		},
 		"Proposal is not active yet": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
@@ -6431,7 +6424,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
-			expectedErr: errProposalInactive,
+			expectedErr: ErrProposalInactive,
 		},
 		"Voter isn't consortium member": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {

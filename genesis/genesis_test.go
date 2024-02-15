@@ -52,18 +52,18 @@ func TestValidateConfig(t *testing.T) {
 		expectedErr error
 	}{
 		"camino": {
-			networkID: 1000,
-			config:    &CaminoConfig,
+			networkID:   1000,
+			config:      &CaminoConfig,
 			expectedErr: nil,
 		},
 		"columbus": {
-			networkID: 1001,
-			config:    &ColumbusConfig,
+			networkID:   1001,
+			config:      &ColumbusConfig,
 			expectedErr: nil,
 		},
 		"kopernikus": {
-			networkID: 1002,
-			config:    &KopernikusConfig,
+			networkID:   1002,
+			config:      &KopernikusConfig,
 			expectedErr: nil,
 		},
 		"local": {
@@ -72,8 +72,8 @@ func TestValidateConfig(t *testing.T) {
 			expectedErr: nil,
 		},
 		"camino (networkID mismatch)": {
-			networkID: 999,
-			config:    &CaminoConfig,
+			networkID:   999,
+			config:      &CaminoConfig,
 			expectedErr: errConflictingNetworkIDs,
 		},
 		"invalid start time": {
@@ -224,7 +224,7 @@ func TestGenesisFromFile(t *testing.T) {
 			networkID:    9999,
 			customConfig: customGenesisConfigJSON,
 			expectedErr:  nil,
-			expected:     "515619ced6ead0ebbdf4b565df264575915f63565701dbf7552d4061039babc8",
+			expectedHash: "515619ced6ead0ebbdf4b565df264575915f63565701dbf7552d4061039babc8",
 		},
 		"custom (networkID mismatch)": {
 			networkID:    9999,
@@ -279,15 +279,15 @@ func TestGenesisFromFlag(t *testing.T) {
 		expectedHash string
 	}{
 		"camino": {
-			networkID: constants.CaminoID,
+			networkID:   constants.CaminoID,
 			expectedErr: errOverridesStandardNetworkConfig,
 		},
 		"columbus": {
-			networkID: constants.ColumbusID,
+			networkID:   constants.ColumbusID,
 			expectedErr: errOverridesStandardNetworkConfig,
 		},
 		"kopernikus": {
-			networkID: constants.KopernikusID,
+			networkID:   constants.KopernikusID,
 			expectedErr: errOverridesStandardNetworkConfig,
 		},
 		"local": {
@@ -303,7 +303,7 @@ func TestGenesisFromFlag(t *testing.T) {
 			networkID:    9999,
 			customConfig: customGenesisConfigJSON,
 			expectedErr:  nil,
-			expected:     "515619ced6ead0ebbdf4b565df264575915f63565701dbf7552d4061039babc8",
+			expectedHash: "515619ced6ead0ebbdf4b565df264575915f63565701dbf7552d4061039babc8",
 		},
 		"custom (networkID mismatch)": {
 			networkID:    9999,

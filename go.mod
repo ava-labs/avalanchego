@@ -44,8 +44,8 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/supranational/blst v0.3.11-0.20220920110316-f72618070295
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
-	github.com/xuri/excelize/v2 v2.8.0
 	github.com/thepudds/fzgen v0.4.2
+	github.com/xuri/excelize/v2 v2.8.0
 	go.opentelemetry.io/otel v1.11.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.11.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.11.0
@@ -141,4 +141,4 @@ require (
 
 replace github.com/ava-labs/avalanche-ledger-go => github.com/chain4travel/camino-ledger-go v0.0.13-c4t
 
-replace github.com/ava-labs/coreth => github.com/chain4travel/caminoethvm v1.1.0-rc8
+replace github.com/ava-labs/coreth => github.com/chain4travel/caminoethvm v1.1.1-rc0

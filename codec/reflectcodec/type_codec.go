@@ -549,7 +549,7 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 				value.Field(0).SetUint(upgradeVersionID)
 				upgradeVersion = codec.UpgradeVersionID(upgradeVersionID).Version()
 				if upgradeVersion > serializedFieldIndices.MaxUpgradeVersion {
-					return fmt.Errorf("incompatible upgrade version: %d", upgradeVersion)
+					return fmt.Errorf("%w: %d", codec.ErrIncompatibleUpgradeVersion, upgradeVersion)
 				}
 			}
 		}

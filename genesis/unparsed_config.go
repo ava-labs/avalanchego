@@ -142,10 +142,10 @@ func (uc UnparsedConfig) Parse() (Config, error) {
 		}
 		c.InitialStakers[i] = is
 	}
-	var err error
-	c.Camino, err = uc.Camino.Parse(uc.StartTime)
+	parsedCaminoConfig, err := uc.Camino.Parse(uc.StartTime)
 	if err != nil {
 		return c, err
 	}
+	c.Camino = *parsedCaminoConfig
 	return c, nil
 }

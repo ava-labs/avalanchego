@@ -154,7 +154,7 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addressStateTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err, ErrEmptyAddress)
+	require.ErrorIs(err, ErrEmptyAddress)
 	addressStateTx.Address = preFundedKeys[0].PublicKey().Address()
 
 	// Invalid mode
@@ -163,26 +163,26 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addressStateTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err, ErrInvalidState)
+	require.ErrorIs(err, ErrInvalidState)
 	addressStateTx.State = as.AddressStateBitRoleAdmin
 
 	// Locked out
 	stx, err = NewSigned(addressStateTxLocked, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, locked.ErrWrongOutType)
 
 	// Staked out
 	stx, err = NewSigned(addressStateTxStaked, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, locked.ErrWrongOutType)
 
 	// Upgraded / empty executor
 	stx, err = NewSigned(addressStateTxUpgraded, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err, ErrEmptyAddress)
+	require.ErrorIs(err, ErrEmptyAddress)
 
 	// Upgraded / Ok
 	addressStateTxUpgraded.Executor = ids.ShortID{'X'}

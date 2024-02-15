@@ -147,7 +147,7 @@ func getNextDepositsToUnlock(
 	chainTime time.Time,
 ) ([]ids.ID, bool, error) {
 	if !chainTime.Before(mockable.MaxTime) {
-		return nil, false, errEndOfTime
+		return nil, false, ErrEndOfTime
 	}
 
 	nextDeposits, nextDepositsEndtime, err := preferredState.GetNextToUnlockDepositIDsAndTime(nil)
@@ -165,7 +165,7 @@ func getExpiredProposals(
 	chainTime time.Time,
 ) ([]ids.ID, error) {
 	if !chainTime.Before(mockable.MaxTime) {
-		return nil, errEndOfTime
+		return nil, ErrEndOfTime
 	}
 
 	nextProposals, nextProposalsEndtime, err := preferredState.GetNextToExpireProposalIDsAndTime(nil)

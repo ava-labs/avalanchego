@@ -39,8 +39,8 @@ import (
 const (
 	totalRounds = 50
 
-	metricBlksProcessing = "avalanche_X_blks_processing"
-	metricBlksAccepted   = "avalanche_X_blks_accepted_count"
+	metricBlksProcessing = "camino_X_blks_processing"
+	metricBlksAccepted   = "camino_X_blks_accepted_count"
 )
 
 var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {

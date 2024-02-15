@@ -88,5 +88,5 @@ func TestUpgrade(codec GeneralCodec, t testing.TB) {
 	// This should fail because we try to unmarshal version2 but struct only knows version 1
 	outputOld := UpgradeStructOld{}
 	_, err = manager.Unmarshal(bytes, &outputOld)
-	require.ErrorContains(err, "incompatible")
+	require.ErrorIs(err, ErrIncompatibleUpgradeVersion)
 }

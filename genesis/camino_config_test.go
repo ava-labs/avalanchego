@@ -25,10 +25,10 @@ func TestUnparse(t *testing.T) {
 		networkID uint32
 	}
 	tests := map[string]struct {
-		camino Camino
-		args   args
-		want   UnparsedCamino
-		err    error
+		camino      Camino
+		args        args
+		want        UnparsedCamino
+		expectedErr error
 	}{
 		"success": {
 			args: args{networkID: 12345},
@@ -113,12 +113,7 @@ func TestUnparse(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			got, err := tt.camino.Unparse(tt.args.networkID, 0)
-
-			if tt.err != nil {
-				require.ErrorContains(t, err, tt.err.Error())
-				return
-			}
-			require.NoError(t, err)
+			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.want, got)
 		})
 	}

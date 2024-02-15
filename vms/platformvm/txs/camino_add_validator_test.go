@@ -28,44 +28,41 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 	sigIndices := []uint32{0}
 
 	tests := map[string]struct {
-		preExecute          func(*testing.T, *CaminoAddValidatorTx) *CaminoAddValidatorTx
-		expectedSpecificErr error
-		// In some checks, avalanche implementation is not returning a specific error or this error is private
-		// So in order not to change avalanche files we should just assert that we have some error
-		expectedGeneralErr bool
+		preExecute  func(*testing.T, *CaminoAddValidatorTx) *CaminoAddValidatorTx
+		expectedErr error
 	}{
 		"Happy path": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
 				return utx
 			},
-			expectedSpecificErr: nil,
+			expectedErr: nil,
 		},
 		"Tx is nil": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
 				return nil
 			},
-			expectedSpecificErr: errSignedTxNotInitialized,
+			expectedErr: errSignedTxNotInitialized,
 		},
 		"Wrong networkID": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
 				utx.NetworkID++
 				return utx
 			},
-			expectedSpecificErr: avax.ErrWrongNetworkID,
+			expectedErr: avax.ErrWrongNetworkID,
 		},
 		"Too many shares": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
 				utx.DelegationShares++
 				return utx
 			},
-			expectedSpecificErr: errTooManyShares,
+			expectedErr: errTooManyShares,
 		},
 		"Weight mismatch": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
 				utx.Validator.Wght++
 				return utx
 			},
-			expectedSpecificErr: errValidatorWeightMismatch,
+			expectedErr: errValidatorWeightMismatch,
 		},
 		"Outputs asset is not AVAX": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
@@ -75,21 +72,21 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 				avax.SortTransferableOutputs(utx.Outs, Codec)
 				return utx
 			},
-			expectedSpecificErr: errAssetNotAVAX,
+			expectedErr: errAssetNotAVAX,
 		},
 		"Stake outputs are not empty": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
 				utx.StakeOuts = append(utx.StakeOuts, generateTestStakeableOut(ctx.AVAXAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), outputOwners))
 				return utx
 			},
-			expectedSpecificErr: errStakeOutsNotEmpty,
+			expectedErr: errStakeOutsNotEmpty,
 		},
 		"Lock owner has no addresses": {
 			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
 				utx.Outs[1].Out.(*locked.Out).TransferableOut.(*secp256k1fx.TransferOutput).Addrs = nil
 				return utx
 			},
-			expectedGeneralErr: true,
+			expectedErr: secp256k1fx.ErrOutputUnspendable,
 		},
 	}
 
@@ -126,11 +123,7 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 			utx = tt.preExecute(t, utx)
 			tx, _ := NewSigned(utx, Codec, signers)
 			err := tx.SyntacticVerify(ctx)
-			if tt.expectedGeneralErr {
-				require.Error(t, err)
-			} else {
-				require.ErrorIs(t, err, tt.expectedSpecificErr)
-			}
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

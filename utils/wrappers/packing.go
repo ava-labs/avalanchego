@@ -156,7 +156,7 @@ func (p *Packer) UnpackLong() uint64 {
 
 func (p *Packer) RevertLong() {
 	if p.Offset < LongLen {
-		p.Add(errBadLength)
+		p.Add(ErrInsufficientLength)
 		return
 	}
 	p.Offset -= LongLen

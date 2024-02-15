@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -468,7 +469,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 	// Fast-forward clock to time a bit forward, but still before deposit will be unlocked
 	vm.clock.Set(vm.Clock().Time().Add(time.Duration(deposit.Duration) * time.Second / 2))
 	_, err = vm.Builder.BuildBlock(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, builder.ErrNoPendingBlocks)
 
 	// Fast-forward clock to time for deposit to be unlocked
 	vm.clock.Set(deposit.EndTime())
@@ -630,7 +631,7 @@ func TestProposals(t *testing.T) {
 			// Try to vote on proposal, expect to fail
 			vm.clock.Set(baseFeeProposalState.StartTime().Add(-time.Second))
 			addVoteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), caminoPreFundedKeys[0], 0)
-			require.Error(vm.Builder.AddUnverifiedTx(addVoteTx))
+			require.ErrorIs(vm.Builder.AddUnverifiedTx(addVoteTx), txexecutor.ErrProposalInactive)
 			vm.clock.Set(baseFeeProposalState.StartTime())
 
 			optionWeights := make([]uint32, len(baseFeeProposalState.Options))
@@ -1147,7 +1148,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 			if tt.moreExlcude {
 				excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, fundsKey, proposalBondAmount, fee,
 					consortiumAdminKey, memberToExcludeAddr, proposalStartTime, proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration)*time.Second), true)
-				require.Error(vm.Builder.AddUnverifiedTx(excludeMemberProposalTx))
+				require.ErrorIs(vm.Builder.AddUnverifiedTx(excludeMemberProposalTx), txexecutor.ErrInvalidProposal)
 				height, err = vm.GetCurrentHeight(context.Background())
 				require.NoError(err)
 				require.Equal(expectedHeight, height)
