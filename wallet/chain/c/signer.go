@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,8 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	stdcontext "context"
-
-	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const version = 0
@@ -51,10 +50,10 @@ type Signer interface {
 
 type EthKeychain interface {
 	// The returned Signer can provide a signature for [addr]
-	GetEth(addr ethcommon.Address) (keychain.Signer, bool)
+	GetEth(addr common.Address) (keychain.Signer, bool)
 	// Returns the set of addresses for which the accessor keeps an associated
 	// signer
-	EthAddresses() set.Set[ethcommon.Address]
+	EthAddresses() set.Set[common.Address]
 }
 
 type SignerBackend interface {
