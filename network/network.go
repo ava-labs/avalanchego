@@ -260,6 +260,7 @@ func NewNetwork(
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
 		MySubnets:            config.TrackedSubnets,
 		Beacons:              config.Beacons,
+		Validators:           config.Validators,
 		NetworkID:            config.NetworkID,
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
