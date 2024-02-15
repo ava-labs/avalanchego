@@ -454,7 +454,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
 			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 		notLinearized: true,
 	})
@@ -476,7 +476,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - env.vm.TxFee,
+				Amt: startBalance / 2,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -502,7 +502,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 				},
 				Asset: avax.Asset{ID: env.genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
-					Amt: startBalance - env.vm.TxFee,
+					Amt: 494681,
 					Input: secp256k1fx.Input{
 						SigIndices: []uint32{
 							0,
@@ -540,7 +540,7 @@ func TestIssueImportTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
 			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 	})
 	defer func() {
@@ -631,7 +631,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{
 			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
+			EUpgradeTime: time.Time{},
 		},
 		notLinearized: true,
 	})
@@ -654,33 +654,35 @@ func TestForceAcceptImportTx(t *testing.T) {
 	}
 
 	txAssetID := avax.Asset{ID: avaxID}
-	tx := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: env.vm.ctx.XChainID,
-			Outs: []*avax.TransferableOutput{{
-				Asset: txAssetID,
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 1000,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+	tx := &txs.Tx{
+		Unsigned: &txs.ImportTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    constants.UnitTestID,
+				BlockchainID: env.vm.ctx.XChainID,
+				Outs: []*avax.TransferableOutput{{
+					Asset: txAssetID,
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1000,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+				}},
+			}},
+			SourceChain: constants.PlatformChainID,
+			ImportedIns: []*avax.TransferableInput{{
+				UTXOID: utxoID,
+				Asset:  txAssetID,
+				In: &secp256k1fx.TransferInput{
+					Amt: 1455,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{0},
 					},
 				},
 			}},
-		}},
-		SourceChain: constants.PlatformChainID,
-		ImportedIns: []*avax.TransferableInput{{
-			UTXOID: utxoID,
-			Asset:  txAssetID,
-			In: &secp256k1fx.TransferInput{
-				Amt: 1010,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{0},
-				},
-			},
-		}},
-	}}
+		},
+	}
 	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 	parsedTx, err := env.vm.ParseTx(context.Background(), tx.Bytes())

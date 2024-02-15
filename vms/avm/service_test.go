@@ -729,7 +729,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		vmStaticConfig: &config.Config{
 			CreateAssetTxFee: testTxFee,
 			DurangoTime:      time.Time{},
-			EUpgradeTime:     mockable.MaxTime,
+			EUpgradeTime:     time.Time{},
 		},
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
@@ -769,7 +769,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 999000,
+					"amount": 994713,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -863,7 +863,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xc40f6ce7b28f2b45e2383cd8a04a739f6280328e98497b49be720201297c8a1a580e3f8a37967a1869199fb3e67c3e2006950c2396292c2e1dadcabb7f789c5f00"
+					"0xd252600ee3f1e0654cad8212c68cf79e9248953057aade0fc603f7eb13acfe5a744d44bdecd1259f3d2cf1c00f6dbc0a2004cfbaceb2aa5cd6a83394d78c120001"
 				]
 			}
 		}
@@ -2604,7 +2604,7 @@ func TestSendMultiple(t *testing.T) {
 				}},
 				vmStaticConfig: &config.Config{
 					DurangoTime:  time.Time{},
-					EUpgradeTime: mockable.MaxTime,
+					EUpgradeTime: time.Time{},
 				},
 			})
 			env.vm.ctx.Lock.Unlock()
