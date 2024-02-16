@@ -234,6 +234,10 @@ func (d *diff) Apply(state Chain) {
 
 	state.SetLastAccepted(d.lastAccepted)
 	state.SetTimestamp(d.timestamp)
-	state.SetUnitFees(*d.unitFees)
-	state.SetFeeWindows(*d.feesWindows)
+	if d.unitFees != nil {
+		state.SetUnitFees(*d.unitFees)
+	}
+	if d.feesWindows != nil {
+		state.SetFeeWindows(*d.feesWindows)
+	}
 }
