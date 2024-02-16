@@ -72,8 +72,8 @@ type ReadOnlyChain interface {
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
 
-	GetUnitFees() commonfees.Dimensions
-	GetFeeWindows() commonfees.Windows
+	GetUnitFees() (commonfees.Dimensions, error)
+	GetFeeWindows() (commonfees.Windows, error)
 }
 
 type Chain interface {
@@ -106,6 +106,8 @@ type State interface {
 	// Invariant: After the chain is linearized, this function is expected to be
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
+
+	InitFees() error
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -472,22 +474,7 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	return err
 }
 
-func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
-	genesis, err := block.NewStandardBlock(
-		stopVertexID,
-		0,
-		genesisTimestamp,
-		nil,
-		s.parser.Codec(),
-	)
-	if err != nil {
-		return err
-	}
-
-	s.SetLastAccepted(genesis.ID())
-	s.SetTimestamp(genesis.Timestamp())
-	s.AddBlock(genesis)
-
+func (s *state) InitFees() error {
 	switch unitFeesBytes, err := s.singletonDB.Get(unitFeesKey); err {
 	case nil:
 		if err := s.unitFees.FromBytes(unitFeesBytes); err != nil {
@@ -520,6 +507,24 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 		return err
 	}
 
+	return nil
+}
+
+func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
+	genesis, err := block.NewStandardBlock(
+		stopVertexID,
+		0,
+		genesisTimestamp,
+		nil,
+		s.parser.Codec(),
+	)
+	if err != nil {
+		return err
+	}
+
+	s.SetLastAccepted(genesis.ID())
+	s.SetTimestamp(genesis.Timestamp())
+	s.AddBlock(genesis)
 	return s.Commit()
 }
 
@@ -547,16 +552,16 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-func (s *state) GetUnitFees() commonfees.Dimensions {
-	return s.unitFees
+func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
+	return s.unitFees, nil
 }
 
 func (s *state) SetUnitFees(uf commonfees.Dimensions) {
 	s.unitFees = uf
 }
 
-func (s *state) GetFeeWindows() commonfees.Windows {
-	return s.feesWindows
+func (s *state) GetFeeWindows() (commonfees.Windows, error) {
+	return s.feesWindows, nil
 }
 
 func (s *state) SetFeeWindows(windows commonfees.Windows) {

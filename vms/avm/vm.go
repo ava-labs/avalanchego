@@ -575,6 +575,10 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 		}
 	}
 
+	if err := vm.state.InitFees(); err != nil {
+		return err
+	}
+
 	if !stateInitialized {
 		return vm.state.SetInitialized()
 	}

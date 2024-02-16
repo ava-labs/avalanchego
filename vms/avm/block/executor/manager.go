@@ -161,13 +161,19 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	unitFees, err := stateDiff.GetUnitFees()
+	if err != nil {
+		return err
+	}
+	feeWindows, err := stateDiff.GetFeeWindows()
+	if err != nil {
+		return err
+	}
+
 	var (
 		feeCfg     = m.backend.Config.GetDynamicFeesConfig(m.state.GetTimestamp())
-		unitFees   = m.state.GetUnitFees()
-		feeWindows = m.state.GetFeeWindows()
+		feeManager = fees.NewManager(unitFees, feeWindows)
 	)
-	feeManager := fees.NewManager(unitFees, feeWindows)
-
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend:       m.backend,
 		BlkFeeManager: feeManager,

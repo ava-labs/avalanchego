@@ -131,10 +131,17 @@ func (b *Block) Verify(context.Context) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
+	unitFees, err := stateDiff.GetUnitFees()
+	if err != nil {
+		return fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := stateDiff.GetFeeWindows()
+	if err != nil {
+		return err
+	}
+
 	var (
 		feeCfg     = b.manager.backend.Config.GetDynamicFeesConfig(b.Timestamp())
-		unitFees   = stateDiff.GetUnitFees()
-		feeWindows = stateDiff.GetFeeWindows()
 		feeManager = fees.NewManager(unitFees, feeWindows)
 	)
 

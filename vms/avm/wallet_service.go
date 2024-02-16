@@ -259,13 +259,20 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
+	unitFees, err := w.vm.state.GetUnitFees()
+	if err != nil {
+		return fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := w.vm.state.GetFeeWindows()
+	if err != nil {
+		return fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
+
 	var (
-		chainTime  = w.vm.state.GetTimestamp()
-		feeCfg     = w.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = w.vm.state.GetUnitFees()
-		feeWindows = w.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
+		chainTime = w.vm.state.GetTimestamp()
+		feeCfg    = w.vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(unitFees, feeWindows)
+		feeCalc   = &fees.Calculator{
 			IsEUpgradeActive: w.vm.IsEUpgradeActivated(chainTime),
 			Config:           &w.vm.Config,
 			FeeManager:       feeMan,

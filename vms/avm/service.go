@@ -791,41 +791,69 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
 
+	return buildCreateAssetTx(
+		s.vm,
+		args.Name,
+		args.Symbol,
+		args.Denomination,
+		[]*txs.InitialState{initialState},
+		utxos,
+		kc,
+		changeAddr,
+	)
+}
+
+func buildCreateAssetTx(
+	vm *VM,
+	name, symbol string,
+	denomination byte,
+	initialStates []*txs.InitialState,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	unitFees, err := vm.state.GetUnitFees()
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := vm.state.GetFeeWindows()
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
+
 	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(unitFees, feeWindows)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 
 	uTx := &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: args.Denomination,
-		States:       []*txs.InitialState{initialState},
+		Name:         name,
+		Symbol:       symbol,
+		Denomination: denomination,
+		States:       initialStates,
 	}
 	if err := uTx.Visit(feeCalc); err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, keys, err := s.vm.FinanceTx(
+	toBurn := make(map[ids.ID]uint64)
+	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
-		s.vm.feeAssetID,
+		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)
@@ -836,7 +864,7 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
+	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // CreateFixedCapAsset returns ID of the newly created asset
@@ -927,21 +955,6 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
-		}
-	)
-
 	initialState := &txs.InitialState{
 		FxIndex: 1, // TODO: Should lookup nftfx FxID
 		Outs:    make([]verify.State, 0, len(args.MinterSets)),
@@ -964,38 +977,16 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 
 	codec := s.vm.parser.Codec()
 	initialState.Sort(codec)
-
-	uTx := &txs.CreateAssetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-		}},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: 0, // NFTs are non-fungible
-		States:       []*txs.InitialState{initialState},
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, keys, err := s.vm.FinanceTx(
+	return buildCreateAssetTx(
+		s.vm,
+		args.Name,
+		args.Symbol,
+		0, // NFTs are non-fungible
+		[]*txs.InitialState{initialState},
 		utxos,
-		s.vm.feeAssetID,
 		kc,
-		toSpend,
-		feeCalc,
 		changeAddr,
 	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
 
 // CreateAddress creates an address for the user [args.Username]
@@ -1304,25 +1295,43 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		})
 	}
 
+	return buildBaseTx(s.vm, outs, memoBytes, utxos, kc, changeAddr)
+}
+
+func buildBaseTx(
+	vm *VM,
+	outs []*avax.TransferableOutput,
+	memo []byte,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	unitFees, err := vm.state.GetUnitFees()
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := vm.state.GetFeeWindows()
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
+
 	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(unitFees, feeWindows)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 	uTx := &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-			Memo:         memoBytes,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Memo:         memo,
 			Outs:         outs,
 		},
 	}
@@ -1330,15 +1339,15 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	toSpend := make(map[ids.ID]uint64)
-	for assetID, amount := range amounts {
-		toSpend[assetID] = amount
+	toBurn := make(map[ids.ID]uint64)
+	for _, out := range outs {
+		toBurn[out.AssetID()] += out.Out.Amount()
 	}
-	ins, feeOuts, keys, err := s.vm.FinanceTx(
+	ins, feeOuts, keys, err := vm.FinanceTx(
 		utxos,
-		s.vm.feeAssetID,
+		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)
@@ -1348,7 +1357,7 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 
 	uTx.Ins = ins
 	uTx.Outs = append(uTx.Outs, feeOuts...)
-	codec := s.vm.parser.Codec()
+	codec := vm.parser.Codec()
 	avax.SortTransferableOutputs(uTx.Outs, codec)
 
 	tx := &txs.Tx{Unsigned: uTx}
@@ -1449,50 +1458,70 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
+	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), opKeys)
+}
+
+func buildOperation(
+	vm *VM,
+	ops []*txs.Operation,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	unitFees, err := vm.state.GetUnitFees()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := vm.state.GetFeeWindows()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
+
 	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(unitFees, feeWindows)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 
 	uTx := &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
 		Ops: ops,
 	}
 	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, keys, err := s.vm.FinanceTx(
-		feeUTXOs,
-		s.vm.feeAssetID,
-		feeKc,
-		toSpend,
+	toBurn := make(map[ids.ID]uint64)
+	ins, outs, keys, err := vm.FinanceTx(
+		utxos,
+		vm.feeAssetID,
+		kc,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
-	keys = append(keys, opKeys...)
-	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
+	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // SendNFTArgs are arguments for passing into SendNFT requests
@@ -1574,54 +1603,12 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-		}},
-		Ops: ops,
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, secpKeys, err := s.vm.FinanceTx(
-		utxos,
-		s.vm.feeAssetID,
-		kc,
-		toSpend,
-		feeCalc,
-		changeAddr,
-	)
+	tx, err := buildOperation(s.vm, ops, utxos, kc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-
-	codec := s.vm.parser.Codec()
-	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	return tx, changeAddr, tx.SignNFTFx(codec, nftKeys)
+	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
 }
 
 // MintNFTArgs are arguments for passing into MintNFT requests
@@ -1712,54 +1699,11 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
-		}},
-		Ops: ops,
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, secpKeys, err := s.vm.FinanceTx(
-		feeUTXOs,
-		s.vm.feeAssetID,
-		feeKc,
-		toSpend,
-		feeCalc,
-		changeAddr,
-	)
+	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-
-	codec := s.vm.parser.Codec()
-	if err := tx.SignSECP256K1Fx(codec, secpKeys); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	return tx, changeAddr, tx.SignNFTFx(codec, nftKeys)
+	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
 }
 
 // ImportArgs are arguments for passing into Import requests
@@ -1822,47 +1766,68 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		return nil, fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
 
-	amountsSpent, importInputs, importKeys, err := s.vm.SpendAll(atomicUTXOs, kc)
+	return buildImportTx(s.vm, chainID, atomicUTXOs, to, utxos, kc)
+}
+
+func buildImportTx(
+	vm *VM,
+	sourceChain ids.ID,
+	atomicUTXOs []*avax.UTXO,
+	to ids.ShortID,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+) (*txs.Tx, error) {
+	toBurn, importInputs, importKeys, err := vm.SpendAll(atomicUTXOs, kc)
 	if err != nil {
 		return nil, err
 	}
 
+	unitFees, err := vm.state.GetUnitFees()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := vm.state.GetFeeWindows()
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
+
 	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(unitFees, feeWindows)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 
 	uTx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
-		SourceChain: chainID,
+		SourceChain: sourceChain,
 		ImportedIns: importInputs,
 	}
 	if err := uTx.Visit(feeCalc); err != nil {
 		return nil, err
 	}
 
-	if amountSpent := amountsSpent[s.vm.feeAssetID]; amountSpent < feeCalc.Fee {
-		feeCalc.Fee -= amountSpent
+	if importedAmt := toBurn[vm.feeAssetID]; importedAmt < feeCalc.Fee {
+		feeCalc.Fee -= importedAmt
+		toBurn[vm.feeAssetID] = 0
+	} else {
+		feeCalc.Fee = 0
+		toBurn[vm.feeAssetID] -= feeCalc.Fee
 	}
-	toSpend := make(map[ids.ID]uint64)
-	ins, outs, keys, err := s.vm.FinanceTx(
+	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
-		s.vm.feeAssetID,
+		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		to,
 	)
@@ -1874,7 +1839,7 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 	uTx.Ins = ins
 	uTx.Outs = outs
 	tx := &txs.Tx{Unsigned: uTx}
-	return tx, tx.SignSECP256K1Fx(s.vm.parser.Codec(), keys)
+	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // ExportArgs are arguments for passing into ExportAVA requests
@@ -1967,53 +1932,71 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	exportOuts := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: uint64(args.Amount),
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
-			},
-		},
-	}}
+	return buildExportTx(s.vm, chainID, to, assetID, uint64(args.Amount), utxos, kc, changeAddr)
+}
+
+func buildExportTx(
+	vm *VM,
+	destinationChain ids.ID,
+	to ids.ShortID,
+	exportedAssetID ids.ID,
+	exportedAmt uint64,
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	unitFees, err := vm.state.GetUnitFees()
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := vm.state.GetFeeWindows()
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
 
 	var (
-		chainTime  = s.vm.state.GetTimestamp()
-		feeCfg     = s.vm.GetDynamicFeesConfig(chainTime)
-		unitFees   = s.vm.state.GetUnitFees()
-		feeWindows = s.vm.state.GetFeeWindows()
-		feeMan     = commonfees.NewManager(unitFees, feeWindows)
-		feeCalc    = &fees.Calculator{
-			IsEUpgradeActive: s.vm.IsEUpgradeActivated(chainTime),
-			Config:           &s.vm.Config,
+		chainTime = vm.state.GetTimestamp()
+		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
+		feeMan    = commonfees.NewManager(unitFees, feeWindows)
+		feeCalc   = &fees.Calculator{
+			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
+			Config:           &vm.Config,
 			FeeManager:       feeMan,
 			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            s.vm.parser.Codec(),
+			Codec:            vm.parser.Codec(),
 		}
 	)
 
 	uTx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    s.vm.ctx.NetworkID,
-			BlockchainID: s.vm.ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 		}},
-		DestinationChain: chainID,
-		ExportedOuts:     exportOuts,
+		DestinationChain: destinationChain,
+		ExportedOuts: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: exportedAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: exportedAmt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{to},
+				},
+			},
+		}},
 	}
 	if err := uTx.Visit(feeCalc); err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	toSpend := map[ids.ID]uint64{
-		assetID: uint64(args.Amount),
+	toBurn := map[ids.ID]uint64{
+		exportedAssetID: exportedAmt,
 	}
-	ins, outs, keys, err := s.vm.FinanceTx(
+	ins, outs, keys, err := vm.FinanceTx(
 		utxos,
-		s.vm.feeAssetID,
+		vm.feeAssetID,
 		kc,
-		toSpend,
+		toBurn,
 		feeCalc,
 		changeAddr,
 	)
@@ -2021,7 +2004,7 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	codec := s.vm.parser.Codec()
+	codec := vm.parser.Codec()
 
 	uTx.Ins = ins
 	uTx.Outs = outs

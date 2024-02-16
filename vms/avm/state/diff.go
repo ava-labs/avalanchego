@@ -42,8 +42,8 @@ type diff struct {
 
 	lastAccepted ids.ID
 	timestamp    time.Time
-	unitFees     commonfees.Dimensions
-	feesWindows  commonfees.Windows
+	unitFees     *commonfees.Dimensions
+	feesWindows  *commonfees.Windows
 }
 
 func NewDiff(
@@ -165,20 +165,54 @@ func (d *diff) SetTimestamp(t time.Time) {
 	d.timestamp = t
 }
 
-func (d *diff) GetUnitFees() commonfees.Dimensions {
-	return d.unitFees
+func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
+	if d.unitFees == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentUnitFees, err := parentState.GetUnitFees()
+		if err != nil {
+			return commonfees.Empty, err
+		}
+
+		d.unitFees = new(commonfees.Dimensions)
+		*d.unitFees = parentUnitFees
+	}
+
+	return *d.unitFees, nil
 }
 
 func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
-	d.unitFees = uf
+	if d.unitFees == nil {
+		d.unitFees = new(commonfees.Dimensions)
+	}
+	*d.unitFees = uf
 }
 
-func (d *diff) GetFeeWindows() commonfees.Windows {
-	return d.feesWindows
+func (d *diff) GetFeeWindows() (commonfees.Windows, error) {
+	if d.feesWindows == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfees.EmptyWindows, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentFeeWindows, err := parentState.GetFeeWindows()
+		if err != nil {
+			return commonfees.EmptyWindows, err
+		}
+
+		d.feesWindows = new(commonfees.Windows)
+		*d.feesWindows = parentFeeWindows
+	}
+
+	return *d.feesWindows, nil
 }
 
 func (d *diff) SetFeeWindows(windows commonfees.Windows) {
-	d.feesWindows = windows
+	if d.feesWindows == nil {
+		d.feesWindows = new(commonfees.Windows)
+	}
+	*d.feesWindows = windows
 }
 
 func (d *diff) Apply(state Chain) {
@@ -200,6 +234,6 @@ func (d *diff) Apply(state Chain) {
 
 	state.SetLastAccepted(d.lastAccepted)
 	state.SetTimestamp(d.timestamp)
-	state.SetUnitFees(d.unitFees)
-	state.SetFeeWindows(d.feesWindows)
+	state.SetUnitFees(*d.unitFees)
+	state.SetFeeWindows(*d.feesWindows)
 }

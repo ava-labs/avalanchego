@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
@@ -36,10 +37,10 @@ import (
 )
 
 var feeConfig = config.Config{
-	TxFee:            2,
-	CreateAssetTxFee: 3,
+	TxFee:            2 * units.MilliAvax,
+	CreateAssetTxFee: 3 * units.MilliAvax,
 	DurangoTime:      time.Time{},
-	EUpgradeTime:     mockable.MaxTime,
+	EUpgradeTime:     time.Time{},
 }
 
 func TestSemanticVerifierBaseTx(t *testing.T) {
@@ -60,7 +61,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		Threshold: 1,
 		Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 	}
-	utxoAmount := 100 + feeConfig.TxFee + 50
+	utxoAmount := units.Avax
 	utxoOut := secp256k1fx.TransferOutput{
 		Amt:          utxoAmount,
 		OutputOwners: outputOwners,
@@ -388,7 +389,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
-				utxoAmount := 100 + feeConfig.TxFee
+				utxoAmount := 2000*units.MicroAvax + 100*units.NanoAvax
 				utxoOut := secp256k1fx.TransferOutput{
 					Amt:          utxoAmount,
 					OutputOwners: outputOwners,
@@ -468,7 +469,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
 				input.In = &secp256k1fx.TransferInput{
-					Amt:   fxOutput.Amt + feeConfig.TxFee - 1,
+					Amt:   5092 * units.NanoAvax,
 					Input: inputSigners,
 				}
 
@@ -772,7 +773,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		Threshold: 1,
 		Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 	}
-	utxoAmount := 100 + feeConfig.TxFee + 50
+	utxoAmount := units.Avax
 	utxoOut := secp256k1fx.TransferOutput{
 		Amt:          utxoAmount,
 		OutputOwners: outputOwners,
@@ -1155,7 +1156,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
 
-				utxoAmount := 100 + feeConfig.TxFee
+				utxoAmount := 2000*units.MicroAvax + 100*units.NanoAvax
 				utxoOut := secp256k1fx.TransferOutput{
 					Amt:          utxoAmount,
 					OutputOwners: outputOwners,
@@ -1239,7 +1240,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				input := input
 				input.In = &secp256k1fx.TransferInput{
-					Amt:   fxOutput.Amt + feeConfig.TxFee - 1,
+					Amt:   5092 * units.NanoAvax,
 					Input: inputSigners,
 				}
 
@@ -1495,10 +1496,14 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
 
+			feeCfg := config.EUpgradeDynamicFeesConfig
+
 			err = tx.Unsigned.Visit(&SemanticVerifier{
-				Backend: backend,
-				State:   state,
-				Tx:      tx,
+				Backend:       backend,
+				BlkFeeManager: fees.NewManager(feeCfg.InitialUnitFees, fees.EmptyWindows),
+				UnitCaps:      feeCfg.BlockUnitsCap,
+				State:         state,
+				Tx:            tx,
 			})
 			require.ErrorIs(err, test.err)
 		})
@@ -1637,10 +1642,14 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		},
 	))
 
+	feeCfg := config.EUpgradeDynamicFeesConfig
+
 	err = tx.Unsigned.Visit(&SemanticVerifier{
-		Backend: backend,
-		State:   state,
-		Tx:      tx,
+		Backend:       backend,
+		BlkFeeManager: fees.NewManager(feeCfg.InitialUnitFees, fees.EmptyWindows),
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         state,
+		Tx:            tx,
 	})
 	require.ErrorIs(err, verify.ErrMismatchedSubnetIDs)
 }
@@ -2171,10 +2180,15 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
-			err := tx.Unsigned.Visit(&SemanticVerifier{
-				Backend: backend,
-				State:   state,
-				Tx:      tx,
+
+			feeCfg := config.EUpgradeDynamicFeesConfig
+
+			err = tx.Unsigned.Visit(&SemanticVerifier{
+				Backend:       backend,
+				BlkFeeManager: fees.NewManager(feeCfg.InitialUnitFees, fees.EmptyWindows),
+				UnitCaps:      feeCfg.BlockUnitsCap,
+				State:         state,
+				Tx:            tx,
 			})
 			require.ErrorIs(err, test.expectedErr)
 		})

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -125,9 +126,25 @@ func (tx *Tx) Verify(context.Context) error {
 	if s := tx.Status(); s != choices.Processing {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
+
+	unitFees, err := tx.vm.state.GetUnitFees()
+	if err != nil {
+		return fmt.Errorf("failed retrieving unit fees: %w", err)
+	}
+	feeWindows, err := tx.vm.state.GetFeeWindows()
+	if err != nil {
+		return fmt.Errorf("failed retrieving fee windows: %w", err)
+	}
+
+	var (
+		feeCfg     = tx.vm.txBackend.Config.GetDynamicFeesConfig(tx.vm.state.GetTimestamp())
+		feeManager = fees.NewManager(unitFees, feeWindows)
+	)
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend: tx.vm.txBackend,
-		State:   tx.vm.state,
-		Tx:      tx.tx,
+		Backend:       tx.vm.txBackend,
+		BlkFeeManager: feeManager,
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         tx.vm.state,
+		Tx:            tx.tx,
 	})
 }

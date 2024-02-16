@@ -30,17 +30,16 @@ type Spender interface {
 	// Arguments:
 	// - [utxos] contains assets ID and amount to be spend for each assestID
 	// - [kc] are the owners of the funds
-	// - [amounts] is the amount of funds that are available to be spent for each assetID
+	// - [toSpend] is the amount of funds that are available to be spent for each assetID
 	// Returns:
-	// - [amountsSpent] the amount of funds that are spent
 	// - [inputs] the inputs that should be consumed to fund the outputs
-	// - [outputs] the outputs that should be generated
+	// - [outputs] the outputs produced
 	// - [signers] the proof of ownership of the funds being moved
 	FinanceTx(
 		utxos []*avax.UTXO,
 		feeAssetID ids.ID,
 		kc *secp256k1fx.Keychain,
-		amounts map[ids.ID]uint64,
+		toSpend map[ids.ID]uint64,
 		feeCalc *fees.Calculator,
 		changeAddr ids.ShortID,
 	) (
@@ -132,22 +131,25 @@ func (s *spender) FinanceTx(
 	toSpend[feeAssetID] = amountWithFee
 
 	var (
-		time = s.clock.Unix()
+		minIssuanceTime = s.clock.Unix()
 
 		ins  = []*avax.TransferableInput{}
 		outs = []*avax.TransferableOutput{}
 		keys = [][]*secp256k1.PrivateKey{}
 	)
 
+	// Iterate over the UTXOs
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
+		remainingAmountToBurn := toSpend[assetID]
 
-		if toSpend[assetID] == 0 {
-			// we have enough inputs allocated to this asset
+		// If we have consumed enough of the asset, then we have no need burn
+		// more.
+		if remainingAmountToBurn == 0 {
 			continue
 		}
 
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		inputIntf, signers, err := kc.Spend(utxo.Out, minIssuanceTime)
 		if err != nil {
 			// this utxo can't be spent with the current keys right now
 			continue
@@ -168,22 +170,22 @@ func (s *spender) FinanceTx(
 		}
 
 		// update fees to target given the extra input added
-		addedFees, err := fees.FinanceInput(feeCalc, s.codec, in)
+		inputFees, err := fees.FinanceInput(feeCalc, s.codec, in)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for input fees: %w", err)
 		}
-		toSpendWithFees, err := math.Add64(toSpend[feeAssetID], addedFees)
+		toSpendWithFees, err := math.Add64(toSpend[feeAssetID], inputFees)
 		if err != nil {
 			return nil, nil, nil, errSpendOverflow
 		}
 		toSpend[feeAssetID] = toSpendWithFees
 
 		// account for credentials as well
-		addedFees, err = fees.FinanceCredential(feeCalc, s.codec, len(signers))
+		credFees, err := fees.FinanceCredential(feeCalc, s.codec, len(signers))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
 		}
-		toSpendWithFees, err = math.Add64(toSpend[feeAssetID], addedFees)
+		toSpendWithFees, err = math.Add64(toSpend[feeAssetID], credFees)
 		if err != nil {
 			return nil, nil, nil, errSpendOverflow
 		}
@@ -192,11 +194,16 @@ func (s *spender) FinanceTx(
 		ins = append(ins, in)
 		keys = append(keys, signers)
 
+		if assetID != feeAssetID {
+			// can't pay fees in non-avax tokens. Move on
+			continue
+		}
+
 		// add change if needed
-		if assetID == feeAssetID && amountToBurn < input.Amount() {
+		if remainingAmt := input.Amount() - amountToBurn; inputFees+credFees < remainingAmt {
 			// input has not been fully spent, so we may have to add a change.
 			// Note that change must pay for its own fees
-			remainingAmt := input.Amount() - amountToBurn
+			remainingAmt -= inputFees + credFees
 			out := &avax.TransferableOutput{
 				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
@@ -209,22 +216,24 @@ func (s *spender) FinanceTx(
 				},
 			}
 
-			addedFees, addedUnits, err := fees.FinanceOutput(feeCalc, s.codec, out)
+			outputFees, addedUnits, err := fees.FinanceOutput(feeCalc, s.codec, out)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("account for credential fees: %w", err)
 			}
 
 			switch {
-			case remainingAmt > addedFees:
+			case remainingAmt > outputFees:
 				// utxo is large enough to pay its own fees
-				out.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmt - addedFees
+				out.Out.(*secp256k1fx.TransferOutput).Amt = remainingAmt - outputFees
 				outs = append(outs, out)
-			case remainingAmt == addedFees:
+				toSpend[assetID] = 0
+			case remainingAmt == outputFees:
 				// utxo matches the amount to burn and the fees of the output.
 				// However output would have a zero amount. We fully burn the input
 				// without adding a zero amount output
+				toSpend[assetID] = 0
 
-			case remainingAmt < addedFees:
+			case remainingAmt < outputFees:
 				// utxo is not large enough to pay its own fees.
 				// we don't add the utxo, fully burn the input and move
 				// to the next utxos to complete tx financing

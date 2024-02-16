@@ -126,11 +126,12 @@ func (mr *MockChainMockRecorder) GetBlockIDAtHeight(arg0 any) *gomock.Call {
 }
 
 // GetFeeWindows mocks base method.
-func (m *MockChain) GetFeeWindows() fees.Windows {
+func (m *MockChain) GetFeeWindows() (fees.Windows, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeWindows")
 	ret0, _ := ret[0].(fees.Windows)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetFeeWindows indicates an expected call of GetFeeWindows.
@@ -198,11 +199,12 @@ func (mr *MockChainMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 }
 
 // GetUnitFees mocks base method.
-func (m *MockChain) GetUnitFees() fees.Dimensions {
+func (m *MockChain) GetUnitFees() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUnitFees")
 	ret0, _ := ret[0].(fees.Dimensions)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetUnitFees indicates an expected call of GetUnitFees.
@@ -431,11 +433,12 @@ func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 any) *gomock.Call {
 }
 
 // GetFeeWindows mocks base method.
-func (m *MockState) GetFeeWindows() fees.Windows {
+func (m *MockState) GetFeeWindows() (fees.Windows, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeWindows")
 	ret0, _ := ret[0].(fees.Windows)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetFeeWindows indicates an expected call of GetFeeWindows.
@@ -503,17 +506,32 @@ func (mr *MockStateMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 }
 
 // GetUnitFees mocks base method.
-func (m *MockState) GetUnitFees() fees.Dimensions {
+func (m *MockState) GetUnitFees() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUnitFees")
 	ret0, _ := ret[0].(fees.Dimensions)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetUnitFees indicates an expected call of GetUnitFees.
 func (mr *MockStateMockRecorder) GetUnitFees() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnitFees", reflect.TypeOf((*MockState)(nil).GetUnitFees))
+}
+
+// InitFees mocks base method.
+func (m *MockState) InitFees() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InitFees")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InitFees indicates an expected call of InitFees.
+func (mr *MockStateMockRecorder) InitFees() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitFees", reflect.TypeOf((*MockState)(nil).InitFees))
 }
 
 // InitializeChainState mocks base method.
@@ -750,11 +768,12 @@ func (mr *MockDiffMockRecorder) GetBlockIDAtHeight(arg0 any) *gomock.Call {
 }
 
 // GetFeeWindows mocks base method.
-func (m *MockDiff) GetFeeWindows() fees.Windows {
+func (m *MockDiff) GetFeeWindows() (fees.Windows, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeWindows")
 	ret0, _ := ret[0].(fees.Windows)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetFeeWindows indicates an expected call of GetFeeWindows.
@@ -822,11 +841,12 @@ func (mr *MockDiffMockRecorder) GetUTXO(arg0 any) *gomock.Call {
 }
 
 // GetUnitFees mocks base method.
-func (m *MockDiff) GetUnitFees() fees.Dimensions {
+func (m *MockDiff) GetUnitFees() (fees.Dimensions, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUnitFees")
 	ret0, _ := ret[0].(fees.Dimensions)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetUnitFees indicates an expected call of GetUnitFees.

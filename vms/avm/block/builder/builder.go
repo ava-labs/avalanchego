@@ -153,6 +153,8 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		inputs.Union(executor.Inputs)
 
 		txDiff.AddTx(tx)
+		txDiff.SetUnitFees(feeManager.GetUnitFees())
+		txDiff.SetFeeWindows(feeManager.GetFeeWindows())
 		txDiff.Apply(stateDiff)
 
 		remainingSize -= len(tx.Bytes())
