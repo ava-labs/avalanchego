@@ -793,7 +793,7 @@ func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool
 	}
 
 	before, err := v.getParentTrie().getEditableNode(key, hadValue)
-	if err != nil && !errors.Is(err, database.ErrNotFound) {
+	if err != nil {
 		return err
 	}
 	v.changes.nodes[key] = &change[*node]{
