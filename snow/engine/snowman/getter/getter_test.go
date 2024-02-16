@@ -110,10 +110,8 @@ func TestAcceptedFrontier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.IsType(t, &getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	var accepted []ids.ID
 	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
@@ -164,10 +162,8 @@ func TestFilterAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.IsType(t, &getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {

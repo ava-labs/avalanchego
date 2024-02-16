@@ -55,8 +55,8 @@ func TestStandardBlocks(t *testing.T) {
 	require.Equal(standardBlk.Bytes(), parsed.Bytes())
 	require.Equal(standardBlk.Timestamp(), parsed.Timestamp())
 
-	parsedStandardBlk, ok := parsed.(*StandardBlock)
-	require.True(ok)
+	require.IsType(&StandardBlock{}, parsed)
+	parsedStandardBlk := parsed.(*StandardBlock)
 
 	require.Equal(txs, parsedStandardBlk.Txs())
 	require.Equal(parsed.Txs(), parsedStandardBlk.Txs())

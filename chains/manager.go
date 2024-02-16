@@ -166,10 +166,10 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled bool            // True iff the network has staking enabled
-	StakingCert    tls.Certificate // needed to sign snowman++ blocks
-	StakingBLSKey  *bls.SecretKey
-	TracingEnabled bool
+	SybilProtectionEnabled bool
+	StakingCert            tls.Certificate // needed to sign snowman++ blocks
+	StakingBLSKey          *bls.SecretKey
+	TracingEnabled         bool
 	// Must not be used unless [TracingEnabled] is true as this may be nil.
 	Tracer                      trace.Tracer
 	Log                         logging.Logger
@@ -203,8 +203,8 @@ type ManagerConfig struct {
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 	Metrics          metrics.MultiGatherer
 
-	ConsensusGossipFrequency time.Duration
-	ConsensusAppConcurrency  int
+	AcceptedFrontierGossipFrequency time.Duration
+	ConsensusAppConcurrency         int
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -241,7 +241,7 @@ type manager struct {
 	unblockChainCreatorCh  chan struct{}
 	chainCreatorShutdownCh chan struct{}
 
-	subnetsLock sync.Mutex
+	subnetsLock sync.RWMutex
 	// Key: Subnet's ID
 	// Value: Subnet description
 	subnets map[ids.ID]subnets.Subnet
@@ -322,9 +322,9 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	m.subnetsLock.Lock()
+	m.subnetsLock.RLock()
 	sb := m.subnets[chainParams.SubnetID]
-	m.subnetsLock.Unlock()
+	m.subnetsLock.RUnlock()
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -522,9 +522,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 
 	var vdrs validators.Set // Validators validating this blockchain
 	var ok bool
-	if m.StakingEnabled {
+	if m.SybilProtectionEnabled {
 		vdrs, ok = m.Validators.Get(chainParams.SubnetID)
-	} else { // Staking is disabled. Every peer validates every subnet.
+	} else { // Sybil protection is disabled. Every peer validates every subnet.
 		vdrs, ok = m.Validators.Get(constants.PrimaryNetworkID)
 	}
 	if !ok {
@@ -629,10 +629,6 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// Passes messages from the avalanche engines to the network
 	avalancheMessageSender, err := sender.New(
 		ctx,
@@ -729,6 +725,10 @@ func (m *manager) createAvalancheChain(
 
 	ctx.Context.Metrics = avalancheRegisterer
 
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
+
 	// The only difference between using avalancheMessageSender and
 	// snowmanMessageSender here is where the metrics will be placed. Because we
 	// end up using this sender after the linearization, we pass in
@@ -817,7 +817,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.ConsensusGossipFrequency,
+		m.AcceptedFrontierGossipFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
@@ -1009,10 +1009,6 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
 		ctx,
@@ -1069,7 +1065,7 @@ func (m *manager) createSnowmanChain(
 			m.validatorState = validators.Trace(m.validatorState, "lockedState", m.Tracer)
 		}
 
-		if !m.ManagerConfig.StakingEnabled {
+		if !m.ManagerConfig.SybilProtectionEnabled {
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}
@@ -1126,6 +1122,10 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
+
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -1151,7 +1151,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		vdrs,
 		msgChan,
-		m.ConsensusGossipFrequency,
+		m.AcceptedFrontierGossipFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		subnetConnector,
@@ -1285,8 +1285,8 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
-	m.subnetsLock.Lock()
-	defer m.subnetsLock.Unlock()
+	m.subnetsLock.RLock()
+	defer m.subnetsLock.RUnlock()
 
 	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
 	for subnetID, subnet := range m.subnets {
@@ -1323,8 +1323,8 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 		return errNoPlatformSubnetConfig
 	}
 
-	m.subnetsLock.Lock()
 	sb := subnets.New(m.NodeID, sbConfig)
+	m.subnetsLock.Lock()
 	m.subnets[platformParams.SubnetID] = sb
 	sb.AddChain(platformParams.ID)
 	m.subnetsLock.Unlock()

@@ -3,9 +3,7 @@
 
 package ids
 
-import (
-	"sync/atomic"
-)
+import "sync/atomic"
 
 var offset = uint64(0)
 

@@ -3,9 +3,7 @@
 
 package formatting
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // PrefixedStringer extends a stringer that adds a prefix
 type PrefixedStringer interface {

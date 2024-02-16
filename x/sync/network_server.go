@@ -45,11 +45,11 @@ var ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the
 
 type NetworkServer struct {
 	appSender common.AppSender // Used to respond to peer requests via AppResponse.
-	db        *merkledb.Database
+	db        merkledb.MerkleDB
 	log       logging.Logger
 }
 
-func NewNetworkServer(appSender common.AppSender, db *merkledb.Database, log logging.Logger) *NetworkServer {
+func NewNetworkServer(appSender common.AppSender, db merkledb.MerkleDB, log logging.Logger) *NetworkServer {
 	return &NetworkServer{
 		appSender: appSender,
 		db:        db,

@@ -135,9 +135,9 @@ func cantBuildBlock(context.Context) (snowman.Block, error) {
 // checkProcessingBlock checks that [blk] is of the correct type and is
 // correctly uniquified when calling GetBlock and ParseBlock.
 func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
-	if _, ok := blk.(*BlockWrapper); !ok {
-		t.Fatalf("Expected block to be of type (*BlockWrapper)")
-	}
+	require := require.New(t)
+
+	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	if err != nil {
@@ -168,9 +168,9 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 // checkDecidedBlock asserts that [blk] is returned with the correct status by ParseBlock
 // and GetBlock.
 func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
-	if _, ok := blk.(*BlockWrapper); !ok {
-		t.Fatalf("Expected block to be of type (*BlockWrapper)")
-	}
+	require := require.New(t)
+
+	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	if err != nil {
@@ -385,7 +385,7 @@ func TestBuildBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Empty(t, chainState.verifiedBlocks)
 
 	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
@@ -433,7 +433,7 @@ func TestStateDecideBlock(t *testing.T) {
 		t.Fatal("Bad block should have failed verification")
 	}
 	// Ensure a block that fails verification is not marked as processing
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Empty(t, chainState.verifiedBlocks)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badAcceptBlk.Bytes())
@@ -521,6 +521,7 @@ func TestStateParent(t *testing.T) {
 }
 
 func TestGetBlockInternal(t *testing.T) {
+	require := require.New(t)
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -539,9 +540,7 @@ func TestGetBlockInternal(t *testing.T) {
 	})
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
-	if _, ok := genesisBlockInternal.(*TestBlock); !ok {
-		t.Fatalf("Expected LastAcceptedBlockInternal to return a block of type *snowman.TestBlock, but found %T", genesisBlockInternal)
-	}
+	require.IsType(&TestBlock{}, genesisBlockInternal)
 	if genesisBlockInternal.ID() != genesisBlock.ID() {
 		t.Fatalf("Expected LastAcceptedBlockInternal to be blk %s, but found %s", genesisBlock.ID(), genesisBlockInternal.ID())
 	}
@@ -551,9 +550,7 @@ func TestGetBlockInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, ok := blk.(*TestBlock); !ok {
-		t.Fatalf("Expected retrieved block to return a block of type *snowman.TestBlock, but found %T", blk)
-	}
+	require.IsType(&TestBlock{}, blk)
 	if blk.ID() != genesisBlock.ID() {
 		t.Fatalf("Expected GetBlock to be blk %s, but found %s", genesisBlock.ID(), blk.ID())
 	}

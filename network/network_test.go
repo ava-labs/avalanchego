@@ -341,7 +341,7 @@ func TestSend(t *testing.T) {
 	toSend := set.Set[ids.NodeID]{}
 	toSend.Add(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
-	require.EqualValues(toSend, sentTo)
+	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())

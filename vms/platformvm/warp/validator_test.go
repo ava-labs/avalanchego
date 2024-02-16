@@ -147,7 +147,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Equal(tt.expectedWeight, weight)
 
 			// These are pointers so have to test equality like this
-			require.Equal(len(tt.expectedVdrs), len(vdrs))
+			require.Len(vdrs, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := vdrs[i]
 				expectedPKBytes := bls.PublicKeyToBytes(expectedVdr.PublicKey)

@@ -3,9 +3,7 @@
 
 package math
 
-import (
-	"time"
-)
+import "time"
 
 // Averager tracks a continuous time exponential moving average of the provided
 // values.

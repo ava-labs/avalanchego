@@ -49,8 +49,8 @@ func TestIndex(t *testing.T) {
 
 		lastAcceptedIndex, ok := idx.lastAcceptedIndex()
 		require.True(ok)
-		require.EqualValues(i, lastAcceptedIndex)
-		require.EqualValues(i+1, idx.nextAcceptedIndex)
+		require.Equal(i, lastAcceptedIndex)
+		require.Equal(i+1, idx.nextAcceptedIndex)
 
 		gotContainer, err := idx.GetContainerByID(containerID)
 		require.NoError(err)
@@ -58,7 +58,7 @@ func TestIndex(t *testing.T) {
 
 		gotIndex, err := idx.GetIndex(containerID)
 		require.NoError(err)
-		require.EqualValues(i, gotIndex)
+		require.Equal(i, gotIndex)
 
 		gotContainer, err = idx.GetContainerByIndex(i)
 		require.NoError(err)
@@ -104,7 +104,7 @@ func TestIndex(t *testing.T) {
 	for _, container := range containersList {
 		require.False(sawContainers.Contains(container.ID)) // Should only see this container once
 		require.Contains(containers, container.ID)
-		require.EqualValues(containers[container.ID], container.Bytes)
+		require.Equal(containers[container.ID], container.Bytes)
 		// Timestamps should be non-decreasing
 		require.True(container.Timestamp >= lastTimestamp)
 		lastTimestamp = container.Timestamp
@@ -150,8 +150,8 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	containers, err = idx.GetContainerRange(MaxFetchedByRange-1, MaxFetchedByRange)
 	require.NoError(err)
 	require.Len(containers, 2)
-	require.EqualValues(containers[1], containers2[MaxFetchedByRange-1])
-	require.EqualValues(containers[0], containers2[MaxFetchedByRange-2])
+	require.Equal(containers[1], containers2[MaxFetchedByRange-1])
+	require.Equal(containers[0], containers2[MaxFetchedByRange-2])
 }
 
 func TestDontIndexSameContainerTwice(t *testing.T) {
@@ -173,5 +173,5 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	require.ErrorIs(err, errNoContainerAtIndex)
 	gotContainer, err := idx.GetContainerByID(containerID)
 	require.NoError(err)
-	require.EqualValues(gotContainer.Bytes, []byte{1, 2, 3}, "should not have accepted same container twice")
+	require.Equal([]byte{1, 2, 3}, gotContainer.Bytes)
 }

@@ -997,11 +997,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	{
 		staker0, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
 		require.NoError(err)
-		require.EqualValues(60000000, staker0.PotentialReward)
+		require.Equal(uint64(60000000), staker0.PotentialReward)
 
 		staker1, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
 		require.NoError(err)
-		require.EqualValues(59999999, staker1.PotentialReward)
+		require.Equal(uint64(59999999), staker1.PotentialReward)
 
 		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
 		require.ErrorIs(err, database.ErrNotFound)
@@ -1034,7 +1034,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
-	require.EqualValues(1, currentHeight)
+	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
 		nodeID0: defaultWeight,
@@ -1089,7 +1089,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	currentHeight, err = vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
-	require.EqualValues(2, currentHeight)
+	require.Equal(uint64(2), currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
 		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
@@ -1124,7 +1124,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	currentHeight, err = vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
-	require.EqualValues(3, currentHeight)
+	require.Equal(uint64(3), currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
 		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)

@@ -32,7 +32,7 @@ func TestWindowerNoValidators(t *testing.T) {
 
 	delay, err := w.Delay(context.Background(), 1, 0, nodeID)
 	require.NoError(err)
-	require.EqualValues(0, delay)
+	require.Zero(delay)
 }
 
 func TestWindowerRepeatedValidator(t *testing.T) {
@@ -58,11 +58,11 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	validatorDelay, err := w.Delay(context.Background(), 1, 0, validatorID)
 	require.NoError(err)
-	require.EqualValues(0, validatorDelay)
+	require.Zero(validatorDelay)
 
 	nonValidatorDelay, err := w.Delay(context.Background(), 1, 0, nonValidatorID)
 	require.NoError(err)
-	require.EqualValues(MaxDelay, nonValidatorDelay)
+	require.Equal(MaxDelay, nonValidatorDelay)
 }
 
 func TestWindowerChangeByHeight(t *testing.T) {
@@ -102,7 +102,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w.Delay(context.Background(), 1, 0, vdrID)
 		require.NoError(err)
-		require.EqualValues(expectedDelay, validatorDelay)
+		require.Equal(expectedDelay, validatorDelay)
 	}
 
 	expectedDelays2 := []time.Duration{
@@ -117,7 +117,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w.Delay(context.Background(), 2, 0, vdrID)
 		require.NoError(err)
-		require.EqualValues(expectedDelay, validatorDelay)
+		require.Equal(expectedDelay, validatorDelay)
 	}
 }
 
@@ -165,7 +165,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w0.Delay(context.Background(), 1, 0, vdrID)
 		require.NoError(err)
-		require.EqualValues(expectedDelay, validatorDelay)
+		require.Equal(expectedDelay, validatorDelay)
 	}
 
 	expectedDelays1 := []time.Duration{
@@ -180,6 +180,6 @@ func TestWindowerChangeByChain(t *testing.T) {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w1.Delay(context.Background(), 1, 0, vdrID)
 		require.NoError(err)
-		require.EqualValues(expectedDelay, validatorDelay)
+		require.Equal(expectedDelay, validatorDelay)
 	}
 }

@@ -3,9 +3,7 @@
 
 package common
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // TODO: Consider renaming Message to, say, VMMessage
 

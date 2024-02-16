@@ -5,6 +5,8 @@ package snowball
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func UnarySnowballStateTest(t *testing.T, sb *unarySnowball, expectedNumSuccessfulPolls, expectedConfidence int, expectedFinalized bool) {
@@ -18,6 +20,8 @@ func UnarySnowballStateTest(t *testing.T, sb *unarySnowball, expectedNumSuccessf
 }
 
 func TestUnarySnowball(t *testing.T) {
+	require := require.New(t)
+
 	beta := 2
 
 	sb := &unarySnowball{}
@@ -33,10 +37,8 @@ func TestUnarySnowball(t *testing.T) {
 	UnarySnowballStateTest(t, sb, 2, 1, false)
 
 	sbCloneIntf := sb.Clone()
-	sbClone, ok := sbCloneIntf.(*unarySnowball)
-	if !ok {
-		t.Fatalf("Unexpected clone type")
-	}
+	require.IsType(&unarySnowball{}, sbCloneIntf)
+	sbClone := sbCloneIntf.(*unarySnowball)
 
 	UnarySnowballStateTest(t, sbClone, 2, 1, false)
 

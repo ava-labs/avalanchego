@@ -145,3 +145,17 @@ func Contains(m Manager, subnetID ids.ID, nodeID ids.NodeID) bool {
 	}
 	return vdrs.Contains(nodeID)
 }
+
+func NodeIDs(m Manager, subnetID ids.ID) ([]ids.NodeID, error) {
+	vdrs, exist := m.Get(subnetID)
+	if !exist {
+		return nil, fmt.Errorf("%w: %s", errMissingValidators, subnetID)
+	}
+
+	vdrsList := vdrs.List()
+	nodeIDs := make([]ids.NodeID, len(vdrsList))
+	for i, vdr := range vdrsList {
+		nodeIDs[i] = vdr.NodeID
+	}
+	return nodeIDs, nil
+}

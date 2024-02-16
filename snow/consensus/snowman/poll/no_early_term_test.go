@@ -53,9 +53,9 @@ func TestNoEarlyTermString(t *testing.T) {
 
 	poll.Vote(vdr1, vtxID)
 
-	expected := `waiting on Bag: (Size = 1)
+	expected := `waiting on Bag[ids.NodeID]: (Size = 1)
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
-received Bag: (Size = 1)
+received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
 	if result := poll.String(); expected != result {
 		t.Fatalf("Poll should have returned %s but returned %s", expected, result)

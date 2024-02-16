@@ -3,9 +3,7 @@
 
 package sampler
 
-import (
-	"github.com/ava-labs/avalanchego/utils/set"
-)
+import "github.com/ava-labs/avalanchego/utils/set"
 
 // uniformResample allows for sampling over a uniform distribution without
 // replacement.

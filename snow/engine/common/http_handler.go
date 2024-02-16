@@ -3,9 +3,7 @@
 
 package common
 
-import (
-	"net/http"
-)
+import "net/http"
 
 // LockOption allows the vm to specify their lock option based on their endpoint
 type LockOption uint32

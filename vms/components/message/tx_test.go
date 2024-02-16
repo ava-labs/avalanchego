@@ -27,8 +27,8 @@ func TestTx(t *testing.T) {
 	require.NoError(err)
 	require.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*Tx)
-	require.True(ok)
+	require.IsType(&Tx{}, parsedMsgIntf)
+	parsedMsg := parsedMsgIntf.(*Tx)
 
 	require.Equal(tx, parsedMsg.Tx)
 }

@@ -3,9 +3,7 @@
 
 package index
 
-import (
-	"github.com/prometheus/client_golang/prometheus"
-)
+import "github.com/prometheus/client_golang/prometheus"
 
 type metrics struct {
 	numTxsIndexed prometheus.Counter

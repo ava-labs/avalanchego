@@ -6,6 +6,8 @@ package password
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSufficientlyStrong(t *testing.T) {
@@ -32,64 +34,53 @@ func TestSufficientlyStrong(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%s-%d", test.password, test.expected), func(t *testing.T) {
-			if !SufficientlyStrong(test.password, test.expected) {
-				t.Fatalf("expected %q to be rated stronger", test.password)
-			}
+			require.True(t, SufficientlyStrong(test.password, test.expected))
 		})
 	}
 }
 
 func TestIsValid(t *testing.T) {
 	tests := []struct {
-		password  string
-		expected  Strength
-		shouldErr bool
+		password    string
+		expected    Strength
+		expectedErr error
 	}{
 		{
-			password:  "",
-			expected:  VeryWeak,
-			shouldErr: true,
+			password:    "",
+			expected:    VeryWeak,
+			expectedErr: ErrEmptyPassword,
 		},
 		{
-			password:  "a",
-			expected:  VeryWeak,
-			shouldErr: false,
+			password: "a",
+			expected: VeryWeak,
 		},
 		{
-			password:  "password",
-			expected:  VeryWeak,
-			shouldErr: false,
+			password: "password",
+			expected: VeryWeak,
 		},
 		{
-			password:  "thisisareallylongandpresumablyverystrongpassword",
-			expected:  VeryStrong,
-			shouldErr: false,
+			password: "thisisareallylongandpresumablyverystrongpassword",
+			expected: VeryStrong,
 		},
 		{
-			password:  string(make([]byte, maxPassLen)),
-			expected:  VeryWeak,
-			shouldErr: false,
+			password: string(make([]byte, maxPassLen)),
+			expected: VeryWeak,
 		},
 		{
-			password:  string(make([]byte, maxPassLen+1)),
-			expected:  VeryWeak,
-			shouldErr: true,
+			password:    string(make([]byte, maxPassLen+1)),
+			expected:    VeryWeak,
+			expectedErr: ErrPassMaxLength,
 		},
 		{
-			password:  "password",
-			expected:  Weak,
-			shouldErr: true,
+			password:    "password",
+			expected:    Weak,
+			expectedErr: ErrWeakPassword,
 		},
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%s-%d", test.password, test.expected), func(t *testing.T) {
 			err := IsValid(test.password, test.expected)
-			if err == nil && test.shouldErr {
-				t.Fatalf("expected %q to be invalid", test.password)
-			}
-			if err != nil && !test.shouldErr {
-				t.Fatalf("expected %q to be valid but returned %s", test.password, err)
-			}
+			require.ErrorIs(t, err, test.expectedErr)
 		})
 	}
 }

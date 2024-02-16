@@ -21,7 +21,8 @@ func TestSubnetValidatorVerifySubnetID(t *testing.T) {
 			Subnet: constants.PrimaryNetworkID,
 		}
 
-		require.ErrorIs(vdr.Verify(), errBadSubnetID)
+		err := vdr.Verify()
+		require.ErrorIs(err, errBadSubnetID)
 	}
 
 	// Happy path

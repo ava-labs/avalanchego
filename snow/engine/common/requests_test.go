@@ -15,7 +15,7 @@ func TestRequests(t *testing.T) {
 	req := Requests{}
 
 	length := req.Len()
-	require.Equal(t, 0, length, "should have had no outstanding requests")
+	require.Zero(t, length, "should have had no outstanding requests")
 
 	_, removed := req.Remove(ids.EmptyNodeID, 0)
 	require.False(t, removed, "shouldn't have removed the request")
@@ -69,7 +69,7 @@ func TestRequests(t *testing.T) {
 	require.True(t, removed, "should have removed the request")
 
 	length = req.Len()
-	require.Equal(t, 0, length, "should have had no outstanding requests")
+	require.Zero(t, length, "should have had no outstanding requests")
 
 	req.Add(ids.EmptyNodeID, 0, ids.Empty)
 
@@ -80,11 +80,11 @@ func TestRequests(t *testing.T) {
 	require.True(t, removed, "should have removed the request")
 
 	length = req.Len()
-	require.Equal(t, 0, length, "should have had no outstanding requests")
+	require.Zero(t, length, "should have had no outstanding requests")
 
 	removed = req.RemoveAny(ids.Empty)
 	require.False(t, removed, "shouldn't have removed the request")
 
 	length = req.Len()
-	require.Equal(t, 0, length, "should have had no outstanding requests")
+	require.Zero(t, length, "should have had no outstanding requests")
 }

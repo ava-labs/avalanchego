@@ -27,15 +27,15 @@ func TestMsgBufferThrottler(t *testing.T) {
 	throttler.Acquire(context.Background(), nodeID1)
 	throttler.Acquire(context.Background(), nodeID1)
 	require.Len(throttler.nodeToNumProcessingMsgs, 1)
-	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
+	require.Equal(uint64(3), throttler.nodeToNumProcessingMsgs[nodeID1])
 
 	// Acquire shouldn't block for other node
 	throttler.Acquire(context.Background(), nodeID2)
 	throttler.Acquire(context.Background(), nodeID2)
 	throttler.Acquire(context.Background(), nodeID2)
 	require.Len(throttler.nodeToNumProcessingMsgs, 2)
-	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
-	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID2])
+	require.Equal(uint64(3), throttler.nodeToNumProcessingMsgs[nodeID1])
+	require.Equal(uint64(3), throttler.nodeToNumProcessingMsgs[nodeID2])
 
 	// Acquire should block for 4th acquire
 	done := make(chan struct{})
@@ -53,7 +53,7 @@ func TestMsgBufferThrottler(t *testing.T) {
 	// fourth acquire should be unblocked
 	<-done
 	require.Len(throttler.nodeToNumProcessingMsgs, 2)
-	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID2])
+	require.Equal(uint64(3), throttler.nodeToNumProcessingMsgs[nodeID2])
 
 	// Releasing from other node should have no effect
 	throttler.release(nodeID2)
@@ -64,7 +64,7 @@ func TestMsgBufferThrottler(t *testing.T) {
 	throttler.release(nodeID1)
 	throttler.release(nodeID1)
 	throttler.release(nodeID1)
-	require.Len(throttler.nodeToNumProcessingMsgs, 0)
+	require.Empty(throttler.nodeToNumProcessingMsgs)
 }
 
 // Test inboundMsgBufferThrottler when an acquire is cancelled
@@ -80,7 +80,7 @@ func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
 	throttler.Acquire(vdr1Context, nodeID1)
 	throttler.Acquire(vdr1Context, nodeID1)
 	require.Len(throttler.nodeToNumProcessingMsgs, 1)
-	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
+	require.Equal(uint64(3), throttler.nodeToNumProcessingMsgs[nodeID1])
 
 	// Acquire should block for 4th acquire
 	done := make(chan struct{})

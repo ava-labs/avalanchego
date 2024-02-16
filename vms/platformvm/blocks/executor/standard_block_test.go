@@ -285,7 +285,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.ErrorIs(block.Verify(context.Background()), errBanffStandardBlockWithoutChanges)
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errBanffStandardBlockWithoutChanges)
 	}
 
 	{
@@ -364,7 +365,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	currentValidator, err := updatedState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.Equal(addPendingValidatorTx.ID(), currentValidator.TxID)
-	require.EqualValues(1370, currentValidator.PotentialReward) // See rewards tests to explain why 1370
+	require.Equal(uint64(1370), currentValidator.PotentialReward) // See rewards tests to explain why 1370
 
 	_, err = updatedState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)

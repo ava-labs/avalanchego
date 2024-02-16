@@ -64,7 +64,7 @@ func TestFetchUTXOs(t *testing.T) {
 
 	balance, err := GetBalance(s, addrs)
 	require.NoError(err)
-	require.EqualValues(12345, balance)
+	require.Equal(uint64(12345), balance)
 }
 
 // TestGetPaginatedUTXOs tests

@@ -14,6 +14,13 @@ then
   go install -v github.com/golang/mock/mockgen@v1.6.0
 fi
 
+if ! command -v go-license &> /dev/null
+then
+  echo "go-license not found, installing..."
+  # https://github.com/palantir/go-license
+  go install -v github.com/palantir/go-license@v1.25.0
+fi
+
 # tuples of (source interface import path, comma-separated interface names, output file path)
 input="scripts/mocks.mockgen.txt"
 while IFS= read -r line
@@ -22,7 +29,11 @@ do
   package_name=$(basename $(dirname $output_path))
   [[ $src_import_path == \#* ]] && continue
   echo "Generating ${output_path}..."
-  mockgen -copyright_file=./LICENSE.header -package=${package_name} -destination=${output_path} ${src_import_path} ${interface_name}
+  mockgen -package=${package_name} -destination=${output_path} ${src_import_path} ${interface_name}
+  
+  go-license \
+  --config=./license.yml \
+  "${output_path}"
 done < "$input"
 
 echo "SUCCESS"

@@ -547,6 +547,8 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 }
 
 func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.ShortID, assetID ids.ID, expectedIdx uint64) {
+	require := require.New(t)
+
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
@@ -554,9 +556,9 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 	binary.BigEndian.PutUint64(expectedIdxBytes, expectedIdx)
 
 	idxBytes, err := assetDB.Get([]byte("idx"))
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.EqualValues(t, expectedIdxBytes, idxBytes)
+	require.Equal(expectedIdxBytes, idxBytes)
 }
 
 func checkIndexedTX(db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) error {

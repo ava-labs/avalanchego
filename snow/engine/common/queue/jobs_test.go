@@ -411,7 +411,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	}
 
 	missingIDs := jobs.MissingIDs()
-	require.Equal(1, len(missingIDs))
+	require.Len(missingIDs, 1)
 
 	require.Equal(missingIDs[0], job0.ID())
 
@@ -482,12 +482,12 @@ func TestInitializeNumJobs(t *testing.T) {
 	pushed, err := jobs.Push(context.Background(), job0)
 	require.True(pushed)
 	require.NoError(err)
-	require.EqualValues(1, jobs.state.numJobs)
+	require.Equal(uint64(1), jobs.state.numJobs)
 
 	pushed, err = jobs.Push(context.Background(), job1)
 	require.True(pushed)
 	require.NoError(err)
-	require.EqualValues(2, jobs.state.numJobs)
+	require.Equal(uint64(2), jobs.state.numJobs)
 
 	err = jobs.Commit()
 	require.NoError(err)
@@ -502,7 +502,7 @@ func TestInitializeNumJobs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.EqualValues(2, jobs.state.numJobs)
+	require.Equal(uint64(2), jobs.state.numJobs)
 }
 
 func TestClearAll(t *testing.T) {

@@ -3,9 +3,7 @@
 
 package states
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 type Versions interface {
 	// GetState returns the state of the chain after [blkID] has been accepted.

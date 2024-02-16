@@ -326,8 +326,8 @@ func TestNetworkGossipTx(t *testing.T) {
 		mempool.NewMockMempool(ctrl),
 		appSender,
 	)
-	n, ok := nIntf.(*network)
-	require.True(ok)
+	require.IsType(&network{}, nIntf)
+	n := nIntf.(*network)
 
 	// Case: Tx was recently gossiped
 	txID := ids.GenerateTestID()

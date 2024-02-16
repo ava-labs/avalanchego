@@ -13,11 +13,11 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require := require.New(t)
 
 	bIntf := NewUnboundedDeque[int](10)
-	b, ok := bIntf.(*unboundedSliceDeque[int])
-	require.True(ok)
+	require.IsType(&unboundedSliceDeque[int]{}, bIntf)
+	b := bIntf.(*unboundedSliceDeque[int])
 	require.Empty(b.List())
-	require.Equal(0, b.Len())
-	_, ok = b.Index(0)
+	require.Zero(b.Len())
+	_, ok := b.Index(0)
 	require.False(ok)
 
 	b.PushLeft(1)
@@ -30,7 +30,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.False(ok)
 
 	got, ok = b.PopLeft()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(1, got)
 	_, ok = b.Index(0)
@@ -44,7 +44,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(1, got)
 
 	got, ok = b.PopRight()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(1, got)
 	require.Empty(b.List())
@@ -59,7 +59,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(1, got)
 
 	got, ok = b.PopRight()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(1, got)
 	require.Empty(b.List())
@@ -74,7 +74,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(1, got)
 
 	got, ok = b.PopLeft()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(1, got)
 	require.Empty(b.List())
@@ -102,7 +102,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(1, got)
 
 	got, ok = b.PopLeft()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(1, got)
 	require.Empty(b.List())
@@ -130,7 +130,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(1, got)
 
 	got, ok = b.PopRight()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(1, got)
 	require.Empty(b.List())
@@ -158,7 +158,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(2, got)
 
 	got, ok = b.PopLeft()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(2, got)
 	require.Empty(b.List())
@@ -186,7 +186,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(2, got)
 
 	got, ok = b.PopLeft()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(2, got)
 	require.Empty(b.List())
@@ -214,7 +214,7 @@ func TestUnboundedDeque_InitialCapGreaterThanMin(t *testing.T) {
 	require.Equal(2, got)
 
 	got, ok = b.PopRight()
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.True(ok)
 	require.Equal(2, got)
 	require.Empty(b.List())
@@ -233,16 +233,16 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 
 	// Starts empty.
 	bIntf := NewUnboundedDeque[int](2)
-	b, ok := bIntf.(*unboundedSliceDeque[int])
-	require.True(ok)
-	require.Equal(0, bIntf.Len())
-	require.Equal(2, len(b.data))
-	require.Equal(0, b.left)
+	require.IsType(&unboundedSliceDeque[int]{}, bIntf)
+	b := bIntf.(*unboundedSliceDeque[int])
+	require.Zero(bIntf.Len())
+	require.Len(b.data, 2)
+	require.Zero(b.left)
 	require.Equal(1, b.right)
 	require.Empty(b.List())
 	// slice is [EMPTY]
 
-	_, ok = b.PopLeft()
+	_, ok := b.PopLeft()
 	require.False(ok)
 	_, ok = b.PeekLeft()
 	require.False(ok)
@@ -251,7 +251,7 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 
 	b.PushLeft(1) // slice is [1,EMPTY]
 	require.Equal(1, b.Len())
-	require.Equal(2, len(b.data))
+	require.Len(b.data, 2)
 	require.Equal(1, b.left)
 	require.Equal(1, b.right)
 	require.Equal([]int{1}, b.List())
@@ -267,7 +267,7 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 	// This causes a resize
 	b.PushLeft(2) // slice is [2,1,EMPTY,EMPTY]
 	require.Equal(2, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{2, 1}, b.List())
@@ -289,7 +289,7 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 	// Tests left moving left with no wrap around.
 	b.PushLeft(3) // slice is [2,1,EMPTY,3]
 	require.Equal(3, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(2, b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{3, 2, 1}, b.List())
@@ -318,7 +318,7 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 	require.True(ok)
 	require.Equal(3, got)
 	require.Equal(2, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{2, 1}, b.List())
@@ -342,8 +342,8 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 	require.True(ok)
 	require.Equal(2, got)
 	require.Equal(1, b.Len())
-	require.Equal(4, len(b.data))
-	require.Equal(0, b.left)
+	require.Len(b.data, 4)
+	require.Zero(b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{1}, b.List())
 	got, ok = b.Index(0)
@@ -361,7 +361,7 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 	// Test left wrapping around to the right side.
 	b.PushLeft(2) // slice is [2,1,EMPTY,EMPTY]
 	require.Equal(2, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{2, 1}, b.List())
@@ -384,8 +384,8 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 	require.True(ok)
 	require.Equal(2, got)
 	require.Equal(1, b.Len())
-	require.Equal(4, len(b.data))
-	require.Equal(0, b.left)
+	require.Len(b.data, 4)
+	require.Zero(b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{1}, b.List())
 	got, ok = b.Index(0)
@@ -395,8 +395,8 @@ func TestUnboundedSliceDequePushLeftPopLeft(t *testing.T) {
 	got, ok = b.PopLeft() // slice is [EMPTY,EMPTY,EMPTY,EMPTY]
 	require.True(ok)
 	require.Equal(1, got)
-	require.Equal(0, b.Len())
-	require.Equal(4, len(b.data))
+	require.Zero(b.Len())
+	require.Len(b.data, 4)
 	require.Equal(1, b.left)
 	require.Equal(2, b.right)
 	require.Empty(b.List())
@@ -416,16 +416,16 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 
 	// Starts empty.
 	bIntf := NewUnboundedDeque[int](2)
-	b, ok := bIntf.(*unboundedSliceDeque[int])
-	require.True(ok)
-	require.Equal(0, bIntf.Len())
-	require.Equal(2, len(b.data))
-	require.Equal(0, b.left)
+	require.IsType(&unboundedSliceDeque[int]{}, bIntf)
+	b := bIntf.(*unboundedSliceDeque[int])
+	require.Zero(bIntf.Len())
+	require.Len(b.data, 2)
+	require.Zero(b.left)
 	require.Equal(1, b.right)
 	require.Empty(b.List())
 	// slice is [EMPTY]
 
-	_, ok = b.PopRight()
+	_, ok := b.PopRight()
 	require.False(ok)
 	_, ok = b.PeekLeft()
 	require.False(ok)
@@ -434,9 +434,9 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 
 	b.PushRight(1) // slice is [1,EMPTY]
 	require.Equal(1, b.Len())
-	require.Equal(2, len(b.data))
-	require.Equal(0, b.left)
-	require.Equal(0, b.right)
+	require.Len(b.data, 2)
+	require.Zero(b.left)
+	require.Zero(b.right)
 	require.Equal([]int{1}, b.List())
 	got, ok := b.Index(0)
 	require.True(ok)
@@ -453,7 +453,7 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 	// This causes a resize
 	b.PushRight(2) // slice is [1,2,EMPTY,EMPTY]
 	require.Equal(2, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{1, 2}, b.List())
@@ -475,7 +475,7 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 	// Tests right moving right with no wrap around
 	b.PushRight(3) // slice is [1,2,3,EMPTY]
 	require.Equal(3, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
 	require.Equal(3, b.right)
 	require.Equal([]int{1, 2, 3}, b.List())
@@ -502,7 +502,7 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 	require.True(ok)
 	require.Equal(3, got)
 	require.Equal(2, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
 	require.Equal(2, b.right)
 	require.Equal([]int{1, 2}, b.List())
@@ -527,7 +527,7 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 	require.True(ok)
 	require.Equal(2, got)
 	require.Equal(1, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
 	require.Equal(1, b.right)
 	require.Equal([]int{1}, b.List())
@@ -548,12 +548,12 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 	got, ok = b.PopRight() // slice is [EMPTY,EMPTY,EMPTY,EMPTY]
 	require.True(ok)
 	require.Equal(1, got)
-	require.Equal(0, b.Len())
-	require.Equal(4, len(b.data))
+	require.Zero(b.Len())
+	require.Len(b.data, 4)
 	require.Equal(3, b.left)
-	require.Equal(0, b.right)
+	require.Zero(b.right)
 	require.Empty(b.List())
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	_, ok = b.Index(0)
 	require.False(ok)
 
@@ -566,9 +566,9 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 
 	b.PushLeft(1) // slice is [EMPTY,EMPTY,EMPTY,1]
 	require.Equal(1, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(2, b.left)
-	require.Equal(0, b.right)
+	require.Zero(b.right)
 	require.Equal([]int{1}, b.List())
 	got, ok = b.Index(0)
 	require.True(ok)
@@ -586,12 +586,12 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 	got, ok = b.PopRight() // slice is [EMPTY,EMPTY,EMPTY,EMPTY]
 	require.True(ok)
 	require.Equal(1, got)
-	require.Equal(0, b.Len())
-	require.Equal(4, len(b.data))
+	require.Zero(b.Len())
+	require.Len(b.data, 4)
 	require.Equal(2, b.left)
 	require.Equal(3, b.right)
 	require.Empty(b.List())
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	_, ok = b.Index(0)
 	require.False(ok)
 
@@ -604,9 +604,9 @@ func TestUnboundedSliceDequePushRightPopRight(t *testing.T) {
 	// Tests right wrapping around to the left
 	b.PushRight(2) // slice is [EMPTY,EMPTY,EMPTY,2]
 	require.Equal(1, b.Len())
-	require.Equal(4, len(b.data))
+	require.Len(b.data, 4)
 	require.Equal(2, b.left)
-	require.Equal(0, b.right)
+	require.Zero(b.right)
 	require.Equal([]int{2}, b.List())
 	got, ok = b.Index(0)
 	require.True(ok)
@@ -648,7 +648,7 @@ func FuzzUnboundedSliceDeque(f *testing.F) {
 			}
 
 			list := b.List()
-			require.Equal(len(input), len(list))
+			require.Len(list, len(input))
 			for i, n := range input {
 				require.Equal(n, list[i])
 			}

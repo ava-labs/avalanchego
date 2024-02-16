@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"fmt"
-)
+import "fmt"
 
 var _ UnarySnowflake = (*unarySnowflake)(nil)
 

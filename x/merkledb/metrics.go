@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ merkleMetrics = &mockMetrics{}
-	_ merkleMetrics = &metrics{}
+	_ merkleMetrics = (*mockMetrics)(nil)
+	_ merkleMetrics = (*metrics)(nil)
 )
 
 type merkleMetrics interface {

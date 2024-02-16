@@ -15,7 +15,7 @@ func TestLinkedHashmap(t *testing.T) {
 	require := require.New(t)
 
 	lh := New[ids.ID, int]()
-	require.Equal(0, lh.Len(), "a new hashmap should be empty")
+	require.Zero(lh.Len(), "a new hashmap should be empty")
 
 	key0 := ids.GenerateTestID()
 	_, exists := lh.Get(key0)
@@ -32,17 +32,17 @@ func TestLinkedHashmap(t *testing.T) {
 
 	val0, exists := lh.Get(key0)
 	require.True(exists, "should have found the value")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey0, val0, exists := lh.Oldest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey0, val0, exists = lh.Newest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	key1 := ids.GenerateTestID()
 	lh.Put(key1, 1)
@@ -55,7 +55,7 @@ func TestLinkedHashmap(t *testing.T) {
 	rkey0, val0, exists = lh.Oldest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey1, val1, exists := lh.Newest()
 	require.True(exists, "should have found the value")
@@ -87,7 +87,7 @@ func TestLinkedHashmap(t *testing.T) {
 	rkey0, val0, exists = lh.Oldest()
 	require.True(exists, "should have found the value")
 	require.Equal(key0, rkey0, "wrong key")
-	require.Equal(0, val0, "wrong value")
+	require.Zero(val0, "wrong value")
 
 	rkey1, val1, exists = lh.Newest()
 	require.True(exists, "should have found the value")
@@ -108,7 +108,7 @@ func TestIterator(t *testing.T) {
 		require.False(iter.Next())
 		require.False(iter.Next())
 		// Should be empty
-		require.EqualValues(ids.Empty, iter.Key())
+		require.Equal(ids.Empty, iter.Key())
 		require.Zero(iter.Value())
 	}
 
@@ -119,16 +119,16 @@ func TestIterator(t *testing.T) {
 		require.NotNil(iter)
 		lh.Put(id1, 1)
 		require.True(iter.Next())
-		require.EqualValues(id1, iter.Key())
-		require.EqualValues(1, iter.Value())
+		require.Equal(id1, iter.Key())
+		require.Equal(1, iter.Value())
 		// Should be empty
 		require.False(iter.Next())
 		// Re-assign id1 --> 10
 		lh.Put(id1, 10)
 		iter = lh.NewIterator() // New iterator
 		require.True(iter.Next())
-		require.EqualValues(id1, iter.Key())
-		require.EqualValues(10, iter.Value())
+		require.Equal(id1, iter.Key())
+		require.Equal(10, iter.Value())
 		// Should be empty
 		require.False(iter.Next())
 		// Delete id1
@@ -148,14 +148,14 @@ func TestIterator(t *testing.T) {
 		iter := lh.NewIterator()
 		// Should give back all 3 elements
 		require.True(iter.Next())
-		require.EqualValues(id1, iter.Key())
-		require.EqualValues(1, iter.Value())
+		require.Equal(id1, iter.Key())
+		require.Equal(1, iter.Value())
 		require.True(iter.Next())
-		require.EqualValues(id2, iter.Key())
-		require.EqualValues(2, iter.Value())
+		require.Equal(id2, iter.Key())
+		require.Equal(2, iter.Value())
 		require.True(iter.Next())
-		require.EqualValues(id3, iter.Key())
-		require.EqualValues(3, iter.Value())
+		require.Equal(id3, iter.Key())
+		require.Equal(3, iter.Value())
 		// Should be exhausted
 		require.False(iter.Next())
 	}
@@ -172,8 +172,8 @@ func TestIterator(t *testing.T) {
 		lh.Delete(id1)
 		lh.Delete(id2)
 		require.True(iter.Next())
-		require.EqualValues(id3, iter.Key())
-		require.EqualValues(3, iter.Value())
+		require.Equal(id3, iter.Key())
+		require.Equal(3, iter.Value())
 		// Should be exhausted
 		require.False(iter.Next())
 	}

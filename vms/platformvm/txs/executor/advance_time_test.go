@@ -60,7 +60,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	validatorStaker, err := executor.OnCommitState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
-	require.EqualValues(1370, validatorStaker.PotentialReward) // See rewards tests to explain why 1370
+	require.Equal(uint64(1370), validatorStaker.PotentialReward) // See rewards tests to explain why 1370
 
 	_, err = executor.OnCommitState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)

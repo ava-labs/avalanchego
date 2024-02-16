@@ -197,7 +197,7 @@ func TestPublicKeyDeserialize(t *testing.T) {
 	pkBytes := pk.Serialize()
 	pkDe := new(bls.PublicKey).Deserialize(pkBytes)
 	require.NotNil(pkDe)
-	require.EqualValues(pk, pkDe)
+	require.Equal(pk, pkDe)
 }
 
 // BenchmarkGetValidatorSet measures the time it takes complete a gRPC client

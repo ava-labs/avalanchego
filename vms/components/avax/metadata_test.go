@@ -3,9 +3,7 @@
 
 package avax
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestMetaDataVerifyNil(t *testing.T) {
 	md := (*Metadata)(nil)

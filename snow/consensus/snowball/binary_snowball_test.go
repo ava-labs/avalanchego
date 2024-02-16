@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestBinarySnowball(t *testing.T) {
 	red := 0

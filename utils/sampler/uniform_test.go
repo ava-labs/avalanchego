@@ -175,7 +175,7 @@ func TestSeeding(t *testing.T) {
 	s1.Seed(0)
 	v, err := s2.Next()
 	require.NoError(err)
-	require.NotEqualValues(s1Val, v)
+	require.NotEqual(s1Val, v)
 
 	s1.ClearSeed()
 

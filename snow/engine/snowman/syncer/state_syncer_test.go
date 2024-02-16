@@ -178,7 +178,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
-	require.True(syncer.locallyAvailableSummary == localSummary)
+	require.Equal(localSummary, syncer.locallyAvailableSummary)
 	ws, ok := syncer.weightedSummaries[summaryID]
 	require.True(ok)
 	require.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
@@ -251,14 +251,14 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// check that vdrs are reached out for frontiers
-	require.True(len(contactedFrontiersProviders) == safeMath.Min(vdrs.Len(), common.MaxOutstandingBroadcastRequests))
+	require.Len(contactedFrontiersProviders, safeMath.Min(vdrs.Len(), common.MaxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		require.True(syncer.pendingSeeders.Contains(beaconID))
 	}
 
 	// check that, obviously, no summary is yet registered
-	require.True(len(syncer.weightedSummaries) == 0)
+	require.Empty(syncer.weightedSummaries)
 }
 
 func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
@@ -319,8 +319,8 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		math.MaxInt32,
 		summaryBytes,
 	))
-	require.True(syncer.pendingSeeders.Contains(responsiveBeaconID)) // responsiveBeacon still pending
-	require.True(len(syncer.weightedSummaries) == 0)
+	require.Contains(syncer.pendingSeeders, responsiveBeaconID) // responsiveBeacon still pending
+	require.Empty(syncer.weightedSummaries)
 
 	// check a response from unsolicited node is dropped
 	unsolicitedNodeID := ids.GenerateTestNodeID()
@@ -330,7 +330,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		responsiveBeaconReqID,
 		summaryBytes,
 	))
-	require.True(len(syncer.weightedSummaries) == 0)
+	require.Empty(syncer.weightedSummaries)
 
 	// check a valid response is duly recorded
 	require.NoError(syncer.StateSummaryFrontier(
@@ -341,7 +341,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	require.False(syncer.pendingSeeders.Contains(responsiveBeaconID))
+	require.NotContains(syncer.pendingSeeders, responsiveBeaconID)
 
 	// valid summary is recorded
 	ws, ok := syncer.weightedSummaries[summaryID]
@@ -413,11 +413,11 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	require.False(syncer.pendingSeeders.Contains(responsiveBeaconID))
+	require.NotContains(syncer.pendingSeeders, responsiveBeaconID)
 
 	// invalid summary is not recorded
 	require.True(isSummaryDecoded)
-	require.True(len(syncer.weightedSummaries) == 0)
+	require.Empty(syncer.weightedSummaries)
 
 	// even in case of invalid summaries, other listed vdrs
 	// are reached for data
@@ -481,8 +481,8 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	))
 
 	// unresponsiveBeacon not pending anymore
-	require.False(syncer.pendingSeeders.Contains(unresponsiveBeaconID))
-	require.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
+	require.NotContains(syncer.pendingSeeders, unresponsiveBeaconID)
+	require.Contains(syncer.failedSeeders, unresponsiveBeaconID)
 
 	// even in case of timeouts, other listed vdrs
 	// are reached for data
@@ -509,7 +509,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	))
 
 	// late summary is not recorded
-	require.True(len(syncer.weightedSummaries) == 0)
+	require.Empty(syncer.weightedSummaries)
 }
 
 func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
@@ -600,10 +600,10 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	}
 
 	// check that some frontier seeders are reached again for the frontier
-	require.True(syncer.pendingSeeders.Len() > 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// check that no vote requests are issued
-	require.True(len(contactedVoters) == 0)
+	require.Empty(contactedVoters)
 }
 
 func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
@@ -768,8 +768,8 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	))
 
 	// responsiveVoter still pending
-	require.True(syncer.pendingVoters.Contains(responsiveVoterID))
-	require.True(syncer.weightedSummaries[summaryID].weight == 0)
+	require.Contains(syncer.pendingVoters, responsiveVoterID)
+	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
 	// check a response from unsolicited node is dropped
 	unsolicitedVoterID := ids.GenerateTestNodeID()
@@ -779,7 +779,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
 	))
-	require.True(syncer.weightedSummaries[summaryID].weight == 0)
+	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
 	// check a valid response is duly recorded
 	require.NoError(syncer.AcceptedStateSummary(
@@ -790,7 +790,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	require.False(syncer.pendingSeeders.Contains(responsiveVoterID))
+	require.NotContains(syncer.pendingSeeders, responsiveVoterID)
 	voterWeight := vdrs.GetWeight(responsiveVoterID)
 	require.Equal(voterWeight, syncer.weightedSummaries[summaryID].weight)
 
@@ -890,14 +890,14 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	require.False(found)
 
 	// check that responsiveVoter cannot cast another vote
-	require.False(syncer.pendingSeeders.Contains(responsiveVoterID))
+	require.NotContains(syncer.pendingSeeders, responsiveVoterID)
 	require.NoError(syncer.AcceptedStateSummary(
 		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
 	))
-	require.True(syncer.weightedSummaries[summaryID].weight == 0)
+	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
 	// other listed voters are reached out, even in the face of vote
 	// on unknown summary

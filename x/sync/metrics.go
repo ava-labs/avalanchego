@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ SyncMetrics = &mockMetrics{}
-	_ SyncMetrics = &metrics{}
+	_ SyncMetrics = (*mockMetrics)(nil)
+	_ SyncMetrics = (*metrics)(nil)
 )
 
 type SyncMetrics interface {

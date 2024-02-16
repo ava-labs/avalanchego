@@ -3,9 +3,7 @@
 
 package utils
 
-import (
-	"crypto/rand"
-)
+import "crypto/rand"
 
 // RandomBytes returns a slice of n random bytes
 // Intended for use in testing

@@ -13,9 +13,7 @@
 
 package version
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // String is displayed when CLI arg --version is used
 var String string

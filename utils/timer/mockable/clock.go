@@ -3,9 +3,7 @@
 
 package mockable
 
-import (
-	"time"
-)
+import "time"
 
 // MaxTime was taken from https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go/32620397#32620397
 var MaxTime = time.Unix(1<<63-62135596801, 0) // 0 is used because we drop the nano-seconds

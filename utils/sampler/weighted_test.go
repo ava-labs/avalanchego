@@ -107,7 +107,7 @@ func WeightedSingletonTest(t *testing.T, s Weighted) {
 
 	index, err := s.Sample(0)
 	require.NoError(t, err)
-	require.Equal(t, 0, index, "should have selected the first element")
+	require.Zero(t, index, "should have selected the first element")
 }
 
 func WeightedWithZeroTest(t *testing.T, s Weighted) {

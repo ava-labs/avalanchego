@@ -33,8 +33,8 @@ func TestNewTargeter(t *testing.T) {
 		vdrs,
 		tracker,
 	)
-	targeter, ok := targeterIntf.(*targeter)
-	require.True(ok)
+	require.IsType(&targeter{}, targeterIntf)
+	targeter := targeterIntf.(*targeter)
 	require.Equal(vdrs, targeter.vdrs)
 	require.Equal(tracker, targeter.tracker)
 	require.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)

@@ -25,7 +25,7 @@ import (
 const minRequestHandlingDuration = 100 * time.Millisecond
 
 var (
-	_ NetworkClient = &networkClient{}
+	_ NetworkClient = (*networkClient)(nil)
 
 	ErrAcquiringSemaphore = errors.New("error acquiring semaphore")
 	ErrRequestFailed      = errors.New("request failed")

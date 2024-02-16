@@ -27,7 +27,7 @@ func TestGetAncestorsDatabaseNotFound(t *testing.T) {
 	}
 	containers, err := GetAncestors(context.Background(), vm, someID, 10, 10, 1*time.Second)
 	require.NoError(t, err)
-	require.Len(t, containers, 0)
+	require.Empty(t, containers)
 }
 
 // TestGetAncestorsPropagatesErrors checks errors other than

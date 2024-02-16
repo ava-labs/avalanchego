@@ -7,8 +7,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/google/btree"
+
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (

@@ -47,6 +47,8 @@ func initLoadVMsTest(t *testing.T) *loadVMsTest {
 
 // Tests behavior for LoadVMs if everything succeeds.
 func TestLoadVMsSuccess(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -75,12 +77,14 @@ func TestLoadVMsSuccess(t *testing.T) {
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
-	require.Equal(t, expectedVMRegistry, reply.NewVMs)
-	require.NoError(t, err)
+	require.Equal(expectedVMRegistry, reply.NewVMs)
+	require.NoError(err)
 }
 
 // Tests behavior for LoadVMs if we fail to reload vms.
 func TestLoadVMsReloadFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -90,11 +94,13 @@ func TestLoadVMsReloadFails(t *testing.T) {
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-	require.ErrorIs(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }
 
 // Tests behavior for LoadVMs if we fail to fetch our aliases
 func TestLoadVMsGetAliasesFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -114,5 +120,5 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-	require.ErrorIs(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }

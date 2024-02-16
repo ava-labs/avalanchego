@@ -44,8 +44,8 @@ func TestGetBlock(t *testing.T) {
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
 		require.NoError(err)
 		require.Equal(statelessBlk.ID(), gotBlk.ID())
-		innerBlk, ok := gotBlk.(*Block)
-		require.True(ok)
+		require.IsType(&Block{}, gotBlk)
+		innerBlk := gotBlk.(*Block)
 		require.Equal(statelessBlk, innerBlk.Block)
 		require.Equal(manager, innerBlk.manager)
 	}
@@ -57,8 +57,8 @@ func TestGetBlock(t *testing.T) {
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
 		require.NoError(err)
 		require.Equal(statelessBlk.ID(), gotBlk.ID())
-		innerBlk, ok := gotBlk.(*Block)
-		require.True(ok)
+		require.IsType(&Block{}, gotBlk)
+		innerBlk := gotBlk.(*Block)
 		require.Equal(statelessBlk, innerBlk.Block)
 		require.Equal(manager, innerBlk.manager)
 	}

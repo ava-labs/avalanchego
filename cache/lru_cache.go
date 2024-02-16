@@ -50,6 +50,13 @@ func (c *LRU[_, _]) Flush() {
 	c.flush()
 }
 
+func (c *LRU[_, _]) PortionFilled() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.portionFilled()
+}
+
 func (c *LRU[K, V]) put(key K, value V) {
 	c.resize()
 
@@ -79,6 +86,10 @@ func (c *LRU[K, _]) evict(key K) {
 
 func (c *LRU[K, V]) flush() {
 	c.elements = linkedhashmap.New[K, V]()
+}
+
+func (c *LRU[_, _]) portionFilled() float64 {
+	return float64(c.elements.Len()) / float64(c.Size)
 }
 
 // Initializes [c.elements] if it's nil.

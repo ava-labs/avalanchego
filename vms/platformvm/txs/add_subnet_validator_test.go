@@ -32,10 +32,12 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
-	require.ErrorIs(addSubnetValidatorTx.SyntacticVerify(ctx), ErrNilTx)
+	err = addSubnetValidatorTx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}

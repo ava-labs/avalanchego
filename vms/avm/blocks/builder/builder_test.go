@@ -265,8 +265,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
@@ -282,8 +282,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx2.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
@@ -374,8 +374,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
@@ -448,8 +448,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
