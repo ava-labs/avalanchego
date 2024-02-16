@@ -26,12 +26,12 @@ type StandardBlock struct {
 	// List of transactions contained in this block.
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 
-	id    ids.ID
-	bytes []byte
+	BlockID ids.ID `json:"id"`
+	bytes   []byte
 }
 
 func (b *StandardBlock) initialize(bytes []byte, cm codec.Manager) error {
-	b.id = hashing.ComputeHash256Array(bytes)
+	b.BlockID = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
 	for _, tx := range b.Transactions {
 		if err := tx.Initialize(cm); err != nil {
@@ -48,7 +48,7 @@ func (b *StandardBlock) InitCtx(ctx *snow.Context) {
 }
 
 func (b *StandardBlock) ID() ids.ID {
-	return b.id
+	return b.BlockID
 }
 
 func (b *StandardBlock) Parent() ids.ID {

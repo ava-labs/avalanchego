@@ -35,7 +35,6 @@ func (p *parser) Parse(ctx context.Context, blkBytes []byte) (queue.Job, error) 
 		return nil, err
 	}
 	return &blockJob{
-		parser:      p,
 		log:         p.log,
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
@@ -45,7 +44,6 @@ func (p *parser) Parse(ctx context.Context, blkBytes []byte) (queue.Job, error) 
 }
 
 type blockJob struct {
-	parser                  *parser
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	blk                     snowman.Block

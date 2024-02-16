@@ -5,8 +5,6 @@ package genesis
 
 import (
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,27 +26,27 @@ var (
 func TestParse(t *testing.T) {
 	tests := map[string]struct {
 		unparsedCamino UnparsedCamino
-		want           Camino
-		err            error
+		want           *Camino
+		expectedErr    error
 	}{
 		"Invalid address - no prefix": {
 			unparsedCamino: UnparsedCamino{
 				InitialAdmin: addressWithInvalidFormat,
 			},
-			err: errCannotParseInitialAdmin,
+			expectedErr: errCannotParseInitialAdmin,
 		},
 		"Invalid address - bad checksum": {
 			unparsedCamino: UnparsedCamino{
 				InitialAdmin: addressWithInvalidChecksum,
 			},
-			err: errCannotParseInitialAdmin,
+			expectedErr: errCannotParseInitialAdmin,
 		},
 		"Invalid allocation - missing eth address": {
 			unparsedCamino: UnparsedCamino{
 				InitialAdmin: xAddress,
 				Allocations:  []UnparsedCaminoAllocation{{}},
 			},
-			err: errInvalidETHAddress,
+			expectedErr: errInvalidETHAddress,
 		},
 		"Invalid allocation - invalid eth address": {
 			unparsedCamino: UnparsedCamino{
@@ -57,7 +55,7 @@ func TestParse(t *testing.T) {
 					ETHAddr: ids.GenerateTestShortID().String(),
 				}},
 			},
-			err: errors.New("encoding/hex: invalid byte"),
+			expectedErr: errInvalidETHAddress,
 		},
 		"Invalid allocation - invalid avax address": {
 			unparsedCamino: UnparsedCamino{
@@ -67,7 +65,7 @@ func TestParse(t *testing.T) {
 					AVAXAddr: addressWithInvalidFormat,
 				}},
 			},
-			err: errors.New("no separator found in address"),
+			expectedErr: errInvalidAVAXAddress,
 		},
 		"Invalid allocation - invalid nodeID": {
 			unparsedCamino: UnparsedCamino{
@@ -85,7 +83,7 @@ func TestParse(t *testing.T) {
 					}},
 				}},
 			},
-			err: fmt.Errorf("ID: %s is missing the prefix: %s", sampleShortID.String(), ids.NodeIDPrefix),
+			expectedErr: errInvalidNodeID,
 		},
 		"Valid allocation": {
 			unparsedCamino: UnparsedCamino{
@@ -125,7 +123,7 @@ func TestParse(t *testing.T) {
 					Addresses: []string{wrappers.IgnoreError(address.Format(configChainIDAlias, "local", shortID2.Bytes())).(string)},
 				}},
 			},
-			want: Camino{
+			want: &Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				InitialAdmin:        toAvaxAddr(xAddress),
@@ -168,12 +166,7 @@ func TestParse(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			got, err := tt.unparsedCamino.Parse(0)
-
-			if tt.err != nil {
-				require.ErrorContains(t, err, tt.err.Error())
-				return
-			}
-			require.NoError(t, err)
+			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.want, got)
 		})
 	}

@@ -14,7 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 )
 
-var errCannotParseInitialAdmin = errors.New("cannot parse initialAdmin from genesis")
+var (
+	errCannotParseInitialAdmin = errors.New("cannot parse initialAdmin from genesis")
+	errInvalidAVAXAddress      = errors.New("invalid avax address")
+	errInvalidNodeID           = errors.New("invalid nodeID")
+)
 
 type UnparsedCamino struct {
 	VerifyNodeSignature      bool                       `json:"verifyNodeSignature"`
@@ -25,7 +29,7 @@ type UnparsedCamino struct {
 	InitialMultisigAddresses []UnparsedMultisigAlias    `json:"initialMultisigAddresses"`
 }
 
-func (uc UnparsedCamino) Parse(startTime uint64) (Camino, error) {
+func (uc UnparsedCamino) Parse(startTime uint64) (*Camino, error) {
 	c := Camino{
 		VerifyNodeSignature:      uc.VerifyNodeSignature,
 		LockModeBondDeposit:      uc.LockModeBondDeposit,
@@ -36,18 +40,18 @@ func (uc UnparsedCamino) Parse(startTime uint64) (Camino, error) {
 
 	_, _, avaxAddrBytes, err := address.Parse(uc.InitialAdmin)
 	if err != nil {
-		return c, fmt.Errorf("%w: %v", errCannotParseInitialAdmin, err)
+		return nil, fmt.Errorf("%w: %v", errCannotParseInitialAdmin, err)
 	}
 	avaxAddr, err := ids.ToShortID(avaxAddrBytes)
 	if err != nil {
-		return c, fmt.Errorf("%w: %v", errCannotParseInitialAdmin, err)
+		return nil, fmt.Errorf("%w: %v", errCannotParseInitialAdmin, err)
 	}
 	c.InitialAdmin = avaxAddr
 
 	for i, udo := range uc.DepositOffers {
 		offer, err := udo.Parse(startTime)
 		if err != nil {
-			return c, err
+			return nil, err
 		}
 		c.DepositOffers[i] = offer
 	}
@@ -55,7 +59,7 @@ func (uc UnparsedCamino) Parse(startTime uint64) (Camino, error) {
 	for i, ua := range uc.Allocations {
 		a, err := ua.Parse()
 		if err != nil {
-			return c, err
+			return nil, err
 		}
 		c.Allocations[i] = a
 	}
@@ -63,11 +67,11 @@ func (uc UnparsedCamino) Parse(startTime uint64) (Camino, error) {
 	for i, uma := range uc.InitialMultisigAddresses {
 		c.InitialMultisigAddresses[i], err = uma.Parse()
 		if err != nil {
-			return c, err
+			return nil, err
 		}
 	}
 
-	return c, nil
+	return &c, nil
 }
 
 type UnparsedCaminoAllocation struct {
@@ -91,21 +95,21 @@ func (ua UnparsedCaminoAllocation) Parse() (CaminoAllocation, error) {
 
 	ethAddrBytes, err := hex.DecodeString(ua.ETHAddr[2:])
 	if err != nil {
-		return a, err
+		return a, fmt.Errorf("%w: %s", errInvalidETHAddress, err)
 	}
 	ethAddr, err := ids.ToShortID(ethAddrBytes)
 	if err != nil {
-		return a, err
+		return a, fmt.Errorf("%w: %s", errInvalidETHAddress, err)
 	}
 	a.ETHAddr = ethAddr
 
 	_, _, avaxAddrBytes, err := address.Parse(ua.AVAXAddr)
 	if err != nil {
-		return a, err
+		return a, fmt.Errorf("%w: %s", errInvalidAVAXAddress, err)
 	}
 	avaxAddr, err := ids.ToShortID(avaxAddrBytes)
 	if err != nil {
-		return a, err
+		return a, fmt.Errorf("%w: %s", errInvalidAVAXAddress, err)
 	}
 	a.AVAXAddr = avaxAddr
 
@@ -144,7 +148,7 @@ func (ua UnparsedPlatformAllocation) Parse() (PlatformAllocation, error) {
 	if ua.NodeID != "" {
 		parsedNodeID, err := ids.NodeIDFromString(ua.NodeID)
 		if err != nil {
-			return a, err
+			return a, fmt.Errorf("%w: %s", errInvalidNodeID, err)
 		}
 		nodeID = parsedNodeID
 	}

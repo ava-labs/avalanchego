@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -56,7 +57,7 @@ func TestStartTrackingDBError(t *testing.T) {
 	up.clock.Set(currentTime)
 
 	err := up.StartTracking([]ids.NodeID{nodeID0}, subnetID)
-	require.Error(err)
+	require.ErrorIs(err, errTest)
 }
 
 func TestStartTrackingNonValidator(t *testing.T) {
@@ -69,7 +70,7 @@ func TestStartTrackingNonValidator(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
 	err := up.StartTracking([]ids.NodeID{nodeID0}, subnetID)
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestStartTrackingInThePast(t *testing.T) {
@@ -182,7 +183,7 @@ func TestStopTrackingDisconnectedNonValidator(t *testing.T) {
 	require.NoError(err)
 
 	err = up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestStopTrackingConnectedDBError(t *testing.T) {
@@ -204,7 +205,7 @@ func TestStopTrackingConnectedDBError(t *testing.T) {
 
 	s.dbReadError = errTest
 	err = up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
-	require.Error(err)
+	require.ErrorIs(err, errTest)
 }
 
 func TestStopTrackingNonConnectedPast(t *testing.T) {
@@ -256,7 +257,7 @@ func TestStopTrackingNonConnectedDBError(t *testing.T) {
 
 	s.dbWriteError = errTest
 	err = up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
-	require.Error(err)
+	require.ErrorIs(err, errTest)
 }
 
 func TestConnectAndDisconnect(t *testing.T) {
@@ -552,7 +553,7 @@ func TestCalculateUptimeNonValidator(t *testing.T) {
 	up := NewManager(s).(*manager)
 
 	_, err := up.CalculateUptimePercentFrom(nodeID0, subnetID, startTime)
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestCalculateUptimePercentageDivBy0(t *testing.T) {

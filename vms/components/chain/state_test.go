@@ -682,6 +682,8 @@ func TestMeteredCache(t *testing.T) {
 
 // Test the bytesToIDCache
 func TestStateBytesToIDCache(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -708,27 +710,27 @@ func TestStateBytesToIDCache(t *testing.T) {
 
 	// Shouldn't have blk1 ID to start with
 	_, err := chainState.GetBlock(context.Background(), blk1.ID())
-	require.Error(t, err)
+	require.ErrorIs(err, database.ErrNotFound)
 	_, ok := chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	require.False(t, ok)
+	require.False(ok)
 
 	// Parse blk1 from bytes
 	_, err = chainState.ParseBlock(context.Background(), blk1.Bytes())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// blk1 should be in cache now
 	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	require.True(t, ok)
+	require.True(ok)
 
 	// Parse another block
 	_, err = chainState.ParseBlock(context.Background(), blk2.Bytes())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// Should have bumped blk1 from cache
 	_, ok = chainState.bytesToIDCache.Get(string(blk2.Bytes()))
-	require.True(t, ok)
+	require.True(ok)
 	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	require.False(t, ok)
+	require.False(ok)
 }
 
 // TestSetLastAcceptedBlock ensures chainState's last accepted block
@@ -823,6 +825,8 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 }
 
 func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(5)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -849,19 +853,16 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	})
 
 	builtBlk, err := chainState.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.NoError(err)
+	require.Empty(chainState.verifiedBlocks)
 
-	if err := builtBlk.Verify(context.Background()); err != nil {
-		t.Fatalf("Built block failed verification due to %s", err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 1)
+	require.NoError(builtBlk.Verify(context.Background()))
+	require.Len(chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
-	require.Error(t, chainState.SetLastAcceptedBlock(resetBlk), "should have errored resetting chain state with processing block")
+	err = chainState.SetLastAcceptedBlock(resetBlk)
+	require.ErrorIs(err, errSetAcceptedWithProcessing)
 }
 
 func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {

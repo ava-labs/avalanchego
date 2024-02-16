@@ -20,29 +20,28 @@ import (
 	"math/rand"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
 )
 
 const (
-	metricVtxProcessing = "camino_X_avalanche_vtx_processing"
-	metricVtxAccepted   = "camino_X_avalanche_vtx_accepted_count"
-	metricVtxRejected   = "camino_X_avalanche_vtx_rejected_count"
-)
+	totalRounds = 50
 
-const totalRounds = 50
+	metricBlksProcessing = "camino_X_blks_processing"
+	metricBlksAccepted   = "camino_X_blks_accepted_count"
+)
 
 var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
@@ -58,9 +57,8 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
 
 			allMetrics := []string{
-				metricVtxProcessing,
-				metricVtxAccepted,
-				metricVtxRejected,
+				metricBlksProcessing,
+				metricBlksAccepted,
 			}
 
 			runFunc := func(round int) {
@@ -112,9 +110,9 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 					gomega.Expect(err).Should(gomega.BeNil())
 					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", ep, mm)
 
-					if mm[metricVtxProcessing] > 0 {
-						tests.Outf("{{red}}{{bold}}%q already has processing vtx!!!{{/}}\n", u)
-						ginkgo.Skip("the cluster has already ongoing vtx txs thus skipping to prevent conflicts...")
+					if mm[metricBlksProcessing] > 0 {
+						tests.Outf("{{red}}{{bold}}%q already has processing block!!!{{/}}\n", u)
+						ginkgo.Skip("the cluster has already ongoing blocks thus skipping to prevent conflicts...")
 					}
 
 					metricsBeforeTx[u] = mm
@@ -265,14 +263,12 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 
 					prev := metricsBeforeTx[u]
 
-					// +0 since X-chain tx must have been processed and accepted by now
-					gomega.Expect(mm[metricVtxProcessing]).Should(gomega.Equal(prev[metricVtxProcessing]))
+					// +0 since X-chain tx must have been processed and accepted
+					// by now
+					gomega.Expect(mm[metricBlksProcessing]).Should(gomega.Equal(prev[metricBlksProcessing]))
 
 					// +1 since X-chain tx must have been accepted by now
-					gomega.Expect(mm[metricVtxAccepted]).Should(gomega.Equal(prev[metricVtxAccepted] + 1))
-
-					// +0 since virtuous X-chain tx must not be rejected
-					gomega.Expect(mm[metricVtxRejected]).Should(gomega.Equal(prev[metricVtxRejected]))
+					gomega.Expect(mm[metricBlksAccepted]).Should(gomega.Equal(prev[metricBlksAccepted] + 1))
 
 					metricsBeforeTx[u] = mm
 				}

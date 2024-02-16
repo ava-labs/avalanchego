@@ -243,16 +243,6 @@ func (tx *UniqueTx) InputIDs() []ids.ID {
 	return tx.inputs
 }
 
-// Whitelist is not supported by this transaction type, so [false] is returned.
-func (*UniqueTx) HasWhitelist() bool {
-	return false
-}
-
-// Whitelist is not supported by this transaction type, so [false] is returned.
-func (*UniqueTx) Whitelist(context.Context) (set.Set[ids.ID], error) {
-	return nil, nil
-}
-
 // InputUTXOs returns the utxos that will be consumed on tx acceptance
 func (tx *UniqueTx) InputUTXOs() []*avax.UTXOID {
 	tx.refresh()

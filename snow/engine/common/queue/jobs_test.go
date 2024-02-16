@@ -390,7 +390,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	_, err = jobs.ExecuteAll(context.Background(), snow.DefaultConsensusContextTest(), &common.Halter{}, false)
 	// Assert that the database closed error on job1 causes ExecuteAll
 	// to fail in the middle of execution.
-	require.Error(err)
+	require.ErrorIs(err, database.ErrClosed)
 	require.True(executed0)
 	require.False(executed1)
 

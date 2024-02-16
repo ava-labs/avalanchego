@@ -3,6 +3,8 @@
 
 package codec
 
+import "errors"
+
 const UpgradePrefix = uint64(0xFFFFFFFFFFFF0000)
 
 type UpgradeVersionID uint64
@@ -19,3 +21,5 @@ func (id UpgradeVersionID) Version() uint16 {
 func BuildUpgradeVersionID(version uint16) UpgradeVersionID {
 	return UpgradeVersionID(UpgradePrefix | uint64(version))
 }
+
+var ErrIncompatibleUpgradeVersion = errors.New("incompatible upgrade version")

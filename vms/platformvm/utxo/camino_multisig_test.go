@@ -4,7 +4,6 @@
 package utxo
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -43,8 +42,8 @@ func TestUTXOWithMsigVerify(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		aliases []verify.State
-		err     error
+		aliases     []verify.State
+		expectedErr error
 	}{
 		"Successful": {
 			aliases: []verify.State{
@@ -56,7 +55,6 @@ func TestUTXOWithMsigVerify(t *testing.T) {
 					},
 				},
 			},
-			err: nil,
 		},
 		"Threshold exceeds Addrs length": {
 			aliases: []verify.State{
@@ -68,7 +66,7 @@ func TestUTXOWithMsigVerify(t *testing.T) {
 					},
 				},
 			},
-			err: errors.New("output is unspendable"),
+			expectedErr: secp256k1fx.ErrOutputUnspendable,
 		},
 	}
 
@@ -76,10 +74,7 @@ func TestUTXOWithMsigVerify(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			utxoWithMSig.Aliases = test.aliases
 			err := utxoWithMSig.Verify()
-			if test.err != nil {
-				require.Error(t, err)
-				require.Equal(t, test.err, err)
-			}
+			require.ErrorIs(t, err, test.expectedErr)
 		})
 	}
 }

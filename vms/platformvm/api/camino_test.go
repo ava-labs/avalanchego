@@ -23,10 +23,9 @@ import (
 )
 
 func TestBuildCaminoGenesis(t *testing.T) {
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	nodeID := ids.NodeID{1}
 	addr := ids.ShortID(nodeID)
-	addrStr, err := address.FormatBech32(hrp, addr.Bytes())
+	addrStr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 	require.NoError(t, err)
 
 	avaxAssetID := ids.ID{}

@@ -320,10 +320,10 @@ func makeValidator(
 	}
 
 	if weight == 0 {
-		return nil, errValidatorAddsNoValue
+		return nil, errValidatorHasNoWeight
 	}
 	if vdr.EndTime <= vdr.StartTime {
-		return nil, errValidatorAddsNoValue
+		return nil, errValidatorAlreadyExited
 	}
 
 	rewardsOwner, err := getSecpOwner(vdr.RewardOwner)

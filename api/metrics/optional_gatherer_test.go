@@ -34,7 +34,7 @@ func TestOptionalGathererDuplicated(t *testing.T) {
 	require.NoError(err)
 
 	err = g.Register(og)
-	require.Equal(errDuplicatedRegister, err)
+	require.ErrorIs(err, errDuplicatedRegister)
 }
 
 func TestOptionalGathererAddedError(t *testing.T) {

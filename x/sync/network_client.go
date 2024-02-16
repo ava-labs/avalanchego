@@ -186,11 +186,6 @@ func (c *networkClient) RequestAny(
 // If the limit on active requests is reached, this function blocks until
 // a slot becomes available.
 func (c *networkClient) Request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
-	// TODO danlaine: is it possible for this condition to occur?
-	if nodeID == ids.EmptyNodeID {
-		return nil, fmt.Errorf("cannot send request to empty nodeID, nodeID=%s, requestLen=%d", nodeID, len(request))
-	}
-
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
 		return nil, ErrAcquiringSemaphore

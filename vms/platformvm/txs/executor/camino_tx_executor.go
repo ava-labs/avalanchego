@@ -87,7 +87,7 @@ var (
 	errNestedMsigAlias                   = errors.New("nested msig aliases are not allowed")
 	errProposalStartToEarly              = errors.New("proposal start time is to early")
 	errProposalToFarInFuture             = fmt.Errorf("proposal start time is more than %s ahead of the current chain time", MaxFutureStartTime)
-	errProposalInactive                  = errors.New("proposal is inactive")
+	ErrProposalInactive                  = errors.New("proposal is inactive")
 	errProposerCredentialMismatch        = errors.New("proposer credential isn't matching")
 	errWrongProposalBondAmount           = errors.New("wrong proposal bond amount")
 	errVoterCredentialMismatch           = errors.New("voter credential isn't matching")
@@ -102,7 +102,7 @@ var (
 	errExpiredProposalsMismatch          = errors.New("expired proposals mismatch")
 	errWrongAdminProposal                = errors.New("this type of proposal can't be admin-proposal")
 	errNotPermittedToCreateProposal      = errors.New("don't have permission to create proposal of this type")
-	errInvalidProposal                   = errors.New("proposal is semantically invalid")
+	ErrInvalidProposal                   = errors.New("proposal is semantically invalid")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -208,16 +208,16 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 	switch {
 	case tx.Validator.Wght < e.Backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
+		return ErrWeightTooSmall
 	case tx.Validator.Wght > e.Backend.Config.MaxValidatorStake:
 		// Ensure validator isn't staking too much
-		return errWeightTooLarge
+		return ErrWeightTooLarge
 	case duration < e.Backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return errStakeTooShort
+		return ErrStakeTooShort
 	case duration > e.Backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
-		return errStakeTooLong
+		return ErrStakeTooLong
 	}
 
 	if e.Backend.Bootstrapped.Get() {
@@ -227,7 +227,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		if !currentTimestamp.Before(startTime) {
 			return fmt.Errorf(
 				"%w: %s >= %s",
-				errTimestampNotBeforeStartTime,
+				ErrTimestampNotBeforeStartTime,
 				currentTimestamp,
 				startTime,
 			)
@@ -262,14 +262,14 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 			e.Ctx.AVAXAssetID,
 			locked.StateBonded,
 		); err != nil {
-			return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+			return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done last
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if startTime.After(maxStartTime) {
-			return errFutureStakeTime
+			return ErrFutureStakeTime
 		}
 	}
 
@@ -314,7 +314,7 @@ func (e *CaminoStandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error 
 	}
 
 	if caminoConfig.LockModeBondDeposit {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 
 	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
@@ -331,7 +331,7 @@ func (e *CaminoStandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermi
 	}
 
 	if caminoConfig.LockModeBondDeposit {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 
 	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
@@ -348,7 +348,7 @@ func (e *CaminoStandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermi
 	}
 
 	if caminoConfig.LockModeBondDeposit {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 
 	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
@@ -498,7 +498,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	case tx == nil:
 		return txs.ErrNilTx
 	case tx.TxID == ids.Empty:
-		return errInvalidID
+		return ErrInvalidID
 	case len(e.Tx.Creds) != 0:
 		return errWrongCredentialsNumber
 	}
@@ -581,7 +581,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		//            time and the current chain timestamp is == this staker's
 		//            EndTime. This means only permissionless stakers should be
 		//            left in the staker set.
-		return errShouldBePermissionlessStaker
+		return ErrShouldBePermissionlessStaker
 	}
 
 	if removeFromCurrent {
@@ -760,7 +760,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		e.Ctx.AVAXAssetID,
 		locked.StateDeposited,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 	}
 
 	txID := e.Tx.ID()
@@ -892,7 +892,7 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		e.Ctx.AVAXAssetID,
 		!hasExpiredDeposits,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 	}
 
 	for depositTxID, consumedDepositedAmount := range consumedDepositedAmounts {
@@ -1140,7 +1140,7 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 	}
 
 	avax.Consume(e.State, tx.Ins)
@@ -1373,7 +1373,7 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 		}
 		unsignedAddValidatorTx, ok := addValidatorTx.Unsigned.(*txs.CaminoAddValidatorTx)
 		if !ok {
-			return errWrongTxType
+			return ErrWrongTxType
 		}
 		txRewardOwner, ok := unsignedAddValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners)
 		if !ok {
@@ -1497,7 +1497,7 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 			e.Ctx.AVAXAssetID,
 			locked.StateUnlocked,
 		); err != nil {
-			return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+			return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 		}
 	}
 
@@ -1576,7 +1576,7 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 	}
 
 	// update state
@@ -1630,7 +1630,7 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 	}
 
 	// check role
@@ -1766,7 +1766,7 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 	}
 
 	if err := txProposal.VerifyWith(dac.NewProposalVerifier(e.State, e.Fx, e.Tx, tx, isAdminProposal)); err != nil {
-		return fmt.Errorf("%w: %s", errInvalidProposal, err)
+		return fmt.Errorf("%w: %s", ErrInvalidProposal, err)
 	}
 
 	// verify the flowcheck
@@ -1788,7 +1788,7 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		e.Ctx.AVAXAssetID,
 		lockState,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 	}
 
 	// Get allowed voters and create proposalState
@@ -1875,7 +1875,7 @@ func (e *CaminoStandardTxExecutor) AddVoteTx(tx *txs.AddVoteTx) error {
 	}
 
 	if !proposal.IsActiveAt(chainTime) {
-		return errProposalInactive // should never happen, cause inactive proposals are removed from state
+		return ErrProposalInactive // should never happen, cause inactive proposals are removed from state
 	}
 
 	// verify voter credential and address state (role)
@@ -1924,7 +1924,7 @@ func (e *CaminoStandardTxExecutor) AddVoteTx(tx *txs.AddVoteTx) error {
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %s", ErrFlowCheckFailed, err)
 	}
 
 	// update state

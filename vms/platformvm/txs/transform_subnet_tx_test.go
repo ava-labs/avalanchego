@@ -373,6 +373,29 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 			err: errInvalidSubnetAuth,
 		},
 		{
+			name: "invalid BaseTx",
+			txFunc: func(*gomock.Controller) *TransformSubnetTx {
+				return &TransformSubnetTx{
+					BaseTx:                   invalidBaseTx,
+					Subnet:                   ids.GenerateTestID(),
+					AssetID:                  ids.GenerateTestID(),
+					InitialSupply:            10,
+					MaximumSupply:            10,
+					MinConsumptionRate:       0,
+					MaxConsumptionRate:       reward.PercentDenominator,
+					MinValidatorStake:        2,
+					MaxValidatorStake:        10,
+					MinStakeDuration:         1,
+					MaxStakeDuration:         2,
+					MinDelegationFee:         reward.PercentDenominator,
+					MinDelegatorStake:        1,
+					MaxValidatorWeightFactor: 1,
+					UptimeRequirement:        reward.PercentDenominator,
+				}
+			},
+			err: avax.ErrWrongNetworkID,
+		},
+		{
 			name: "passes verification",
 			txFunc: func(ctrl *gomock.Controller) *TransformSubnetTx {
 				// This SubnetAuth passes verification.
@@ -411,26 +434,4 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 			require.ErrorIs(t, err, tt.err)
 		})
 	}
-
-	t.Run("invalid BaseTx", func(t *testing.T) {
-		tx := &TransformSubnetTx{
-			BaseTx:                   invalidBaseTx,
-			Subnet:                   ids.GenerateTestID(),
-			AssetID:                  ids.GenerateTestID(),
-			InitialSupply:            10,
-			MaximumSupply:            10,
-			MinConsumptionRate:       0,
-			MaxConsumptionRate:       reward.PercentDenominator,
-			MinValidatorStake:        2,
-			MaxValidatorStake:        10,
-			MinStakeDuration:         1,
-			MaxStakeDuration:         2,
-			MinDelegationFee:         reward.PercentDenominator,
-			MinDelegatorStake:        1,
-			MaxValidatorWeightFactor: 1,
-			UptimeRequirement:        reward.PercentDenominator,
-		}
-		err := tx.SyntacticVerify(ctx)
-		require.Error(t, err)
-	})
 }

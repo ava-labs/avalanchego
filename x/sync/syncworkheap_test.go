@@ -15,7 +15,7 @@ import (
 func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	require := require.New(t)
 
-	h := newSyncWorkHeap(1)
+	h := newSyncWorkHeap()
 	require.Equal(0, h.Len())
 
 	item1 := &heapItem{
@@ -92,7 +92,7 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 // Tests Insert and GetWork
 func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 	require := require.New(t)
-	h := newSyncWorkHeap(1)
+	h := newSyncWorkHeap()
 
 	item1 := &syncWorkItem{
 		start:       []byte{0},
@@ -143,7 +143,7 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 func Test_SyncWorkHeap_remove(t *testing.T) {
 	require := require.New(t)
 
-	h := newSyncWorkHeap(1)
+	h := newSyncWorkHeap()
 
 	item1 := &syncWorkItem{
 		start:       []byte{0},
@@ -190,7 +190,7 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 
 func Test_SyncWorkHeap_Merge_Insert(t *testing.T) {
 	// merge with range before
-	syncHeap := newSyncWorkHeap(1000)
+	syncHeap := newSyncWorkHeap()
 
 	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
 	require.Equal(t, 1, syncHeap.Len())
@@ -205,7 +205,7 @@ func Test_SyncWorkHeap_Merge_Insert(t *testing.T) {
 	require.Equal(t, 3, syncHeap.Len())
 
 	// merge with range after
-	syncHeap = newSyncWorkHeap(1000)
+	syncHeap = newSyncWorkHeap()
 
 	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
 	require.Equal(t, 1, syncHeap.Len())
@@ -220,7 +220,7 @@ func Test_SyncWorkHeap_Merge_Insert(t *testing.T) {
 	require.Equal(t, 3, syncHeap.Len())
 
 	// merge both sides at the same time
-	syncHeap = newSyncWorkHeap(1000)
+	syncHeap = newSyncWorkHeap()
 
 	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
 	require.Equal(t, 1, syncHeap.Len())

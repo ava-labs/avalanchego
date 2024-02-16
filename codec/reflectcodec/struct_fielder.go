@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/codec"
 )
 
 const (
@@ -109,7 +111,10 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) (*SerializedFields, 
 			continue
 		}
 		if !field.IsExported() { // Can only marshal exported fields
-			return nil, fmt.Errorf("can't marshal un-exported field %s", field.Name)
+			return nil, fmt.Errorf("can not marshal %w: %s",
+				codec.ErrUnexportedField,
+				field.Name,
+			)
 		}
 
 		upgradeVersionTag := field.Tag.Get(UpgradeVersionTagName)

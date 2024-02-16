@@ -31,7 +31,7 @@ type Tx struct {
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 
-	id    ids.ID
+	TxID  ids.ID `json:"id"`
 	bytes []byte
 }
 
@@ -63,7 +63,7 @@ func (tx *Tx) Initialize(c codec.Manager) error {
 func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
 	tx.Unsigned.SetBytes(unsignedBytes)
 	tx.bytes = signedBytes
-	tx.id = hashing.ComputeHash256Array(signedBytes)
+	tx.TxID = hashing.ComputeHash256Array(signedBytes)
 }
 
 // Parse signed tx starting from its byte representation.
@@ -90,7 +90,7 @@ func (tx *Tx) Bytes() []byte {
 }
 
 func (tx *Tx) ID() ids.ID {
-	return tx.id
+	return tx.TxID
 }
 
 // UTXOs returns the UTXOs transaction is producing.
@@ -100,7 +100,7 @@ func (tx *Tx) UTXOs() []*avax.UTXO {
 	for i, out := range outs {
 		utxos[i] = &avax.UTXO{
 			UTXOID: avax.UTXOID{
-				TxID:        tx.id,
+				TxID:        tx.TxID,
 				OutputIndex: uint32(i),
 			},
 			Asset: avax.Asset{ID: out.AssetID()},
@@ -114,7 +114,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilSignedTx
-	case tx.id == ids.Empty:
+	case tx.TxID == ids.Empty:
 		return errSignedTxNotInitialized
 	default:
 		return tx.Unsigned.SyntacticVerify(ctx)

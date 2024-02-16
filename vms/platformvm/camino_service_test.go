@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/stretchr/testify/require"
 )
 
@@ -101,7 +102,7 @@ func TestGetCaminoBalance(t *testing.T) {
 			camino: api.Camino{
 				LockModeBondDeposit: true,
 			},
-			expectedError: fmt.Errorf("couldn't parse address %q: %s", "P-", ""),
+			expectedError: bech32.ErrInvalidLength(0),
 		},
 	}
 
@@ -160,11 +161,10 @@ func TestGetCaminoBalance(t *testing.T) {
 			}
 
 			err := service.GetBalance(nil, &request, &responseWrapper)
+			require.ErrorIs(t, err, tt.expectedError)
 			if tt.expectedError != nil {
-				require.ErrorContains(t, err, tt.expectedError.Error())
 				return
 			}
-			require.NoError(t, err)
 			expectedBalance := json.Uint64(defaultCaminoValidatorWeight + defaultBalance + tt.bonded + tt.deposited + tt.depositedBonded)
 
 			if !tt.camino.LockModeBondDeposit {

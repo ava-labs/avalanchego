@@ -26,7 +26,6 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 
 	type test struct {
 		description string
-		shouldErr   bool
 		subnetID    ids.ID
 		genesisData []byte
 		vmID        ids.ID
@@ -34,12 +33,12 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		chainName   string
 		keys        []*secp256k1.PrivateKey
 		setup       func(*CreateChainTx) *CreateChainTx
+		expectedErr error
 	}
 
 	tests := []test{
 		{
 			description: "tx is nil",
-			shouldErr:   true,
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
 			vmID:        constants.AVMID,
@@ -49,10 +48,10 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			setup: func(*CreateChainTx) *CreateChainTx {
 				return nil
 			},
+			expectedErr: ErrNilTx,
 		},
 		{
 			description: "vm ID is empty",
-			shouldErr:   true,
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
 			vmID:        constants.AVMID,
@@ -63,24 +62,10 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 				tx.VMID = ids.ID{}
 				return tx
 			},
-		},
-		{
-			description: "subnet ID is empty",
-			shouldErr:   true,
-			subnetID:    testSubnet1ID,
-			genesisData: nil,
-			vmID:        constants.AVMID,
-			fxIDs:       nil,
-			chainName:   "yeet",
-			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup: func(tx *CreateChainTx) *CreateChainTx {
-				tx.SubnetID = ids.ID{}
-				return tx
-			},
+			expectedErr: errInvalidVMID,
 		},
 		{
 			description: "subnet ID is platform chain's ID",
-			shouldErr:   true,
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
 			vmID:        constants.AVMID,
@@ -91,10 +76,10 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 				tx.SubnetID = ctx.ChainID
 				return tx
 			},
+			expectedErr: ErrCantValidatePrimaryNetwork,
 		},
 		{
 			description: "chain name is too long",
-			shouldErr:   true,
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
 			vmID:        constants.AVMID,
@@ -105,10 +90,10 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 				tx.ChainName = string(make([]byte, MaxNameLen+1))
 				return tx
 			},
+			expectedErr: errNameTooLong,
 		},
 		{
 			description: "chain name has invalid character",
-			shouldErr:   true,
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
 			vmID:        constants.AVMID,
@@ -119,10 +104,10 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 				tx.ChainName = "⌘"
 				return tx
 			},
+			expectedErr: errIllegalNameCharacter,
 		},
 		{
 			description: "genesis data is too long",
-			shouldErr:   true,
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
 			vmID:        constants.AVMID,
@@ -133,62 +118,63 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 				tx.GenesisData = make([]byte, MaxGenesisLen+1)
 				return tx
 			},
+			expectedErr: errGenesisTooLong,
 		},
 	}
 
 	for _, test := range tests {
-		inputs := []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.ID{'t', 'x', 'I', 'D'},
-				OutputIndex: 2,
-			},
-			Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-			In: &secp256k1fx.TransferInput{
-				Amt:   uint64(5678),
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-			},
-		}}
-		outputs := []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: uint64(1234),
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
+
+			inputs := []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.ID{'t', 'x', 'I', 'D'},
+					OutputIndex: 2,
 				},
-			},
-		}}
-		subnetAuth := &secp256k1fx.Input{
-			SigIndices: []uint32{0, 1},
-		}
+				Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+				In: &secp256k1fx.TransferInput{
+					Amt:   uint64(5678),
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}}
+			outputs := []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: uint64(1234),
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					},
+				},
+			}}
+			subnetAuth := &secp256k1fx.Input{
+				SigIndices: []uint32{0, 1},
+			}
 
-		createChainTx := &CreateChainTx{
-			BaseTx: BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    ctx.NetworkID,
-				BlockchainID: ctx.ChainID,
-				Ins:          inputs,
-				Outs:         outputs,
-			}},
-			SubnetID:    test.subnetID,
-			ChainName:   test.chainName,
-			VMID:        test.vmID,
-			FxIDs:       test.fxIDs,
-			GenesisData: test.genesisData,
-			SubnetAuth:  subnetAuth,
-		}
+			createChainTx := &CreateChainTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins:          inputs,
+					Outs:         outputs,
+				}},
+				SubnetID:    test.subnetID,
+				ChainName:   test.chainName,
+				VMID:        test.vmID,
+				FxIDs:       test.fxIDs,
+				GenesisData: test.genesisData,
+				SubnetAuth:  subnetAuth,
+			}
 
-		signers := [][]*secp256k1.PrivateKey{preFundedKeys}
-		stx, err := NewSigned(createChainTx, Codec, signers)
-		require.NoError(t, err)
+			signers := [][]*secp256k1.PrivateKey{preFundedKeys}
+			stx, err := NewSigned(createChainTx, Codec, signers)
+			require.NoError(err)
 
-		createChainTx.SyntacticallyVerified = false
-		stx.Unsigned = test.setup(createChainTx)
+			createChainTx.SyntacticallyVerified = false
+			stx.Unsigned = test.setup(createChainTx)
 
-		err = stx.SyntacticVerify(ctx)
-		if !test.shouldErr {
-			require.NoError(t, err)
-		} else {
-			require.Error(t, err)
-		}
+			err = stx.SyntacticVerify(ctx)
+			require.ErrorIs(err, test.expectedErr)
+		})
 	}
 }

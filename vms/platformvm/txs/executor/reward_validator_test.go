@@ -58,7 +58,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.Error(tx.Unsigned.Visit(&txExecutor))
+	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
@@ -79,7 +79,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.Error(tx.Unsigned.Visit(&txExecutor))
+	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
@@ -121,7 +121,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
-	require.Equal(oldBalance+stakerToRemove.Weight+27, onCommitBalance)
+	require.Equal(oldBalance+stakerToRemove.Weight+27697, onCommitBalance)
 }
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
@@ -159,7 +159,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.Error(tx.Unsigned.Visit(&txExecutor))
+	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
@@ -174,7 +174,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.Error(tx.Unsigned.Visit(&txExecutor))
+	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)

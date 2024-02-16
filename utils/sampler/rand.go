@@ -4,58 +4,94 @@
 package sampler
 
 import (
-	"math/rand"
+	"math"
 	"sync"
 	"time"
 
 	"gonum.org/v1/gonum/mathext/prng"
 )
 
-var (
-	int63Mask uint64 = 1<<63 - 1
-	globalRNG        = newRNG()
-)
+var globalRNG = newRNG()
 
-func newRNG() rng {
-	source := prng.NewMT19937()
-	source.Seed(uint64(time.Now().UnixNano()))
+func newRNG() *rng {
 	// We don't use a cryptographically secure source of randomness here, as
 	// there's no need to ensure a truly random sampling.
-	return rand.New(&syncSource{rng: source}) // #nosec G404
+	source := prng.NewMT19937()
+	source.Seed(uint64(time.Now().UnixNano()))
+	return &rng{rng: source}
 }
 
 func Seed(seed int64) {
 	globalRNG.Seed(seed)
 }
 
-type rng interface {
-	// Seed uses the provided seed value to initialize the generator to a
-	// deterministic state.
-	Seed(seed int64)
-
-	// Int63n returns, as an int64, a non-negative pseudo-random number in
-	// [0,n). It panics if n <= 0.
-	Int63n(n int64) int64
+type source interface {
+	Seed(uint64)
+	Uint64() uint64
 }
 
-type syncSource struct {
+type rng struct {
 	lock sync.Mutex
-	rng  *prng.MT19937
+	rng  source
 }
 
-func (s *syncSource) Seed(seed int64) {
-	s.lock.Lock()
-	s.rng.Seed(uint64(seed))
-	s.lock.Unlock()
+// Seed uses the provided seed value to initialize the generator to a
+// deterministic state.
+func (r *rng) Seed(seed int64) {
+	r.lock.Lock()
+	r.rng.Seed(uint64(seed))
+	r.lock.Unlock()
 }
 
-func (s *syncSource) Int63() int64 {
-	return int64(s.Uint64() & int63Mask)
+// Uint64Inclusive returns a pseudo-random number in [0,n].
+//
+// Invariant: The result of this function is stored in chain state, so any
+// modifications are considered breaking.
+func (r *rng) Uint64Inclusive(n uint64) uint64 {
+	switch {
+	// n+1 is power of two, so we can just mask
+	//
+	// Note: This does work for MaxUint64 as overflow is explicitly part of the
+	// compiler specification: https://go.dev/ref/spec#Integer_overflow
+	case n&(n+1) == 0:
+		return r.uint64() & n
+
+	// n is greater than MaxUint64/2 so we need to just iterate until we get a
+	// number in the requested range.
+	case n > math.MaxInt64:
+		v := r.uint64()
+		for v > n {
+			v = r.uint64()
+		}
+		return v
+
+	// n is less than MaxUint64/2 so we generate a number in the range
+	// [0, k*(n+1)) where k is the largest integer such that k*(n+1) is less
+	// than or equal to MaxUint64/2. We can't easily find k such that k*(n+1) is
+	// less than or equal to MaxUint64 because the calculation would overflow.
+	//
+	// ref: https://github.com/golang/go/blob/ce10e9d84574112b224eae88dc4e0f43710808de/src/math/rand/rand.go#L127-L132
+	default:
+		max := (1 << 63) - 1 - (1<<63)%(n+1)
+		v := r.uint63()
+		for v > max {
+			v = r.uint63()
+		}
+		return v % (n + 1)
+	}
 }
 
-func (s *syncSource) Uint64() uint64 {
-	s.lock.Lock()
-	n := s.rng.Uint64()
-	s.lock.Unlock()
+// uint63 returns a random number in [0, MaxInt64]
+func (r *rng) uint63() uint64 {
+	return r.uint64() & math.MaxInt64
+}
+
+// uint64 returns a random number in [0, MaxUint64]
+func (r *rng) uint64() uint64 {
+	// Note: We must grab a write lock here because rng.Uint64 internally
+	// modifies state.
+	r.lock.Lock()
+	n := r.rng.Uint64()
+	r.lock.Unlock()
 	return n
 }

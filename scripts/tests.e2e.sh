@@ -5,8 +5,7 @@ set -o pipefail
 
 # e.g.,
 # ./scripts/build.sh
-# ./scripts/tests.e2e.sh ./build/caminogo
-# ENABLE_WHITELIST_VTX_TESTS=false ./scripts/tests.e2e.sh ./build/caminogo ./tools/camino-network-runner/bin/camino-network-runner
+# ./scripts/tests.e2e.sh ./build/caminogo ./tools/camino-network-runner/bin/camino-network-runner
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -28,16 +27,17 @@ if [[ -z "${CAMINO_NETWORK_RUNNER_PATH}" ]]; then
   exit 255
 fi
 
-ENABLE_WHITELIST_VTX_TESTS=${ENABLE_WHITELIST_VTX_TESTS:-false}
-# ref. https://onsi.github.io/ginkgo/#spec-labels
-GINKGO_LABEL_FILTER="!whitelist-tx"
-if [[ ${ENABLE_WHITELIST_VTX_TESTS} == true ]]; then
-  # run only "whitelist-tx" tests, no other test
-  GINKGO_LABEL_FILTER="whitelist-tx"
-fi
-echo GINKGO_LABEL_FILTER: ${GINKGO_LABEL_FILTER}
-
 cp $CAMINO_NETWORK_RUNNER_PATH /tmp/camino-network-runner
+
+# Set the CGO flags to use the portable version of BLST
+#
+# We use "export" here instead of just setting a bash variable because we need
+# to pass this flag to all child processes spawned by the shell.
+export CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+
+# While CGO_ENABLED doesn't need to be explicitly set, it produces a much more
+# clear error due to the default value change in go1.20.
+export CGO_ENABLED=1
 
 GOPATH="$(go env GOPATH)"
 PATH="${GOPATH}/bin:${PATH}"
@@ -67,13 +67,8 @@ PID=${!}
 # to run only ping tests:
 # --ginkgo.focus "\[Local\] \[Ping\]"
 #
-# to run only X-Chain whitelist vtx tests:
-# --ginkgo.focus "\[X-Chain\] \[WhitelistVtx\]"
-#
 # to skip all "Local" tests
 # --ginkgo.skip "\[Local\]"
-#
-# set "--enable-whitelist-vtx-tests" to explicitly enable/disable whitelist vtx tests
 echo "running e2e tests against the local cluster with ${CAMINOGO_PATH}"
 ./tests/e2e/e2e.test \
 --ginkgo.v \
@@ -81,7 +76,7 @@ echo "running e2e tests against the local cluster with ${CAMINOGO_PATH}"
 --network-runner-grpc-endpoint="0.0.0.0:12342" \
 --network-runner-camino-node-path=${CAMINOGO_PATH} \
 --network-runner-camino-log-level="WARN" \
---test-keys-file=tests/test.insecure.secp256k1.keys --ginkgo.label-filter="${GINKGO_LABEL_FILTER}" \
+--test-keys-file=tests/test.insecure.secp256k1.keys \
 && EXIT_CODE=$? || EXIT_CODE=$?
 
 kill ${PID}

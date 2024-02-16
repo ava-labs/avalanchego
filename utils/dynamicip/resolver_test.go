@@ -12,44 +12,40 @@ import (
 
 func TestNewResolver(t *testing.T) {
 	type test struct {
-		service      string
-		validService bool
+		service string
+		err     error
 	}
 	tests := []test{
 		{
-			service:      OpenDNSName,
-			validService: true,
+			service: OpenDNSName,
+			err:     nil,
 		},
 		{
-			service:      IFConfigName,
-			validService: true,
+			service: IFConfigName,
+			err:     nil,
 		},
 		{
-			service:      IFConfigCoName,
-			validService: true,
+			service: IFConfigCoName,
+			err:     nil,
 		},
 		{
-			service:      IFConfigMeName,
-			validService: true,
+			service: IFConfigMeName,
+			err:     nil,
 		},
 		{
-			service:      strings.ToUpper(IFConfigMeName),
-			validService: true,
+			service: strings.ToUpper(IFConfigMeName),
+			err:     nil,
 		},
 		{
-			service:      "not a valid resolution service name",
-			validService: false,
+			service: "not a valid resolution service name",
+			err:     errUnknownResolver,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.service, func(t *testing.T) {
 			require := require.New(t)
 			_, err := NewResolver(tt.service)
-			if tt.validService {
-				require.NoError(err)
-			} else {
-				require.Error(err)
-			}
+			require.ErrorIs(err, tt.err)
 		})
 	}
 }

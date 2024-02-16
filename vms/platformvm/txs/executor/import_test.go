@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -32,8 +33,7 @@ func TestNewImportTx(t *testing.T) {
 		sharedMemory  atomic.SharedMemory
 		sourceKeys    []*secp256k1.PrivateKey
 		timestamp     time.Time
-		shouldErr     bool
-		shouldVerify  bool
+		expectedErr   error
 	}
 
 	factory := secp256k1.Factory{}
@@ -104,8 +104,8 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee - 1,
 				},
 			),
-			sourceKeys: []*secp256k1.PrivateKey{sourceKey},
-			shouldErr:  true,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			expectedErr: utxo.ErrInsufficientFunds,
 		},
 		{
 			description:   "can barely pay fee",
@@ -116,9 +116,8 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
-			shouldErr:    false,
-			shouldVerify: true,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			expectedErr: nil,
 		},
 		{
 			description:   "attempting to import from C-chain",
@@ -129,10 +128,9 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
-			timestamp:    env.config.ApricotPhase5Time,
-			shouldErr:    false,
-			shouldVerify: true,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			timestamp:   env.config.ApricotPhase5Time,
+			expectedErr: nil,
 		},
 		{
 			description:   "attempting to import non-avax from X-chain",
@@ -144,10 +142,9 @@ func TestNewImportTx(t *testing.T) {
 					customAssetID:       1,
 				},
 			),
-			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
-			timestamp:    env.config.BanffTime,
-			shouldErr:    false,
-			shouldVerify: true,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			timestamp:   env.config.BanffTime,
+			expectedErr: nil,
 		},
 	}
 
@@ -163,8 +160,8 @@ func TestNewImportTx(t *testing.T) {
 				tt.sourceKeys,
 				ids.ShortEmpty,
 			)
-			if tt.shouldErr {
-				require.Error(err)
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr != nil {
 				return
 			}
 			require.NoError(err)
@@ -202,11 +199,7 @@ func TestNewImportTx(t *testing.T) {
 				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
-			if tt.shouldVerify {
-				require.NoError(err)
-			} else {
-				require.Error(err)
-			}
+			require.NoError(err)
 		})
 	}
 }

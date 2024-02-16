@@ -81,7 +81,7 @@ func (s *weightedHeap) Initialize(weights []uint64) error {
 
 func (s *weightedHeap) Sample(value uint64) (int, error) {
 	if len(s.heap) == 0 || s.heap[0].cumulativeWeight <= value {
-		return 0, errOutOfRange
+		return 0, ErrOutOfRange
 	}
 
 	index := 0

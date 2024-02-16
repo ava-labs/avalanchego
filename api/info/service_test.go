@@ -70,7 +70,7 @@ func TestGetVMsSuccess(t *testing.T) {
 	err := resources.info.GetVMs(nil, nil, &reply)
 
 	require.Equal(t, expectedVMRegistry, reply.VMs)
-	require.Equal(t, err, nil)
+	require.NoError(t, err)
 }
 
 // Tests GetVMs if we fail to list our vms.
@@ -83,8 +83,7 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-
-	require.Equal(t, errTest, err)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Tests GetVMs if we can't get our vm aliases.
@@ -104,6 +103,5 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-
-	require.Equal(t, err, errTest)
+	require.ErrorIs(t, err, errTest)
 }

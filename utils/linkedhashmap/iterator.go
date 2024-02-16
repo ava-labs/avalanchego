@@ -59,8 +59,9 @@ func (it *iterator[K, V]) Next() bool {
 	// It's important to ensure that [it.next] is not nil
 	// by not deleting elements that have not yet been iterated
 	// over from [it.lh]
-	it.key = it.next.Value.(keyValue[K, V]).key
-	it.value = it.next.Value.(keyValue[K, V]).value
+	kv := it.next.Value.(keyValue[K, V])
+	it.key = kv.key
+	it.value = kv.value
 	it.next = it.next.Next() // Next time, return next element
 	it.exhausted = it.next == nil
 	return true

@@ -38,7 +38,7 @@ var (
 	errInputsUTXOsMismatch       = errors.New("number of inputs is different from number of utxos")
 	errBadCredentials            = errors.New("bad credentials")
 	errNotBurnedEnough           = errors.New("burned less tokens, than needed to")
-	errAssetIDMismatch           = errors.New("utxo/input/output assetID is different from expected asset id")
+	errUnexpectedAssetID         = errors.New("utxo/input/output assetID is different from expected asset id")
 	errLockIDsMismatch           = errors.New("input lock ids is different from utxo lock ids")
 	errFailToGetDeposit          = errors.New("couldn't get deposit")
 	errLockedUTXO                = errors.New("can't spend locked utxo")
@@ -856,7 +856,7 @@ func (h *handler) VerifyLockUTXOs(
 				index,
 				utxoAssetID,
 				assetID,
-				errAssetIDMismatch,
+				errUnexpectedAssetID,
 			)
 		}
 
@@ -866,7 +866,7 @@ func (h *handler) VerifyLockUTXOs(
 				index,
 				inputAssetID,
 				assetID,
-				errAssetIDMismatch,
+				errUnexpectedAssetID,
 			)
 		}
 
@@ -944,7 +944,7 @@ func (h *handler) VerifyLockUTXOs(
 				index,
 				outputAssetID,
 				assetID,
-				errAssetIDMismatch,
+				errUnexpectedAssetID,
 			)
 		}
 
@@ -1102,7 +1102,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 				index,
 				utxoAssetID,
 				assetID,
-				errAssetIDMismatch,
+				errUnexpectedAssetID,
 			)
 		}
 
@@ -1112,7 +1112,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 				index,
 				inputAssetID,
 				assetID,
-				errAssetIDMismatch,
+				errUnexpectedAssetID,
 			)
 		}
 

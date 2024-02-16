@@ -467,7 +467,7 @@ func TestDiffUTXO(t *testing.T) {
 
 		// Make sure it's gone
 		_, err = d.GetUTXO(utxo.InputID())
-		require.Error(err)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 }
 

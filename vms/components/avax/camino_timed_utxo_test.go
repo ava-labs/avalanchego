@@ -108,7 +108,7 @@ func TestRewardUTXOSerializeC(t *testing.T) {
 
 	utxo := UTXO{}
 	_, err = manager.Unmarshal(utxoBytes, &utxo)
-	require.Error(t, err, "should not deserialize into UTXO")
+	require.ErrorIs(t, err, codec.ErrExtraSpace)
 
 	_, err = manager.Unmarshal(utxoBytes, tutxo)
 	require.NoError(t, err)

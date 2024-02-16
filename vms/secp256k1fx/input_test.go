@@ -18,17 +18,17 @@ func TestInputVerifyNil(t *testing.T) {
 		{
 			name:        "nil input",
 			in:          nil,
-			expectedErr: errNilInput,
+			expectedErr: ErrNilInput,
 		},
 		{
 			name:        "not sorted",
 			in:          &Input{SigIndices: []uint32{2, 1}},
-			expectedErr: errNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name:        "not unique",
 			in:          &Input{SigIndices: []uint32{2, 2}},
-			expectedErr: errNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name:        "passes verification",

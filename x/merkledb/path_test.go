@@ -60,6 +60,20 @@ func Test_SerializedPath_Has_Prefix(t *testing.T) {
 	prefix = SerializedPath{Value: []byte{}, NibbleLength: 0}
 	require.True(t, first.HasPrefix(prefix))
 	require.False(t, first.HasStrictPrefix(prefix))
+
+	a := SerializedPath{Value: []byte{0x10}, NibbleLength: 1}
+	b := SerializedPath{Value: []byte{0x10}, NibbleLength: 2}
+	require.False(t, a.HasPrefix(b))
+}
+
+func Test_SerializedPath_HasPrefix_BadInput(t *testing.T) {
+	a := SerializedPath{Value: []byte{}}
+	b := SerializedPath{Value: []byte{}, NibbleLength: 1}
+	require.False(t, a.HasPrefix(b))
+
+	a = SerializedPath{Value: []byte{}, NibbleLength: 10}
+	b = SerializedPath{Value: []byte{0x10}, NibbleLength: 1}
+	require.False(t, a.HasPrefix(b))
 }
 
 func Test_SerializedPath_Equal(t *testing.T) {

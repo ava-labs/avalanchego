@@ -94,16 +94,16 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, avax.ErrWrongNetworkID)
 	addSubnetValidatorTx.NetworkID--
 
-	// Case: Missing Subnet ID
+	// Case: Specifies primary network SubnetID
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.Subnet = ids.Empty
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, errAddPrimaryNetworkValidator)
 	addSubnetValidatorTx.Subnet = subnetID
 
 	// Case: No weight
@@ -112,7 +112,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, ErrWeightTooSmall)
 	addSubnetValidatorTx.Wght = validatorWeight
 
 	// Case: Subnet auth indices not unique
@@ -123,7 +123,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, secp256k1fx.ErrInputIndicesNotSortedUnique)
 	*input = oldInput
 
 	// Case: adding to Primary Network

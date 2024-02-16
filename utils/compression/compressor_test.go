@@ -114,21 +114,23 @@ func TestSizeLimiting(t *testing.T) {
 			continue
 		}
 		t.Run(compressionType.String(), func(t *testing.T) {
+			require := require.New(t)
+
 			compressor, err := compressorFunc(maxMessageSize)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			data := make([]byte, maxMessageSize+1)
 			_, err = compressor.Compress(data) // should be too large
-			require.Error(t, err)
+			require.ErrorIs(err, ErrMsgTooLarge)
 
 			compressor2, err := compressorFunc(2 * maxMessageSize)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			dataCompressed, err := compressor2.Compress(data)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			_, err = compressor.Decompress(dataCompressed) // should be too large
-			require.Error(t, err)
+			require.ErrorIs(err, ErrDecompressedMsgTooLarge)
 		})
 	}
 }
@@ -178,7 +180,7 @@ func fuzzHelper(f *testing.F, compressionType Type) {
 
 		if len(data) > maxMessageSize {
 			_, err := compressor.Compress(data)
-			require.Error(err)
+			require.ErrorIs(err, ErrMsgTooLarge)
 		}
 
 		compressed, err := compressor.Compress(data)

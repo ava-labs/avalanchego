@@ -5,7 +5,7 @@ package sampler
 
 import "errors"
 
-var errOutOfRange = errors.New("out of range")
+var ErrOutOfRange = errors.New("out of range")
 
 // Weighted defines how to sample a specified valued based on a provided
 // weighted distribution

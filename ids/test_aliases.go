@@ -17,7 +17,8 @@ var AliasTests = []func(require *require.Assertions, r AliaserReader, w AliaserW
 
 func AliaserLookupErrorTest(require *require.Assertions, r AliaserReader, _ AliaserWriter) {
 	_, err := r.Lookup("Batman")
-	require.Error(err, "expected an error due to missing alias")
+	// TODO: require error to be errNoIDWithAlias
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func AliaserLookupTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
@@ -63,7 +64,8 @@ func AliaserPrimaryAliasTest(require *require.Assertions, r AliaserReader, w Ali
 	require.NoError(err)
 
 	_, err = r.PrimaryAlias(id1)
-	require.Error(err)
+	// TODO: require error to be errNoAliasForID
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 
 	expected := "Batman"
 	res, err := r.PrimaryAlias(id2)
@@ -78,7 +80,8 @@ func AliaserAliasClashTest(require *require.Assertions, _ AliaserReader, w Alias
 	require.NoError(err)
 
 	err = w.Alias(id2, "Batman")
-	require.Error(err)
+	// TODO: require error to be errAliasAlreadyMapped
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func AliaserRemoveAliasTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
@@ -93,7 +96,8 @@ func AliaserRemoveAliasTest(require *require.Assertions, r AliaserReader, w Alia
 	w.RemoveAliases(id1)
 
 	_, err = r.PrimaryAlias(id1)
-	require.Error(err)
+	// TODO: require error to be errNoAliasForID
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 
 	err = w.Alias(id2, "Batman")
 	require.NoError(err)

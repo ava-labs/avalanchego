@@ -8,13 +8,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestParseInvalid(t *testing.T) {
-	vtxBytes := []byte{}
+	vtxBytes := []byte{1, 2, 3, 4, 5}
 	_, err := Parse(vtxBytes)
-	require.Error(t, err, "parse on an invalid vertex should have errored")
+	require.ErrorIs(t, err, codec.ErrUnknownVersion)
 }
 
 func TestParseValid(t *testing.T) {
