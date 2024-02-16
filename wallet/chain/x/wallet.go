@@ -286,7 +286,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := w.signer.SignUnsigned(ctx, utx)
+	tx, err := SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}

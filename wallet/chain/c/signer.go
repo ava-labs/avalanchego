@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	stdcontext "context"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const version = 0
@@ -37,16 +37,23 @@ var (
 )
 
 type Signer interface {
-	SignUnsignedAtomic(ctx stdcontext.Context, tx evm.UnsignedAtomicTx) (*evm.Tx, error)
+	// SignAtomic adds as many missing signatures as possible to the provided
+	// transaction.
+	//
+	// If there are already some signatures on the transaction, those signatures
+	// will not be removed.
+	//
+	// If the signer doesn't have the ability to provide a required signature,
+	// the signature slot will be skipped without reporting an error.
 	SignAtomic(ctx stdcontext.Context, tx *evm.Tx) error
 }
 
 type EthKeychain interface {
 	// The returned Signer can provide a signature for [addr]
-	GetEth(addr ethcommon.Address) (keychain.Signer, bool)
+	GetEth(addr common.Address) (keychain.Signer, bool)
 	// Returns the set of addresses for which the accessor keeps an associated
 	// signer
-	EthAddresses() set.Set[ethcommon.Address]
+	EthAddresses() set.Set[common.Address]
 }
 
 type SignerBackend interface {
@@ -65,11 +72,6 @@ func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBacken
 		ethKC:   ethKC,
 		backend: backend,
 	}
-}
-
-func (s *txSigner) SignUnsignedAtomic(ctx stdcontext.Context, utx evm.UnsignedAtomicTx) (*evm.Tx, error) {
-	tx := &evm.Tx{UnsignedAtomicTx: utx}
-	return tx, s.SignAtomic(ctx, tx)
 }
 
 func (s *txSigner) SignAtomic(ctx stdcontext.Context, tx *evm.Tx) error {
@@ -148,6 +150,11 @@ func (s *txSigner) getExportSigners(ins []evm.EVMInput) [][]keychain.Signer {
 		inputSigners[0] = key
 	}
 	return txSigners
+}
+
+func SignUnsignedAtomic(ctx stdcontext.Context, signer Signer, utx evm.UnsignedAtomicTx) (*evm.Tx, error) {
+	tx := &evm.Tx{UnsignedAtomicTx: utx}
+	return tx, signer.SignAtomic(ctx, tx)
 }
 
 // TODO: remove [signHash] after the ledger supports signing all transactions.
