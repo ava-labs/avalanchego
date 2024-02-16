@@ -6,6 +6,7 @@ package utxo
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -137,6 +138,19 @@ func (s *spender) FinanceTx(
 		outs = []*avax.TransferableOutput{}
 		keys = [][]*secp256k1.PrivateKey{}
 	)
+
+	// we can only pay fees in avax, so we sort avax-denominated UTXOs last
+	// to maximize probability of being able to pay fees.
+	slices.SortFunc(utxos, func(lhs, rhs *avax.UTXO) int {
+		switch {
+		case lhs.Asset.AssetID() == feeAssetID && rhs.Asset.AssetID() != feeAssetID:
+			return 1
+		case lhs.Asset.AssetID() != feeAssetID && rhs.Asset.AssetID() == feeAssetID:
+			return -1
+		default:
+			return 0
+		}
+	})
 
 	// Iterate over the UTXOs
 	for _, utxo := range utxos {
