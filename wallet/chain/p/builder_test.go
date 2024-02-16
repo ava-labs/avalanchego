@@ -56,17 +56,12 @@ func TestBaseTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
 		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -105,17 +100,13 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -166,17 +157,13 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -221,17 +208,13 @@ func TestCreateChainTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -284,17 +267,13 @@ func TestCreateSubnetTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -336,17 +315,13 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -391,19 +366,16 @@ func TestImportTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey    = testKeys[1]
-		utxos       = makeTestUTXOs(utxosKey)
-		globalUTXOs = common.NewUTXOs()
-		chainUTXOs  = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, globalUTXOs))
-	)
-	for _, utxo := range utxos {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey      = testKeys[1]
+		utxos         = makeTestUTXOs(utxosKey)
+		sourceChainID = ids.GenerateTestID()
+		importedUTXOs = utxos[:1]
+		chainUTXOs    = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+			sourceChainID:             importedUTXOs,
+		})
+
 		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -411,20 +383,13 @@ func TestImportTx(t *testing.T) {
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
-		sourceChainID = ids.GenerateTestID()
-
-		importedUTXO = utxos[0]
-		importKey    = testKeys[0]
-		importTo     = &secp256k1fx.OutputOwners{
+		importKey = testKeys[0]
+		importTo  = &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				importKey.Address(),
 			},
 		}
-	)
-
-	require.NoError(
-		globalUTXOs.AddUTXO(stdcontext.Background(), sourceChainID, constants.PlatformChainID, importedUTXO),
 	)
 
 	// build the transaction
@@ -451,17 +416,12 @@ func TestExportTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
 		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -505,17 +465,13 @@ func TestTransformSubnetTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -579,17 +535,12 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
 		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -654,17 +605,12 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		utxosKey   = testKeys[1]
-		chainUTXOs = newDeterministicChainUTXOs(common.NewChainUTXOs(constants.PlatformChainID, common.NewUTXOs()))
-	)
-	for _, utxo := range makeTestUTXOs(utxosKey) {
-		require.NoError(
-			chainUTXOs.AddUTXO(stdcontext.Background(), constants.PlatformChainID, utxo),
-		)
-	}
-
-	var (
 		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
 		backend = NewBackend(testCtx, chainUTXOs, nil)
 
 		// builder
@@ -711,28 +657,6 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	expectedConsumed := testCtx.AddPrimaryNetworkDelegatorFee()
 	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-}
-
-func newDeterministicChainUTXOs(utxos common.ChainUTXOs) common.ChainUTXOs {
-	return &deterministicChainUTXOs{
-		ChainUTXOs: utxos,
-	}
-}
-
-type deterministicChainUTXOs struct {
-	common.ChainUTXOs
-}
-
-func (c *deterministicChainUTXOs) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
-	utxos, err := c.ChainUTXOs.UTXOs(ctx, sourceChainID)
-	if err != nil {
-		return nil, err
-	}
-
-	slices.SortFunc(utxos, func(a, b *avax.UTXO) int {
-		return a.Compare(&b.UTXOID)
-	})
-	return utxos, nil
 }
 
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
@@ -822,4 +746,34 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 			},
 		},
 	}
+}
+
+func newChainUTXOs(require *require.Assertions, utxoSets map[ids.ID][]*avax.UTXO) common.ChainUTXOs {
+	globalUTXOs := common.NewUTXOs()
+	for subnetID, utxos := range utxoSets {
+		for _, utxo := range utxos {
+			require.NoError(
+				globalUTXOs.AddUTXO(stdcontext.Background(), subnetID, constants.PlatformChainID, utxo),
+			)
+		}
+	}
+	return &deterministicChainUTXOs{
+		ChainUTXOs: common.NewChainUTXOs(constants.PlatformChainID, globalUTXOs),
+	}
+}
+
+type deterministicChainUTXOs struct {
+	common.ChainUTXOs
+}
+
+func (c *deterministicChainUTXOs) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+	utxos, err := c.ChainUTXOs.UTXOs(ctx, sourceChainID)
+	if err != nil {
+		return nil, err
+	}
+
+	slices.SortFunc(utxos, func(a, b *avax.UTXO) int {
+		return a.Compare(&b.UTXOID)
+	})
+	return utxos, nil
 }
