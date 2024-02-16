@@ -102,29 +102,6 @@ jobs:
       - name: Clippy
         run: cargo clippy --tests --examples --benches --all-features -- -D warnings
 
-  upgrades:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Restore Check Deps
-        id: cache-build-deps-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ needs.build.outputs.cache-key }}
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Cargo Edit
-        run: cargo install cargo-edit
-      - name: Cargo upgrade
-        run: cargo upgrade --locked
-
   test:
     needs: build
     runs-on: ubuntu-latest
