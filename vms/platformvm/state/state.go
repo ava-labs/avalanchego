@@ -101,10 +101,10 @@ type Chain interface {
 	avax.UTXOGetter
 	avax.UTXODeleter
 
-	GetUnitFees() commonfees.Dimensions
+	GetUnitFees() (commonfees.Dimensions, error)
 	SetUnitFees(uf commonfees.Dimensions)
 
-	GetFeeWindows() commonfees.Windows
+	GetFeeWindows() (commonfees.Windows, error)
 	SetFeeWindows(windows commonfees.Windows)
 
 	GetTimestamp() time.Time
@@ -1086,16 +1086,16 @@ func (s *state) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, err
 	return staker.StartTime, nil
 }
 
-func (s *state) GetUnitFees() commonfees.Dimensions {
-	return s.unitFees
+func (s *state) GetUnitFees() (commonfees.Dimensions, error) {
+	return s.unitFees, nil
 }
 
 func (s *state) SetUnitFees(uf commonfees.Dimensions) {
 	s.unitFees = uf
 }
 
-func (s *state) GetFeeWindows() commonfees.Windows {
-	return s.feesWindows
+func (s *state) GetFeeWindows() (commonfees.Windows, error) {
+	return s.feesWindows, nil
 }
 
 func (s *state) SetFeeWindows(windows commonfees.Windows) {

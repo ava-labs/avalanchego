@@ -143,13 +143,19 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	var (
-		feesCfg     = m.txExecutorBackend.Config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
-		unitFees    = stateDiff.GetUnitFees()
-		unitWindows = stateDiff.GetFeeWindows()
-	)
+	unitFees, err := stateDiff.GetUnitFees()
+	if err != nil {
+		return err
+	}
+	unitWindows, err := stateDiff.GetFeeWindows()
+	if err != nil {
+		return err
+	}
 
-	parentFeeManager := fees.NewManager(unitFees, unitWindows)
+	var (
+		feesCfg          = m.txExecutorBackend.Config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+		parentFeeManager = fees.NewManager(unitFees, unitWindows)
+	)
 	feeManager := parentFeeManager.ComputeNext(
 		stateDiff.GetTimestamp().Unix(),
 		nextBlkTime.Unix(),

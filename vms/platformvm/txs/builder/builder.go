@@ -373,15 +373,21 @@ func (b *builder) NewImportTx(
 		delete(importedAmounts, assetID)
 	}
 
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
 	var (
 		importedAVAX     = importedAmounts[b.ctx.AVAXAssetID] // the only entry left in importedAmounts
 		chainTime        = b.state.GetTimestamp()
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -505,13 +511,19 @@ func (b *builder) NewExportTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
-
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
 
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
@@ -583,14 +595,21 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -655,13 +674,19 @@ func (b *builder) NewCreateSubnetTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
-
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
 
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
@@ -750,14 +775,21 @@ func (b *builder) NewTransformSubnetTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -833,14 +865,21 @@ func (b *builder) NewAddValidatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -918,13 +957,19 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
-
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
 
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
@@ -994,13 +1039,19 @@ func (b *builder) NewAddDelegatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
-
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
 
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
@@ -1073,13 +1124,19 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
-
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
 
 		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
@@ -1152,14 +1209,21 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -1227,14 +1291,21 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -1306,14 +1377,21 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -1379,14 +1457,21 @@ func (b *builder) NewBaseTx(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
+	unitFees, err := b.state.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := b.state.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		chainTime        = b.state.GetTimestamp()
 		isEUpgradeActive = b.cfg.IsEUpgradeActivated(chainTime)
 		feeCfg           = b.cfg.GetDynamicFeesConfig(chainTime)
 
-		unitFees    = b.state.GetUnitFees()
-		unitWindows = b.state.GetFeeWindows()
-		feeCalc     = &fees.Calculator{
+		feeCalc = &fees.Calculator{
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,

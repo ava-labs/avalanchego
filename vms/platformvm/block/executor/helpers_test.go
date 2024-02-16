@@ -283,11 +283,17 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	var (
-		unitFees    = env.state.GetUnitFees()
-		unitWindows = env.state.GetFeeWindows()
-		feeCfg      = env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
-	)
+	unitFees, err := env.state.GetUnitFees()
+	if err != nil {
+		panic(err)
+	}
+
+	unitWindows, err := env.state.GetFeeWindows()
+	if err != nil {
+		panic(err)
+	}
+
+	feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
 		BlkFeeManager: fees.NewManager(unitFees, unitWindows),

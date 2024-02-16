@@ -37,8 +37,8 @@ type diff struct {
 
 	timestamp time.Time
 
-	unitFees             commonfees.Dimensions
-	consumedUnitsWindows commonfees.Windows
+	unitFees    *commonfees.Dimensions
+	feesWindows *commonfees.Windows
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -94,20 +94,54 @@ func NewDiffOn(parentState Chain) (Diff, error) {
 	})
 }
 
-func (d *diff) GetUnitFees() commonfees.Dimensions {
-	return d.unitFees
+func (d *diff) GetUnitFees() (commonfees.Dimensions, error) {
+	if d.unitFees == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfees.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentUnitFees, err := parentState.GetUnitFees()
+		if err != nil {
+			return commonfees.Empty, err
+		}
+
+		d.unitFees = new(commonfees.Dimensions)
+		*d.unitFees = parentUnitFees
+	}
+
+	return *d.unitFees, nil
 }
 
 func (d *diff) SetUnitFees(uf commonfees.Dimensions) {
-	d.unitFees = uf
+	if d.unitFees == nil {
+		d.unitFees = new(commonfees.Dimensions)
+	}
+	*d.unitFees = uf
 }
 
-func (d *diff) GetFeeWindows() commonfees.Windows {
-	return d.consumedUnitsWindows
+func (d *diff) GetFeeWindows() (commonfees.Windows, error) {
+	if d.feesWindows == nil {
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return commonfees.EmptyWindows, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		parentFeeWindows, err := parentState.GetFeeWindows()
+		if err != nil {
+			return commonfees.EmptyWindows, err
+		}
+
+		d.feesWindows = new(commonfees.Windows)
+		*d.feesWindows = parentFeeWindows
+	}
+
+	return *d.feesWindows, nil
 }
 
 func (d *diff) SetFeeWindows(windows commonfees.Windows) {
-	d.consumedUnitsWindows = windows
+	if d.feesWindows == nil {
+		d.feesWindows = new(commonfees.Windows)
+	}
+	*d.feesWindows = windows
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -422,8 +456,12 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
-	baseState.SetUnitFees(d.unitFees)
-	baseState.SetFeeWindows(d.consumedUnitsWindows)
+	if d.unitFees != nil {
+		baseState.SetUnitFees(*d.unitFees)
+	}
+	if d.feesWindows != nil {
+		baseState.SetFeeWindows(*d.feesWindows)
+	}
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}

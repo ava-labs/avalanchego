@@ -2900,8 +2900,9 @@ func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesRe
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	reply.UnitFees = s.vm.state.GetUnitFees()
-	return nil
+	var err error
+	reply.UnitFees, err = s.vm.state.GetUnitFees()
+	return err
 }
 
 // GetBlockUnitsCapReply is the response from GetBlockUnitsCap
@@ -2920,8 +2921,9 @@ func (s *Service) GetFeeWindows(_ *http.Request, _ *struct{}, reply *GetFeeWindo
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	reply.FeeWindows = s.vm.state.GetFeeWindows()
-	return nil
+	var err error
+	reply.FeeWindows, err = s.vm.state.GetFeeWindows()
+	return err
 }
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*avajson.Float32, error) {

@@ -349,11 +349,18 @@ func packBlockTxs(
 		return nil, err
 	}
 
+	unitFees, err := stateDiff.GetUnitFees()
+	if err != nil {
+		return nil, err
+	}
+	unitWindows, err := stateDiff.GetFeeWindows()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
-		feeCfg      = backend.Config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
-		unitFees    = stateDiff.GetUnitFees()
-		unitWindows = stateDiff.GetFeeWindows()
-		feeMan      = fees.NewManager(unitFees, unitWindows)
+		feeCfg = backend.Config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
+		feeMan = fees.NewManager(unitFees, unitWindows)
 
 		blockTxs []*txs.Tx
 		inputs   set.Set[ids.ID]

@@ -130,14 +130,16 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	var (
-		feeCfg     = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
-		unitFees   = env.state.GetUnitFees()
-		feeWindows = env.state.GetFeeWindows()
-	)
+	unitFees, err := env.state.GetUnitFees()
+	require.NoError(err)
+
+	unitWindows, err := env.state.GetFeeWindows()
+	require.NoError(err)
+
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(unitFees, feeWindows),
+		BlkFeeManager: commonfees.NewManager(unitFees, unitWindows),
 		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,
@@ -168,14 +170,16 @@ func TestCreateChainTxValid(t *testing.T) {
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	var (
-		feeCfg     = env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
-		unitFees   = env.state.GetUnitFees()
-		feeWindows = env.state.GetFeeWindows()
-	)
+	unitFees, err := env.state.GetUnitFees()
+	require.NoError(err)
+
+	unitWindows, err := env.state.GetFeeWindows()
+	require.NoError(err)
+
+	feeCfg := env.config.GetDynamicFeesConfig(stateDiff.GetTimestamp())
 	executor := StandardTxExecutor{
 		Backend:       &env.backend,
-		BlkFeeManager: commonfees.NewManager(unitFees, feeWindows),
+		BlkFeeManager: commonfees.NewManager(unitFees, unitWindows),
 		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         stateDiff,
 		Tx:            tx,

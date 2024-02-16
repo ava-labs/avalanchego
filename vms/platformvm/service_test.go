@@ -394,13 +394,17 @@ func TestGetBalance(t *testing.T) {
 		if idx == 0 {
 			// we use the first key to fund a subnet creation in [defaultGenesis].
 			// As such we need to account for the subnet creation fee
+			unitFees, err := service.vm.state.GetUnitFees()
+			require.NoError(err)
+
+			feeWindows, err := service.vm.state.GetFeeWindows()
+			require.NoError(err)
+
 			var (
-				chainTime  = service.vm.state.GetTimestamp()
-				feeCfg     = service.vm.Config.GetDynamicFeesConfig(chainTime)
-				unitFees   = service.vm.state.GetUnitFees()
-				feeWindows = service.vm.state.GetFeeWindows()
-				feeMan     = commonfees.NewManager(unitFees, feeWindows)
-				feeCalc    = &fees.Calculator{
+				chainTime = service.vm.state.GetTimestamp()
+				feeCfg    = service.vm.Config.GetDynamicFeesConfig(chainTime)
+				feeMan    = commonfees.NewManager(unitFees, feeWindows)
+				feeCalc   = &fees.Calculator{
 					IsEUpgradeActive: service.vm.IsEUpgradeActivated(chainTime),
 					Config:           &service.vm.Config,
 					ChainTime:        chainTime,
@@ -1055,8 +1059,8 @@ func TestGetUnitFees(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	unitFees := service.vm.state.GetUnitFees()
-
+	unitFees, err := service.vm.state.GetUnitFees()
+	require.NoError(err)
 	require.Equal(unitFees, reply.UnitFees)
 
 	updatedUnitFees := commonfees.Dimensions{
@@ -1082,7 +1086,8 @@ func TestGetFeeWindows(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	feeWindows := service.vm.state.GetFeeWindows()
+	feeWindows, err := service.vm.state.GetFeeWindows()
+	require.NoError(err)
 	require.Equal(feeWindows, reply.FeeWindows)
 
 	updatedFeeWindows := commonfees.Windows{

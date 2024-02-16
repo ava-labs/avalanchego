@@ -440,12 +440,19 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	func(),
 	error,
 ) {
+	unitFees, err := state.GetUnitFees()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	unitWindows, err := state.GetFeeWindows()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	var (
 		currentTimestamp = state.GetTimestamp()
 		isEForkActive    = v.txExecutorBackend.Config.IsEUpgradeActivated(currentTimestamp)
 		feesCfg          = v.txExecutorBackend.Config.GetDynamicFeesConfig(currentTimestamp)
-		unitFees         = state.GetUnitFees()
-		unitWindows      = state.GetFeeWindows()
 
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]
