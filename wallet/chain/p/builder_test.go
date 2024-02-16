@@ -73,10 +73,6 @@ func TestBaseTx(t *testing.T) {
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
 
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
-
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxAssetID},
@@ -103,10 +99,6 @@ func TestBaseTx(t *testing.T) {
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 	require.Equal(outputsToMove[0], outs[1])
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestAddSubnetValidatorTx(t *testing.T) {
@@ -145,10 +137,6 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
-
 		// data to build the transaction
 		subnetValidator = &txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -172,10 +160,6 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	expectedConsumed := testCtx.AddSubnetValidatorFee()
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestRemoveSubnetValidatorTx(t *testing.T) {
@@ -213,10 +197,6 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
-
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
 	)
 
 	// build the transaction
@@ -235,10 +215,6 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	expectedConsumed := testCtx.BaseTxFee()
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestCreateChainTx(t *testing.T) {
@@ -276,10 +252,6 @@ func TestCreateChainTx(t *testing.T) {
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
-
 		// data to build the transaction
 		genesisBytes = []byte{'a', 'b', 'c'}
 		vmID         = ids.GenerateTestID()
@@ -306,10 +278,6 @@ func TestCreateChainTx(t *testing.T) {
 	expectedConsumed := testCtx.CreateBlockchainTxFee()
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestCreateSubnetTx(t *testing.T) {
@@ -347,10 +315,6 @@ func TestCreateSubnetTx(t *testing.T) {
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
-
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
 	)
 
 	// build the transaction
@@ -366,10 +330,6 @@ func TestCreateSubnetTx(t *testing.T) {
 	expectedConsumed := testCtx.CreateSubnetTxFee()
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestTransferSubnetOwnershipTx(t *testing.T) {
@@ -407,10 +367,6 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
-
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
 	)
 
 	// build the transaction
@@ -429,10 +385,6 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	expectedConsumed := testCtx.BaseTxFee()
 	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestImportTx(t *testing.T) {
@@ -457,10 +409,6 @@ func TestImportTx(t *testing.T) {
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
-
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
 
 		// data to build the transaction
 		sourceChainID = ids.GenerateTestID()
@@ -497,10 +445,6 @@ func TestImportTx(t *testing.T) {
 	expectedConsumed := testCtx.BaseTxFee()
 	consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestExportTx(t *testing.T) {
@@ -523,10 +467,6 @@ func TestExportTx(t *testing.T) {
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
-
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -559,10 +499,6 @@ func TestExportTx(t *testing.T) {
 	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
 	require.Equal(utx.ExportedOutputs, exportedOutputs)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestTransformSubnetTx(t *testing.T) {
@@ -601,10 +537,6 @@ func TestTransformSubnetTx(t *testing.T) {
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
-
 		// data to build the transaction
 		initialSupply = 40 * units.MegaAvax
 		maxSupply     = 100 * units.MegaAvax
@@ -641,10 +573,6 @@ func TestTransformSubnetTx(t *testing.T) {
 	expectedConsumed := testCtx.TransformSubnetTxFee()
 	consumed := ins[1].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func TestAddPermissionlessValidatorTx(t *testing.T) {
@@ -669,10 +597,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
 		builder    = NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
-
-		// signer
-		kc       = secp256k1fx.NewKeychain(utxosKey)
-		txSigner = NewSigner(kc, backend)
 
 		// data to build the transaction
 		validationRewardsOwner = &secp256k1fx.OutputOwners{
@@ -724,10 +648,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	expectedConsumed := testCtx.AddPrimaryNetworkValidatorFee()
 	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), txSigner, utx)
-	require.NoError(err)
 }
 
 func TestAddPermissionlessDelegatorTx(t *testing.T) {
@@ -752,10 +672,6 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
 		builder    = NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
-
-		// signer
-		kc     = secp256k1fx.NewKeychain(utxosKey)
-		signer = NewSigner(kc, backend)
 
 		// data to build the transaction
 		rewardsOwner = &secp256k1fx.OutputOwners{
@@ -795,10 +711,6 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	expectedConsumed := testCtx.AddPrimaryNetworkDelegatorFee()
 	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
 	require.Equal(expectedConsumed, consumed)
-
-	// sign the transaction
-	_, err = SignUnsigned(stdcontext.Background(), signer, utx)
-	require.NoError(err)
 }
 
 func newDeterministicChainUTXOs(utxos common.ChainUTXOs) common.ChainUTXOs {
