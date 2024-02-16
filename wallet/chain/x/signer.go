@@ -15,7 +15,14 @@ import (
 var _ Signer = (*signer)(nil)
 
 type Signer interface {
-	SignUnsigned(ctx stdcontext.Context, tx txs.UnsignedTx) (*txs.Tx, error)
+	// Sign adds as many missing signatures as possible to the provided
+	// transaction.
+	//
+	// If there are already some signatures on the transaction, those signatures
+	// will not be removed.
+	//
+	// If the signer doesn't have the ability to provide a required signature,
+	// the signature slot will be skipped without reporting an error.
 	Sign(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
@@ -35,11 +42,6 @@ func NewSigner(kc keychain.Keychain, backend SignerBackend) Signer {
 	}
 }
 
-func (s *signer) SignUnsigned(ctx stdcontext.Context, utx txs.UnsignedTx) (*txs.Tx, error) {
-	tx := &txs.Tx{Unsigned: utx}
-	return tx, s.Sign(ctx, tx)
-}
-
 func (s *signer) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 	return tx.Unsigned.Visit(&signerVisitor{
 		kc:      s.kc,
@@ -47,4 +49,13 @@ func (s *signer) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 		ctx:     ctx,
 		tx:      tx,
 	})
+}
+
+func SignUnsigned(
+	ctx stdcontext.Context,
+	signer Signer,
+	utx txs.UnsignedTx,
+) (*txs.Tx, error) {
+	tx := &txs.Tx{Unsigned: utx}
+	return tx, signer.Sign(ctx, tx)
 }
