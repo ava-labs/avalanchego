@@ -542,6 +542,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	t.Ctx.Log.Info("consensus starting",
 		zap.Stringer("lastAcceptedBlock", lastAcceptedID),
+		zap.Stringer("chainID", t.Ctx.ChainID),
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
