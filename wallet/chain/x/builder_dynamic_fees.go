@@ -38,7 +38,7 @@ func NewDynamicFeesBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) *
 
 func (b *DynamicFeesBuilder) NewBaseTx(
 	outputs []*avax.TransferableOutput,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
 	// 1. Build core transaction without utxos
@@ -64,14 +64,6 @@ func (b *DynamicFeesBuilder) NewBaseTx(
 		toBurn[assetID] = amountToBurn
 	}
 
-	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		Codec:            Parser.Codec(),
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
-
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.BaseTx(utx); err != nil {
 		return nil, err
@@ -95,7 +87,7 @@ func (b *DynamicFeesBuilder) NewCreateAssetTx(
 	symbol string,
 	denomination byte,
 	initialState map[uint32][]verify.State,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.CreateAssetTx, error) {
 	// 1. Build core transaction without utxos
@@ -128,13 +120,6 @@ func (b *DynamicFeesBuilder) NewCreateAssetTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		Codec:            Parser.Codec(),
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.CreateAssetTx(utx); err != nil {
@@ -154,7 +139,7 @@ func (b *DynamicFeesBuilder) NewCreateAssetTx(
 
 func (b *DynamicFeesBuilder) NewOperationTx(
 	operations []*txs.Operation,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	// 1. Build core transaction without utxos
@@ -173,13 +158,6 @@ func (b *DynamicFeesBuilder) NewOperationTx(
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
-	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		Codec:            Parser.Codec(),
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.OperationTx(utx); err != nil {
@@ -199,7 +177,7 @@ func (b *DynamicFeesBuilder) NewOperationTx(
 
 func (b *DynamicFeesBuilder) NewOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -209,8 +187,7 @@ func (b *DynamicFeesBuilder) NewOperationTxMintFT(
 	}
 	return b.NewOperationTx(
 		operations,
-		unitFees,
-		unitCaps,
+		feeCalc,
 		options...,
 	)
 }
@@ -219,7 +196,7 @@ func (b *DynamicFeesBuilder) NewOperationTxMintNFT(
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -229,8 +206,7 @@ func (b *DynamicFeesBuilder) NewOperationTxMintNFT(
 	}
 	return b.NewOperationTx(
 		operations,
-		unitFees,
-		unitCaps,
+		feeCalc,
 		options...,
 	)
 }
@@ -238,7 +214,7 @@ func (b *DynamicFeesBuilder) NewOperationTxMintNFT(
 func (b *DynamicFeesBuilder) NewOperationTxMintProperty(
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -248,15 +224,14 @@ func (b *DynamicFeesBuilder) NewOperationTxMintProperty(
 	}
 	return b.NewOperationTx(
 		operations,
-		unitFees,
-		unitCaps,
+		feeCalc,
 		options...,
 	)
 }
 
 func (b *DynamicFeesBuilder) NewOperationTxBurnProperty(
 	assetID ids.ID,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
@@ -266,8 +241,7 @@ func (b *DynamicFeesBuilder) NewOperationTxBurnProperty(
 	}
 	return b.NewOperationTx(
 		operations,
-		unitFees,
-		unitCaps,
+		feeCalc,
 		options...,
 	)
 }
@@ -275,7 +249,7 @@ func (b *DynamicFeesBuilder) NewOperationTxBurnProperty(
 func (b *DynamicFeesBuilder) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
 	ops := common.NewOptions(options)
@@ -364,13 +338,6 @@ func (b *DynamicFeesBuilder) NewImportTx(
 	}
 
 	// 3. Finance fees as much as possible with imported, Avax-denominated UTXOs
-	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		Codec:            Parser.Codec(),
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
-	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.ImportTx(utx); err != nil {
@@ -448,7 +415,7 @@ func (b *DynamicFeesBuilder) NewImportTx(
 func (b *DynamicFeesBuilder) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
-	unitFees, unitCaps commonfees.Dimensions,
+	feeCalc *fees.Calculator,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	// 1. Build core transaction without utxos
@@ -474,14 +441,6 @@ func (b *DynamicFeesBuilder) NewExportTx(
 			return nil, err
 		}
 		toBurn[assetID] = amountToBurn
-	}
-
-	feesMan := commonfees.NewManager(unitFees, commonfees.EmptyWindows)
-	feeCalc := &fees.Calculator{
-		IsEUpgradeActive: true,
-		Codec:            Parser.Codec(),
-		FeeManager:       feesMan,
-		ConsumedUnitsCap: unitCaps,
 	}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far

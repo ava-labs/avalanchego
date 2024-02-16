@@ -52,13 +52,17 @@ func TestBaseTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	be := mocks.NewMockBuilderBackend(ctrl)
-
 	var (
 		utxosKey           = testKeys[1]
 		utxoAddr           = utxosKey.PublicKey().Address()
 		utxos, avaxAssetID = testUTXOsList(utxosKey)
 
+		be  = mocks.NewMockBuilderBackend(ctrl)
+		kc  = secp256k1fx.NewKeychain(utxosKey)
+		sbe = mocks.NewMockSignerBackend(ctrl)
+		s   = NewSigner(kc, sbe)
+
+		// data to build tx
 		outputsToMove = []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -71,41 +75,38 @@ func TestBaseTx(t *testing.T) {
 		}}
 	)
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
-
+	// set expectations
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
-	be.EXPECT().BlockchainID().Return(constants.PlatformChainID)
-	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
-	utx, err := b.NewBaseTx(
-		outputsToMove,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
-	)
-	require.NoError(err)
-
-	var (
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
-	)
-
+	be.EXPECT().BlockchainID().Return(constants.PlatformChainID).AnyTimes()
+	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil).AnyTimes()
 	for _, utxo := range utxos {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
+
+	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+
+	// Post E-Upgrade
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Codec:            Parser.Codec(),
+	}
+	utx, err := b.NewBaseTx(
+		outputsToMove,
+		feeCalc,
+	)
+	require.NoError(err)
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
 		IsEUpgradeActive: true,
-		Codec:            Parser.Codec(),
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Codec:            Parser.Codec(),
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
@@ -123,12 +124,15 @@ func TestCreateAssetTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	be := mocks.NewMockBuilderBackend(ctrl)
-
 	var (
 		utxosKey           = testKeys[1]
 		utxoAddr           = utxosKey.PublicKey().Address()
 		utxos, avaxAssetID = testUTXOsList(utxosKey)
+
+		be  = mocks.NewMockBuilderBackend(ctrl)
+		kc  = secp256k1fx.NewKeychain(utxosKey)
+		sbe = mocks.NewMockSignerBackend(ctrl)
+		s   = NewSigner(kc, sbe)
 
 		assetName          = "Team Rocket"
 		symbol             = "TR"
@@ -180,44 +184,42 @@ func TestCreateAssetTx(t *testing.T) {
 		}
 	)
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
-
+	// set expectations
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().BlockchainID().Return(constants.PlatformChainID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
+	for _, utxo := range utxos {
+		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
+	}
+
+	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+
+	// Post E-Upgrade
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Codec:            Parser.Codec(),
+	}
 
 	utx, err := b.NewCreateAssetTx(
 		assetName,
 		symbol,
 		denomination,
 		initialState,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
-
-	var (
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
-	)
-
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
 		IsEUpgradeActive: true,
-		Codec:            Parser.Codec(),
 		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
 		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Codec:            Parser.Codec(),
 		Credentials:      tx.Creds,
 	}
 	require.NoError(utx.Visit(fc))
@@ -234,13 +236,16 @@ func TestImportTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	be := mocks.NewMockBuilderBackend(ctrl)
-
 	var (
 		utxosKey           = testKeys[1]
 		utxoAddr           = utxosKey.PublicKey().Address()
 		sourceChainID      = ids.GenerateTestID()
 		utxos, avaxAssetID = testUTXOsList(utxosKey)
+
+		be  = mocks.NewMockBuilderBackend(ctrl)
+		kc  = secp256k1fx.NewKeychain(utxosKey)
+		sbe = mocks.NewMockSignerBackend(ctrl)
+		s   = NewSigner(kc, sbe)
 
 		importKey = testKeys[0]
 		importTo  = &secp256k1fx.OutputOwners{
@@ -250,38 +255,35 @@ func TestImportTx(t *testing.T) {
 			},
 		}
 	)
-
 	importedUtxo := utxos[0]
 	utxos = utxos[1:]
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().BlockchainID().Return(constants.PlatformChainID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), sourceChainID).Return([]*avax.UTXO{importedUtxo}, nil)
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
-
-	utx, err := b.NewImportTx(
-		sourceChainID,
-		importTo,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
-	)
-	require.NoError(err)
-
-	var (
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
-	)
-
 	sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), importedUtxo.InputID()).Return(importedUtxo, nil).AnyTimes()
 	for _, utxo := range utxos {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
+
+	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+
+	// Post E-Upgrade
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Codec:            Parser.Codec(),
+	}
+
+	utx, err := b.NewImportTx(
+		sourceChainID,
+		importTo,
+		feeCalc,
+	)
+	require.NoError(err)
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
@@ -309,13 +311,16 @@ func TestExportTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	be := mocks.NewMockBuilderBackend(ctrl)
-
 	var (
 		utxosKey           = testKeys[1]
 		utxoAddr           = utxosKey.PublicKey().Address()
 		subnetID           = ids.GenerateTestID()
 		utxos, avaxAssetID = testUTXOsList(utxosKey)
+
+		be  = mocks.NewMockBuilderBackend(ctrl)
+		kc  = secp256k1fx.NewKeychain(utxosKey)
+		sbe = mocks.NewMockSignerBackend(ctrl)
+		s   = NewSigner(kc, sbe)
 
 		exportedOutputs = []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxAssetID},
@@ -329,32 +334,30 @@ func TestExportTx(t *testing.T) {
 		}}
 	)
 
-	b := &DynamicFeesBuilder{
-		addrs:   set.Of(utxoAddr),
-		backend: be,
-	}
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
 	be.EXPECT().BlockchainID().Return(constants.PlatformChainID)
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
+	for _, utxo := range utxos {
+		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
+	}
+
+	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+
+	// Post E-Upgrade
+	feeCalc := &fees.Calculator{
+		IsEUpgradeActive: true,
+		FeeManager:       commonfees.NewManager(testUnitFees, commonfees.EmptyWindows),
+		ConsumedUnitsCap: testBlockMaxConsumedUnits,
+		Codec:            Parser.Codec(),
+	}
 
 	utx, err := b.NewExportTx(
 		subnetID,
 		exportedOutputs,
-		testUnitFees,
-		testBlockMaxConsumedUnits,
+		feeCalc,
 	)
 	require.NoError(err)
-
-	var (
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
-	)
-
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
 	require.NoError(err)
