@@ -84,7 +84,7 @@ func TestBaseTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
@@ -193,7 +193,7 @@ func TestCreateAssetTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
@@ -268,7 +268,7 @@ func TestImportTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
@@ -342,7 +342,7 @@ func TestExportTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
