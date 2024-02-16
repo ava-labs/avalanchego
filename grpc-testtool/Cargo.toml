@@ -33,8 +33,16 @@ serde = { version = "1.0.196", features = ["derive"] }
 [build-dependencies]
 tonic-build = "0.11.0"
 
+[dev-dependencies]
+criterion = {version = "0.5.1", features = ["async_tokio"]}
+rand = "0.8.5"
+
 [lints.rust]
 unsafe_code = "deny"
+
+[[bench]]
+name = "insert"
+harness = false
 
 [lints.clippy]
 unwrap_used = "warn"

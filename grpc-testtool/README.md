@@ -21,29 +21,9 @@ There are 3 RPC specs that must be implemented:
 
 # Running
 
-To run a single test and make sure things are working, first check out and build the go and rust code.
-These have to be in the same directory. See the corresponding README for specific build requirements.
+To test the release version of firewood, just run `RUST_MIN_STACK=7000000 cargo bench`. If you make some changes and then
+run it again, it will give you a report showing how much it sped up or slowed down.
 
-```sh
-BASE=$HOME
-cd $BASE && git clone git@github.com:ava-labs/merkledb-tester.git
-cd $BASE && git clone git@github.com:ava-labs/firewood.git
-```
-
-Then, build the rust process server and symlink it to where the testtool expects it:
-
-```sh
-cd $BASE/firewood
-cargo build --release
-ln -sf $BASE/firewood/target/release/process-server $BASE/merkledb-tester/process/process-server
-```
-
-Then, run the test you want:
-
-```sh
-export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
-export CGO_ENABLED=1
-export GOPROXY=https://proxy.golang.org
-cd $BASE/merkledb-tester
-./scripts/test.sh
-```
+If you want to run this against merkledb, first build the process-server following the instructions in
+the [merkledb-tester](https://github.com/ava-labs/merkledb-tester) directory, then modify your PATH so
+that `process-server` from the merkledbexecutable is found first, then run `cargo bench`.
