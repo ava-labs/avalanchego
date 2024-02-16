@@ -392,7 +392,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 			{ // fee asset
 				Asset: avax.Asset{ID: feeAssetCreateTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - expectedFee,
+					Amt: 1,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
