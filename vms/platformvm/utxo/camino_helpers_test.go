@@ -87,10 +87,9 @@ func defaultConfig() *config.Config {
 
 func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range preFundedKeys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -103,7 +102,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}

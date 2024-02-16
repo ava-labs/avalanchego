@@ -106,7 +106,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
+	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 
@@ -114,12 +114,12 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
-	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, fx, true)
+	utxoHandler := utxo.NewCaminoHandler(ctx, clk, fx, true)
 
 	txBuilder := builder.NewCamino(
 		ctx,
 		&config,
-		&clk,
+		clk,
 		fx,
 		baseState,
 		atomicUTXOs,
@@ -129,7 +129,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 	backend := Backend{
 		Config:       &config,
 		Ctx:          ctx,
-		Clk:          &clk,
+		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
 		Fx:           fx,
 		FlowChecker:  utxoHandler,
@@ -140,7 +140,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 	env := &caminoEnvironment{
 		isBootstrapped: &isBootstrapped,
 		config:         &config,
-		clk:            &clk,
+		clk:            clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
 		msm:            msm,
@@ -279,9 +279,8 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 
 func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []byte {
 	genesisUTXOs := make([]api.UTXO, len(caminoPreFundedKeys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range caminoPreFundedKeys {
-		addr, err := address.FormatBech32(hrp, key.PublicKey().Address().Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, key.PublicKey().Address().Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -297,7 +296,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 
 	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
 	for i, key := range caminoPreFundedKeys {
-		addr, err := address.FormatBech32(hrp, key.PublicKey().Address().Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, key.PublicKey().Address().Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -322,7 +321,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   ctx.AVAXAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
@@ -640,7 +639,7 @@ func newCaminoEnvironmentWithMocks(
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
+	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(vmConfig.RewardConfig)
 
@@ -655,12 +654,12 @@ func newCaminoEnvironmentWithMocks(
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(defaultState)
-	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, fx, true)
+	utxoHandler := utxo.NewCaminoHandler(ctx, clk, fx, true)
 
 	return &caminoEnvironment{
 		isBootstrapped: &isBootstrapped,
 		config:         &vmConfig,
-		clk:            &clk,
+		clk:            clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
 		msm:            msm,
@@ -673,7 +672,7 @@ func newCaminoEnvironmentWithMocks(
 		txBuilder: builder.NewCamino(
 			ctx,
 			&vmConfig,
-			&clk,
+			clk,
 			fx,
 			defaultState,
 			atomicUTXOs,
@@ -682,7 +681,7 @@ func newCaminoEnvironmentWithMocks(
 		backend: Backend{
 			Config:       &vmConfig,
 			Ctx:          ctx,
-			Clk:          &clk,
+			Clk:          clk,
 			Bootstrapped: &isBootstrapped,
 			Fx:           fx,
 			FlowChecker:  utxoHandler,

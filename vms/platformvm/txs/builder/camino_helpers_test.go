@@ -404,9 +404,8 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 
 func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []byte {
 	genesisUTXOs := make([]api.UTXO, len(caminoPreFundedKeys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range caminoPreFundedKeys {
-		addr, err := address.FormatBech32(hrp, key.PublicKey().Address().Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, key.PublicKey().Address().Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -422,7 +421,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 
 	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
 	for i, key := range caminoPreFundedKeys {
-		addr, err := address.FormatBech32(hrp, key.PublicKey().Address().Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, key.PublicKey().Address().Bytes())
 		if err != nil {
 			panic(err)
 		}

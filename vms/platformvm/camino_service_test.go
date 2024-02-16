@@ -29,10 +29,8 @@ import (
 
 // Test method GetBalance in CaminoService
 func TestGetCaminoBalance(t *testing.T) {
-	hrp := constants.NetworkIDToHRP[testNetworkID]
-
 	id := caminoPreFundedKeys[0].PublicKey().Address()
-	addr, err := address.FormatBech32(hrp, id.Bytes())
+	addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -396,9 +394,8 @@ func TestGetFakeKeys(t *testing.T) {
 }
 
 func TestSpend(t *testing.T) {
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	id := keys[0].PublicKey().Address()
-	addr, err := address.FormatBech32(hrp, id.Bytes())
+	addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 	require.NoError(t, err)
 
 	service := defaultCaminoService(

@@ -86,3 +86,17 @@ func (mr *MockCacherMockRecorder[K, V]) Put(arg0, arg1 interface{}) *gomock.Call
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockCacher[K, V])(nil).Put), arg0, arg1)
 }
+
+// PortionFilled mocks base method.
+func (m *MockCacher[K, V]) PortionFilled()float64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PortionFilled")
+	ret0, _ := ret[0].(float64)
+	return ret0
+}
+
+// PortionFilled indicates an expected call of PortionFilled.
+func (mr *MockCacherMockRecorder[K, V]) PortionFilled() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PortionFilled", reflect.TypeOf((*MockCacher[K, V])(nil).PortionFilled))
+}

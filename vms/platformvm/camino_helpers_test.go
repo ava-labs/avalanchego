@@ -155,8 +155,6 @@ func defaultCaminoConfig(postBanff bool) config.Config { //nolint:unparam
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
 func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []api.UTXO, starttime *time.Time) (*api.BuildGenesisArgs, []byte) {
-	hrp := constants.NetworkIDToHRP[testNetworkID]
-
 	if starttime == nil {
 		starttime = &defaultValidateStartTime
 	}
@@ -166,7 +164,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 
 	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
 	for i, key := range caminoPreFundedKeys {
-		addr, err := address.FormatBech32(hrp, key.PublicKey().Address().Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, key.PublicKey().Address().Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -195,7 +193,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,

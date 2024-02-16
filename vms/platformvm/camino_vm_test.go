@@ -42,8 +42,7 @@ import (
 func TestRemoveDeferredValidator(t *testing.T) {
 	require := require.New(t)
 	addr := caminoPreFundedKeys[0].Address()
-	hrp := constants.NetworkIDToHRP[testNetworkID]
-	bech32Addr, err := address.FormatBech32(hrp, addr.Bytes())
+	bech32Addr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 	require.NoError(err)
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
@@ -228,8 +227,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 func TestRemoveReactivatedValidator(t *testing.T) {
 	require := require.New(t)
 	addr := caminoPreFundedKeys[0].Address()
-	hrp := constants.NetworkIDToHRP[testNetworkID]
-	bech32Addr, err := address.FormatBech32(hrp, addr.Bytes())
+	bech32Addr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 	require.NoError(err)
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
@@ -427,7 +425,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 	depositOwnerKey, depositOwnerAddr, depositOwner := generateKeyAndOwner(t)
 	ownerID, err := txs.GetOwnerID(depositOwner)
 	require.NoError(err)
-	depositOwnerAddrBech32, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], depositOwnerAddr.Bytes())
+	depositOwnerAddrBech32, err := address.FormatBech32(constants.UnitTestHRP, depositOwnerAddr.Bytes())
 	require.NoError(err)
 
 	depositOffer := &deposit.Offer{
@@ -501,9 +499,9 @@ func TestDepositsAutoUnlock(t *testing.T) {
 
 func TestProposals(t *testing.T) {
 	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
-	proposerAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], proposerAddr.Bytes())
+	proposerAddrStr, err := address.FormatBech32(constants.UnitTestHRP, proposerAddr.Bytes())
 	require.NoError(t, err)
-	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
+	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.UnitTestHRP, caminoPreFundedKeys[0].Address().Bytes())
 	require.NoError(t, err)
 
 	defaultConfig := defaultCaminoConfig(true)
@@ -701,9 +699,9 @@ func TestAdminProposals(t *testing.T) {
 	require := require.New(t)
 
 	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
-	proposerAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], proposerAddr.Bytes())
+	proposerAddrStr, err := address.FormatBech32(constants.UnitTestHRP, proposerAddr.Bytes())
 	require.NoError(err)
-	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
+	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.UnitTestHRP, caminoPreFundedKeys[0].Address().Bytes())
 	require.NoError(err)
 
 	applicantAddr := proposerAddr
@@ -821,7 +819,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 	proposerMemberKey := caminoPreFundedKeys[0]
 	fundsKey := caminoPreFundedKeys[0]
 	fundsAddr := caminoPreFundedKeys[0].Address()
-	fundsKeyAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], fundsKey.Address().Bytes())
+	fundsKeyAddrStr, err := address.FormatBech32(constants.UnitTestHRP, fundsKey.Address().Bytes())
 	require.NoError(t, err)
 
 	defaultConfig := defaultCaminoConfig(true)
