@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -221,7 +220,7 @@ func (b *builder) NewBaseTx(
 	utx := &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: b.backend.BlockchainID(),
 			Memo:         ops.Memo(),
 			Outs:         outputs, // not sorted yet, we'll sort later on when we have all the outputs
 		},
@@ -415,7 +414,7 @@ func (b *builder) NewImportTx(
 	utx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: b.backend.BlockchainID(),
 			Memo:         ops.Memo(),
 		}},
 		SourceChain: chainID,
@@ -436,10 +435,11 @@ func (b *builder) NewImportTx(
 		importedSigIndices = make([][]uint32, 0)
 		importedAmounts    = make(map[ids.ID]uint64)
 	)
-
+	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
+			// Can't import an unknown transfer output type
 			continue
 		}
 
@@ -452,6 +452,7 @@ func (b *builder) NewImportTx(
 		importedInputs = append(importedInputs, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
+			FxID:   secp256k1fx.ID,
 			In: &secp256k1fx.TransferInput{
 				Amt: out.Amt,
 				Input: secp256k1fx.Input{
@@ -488,6 +489,7 @@ func (b *builder) NewImportTx(
 
 		utx.Outs = append(utx.Outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
+			FxID:  secp256k1fx.ID,
 			Out: &secp256k1fx.TransferOutput{
 				Amt:          amount,
 				OutputOwners: *to,
@@ -583,7 +585,7 @@ func (b *builder) NewExportTx(
 	utx := &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: b.backend.BlockchainID(),
 			Memo:         ops.Memo(),
 		}},
 		DestinationChain: chainID,
@@ -667,7 +669,7 @@ func (b *builder) financeTx(
 	err error,
 ) {
 	avaxAssetID := b.backend.AVAXAssetID()
-	utxos, err := b.backend.UTXOs(options.Context(), constants.PlatformChainID)
+	utxos, err := b.backend.UTXOs(options.Context(), b.backend.BlockchainID())
 	if err != nil {
 		return nil, nil, err
 	}

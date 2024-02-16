@@ -5,10 +5,10 @@ package x
 
 import (
 	"errors"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -197,6 +197,7 @@ func (w *wallet) IssueBaseTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -225,6 +226,7 @@ func (w *wallet) IssueCreateAssetTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -250,6 +252,7 @@ func (w *wallet) IssueOperationTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -275,6 +278,7 @@ func (w *wallet) IssueOperationTxMintFT(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -302,6 +306,7 @@ func (w *wallet) IssueOperationTxMintNFT(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -328,6 +333,7 @@ func (w *wallet) IssueOperationTxMintProperty(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -353,6 +359,7 @@ func (w *wallet) IssueOperationTxBurnProperty(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -379,6 +386,7 @@ func (w *wallet) IssueImportTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -405,6 +413,7 @@ func (w *wallet) IssueExportTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
+			Codec:            Parser.Codec(),
 		}
 	)
 
@@ -479,7 +488,7 @@ func (w *wallet) refreshFork(_ ...common.Option) {
 	// if err != nil {
 	// 	return err
 	// }
-	chainTime := time.Time{}
+	chainTime := mockable.MaxTime // assume fork is already active
 
 	w.isEForkActive = !chainTime.Before(eForkTime)
 	if w.isEForkActive {
