@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -141,6 +142,14 @@ type peer struct {
 	// options of ACPs provided in the Handshake message.
 	supportedACPs set.Set[uint32]
 	objectedACPs  set.Set[uint32]
+
+	// txIDOfVerifiedBLSKey is the txID that added the BLS key that was most
+	// recently verified to have signed the IP.
+	//
+	// Invariant: Prior to the handshake being completed, this can only be
+	// accessed by the reader goroutine. After the handshake has been completed,
+	// this can only be accessed by the message sender goroutine.
+	txIDOfVerifiedBLSKey ids.ID
 
 	observedUptimesLock sync.RWMutex
 	// [observedUptimesLock] must be held while accessing [observedUptime]
@@ -698,16 +707,11 @@ func (p *peer) sendNetworkMessages() {
 				return
 			}
 
-			if p.finishedHandshake.Get() {
-				if err := p.VersionCompatibility.Compatible(p.version); err != nil {
-					p.Log.Debug("disconnecting from peer",
-						zap.String("reason", "version not compatible"),
-						zap.Stringer("nodeID", p.id),
-						zap.Stringer("peerVersion", p.version),
-						zap.Error(err),
-					)
-					return
-				}
+			// Only check if we should disconnect after the handshake is
+			// finished to avoid race conditions and accessing uninitialized
+			// values.
+			if p.finishedHandshake.Get() && p.shouldDisconnect() {
+				return
 			}
 
 			primaryUptime, subnetUptimes := p.getUptimes()
@@ -726,6 +730,68 @@ func (p *peer) sendNetworkMessages() {
 			return
 		}
 	}
+}
+
+// shouldDisconnect is called both during receipt of the Handshake message and
+// periodically when sending a Ping message (after finishing the handshake!).
+//
+// It is called during the Handshake to prevent marking a peer as connected and
+// then immediately disconnecting from them.
+//
+// It is called when sending a Ping message to account for validator set
+// changes. It's called when sending a Ping rather than in a validator set
+// callback to avoid signature verification on the P-chain accept path.
+func (p *peer) shouldDisconnect() bool {
+	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "version not compatible"),
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("peerVersion", p.version),
+			zap.Error(err),
+		)
+		return true
+	}
+
+	// Enforce that all validators that have registered a BLS key are signing
+	// their IP with it after the activation of Durango.
+	vdr, ok := p.Validators.GetValidator(constants.PrimaryNetworkID, p.id)
+	if !ok || vdr.PublicKey == nil || vdr.TxID == p.txIDOfVerifiedBLSKey {
+		return false
+	}
+
+	postDurango := p.Clock.Time().After(version.GetDurangoTime(constants.MainnetID))
+	if postDurango && p.ip.BLSSignature == nil {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "missing BLS signature"),
+			zap.Stringer("nodeID", p.id),
+		)
+		return true
+	}
+
+	// If Durango hasn't activated on mainnet yet, we don't require BLS
+	// signatures to be provided. However, if they are provided, verify that
+	// they are correct.
+	if p.ip.BLSSignature == nil {
+		return false
+	}
+
+	validSignature := bls.VerifyProofOfPossession(
+		vdr.PublicKey,
+		p.ip.BLSSignature,
+		p.ip.UnsignedIP.bytes(),
+	)
+	if !validSignature {
+		p.Log.Debug("disconnecting from peer",
+			zap.String("reason", "invalid BLS signature"),
+			zap.Stringer("nodeID", p.id),
+		)
+		return true
+	}
+
+	// Avoid unnecessary signature verifications by only verifing the signature
+	// once per validation period.
+	p.txIDOfVerifiedBLSKey = vdr.TxID
+	return false
 }
 
 func (p *peer) handle(msg message.InboundMessage) {
@@ -966,16 +1032,6 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		}
 	}
 
-	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
-		p.Log.Verbo("peer version not compatible",
-			zap.Stringer("nodeID", p.id),
-			zap.Stringer("peerVersion", p.version),
-			zap.Error(err),
-		)
-		p.StartClose()
-		return
-	}
-
 	// handle subnet IDs
 	for _, subnetIDBytes := range msg.TrackedSubnets {
 		subnetID, err := ids.ToID(subnetIDBytes)
@@ -1078,13 +1134,13 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			Timestamp: msg.IpSigningTime,
 		},
 		TLSSignature: msg.IpNodeIdSig,
-		// TODO: Populate the BLS Signature here.
 	}
 	maxTimestamp := myTime.Add(p.MaxClockDifference)
 	if err := p.ip.Verify(p.cert, maxTimestamp); err != nil {
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			p.Log.Warn("beacon has invalid signature or is out of sync",
 				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "tls"),
 				zap.Uint64("peerTime", msg.MyTime),
 				zap.Uint64("myTime", myTimeUnix),
 				zap.Error(err),
@@ -1092,12 +1148,38 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		} else {
 			p.Log.Debug("peer has invalid signature or is out of sync",
 				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "tls"),
 				zap.Uint64("peerTime", msg.MyTime),
 				zap.Uint64("myTime", myTimeUnix),
 				zap.Error(err),
 			)
 		}
 
+		p.StartClose()
+		return
+	}
+
+	// TODO: After v1.11.x is activated, require the key to be provided.
+	if len(msg.IpBlsSig) > 0 {
+		signature, err := bls.SignatureFromBytes(msg.IpBlsSig)
+		if err != nil {
+			p.Log.Debug("peer has malformed signature",
+				zap.Stringer("nodeID", p.id),
+				zap.String("signatureType", "bls"),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
+
+		p.ip.BLSSignature = signature
+		p.ip.BLSSignatureBytes = msg.IpBlsSig
+	}
+
+	// If the peer is running an incompatible version or has an invalid BLS
+	// signature, disconnect from them prior to marking the handshake as
+	// completed.
+	if p.shouldDisconnect() {
 		p.StartClose()
 		return
 	}
