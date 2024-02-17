@@ -10,7 +10,6 @@ use futures::{
     Future,
 };
 
-use std::convert::{TryFrom, TryInto};
 use std::mem::MaybeUninit;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
@@ -24,10 +23,12 @@ use std::{
     marker::PhantomData,
 };
 
+use strum_macros::FromRepr;
+
 pub use crate::walerror::WalError;
 
+#[derive(Debug, FromRepr)]
 enum WalRingType {
-    #[allow(dead_code)]
     Null = 0x0,
     Full,
     First,
@@ -43,20 +44,6 @@ struct WalRingBlob {
     rsize: u32,
     rtype: u8,
     // payload follows
-}
-
-impl TryFrom<u8> for WalRingType {
-    type Error = ();
-    fn try_from(v: u8) -> Result<Self, Self::Error> {
-        match v {
-            x if x == WalRingType::Null as u8 => Ok(WalRingType::Null),
-            x if x == WalRingType::Full as u8 => Ok(WalRingType::Full),
-            x if x == WalRingType::First as u8 => Ok(WalRingType::First),
-            x if x == WalRingType::Middle as u8 => Ok(WalRingType::Middle),
-            x if x == WalRingType::Last as u8 => Ok(WalRingType::Last),
-            _ => Err(()),
-        }
-    }
 }
 
 type WalFileId = u64;
@@ -812,8 +799,8 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                 let (header, payload) = ring;
                 #[allow(clippy::unwrap_used)]
                 let payload = payload.unwrap();
-                match header.rtype.try_into() {
-                    Ok(WalRingType::Full) => {
+                match WalRingType::from_repr(header.rtype as usize) {
+                    Some(WalRingType::Full) => {
                         assert!(chunks.is_none());
                         if !WalLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
                             return Err(WalError::InvalidChecksum);
@@ -821,7 +808,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         off += header.rsize as u64;
                         records.push(payload);
                     }
-                    Ok(WalRingType::First) => {
+                    Some(WalRingType::First) => {
                         if !WalLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
                             return Err(WalError::InvalidChecksum);
                         }
@@ -838,7 +825,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         }
                         off += header.rsize as u64;
                     }
-                    Ok(WalRingType::Middle) => {
+                    Some(WalRingType::Middle) => {
                         if let Some(chunks) = &mut chunks {
                             chunks.push(payload);
                         } else {
@@ -846,13 +833,13 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         }
                         off += header.rsize as u64;
                     }
-                    Ok(WalRingType::Last) => {
+                    Some(WalRingType::Last) => {
                         assert!(chunks.is_none());
                         chunks = Some(vec![payload]);
                         off += header.rsize as u64;
                     }
-                    Ok(WalRingType::Null) => break,
-                    Err(_) => match recover_policy {
+                    Some(WalRingType::Null) => break,
+                    None => match recover_policy {
                         RecoverPolicy::Strict => {
                             return Err(WalError::Other(
                                 "invalid ring type - strict recovery requested".to_string(),
@@ -1022,11 +1009,11 @@ impl WalLoader {
                 let header = *header.first()?;
 
                 let payload;
-                match header.rtype.try_into() {
-                    Ok(WalRingType::Full)
-                    | Ok(WalRingType::First)
-                    | Ok(WalRingType::Middle)
-                    | Ok(WalRingType::Last) => {
+                match WalRingType::from_repr(header.rtype as usize) {
+                    Some(WalRingType::Full)
+                    | Some(WalRingType::First)
+                    | Some(WalRingType::Middle)
+                    | Some(WalRingType::Last) => {
                         payload = if read_payload {
                             Some(check!(check!(
                                 v.file.read(v.off, header.rsize as usize).await
@@ -1037,8 +1024,8 @@ impl WalLoader {
                         };
                         v.off += header.rsize as u64;
                     }
-                    Ok(WalRingType::Null) => _yield!(),
-                    Err(_) => match recover_policy {
+                    Some(WalRingType::Null) => _yield!(),
+                    None => match recover_policy {
                         RecoverPolicy::Strict => die!(),
                         RecoverPolicy::BestEffort => {
                             v.done = true;
@@ -1130,8 +1117,8 @@ impl WalLoader {
                     v.off += msize as u64;
                     let header: WalRingBlob = *cast_slice(&header_raw).first()?;
                     let rsize = header.rsize;
-                    match header.rtype.try_into() {
-                        Ok(WalRingType::Full) => {
+                    match WalRingType::from_repr(header.rtype as usize) {
+                        Some(WalRingType::Full) => {
                             assert!(v.chunks.is_none());
                             let payload = check!(check!(v.file.read(v.off, rsize as usize).await)
                                 .ok_or(WalError::Other));
@@ -1150,7 +1137,7 @@ impl WalLoader {
                                 header.counter
                             ))
                         }
-                        Ok(WalRingType::First) => {
+                        Some(WalRingType::First) => {
                             assert!(v.chunks.is_none());
                             let chunk = check!(check!(v.file.read(v.off, rsize as usize).await)
                                 .ok_or(WalError::Other));
@@ -1160,7 +1147,7 @@ impl WalLoader {
                             *v.chunks = Some((vec![chunk], ringid_start));
                             v.off += rsize as u64;
                         }
-                        Ok(WalRingType::Middle) => {
+                        Some(WalRingType::Middle) => {
                             let Vars {
                                 chunks, off, file, ..
                             } = &mut *v;
@@ -1174,7 +1161,7 @@ impl WalLoader {
                             } // otherwise ignore the leftover
                             *off += rsize as u64;
                         }
-                        Ok(WalRingType::Last) => {
+                        Some(WalRingType::Last) => {
                             let v_off = v.off;
                             v.off += rsize as u64;
                             if let Some((mut chunks, ringid_start)) = v.chunks.take() {
@@ -1204,8 +1191,8 @@ impl WalLoader {
                                 ))
                             }
                         }
-                        Ok(WalRingType::Null) => _yield!(),
-                        Err(_) => match self.recover_policy {
+                        Some(WalRingType::Null) => _yield!(),
+                        None => match self.recover_policy {
                             RecoverPolicy::Strict => die!(),
                             RecoverPolicy::BestEffort => {
                                 v.done = true;

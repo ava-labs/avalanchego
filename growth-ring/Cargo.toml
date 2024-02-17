@@ -20,6 +20,7 @@ bytemuck = {version = "1.14.3", features = ["derive"]}
 thiserror = "1.0.57"
 tokio = { version = "1.36.0", features = ["fs", "io-util", "sync"] }
 crc32fast = "1.4.0"
+strum_macros = "0.26.1"
 
 [dev-dependencies]
 hex = "0.4.3"
