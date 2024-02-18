@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var _ Client = (*client)(nil)
@@ -74,6 +76,10 @@ type Client interface {
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
+	// GetUnitFees returns the current unit fees that a transaction must pay to be accepted
+	GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error)
+	// GetFeeWindows returns the fee window needed to calculate next block unit fees
+	GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error)
 	// CreateAsset creates a new asset and returns its assetID
 	//
 	// Deprecated: Transactions should be issued using the
@@ -404,6 +410,18 @@ func (c *client) GetAllBalances(
 		IncludePartial: includePartial,
 	}, res, options...)
 	return res.Balances, err
+}
+
+func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error) {
+	res := &GetUnitFeesReply{}
+	err := c.requester.SendRequest(ctx, "platform.getUnitFees", struct{}{}, res, options...)
+	return res.UnitFees, err
+}
+
+func (c *client) GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error) {
+	res := &GetFeeWindowsReply{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeWindows", struct{}{}, res, options...)
+	return res.FeeWindows, err
 }
 
 // ClientHolder describes how much an address owns of an asset

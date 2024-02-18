@@ -84,7 +84,7 @@ func TestBaseTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
@@ -99,7 +99,7 @@ func TestBaseTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
@@ -193,7 +193,7 @@ func TestCreateAssetTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
@@ -212,7 +212,7 @@ func TestCreateAssetTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
@@ -268,7 +268,7 @@ func TestImportTx(t *testing.T) {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
@@ -285,7 +285,7 @@ func TestImportTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
@@ -336,13 +336,13 @@ func TestExportTx(t *testing.T) {
 
 	be.EXPECT().AVAXAssetID().Return(avaxAssetID).AnyTimes()
 	be.EXPECT().NetworkID().Return(constants.MainnetID).AnyTimes()
-	be.EXPECT().BlockchainID().Return(constants.PlatformChainID)
+	be.EXPECT().BlockchainID().Return(constants.PlatformChainID).AnyTimes()
 	be.EXPECT().UTXOs(gomock.Any(), constants.PlatformChainID).Return(utxos, nil)
 	for _, utxo := range utxos {
 		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
 	}
 
-	b := NewDynamicFeesBuilder(set.Of(utxoAddr), be)
+	b := NewBuilder(set.Of(utxoAddr), be)
 
 	// Post E-Upgrade
 	feeCalc := &fees.Calculator{
@@ -359,7 +359,7 @@ func TestExportTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{

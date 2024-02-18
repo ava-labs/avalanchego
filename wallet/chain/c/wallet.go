@@ -140,7 +140,7 @@ func (w *wallet) IssueUnsignedAtomicTx(
 ) (*evm.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := w.signer.SignUnsignedAtomic(ctx, utx)
+	tx, err := SignUnsignedAtomic(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}

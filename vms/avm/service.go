@@ -672,6 +672,48 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	return nil
 }
 
+// GetUnitFeesReply is the response from GetUnitFees
+type GetUnitFeesReply struct {
+	// Current timestamp
+	UnitFees commonfees.Dimensions `json:"unitfees"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getUnitFees"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	var err error
+	reply.UnitFees, err = s.vm.state.GetUnitFees()
+	return err
+}
+
+// GetBlockUnitsCapReply is the response from GetBlockUnitsCap
+type GetFeeWindowsReply struct {
+	// Current timestamp
+	FeeWindows commonfees.Windows `json:"feeWindows"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (s *Service) GetFeeWindows(_ *http.Request, _ *struct{}, reply *GetFeeWindowsReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getBlockUnitsCap"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	var err error
+	reply.FeeWindows, err = s.vm.state.GetFeeWindows()
+	return err
+}
+
 // Holder describes how much an address owns of an asset
 type Holder struct {
 	Amount  avajson.Uint64 `json:"amount"`
