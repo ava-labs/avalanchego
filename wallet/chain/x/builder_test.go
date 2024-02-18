@@ -99,7 +99,7 @@ func TestBaseTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
@@ -212,7 +212,7 @@ func TestCreateAssetTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
@@ -285,7 +285,7 @@ func TestImportTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
@@ -359,7 +359,7 @@ func TestExportTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx, err := s.SignUnsigned(stdcontext.Background(), utx)
+	tx, err := SignUnsigned(stdcontext.Background(), s, utx)
 	require.NoError(err)
 
 	fc := &fees.Calculator{
