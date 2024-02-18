@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -19,13 +19,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/mocks"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
@@ -68,19 +68,23 @@ var (
 func TestBaseTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-		backend = NewBackend(testCtx, chainUTXOs, nil)
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			}, nil,
+		)
+		backend = NewBackend(testCtx, genericBackend, nil)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -93,16 +97,7 @@ func TestBaseTx(t *testing.T) {
 				},
 			},
 		}}
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
-
-	// set expectations
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -186,15 +181,10 @@ func TestBaseTx(t *testing.T) {
 func TestAddSubnetValidatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -202,6 +192,17 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
+
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			map[ids.ID]fx.Owner{
+				subnetID: subnetOwner,
+			},
+		)
+
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -209,12 +210,13 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				},
 			},
 		}
+		backend = NewBackend(testCtx, genericBackend, subnets)
 
-		backend = NewBackend(testCtx, chainUTXOs, subnets)
-
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		subnetValidator = &txs.SubnetValidator{
@@ -224,17 +226,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			},
 			Subnet: subnetID,
 		}
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
-
-	// set expectations
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
-	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -313,15 +305,10 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 func TestRemoveSubnetValidatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -329,6 +316,17 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
+
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			map[ids.ID]fx.Owner{
+				subnetID: subnetOwner,
+			},
+		)
+
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -337,22 +335,14 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, chainUTXOs, subnets)
+		backend = NewBackend(testCtx, genericBackend, subnets)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 	)
-
-	// set expectations
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
-	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -437,15 +427,10 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 func TestCreateChainTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -453,6 +438,17 @@ func TestCreateChainTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
+
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			map[ids.ID]fx.Owner{
+				subnetID: subnetOwner,
+			},
+		)
+
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -461,27 +457,20 @@ func TestCreateChainTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, chainUTXOs, subnets)
+		backend = NewBackend(testCtx, genericBackend, subnets)
 
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		genesisBytes = []byte{'a', 'b', 'c'}
 		vmID         = ids.GenerateTestID()
 		fxIDs        = []ids.ID{ids.GenerateTestID()}
 		chainName    = "dummyChain"
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
-
-	// set expectations
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
-	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -570,15 +559,10 @@ func TestCreateChainTx(t *testing.T) {
 func TestCreateSubnetTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -586,6 +570,17 @@ func TestCreateSubnetTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
+
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			map[ids.ID]fx.Owner{
+				subnetID: subnetOwner,
+			},
+		)
+
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -594,21 +589,14 @@ func TestCreateSubnetTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, chainUTXOs, subnets)
+		backend = NewBackend(testCtx, genericBackend, subnets)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 	)
-
-	// setup expectations
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -690,15 +678,10 @@ func TestCreateSubnetTx(t *testing.T) {
 func TestTransferSubnetOwnershipTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -706,6 +689,17 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
+
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			map[ids.ID]fx.Owner{
+				subnetID: subnetOwner,
+			},
+		)
+
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -714,22 +708,15 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, chainUTXOs, subnets)
+		backend = NewBackend(testCtx, genericBackend, subnets)
 
 		// builder
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
+		kc = secp256k1fx.NewKeychain(utxosKey)
+		s  = NewSigner(kc, genericBackend)
 	)
-
-	// setup expectations
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
-	sbe.EXPECT().GetSubnetOwner(gomock.Any(), gomock.Any()).Return(subnetOwner, nil).AnyTimes()
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -813,23 +800,28 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 func TestImportTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey      = testKeys[1]
-		utxos         = makeTestUTXOs(utxosKey)
-		sourceChainID = ids.GenerateTestID()
-		importedUTXOs = utxos[:1]
-		chainUTXOs    = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-			sourceChainID:             importedUTXOs,
-		})
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
+		sourceChainID  = ids.GenerateTestID()
+		importedUTXOs  = utxos[:1]
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+				sourceChainID:             importedUTXOs,
+			},
+			nil,
+		)
 
-		backend = NewBackend(testCtx, chainUTXOs, nil)
+		backend = NewBackend(testCtx, genericBackend, nil)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -839,17 +831,7 @@ func TestImportTx(t *testing.T) {
 				importKey.Address(),
 			},
 		}
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
-
-	// setup expectations
-	sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), importedUTXOs[0].InputID()).Return(importedUTXOs[0], nil).AnyTimes()
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -937,19 +919,24 @@ func TestImportTx(t *testing.T) {
 func TestExportTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-		backend = NewBackend(testCtx, chainUTXOs, nil)
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			nil,
+		)
+		backend = NewBackend(testCtx, genericBackend, nil)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -963,16 +950,7 @@ func TestExportTx(t *testing.T) {
 				},
 			},
 		}}
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
-
-	// setup expectation
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -1058,15 +1036,10 @@ func TestExportTx(t *testing.T) {
 func TestTransformSubnetTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
 		subnetID       = ids.GenerateTestID()
 		subnetAuthKey  = testKeys[0]
 		subnetAuthAddr = subnetAuthKey.Address()
@@ -1074,6 +1047,17 @@ func TestTransformSubnetTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
+
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			map[ids.ID]fx.Owner{
+				subnetID: subnetOwner,
+			},
+		)
+
 		subnets = map[ids.ID]*txs.Tx{
 			subnetID: {
 				Unsigned: &txs.CreateSubnetTx{
@@ -1082,25 +1066,18 @@ func TestTransformSubnetTx(t *testing.T) {
 			},
 		}
 
-		backend = NewBackend(testCtx, chainUTXOs, subnets)
+		backend = NewBackend(testCtx, genericBackend, subnets)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
 		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		initialSupply = 40 * units.MegaAvax
 		maxSupply     = 100 * units.MegaAvax
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
-
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
-	sbe.EXPECT().GetSubnetOwner(gomock.Any(), subnetID).Return(subnetOwner, nil).AnyTimes()
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -1214,21 +1191,26 @@ func TestTransformSubnetTx(t *testing.T) {
 func TestAddPermissionlessValidatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-		backend = NewBackend(testCtx, chainUTXOs, nil)
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			nil,
+		)
+		backend = NewBackend(testCtx, genericBackend, nil)
 
 		// builder
 		utxoAddr   = utxosKey.Address()
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
 		builder    = NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
+		kc         = secp256k1fx.NewKeychain(utxosKey)
+		s          = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		validationRewardsOwner = &secp256k1fx.OutputOwners{
@@ -1243,19 +1225,10 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				rewardAddr,
 			},
 		}
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
-
-	// setup expectations
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -1371,21 +1344,26 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	var (
 		require = require.New(t)
-		ctrl    = gomock.NewController(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = newChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-		backend = NewBackend(testCtx, chainUTXOs, nil)
+		utxosKey       = testKeys[1]
+		utxos          = makeTestUTXOs(utxosKey)
+		genericBackend = newDeterministicGenericBackend(
+			require,
+			map[ids.ID][]*avax.UTXO{
+				constants.PlatformChainID: utxos,
+			},
+			nil,
+		)
+		backend = NewBackend(testCtx, genericBackend, nil)
 
-		// builder
+		// builder and signer
 		utxoAddr   = utxosKey.Address()
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
 		builder    = NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
+		kc         = secp256k1fx.NewKeychain(utxosKey)
+		s          = NewSigner(kc, genericBackend)
 
 		// data to build the transaction
 		rewardsOwner = &secp256k1fx.OutputOwners{
@@ -1394,15 +1372,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				rewardAddr,
 			},
 		}
-
-		kc  = secp256k1fx.NewKeychain(utxosKey)
-		sbe = mocks.NewMockSignerBackend(ctrl)
-		s   = NewSigner(kc, sbe)
 	)
-
-	for _, utxo := range utxos {
-		sbe.EXPECT().GetUTXO(gomock.Any(), gomock.Any(), utxo.InputID()).Return(utxo, nil).AnyTimes()
-	}
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
@@ -1598,7 +1568,11 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	}
 }
 
-func newChainUTXOs(require *require.Assertions, utxoSets map[ids.ID][]*avax.UTXO) common.ChainUTXOs {
+func newDeterministicGenericBackend(
+	require *require.Assertions,
+	utxoSets map[ids.ID][]*avax.UTXO,
+	subnetOwners map[ids.ID]fx.Owner,
+) *deterministicGenericBackend {
 	globalUTXOs := common.NewUTXOs()
 	for subnetID, utxos := range utxoSets {
 		for _, utxo := range utxos {
@@ -1607,16 +1581,23 @@ func newChainUTXOs(require *require.Assertions, utxoSets map[ids.ID][]*avax.UTXO
 			)
 		}
 	}
-	return &deterministicChainUTXOs{
-		ChainUTXOs: common.NewChainUTXOs(constants.PlatformChainID, globalUTXOs),
+	return &deterministicGenericBackend{
+		ChainUTXOs:   common.NewChainUTXOs(constants.PlatformChainID, globalUTXOs),
+		subnetOwners: subnetOwners,
 	}
 }
 
-type deterministicChainUTXOs struct {
+var (
+	_ common.ChainUTXOs = (*deterministicGenericBackend)(nil)
+	_ SignerBackend     = (*deterministicGenericBackend)(nil)
+)
+
+type deterministicGenericBackend struct {
 	common.ChainUTXOs
+	subnetOwners map[ids.ID]fx.Owner // subnetID --> fx.Owner
 }
 
-func (c *deterministicChainUTXOs) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+func (c *deterministicGenericBackend) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
 	utxos, err := c.ChainUTXOs.UTXOs(ctx, sourceChainID)
 	if err != nil {
 		return nil, err
@@ -1626,4 +1607,13 @@ func (c *deterministicChainUTXOs) UTXOs(ctx stdcontext.Context, sourceChainID id
 		return a.Compare(&b.UTXOID)
 	})
 	return utxos, nil
+}
+
+func (c *deterministicGenericBackend) GetSubnetOwner(_ stdcontext.Context, subnetID ids.ID) (fx.Owner, error) {
+	owner, found := c.subnetOwners[subnetID]
+	if !found {
+		return nil, database.ErrNotFound
+	}
+
+	return owner, nil
 }

@@ -701,6 +701,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 			BlockchainID: constants.PlatformChainID,
 			Memo:         ops.Memo(),
 		}},
+		Subnet:     subnetID,
 		SubnetAuth: subnetAuth,
 		Owner:      owner,
 	}
