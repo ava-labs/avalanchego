@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -354,7 +353,7 @@ func (b *builder) NewOperationTxMintFT(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintFTs(b.addrs, b.backend, outputs, ops)
+	operations, err := mintFTs(b.addrs, b.backend, outputs, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +368,7 @@ func (b *builder) NewOperationTxMintNFT(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintNFTs(b.addrs, b.backend, assetID, payload, owners, ops)
+	operations, err := mintNFTs(b.addrs, b.backend, assetID, payload, owners, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +382,7 @@ func (b *builder) NewOperationTxMintProperty(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := mintProperty(b.addrs, b.backend, assetID, owner, ops)
+	operations, err := mintProperty(b.addrs, b.backend, assetID, owner, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +395,7 @@ func (b *builder) NewOperationTxBurnProperty(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	ops := common.NewOptions(options)
-	operations, err := burnProperty(b.addrs, b.backend, assetID, ops)
+	operations, err := burnProperty(b.addrs, b.backend, assetID, feeCalc, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -712,18 +711,10 @@ func (b *builder) financeTx(
 		}
 
 		outIntf := utxo.Out
-		if lockedOut, ok := outIntf.(*stakeable.LockOut); ok {
-			if lockedOut.Locktime > minIssuanceTime {
-				// This output is currently locked, so this output can't be
-				// burned.
-				continue
-			}
-			outIntf = lockedOut.TransferableOut
-		}
-
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, errUnknownOutputType
+			// We only support burning [secp256k1fx.TransferOutput]s.
+			continue
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -735,6 +726,7 @@ func (b *builder) financeTx(
 		input := &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
+			FxID:   secp256k1fx.ID,
 			In: &secp256k1fx.TransferInput{
 				Amt: out.Amt,
 				Input: secp256k1fx.Input{
@@ -817,6 +809,7 @@ func mintFTs(
 	addresses set.Set[ids.ShortID],
 	backend BuilderBackend,
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
+	feeCalc *fees.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -861,6 +854,10 @@ func mintFTs(
 			},
 		})
 
+		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fees: %w", err)
+		}
+
 		// remove the asset from the required outputs to mint
 		delete(outputs, assetID)
 	}
@@ -882,6 +879,7 @@ func mintNFTs(
 	assetID ids.ID,
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -927,6 +925,11 @@ func mintNFTs(
 				Outputs: owners,
 			},
 		})
+
+		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fees: %w", err)
+		}
+
 		return operations, nil
 	}
 	return nil, fmt.Errorf(
@@ -941,6 +944,7 @@ func mintProperty(
 	backend BuilderBackend,
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
+	feeCalc *fees.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -987,6 +991,11 @@ func mintProperty(
 				},
 			},
 		})
+
+		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fees: %w", err)
+		}
+
 		return operations, nil
 	}
 	return nil, fmt.Errorf(
@@ -1000,6 +1009,7 @@ func burnProperty(
 	addresses set.Set[ids.ShortID],
 	backend BuilderBackend,
 	assetID ids.ID,
+	feeCalc *fees.Calculator,
 	options *common.Options,
 ) (
 	operations []*txs.Operation,
@@ -1042,6 +1052,10 @@ func burnProperty(
 				},
 			},
 		})
+
+		if _, err = fees.FinanceCredential(feeCalc, Parser.Codec(), len(inputSigIndices)); err != nil {
+			return nil, fmt.Errorf("account for credential fees: %w", err)
+		}
 	}
 	if len(operations) == 0 {
 		return nil, fmt.Errorf(
