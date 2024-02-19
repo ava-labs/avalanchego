@@ -1,18 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{node::Node, BranchNode, Merkle, NodeObjRef, NodeType};
+use super::{node::Node, BranchNode, Key, Merkle, MerkleError, NodeObjRef, NodeType, Value};
 use crate::{
-    nibbles::Nibbles,
+    nibbles::{Nibbles, NibblesIterator},
     shale::{DiskAddress, ShaleStore},
     v2::api,
 };
 use futures::{stream::FusedStream, Stream, StreamExt};
 use std::task::Poll;
 use std::{cmp::Ordering, iter::once};
-
-type Key = Box<[u8]>;
-type Value = Vec<u8>;
 
 /// Represents an ongoing iteration over a node and its children.
 enum IterationNode<'a> {
@@ -177,7 +174,7 @@ fn get_iterator_intial_state<'a, S: ShaleStore<Node> + Send + Sync, T>(
     // Invariant: `node`'s key is a prefix of `key`.
     let mut node = merkle.get_node(root_node)?;
 
-    // Invariant: [matched_key_nibbles] is the key of `node` at the start
+    // Invariant: `matched_key_nibbles` is the key of `node` at the start
     // of each loop iteration.
     let mut matched_key_nibbles = vec![];
 
@@ -396,6 +393,138 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
     }
 }
 
+enum PathIteratorState<'a> {
+    Iterating {
+        /// The key, as nibbles, of the node at `address`, without the
+        /// node's partial path (if any) at the end.
+        /// Invariant: If this node has a parent, the parent's key is a
+        /// prefix of the key we're traversing to.
+        /// Note the node at `address` may not have a key which is a
+        /// prefix of the key we're traversing to.
+        matched_key: Vec<u8>,
+        unmatched_key: NibblesIterator<'a, 0>,
+        address: DiskAddress,
+    },
+    Exhausted,
+}
+
+/// Iterates over all nodes on the path to a given key starting from the root.
+/// All nodes are branch nodes except possibly the last, which may be a leaf.
+/// If the key is in the trie, the last node is the one at the given key.
+/// Otherwise, the last node proves the non-existence of the key.
+/// Specifically, if during the traversal, we encounter:
+/// * A branch node with no child at the index of the next nibble in the key,
+///   then the branch node proves the non-existence of the key.
+/// * A node (either branch or leaf) whose partial path doesn't match the
+///   remaining unmatched key, the node proves the non-existence of the key.
+/// Note that thi means that the last node's key isn't necessarily a prefix of
+/// the key we're traversing to.
+pub struct PathIterator<'a, 'b, S, T> {
+    state: PathIteratorState<'b>,
+    merkle: &'a Merkle<S, T>,
+}
+
+impl<'a, 'b, S: ShaleStore<Node> + Send + Sync, T> PathIterator<'a, 'b, S, T> {
+    pub(super) fn new(
+        merkle: &'a Merkle<S, T>,
+        sentinel_node: NodeObjRef<'a>,
+        key: &'b [u8],
+    ) -> Self {
+        let root = match sentinel_node.inner() {
+            NodeType::Branch(branch) => match branch.children[0] {
+                Some(root) => root,
+                None => {
+                    return Self {
+                        state: PathIteratorState::Exhausted,
+                        merkle,
+                    }
+                }
+            },
+            _ => unreachable!("sentinel node is not a branch"),
+        };
+
+        Self {
+            merkle,
+            state: PathIteratorState::Iterating {
+                matched_key: vec![],
+                unmatched_key: Nibbles::new(key).into_iter(),
+                address: root,
+            },
+        }
+    }
+}
+
+impl<'a, 'b, S: ShaleStore<Node> + Send + Sync, T> Iterator for PathIterator<'a, 'b, S, T> {
+    type Item = Result<(Key, NodeObjRef<'a>), MerkleError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // destructuring is necessary here because we need mutable access to `state`
+        // at the same time as immutable access to `merkle`.
+        let Self { state, merkle } = &mut *self;
+
+        match state {
+            PathIteratorState::Exhausted => None,
+            PathIteratorState::Iterating {
+                matched_key,
+                unmatched_key,
+                address,
+            } => {
+                let node = match merkle.get_node(*address) {
+                    Ok(node) => node,
+                    Err(e) => return Some(Err(e)),
+                };
+
+                let partial_path = match node.inner() {
+                    NodeType::Branch(branch) => &branch.path,
+                    NodeType::Leaf(leaf) => &leaf.path,
+                    _ => unreachable!("extension nodes shouldn't exist"),
+                };
+
+                let (comparison, unmatched_key) =
+                    compare_partial_path(partial_path.iter(), unmatched_key);
+
+                matched_key.extend(partial_path.iter());
+                let node_key = matched_key.clone().into_boxed_slice();
+
+                match comparison {
+                    Ordering::Less | Ordering::Greater => {
+                        self.state = PathIteratorState::Exhausted;
+                        Some(Ok((node_key, node)))
+                    }
+                    Ordering::Equal => match node.inner() {
+                        NodeType::Extension(_) => unreachable!(),
+                        NodeType::Leaf(_) => {
+                            self.state = PathIteratorState::Exhausted;
+                            Some(Ok((node_key, node)))
+                        }
+                        NodeType::Branch(branch) => {
+                            let Some(next_unmatched_key_nibble) = unmatched_key.next() else {
+                                // There's no more key to match. We're done.
+                                self.state = PathIteratorState::Exhausted;
+                                return Some(Ok((node_key, node)));
+                            };
+
+                            #[allow(clippy::indexing_slicing)]
+                            let Some(child) = branch.children[next_unmatched_key_nibble as usize] else {
+                                // There's no child at the index of the next nibble in the key.
+                                // The node we're traversing to isn't in the trie.
+                                self.state = PathIteratorState::Exhausted;
+                                return Some(Ok((node_key, node)));
+                            };
+
+                            matched_key.push(next_unmatched_key_nibble);
+
+                            *address = child;
+
+                            Some(Ok((node_key, node)))
+                        }
+                    },
+                }
+            }
+        }
+    }
+}
+
 /// Takes in an iterator over a node's partial path and an iterator over the
 /// unmatched portion of a key.
 /// The first returned element is:
@@ -474,6 +603,128 @@ mod tests {
         ) -> MerkleNodeStream<'_, S, T> {
             MerkleNodeStream::new(self, root, key)
         }
+    }
+
+    #[test_case(&[]; "empty key")]
+    #[test_case(&[1]; "non-empty key")]
+    #[tokio::test]
+    async fn path_iterate_empty_merkle_empty_key(key: &[u8]) {
+        let merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+        let sentinel_node = merkle.get_node(root).unwrap();
+        let mut stream = merkle.path_iter(sentinel_node, key);
+        assert!(stream.next().is_none());
+    }
+
+    #[test_case(&[]; "empty key")]
+    #[test_case(&[13]; "prefix of singleton key")]
+    #[test_case(&[13, 37]; "match singleton key")]
+    #[test_case(&[13, 37,1]; "suffix of singleton key")]
+    #[test_case(&[255]; "no key nibbles match singleton key")]
+    #[tokio::test]
+    async fn path_iterate_singleton_merkle(key: &[u8]) {
+        let mut merkle = create_test_merkle();
+        let root = merkle.init_root().unwrap();
+
+        merkle.insert(vec![0x13, 0x37], vec![0x42], root).unwrap();
+
+        let sentinel_node = merkle.get_node(root).unwrap();
+
+        let mut stream = merkle.path_iter(sentinel_node, key);
+        let (key, node) = match stream.next() {
+            Some(Ok((key, node))) => (key, node),
+            Some(Err(e)) => panic!("{:?}", e),
+            None => panic!("unexpected end of iterator"),
+        };
+
+        assert_eq!(key, vec![0x01, 0x03, 0x03, 0x07].into_boxed_slice());
+        assert_eq!(node.inner().as_leaf().unwrap().data, vec![0x42].into());
+
+        assert!(stream.next().is_none());
+    }
+
+    #[test_case(&[0x00, 0x00, 0x00, 0xFF]; "leaf key")]
+    #[test_case(&[0x00, 0x00, 0x00, 0xF3]; "leaf sibling key")]
+    #[test_case(&[0x00, 0x00, 0x00, 0xFF, 0x01]; "past leaf key")]
+    #[tokio::test]
+    async fn path_iterate_non_singleton_merkle_seek_leaf(key: &[u8]) {
+        let (merkle, root) = created_populated_merkle();
+
+        let sentinel_node = merkle.get_node(root).unwrap();
+
+        let mut stream = merkle.path_iter(sentinel_node, key);
+
+        let (key, node) = match stream.next() {
+            Some(Ok((key, node))) => (key, node),
+            Some(Err(e)) => panic!("{:?}", e),
+            None => panic!("unexpected end of iterator"),
+        };
+        assert_eq!(key, vec![0x00, 0x00].into_boxed_slice());
+        assert!(node.inner().as_branch().unwrap().value.is_none());
+
+        let (key, node) = match stream.next() {
+            Some(Ok((key, node))) => (key, node),
+            Some(Err(e)) => panic!("{:?}", e),
+            None => panic!("unexpected end of iterator"),
+        };
+        assert_eq!(
+            key,
+            vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00].into_boxed_slice()
+        );
+        assert_eq!(
+            node.inner().as_branch().unwrap().value,
+            Some(vec![0x00, 0x00, 0x00].into()),
+        );
+
+        let (key, node) = match stream.next() {
+            Some(Ok((key, node))) => (key, node),
+            Some(Err(e)) => panic!("{:?}", e),
+            None => panic!("unexpected end of iterator"),
+        };
+        assert_eq!(
+            key,
+            vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x0F].into_boxed_slice()
+        );
+        assert_eq!(
+            node.inner().as_leaf().unwrap().data,
+            vec![0x00, 0x00, 0x00, 0x0FF].into(),
+        );
+
+        assert!(stream.next().is_none());
+    }
+
+    #[tokio::test]
+    async fn path_iterate_non_singleton_merkle_seek_branch() {
+        let (merkle, root) = created_populated_merkle();
+
+        let key = &[0x00, 0x00, 0x00];
+
+        let sentinel_node = merkle.get_node(root).unwrap();
+        let mut stream = merkle.path_iter(sentinel_node, key);
+
+        let (key, node) = match stream.next() {
+            Some(Ok((key, node))) => (key, node),
+            Some(Err(e)) => panic!("{:?}", e),
+            None => panic!("unexpected end of iterator"),
+        };
+        assert_eq!(key, vec![0x00, 0x00].into_boxed_slice());
+        assert!(node.inner().as_branch().unwrap().value.is_none());
+
+        let (key, node) = match stream.next() {
+            Some(Ok((key, node))) => (key, node),
+            Some(Err(e)) => panic!("{:?}", e),
+            None => panic!("unexpected end of iterator"),
+        };
+        assert_eq!(
+            key,
+            vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00].into_boxed_slice()
+        );
+        assert_eq!(
+            node.inner().as_branch().unwrap().value,
+            Some(vec![0x00, 0x00, 0x00].into()),
+        );
+
+        assert!(stream.next().is_none());
     }
 
     #[tokio::test]

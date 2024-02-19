@@ -25,9 +25,14 @@ pub use proof::{Proof, ProofError};
 pub use stream::MerkleKeyValueStream;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 
+use self::stream::PathIterator;
+
 type NodeObjRef<'a> = shale::ObjRef<'a, Node>;
 type ParentRefs<'a> = Vec<(NodeObjRef<'a>, u8)>;
 type ParentAddresses = Vec<(DiskAddress, u8)>;
+
+type Key = Box<[u8]>;
+type Value = Vec<u8>;
 
 #[derive(Debug, Error)]
 pub enum MerkleError {
@@ -1713,6 +1718,14 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
 
     pub fn flush_dirty(&self) -> Option<()> {
         self.store.flush_dirty()
+    }
+
+    pub fn path_iter<'a, 'b>(
+        &'a self,
+        sentinel_node: NodeObjRef<'a>,
+        key: &'b [u8],
+    ) -> PathIterator<'_, 'b, S, T> {
+        PathIterator::new(self, sentinel_node, key)
     }
 
     pub(crate) fn key_value_iter(&self, root: DiskAddress) -> MerkleKeyValueStream<'_, S, T> {
