@@ -180,6 +180,8 @@ type NetworkAppSender interface {
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
 	SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error
+	// SendAppError sends an application-level error to an AppRequest
+	SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error
 	// Gossip an application-level message.
 	SendAppGossip(ctx context.Context, appGossipBytes []byte) error
 	SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error
@@ -204,6 +206,8 @@ type CrossChainAppSender interface {
 	// corresponding to this CrossChainAppSender received from [chainID] with ID
 	// [requestID].
 	SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error
+	// SendCrossChainAppError sends an application-level error to a CrossChainAppRequest
+	SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error
 }
 
 // AppSender sends application (VM) level messages.
