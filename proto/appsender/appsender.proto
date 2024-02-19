@@ -9,11 +9,13 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/appsender";
 service AppSender {
   rpc SendAppRequest(SendAppRequestMsg) returns (google.protobuf.Empty);
   rpc SendAppResponse(SendAppResponseMsg) returns (google.protobuf.Empty);
+  rpc SendAppError(SendAppErrorMsg) returns (google.protobuf.Empty);
   rpc SendAppGossip(SendAppGossipMsg) returns (google.protobuf.Empty);
   rpc SendAppGossipSpecific(SendAppGossipSpecificMsg) returns (google.protobuf.Empty);
 
   rpc SendCrossChainAppRequest(SendCrossChainAppRequestMsg) returns (google.protobuf.Empty);
   rpc SendCrossChainAppResponse(SendCrossChainAppResponseMsg) returns (google.protobuf.Empty);
+  rpc SendCrossChainAppError(SendCrossChainAppErrorMsg) returns (google.protobuf.Empty);
 }
 
 message SendAppRequestMsg {
@@ -32,6 +34,17 @@ message SendAppResponseMsg {
   uint32 request_id = 2;
   // The response body
   bytes response = 3;
+}
+
+message SendAppErrorMsg {
+  // The node to send a response to
+  bytes node_id = 1;
+  // ID of this request
+  uint32 request_id = 2;
+  // Application-defined error code
+  sint32 error_code = 3;
+  // Application-defined error message
+  string error_message = 4;
 }
 
 message SendAppGossipMsg {
@@ -62,4 +75,15 @@ message SendCrossChainAppResponseMsg {
   uint32 request_id = 2;
   // The response body
   bytes response = 3;
+}
+
+message SendCrossChainAppErrorMsg {
+  // The chain to send a response to
+  bytes chain_id = 1;
+  // ID of this request
+  uint32 request_id = 2;
+  // Application-defined error code
+  sint32 error_code = 3;
+  // Application-defined error message
+  string error_message = 4;
 }
