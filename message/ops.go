@@ -97,6 +97,7 @@ var (
 		PutOp,
 		ChitsOp,
 		AppResponseOp,
+		AppErrorOp,
 	}
 	// AppGossip is the only message that is sent unrequested without the
 	// expectation of a response
@@ -115,7 +116,6 @@ var (
 		GetAncestorsFailedOp,
 		GetFailedOp,
 		QueryFailedOp,
-		AppErrorOp,
 		CrossChainAppRequestOp,
 		CrossChainAppErrorOp,
 		CrossChainAppResponseOp,
