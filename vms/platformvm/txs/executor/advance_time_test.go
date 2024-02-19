@@ -832,7 +832,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, durangoFork)
+	env := newEnvironment(t, durango)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time

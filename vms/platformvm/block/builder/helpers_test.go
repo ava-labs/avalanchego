@@ -61,11 +61,11 @@ const (
 
 	apricotPhase3 fork = iota
 	apricotPhase5
-	banffFork
-	cortinaFork
-	durangoFork
+	banff
+	cortina
+	durango
 
-	latestFork = durangoFork
+	latestFork = durango
 )
 
 var (
@@ -314,13 +314,13 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	)
 
 	switch f {
-	case durangoFork:
+	case durango:
 		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case cortinaFork:
+	case cortina:
 		cortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case banffFork:
+	case banff:
 		banffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case apricotPhase5:

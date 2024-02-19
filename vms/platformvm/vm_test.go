@@ -74,11 +74,11 @@ import (
 const (
 	apricotPhase3 fork = iota
 	apricotPhase5
-	banffFork
-	cortinaFork
-	durangoFork
+	banff
+	cortina
+	durango
 
-	latestFork = durangoFork
+	latestFork = durango
 
 	defaultWeight uint64 = 10000
 )
@@ -215,13 +215,13 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch f {
-	case durangoFork:
+	case durango:
 		durangoTime = latestForkTime
 		fallthrough
-	case cortinaFork:
+	case cortina:
 		cortinaTime = latestForkTime
 		fallthrough
-	case banffFork:
+	case banff:
 		banffTime = latestForkTime
 		fallthrough
 	case apricotPhase5:
@@ -436,7 +436,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -487,7 +487,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

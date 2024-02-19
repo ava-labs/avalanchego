@@ -53,9 +53,9 @@ const (
 
 	apricotPhase3 fork = iota
 	apricotPhase5
-	banffFork
-	cortinaFork
-	durangoFork
+	banff
+	cortina
+	durango
 )
 
 var (
@@ -289,13 +289,13 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	)
 
 	switch f {
-	case durangoFork:
+	case durango:
 		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
-	case cortinaFork:
+	case cortina:
 		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
-	case banffFork:
+	case banff:
 		banffTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
 	case apricotPhase5:
@@ -335,7 +335,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 
 func defaultClock(f fork) *mockable.Clock {
 	now := defaultGenesisTime
-	if f >= banffFork {
+	if f >= banff {
 		// 1 second after active fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
