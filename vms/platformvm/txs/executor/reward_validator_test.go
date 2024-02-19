@@ -352,7 +352,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, cortinaFork)
+	env := newEnvironment(t, cortina)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
@@ -570,7 +570,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, cortinaFork)
+	env := newEnvironment(t, cortina)
 	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()

@@ -177,6 +177,13 @@ type OutboundMsgBuilder interface {
 		msg []byte,
 	) (OutboundMessage, error)
 
+	AppError(
+		chainID ids.ID,
+		requestID uint32,
+		errorCode int32,
+		errorMessage string,
+	) (OutboundMessage, error)
+
 	AppGossip(
 		chainID ids.ID,
 		msg []byte,
@@ -702,6 +709,23 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 					ChainId:   chainID[:],
 					RequestId: requestID,
 					AppBytes:  msg,
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) AppError(chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_AppError{
+				AppError: &p2p.AppError{
+					ChainId:      chainID[:],
+					RequestId:    requestID,
+					ErrorCode:    errorCode,
+					ErrorMessage: errorMessage,
 				},
 			},
 		},
