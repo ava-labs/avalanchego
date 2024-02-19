@@ -27,8 +27,8 @@ func init() {
 	}
 }
 
-// GetCheckpoints returns all specified checkpoints for the chain on the
-// requested network.
+// GetCheckpoints returns all known checkpoints for the chain on the requested
+// network.
 func GetCheckpoints(networkID uint32, chainID ids.ID) set.Set[ids.ID] {
 	networkName := constants.NetworkIDToNetworkName[networkID]
 	return checkpointsPerNetwork[networkName][chainID]
