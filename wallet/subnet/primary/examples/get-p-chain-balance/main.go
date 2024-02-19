@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 	}
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
-	pUTXOs := primary.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
+	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
 	pBackend := p.NewBackend(state.PCTX, pUTXOs, nil)
 	pBuilder := p.NewBuilder(addresses, pBackend)
 
