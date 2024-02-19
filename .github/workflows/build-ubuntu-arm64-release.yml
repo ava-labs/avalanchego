@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
@@ -79,7 +79,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.go_version }}
           check-latest: true
