@@ -168,11 +168,11 @@ func TestBaseTx(t *testing.T) {
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
-		require.Len(ins, 1)
+		require.Len(ins, 2)
 		require.Len(outs, 2)
 
-		expectedConsumed := fc.Fee
-		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		expectedConsumed := fc.Fee + outputsToMove[0].Out.Amount()
+		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 		require.Equal(outputsToMove[0], outs[1])
 	}
