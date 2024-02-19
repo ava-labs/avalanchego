@@ -51,14 +51,14 @@ const (
 	defaultWeight = 5 * units.MilliAvax
 	trackChecksum = false
 
-	apricotPhase3 activeFork = iota
+	apricotPhase3 fork = iota
 	apricotPhase5
 	banffFork
 	cortinaFork
 	durangoFork
 )
 
-type activeFork uint8
+type fork uint8
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -119,12 +119,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, fork activeFork) *environment {
+func newEnvironment(t *testing.T, f fork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(t, fork)
-	clk := defaultClock(fork)
+	config := defaultConfig(t, f)
+	clk := defaultClock(f)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -279,7 +279,7 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(t *testing.T, fork activeFork) *config.Config {
+func defaultConfig(t *testing.T, f fork) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime
 		apricotPhase5Time = mockable.MaxTime
@@ -288,7 +288,7 @@ func defaultConfig(t *testing.T, fork activeFork) *config.Config {
 		durangoTime       = mockable.MaxTime
 	)
 
-	switch fork {
+	switch f {
 	case durangoFork:
 		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
@@ -304,7 +304,7 @@ func defaultConfig(t *testing.T, fork activeFork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", fork))
+		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
 	}
 
 	return &config.Config{
@@ -333,10 +333,10 @@ func defaultConfig(t *testing.T, fork activeFork) *config.Config {
 	}
 }
 
-func defaultClock(fork activeFork) *mockable.Clock {
+func defaultClock(f fork) *mockable.Clock {
 	now := defaultGenesisTime
-	if fork == durangoFork || fork == cortinaFork || fork == banffFork {
-		// 1 second after Banff fork
+	if f == durangoFork || f == cortinaFork || f == banffFork {
+		// 1 second after active fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}

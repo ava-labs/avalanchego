@@ -71,16 +71,16 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-type activeFork uint8
+type fork uint8
 
 const (
-	apricotPhase3 activeFork = iota
+	apricotPhase3 fork = iota
 	apricotPhase5
 	banffFork
 	cortinaFork
 	durangoFork
 
-	latestFork activeFork = durangoFork
+	latestFork fork = durangoFork
 
 	defaultWeight uint64 = 10000
 )
@@ -201,7 +201,7 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 	var (
 		apricotPhase3Time = mockable.MaxTime
@@ -214,7 +214,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
-	switch fork {
+	switch f {
 	case durangoFork:
 		durangoTime = latestForkTime
 		fallthrough
@@ -230,7 +230,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.NoError(fmt.Errorf("unhandled fork %d", fork))
+		require.NoError(fmt.Errorf("unhandled fork %d", f))
 	}
 
 	vm := &VM{Config: config.Config{

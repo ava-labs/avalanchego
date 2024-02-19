@@ -60,14 +60,14 @@ const (
 	defaultWeight = 10000
 	trackChecksum = false
 
-	apricotPhase3 activeFork = iota
+	apricotPhase3 fork = iota
 	apricotPhase5
 	banffFork
 	cortinaFork
 	durangoFork
 )
 
-type activeFork uint8
+type fork uint8
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -132,10 +132,10 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller, fork activeFork) *environment {
+func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(t, fork),
+		config:         defaultConfig(t, f),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -328,7 +328,7 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(t *testing.T, fork activeFork) *config.Config {
+func defaultConfig(t *testing.T, f fork) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime
 		apricotPhase5Time = mockable.MaxTime
@@ -337,15 +337,15 @@ func defaultConfig(t *testing.T, fork activeFork) *config.Config {
 		durangoTime       = mockable.MaxTime
 	)
 
-	switch fork {
+	switch f {
 	case durangoFork:
-		durangoTime = time.Time{} // neglecting fork ordering this for package tests
+		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case cortinaFork:
-		cortinaTime = time.Time{} // neglecting fork ordering this for package tests
+		cortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case banffFork:
-		banffTime = time.Time{} // neglecting fork ordering this for package tests
+		banffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case apricotPhase5:
 		apricotPhase5Time = defaultValidateEndTime
@@ -353,7 +353,7 @@ func defaultConfig(t *testing.T, fork activeFork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", fork))
+		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
 	}
 
 	return &config.Config{
