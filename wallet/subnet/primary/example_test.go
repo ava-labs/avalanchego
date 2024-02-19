@@ -15,9 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 func ExampleWallet() {
@@ -151,7 +152,7 @@ func ExampleWallet() {
 			},
 			Subnet: createSubnetTxID,
 		},
-		&signer.Empty{},
+		&blssigner.Empty{},
 		createAssetTx.ID(),
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{},

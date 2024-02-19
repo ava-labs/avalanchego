@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
@@ -24,7 +25,7 @@ var _ Backend = (*backend)(nil)
 type Backend interface {
 	common.ChainUTXOs
 	BuilderBackend
-	SignerBackend
+	signer.Backend
 
 	AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error
 }
