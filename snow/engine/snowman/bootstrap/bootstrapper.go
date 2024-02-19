@@ -13,6 +13,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -389,14 +390,18 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 	// Initialize the fetch from set to the currently preferred peers
 	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
+	knownContainerIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
 	pendingContainerIDs := b.Blocked.MissingIDs()
-	// Append the list of accepted container IDs to pendingContainerIDs to ensure
-	// we iterate over every container that must be traversed.
-	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
 	b.Ctx.Log.Debug("starting bootstrapping",
+		zap.Int("numKnownBlocks", knownContainerIDs.Len()),
 		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
 		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
 	)
+
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	pendingContainerIDs = append(pendingContainerIDs, knownContainerIDs.List()...)
 
 	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
 	for _, blkID := range pendingContainerIDs {
