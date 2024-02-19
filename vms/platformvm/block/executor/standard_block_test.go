@@ -29,7 +29,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, apricotPhase5)
 
 	// setup and store parent block
 	// it's a standard block for simplicity
@@ -82,10 +82,9 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, banff)
 	now := env.clk.Time()
 	env.clk.Set(now)
-	env.config.BanffTime = time.Time{} // activate Banff
 
 	// setup and store parent block
 	// it's a standard block for simplicity
@@ -290,8 +289,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -492,8 +490,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, nil, banff)
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -592,8 +589,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 // is after the new timestamp
 func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -690,8 +686,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, nil, banff)
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -751,8 +746,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
