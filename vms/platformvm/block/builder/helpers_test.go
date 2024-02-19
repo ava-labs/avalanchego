@@ -65,10 +65,8 @@ const (
 	cortinaFork
 	durangoFork
 
-	latestFork fork = durangoFork
+	latestFork = durangoFork
 )
-
-type fork uint8
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -94,6 +92,8 @@ func init() {
 		genesisNodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
+
+type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory

@@ -71,8 +71,6 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-type fork uint8
-
 const (
 	apricotPhase3 fork = iota
 	apricotPhase5
@@ -80,7 +78,7 @@ const (
 	cortinaFork
 	durangoFork
 
-	latestFork fork = durangoFork
+	latestFork = durangoFork
 
 	defaultWeight uint64 = 10000
 )
@@ -136,6 +134,8 @@ func init() {
 		genesisNodeIDs = append(genesisNodeIDs, nodeID)
 	}
 }
+
+type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory

@@ -67,8 +67,6 @@ const (
 	durangoFork
 )
 
-type fork uint8
-
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -96,6 +94,8 @@ func init() {
 }
 
 type stakerStatus uint
+
+type fork uint8
 
 type staker struct {
 	nodeID             ids.NodeID

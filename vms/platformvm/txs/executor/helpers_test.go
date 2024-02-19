@@ -58,8 +58,6 @@ const (
 	durangoFork
 )
 
-type fork uint8
-
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -85,6 +83,8 @@ func init() {
 		genesisNodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
+
+type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -335,7 +335,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 
 func defaultClock(f fork) *mockable.Clock {
 	now := defaultGenesisTime
-	if f == durangoFork || f == cortinaFork || f == banffFork {
+	if f >= banffFork {
 		// 1 second after active fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
