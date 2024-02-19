@@ -1504,7 +1504,21 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
         node_ref: NodeObjRef<'a>,
         key: K,
     ) -> Result<Option<NodeObjRef<'a>>, MerkleError> {
-        self.get_node_by_key_with_callbacks(node_ref, key, |_, _| {}, |_, _| {})
+        let key = key.as_ref();
+        let path_iter = self.path_iter(node_ref, key);
+
+        match path_iter.last() {
+            None => Ok(None),
+            Some(Err(e)) => Err(e),
+            Some(Ok((node_key, node))) => {
+                let key_nibbles = Nibbles::<0>::new(key).into_iter();
+                if key_nibbles.eq(node_key.iter().copied()) {
+                    Ok(Some(node))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
     }
 
     fn get_node_and_parents_by_key<'a, K: AsRef<[u8]>>(
@@ -1676,24 +1690,16 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
             return Ok(Proof(proofs));
         }
 
-        let root_node = self.get_node(root)?;
+        let sentinel_node = self.get_node(root)?;
 
-        let mut nodes = Vec::new();
+        let path_iter = self.path_iter(sentinel_node, key.as_ref());
 
-        let node = self.get_node_by_key_with_callbacks(
-            root_node,
-            key,
-            |node, _| nodes.push(node),
-            |_, _| {},
-        )?;
-
-        if let Some(node) = node {
-            nodes.push(node.as_ptr());
-        }
+        let nodes = path_iter
+            .map(|result| result.map(|(_, node)| node))
+            .collect::<Result<Vec<NodeObjRef>, MerkleError>>()?;
 
         // Get the hashes of the nodes.
-        for node in nodes.into_iter().skip(1) {
-            let node = self.get_node(node)?;
+        for node in nodes.into_iter() {
             let encoded = <&[u8]>::clone(&node.get_encoded::<S>(self.store.as_ref()));
             let hash: [u8; TRIE_HASH_LEN] = sha3::Keccak256::digest(encoded).into();
             proofs.insert(hash, encoded.to_vec());
