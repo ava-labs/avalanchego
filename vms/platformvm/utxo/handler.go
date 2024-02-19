@@ -37,6 +37,7 @@ var (
 	errLocktimeMismatch             = errors.New("input locktime does not match UTXO locktime")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
+	errUnknownOutputType            = errors.New("unknown output type")
 )
 
 // TODO: Stake and Authorize should be replaced by similar methods in the
@@ -58,8 +59,8 @@ type Spender interface {
 	Spend(
 		utxoReader avax.UTXOReader,
 		keys []*secp256k1.PrivateKey,
-		amount uint64,
-		fee uint64,
+		amountsToBurn map[ids.ID]uint64,
+		amountsToStake map[ids.ID]uint64,
 		changeAddr ids.ShortID,
 	) (
 		[]*avax.TransferableInput, // inputs
@@ -149,15 +150,15 @@ type handler struct {
 func (h *handler) Spend(
 	utxoReader avax.UTXOReader,
 	keys []*secp256k1.PrivateKey,
-	amount uint64,
-	fee uint64,
+	amountsToBurn map[ids.ID]uint64,
+	amountsToStake map[ids.ID]uint64,
 	changeAddr ids.ShortID,
 ) (
-	[]*avax.TransferableInput, // inputs
-	[]*avax.TransferableOutput, // returnedOutputs
-	[]*avax.TransferableOutput, // stakedOutputs
-	[][]*secp256k1.PrivateKey, // signers
-	error,
+	inputs []*avax.TransferableInput,
+	changeOutputs []*avax.TransferableOutput,
+	stakeOutputs []*avax.TransferableOutput,
+	signers [][]*secp256k1.PrivateKey,
+	err error,
 ) {
 	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
 	for _, key := range keys {
@@ -171,47 +172,43 @@ func (h *handler) Spend(
 	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
-	now := uint64(h.clk.Time().Unix())
+	minIssuanceTime := uint64(h.clk.Time().Unix())
 
-	ins := []*avax.TransferableInput{}
-	returnedOuts := []*avax.TransferableOutput{}
-	stakedOuts := []*avax.TransferableOutput{}
-	signers := [][]*secp256k1.PrivateKey{}
+	changeOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{changeAddr},
+	}
 
-	// Amount of AVAX that has been staked
-	amountStaked := uint64(0)
-
-	// Consume locked UTXOs
+	// Iterate over the locked UTXOs
 	for _, utxo := range utxos {
-		// If we have consumed more AVAX than we are trying to stake, then we
-		// have no need to consume more locked AVAX
-		if amountStaked >= amount {
-			break
+		assetID := utxo.AssetID()
+		remainingAmountToStake := amountsToStake[assetID]
+
+		// If we have staked enough of the asset, then we have no need burn
+		// more.
+		if remainingAmountToStake == 0 {
+			continue
 		}
 
-		if assetID := utxo.AssetID(); assetID != h.ctx.AVAXAssetID {
-			continue // We only care about staking AVAX, so ignore other assets
-		}
-
-		out, ok := utxo.Out.(*stakeable.LockOut)
+		outIntf := utxo.Out
+		lockedOut, ok := outIntf.(*stakeable.LockOut)
 		if !ok {
 			// This output isn't locked, so it will be handled during the next
 			// iteration of the UTXO set
 			continue
 		}
-		if out.Locktime <= now {
-			// This output is no longer locked, so it will be handled during the
-			// next iteration of the UTXO set
+		if minIssuanceTime >= lockedOut.Locktime {
+			// This output isn't locked, so it will be handled during the next
+			// iteration of the UTXO set
 			continue
 		}
 
-		inner, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
+		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
-			// We only know how to clone secp256k1 outputs for now
-			continue
+			return nil, nil, nil, nil, errUnknownOutputType
 		}
 
-		inIntf, inSigners, err := kc.Spend(out.TransferableOut, now)
+		inIntf, inSigners, err := kc.Spend(out, minIssuanceTime)
 		if err != nil {
 			// We couldn't spend the output, so move on to the next one
 			continue
@@ -225,169 +222,163 @@ func (h *handler) Spend(
 			continue
 		}
 
-		// The remaining value is initially the full value of the input
-		remainingValue := in.Amount()
-
-		// Stake any value that should be staked
-		amountToStake := min(
-			amount-amountStaked, // Amount we still need to stake
-			remainingValue,      // Amount available to stake
-		)
-		amountStaked += amountToStake
-		remainingValue -= amountToStake
-
-		// Add the input to the consumed inputs
-		ins = append(ins, &avax.TransferableInput{
+		inputs = append(inputs, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			Asset:  utxo.Asset,
 			In: &stakeable.LockIn{
-				Locktime:       out.Locktime,
+				Locktime:       lockedOut.Locktime,
 				TransferableIn: in,
 			},
 		})
 
+		// Add the signers needed for this input to the set of signers
+		signers = append(signers, inSigners)
+
+		// Stake any value that should be staked
+		amountToStake := min(
+			remainingAmountToStake, // Amount we still need to stake
+			out.Amt,                // Amount available to stake
+		)
+
 		// Add the output to the staked outputs
-		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+			Asset: utxo.Asset,
 			Out: &stakeable.LockOut{
-				Locktime: out.Locktime,
+				Locktime: lockedOut.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
 					Amt:          amountToStake,
-					OutputOwners: inner.OutputOwners,
+					OutputOwners: out.OutputOwners,
 				},
 			},
 		})
 
-		if remainingValue > 0 {
-			// This input provided more value than was needed to be locked.
-			// Some of it must be returned
-			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+		amountsToStake[assetID] -= amountToStake
+		if remainingAmount := out.Amt - amountToStake; remainingAmount > 0 {
+			// This input had extra value, so some of it must be returned
+			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
+				Asset: utxo.Asset,
 				Out: &stakeable.LockOut{
-					Locktime: out.Locktime,
+					Locktime: lockedOut.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
-						Amt:          remainingValue,
-						OutputOwners: inner.OutputOwners,
+						Amt:          remainingAmount,
+						OutputOwners: out.OutputOwners,
 					},
 				},
 			})
 		}
-
-		// Add the signers needed for this input to the set of signers
-		signers = append(signers, inSigners)
 	}
 
-	// Amount of AVAX that has been burned
-	amountBurned := uint64(0)
-
+	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
-		// If we have consumed more AVAX than we are trying to stake,
-		// and we have burned more AVAX than we need to,
-		// then we have no need to consume more AVAX
-		if amountBurned >= fee && amountStaked >= amount {
-			break
+		assetID := utxo.AssetID()
+		remainingAmountToStake := amountsToStake[assetID]
+		remainingAmountToBurn := amountsToBurn[assetID]
+
+		// If we have consumed enough of the asset, then we have no need burn
+		// more.
+		if remainingAmountToStake == 0 && remainingAmountToBurn == 0 {
+			continue
 		}
 
-		if assetID := utxo.AssetID(); assetID != h.ctx.AVAXAssetID {
-			continue // We only care about burning AVAX, so ignore other assets
-		}
-
-		out := utxo.Out
-		inner, ok := out.(*stakeable.LockOut)
-		if ok {
-			if inner.Locktime > now {
+		outIntf := utxo.Out
+		if lockedOut, ok := outIntf.(*stakeable.LockOut); ok {
+			if lockedOut.Locktime > minIssuanceTime {
 				// This output is currently locked, so this output can't be
-				// burned. Additionally, it may have already been consumed
-				// above. Regardless, we skip to the next UTXO
+				// burned.
 				continue
 			}
-			out = inner.TransferableOut
+			outIntf = lockedOut.TransferableOut
 		}
 
-		inIntf, inSigners, err := kc.Spend(out, now)
+		out, ok := outIntf.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return nil, nil, nil, nil, errUnknownOutputType
+		}
+
+		inIntf, inSigners, err := kc.Spend(out, minIssuanceTime)
 		if err != nil {
-			// We couldn't spend this UTXO, so we skip to the next one
+			// We couldn't spend the output, so move on to the next one
 			continue
 		}
 		in, ok := inIntf.(avax.TransferableIn)
-		if !ok {
-			// Because we only use the secp Fx right now, this should never
-			// happen
+		if !ok { // should never happen
+			h.ctx.Log.Warn("wrong input type",
+				zap.String("expectedType", "avax.TransferableIn"),
+				zap.String("actualType", fmt.Sprintf("%T", inIntf)),
+			)
 			continue
 		}
 
-		// The remaining value is initially the full value of the input
-		remainingValue := in.Amount()
-
-		// Burn any value that should be burned
-		amountToBurn := min(
-			fee-amountBurned, // Amount we still need to burn
-			remainingValue,   // Amount available to burn
-		)
-		amountBurned += amountToBurn
-		remainingValue -= amountToBurn
-
-		// Stake any value that should be staked
-		amountToStake := min(
-			amount-amountStaked, // Amount we still need to stake
-			remainingValue,      // Amount available to stake
-		)
-		amountStaked += amountToStake
-		remainingValue -= amountToStake
-
-		// Add the input to the consumed inputs
-		ins = append(ins, &avax.TransferableInput{
+		inputs = append(inputs, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			Asset:  utxo.Asset,
 			In:     in,
 		})
 
-		if amountToStake > 0 {
-			// Some of this input was put for staking
-			stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: amountToStake,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
-
-		if remainingValue > 0 {
-			// This input had extra value, so some of it must be returned
-			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: remainingValue,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
-				},
-			})
-		}
-
 		// Add the signers needed for this input to the set of signers
 		signers = append(signers, inSigners)
-	}
 
-	if amountBurned < fee || amountStaked < amount {
-		return nil, nil, nil, nil, fmt.Errorf(
-			"%w (unlocked, locked) (%d, %d) but need (%d, %d)",
-			ErrInsufficientFunds, amountBurned, amountStaked, fee, amount,
+		// Burn any value that should be burned
+		amountToBurn := min(
+			remainingAmountToBurn, // Amount we still need to burn
+			out.Amt,               // Amount available to burn
 		)
+		amountsToBurn[assetID] -= amountToBurn
+
+		amountAvalibleToStake := out.Amt - amountToBurn
+		// Burn any value that should be burned
+		amountToStake := min(
+			remainingAmountToStake, // Amount we still need to stake
+			amountAvalibleToStake,  // Amount available to stake
+		)
+		amountsToStake[assetID] -= amountToStake
+		if amountToStake > 0 {
+			// Some of this input was put for staking
+			stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+				Asset: utxo.Asset,
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          amountToStake,
+					OutputOwners: *changeOwner,
+				},
+			})
+		}
+		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
+			// This input had extra value, so some of it must be returned
+			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
+				Asset: utxo.Asset,
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          remainingAmount,
+					OutputOwners: *changeOwner,
+				},
+			})
+		}
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers)  // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, txs.Codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, txs.Codec)   // sort outputs
+	for assetID, amount := range amountsToStake {
+		if amount != 0 {
+			return nil, nil, nil, nil, fmt.Errorf(
+				"%w: provided UTXOs need %d more units of asset %q to stake",
+				ErrInsufficientFunds,
+				amount,
+				assetID,
+			)
+		}
+	}
+	for assetID, amount := range amountsToBurn {
+		if amount != 0 {
+			return nil, nil, nil, nil, fmt.Errorf(
+				"%w: provided UTXOs need %d more units of asset %q",
+				ErrInsufficientFunds,
+				amount,
+				assetID,
+			)
+		}
+	}
 
-	return ins, returnedOuts, stakedOuts, signers, nil
+	avax.SortTransferableInputsWithSigners(inputs, signers) // sort inputs and keys
+	avax.SortTransferableOutputs(changeOutputs, txs.Codec)  // sort the change outputs
+	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)   // sort stake outputs
+	return inputs, changeOutputs, stakeOutputs, signers, nil
 }
 
 func (h *handler) Authorize(

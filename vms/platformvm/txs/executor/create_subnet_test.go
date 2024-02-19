@@ -54,7 +54,11 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			toBurn := map[ids.ID]uint64{
+				env.ctx.AVAXAssetID: test.fee,
+			}
+			toStake := make(map[ids.ID]uint64)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, toBurn, toStake, ids.ShortEmpty)
 			require.NoError(err)
 
 			// Create the tx

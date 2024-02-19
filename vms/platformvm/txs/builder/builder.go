@@ -340,7 +340,11 @@ func (b *builder) NewImportTx(
 	switch {
 	case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
 		var baseSigners [][]*secp256k1.PrivateKey
-		ins, outs, _, baseSigners, err = b.Spend(b.state, keys, 0, b.cfg.TxFee-importedAVAX, changeAddr)
+		toBurn := map[ids.ID]uint64{
+			b.ctx.AVAXAssetID: b.cfg.TxFee - importedAVAX,
+		}
+		toStake := make(map[ids.ID]uint64)
+		ins, outs, _, baseSigners, err = b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
@@ -396,11 +400,15 @@ func (b *builder) NewExportTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	toBurn, err := math.Add64(amount, b.cfg.TxFee)
+	amtToBurn, err := math.Add64(amount, b.cfg.TxFee)
 	if err != nil {
 		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
 	}
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: amtToBurn,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -446,7 +454,11 @@ func (b *builder) NewCreateChainTx(
 ) (*txs.Tx, error) {
 	timestamp := b.state.GetTimestamp()
 	createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, createBlockchainTxFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: createBlockchainTxFee,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -492,7 +504,11 @@ func (b *builder) NewCreateSubnetTx(
 ) (*txs.Tx, error) {
 	timestamp := b.state.GetTimestamp()
 	createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(timestamp)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, createSubnetTxFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: createSubnetTxFee,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -540,7 +556,11 @@ func (b *builder) NewTransformSubnetTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TransformSubnetTxFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.TransformSubnetTxFee,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -596,7 +616,13 @@ func (b *builder) NewAddValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.AddPrimaryNetworkValidatorFee,
+	}
+	toStake := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: stakeAmount,
+	}
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -642,7 +668,13 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.AddPrimaryNetworkValidatorFee,
+	}
+	toStake := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: stakeAmount,
+	}
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -693,7 +725,13 @@ func (b *builder) NewAddDelegatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.AddPrimaryNetworkDelegatorFee,
+	}
+	toStake := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: stakeAmount,
+	}
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -736,7 +774,13 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.AddPrimaryNetworkDelegatorFee,
+	}
+	toStake := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: stakeAmount,
+	}
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -780,7 +824,11 @@ func (b *builder) NewAddSubnetValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.TxFee,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -825,7 +873,11 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.TxFee,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -864,7 +916,11 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: b.cfg.TxFee,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -904,11 +960,15 @@ func (b *builder) NewBaseTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	toBurn, err := math.Add64(amount, b.cfg.TxFee)
+	amtToBurn, err := math.Add64(amount, b.cfg.TxFee)
 	if err != nil {
 		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
 	}
-	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, toBurn, changeAddr)
+	toBurn := map[ids.ID]uint64{
+		b.ctx.AVAXAssetID: amtToBurn,
+	}
+	toStake := make(map[ids.ID]uint64)
+	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
