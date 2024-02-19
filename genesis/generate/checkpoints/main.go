@@ -28,8 +28,8 @@ var (
 	mainnetCChainID = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
 )
 
-// This example program continuously polls for the next X-Chain block
-// and prints the ID of the block and its transactions.
+// This fetches IDs of blocks periodically accepted on the P-chain, X-chain, and
+// C-chain on both Fuji and Mainnet.
 func main() {
 	ctx := context.Background()
 
