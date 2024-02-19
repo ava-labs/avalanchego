@@ -5,6 +5,7 @@ package builder
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -57,6 +58,14 @@ import (
 const (
 	defaultWeight = 10000
 	trackChecksum = false
+
+	apricotPhase3 fork = iota
+	apricotPhase5
+	banff
+	cortina
+	durango
+
+	latestFork = durango
 )
 
 var (
@@ -84,6 +93,8 @@ func init() {
 	}
 }
 
+type fork uint8
+
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
@@ -110,12 +121,12 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T) *environment {
+func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	require := require.New(t)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
+		config:         defaultConfig(t, f),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -293,7 +304,34 @@ func defaultState(
 	return state
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(t *testing.T, f fork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
+	)
+
+	switch f {
+	case durango:
+		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case cortina:
+		cortinaTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case banff:
+		banffTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case apricotPhase5:
+		apricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		apricotPhase3Time = defaultValidateEndTime
+	default:
+		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
+	}
+
 	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -312,9 +350,11 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DurangoTime:       durangoTime,
 	}
 }
 

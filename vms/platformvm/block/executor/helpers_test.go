@@ -59,6 +59,12 @@ const (
 
 	defaultWeight = 10000
 	trackChecksum = false
+
+	apricotPhase3 fork = iota
+	apricotPhase5
+	banff
+	cortina
+	durango
 )
 
 var (
@@ -88,6 +94,8 @@ func init() {
 }
 
 type stakerStatus uint
+
+type fork uint8
 
 type staker struct {
 	nodeID             ids.NodeID
@@ -124,10 +132,10 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
+func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
+		config:         defaultConfig(t, f),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -320,7 +328,34 @@ func defaultState(
 	return state
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(t *testing.T, f fork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
+	)
+
+	switch f {
+	case durango:
+		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case cortina:
+		cortinaTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case banff:
+		banffTime = time.Time{} // neglecting fork ordering for this package's tests
+		fallthrough
+	case apricotPhase5:
+		apricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		apricotPhase3Time = defaultValidateEndTime
+	default:
+		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
+	}
+
 	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -339,9 +374,11 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         mockable.MaxTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
+		DurangoTime:       durangoTime,
 	}
 }
 

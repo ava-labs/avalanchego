@@ -71,16 +71,14 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-type activeFork uint8
-
 const (
-	apricotPhase3 activeFork = iota
+	apricotPhase3 fork = iota
 	apricotPhase5
-	banffFork
-	cortinaFork
-	durangoFork
+	banff
+	cortina
+	durango
 
-	latestFork activeFork = durangoFork
+	latestFork = durango
 
 	defaultWeight uint64 = 10000
 )
@@ -136,6 +134,8 @@ func init() {
 		genesisNodeIDs = append(genesisNodeIDs, nodeID)
 	}
 }
+
+type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -201,7 +201,7 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 	var (
 		apricotPhase3Time = mockable.MaxTime
@@ -214,14 +214,14 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
-	switch fork {
-	case durangoFork:
+	switch f {
+	case durango:
 		durangoTime = latestForkTime
 		fallthrough
-	case cortinaFork:
+	case cortina:
 		cortinaTime = latestForkTime
 		fallthrough
-	case banffFork:
+	case banff:
 		banffTime = latestForkTime
 		fallthrough
 	case apricotPhase5:
@@ -230,7 +230,7 @@ func defaultVM(t *testing.T, fork activeFork) (*VM, database.Database, *mutableS
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.NoError(fmt.Errorf("unhandled fork %d", fork))
+		require.NoError(fmt.Errorf("unhandled fork %d", f))
 	}
 
 	vm := &VM{Config: config.Config{
@@ -436,7 +436,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -487,7 +487,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
