@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package merkle;
+
+import "google/protobuf/empty.proto";
+
+service Merkle {
+    rpc NewProposal(NewProposalRequest) returns (NewProposalResponse);
+    rpc ProposalCommit(ProposalCommitRequest) returns (ProposalCommitResponse);
+  
+    rpc NewView(NewViewRequest) returns (NewViewResponse);
+    // The methods below may be called with a view ID that corresponds to either a (committable) proposal
+    // or (non-committable) historical view.
+    rpc ViewHas(ViewHasRequest) returns (ViewHasResponse);
+    rpc ViewGet(ViewGetRequest) returns (ViewGetResponse);
+    rpc ViewNewIteratorWithStartAndPrefix(ViewNewIteratorWithStartAndPrefixRequest) returns (ViewNewIteratorWithStartAndPrefixResponse);
+    rpc ViewRelease(ViewReleaseRequest) returns (google.protobuf.Empty);
+}
+
+message NewProposalRequest {
+  // If not given, the parent view is the current database revision.
+  optional uint32 parent_view_id = 1;
+  repeated PutRequest puts = 2;
+  // The keys being deleted.
+  repeated bytes deletes = 3;
+}
+
+message NewProposalResponse {
+  uint32 proposal_id = 1;
+}
+
+message ProposalCommitRequest {
+  uint32 proposal_id = 1;
+}
+
+message ProposalCommitResponse {
+  CommitError err = 1;
+}
+
+message NewViewRequest {
+  bytes root_id = 1;
+}
+
+message NewViewResponse {
+  uint32 view_id = 1;
+}
+
+message ViewHasRequest {
+  uint32 view_id = 1;
+  bytes key = 2;
+}
+
+message ViewHasResponse {
+  bool has = 1;
+}
+
+message ViewGetRequest {
+  uint32 view_id = 1;
+  bytes key = 2;
+}
+
+message ViewGetResponse {
+  bytes value = 1;
+  GetError err = 2;
+}
+
+message ViewNewIteratorWithStartAndPrefixRequest {
+  uint32 view_id = 1;
+  bytes start = 2;
+  bytes prefix = 3;
+}
+
+message ViewNewIteratorWithStartAndPrefixResponse {
+  uint32 iterator_id = 1;
+}
+
+message ViewReleaseRequest {
+  uint32 view_id = 1;
+}
+
+// TODO import this from the rpcdb package.
+message PutRequest {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+enum GetError {
+  // ERROR_UNSPECIFIED_GET is used to indicate that no error occurred.
+  ERROR_UNSPECIFIED_GET = 0;
+  ERROR_CLOSED_GET = 1;
+  ERROR_NOT_FOUND = 2;
+}
+
+enum CommitError {
+  // ERROR_UNSPECIFIED_COMMIT is used to indicate that no error occurred.
+  ERROR_UNSPECIFIED_COMMIT = 0;
+  ERROR_CLOSED_COMMIT = 1;
+  ERROR_INVALID = 2;
+  ERROR_COMMITTED = 3;
+  ERROR_PARENT_NOT_DATABASE = 4;
+  ERROR_NON_PROPOSAL_ID = 5;
+}
