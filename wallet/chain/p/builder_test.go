@@ -168,11 +168,11 @@ func TestBaseTx(t *testing.T) {
 		// check UTXOs selection and fee financing
 		ins := utx.Ins
 		outs := utx.Outs
-		require.Len(ins, 1)
+		require.Len(ins, 2)
 		require.Len(outs, 2)
 
-		expectedConsumed := fc.Fee
-		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		expectedConsumed := fc.Fee + outputsToMove[0].Out.Amount()
+		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
 		require.Equal(expectedConsumed, consumed)
 		require.Equal(outputsToMove[0], outs[1])
 	}
@@ -1572,7 +1572,7 @@ func newDeterministicGenericBackend(
 	require *require.Assertions,
 	utxoSets map[ids.ID][]*avax.UTXO,
 	subnetOwners map[ids.ID]fx.Owner,
-) *deterministicGenericBackend {
+) *testBackend {
 	globalUTXOs := common.NewUTXOs()
 	for subnetID, utxos := range utxoSets {
 		for _, utxo := range utxos {
@@ -1581,23 +1581,18 @@ func newDeterministicGenericBackend(
 			)
 		}
 	}
-	return &deterministicGenericBackend{
-		ChainUTXOs:   common.NewChainUTXOs(constants.PlatformChainID, globalUTXOs),
-		subnetOwners: subnetOwners,
+	return &testBackend{
+		DeterministicChainUTXOs: common.NewDeterministicChainUTXOs(require, utxoSets),
+		subnetOwners:            subnetOwners,
 	}
 }
 
-var (
-	_ common.ChainUTXOs = (*deterministicGenericBackend)(nil)
-	_ SignerBackend     = (*deterministicGenericBackend)(nil)
-)
-
-type deterministicGenericBackend struct {
-	common.ChainUTXOs
+type testBackend struct {
+	*common.DeterministicChainUTXOs
 	subnetOwners map[ids.ID]fx.Owner // subnetID --> fx.Owner
 }
 
-func (c *deterministicGenericBackend) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+func (c *testBackend) UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
 	utxos, err := c.ChainUTXOs.UTXOs(ctx, sourceChainID)
 	if err != nil {
 		return nil, err
@@ -1609,7 +1604,7 @@ func (c *deterministicGenericBackend) UTXOs(ctx stdcontext.Context, sourceChainI
 	return utxos, nil
 }
 
-func (c *deterministicGenericBackend) GetSubnetOwner(_ stdcontext.Context, subnetID ids.ID) (fx.Owner, error) {
+func (c *testBackend) GetSubnetOwner(_ stdcontext.Context, subnetID ids.ID) (fx.Owner, error) {
 	owner, found := c.subnetOwners[subnetID]
 	if !found {
 		return nil, database.ErrNotFound

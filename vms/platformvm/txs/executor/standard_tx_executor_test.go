@@ -845,7 +845,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banffFork)
+	env := newEnvironment(t, banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -1107,7 +1107,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, durangoFork)
+			env := newEnvironment(t, durango)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -1453,7 +1453,7 @@ func TestDurangoMemoField(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, durangoFork)
+			env := newEnvironment(t, durango)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 

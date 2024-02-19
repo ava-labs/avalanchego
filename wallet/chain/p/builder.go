@@ -385,8 +385,16 @@ func (b *builder) newBaseTxPreEUpgrade(
 	}
 
 	// 2. Finance the tx by building the utxos (inputs, outputs and stakes)
-	toStake := map[ids.ID]uint64{}
 	toBurn := map[ids.ID]uint64{} // fees are calculated in financeTx
+	for _, out := range outputs {
+		assetID := out.AssetID()
+		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		if err != nil {
+			return nil, err
+		}
+		toBurn[assetID] = amountToBurn
+	}
+	toStake := map[ids.ID]uint64{}
 
 	// feesMan cumulates consumed units. Let's init it with utx filled so far
 	if err := feeCalc.CreateSubnetTx(utx); err != nil {

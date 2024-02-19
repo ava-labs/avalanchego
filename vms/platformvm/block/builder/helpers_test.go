@@ -60,15 +60,15 @@ const (
 	defaultWeight = 10000
 	trackChecksum = false
 
-	apricotPhase3 activeFork = iota
+	apricotPhase3 fork = iota
 	apricotPhase5
-	banffFork
-	cortinaFork
-	durangoFork
-	eUpgradeFork
-)
+	banff
+	cortina
+	durango
+	eUpgrade
 
-type activeFork uint8
+	latestFork = durango
+)
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -94,6 +94,8 @@ func init() {
 		genesisNodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
+
+type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -121,12 +123,12 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unparam
+func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	require := require.New(t)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(t, fork),
+		config:         defaultConfig(t, f),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -314,7 +316,7 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(t *testing.T, fork activeFork) *config.Config {
+func defaultConfig(t *testing.T, f fork) *config.Config {
 	var (
 		apricotPhase3Time = mockable.MaxTime
 		apricotPhase5Time = mockable.MaxTime
@@ -324,18 +326,18 @@ func defaultConfig(t *testing.T, fork activeFork) *config.Config {
 		eUpgradeTime      = mockable.MaxTime
 	)
 
-	switch fork {
-	case eUpgradeFork:
+	switch f {
+	case eUpgrade:
 		eUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
-	case durangoFork:
-		durangoTime = time.Time{} // neglecting fork ordering this for package tests
+	case durango:
+		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case cortinaFork:
-		cortinaTime = time.Time{} // neglecting fork ordering this for package tests
+	case cortina:
+		cortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case banffFork:
-		banffTime = time.Time{} // neglecting fork ordering this for package tests
+	case banff:
+		banffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
 	case apricotPhase5:
 		apricotPhase5Time = defaultValidateEndTime
@@ -343,7 +345,7 @@ func defaultConfig(t *testing.T, fork activeFork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", fork))
+		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
 	}
 
 	return &config.Config{
