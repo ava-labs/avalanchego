@@ -5,17 +5,11 @@ package p
 
 import (
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 
 	stdcontext "context"
 )
-
-const Alias = "P"
 
 func NewContextFromURI(ctx stdcontext.Context, uri string) (backends.Context, error) {
 	infoClient := info.NewClient(uri)
@@ -55,16 +49,4 @@ func NewContextFromClients(
 		uint64(txFees.AddSubnetValidatorFee),
 		uint64(txFees.AddSubnetDelegatorFee),
 	), nil
-}
-
-func newSnowContext(c backends.Context) (*snow.Context, error) {
-	lookup := ids.NewAliaser()
-	return &snow.Context{
-		NetworkID:   c.NetworkID(),
-		SubnetID:    constants.PrimaryNetworkID,
-		ChainID:     constants.PlatformChainID,
-		AVAXAssetID: c.AVAXAssetID(),
-		Log:         logging.NoLog{},
-		BCLookup:    lookup,
-	}, lookup.Alias(constants.PlatformChainID, Alias)
 }

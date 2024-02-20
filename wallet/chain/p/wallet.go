@@ -29,7 +29,7 @@ type Wallet interface {
 	backends.Context
 
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() Builder
+	Builder() backends.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
 	Signer() backends.Signer
@@ -259,7 +259,7 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder Builder,
+	builder backends.Builder,
 	signer backends.Signer,
 	client platformvm.Client,
 	backend Backend,
@@ -274,12 +274,12 @@ func NewWallet(
 
 type wallet struct {
 	Backend
-	builder Builder
+	builder backends.Builder
 	signer  backends.Signer
 	client  platformvm.Client
 }
 
-func (w *wallet) Builder() Builder {
+func (w *wallet) Builder() backends.Builder {
 	return w.builder
 }
 

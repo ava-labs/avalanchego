@@ -3,7 +3,14 @@
 
 package backends
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+)
+
+const Alias = "P"
 
 var _ Context = (*builderCtx)(nil)
 
@@ -97,4 +104,16 @@ func (c *builderCtx) AddSubnetValidatorFee() uint64 {
 
 func (c *builderCtx) AddSubnetDelegatorFee() uint64 {
 	return c.addSubnetDelegatorFee
+}
+
+func newSnowContext(c Context) (*snow.Context, error) {
+	lookup := ids.NewAliaser()
+	return &snow.Context{
+		NetworkID:   c.NetworkID(),
+		SubnetID:    constants.PrimaryNetworkID,
+		ChainID:     constants.PlatformChainID,
+		AVAXAssetID: c.AVAXAssetID(),
+		Log:         logging.NoLog{},
+		BCLookup:    lookup,
+	}, lookup.Alias(constants.PlatformChainID, Alias)
 }

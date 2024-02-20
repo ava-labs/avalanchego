@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -31,7 +32,7 @@ type walletWithOptions struct {
 	options []common.Option
 }
 
-func (w *walletWithOptions) Builder() Builder {
+func (w *walletWithOptions) Builder() backends.Builder {
 	return NewBuilderWithOptions(
 		w.Wallet.Builder(),
 		w.options...,

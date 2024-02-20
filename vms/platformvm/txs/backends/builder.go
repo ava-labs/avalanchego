@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package backends
 
 import (
 	"errors"
@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -256,7 +255,7 @@ type Builder interface {
 
 type builder struct {
 	addrs   set.Set[ids.ShortID]
-	backend backends.BuilderBackend
+	backend BuilderBackend
 }
 
 // NewBuilder returns a new transaction builder.
@@ -265,7 +264,7 @@ type builder struct {
 //     signing the transactions in the future.
 //   - [backend] provides the required access to the chain's context and state
 //     to build out the transactions.
-func NewBuilder(addrs set.Set[ids.ShortID], backend backends.BuilderBackend) Builder {
+func NewBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) Builder {
 	return &builder{
 		addrs:   addrs,
 		backend: backend,
@@ -890,7 +889,7 @@ func (b *builder) getBalance(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, backends.ErrUnknownOutputType
+			return nil, ErrUnknownOutputType
 		}
 
 		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -972,7 +971,7 @@ func (b *builder) spend(
 
 		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, backends.ErrUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1053,7 +1052,7 @@ func (b *builder) spend(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, backends.ErrUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
