@@ -120,7 +120,7 @@ func (m *BiMap[K, _]) Keys() []K {
 // Values returns the values of the map. The values will be in an indeterminate
 // order.
 func (m *BiMap[_, V]) Values() []V {
-	return maps.Keys(m.valueToKey)
+	return maps.Values(m.keyToValue)
 }
 
 // Len return the number of entries in this map.
