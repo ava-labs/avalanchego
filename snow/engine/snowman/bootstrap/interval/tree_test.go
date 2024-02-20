@@ -138,10 +138,10 @@ func TestTreeAdd(t *testing.T) {
 
 			db := memdb.New()
 			treeFromAdditions := newTree(require, db, test.toAdd)
-			require.Equal(test.expected, flatten(treeFromAdditions.knownBlocks))
+			require.Equal(test.expected, flatten(treeFromAdditions.knownHeights))
 
 			treeFromDB := newTree(require, db, nil)
-			require.Equal(test.expected, flatten(treeFromDB.knownBlocks))
+			require.Equal(test.expected, flatten(treeFromDB.knownHeights))
 		})
 	}
 }

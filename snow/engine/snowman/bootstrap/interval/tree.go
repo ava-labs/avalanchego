@@ -12,8 +12,8 @@ import (
 const treeDegree = 2
 
 type Tree struct {
-	db          database.Database
-	knownBlocks *btree.BTreeG[*interval]
+	db           database.Database
+	knownHeights *btree.BTreeG[*interval]
 }
 
 func NewTree(db database.Database) (*Tree, error) {
@@ -22,13 +22,13 @@ func NewTree(db database.Database) (*Tree, error) {
 		return nil, err
 	}
 
-	knownBlocks := btree.NewG(treeDegree, (*interval).Less)
+	knownHeights := btree.NewG(treeDegree, (*interval).Less)
 	for _, i := range intervals {
-		knownBlocks.ReplaceOrInsert(i)
+		knownHeights.ReplaceOrInsert(i)
 	}
 	return &Tree{
-		db:          db,
-		knownBlocks: knownBlocks,
+		db:           db,
+		knownHeights: knownHeights,
 	}, nil
 }
 
@@ -41,7 +41,7 @@ func (t *Tree) Add(height uint64) error {
 		upper *interval
 		lower *interval
 	)
-	t.knownBlocks.AscendGreaterOrEqual(newInterval, func(item *interval) bool {
+	t.knownHeights.AscendGreaterOrEqual(newInterval, func(item *interval) bool {
 		upper = item
 		return false
 	})
@@ -50,7 +50,7 @@ func (t *Tree) Add(height uint64) error {
 		return nil
 	}
 
-	t.knownBlocks.DescendLessOrEqual(newInterval, func(item *interval) bool {
+	t.knownHeights.DescendLessOrEqual(newInterval, func(item *interval) bool {
 		lower = item
 		return false
 	})
@@ -66,7 +66,7 @@ func (t *Tree) Add(height uint64) error {
 			return err
 		}
 		upper.lowerBound = lower.lowerBound
-		t.knownBlocks.Delete(lower)
+		t.knownHeights.Delete(lower)
 		return PutInterval(t.db, upper.upperBound, lower.lowerBound)
 	case adjacentToLowerBound:
 		// the upper range should be extended by one on the lower side
@@ -80,7 +80,7 @@ func (t *Tree) Add(height uint64) error {
 		lower.upperBound = height
 		return PutInterval(t.db, height, lower.lowerBound)
 	default:
-		t.knownBlocks.ReplaceOrInsert(newInterval)
+		t.knownHeights.ReplaceOrInsert(newInterval)
 		return PutInterval(t.db, height, height)
 	}
 }
@@ -93,7 +93,7 @@ func (t *Tree) Contains(height uint64) bool {
 		}
 		higher *interval
 	)
-	t.knownBlocks.AscendGreaterOrEqual(i, func(item *interval) bool {
+	t.knownHeights.AscendGreaterOrEqual(i, func(item *interval) bool {
 		higher = item
 		return false
 	})
