@@ -5,20 +5,16 @@ package p2p
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	ErrThrottled         = errors.New("throttled")
-	_            Handler = (*ThrottlerHandler)(nil)
-)
+var _ Handler = (*ThrottlerHandler)(nil)
 
 func NewThrottlerHandler(handler Handler, throttler Throttler, log logging.Logger) *ThrottlerHandler {
 	return &ThrottlerHandler{
@@ -47,14 +43,14 @@ func (t ThrottlerHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, goss
 	t.handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
-func (t ThrottlerHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+func (t ThrottlerHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	if !t.throttler.Handle(nodeID) {
-		return nil, fmt.Errorf("dropping message from %s: %w", nodeID, ErrThrottled)
+		return nil, ErrThrottled
 	}
 
 	return t.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
 
-func (t ThrottlerHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+func (t ThrottlerHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	return t.handler.CrossChainAppRequest(ctx, chainID, deadline, requestBytes)
 }
