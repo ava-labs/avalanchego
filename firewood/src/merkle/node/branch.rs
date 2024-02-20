@@ -95,22 +95,6 @@ impl BranchNode {
         &mut self.children_encoded
     }
 
-    pub(crate) fn single_child(&self) -> (Option<(DiskAddress, u8)>, bool) {
-        let mut has_chd = false;
-        let mut only_chd = None;
-        for (i, c) in self.children.iter().enumerate() {
-            if c.is_some() {
-                has_chd = true;
-                if only_chd.is_some() {
-                    only_chd = None;
-                    break;
-                }
-                only_chd = (*c).map(|e| (e, i as u8))
-            }
-        }
-        (only_chd, has_chd)
-    }
-
     pub(super) fn decode(buf: &[u8]) -> Result<Self, Error> {
         let mut items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
 
