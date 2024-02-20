@@ -8,6 +8,9 @@ import (
 
 	"github.com/google/btree"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
 func flatten(tree *btree.BTreeG[*interval]) []*interval {
@@ -19,11 +22,13 @@ func flatten(tree *btree.BTreeG[*interval]) []*interval {
 	return intervals
 }
 
-func newTree(intervals []*interval) *Tree {
-	tree := NewTree()
+func newTree(require *require.Assertions, db database.Database, intervals []*interval) *Tree {
+	tree, err := NewTree(db)
+	require.NoError(err)
+
 	for _, toAdd := range intervals {
 		for i := toAdd.lowerBound; i <= toAdd.upperBound; i++ {
-			tree.Add(i)
+			require.NoError(tree.Add(i))
 		}
 	}
 	return tree
@@ -129,8 +134,14 @@ func TestTreeAdd(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tree := newTree(test.toAdd)
-			require.Equal(t, test.expected, flatten(tree.knownBlocks))
+			require := require.New(t)
+
+			db := memdb.New()
+			treeFromAdditions := newTree(require, db, test.toAdd)
+			require.Equal(test.expected, flatten(treeFromAdditions.knownBlocks))
+
+			treeFromDB := newTree(require, db, nil)
+			require.Equal(test.expected, flatten(treeFromDB.knownBlocks))
 		})
 	}
 }
@@ -211,8 +222,10 @@ func TestTreeContains(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tree := newTree(test.tree)
-			require.Equal(t, test.expected, tree.Contains(test.height))
+			require := require.New(t)
+
+			tree := newTree(require, memdb.New(), test.tree)
+			require.Equal(test.expected, tree.Contains(test.height))
 		})
 	}
 }

@@ -5,20 +5,34 @@ package interval
 
 import (
 	"github.com/google/btree"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
+const treeDegree = 2
+
 type Tree struct {
+	db          database.Database
 	knownBlocks *btree.BTreeG[*interval]
 }
 
-func NewTree() *Tree {
-	knownBlocks := btree.NewG(2, (*interval).Less)
-	return &Tree{
-		knownBlocks: knownBlocks,
+func NewTree(db database.Database) (*Tree, error) {
+	intervals, err := GetIntervals(db)
+	if err != nil {
+		return nil, err
 	}
+
+	knownBlocks := btree.NewG(treeDegree, (*interval).Less)
+	for _, i := range intervals {
+		knownBlocks.ReplaceOrInsert(i)
+	}
+	return &Tree{
+		db:          db,
+		knownBlocks: knownBlocks,
+	}, nil
 }
 
-func (t *Tree) Add(height uint64) {
+func (t *Tree) Add(height uint64) error {
 	var (
 		newInterval = &interval{
 			lowerBound: height,
@@ -33,7 +47,7 @@ func (t *Tree) Add(height uint64) {
 	})
 	if upper.Contains(height) {
 		// height is already in the tree
-		return
+		return nil
 	}
 
 	t.knownBlocks.DescendLessOrEqual(newInterval, func(item *interval) bool {
@@ -48,16 +62,26 @@ func (t *Tree) Add(height uint64) {
 	switch {
 	case adjacentToLowerBound && adjacentToUpperBound:
 		// the upper and lower ranges should be merged
+		if err := DeleteInterval(t.db, lower.upperBound); err != nil {
+			return err
+		}
 		upper.lowerBound = lower.lowerBound
 		t.knownBlocks.Delete(lower)
+		return PutInterval(t.db, upper.upperBound, lower.lowerBound)
 	case adjacentToLowerBound:
 		// the upper range should be extended by one on the lower side
 		upper.lowerBound = height
+		return PutInterval(t.db, upper.upperBound, height)
 	case adjacentToUpperBound:
 		// the lower range should be extended by one on the upper side
+		if err := DeleteInterval(t.db, lower.upperBound); err != nil {
+			return err
+		}
 		lower.upperBound = height
+		return PutInterval(t.db, height, lower.lowerBound)
 	default:
 		t.knownBlocks.ReplaceOrInsert(newInterval)
+		return PutInterval(t.db, height, height)
 	}
 }
 
