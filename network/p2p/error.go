@@ -7,18 +7,23 @@ import "github.com/ava-labs/avalanchego/snow/engine/common"
 
 var (
 	// ErrUnexpected should be used to indicate that a request failed due to a
-	// generic server-side error
+	// generic error
 	ErrUnexpected = &common.AppError{
 		Code: -1,
+	}
+	// ErrUnregisteredHandler should be used to indicate that a request failed
+	// due to it not matching a registered handler
+	ErrUnregisteredHandler = &common.AppError{
+		Code: -2,
 	}
 	// ErrNotValidator should be used to indicate that a request failed due to
 	// the requesting peer not being a validator
 	ErrNotValidator = &common.AppError{
-		Code: -2,
+		Code: -3,
 	}
 	// ErrThrottled should be used to indicate that a request failed due to the
 	// requesting peer exceeding a rate limit
 	ErrThrottled = &common.AppError{
-		Code: -3,
+		Code: -4,
 	}
 )

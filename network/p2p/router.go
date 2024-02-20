@@ -25,11 +25,6 @@ var (
 	ErrExistingAppProtocol = errors.New("existing app protocol")
 	ErrUnrequestedResponse = errors.New("unrequested response")
 
-	ErrUnregisteredHandler = &common.AppError{
-		Code:    -1,
-		Message: "unregistered handler",
-	}
-
 	_ common.AppHandler = (*router)(nil)
 )
 
