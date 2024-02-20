@@ -1,13 +1,13 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package signer
+package backends
 
 import (
-	"context"
-
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	stdcontext "context"
 )
 
 var _ Signer = (*txSigner)(nil)
@@ -21,22 +21,22 @@ type Signer interface {
 	//
 	// If the signer doesn't have the ability to provide a required signature,
 	// the signature slot will be skipped without reporting an error.
-	Sign(ctx context.Context, tx *txs.Tx) error
+	Sign(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
 type txSigner struct {
 	kc      keychain.Keychain
-	backend Backend
+	backend SignerBackend
 }
 
-func New(kc keychain.Keychain, backend Backend) Signer {
+func New(kc keychain.Keychain, backend SignerBackend) Signer {
 	return &txSigner{
 		kc:      kc,
 		backend: backend,
 	}
 }
 
-func (s *txSigner) Sign(ctx context.Context, tx *txs.Tx) error {
+func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 	return tx.Unsigned.Visit(&Visitor{
 		kc:      s.kc,
 		backend: s.backend,
@@ -46,7 +46,7 @@ func (s *txSigner) Sign(ctx context.Context, tx *txs.Tx) error {
 }
 
 func SignUnsigned(
-	ctx context.Context,
+	ctx stdcontext.Context,
 	s Signer,
 	utx txs.UnsignedTx,
 ) (*txs.Tx, error) {

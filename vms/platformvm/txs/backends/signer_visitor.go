@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package signer
+package backends
 
 import (
 	"context"
@@ -38,7 +38,7 @@ var (
 // Visitor handles signing transactions for the signer
 type Visitor struct {
 	kc      keychain.Keychain
-	backend Backend
+	backend SignerBackend
 	ctx     context.Context
 	tx      *txs.Tx
 }

@@ -8,11 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var _ Wallet = (*walletWithOptions)(nil)
@@ -199,7 +198,7 @@ func (w *walletWithOptions) IssueTransformSubnetTx(
 
 func (w *walletWithOptions) IssueAddPermissionlessValidatorTx(
 	vdr *txs.SubnetValidator,
-	signer blssigner.Signer,
+	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,

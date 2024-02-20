@@ -19,13 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 // Max number of items allowed in a page
@@ -170,7 +169,7 @@ type ProposalTxBuilder interface {
 		startTime,
 		endTime uint64,
 		nodeID ids.NodeID,
-		pop *blssigner.ProofOfPossession,
+		pop *signer.ProofOfPossession,
 		rewardAddress ids.ShortID,
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
@@ -386,11 +385,11 @@ func (b *builder) NewImportTx(
 		ImportedInputs: importedInputs,
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, from, atomicUTXOs),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -442,11 +441,11 @@ func (b *builder) NewExportTx(
 		}},
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -499,11 +498,11 @@ func (b *builder) NewCreateChainTx(
 		SubnetAuth:  subnetAuth,
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -546,11 +545,11 @@ func (b *builder) NewCreateSubnetTx(
 		},
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -617,11 +616,11 @@ func (b *builder) NewTransformSubnetTx(
 		SubnetAuth:               subnetAuth,
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -673,11 +672,11 @@ func (b *builder) NewAddValidatorTx(
 		DelegationShares: shares,
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -689,7 +688,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
-	pop *blssigner.ProofOfPossession,
+	pop *signer.ProofOfPossession,
 	rewardAddress ids.ShortID,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
@@ -737,11 +736,11 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		DelegationShares: shares,
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -791,11 +790,11 @@ func (b *builder) NewAddDelegatorTx(
 		},
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -846,11 +845,11 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		},
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -902,11 +901,11 @@ func (b *builder) NewAddSubnetValidatorTx(
 		SubnetAuth: subnetAuth,
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -948,11 +947,11 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		SubnetAuth: subnetAuth,
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -997,11 +996,11 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		},
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -1048,11 +1047,11 @@ func (b *builder) NewBaseTx(
 		},
 	}
 
-	s := signer.New(
+	s := backends.New(
 		secp256k1fx.NewKeychain(keys...),
 		NewSignerBackend(b.state, ids.Empty, nil),
 	)
-	tx, err := signer.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}

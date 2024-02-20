@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	psigner "github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
+	psigner "github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 )
 
 var _ Wallet = (*wallet)(nil)

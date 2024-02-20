@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -32,7 +33,7 @@ var (
 	avaxAssetID   = ids.Empty.Prefix(1789)
 	subnetAssetID = ids.Empty.Prefix(2024)
 
-	testCtx = NewContext(
+	testCtx = backends.NewContext(
 		constants.UnitTestID,
 		avaxAssetID,
 		units.MicroAvax,      // BaseTxFee

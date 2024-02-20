@@ -13,12 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 )
 
-var _ signer.Backend = (*signerBackend)(nil)
+var _ backends.SignerBackend = (*signerBackend)(nil)
 
-func NewSignerBackend(state state.State, sourceChain ids.ID, atomicUTXOs []*avax.UTXO) signer.Backend {
+func NewSignerBackend(state state.State, sourceChain ids.ID, atomicUTXOs []*avax.UTXO) backends.SignerBackend {
 	importedUTXO := make(map[ids.ID]*avax.UTXO, len(atomicUTXOs))
 	for _, utxo := range atomicUTXOs {
 		importedUTXO[utxo.InputID()] = utxo

@@ -11,13 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var (
@@ -27,13 +26,13 @@ var (
 )
 
 type Wallet interface {
-	Context
+	backends.Context
 
 	// Builder returns the builder that will be used to create the transactions.
 	Builder() Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() signer.Signer
+	Signer() backends.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	// Because the P-chain doesn't intend for balance transfers to occur, this
@@ -223,7 +222,7 @@ type Wallet interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddPermissionlessValidatorTx(
 		vdr *txs.SubnetValidator,
-		signer blssigner.Signer,
+		signer signer.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -261,7 +260,7 @@ type Wallet interface {
 
 func NewWallet(
 	builder Builder,
-	signer signer.Signer,
+	signer backends.Signer,
 	client platformvm.Client,
 	backend Backend,
 ) Wallet {
@@ -276,7 +275,7 @@ func NewWallet(
 type wallet struct {
 	Backend
 	builder Builder
-	signer  signer.Signer
+	signer  backends.Signer
 	client  platformvm.Client
 }
 
@@ -284,7 +283,7 @@ func (w *wallet) Builder() Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() signer.Signer {
+func (w *wallet) Signer() backends.Signer {
 	return w.signer
 }
 
@@ -451,7 +450,7 @@ func (w *wallet) IssueTransformSubnetTx(
 
 func (w *wallet) IssueAddPermissionlessValidatorTx(
 	vdr *txs.SubnetValidator,
-	signer blssigner.Signer,
+	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -497,7 +496,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := signer.SignUnsigned(ctx, w.signer, utx)
+	tx, err := backends.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}

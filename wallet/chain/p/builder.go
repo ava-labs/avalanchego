@@ -14,15 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	stdcontext "context"
-	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var (
@@ -222,7 +219,7 @@ type Builder interface {
 	// - [vdr] specifies all the details of the validation period such as the
 	//   subnetID, startTime, endTime, stake weight, and nodeID.
 	// - [signer] if the subnetID is the primary network, this is the BLS key
-	//   for this validator. Otherwise, this value should be the empty signer.
+	//   for this validator. Otherwise, this value should be the empty backends.
 	// - [assetID] specifies the asset to stake.
 	// - [validationRewardsOwner] specifies the owner of all the rewards this
 	//   validator earns for its validation period.
@@ -233,7 +230,7 @@ type Builder interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	NewAddPermissionlessValidatorTx(
 		vdr *txs.SubnetValidator,
-		signer blssigner.Signer,
+		signer signer.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -257,17 +254,9 @@ type Builder interface {
 	) (*txs.AddPermissionlessDelegatorTx, error)
 }
 
-// BuilderBackend specifies the required information needed to build unsigned
-// P-chain transactions.
-type BuilderBackend interface {
-	Context
-	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
-}
-
 type builder struct {
 	addrs   set.Set[ids.ShortID]
-	backend BuilderBackend
+	backend backends.BuilderBackend
 }
 
 // NewBuilder returns a new transaction builder.
@@ -276,7 +265,7 @@ type builder struct {
 //     signing the transactions in the future.
 //   - [backend] provides the required access to the chain's context and state
 //     to build out the transactions.
-func NewBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) Builder {
+func NewBuilder(addrs set.Set[ids.ShortID], backend backends.BuilderBackend) Builder {
 	return &builder{
 		addrs:   addrs,
 		backend: backend,
@@ -788,7 +777,7 @@ func (b *builder) NewTransformSubnetTx(
 
 func (b *builder) NewAddPermissionlessValidatorTx(
 	vdr *txs.SubnetValidator,
-	signer blssigner.Signer,
+	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -901,7 +890,7 @@ func (b *builder) getBalance(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, signer.ErrUnknownOutputType
+			return nil, backends.ErrUnknownOutputType
 		}
 
 		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -983,7 +972,7 @@ func (b *builder) spend(
 
 		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, signer.ErrUnknownOutputType
+			return nil, nil, nil, backends.ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1064,7 +1053,7 @@ func (b *builder) spend(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, signer.ErrUnknownOutputType
+			return nil, nil, nil, backends.ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)

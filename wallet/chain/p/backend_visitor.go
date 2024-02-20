@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 
 	stdcontext "context"
 )
@@ -23,11 +23,11 @@ type backendVisitor struct {
 }
 
 func (*backendVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return signer.ErrUnsupportedTxType
+	return backends.ErrUnsupportedTxType
 }
 
 func (*backendVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return signer.ErrUnsupportedTxType
+	return backends.ErrUnsupportedTxType
 }
 
 func (b *backendVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
