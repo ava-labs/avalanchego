@@ -201,7 +201,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				env.ctx.AVAXAssetID: test.fee,
 			}
 			toStake := make(map[ids.ID]uint64)
-			ins, outs, _, _, err := env.utxosHandler.Spend(env.state, preFundedKeys, toBurn, toStake, ids.ShortEmpty)
+			ins, outs, _, err := env.utxosHandler.Spend(env.state, preFundedKeys, toBurn, toStake, ids.ShortEmpty)
 			require.NoError(err)
 
 			subnetAuth, _, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)

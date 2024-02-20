@@ -7,10 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -22,7 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 var (
@@ -37,7 +38,6 @@ var (
 	errLocktimeMismatch             = errors.New("input locktime does not match UTXO locktime")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
-	errUnknownOutputType            = errors.New("unknown output type")
 )
 
 // TODO: Stake and Authorize should be replaced by similar methods in the
@@ -66,7 +66,6 @@ type Spender interface {
 		[]*avax.TransferableInput, // inputs
 		[]*avax.TransferableOutput, // returnedOutputs
 		[]*avax.TransferableOutput, // stakedOutputs
-		[][]*secp256k1.PrivateKey, // signers
 		error,
 	)
 
@@ -157,7 +156,6 @@ func (h *handler) Spend(
 	inputs []*avax.TransferableInput,
 	changeOutputs []*avax.TransferableOutput,
 	stakeOutputs []*avax.TransferableOutput,
-	signers [][]*secp256k1.PrivateKey,
 	err error,
 ) {
 	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
@@ -166,10 +164,8 @@ func (h *handler) Spend(
 	}
 	utxos, err := avax.GetAllUTXOs(utxoReader, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
+		return nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
-
-	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
 	minIssuanceTime := uint64(h.clk.Time().Unix())
@@ -205,20 +201,12 @@ func (h *handler) Spend(
 
 		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, signer.ErrUnknownOutputType
 		}
 
-		inIntf, inSigners, err := kc.Spend(out, minIssuanceTime)
-		if err != nil {
-			// We couldn't spend the output, so move on to the next one
-			continue
-		}
-		in, ok := inIntf.(avax.TransferableIn)
-		if !ok { // should never happen
-			h.ctx.Log.Warn("wrong input type",
-				zap.String("expectedType", "avax.TransferableIn"),
-				zap.String("actualType", fmt.Sprintf("%T", inIntf)),
-			)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+		if !ok {
+			// We couldn't spend this UTXO, so we skip to the next one
 			continue
 		}
 
@@ -226,13 +214,15 @@ func (h *handler) Spend(
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &stakeable.LockIn{
-				Locktime:       lockedOut.Locktime,
-				TransferableIn: in,
+				Locktime: lockedOut.Locktime,
+				TransferableIn: &secp256k1fx.TransferInput{
+					Amt: out.Amt,
+					Input: secp256k1fx.Input{
+						SigIndices: inputSigIndices,
+					},
+				},
 			},
 		})
-
-		// Add the signers needed for this input to the set of signers
-		signers = append(signers, inSigners)
 
 		// Stake any value that should be staked
 		amountToStake := min(
@@ -292,31 +282,25 @@ func (h *handler) Spend(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, signer.ErrUnknownOutputType
 		}
 
-		inIntf, inSigners, err := kc.Spend(out, minIssuanceTime)
-		if err != nil {
-			// We couldn't spend the output, so move on to the next one
-			continue
-		}
-		in, ok := inIntf.(avax.TransferableIn)
-		if !ok { // should never happen
-			h.ctx.Log.Warn("wrong input type",
-				zap.String("expectedType", "avax.TransferableIn"),
-				zap.String("actualType", fmt.Sprintf("%T", inIntf)),
-			)
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+		if !ok {
+			// We couldn't spend this UTXO, so we skip to the next one
 			continue
 		}
 
 		inputs = append(inputs, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
-			In:     in,
+			In: &secp256k1fx.TransferInput{
+				Amt: out.Amt,
+				Input: secp256k1fx.Input{
+					SigIndices: inputSigIndices,
+				},
+			},
 		})
-
-		// Add the signers needed for this input to the set of signers
-		signers = append(signers, inSigners)
 
 		// Burn any value that should be burned
 		amountToBurn := min(
@@ -356,7 +340,7 @@ func (h *handler) Spend(
 
 	for assetID, amount := range amountsToStake {
 		if amount != 0 {
-			return nil, nil, nil, nil, fmt.Errorf(
+			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q to stake",
 				ErrInsufficientFunds,
 				amount,
@@ -366,7 +350,7 @@ func (h *handler) Spend(
 	}
 	for assetID, amount := range amountsToBurn {
 		if amount != 0 {
-			return nil, nil, nil, nil, fmt.Errorf(
+			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q",
 				ErrInsufficientFunds,
 				amount,
@@ -375,10 +359,10 @@ func (h *handler) Spend(
 		}
 	}
 
-	avax.SortTransferableInputsWithSigners(inputs, signers) // sort inputs and keys
-	avax.SortTransferableOutputs(changeOutputs, txs.Codec)  // sort the change outputs
-	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)   // sort stake outputs
-	return inputs, changeOutputs, stakeOutputs, signers, nil
+	utils.Sort(inputs)                                     // sort inputs
+	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
+	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
+	return inputs, changeOutputs, stakeOutputs, nil
 }
 
 func (h *handler) Authorize(

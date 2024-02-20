@@ -346,7 +346,7 @@ func (b *builder) NewImportTx(
 			b.ctx.AVAXAssetID: b.cfg.TxFee - importedAVAX,
 		}
 		toStake := make(map[ids.ID]uint64)
-		ins, outs, _, _, err = b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+		ins, outs, _, err = b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
@@ -414,7 +414,7 @@ func (b *builder) NewExportTx(
 		b.ctx.AVAXAssetID: amtToBurn,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -469,7 +469,7 @@ func (b *builder) NewCreateChainTx(
 		b.ctx.AVAXAssetID: createBlockchainTxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -523,7 +523,7 @@ func (b *builder) NewCreateSubnetTx(
 		b.ctx.AVAXAssetID: createSubnetTxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -580,7 +580,7 @@ func (b *builder) NewTransformSubnetTx(
 		b.ctx.AVAXAssetID: b.cfg.TransformSubnetTxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -645,7 +645,7 @@ func (b *builder) NewAddValidatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unstakedOuts, stakedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unstakedOuts, stakedOuts, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -702,7 +702,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unstakedOuts, stakedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unstakedOuts, stakedOuts, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -764,7 +764,7 @@ func (b *builder) NewAddDelegatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unlockedOuts, lockedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unlockedOuts, lockedOuts, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -818,7 +818,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unlockedOuts, lockedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unlockedOuts, lockedOuts, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -871,7 +871,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		b.ctx.AVAXAssetID: b.cfg.TxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -924,7 +924,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		b.ctx.AVAXAssetID: b.cfg.TxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -971,7 +971,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		b.ctx.AVAXAssetID: b.cfg.TxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -1023,7 +1023,7 @@ func (b *builder) NewBaseTx(
 		b.ctx.AVAXAssetID: amtToBurn,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
