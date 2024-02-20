@@ -106,13 +106,13 @@ func (c *builderCtx) AddSubnetDelegatorFee() uint64 {
 	return c.addSubnetDelegatorFee
 }
 
-func newSnowContext(c Context) (*snow.Context, error) {
+func NewSnowContext(networkID uint32, avaxAssetID ids.ID) (*snow.Context, error) {
 	lookup := ids.NewAliaser()
 	return &snow.Context{
-		NetworkID:   c.NetworkID(),
+		NetworkID:   networkID,
 		SubnetID:    constants.PrimaryNetworkID,
 		ChainID:     constants.PlatformChainID,
-		AVAXAssetID: c.AVAXAssetID(),
+		AVAXAssetID: avaxAssetID,
 		Log:         logging.NoLog{},
 		BCLookup:    lookup,
 	}, lookup.Alias(constants.PlatformChainID, Alias)

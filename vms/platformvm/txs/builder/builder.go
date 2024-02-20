@@ -11,10 +11,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 // Max number of items allowed in a page
@@ -462,40 +463,23 @@ func (b *builder) NewCreateChainTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	timestamp := b.state.GetTimestamp()
-	createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
-	toBurn := map[ids.ID]uint64{
-		b.ctx.AVAXAssetID: createBlockchainTxFee,
+	addrs := set.NewSet[ids.ShortID](len(keys))
+	for _, key := range keys {
+		addrs.Add(key.Address())
 	}
-	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state)
+	pBuilder := backends.NewBuilder(addrs, builderBackend)
+
+	opts := common.UnionOptions(
+		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		})},
+		[]common.Option{common.WithMemo(memo)},
+	)
+	utx, err := pBuilder.NewCreateChainTx(subnetID, genesisData, vmID, fxIDs, chainName, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	subnetAuth, _, err := b.Authorize(b.state, subnetID, keys)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
-	}
-
-	// Sort the provided fxIDs
-	utils.Sort(fxIDs)
-
-	// Create the tx
-	utx := &txs.CreateChainTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-			Memo:         memo,
-		}},
-		SubnetID:    subnetID,
-		ChainName:   chainName,
-		VMID:        vmID,
-		FxIDs:       fxIDs,
-		GenesisData: genesisData,
-		SubnetAuth:  subnetAuth,
+		return nil, fmt.Errorf("failed building create chain tx: %w", err)
 	}
 
 	s := backends.New(
@@ -516,33 +500,28 @@ func (b *builder) NewCreateSubnetTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	timestamp := b.state.GetTimestamp()
-	createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(timestamp)
-	toBurn := map[ids.ID]uint64{
-		b.ctx.AVAXAssetID: createSubnetTxFee,
+	addrs := set.NewSet[ids.ShortID](len(keys))
+	for _, key := range keys {
+		addrs.Add(key.Address())
 	}
-	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state)
+	pBuilder := backends.NewBuilder(addrs, builderBackend)
+
+	subnetOwner := &secp256k1fx.OutputOwners{
+		Threshold: threshold,
+		Addrs:     ownerAddrs,
+	}
+
+	opts := common.UnionOptions(
+		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		})},
+		[]common.Option{common.WithMemo(memo)},
+	)
+	utx, err := pBuilder.NewCreateSubnetTx(subnetOwner, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	// Sort control addresses
-	utils.Sort(ownerAddrs)
-
-	// Create the tx
-	utx := &txs.CreateSubnetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-			Memo:         memo,
-		}},
-		Owner: &secp256k1fx.OutputOwners{
-			Threshold: threshold,
-			Addrs:     ownerAddrs,
-		},
+		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
 	}
 
 	s := backends.New(
@@ -638,38 +617,35 @@ func (b *builder) NewAddValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.ctx.AVAXAssetID: b.cfg.AddPrimaryNetworkValidatorFee,
+	addrs := set.NewSet[ids.ShortID](len(keys))
+	for _, key := range keys {
+		addrs.Add(key.Address())
 	}
-	toStake := map[ids.ID]uint64{
-		b.ctx.AVAXAssetID: stakeAmount,
+	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state)
+	pBuilder := backends.NewBuilder(addrs, builderBackend)
+
+	vdr := &txs.Validator{
+		NodeID: nodeID,
+		Start:  startTime,
+		End:    endTime,
+		Wght:   stakeAmount,
 	}
-	ins, unstakedOuts, stakedOuts, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+
+	rewardOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{rewardAddress},
 	}
-	// Create the tx
-	utx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-			Memo:         memo,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmount,
-		},
-		StakeOuts: stakedOuts,
-		RewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
+
+	opts := common.UnionOptions(
+		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{rewardAddress},
-		},
-		DelegationShares: shares,
+			Addrs:     []ids.ShortID{changeAddr},
+		})},
+		[]common.Option{common.WithMemo(memo)},
+	)
+	utx, err := pBuilder.NewAddValidatorTx(vdr, rewardOwner, shares, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
 	}
 
 	s := backends.New(

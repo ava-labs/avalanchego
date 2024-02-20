@@ -5,10 +5,10 @@ package builder
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -21,13 +21,14 @@ var _ backends.BuilderBackend = (*buiderBackend)(nil)
 func NewBuilderBackend(
 	ctx *snow.Context,
 	cfg *config.Config,
+	addrs set.Set[ids.ShortID],
 	state state.State,
 ) backends.BuilderBackend {
 	backendCtx := backends.NewContext(
 		ctx.NetworkID,
 		ctx.AVAXAssetID,
 		cfg.TxFee,
-		cfg.CreateSubnetTxFee,
+		cfg.GetCreateSubnetTxFee(state.GetTimestamp()),
 		cfg.TransformSubnetTxFee,
 		cfg.CreateBlockchainTxFee,
 		cfg.AddPrimaryNetworkValidatorFee,
@@ -37,6 +38,7 @@ func NewBuilderBackend(
 	)
 	return &buiderBackend{
 		Context: backendCtx,
+		addrs:   addrs,
 		state:   state,
 	}
 }
@@ -44,11 +46,13 @@ func NewBuilderBackend(
 type buiderBackend struct {
 	backends.Context
 
+	addrs set.Set[ids.ShortID]
 	state state.State
 }
 
-func (*buiderBackend) UTXOs(_ context.Context /*sourceChainID*/, _ ids.ID) ([]*avax.UTXO, error) {
-	return nil, errors.New("not yet implemented")
+// TODO ABENEGIA: handle non-P-chain UTXOs case
+func (b *buiderBackend) UTXOs(_ context.Context /*sourceChainID*/, _ ids.ID) ([]*avax.UTXO, error) {
+	return avax.GetAllUTXOs(b.state, b.addrs) // The UTXOs controlled by [keys]
 }
 
 func (b *buiderBackend) GetSubnetOwner(_ context.Context, subnetID ids.ID) (fx.Owner, error) {

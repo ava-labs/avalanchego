@@ -1162,7 +1162,7 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 }
 
 func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
+	ctx, err := NewSnowContext(b.backend.NetworkID(), b.backend.AVAXAssetID())
 	if err != nil {
 		return err
 	}
