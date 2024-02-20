@@ -520,12 +520,14 @@ impl Db {
         let disk_requester = DiskBufferRequester::new(sender);
         let buffer = cfg.buffer.clone();
         #[allow(clippy::unwrap_used)]
-        let disk_thread = block_in_place(|| {
-            Some(std::thread::spawn(move || {
-                let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).unwrap();
-                disk_buffer.run()
-            }))
-        });
+        let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).expect("DiskBuffer::new");
+
+        let disk_thread = Some(
+            std::thread::Builder::new()
+                .name("DiskBuffer".to_string())
+                .spawn(move || disk_buffer.run())
+                .expect("thread spawn should succeed"),
+        );
 
         #[allow(clippy::unwrap_used)]
         let root_hash_cache: Arc<CachedSpace> = CachedSpace::new(
