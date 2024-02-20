@@ -228,7 +228,7 @@ impl Proposal {
 
         // schedule writes to the disk
         rev_inner.disk_requester.write(
-            vec![
+            Box::new([
                 BufferWrite {
                     space_id: store.merkle.payload.id(),
                     delta: merkle_payload_redo,
@@ -241,7 +241,7 @@ impl Proposal {
                     space_id: rev_inner.root_hash_staging.id(),
                     delta: root_hash_redo,
                 },
-            ],
+            ]),
             AshRecord(
                 [
                     (MERKLE_META_SPACE, merkle_meta_wal),

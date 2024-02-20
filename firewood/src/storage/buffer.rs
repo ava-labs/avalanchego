@@ -31,12 +31,14 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
+type BufferWrites = Box<[BufferWrite]>;
+
 #[derive(Debug)]
 pub enum BufferCmd {
     /// Initialize the Wal.
     InitWal(PathBuf, String),
     /// Process a write batch against the underlying store.
-    WriteBatch(Vec<BufferWrite>, AshRecord),
+    WriteBatch(BufferWrites, AshRecord),
     /// Get a page from the disk buffer.
     GetPage((SpaceId, u64), oneshot::Sender<Option<Page>>),
     CollectAsh(usize, oneshot::Sender<Vec<AshRecord>>),
@@ -343,7 +345,7 @@ async fn run_wal_queue(
     wal: Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>,
     pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
     file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
-    mut writes: mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>,
+    mut writes: mpsc::Receiver<(BufferWrites, AshRecord)>,
     fc_notifier: Rc<Notify>,
     aiomgr: Rc<AioManager>,
 ) {
@@ -356,14 +358,14 @@ async fn run_wal_queue(
 
         if let Some((bw, ac)) = writes.recv().await {
             records.push(ac);
-            bwrites.extend(bw);
+            bwrites.extend(bw.into_vec());
         } else {
             break;
         }
 
         while let Ok((bw, ac)) = writes.try_recv() {
             records.push(ac);
-            bwrites.extend(bw);
+            bwrites.extend(bw.into_vec());
 
             if records.len() >= max.batch {
                 break;
@@ -467,8 +469,8 @@ async fn process(
     wal_cfg: &WalConfig,
     req: BufferCmd,
     max: WalQueueMax,
-    wal_in: mpsc::Sender<(Vec<BufferWrite>, AshRecord)>,
-    writes: &mut Option<mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>>,
+    wal_in: mpsc::Sender<(BufferWrites, AshRecord)>,
+    writes: &mut Option<mpsc::Receiver<(BufferWrites, AshRecord)>>,
 ) -> bool {
     match req {
         BufferCmd::Shutdown => return false,
@@ -590,7 +592,7 @@ impl DiskBufferRequester {
     }
 
     /// Sends a batch of writes to the buffer.
-    pub fn write(&self, page_batch: Vec<BufferWrite>, write_batch: AshRecord) {
+    pub fn write(&self, page_batch: BufferWrites, write_batch: AshRecord) {
         self.sender
             .send(BufferCmd::WriteBatch(page_batch, write_batch))
             .map_err(StoreError::Send)
@@ -808,10 +810,10 @@ mod tests {
         // page is not yet persisted to disk.
         assert!(disk_requester.get_page(STATE_SPACE, 0).is_none());
         disk_requester.write(
-            vec![BufferWrite {
+            Box::new([BufferWrite {
                 space_id: STATE_SPACE,
                 delta: redo_delta,
-            }],
+            }]),
             AshRecord([(STATE_SPACE, wal)].into()),
         );
 
@@ -943,7 +945,7 @@ mod tests {
         disk_requester
     }
 
-    fn create_batches(rev_mut: &StoreRevMut) -> (Vec<BufferWrite>, AshRecord) {
+    fn create_batches(rev_mut: &StoreRevMut) -> (BufferWrites, AshRecord) {
         let deltas = std::mem::replace(
             &mut *rev_mut.deltas.write(),
             StoreRevMutDelta {
@@ -959,10 +961,10 @@ mod tests {
         }
         pages.sort_by_key(|p| p.0);
 
-        let page_batch = vec![BufferWrite {
+        let page_batch = Box::new([BufferWrite {
             space_id: STATE_SPACE,
             delta: StoreDelta(pages),
-        }];
+        }]);
 
         let write_batch = AshRecord([(STATE_SPACE, deltas.plain)].into());
         (page_batch, write_batch)
