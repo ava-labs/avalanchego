@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -198,13 +201,11 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				env.ctx.AVAXAssetID: test.fee,
 			}
 			toStake := make(map[ids.ID]uint64)
-			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, toBurn, toStake, ids.ShortEmpty)
+			ins, outs, _, _, err := env.utxosHandler.Spend(env.state, preFundedKeys, toBurn, toStake, ids.ShortEmpty)
 			require.NoError(err)
 
-			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
+			subnetAuth, _, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
 			require.NoError(err)
-
-			signers = append(signers, subnetSigners)
 
 			// Create the tx
 
@@ -219,8 +220,12 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				VMID:       constants.AVMID,
 				SubnetAuth: subnetAuth,
 			}
-			tx := &txs.Tx{Unsigned: utx}
-			require.NoError(tx.Sign(txs.Codec, signers))
+			s := signer.New(
+				secp256k1fx.NewKeychain(preFundedKeys...),
+				builder.NewSignerBackend(env.state, ids.Empty, nil),
+			)
+			tx, err := signer.SignUnsigned(context.Background(), s, utx)
+			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

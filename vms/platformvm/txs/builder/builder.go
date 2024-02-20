@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -18,11 +19,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blssigner "github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 // Max number of items allowed in a page
@@ -167,7 +170,7 @@ type ProposalTxBuilder interface {
 		startTime,
 		endTime uint64,
 		nodeID ids.NodeID,
-		pop *signer.ProofOfPossession,
+		pop *blssigner.ProofOfPossession,
 		rewardAddress ids.ShortID,
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
@@ -339,16 +342,14 @@ func (b *builder) NewImportTx(
 	outs := []*avax.TransferableOutput{}
 	switch {
 	case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
-		var baseSigners [][]*secp256k1.PrivateKey
 		toBurn := map[ids.ID]uint64{
 			b.ctx.AVAXAssetID: b.cfg.TxFee - importedAVAX,
 		}
 		toStake := make(map[ids.ID]uint64)
-		ins, outs, _, baseSigners, err = b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+		ins, outs, _, _, err = b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
-		signers = append(baseSigners, signers...)
 		delete(importedAmounts, b.ctx.AVAXAssetID)
 	case importedAVAX == b.cfg.TxFee:
 		delete(importedAmounts, b.ctx.AVAXAssetID)
@@ -384,7 +385,12 @@ func (b *builder) NewImportTx(
 		SourceChain:    from,
 		ImportedInputs: importedInputs,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, from, atomicUTXOs),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +414,7 @@ func (b *builder) NewExportTx(
 		b.ctx.AVAXAssetID: amtToBurn,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -435,7 +441,12 @@ func (b *builder) NewExportTx(
 			},
 		}},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -458,16 +469,15 @@ func (b *builder) NewCreateChainTx(
 		b.ctx.AVAXAssetID: createBlockchainTxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	subnetAuth, _, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
-	signers = append(signers, subnetSigners)
 
 	// Sort the provided fxIDs
 	utils.Sort(fxIDs)
@@ -488,7 +498,12 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +523,7 @@ func (b *builder) NewCreateSubnetTx(
 		b.ctx.AVAXAssetID: createSubnetTxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -530,7 +545,12 @@ func (b *builder) NewCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -560,16 +580,15 @@ func (b *builder) NewTransformSubnetTx(
 		b.ctx.AVAXAssetID: b.cfg.TransformSubnetTxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	subnetAuth, _, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
-	signers = append(signers, subnetSigners)
 
 	utx := &txs.TransformSubnetTx{
 		BaseTx: txs.BaseTx{
@@ -598,7 +617,11 @@ func (b *builder) NewTransformSubnetTx(
 		SubnetAuth:               subnetAuth,
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -622,7 +645,7 @@ func (b *builder) NewAddValidatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unstakedOuts, stakedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -649,7 +672,12 @@ func (b *builder) NewAddValidatorTx(
 		},
 		DelegationShares: shares,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -661,7 +689,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
-	pop *signer.ProofOfPossession,
+	pop *blssigner.ProofOfPossession,
 	rewardAddress ids.ShortID,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
@@ -674,7 +702,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unstakedOuts, stakedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -708,7 +736,12 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		},
 		DelegationShares: shares,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -731,7 +764,7 @@ func (b *builder) NewAddDelegatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unlockedOuts, lockedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -757,7 +790,12 @@ func (b *builder) NewAddDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +818,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	toStake := map[ids.ID]uint64{
 		b.ctx.AVAXAssetID: stakeAmount,
 	}
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, unlockedOuts, lockedOuts, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -807,7 +845,12 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -828,16 +871,15 @@ func (b *builder) NewAddSubnetValidatorTx(
 		b.ctx.AVAXAssetID: b.cfg.TxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	subnetAuth, _, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
-	signers = append(signers, subnetSigners)
 
 	// Create the tx
 	utx := &txs.AddSubnetValidatorTx{
@@ -859,7 +901,12 @@ func (b *builder) NewAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -877,16 +924,15 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		b.ctx.AVAXAssetID: b.cfg.TxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	subnetAuth, _, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
-	signers = append(signers, subnetSigners)
 
 	// Create the tx
 	utx := &txs.RemoveSubnetValidatorTx{
@@ -901,7 +947,12 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -920,16 +971,15 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		b.ctx.AVAXAssetID: b.cfg.TxFee,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	subnetAuth, _, err := b.Authorize(b.state, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
-	signers = append(signers, subnetSigners)
 
 	utx := &txs.TransferSubnetOwnershipTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -946,7 +996,12 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -968,7 +1023,7 @@ func (b *builder) NewBaseTx(
 		b.ctx.AVAXAssetID: amtToBurn,
 	}
 	toStake := make(map[ids.ID]uint64)
-	ins, outs, _, signers, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
+	ins, outs, _, _, err := b.Spend(b.state, keys, toBurn, toStake, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -992,7 +1047,12 @@ func (b *builder) NewBaseTx(
 			Memo:         memo,
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+
+	s := signer.New(
+		secp256k1fx.NewKeychain(keys...),
+		NewSignerBackend(b.state, ids.Empty, nil),
+	)
+	tx, err := signer.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
 	}
