@@ -5,7 +5,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -96,10 +95,7 @@ func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, goss
 
 func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	if !v.validatorSet.Has(ctx, nodeID) {
-		return nil, &common.AppError{
-			Code:    ErrNotValidator.Code,
-			Message: fmt.Sprintf("%s is not a validator", nodeID),
-		}
+		return nil, ErrNotValidator
 	}
 
 	return v.handler.AppRequest(ctx, nodeID, deadline, requestBytes)

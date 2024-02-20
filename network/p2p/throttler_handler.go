@@ -5,7 +5,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -46,10 +45,7 @@ func (t ThrottlerHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, goss
 
 func (t ThrottlerHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	if !t.throttler.Handle(nodeID) {
-		return nil, &common.AppError{
-			Code:    ErrThrottled.Code,
-			Message: fmt.Sprintf("rate limit exceeded for %s", nodeID),
-		}
+		return nil, ErrThrottled
 	}
 
 	return t.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
