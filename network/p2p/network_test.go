@@ -340,7 +340,7 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 
 			wg := &sync.WaitGroup{}
 			sender := &common.SenderTest{}
-			sender.SendAppErrorF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+			sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
 				defer wg.Done()
 
 				require.Equal(wantNodeID, nodeID)
@@ -398,7 +398,7 @@ func TestCrossChainAppRequestMessageForUnregisteredHandler(t *testing.T) {
 
 			wg := &sync.WaitGroup{}
 			sender := &common.SenderTest{}
-			sender.SendCrossChainAppErrorF = func(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
+			sender.SendCrossChainAppErrorF = func(_ context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
 				defer wg.Done()
 
 				require.Equal(wantChainID, chainID)
