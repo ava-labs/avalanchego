@@ -125,7 +125,7 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 			zap.Uint64("handlerID", r.handlerID),
 			zap.Binary("message", request),
 		)
-		return nil
+		return r.sender.SendAppError(ctx, nodeID, requestID, err.Code, err.Message)
 	}
 
 	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
@@ -144,7 +144,7 @@ func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, re
 			zap.Uint64("handlerID", r.handlerID),
 			zap.Binary("message", request),
 		)
-		return nil
+		return r.sender.SendCrossChainAppError(ctx, chainID, requestID, err.Code, err.Message)
 	}
 
 	return r.sender.SendCrossChainAppResponse(ctx, chainID, requestID, appResponse)

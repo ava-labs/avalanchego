@@ -418,6 +418,82 @@ func TestCrossChainAppRequestMessageForUnregisteredHandler(t *testing.T) {
 	}
 }
 
+// A handler that errors should send an AppError to the requesting peer
+func TestAppError(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+	appError := &common.AppError{
+		Code:    123,
+		Message: "foo",
+	}
+	handler := &TestHandler{
+		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+			return nil, appError
+		},
+	}
+
+	wantNodeID := ids.GenerateTestNodeID()
+	wantRequestID := uint32(111)
+
+	wg := &sync.WaitGroup{}
+	sender := &common.SenderTest{}
+	sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+		defer wg.Done()
+
+		require.Equal(wantNodeID, nodeID)
+		require.Equal(wantRequestID, requestID)
+		require.Equal(appError.Code, errorCode)
+		require.Equal(appError.Message, errorMessage)
+
+		return nil
+	}
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	require.NoError(network.AddHandler(handlerID, handler))
+	msg := PrefixMessage(ProtocolPrefix(handlerID), []byte("message"))
+
+	wg.Add(1)
+	require.NoError(network.AppRequest(ctx, wantNodeID, wantRequestID, time.Time{}, msg))
+	wg.Wait()
+}
+
+// A handler that errors should send a CrossChainAppError to the requesting peer
+func TestCrossChainAppError(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+	appError := &common.AppError{
+		Code:    123,
+		Message: "foo",
+	}
+	handler := &TestHandler{
+		CrossChainAppRequestF: func(context.Context, ids.ID, time.Time, []byte) ([]byte, *common.AppError) {
+			return nil, appError
+		},
+	}
+
+	wantChainID := ids.GenerateTestID()
+	wantRequestID := uint32(111)
+
+	wg := &sync.WaitGroup{}
+	sender := &common.SenderTest{}
+	sender.SendCrossChainAppErrorF = func(_ context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) {
+		defer wg.Done()
+
+		require.Equal(wantChainID, chainID)
+		require.Equal(wantRequestID, requestID)
+		require.Equal(appError.Code, errorCode)
+		require.Equal(appError.Message, errorMessage)
+	}
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	require.NoError(network.AddHandler(handlerID, handler))
+	msg := PrefixMessage(ProtocolPrefix(handlerID), []byte("message"))
+
+	wg.Add(1)
+	require.NoError(network.CrossChainAppRequest(ctx, wantChainID, wantRequestID, time.Time{}, msg))
+	wg.Wait()
+}
+
 // A response or timeout for a request we never made should return an error
 func TestResponseForUnrequestedRequest(t *testing.T) {
 	tests := []struct {
