@@ -110,9 +110,6 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleNodeStream<'a, S
                                     });
                                 }
                                 NodeType::Leaf(_) => {}
-                                NodeType::Extension(_) => {
-                                    unreachable!("extension nodes shouldn't exist")
-                                }
                             }
 
                             let key = key_from_nibble_iter(key.iter().copied().skip(1));
@@ -133,9 +130,6 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleNodeStream<'a, S
                             let partial_path = match child.inner() {
                                 NodeType::Branch(branch) => branch.path.iter().copied(),
                                 NodeType::Leaf(leaf) => leaf.path.iter().copied(),
-                                NodeType::Extension(_) => {
-                                    unreachable!("extension nodes shouldn't exist")
-                                }
                             };
 
                             // The child's key is its parent's key, followed by the child's index,
@@ -195,9 +189,6 @@ fn get_iterator_intial_state<'a, S: ShaleStore<Node> + Send + Sync, T>(
                         node,
                     });
                 }
-                NodeType::Extension(_) => {
-                    unreachable!("extension nodes shouldn't exist")
-                }
             }
 
             return Ok(NodeStreamState::Iterating { iter_stack });
@@ -233,9 +224,6 @@ fn get_iterator_intial_state<'a, S: ShaleStore<Node> + Send + Sync, T>(
                 let partial_key = match child.inner() {
                     NodeType::Branch(branch) => &branch.path,
                     NodeType::Leaf(leaf) => &leaf.path,
-                    NodeType::Extension(_) => {
-                        unreachable!("extension nodes shouldn't exist")
-                    }
                 };
 
                 let (comparison, new_unmatched_key_nibbles) =
@@ -278,9 +266,6 @@ fn get_iterator_intial_state<'a, S: ShaleStore<Node> + Send + Sync, T>(
                     iter_stack.push(IterationNode::Unvisited { key, node });
                 }
                 return Ok(NodeStreamState::Iterating { iter_stack });
-            }
-            NodeType::Extension(_) => {
-                unreachable!("extension nodes shouldn't exist")
             }
         };
     }
@@ -379,9 +364,6 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleKeyValueStream<'
                                 let value = leaf.data.to_vec();
                                 Poll::Ready(Some(Ok((key, value))))
                             }
-                            NodeType::Extension(_) => {
-                                unreachable!("extension nodes shouldn't exist")
-                            }
                         },
                         Some(Err(e)) => Poll::Ready(Some(Err(e))),
                         None => Poll::Ready(None),
@@ -477,7 +459,6 @@ impl<'a, 'b, S: ShaleStore<Node> + Send + Sync, T> Iterator for PathIterator<'a,
                 let partial_path = match node.inner() {
                     NodeType::Branch(branch) => &branch.path,
                     NodeType::Leaf(leaf) => &leaf.path,
-                    _ => unreachable!("extension nodes shouldn't exist"),
                 };
 
                 let (comparison, unmatched_key) =
@@ -492,7 +473,6 @@ impl<'a, 'b, S: ShaleStore<Node> + Send + Sync, T> Iterator for PathIterator<'a,
                         Some(Ok((node_key, node)))
                     }
                     Ordering::Equal => match node.inner() {
-                        NodeType::Extension(_) => unreachable!(),
                         NodeType::Leaf(_) => {
                             self.state = PathIteratorState::Exhausted;
                             Some(Ok((node_key, node)))

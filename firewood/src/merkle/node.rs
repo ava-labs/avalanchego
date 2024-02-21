@@ -28,12 +28,10 @@ use std::{
 };
 
 mod branch;
-mod extension;
 mod leaf;
 mod partial_path;
 
 pub use branch::BranchNode;
-pub use extension::ExtNode;
 pub use leaf::{LeafNode, SIZE as LEAF_NODE_SIZE};
 pub use partial_path::PartialPath;
 
@@ -104,7 +102,6 @@ impl<T: DeserializeOwned + AsRef<[u8]>> Encoded<T> {
 pub enum NodeType {
     Branch(Box<BranchNode>),
     Leaf(LeafNode),
-    Extension(ExtNode),
 }
 
 impl NodeType {
@@ -120,22 +117,13 @@ impl NodeType {
 
                 let decoded_key_nibbles = Nibbles::<0>::new(&decoded_key);
 
-                let (cur_key_path, term) =
-                    PartialPath::from_nibbles(decoded_key_nibbles.into_iter());
+                let cur_key_path = PartialPath::from_nibbles(decoded_key_nibbles.into_iter()).0;
 
                 let cur_key = cur_key_path.into_inner();
                 #[allow(clippy::unwrap_used)]
                 let data: Vec<u8> = items.next().unwrap().decode()?;
 
-                if term {
-                    Ok(NodeType::Leaf(LeafNode::new(cur_key, data)))
-                } else {
-                    Ok(NodeType::Extension(ExtNode {
-                        path: PartialPath(cur_key),
-                        child: DiskAddress::null(),
-                        child_encoded: Some(data),
-                    }))
-                }
+                Ok(NodeType::Leaf(LeafNode::new(cur_key, data)))
             }
             // TODO: add path
             BranchNode::MSIZE => Ok(NodeType::Branch(BranchNode::decode(buf)?.into())),
@@ -148,7 +136,6 @@ impl NodeType {
     pub fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         match &self {
             NodeType::Leaf(n) => n.encode(),
-            NodeType::Extension(n) => n.encode(store),
             NodeType::Branch(n) => n.encode(store),
         }
     }
@@ -157,7 +144,6 @@ impl NodeType {
         match self {
             NodeType::Branch(u) => &mut u.path,
             NodeType::Leaf(node) => &mut node.path,
-            NodeType::Extension(node) => &mut node.path,
         }
     }
 
@@ -165,7 +151,6 @@ impl NodeType {
         match self {
             NodeType::Branch(u) => u.path = path,
             NodeType::Leaf(node) => node.path = path,
-            NodeType::Extension(node) => node.path = path,
         }
     }
 
@@ -173,7 +158,6 @@ impl NodeType {
         match self {
             NodeType::Branch(u) => u.value = Some(data),
             NodeType::Leaf(node) => node.data = data,
-            NodeType::Extension(_) => (),
         }
     }
 }
@@ -370,7 +354,6 @@ mod type_id {
     pub enum NodeTypeId {
         Branch = 0,
         Leaf = 1,
-        Extension = 2,
     }
 
     impl TryFrom<u8> for NodeTypeId {
@@ -386,7 +369,6 @@ mod type_id {
             match node_type {
                 NodeType::Branch(_) => NodeTypeId::Branch,
                 NodeType::Leaf(_) => NodeTypeId::Leaf,
-                NodeType::Extension(_) => NodeTypeId::Extension,
             }
         }
     }
@@ -450,14 +432,6 @@ impl Storable for Node {
                 ))
             }
 
-            NodeTypeId::Extension => {
-                let inner = NodeType::Extension(ExtNode::deserialize(offset, mem)?);
-                let node =
-                    Self::new_from_hash(root_hash, encoded, is_encoded_longer_than_hash_len, inner);
-
-                Ok(node)
-            }
-
             NodeTypeId::Leaf => {
                 let inner = NodeType::Leaf(LeafNode::deserialize(offset, mem)?);
                 let node =
@@ -472,7 +446,6 @@ impl Storable for Node {
         Meta::SIZE as u64
             + match &self.inner {
                 NodeType::Branch(n) => n.serialized_len(),
-                NodeType::Extension(n) => n.serialized_len(),
                 NodeType::Leaf(n) => n.serialized_len(),
             }
     }
@@ -520,13 +493,6 @@ impl Storable for Node {
 
         match &self.inner {
             NodeType::Branch(n) => {
-                let pos = cursor.position() as usize;
-
-                #[allow(clippy::indexing_slicing)]
-                n.serialize(&mut cursor.get_mut()[pos..])
-            }
-
-            NodeType::Extension(n) => {
                 let pos = cursor.position() as usize;
 
                 #[allow(clippy::indexing_slicing)]
@@ -931,11 +897,6 @@ mod tests {
             value: Some(Data(vec![1, 2, 3])),
             children_encoded: std::array::from_fn(|_| Some(vec![1])),
         }));
-        let extension = NodeType::Extension(ExtNode {
-            path: PartialPath(vec![1, 2, 3]),
-            child: DiskAddress::from(1),
-            child_encoded: Some(vec![1, 2, 3]),
-        });
 
         let root_hash = root_hash.into().map(TrieHash);
         let encoded = encoded.into();
@@ -955,15 +916,6 @@ mod tests {
             encoded.clone(),
             is_encoded_longer_than_hash_len,
             branch,
-        );
-
-        check_node_encoding(node);
-
-        let node = Node::new_from_hash(
-            root_hash,
-            encoded.clone(),
-            is_encoded_longer_than_hash_len,
-            extension,
         );
 
         check_node_encoding(node);
@@ -1022,27 +974,6 @@ mod tests {
             value,
             children_encoded,
         });
-
-        check_node_encoding(node);
-    }
-
-    #[test_matrix(
-        [0..1, 0..16],
-        [DiskAddress::null(), DiskAddress::from(1)],
-        [Nil, 1, 32, 33]
-    )]
-    fn extension_encoding<Iter: Iterator<Item = u8>>(
-        path: Iter,
-        child: DiskAddress,
-        child_encoded: impl Into<Option<usize>>,
-    ) {
-        let node = Node::from(NodeType::Extension(ExtNode {
-            path: PartialPath(path.map(|x| x & 0xf).collect()),
-            child,
-            child_encoded: child_encoded
-                .into()
-                .map(|x| repeat(x as u8).take(x).collect()),
-        }));
 
         check_node_encoding(node);
     }

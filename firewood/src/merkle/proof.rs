@@ -310,22 +310,6 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     }
                 }
 
-                NodeType::Extension(n) if n.chd().is_null() => {
-                    let child_node = decode_subproof(merkle, proofs_map, &child_hash)?;
-
-                    parent_node_ref.write(|node| {
-                        let node = node
-                            .inner_mut()
-                            .as_extension_mut()
-                            .expect("parent_node_ref must be an extension");
-                        *node.chd_mut() = child_node.as_ptr();
-                    })?;
-
-                    child_node
-                }
-
-                NodeType::Extension(n) => merkle.get_node(n.chd())?,
-
                 // We should not hit a leaf node as a parent.
                 _ => return Err(ProofError::InvalidNode(MerkleError::ParentLeafBranch)),
             };
@@ -339,20 +323,6 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                         .copied()
                         .eq(key_nibbles) // all nibbles have to match
                         .then(|| n.data().to_vec());
-                }
-
-                NodeType::Extension(n) => {
-                    let paths_match = n
-                        .path
-                        .iter()
-                        .copied()
-                        .all(|nibble| Some(nibble) == key_nibbles.next());
-
-                    if !paths_match {
-                        break None;
-                    }
-
-                    Some(n.chd_encoded().ok_or(ProofError::InvalidData)?)
                 }
 
                 NodeType::Branch(n) => {
@@ -431,21 +401,6 @@ fn locate_subproof(
             let encoded: Vec<u8> = n.data().to_vec();
 
             let sub_proof = SubProof::Data(encoded);
-
-            Ok((sub_proof.into(), key_nibbles))
-        }
-        NodeType::Extension(n) => {
-            let cur_key = &n.path.0;
-            // Check if the key of current node match with the given key
-            // and consume the current-key portion of the nibbles-iterator
-            let does_not_match = key_nibbles.size_hint().0 < cur_key.len()
-                || !cur_key.iter().all(|val| key_nibbles.next() == Some(*val));
-
-            if does_not_match {
-                return Ok((None, Nibbles::<0>::new(&[]).into_iter()));
-            }
-            let data = n.chd_encoded().ok_or(ProofError::InvalidData)?;
-            let sub_proof = generate_subproof(data)?;
 
             Ok((sub_proof.into(), key_nibbles))
         }
@@ -576,25 +531,6 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
             }
 
             #[allow(clippy::indexing_slicing)]
-            NodeType::Extension(n) => {
-                // If either the key of left proof or right proof doesn't match with
-                // shortnode, stop here and the forkpoint is the shortnode.
-                let path = &*n.path;
-
-                [fork_left, fork_right] = [&left_chunks[index..], &right_chunks[index..]]
-                    .map(|chunks| chunks.chunks(path.len()).next().unwrap_or_default())
-                    .map(|key| key.cmp(path));
-
-                if !fork_left.is_eq() || !fork_right.is_eq() {
-                    break;
-                }
-
-                parent = u_ref.as_ptr();
-                index += path.len();
-                u_ref = merkle.get_node(n.chd())?;
-            }
-
-            #[allow(clippy::indexing_slicing)]
             NodeType::Leaf(n) => {
                 let path = &*n.path;
 
@@ -694,82 +630,6 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
             Ok(false)
         }
 
-        NodeType::Extension(n) => {
-            // There can have these five scenarios:
-            // - both proofs are less than the trie path => no valid range
-            // - both proofs are greater than the trie path => no valid range
-            // - left proof is less and right proof is greater => valid range, unset the shortnode entirely
-            // - left proof points to the shortnode, but right proof is greater
-            // - right proof points to the shortnode, but left proof is less
-            if fork_left.is_lt() && fork_right.is_lt() {
-                return Err(ProofError::EmptyRange);
-            }
-
-            if fork_left.is_gt() && fork_right.is_gt() {
-                return Err(ProofError::EmptyRange);
-            }
-
-            if fork_left.is_ne() && fork_right.is_ne() {
-                // The fork point is root node, unset the entire trie
-                if parent.is_null() {
-                    return Ok(true);
-                }
-
-                let mut p_ref = merkle
-                    .get_node(parent)
-                    .map_err(|_| ProofError::NoSuchNode)?;
-                #[allow(clippy::unwrap_used)]
-                p_ref
-                    .write(|p| {
-                        let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                        #[allow(clippy::indexing_slicing)]
-                        (pp.chd_mut()[left_chunks[index - 1] as usize] = None);
-                        #[allow(clippy::indexing_slicing)]
-                        (pp.chd_encoded_mut()[left_chunks[index - 1] as usize] = None);
-                    })
-                    .unwrap();
-
-                return Ok(false);
-            }
-
-            let node = n.chd();
-            let index = n.path.len();
-
-            let p = u_ref.as_ptr();
-            drop(u_ref);
-
-            // Only one proof points to non-existent key.
-            if fork_right.is_ne() {
-                unset_node_ref(
-                    merkle,
-                    p,
-                    Some(node),
-                    #[allow(clippy::indexing_slicing)]
-                    &left_chunks[index..],
-                    index,
-                    false,
-                )?;
-
-                return Ok(false);
-            }
-
-            if fork_left.is_ne() {
-                unset_node_ref(
-                    merkle,
-                    p,
-                    Some(node),
-                    #[allow(clippy::indexing_slicing)]
-                    &right_chunks[index..],
-                    index,
-                    true,
-                )?;
-
-                return Ok(false);
-            }
-
-            Ok(false)
-        }
-
         NodeType::Leaf(_) => {
             if fork_left.is_lt() && fork_right.is_lt() {
                 return Err(ProofError::EmptyRange);
@@ -786,18 +646,13 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
             #[allow(clippy::unwrap_used)]
             if fork_left.is_ne() && fork_right.is_ne() {
                 p_ref
-                    .write(|p| match p.inner_mut() {
-                        NodeType::Extension(n) => {
-                            *n.chd_mut() = DiskAddress::null();
-                            *n.chd_encoded_mut() = None;
-                        }
-                        NodeType::Branch(n) => {
+                    .write(|p| {
+                        if let NodeType::Branch(n) = p.inner_mut() {
                             #[allow(clippy::indexing_slicing)]
                             (n.chd_mut()[left_chunks[index - 1] as usize] = None);
                             #[allow(clippy::indexing_slicing)]
                             (n.chd_encoded_mut()[left_chunks[index - 1] as usize] = None);
                         }
-                        _ => {}
                     })
                     .unwrap();
             } else if fork_right.is_ne() {
@@ -930,57 +785,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                             pp.chd_mut()[chunks[index - 1] as usize] = None;
                             pp.chd_encoded_mut()[chunks[index - 1] as usize] = None;
                         }
-                        NodeType::Extension(n) => {
-                            *n.chd_mut() = DiskAddress::null();
-                            *n.chd_encoded_mut() = None;
-                        }
                         NodeType::Leaf(_) => (),
-                    })
-                    .unwrap();
-            }
-
-            Ok(())
-        }
-
-        #[allow(clippy::indexing_slicing)]
-        NodeType::Extension(n) if chunks[index..].starts_with(&n.path) => {
-            let node = Some(n.chd());
-            unset_node_ref(merkle, p, node, key, index + n.path.len(), remove_left)
-        }
-
-        NodeType::Extension(n) => {
-            let cur_key = &n.path;
-
-            // Find the fork point, it's a non-existent branch.
-            //
-            // for (true, Ordering::Less)
-            // The key of fork shortnode is less than the path
-            // (it belongs to the range), unset the entire
-            // branch. The parent must be a fullnode.
-            //
-            // for (false, Ordering::Greater)
-            // The key of fork shortnode is greater than the
-            // path(it belongs to the range), unset the entrie
-            // branch. The parent must be a fullnode. Otherwise the
-            // key is not part of the range and should remain in the
-            // cached hash.
-            #[allow(clippy::indexing_slicing)]
-            let should_unset_entire_branch = matches!(
-                (remove_left, cur_key.cmp(&chunks[index..])),
-                (true, Ordering::Less) | (false, Ordering::Greater)
-            );
-
-            #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
-            if should_unset_entire_branch {
-                let mut p_ref = merkle
-                    .get_node(parent)
-                    .map_err(|_| ProofError::NoSuchNode)?;
-
-                p_ref
-                    .write(|p| {
-                        let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                        pp.chd_mut()[chunks[index - 1] as usize] = None;
-                        pp.chd_encoded_mut()[chunks[index - 1] as usize] = None;
                     })
                     .unwrap();
             }
@@ -1014,19 +819,14 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySe
                 }
             } else {
                 p_ref
-                    .write(|p| match p.inner_mut() {
-                        NodeType::Extension(n) => {
-                            *n.chd_mut() = DiskAddress::null();
-                            *n.chd_encoded_mut() = None;
-                        }
-                        NodeType::Branch(n) => {
+                    .write(|p| {
+                        if let NodeType::Branch(n) = p.inner_mut() {
                             #[allow(clippy::indexing_slicing)]
                             let index = chunks[index - 1] as usize;
 
                             n.chd_mut()[index] = None;
                             n.chd_encoded_mut()[index] = None;
                         }
-                        _ => {}
                     })
                     .expect("node write failure");
             }
