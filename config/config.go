@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
@@ -54,7 +53,6 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
-	ipcDeprecationMsg                    = "IPC API is deprecated"
 	keystoreDeprecationMsg               = "keystore API is deprecated"
 	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
 	peerListPushGossipDeprecationMsg     = "push-based peer list gossip is deprecated"
@@ -65,10 +63,6 @@ var (
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
 	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
 	deprecatedKeys                = map[string]string{
-		IpcAPIEnabledKey: ipcDeprecationMsg,
-		IpcsChainIDsKey:  ipcDeprecationMsg,
-		IpcsPathKey:      ipcDeprecationMsg,
-
 		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
 
 		ConsensusGossipAcceptedFrontierValidatorSizeKey:    acceptedFrontierGossipDeprecationMsg,
@@ -160,20 +154,6 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	return loggingConfig, err
 }
 
-func getIPCConfig(v *viper.Viper) node.IPCConfig {
-	config := node.IPCConfig{
-		IPCAPIEnabled: v.GetBool(IpcAPIEnabledKey),
-		IPCPath:       ipcs.DefaultBaseURL,
-	}
-	if v.IsSet(IpcsChainIDsKey) {
-		config.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
-	}
-	if v.IsSet(IpcsPathKey) {
-		config.IPCPath = GetExpandedArg(v, IpcsPathKey)
-	}
-	return config
-}
-
 func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 	var (
 		httpsKey  []byte
@@ -222,7 +202,6 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 				IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
 				IndexAllowIncomplete: v.GetBool(IndexAllowIncompleteKey),
 			},
-			IPCConfig:          getIPCConfig(v),
 			AdminAPIEnabled:    v.GetBool(AdminAPIEnabledKey),
 			InfoAPIEnabled:     v.GetBool(InfoAPIEnabledKey),
 			KeystoreAPIEnabled: v.GetBool(KeystoreAPIEnabledKey),

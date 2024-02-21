@@ -25,12 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-type IPCConfig struct {
-	IPCAPIEnabled      bool     `json:"ipcAPIEnabled"`
-	IPCPath            string   `json:"ipcPath"`
-	IPCDefaultChainIDs []string `json:"ipcDefaultChainIDs"`
-}
-
 type APIIndexerConfig struct {
 	IndexAPIEnabled      bool `json:"indexAPIEnabled"`
 	IndexAllowIncomplete bool `json:"indexAllowIncomplete"`
@@ -55,7 +49,6 @@ type HTTPConfig struct {
 
 type APIConfig struct {
 	APIIndexerConfig `json:"indexerConfig"`
-	IPCConfig        `json:"ipcConfig"`
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool `json:"adminAPIEnabled"`
