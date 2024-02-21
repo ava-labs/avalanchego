@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -122,7 +121,7 @@ func TestManagerVerifyTx(t *testing.T) {
 			txF: func(*gomock.Controller) *txs.Tx {
 				return &txs.Tx{}
 			},
-			managerF: func(ctrl *gomock.Controller) *manager {
+			managerF: func(*gomock.Controller) *manager {
 				return &manager{
 					backend: &executor.Backend{},
 				}

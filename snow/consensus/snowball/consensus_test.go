@@ -16,7 +16,7 @@ var (
 	_ Consensus = (*Byzantine)(nil)
 )
 
-func NewByzantine(_ Parameters, choice ids.ID) Consensus {
+func NewByzantine(_ Factory, _ Parameters, choice ids.ID) Consensus {
 	return &Byzantine{
 		preference: choice,
 	}

@@ -11,8 +11,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -305,7 +303,7 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 
 	// Runtime = 2 * |live set| ; Space = Constant
 	ts.preferredIDs.Clear()
-	maps.Clear(ts.preferredHeights)
+	clear(ts.preferredHeights)
 
 	ts.preference = preferred
 	startBlock := ts.blocks[ts.preference]
@@ -369,7 +367,7 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 // the non-transitively applied votes. Also returns the list of leaf blocks.
 func (ts *Topological) calculateInDegree(votes bag.Bag[ids.ID]) {
 	// Clear the Kahn node set
-	maps.Clear(ts.kahnNodes)
+	clear(ts.kahnNodes)
 	// Clear the leaf set
 	ts.leaves.Clear()
 

@@ -5,7 +5,7 @@ package snowball
 
 import "fmt"
 
-var _ UnarySnowball = (*unarySnowball)(nil)
+var _ Unary = (*unarySnowball)(nil)
 
 func newUnarySnowball(beta int) unarySnowball {
 	return unarySnowball{
@@ -32,7 +32,7 @@ func (sb *unarySnowball) RecordPollPreference() {
 	sb.unarySnowflake.RecordUnsuccessfulPoll()
 }
 
-func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
+func (sb *unarySnowball) Extend(beta int, choice int) Binary {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
 			binarySlush: binarySlush{preference: choice},
@@ -46,7 +46,7 @@ func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 	return bs
 }
 
-func (sb *unarySnowball) Clone() UnarySnowball {
+func (sb *unarySnowball) Clone() Unary {
 	newSnowball := *sb
 	return &newSnowball
 }

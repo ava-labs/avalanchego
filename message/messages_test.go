@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -133,8 +131,9 @@ func TestMessage(t *testing.T) {
 						IpPort:         9651,
 						MyVersion:      "v1.2.3",
 						IpSigningTime:  uint64(nowUnix),
-						Sig:            []byte{'y', 'e', 'e', 't'},
+						IpNodeIdSig:    []byte{'y', 'e', 'e', 't'},
 						TrackedSubnets: [][]byte{testID[:]},
+						IpBlsSig:       []byte{'y', 'e', 'e', 't', '2'},
 					},
 				},
 			},

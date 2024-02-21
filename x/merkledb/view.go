@@ -6,18 +6,17 @@ package merkledb
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -794,7 +793,7 @@ func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool
 	}
 
 	before, err := v.getParentTrie().getEditableNode(key, hadValue)
-	if err != nil && !errors.Is(err, database.ErrNotFound) {
+	if err != nil {
 		return err
 	}
 	v.changes.nodes[key] = &change[*node]{

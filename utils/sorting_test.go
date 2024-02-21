@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"cmp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ var _ Sortable[sortable] = sortable(0)
 type sortable int
 
 func (s sortable) Compare(other sortable) int {
-	return Compare(s, other)
+	return cmp.Compare(s, other)
 }
 
 func TestSortSliceSortable(t *testing.T) {

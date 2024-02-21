@@ -13,8 +13,6 @@ import (
 )
 
 func TestAveragerHeap(t *testing.T) {
-	require := require.New(t)
-
 	n0 := ids.GenerateTestNodeID()
 	n1 := ids.GenerateTestNodeID()
 	n2 := ids.GenerateTestNodeID()
@@ -37,6 +35,8 @@ func TestAveragerHeap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
 			_, _, ok := test.h.Pop()
 			require.False(ok)
 
