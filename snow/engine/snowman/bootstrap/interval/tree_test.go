@@ -18,7 +18,7 @@ func newTree(require *require.Assertions, db database.Database, intervals []*Int
 
 	for _, toAdd := range intervals {
 		for i := toAdd.LowerBound; i <= toAdd.UpperBound; i++ {
-			require.NoError(tree.Add(i))
+			require.NoError(tree.Add(db, i))
 		}
 	}
 	return tree
@@ -270,7 +270,7 @@ func TestTreeRemove(t *testing.T) {
 			treeFromModifications := newTree(require, db, test.toAdd)
 			for _, toRemove := range test.toRemove {
 				for i := toRemove.LowerBound; i <= toRemove.UpperBound; i++ {
-					require.NoError(treeFromModifications.Remove(i))
+					require.NoError(treeFromModifications.Remove(db, i))
 				}
 			}
 			require.Equal(test.expected, treeFromModifications.Flatten())

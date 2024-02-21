@@ -12,12 +12,11 @@ import (
 const treeDegree = 2
 
 type Tree struct {
-	db              database.Database
 	knownHeights    *btree.BTreeG[*Interval]
 	numKnownHeights uint64
 }
 
-func NewTree(db database.Database) (*Tree, error) {
+func NewTree(db database.Iteratee) (*Tree, error) {
 	intervals, err := GetIntervals(db)
 	if err != nil {
 		return nil, err
@@ -32,13 +31,12 @@ func NewTree(db database.Database) (*Tree, error) {
 		numKnownHeights += i.UpperBound - i.LowerBound + 1
 	}
 	return &Tree{
-		db:              db,
 		knownHeights:    knownHeights,
 		numKnownHeights: numKnownHeights,
 	}, nil
 }
 
-func (t *Tree) Add(height uint64) error {
+func (t *Tree) Add(db database.KeyValueWriterDeleter, height uint64) error {
 	var (
 		newInterval = &Interval{
 			LowerBound: height,
@@ -70,30 +68,30 @@ func (t *Tree) Add(height uint64) error {
 	switch {
 	case adjacentToLowerBound && adjacentToUpperBound:
 		// the upper and lower ranges should be merged
-		if err := DeleteInterval(t.db, lower.UpperBound); err != nil {
+		if err := DeleteInterval(db, lower.UpperBound); err != nil {
 			return err
 		}
 		upper.LowerBound = lower.LowerBound
 		t.knownHeights.Delete(lower)
-		return PutInterval(t.db, upper.UpperBound, lower.LowerBound)
+		return PutInterval(db, upper.UpperBound, lower.LowerBound)
 	case adjacentToLowerBound:
 		// the upper range should be extended by one on the lower side
 		upper.LowerBound = height
-		return PutInterval(t.db, upper.UpperBound, height)
+		return PutInterval(db, upper.UpperBound, height)
 	case adjacentToUpperBound:
 		// the lower range should be extended by one on the upper side
-		if err := DeleteInterval(t.db, lower.UpperBound); err != nil {
+		if err := DeleteInterval(db, lower.UpperBound); err != nil {
 			return err
 		}
 		lower.UpperBound = height
-		return PutInterval(t.db, height, lower.LowerBound)
+		return PutInterval(db, height, lower.LowerBound)
 	default:
 		t.knownHeights.ReplaceOrInsert(newInterval)
-		return PutInterval(t.db, height, height)
+		return PutInterval(db, height, height)
 	}
 }
 
-func (t *Tree) Remove(height uint64) error {
+func (t *Tree) Remove(db database.KeyValueWriterDeleter, height uint64) error {
 	var (
 		newInterval = &Interval{
 			LowerBound: height,
@@ -115,26 +113,26 @@ func (t *Tree) Remove(height uint64) error {
 	switch {
 	case higher.LowerBound == higher.UpperBound:
 		t.knownHeights.Delete(higher)
-		return DeleteInterval(t.db, higher.UpperBound)
+		return DeleteInterval(db, higher.UpperBound)
 	case higher.LowerBound == height:
 		higher.LowerBound++
-		return PutInterval(t.db, higher.UpperBound, higher.LowerBound)
+		return PutInterval(db, higher.UpperBound, higher.LowerBound)
 	case higher.UpperBound == height:
-		if err := DeleteInterval(t.db, higher.UpperBound); err != nil {
+		if err := DeleteInterval(db, higher.UpperBound); err != nil {
 			return err
 		}
 		higher.UpperBound--
-		return PutInterval(t.db, higher.UpperBound, higher.LowerBound)
+		return PutInterval(db, higher.UpperBound, higher.LowerBound)
 	default:
 		newInterval.LowerBound = higher.LowerBound
 		newInterval.UpperBound = height - 1
 		t.knownHeights.ReplaceOrInsert(newInterval)
-		if err := PutInterval(t.db, newInterval.UpperBound, newInterval.LowerBound); err != nil {
+		if err := PutInterval(db, newInterval.UpperBound, newInterval.LowerBound); err != nil {
 			return err
 		}
 
 		higher.LowerBound = height + 1
-		return PutInterval(t.db, higher.UpperBound, higher.LowerBound)
+		return PutInterval(db, higher.UpperBound, higher.LowerBound)
 	}
 }
 

@@ -5,10 +5,22 @@ package interval
 
 import (
 	"context"
+	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer"
+)
+
+const (
+	batchWritePeriod      = 1
+	iteratorReleasePeriod = 1024
+	logPeriod             = 5 * time.Second
 )
 
 type Parser interface {
@@ -17,6 +29,7 @@ type Parser interface {
 
 func GetMissingBlockIDs(
 	ctx context.Context,
+	db database.KeyValueReader,
 	parser Parser,
 	tree *Tree,
 	lastAcceptedHeight uint64,
@@ -31,7 +44,7 @@ func GetMissingBlockIDs(
 			continue
 		}
 
-		blkBytes, err := GetBlock(tree.db, i.LowerBound)
+		blkBytes, err := GetBlock(db, i.LowerBound)
 		if err != nil {
 			return nil, err
 		}
@@ -48,7 +61,12 @@ func GetMissingBlockIDs(
 }
 
 // Add the block to the tree and return if the parent block should be fetched.
-func Add(tree *Tree, lastAcceptedHeight uint64, blk snowman.Block) (bool, error) {
+func Add(
+	db database.KeyValueWriterDeleter,
+	tree *Tree,
+	lastAcceptedHeight uint64,
+	blk snowman.Block,
+) (bool, error) {
 	var (
 		height            = blk.Height()
 		lastHeightToFetch = lastAcceptedHeight + 1
@@ -58,11 +76,11 @@ func Add(tree *Tree, lastAcceptedHeight uint64, blk snowman.Block) (bool, error)
 	}
 
 	blkBytes := blk.Bytes()
-	if err := PutBlock(tree.db, height, blkBytes); err != nil {
+	if err := PutBlock(db, height, blkBytes); err != nil {
 		return false, err
 	}
 
-	if err := tree.Add(height); err != nil {
+	if err := tree.Add(db, height); err != nil {
 		return false, err
 	}
 
@@ -71,32 +89,95 @@ func Add(tree *Tree, lastAcceptedHeight uint64, blk snowman.Block) (bool, error)
 
 func Execute(
 	ctx context.Context,
+	log logging.Logger,
+	db database.Database,
 	parser Parser,
 	tree *Tree,
 	lastAcceptedHeight uint64,
 ) error {
-	it := tree.db.NewIteratorWithPrefix(blockPrefix)
+	var (
+		batch                    = db.NewBatch()
+		processedSinceBatchWrite uint
+		writeBatch               = func() error {
+			if processedSinceBatchWrite == 0 {
+				return nil
+			}
+			processedSinceBatchWrite %= batchWritePeriod
+
+			if err := batch.Write(); err != nil {
+				return err
+			}
+			batch.Reset()
+			return nil
+		}
+
+		iterator                      = db.NewIteratorWithPrefix(blockPrefix)
+		processedSinceIteratorRelease uint
+
+		startTime            = time.Now()
+		timeOfNextLog        = startTime.Add(logPeriod)
+		totalNumberToProcess = tree.Len()
+	)
 	defer func() {
-		it.Release()
+		iterator.Release()
 	}()
 
-	// TODO: Periodically release the iterator here
-	// TODO: Periodically log progress
-	// TODO: Add metrics
-	for it.Next() {
-		blkBytes := it.Value()
+	log.Info("executing blocks",
+		zap.Uint64("numToExecute", totalNumberToProcess),
+	)
+
+	for iterator.Next() {
+		blkBytes := iterator.Value()
 		blk, err := parser.ParseBlock(ctx, blkBytes)
 		if err != nil {
 			return err
 		}
 
 		height := blk.Height()
-		if err := DeleteBlock(tree.db, height); err != nil {
+		if err := DeleteBlock(batch, height); err != nil {
 			return err
 		}
 
-		if err := tree.Remove(height); err != nil {
+		if err := tree.Remove(batch, height); err != nil {
 			return err
+		}
+
+		// Periodically write the batch to disk to avoid memory pressure.
+		processedSinceBatchWrite++
+		if processedSinceBatchWrite >= batchWritePeriod {
+			if err := writeBatch(); err != nil {
+				return err
+			}
+		}
+
+		// Periodically release and re-grab the database iterator to avoid
+		// keeping a reference to an old database revision.
+		processedSinceIteratorRelease++
+		if processedSinceIteratorRelease >= iteratorReleasePeriod {
+			if err := iterator.Error(); err != nil {
+				return err
+			}
+
+			// The batch must be written here to avoid re-processing a block.
+			if err := writeBatch(); err != nil {
+				return err
+			}
+
+			iterator.Release()
+			iterator = db.NewIteratorWithPrefix(blockPrefix)
+		}
+
+		now := time.Now()
+		if now.After(timeOfNextLog) {
+			numProcessed := totalNumberToProcess - tree.Len()
+			eta := timer.EstimateETA(startTime, numProcessed, totalNumberToProcess)
+
+			log.Info("executing blocks",
+				zap.Duration("eta", eta),
+				zap.Uint64("numExecuted", numProcessed),
+				zap.Uint64("numToExecute", totalNumberToProcess),
+			)
+			timeOfNextLog = now.Add(logPeriod)
 		}
 
 		if height <= lastAcceptedHeight {
@@ -110,5 +191,16 @@ func Execute(
 			return err
 		}
 	}
-	return it.Error()
+	if err := writeBatch(); err != nil {
+		return err
+	}
+	if err := iterator.Error(); err != nil {
+		return err
+	}
+
+	log.Info("executed blocks",
+		zap.Uint64("numExecuted", totalNumberToProcess),
+		zap.Duration("duration", time.Since(startTime)),
+	)
+	return nil
 }
