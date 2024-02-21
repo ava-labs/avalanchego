@@ -6,7 +6,7 @@ package p
 import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 
 	stdcontext "context"
 )

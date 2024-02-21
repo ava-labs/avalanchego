@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 )
 
 var _ backends.BuilderBackend = (*buiderBackend)(nil)
