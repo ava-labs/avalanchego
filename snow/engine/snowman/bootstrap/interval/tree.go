@@ -12,8 +12,9 @@ import (
 const treeDegree = 2
 
 type Tree struct {
-	db           database.Database
-	knownHeights *btree.BTreeG[*Interval]
+	db              database.Database
+	knownHeights    *btree.BTreeG[*Interval]
+	numKnownHeights uint64
 }
 
 func NewTree(db database.Database) (*Tree, error) {
@@ -22,13 +23,18 @@ func NewTree(db database.Database) (*Tree, error) {
 		return nil, err
 	}
 
-	knownHeights := btree.NewG(treeDegree, (*Interval).Less)
+	var (
+		knownHeights    = btree.NewG(treeDegree, (*Interval).Less)
+		numKnownHeights uint64
+	)
 	for _, i := range intervals {
 		knownHeights.ReplaceOrInsert(i)
+		numKnownHeights += i.UpperBound - i.LowerBound + 1
 	}
 	return &Tree{
-		db:           db,
-		knownHeights: knownHeights,
+		db:              db,
+		knownHeights:    knownHeights,
+		numKnownHeights: numKnownHeights,
 	}, nil
 }
 
@@ -54,6 +60,8 @@ func (t *Tree) Add(height uint64) error {
 		lower = item
 		return false
 	})
+
+	t.numKnownHeights++
 
 	var (
 		adjacentToLowerBound = upper.AdjacentToLowerBound(height)
@@ -101,6 +109,8 @@ func (t *Tree) Remove(height uint64) error {
 		// height isn't in the tree
 		return nil
 	}
+
+	t.numKnownHeights--
 
 	switch {
 	case higher.LowerBound == higher.UpperBound:
@@ -150,4 +160,9 @@ func (t *Tree) Flatten() []*Interval {
 		return true
 	})
 	return intervals
+}
+
+// Len returns the number of heights in the tree; not the number of intervals.
+func (t *Tree) Len() uint64 {
+	return t.numKnownHeights
 }

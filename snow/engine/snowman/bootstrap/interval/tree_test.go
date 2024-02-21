@@ -26,9 +26,10 @@ func newTree(require *require.Assertions, db database.Database, intervals []*Int
 
 func TestTreeAdd(t *testing.T) {
 	tests := []struct {
-		name     string
-		toAdd    []*Interval
-		expected []*Interval
+		name        string
+		toAdd       []*Interval
+		expected    []*Interval
+		expectedLen uint64
 	}{
 		{
 			name: "single addition",
@@ -44,6 +45,7 @@ func TestTreeAdd(t *testing.T) {
 					UpperBound: 10,
 				},
 			},
+			expectedLen: 1,
 		},
 		{
 			name: "extend above",
@@ -59,6 +61,7 @@ func TestTreeAdd(t *testing.T) {
 					UpperBound: 11,
 				},
 			},
+			expectedLen: 2,
 		},
 		{
 			name: "extend below",
@@ -78,6 +81,7 @@ func TestTreeAdd(t *testing.T) {
 					UpperBound: 11,
 				},
 			},
+			expectedLen: 2,
 		},
 		{
 			name: "merge",
@@ -101,6 +105,7 @@ func TestTreeAdd(t *testing.T) {
 					UpperBound: 12,
 				},
 			},
+			expectedLen: 3,
 		},
 		{
 			name: "ignore duplicate",
@@ -120,6 +125,7 @@ func TestTreeAdd(t *testing.T) {
 					UpperBound: 11,
 				},
 			},
+			expectedLen: 2,
 		},
 	}
 	for _, test := range tests {
@@ -129,19 +135,22 @@ func TestTreeAdd(t *testing.T) {
 			db := memdb.New()
 			treeFromAdditions := newTree(require, db, test.toAdd)
 			require.Equal(test.expected, treeFromAdditions.Flatten())
+			require.Equal(test.expectedLen, treeFromAdditions.Len())
 
 			treeFromDB := newTree(require, db, nil)
 			require.Equal(test.expected, treeFromDB.Flatten())
+			require.Equal(test.expectedLen, treeFromDB.Len())
 		})
 	}
 }
 
 func TestTreeRemove(t *testing.T) {
 	tests := []struct {
-		name     string
-		toAdd    []*Interval
-		toRemove []*Interval
-		expected []*Interval
+		name        string
+		toAdd       []*Interval
+		toRemove    []*Interval
+		expected    []*Interval
+		expectedLen uint64
 	}{
 		{
 			name: "single removal",
@@ -157,7 +166,8 @@ func TestTreeRemove(t *testing.T) {
 					UpperBound: 10,
 				},
 			},
-			expected: []*Interval{},
+			expected:    []*Interval{},
+			expectedLen: 0,
 		},
 		{
 			name: "reduce above",
@@ -179,6 +189,7 @@ func TestTreeRemove(t *testing.T) {
 					UpperBound: 10,
 				},
 			},
+			expectedLen: 1,
 		},
 		{
 			name: "reduce below",
@@ -200,6 +211,7 @@ func TestTreeRemove(t *testing.T) {
 					UpperBound: 11,
 				},
 			},
+			expectedLen: 1,
 		},
 		{
 			name: "split",
@@ -225,6 +237,7 @@ func TestTreeRemove(t *testing.T) {
 					UpperBound: 12,
 				},
 			},
+			expectedLen: 2,
 		},
 		{
 			name: "ignore missing",
@@ -246,6 +259,7 @@ func TestTreeRemove(t *testing.T) {
 					UpperBound: 10,
 				},
 			},
+			expectedLen: 1,
 		},
 	}
 	for _, test := range tests {
@@ -260,9 +274,11 @@ func TestTreeRemove(t *testing.T) {
 				}
 			}
 			require.Equal(test.expected, treeFromModifications.Flatten())
+			require.Equal(test.expectedLen, treeFromModifications.Len())
 
 			treeFromDB := newTree(require, db, nil)
 			require.Equal(test.expected, treeFromDB.Flatten())
+			require.Equal(test.expectedLen, treeFromDB.Len())
 		})
 	}
 }

@@ -88,6 +88,9 @@ func Execute(
 		it.Release()
 	}()
 
+	// TODO: Periodically release the iterator here
+	// TODO: Periodically log progress
+	// TODO: Add metrics
 	for it.Next() {
 		blkBytes := it.Value()
 		blk, err := parser.ParseBlock(ctx, blkBytes)
