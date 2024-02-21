@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
@@ -197,29 +197,24 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env := newEnvironment(t, banff)
 			env.config.ApricotPhase3Time = ap3Time
 
-			toBurn := map[ids.ID]uint64{
-				env.ctx.AVAXAssetID: test.fee,
+			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
+			for _, key := range preFundedKeys {
+				addrs.Add(key.Address())
 			}
-			toStake := make(map[ids.ID]uint64)
-			ins, outs, _, err := env.utxosHandler.Spend(env.state, preFundedKeys, toBurn, toStake, ids.ShortEmpty)
+
+			cfg := *env.config
+			cfg.CreateBlockchainTxFee = test.fee
+			builderBackend := builder.NewBuilderBackend(env.ctx, &cfg, addrs, env.state, env.atomicUTXOs)
+			pBuilder := backends.NewBuilder(addrs, builderBackend)
+
+			utx, err := pBuilder.NewCreateChainTx(
+				testSubnet1.ID(),
+				nil,                  // genesisData
+				ids.GenerateTestID(), // vmID
+				nil,                  // fxIDs
+				"",                   // chainName
+			)
 			require.NoError(err)
-
-			subnetAuth, _, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
-			require.NoError(err)
-
-			// Create the tx
-
-			utx := &txs.CreateChainTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         outs,
-				}},
-				SubnetID:   testSubnet1.ID(),
-				VMID:       constants.AVMID,
-				SubnetAuth: subnetAuth,
-			}
 
 			kc := secp256k1fx.NewKeychain(preFundedKeys...)
 			s := backends.New(

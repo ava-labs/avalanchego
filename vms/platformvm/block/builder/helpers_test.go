@@ -116,7 +116,7 @@ type environment struct {
 	state          state.State
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
+	utxosHandler   utxo.Verifier
 	txBuilder      txbuilder.Builder
 	backend        txexecutor.Backend
 }
@@ -151,7 +151,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+	res.utxosHandler = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
 	res.txBuilder = txbuilder.New(
 		res.ctx,

@@ -11,10 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -57,23 +56,22 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			toBurn := map[ids.ID]uint64{
-				env.ctx.AVAXAssetID: test.fee,
-			}
-			toStake := make(map[ids.ID]uint64)
-			ins, outs, _, err := env.utxosHandler.Spend(env.state, preFundedKeys, toBurn, toStake, ids.ShortEmpty)
-			require.NoError(err)
+			env.state.SetTimestamp(test.time)
 
-			// Create the tx
-			utx := &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         outs,
-				}},
-				Owner: &secp256k1fx.OutputOwners{},
+			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
+			for _, key := range preFundedKeys {
+				addrs.Add(key.Address())
 			}
+
+			cfg := *env.config
+			cfg.CreateSubnetTxFee = test.fee
+			builderBackend := builder.NewBuilderBackend(env.ctx, &cfg, addrs, env.state, env.atomicUTXOs)
+			pBuilder := backends.NewBuilder(addrs, builderBackend)
+
+			utx, err := pBuilder.NewCreateSubnetTx(
+				&secp256k1fx.OutputOwners{}, // owner
+			)
+			require.NoError(err)
 
 			kc := secp256k1fx.NewKeychain(preFundedKeys...)
 			s := backends.New(

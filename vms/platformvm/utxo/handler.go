@@ -9,25 +9,18 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 var (
-	_ Handler = (*handler)(nil)
+	_ Verifier = (*verifier)(nil)
 
 	ErrInsufficientFunds            = errors.New("insufficient funds")
 	ErrInsufficientUnlockedFunds    = errors.New("insufficient unlocked funds")
@@ -36,51 +29,8 @@ var (
 	errWrongNumberUTXOs             = errors.New("wrong number of UTXOs")
 	errAssetIDMismatch              = errors.New("input asset ID does not match UTXO asset ID")
 	errLocktimeMismatch             = errors.New("input locktime does not match UTXO locktime")
-	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
-
-// TODO: Stake and Authorize should be replaced by similar methods in the
-// P-chain wallet
-type Spender interface {
-	// Spend the provided amount while deducting the provided fee.
-	// Arguments:
-	// - [keys] are the owners of the funds
-	// - [amount] is the amount of funds that are trying to be staked
-	// - [fee] is the amount of AVAX that should be burned
-	// - [changeAddr] is the address that change, if there is any, is sent to
-	// Returns:
-	// - [inputs] the inputs that should be consumed to fund the outputs
-	// - [returnedOutputs] the outputs that should be immediately returned to
-	//                     the UTXO set
-	// - [stakedOutputs] the outputs that should be locked for the duration of
-	//                   the staking period
-	// - [signers] the proof of ownership of the funds being moved
-	Spend(
-		utxoReader avax.UTXOReader,
-		keys []*secp256k1.PrivateKey,
-		amountsToBurn map[ids.ID]uint64,
-		amountsToStake map[ids.ID]uint64,
-		changeAddr ids.ShortID,
-	) (
-		[]*avax.TransferableInput, // inputs
-		[]*avax.TransferableOutput, // returnedOutputs
-		[]*avax.TransferableOutput, // stakedOutputs
-		error,
-	)
-
-	// Authorize an operation on behalf of the named subnet with the provided
-	// keys.
-	Authorize(
-		state state.Chain,
-		subnetID ids.ID,
-		keys []*secp256k1.PrivateKey,
-	) (
-		verify.Verifiable, // Input that names owners
-		[]*secp256k1.PrivateKey, // Keys that prove ownership
-		error,
-	)
-}
 
 type Verifier interface {
 	// Verify that [tx] is semantically valid.
@@ -123,288 +73,25 @@ type Verifier interface {
 	) error
 }
 
-type Handler interface {
-	Spender
-	Verifier
-}
-
-func NewHandler(
+func NewVerifier(
 	ctx *snow.Context,
 	clk *mockable.Clock,
 	fx fx.Fx,
-) Handler {
-	return &handler{
+) Verifier {
+	return &verifier{
 		ctx: ctx,
 		clk: clk,
 		fx:  fx,
 	}
 }
 
-type handler struct {
+type verifier struct {
 	ctx *snow.Context
 	clk *mockable.Clock
 	fx  fx.Fx
 }
 
-func (h *handler) Spend(
-	utxoReader avax.UTXOReader,
-	keys []*secp256k1.PrivateKey,
-	amountsToBurn map[ids.ID]uint64,
-	amountsToStake map[ids.ID]uint64,
-	changeAddr ids.ShortID,
-) (
-	inputs []*avax.TransferableInput,
-	changeOutputs []*avax.TransferableOutput,
-	stakeOutputs []*avax.TransferableOutput,
-	err error,
-) {
-	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
-	for _, key := range keys {
-		addrs.Add(key.PublicKey().Address())
-	}
-	utxos, err := avax.GetAllUTXOs(utxoReader, addrs) // The UTXOs controlled by [keys]
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
-	}
-
-	// Minimum time this transaction will be issued at
-	minIssuanceTime := uint64(h.clk.Time().Unix())
-
-	changeOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{changeAddr},
-	}
-
-	// Iterate over the locked UTXOs
-	for _, utxo := range utxos {
-		assetID := utxo.AssetID()
-		remainingAmountToStake := amountsToStake[assetID]
-
-		// If we have staked enough of the asset, then we have no need burn
-		// more.
-		if remainingAmountToStake == 0 {
-			continue
-		}
-
-		outIntf := utxo.Out
-		lockedOut, ok := outIntf.(*stakeable.LockOut)
-		if !ok {
-			// This output isn't locked, so it will be handled during the next
-			// iteration of the UTXO set
-			continue
-		}
-		if minIssuanceTime >= lockedOut.Locktime {
-			// This output isn't locked, so it will be handled during the next
-			// iteration of the UTXO set
-			continue
-		}
-
-		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
-		if !ok {
-			return nil, nil, nil, backends.ErrUnknownOutputType
-		}
-
-		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
-		if !ok {
-			// We couldn't spend this UTXO, so we skip to the next one
-			continue
-		}
-
-		inputs = append(inputs, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  utxo.Asset,
-			In: &stakeable.LockIn{
-				Locktime: lockedOut.Locktime,
-				TransferableIn: &secp256k1fx.TransferInput{
-					Amt: out.Amt,
-					Input: secp256k1fx.Input{
-						SigIndices: inputSigIndices,
-					},
-				},
-			},
-		})
-
-		// Stake any value that should be staked
-		amountToStake := min(
-			remainingAmountToStake, // Amount we still need to stake
-			out.Amt,                // Amount available to stake
-		)
-
-		// Add the output to the staked outputs
-		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
-			Asset: utxo.Asset,
-			Out: &stakeable.LockOut{
-				Locktime: lockedOut.Locktime,
-				TransferableOut: &secp256k1fx.TransferOutput{
-					Amt:          amountToStake,
-					OutputOwners: out.OutputOwners,
-				},
-			},
-		})
-
-		amountsToStake[assetID] -= amountToStake
-		if remainingAmount := out.Amt - amountToStake; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &stakeable.LockOut{
-					Locktime: lockedOut.Locktime,
-					TransferableOut: &secp256k1fx.TransferOutput{
-						Amt:          remainingAmount,
-						OutputOwners: out.OutputOwners,
-					},
-				},
-			})
-		}
-	}
-
-	// Iterate over the unlocked UTXOs
-	for _, utxo := range utxos {
-		assetID := utxo.AssetID()
-		remainingAmountToStake := amountsToStake[assetID]
-		remainingAmountToBurn := amountsToBurn[assetID]
-
-		// If we have consumed enough of the asset, then we have no need burn
-		// more.
-		if remainingAmountToStake == 0 && remainingAmountToBurn == 0 {
-			continue
-		}
-
-		outIntf := utxo.Out
-		if lockedOut, ok := outIntf.(*stakeable.LockOut); ok {
-			if lockedOut.Locktime > minIssuanceTime {
-				// This output is currently locked, so this output can't be
-				// burned.
-				continue
-			}
-			outIntf = lockedOut.TransferableOut
-		}
-
-		out, ok := outIntf.(*secp256k1fx.TransferOutput)
-		if !ok {
-			return nil, nil, nil, backends.ErrUnknownOutputType
-		}
-
-		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
-		if !ok {
-			// We couldn't spend this UTXO, so we skip to the next one
-			continue
-		}
-
-		inputs = append(inputs, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  utxo.Asset,
-			In: &secp256k1fx.TransferInput{
-				Amt: out.Amt,
-				Input: secp256k1fx.Input{
-					SigIndices: inputSigIndices,
-				},
-			},
-		})
-
-		// Burn any value that should be burned
-		amountToBurn := min(
-			remainingAmountToBurn, // Amount we still need to burn
-			out.Amt,               // Amount available to burn
-		)
-		amountsToBurn[assetID] -= amountToBurn
-
-		amountAvalibleToStake := out.Amt - amountToBurn
-		// Burn any value that should be burned
-		amountToStake := min(
-			remainingAmountToStake, // Amount we still need to stake
-			amountAvalibleToStake,  // Amount available to stake
-		)
-		amountsToStake[assetID] -= amountToStake
-		if amountToStake > 0 {
-			// Some of this input was put for staking
-			stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          amountToStake,
-					OutputOwners: *changeOwner,
-				},
-			})
-		}
-		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          remainingAmount,
-					OutputOwners: *changeOwner,
-				},
-			})
-		}
-	}
-
-	for assetID, amount := range amountsToStake {
-		if amount != 0 {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q to stake",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
-	}
-	for assetID, amount := range amountsToBurn {
-		if amount != 0 {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
-	}
-
-	utils.Sort(inputs)                                     // sort inputs
-	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
-	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
-	return inputs, changeOutputs, stakeOutputs, nil
-}
-
-func (h *handler) Authorize(
-	state state.Chain,
-	subnetID ids.ID,
-	keys []*secp256k1.PrivateKey,
-) (
-	verify.Verifiable, // Input that names owners
-	[]*secp256k1.PrivateKey, // Keys that prove ownership
-	error,
-) {
-	subnetOwner, err := state.GetSubnetOwner(subnetID)
-	if err != nil {
-		return nil, nil, fmt.Errorf(
-			"failed to fetch subnet owner for %s: %w",
-			subnetID,
-			err,
-		)
-	}
-
-	// Make sure the owners of the subnet match the provided keys
-	owner, ok := subnetOwner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnetOwner)
-	}
-
-	// Add the keys to a keychain
-	kc := secp256k1fx.NewKeychain(keys...)
-
-	// Make sure that the operation is valid after a minimum time
-	now := uint64(h.clk.Time().Unix())
-
-	// Attempt to prove ownership of the subnet
-	indices, signers, matches := kc.Match(owner, now)
-	if !matches {
-		return nil, nil, errCantSign
-	}
-
-	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
-}
-
-func (h *handler) VerifySpend(
+func (h *verifier) VerifySpend(
 	tx txs.UnsignedTx,
 	utxoDB avax.UTXOGetter,
 	ins []*avax.TransferableInput,
@@ -428,7 +115,7 @@ func (h *handler) VerifySpend(
 	return h.VerifySpendUTXOs(tx, utxos, ins, outs, creds, unlockedProduced)
 }
 
-func (h *handler) VerifySpendUTXOs(
+func (h *verifier) VerifySpendUTXOs(
 	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
