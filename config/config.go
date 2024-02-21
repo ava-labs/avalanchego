@@ -88,6 +88,7 @@ var (
 	}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
+	errConflictingImplicitACPOpinion          = errors.New("objecting to enabled ACP")
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
 	errInvalidUptimeRequirement               = errors.New("uptime requirement must be in the range [0, 1]")
@@ -341,6 +342,13 @@ func getNetworkConfig(
 	if supportedACPs.Overlaps(objectedACPs) {
 		return network.Config{}, errConflictingACPOpinion
 	}
+	if constants.ScheduledACPs.Overlaps(objectedACPs) {
+		return network.Config{}, errConflictingImplicitACPOpinion
+	}
+
+	// Because this node version has scheduled these ACPs, we should notify
+	// peers that we support these upgrades.
+	supportedACPs.Union(constants.ScheduledACPs)
 
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
