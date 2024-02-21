@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -35,7 +34,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, apricotPhase5)
 
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
@@ -138,10 +137,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl)
-	env.clk.Set(defaultGenesisTime)
-	env.config.BanffTime = time.Time{}        // activate Banff
-	env.config.DurangoTime = mockable.MaxTime // deactivate Durango
+	env := newEnvironment(t, ctrl, banff)
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
@@ -549,8 +545,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, nil, banff)
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -702,8 +697,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -845,8 +839,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
-			env.config.BanffTime = time.Time{} // activate Banff
+			env := newEnvironment(t, nil, banff)
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -950,8 +943,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1135,8 +1127,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, nil, banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1320,9 +1311,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 func TestAddValidatorProposalBlock(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
-	env.config.BanffTime = time.Time{}   // activate Banff
-	env.config.DurangoTime = time.Time{} // activate Durango
+	env := newEnvironment(t, nil, durango)
 
 	now := env.clk.Time()
 

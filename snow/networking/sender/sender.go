@@ -1253,6 +1253,21 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	return nil
 }
 
+func (s *sender) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
+	ctx = context.WithoutCancel(ctx)
+
+	inMsg := message.InternalCrossChainAppError(
+		s.ctx.NodeID,
+		s.ctx.ChainID,
+		chainID,
+		requestID,
+		errorCode,
+		errorMessage,
+	)
+	go s.router.HandleInbound(ctx, inMsg)
+	return nil
+}
+
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 	ctx = context.WithoutCancel(ctx)
 
@@ -1437,6 +1452,72 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
+			)
+		}
+	}
+	return nil
+}
+
+func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+	ctx = context.WithoutCancel(ctx)
+
+	if nodeID == s.ctx.NodeID {
+		inMsg := message.InboundAppError(
+			nodeID,
+			s.ctx.ChainID,
+			requestID,
+			errorCode,
+			errorMessage,
+		)
+		go s.router.HandleInbound(ctx, inMsg)
+		return nil
+	}
+
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.AppError(
+		s.ctx.ChainID,
+		requestID,
+		errorCode,
+		errorMessage,
+	)
+	if err != nil {
+		s.ctx.Log.Error("failed to build message",
+			zap.Stringer("messageOp", message.AppErrorOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Uint32("requestID", requestID),
+			zap.Int32("errorCode", errorCode),
+			zap.String("errorMessage", errorMessage),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	// Send the message over the network.
+	sentTo := s.sender.Send(
+		outMsg,
+		set.Of(nodeID),
+		s.ctx.SubnetID,
+		s.subnet,
+	)
+	if sentTo.Len() == 0 {
+		if s.ctx.Log.Enabled(logging.Verbo) {
+			s.ctx.Log.Verbo("failed to send message",
+				zap.Stringer("messageOp", message.AppErrorOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Uint32("requestID", requestID),
+				zap.Int32("errorCode", errorCode),
+				zap.String("errorMessage", errorMessage),
+			)
+		} else {
+			s.ctx.Log.Debug("failed to send message",
+				zap.Stringer("messageOp", message.AppErrorOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Uint32("requestID", requestID),
+				zap.Int32("errorCode", errorCode),
+				zap.String("errorMessage", errorMessage),
 			)
 		}
 	}

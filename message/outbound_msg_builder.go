@@ -28,7 +28,8 @@ type OutboundMsgBuilder interface {
 		minor uint32,
 		patch uint32,
 		ipSigningTime uint64,
-		sig []byte,
+		ipNodeIDSig []byte,
+		ipBLSSig []byte,
 		trackedSubnets []ids.ID,
 		supportedACPs []uint32,
 		objectedACPs []uint32,
@@ -176,6 +177,13 @@ type OutboundMsgBuilder interface {
 		msg []byte,
 	) (OutboundMessage, error)
 
+	AppError(
+		chainID ids.ID,
+		requestID uint32,
+		errorCode int32,
+		errorMessage string,
+	) (OutboundMessage, error)
+
 	AppGossip(
 		chainID ids.ID,
 		msg []byte,
@@ -243,7 +251,8 @@ func (b *outMsgBuilder) Handshake(
 	minor uint32,
 	patch uint32,
 	ipSigningTime uint64,
-	sig []byte,
+	ipNodeIDSig []byte,
+	ipBLSSig []byte,
 	trackedSubnets []ids.ID,
 	supportedACPs []uint32,
 	objectedACPs []uint32,
@@ -262,7 +271,7 @@ func (b *outMsgBuilder) Handshake(
 					IpPort:         uint32(ip.Port),
 					MyVersion:      myVersion,
 					IpSigningTime:  ipSigningTime,
-					Sig:            sig,
+					IpNodeIdSig:    ipNodeIDSig,
 					TrackedSubnets: subnetIDBytes,
 					Client: &p2p.Client{
 						Name:  client,
@@ -276,6 +285,7 @@ func (b *outMsgBuilder) Handshake(
 						Filter: knownPeersFilter,
 						Salt:   knownPeersSalt,
 					},
+					IpBlsSig: ipBLSSig,
 				},
 			},
 		},
@@ -699,6 +709,23 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 					ChainId:   chainID[:],
 					RequestId: requestID,
 					AppBytes:  msg,
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) AppError(chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_AppError{
+				AppError: &p2p.AppError{
+					ChainId:      chainID[:],
+					RequestId:    requestID,
+					ErrorCode:    errorCode,
+					ErrorMessage: errorMessage,
 				},
 			},
 		},

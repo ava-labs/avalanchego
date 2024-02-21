@@ -50,6 +50,12 @@ import (
 const (
 	defaultWeight = 5 * units.MilliAvax
 	trackChecksum = false
+
+	apricotPhase3 fork = iota
+	apricotPhase5
+	banff
+	cortina
+	durango
 )
 
 var (
@@ -77,6 +83,8 @@ func init() {
 		genesisNodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
+
+type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -111,12 +119,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *environment {
+func newEnvironment(t *testing.T, f fork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina, postDurango)
-	clk := defaultClock(postBanff || postCortina || postDurango)
+	config := defaultConfig(t, f)
+	clk := defaultClock(f)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -271,18 +279,32 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
-	}
-	durangoTime := mockable.MaxTime
-	if postDurango {
+func defaultConfig(t *testing.T, f fork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
+	)
+
+	switch f {
+	case durango:
 		durangoTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case cortina:
+		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case banff:
+		banffTime = defaultValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case apricotPhase5:
+		apricotPhase5Time = defaultValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		apricotPhase3Time = defaultValidateEndTime
+	default:
+		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
 	}
 
 	return &config.Config{
@@ -303,18 +325,18 @@ func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,
 	}
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
+func defaultClock(f fork) *mockable.Clock {
 	now := defaultGenesisTime
-	if postFork {
-		// 1 second after Banff fork
+	if f >= banff {
+		// 1 second after active fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}
