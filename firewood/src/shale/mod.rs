@@ -5,6 +5,7 @@ pub(crate) use disk_address::DiskAddress;
 use std::any::type_name;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
+use std::mem::ManuallyDrop;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
@@ -184,25 +185,23 @@ impl<T: Storable> Deref for Obj<T> {
 /// User handle that offers read & write access to the stored [ShaleStore] item.
 #[derive(Debug)]
 pub struct ObjRef<'a, T: Storable> {
-    /// WARNING:
-    /// [Self::inner] should only set to [None] when consuming [Self] or inside [Drop::drop].
-    inner: Option<Obj<T>>,
+    inner: ManuallyDrop<Obj<T>>,
     cache: &'a ObjCache<T>,
 }
 
 impl<'a, T: Storable + Debug> ObjRef<'a, T> {
     const fn new(inner: Obj<T>, cache: &'a ObjCache<T>) -> Self {
-        let inner = Some(inner);
-        Self { inner, cache }
+        Self {
+            inner: ManuallyDrop::new(inner),
+            cache,
+        }
     }
 
     #[inline]
     pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteSizeError> {
-        #[allow(clippy::unwrap_used)]
-        let inner = self.inner.as_mut().unwrap();
-        inner.write(modify)?;
+        self.inner.write(modify)?;
 
-        self.cache.lock().dirty.insert(inner.as_ptr());
+        self.cache.lock().dirty.insert(self.inner.as_ptr());
 
         Ok(())
     }
@@ -213,37 +212,48 @@ impl<'a, T: Storable + Debug> ObjRef<'a, T> {
 }
 
 impl<'a> ObjRef<'a, Node> {
-    /// # Panics:
-    /// if inner is not set
     pub fn into_inner(mut self) -> Node {
-        self.inner
-            .take()
-            .expect("inner should already be set")
-            .into_inner()
+        // Safety: okay because we'll never be touching "self.inner" again
+        let b = unsafe { ManuallyDrop::take(&mut self.inner) };
+
+        // Safety: safe because self.cache:
+        //  - is valid for both reads and writes.
+        //  - is properly aligned
+        //  - is nonnull
+        //  - upholds invariant T
+        //  - does not have a manual drop() implementation
+        //  - is not accessed after drop_in_place and is not Copy
+        unsafe { std::ptr::drop_in_place(&mut self.cache) };
+
+        // we have dropped or moved everything out of self, so we can forget it
+        std::mem::forget(self);
+
+        b.into_inner()
     }
 }
 
 impl<'a, T: Storable + Debug> Deref for ObjRef<'a, T> {
     type Target = Obj<T>;
     fn deref(&self) -> &Obj<T> {
-        // TODO: Something is seriously wrong here but I'm not quite sure about the best approach for the fix
-        #[allow(clippy::unwrap_used)]
-        self.inner.as_ref().unwrap()
+        &self.inner
     }
 }
 
 impl<'a, T: Storable> Drop for ObjRef<'a, T> {
     fn drop(&mut self) {
-        if let Some(mut inner) = self.inner.take() {
-            let ptr = inner.as_ptr();
-            let mut cache = self.cache.lock();
-            match cache.pinned.remove(&ptr) {
-                Some(true) => {
-                    inner.dirty = None;
-                }
-                _ => {
-                    cache.cached.put(ptr, inner);
-                }
+        let ptr = self.inner.as_ptr();
+        let mut cache = self.cache.lock();
+        match cache.pinned.remove(&ptr) {
+            Some(true) => {
+                self.inner.dirty = None;
+                // SAFETY: self.inner will have completed it's destructor
+                // so it must not be referenced after this line, and it isn't
+                unsafe { ManuallyDrop::drop(&mut self.inner) };
+            }
+            _ => {
+                // SAFETY: safe because self.inner is not referenced after this line
+                let b = unsafe { ManuallyDrop::take(&mut self.inner) };
+                cache.cached.put(ptr, b);
             }
         }
     }
