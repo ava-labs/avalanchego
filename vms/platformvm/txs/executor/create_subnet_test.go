@@ -56,7 +56,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			env.state.SetTimestamp(test.time)
+			env.state.SetTimestamp(test.time) // to duly set fee
 
 			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
 			for _, key := range preFundedKeys {

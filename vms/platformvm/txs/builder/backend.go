@@ -62,9 +62,9 @@ func (b *Backend) CreateSubnetTxFee() uint64 {
 	return b.cfg.GetCreateSubnetTxFee(b.state.GetTimestamp())
 }
 
-// Override [backend.Context.GetCreateBlockchainTxFee] to refresh fee
+// Override [backend.Context.CreateBlockchainTxFee] to refresh fee
 // relevant in unit tests only
-func (b *Backend) GetCreateBlockchainTxFee() uint64 {
+func (b *Backend) CreateBlockchainTxFee() uint64 {
 	return b.cfg.GetCreateBlockchainTxFee(b.state.GetTimestamp())
 }
 
