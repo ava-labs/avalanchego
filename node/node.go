@@ -25,7 +25,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/admin"
-	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -965,30 +964,6 @@ func (n *Node) initAPIServer() error {
 	}
 	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
 
-	if !n.Config.APIRequireAuthToken {
-		var err error
-		n.APIServer, err = server.New(
-			n.Log,
-			n.LogFactory,
-			listener,
-			n.Config.HTTPAllowedOrigins,
-			n.Config.ShutdownTimeout,
-			n.ID,
-			n.Config.TraceConfig.Enabled,
-			n.tracer,
-			"api",
-			n.MetricsRegisterer,
-			n.Config.HTTPConfig.HTTPConfig,
-			n.Config.HTTPAllowedHosts,
-		)
-		return err
-	}
-
-	a, err := auth.New(n.Log, "auth", n.Config.APIAuthPassword)
-	if err != nil {
-		return err
-	}
-
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
@@ -1002,19 +977,8 @@ func (n *Node) initAPIServer() error {
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
-		a,
 	)
-	if err != nil {
-		return err
-	}
-
-	// only create auth service if token authorization is required
-	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
-	handler, err := a.CreateHandler()
-	if err != nil {
-		return err
-	}
-	return n.APIServer.AddRoute(handler, "auth", "")
+	return err
 }
 
 // Add the default VM aliases

@@ -25,11 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-type APIAuthConfig struct {
-	APIRequireAuthToken bool   `json:"apiRequireAuthToken"`
-	APIAuthPassword     string `json:"-"`
-}
-
 type APIIndexerConfig struct {
 	IndexAPIEnabled      bool `json:"indexAPIEnabled"`
 	IndexAllowIncomplete bool `json:"indexAllowIncomplete"`
@@ -53,7 +48,6 @@ type HTTPConfig struct {
 }
 
 type APIConfig struct {
-	APIAuthConfig    `json:"authConfig"`
 	APIIndexerConfig `json:"indexerConfig"`
 
 	// Enable/Disable APIs

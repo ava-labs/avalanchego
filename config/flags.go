@@ -228,11 +228,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(HTTPReadHeaderTimeoutKey, 30*time.Second, fmt.Sprintf("Maximum duration to read request headers. The connection's read deadline is reset after reading the headers. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPReadHeaderTimeoutKey, HTTPReadTimeoutKey))
 	fs.Duration(HTTPWriteTimeoutKey, 30*time.Second, "Maximum duration before timing out writes of the response. It is reset whenever a new request's header is read. A zero or negative value means there will be no timeout.")
 	fs.Duration(HTTPIdleTimeoutKey, 120*time.Second, fmt.Sprintf("Maximum duration to wait for the next request when keep-alives are enabled. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPIdleTimeoutKey, HTTPReadTimeoutKey))
-	fs.Bool(APIAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(APIAuthPasswordFileKey, "",
-		fmt.Sprintf("Password file used to initially create/validate API authorization tokens. Ignored if %s is specified. Leading and trailing whitespace is removed from the password. Can be changed via API call",
-			APIAuthPasswordKey))
-	fs.String(APIAuthPasswordKey, "", "Specifies password for API authorization tokens")
 
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")

@@ -16,7 +16,6 @@ require (
 	github.com/cockroachdb/pebble v0.0.0-20230209160836-829675f94811
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
 	github.com/ethereum/go-ethereum v1.12.0
-	github.com/golang-jwt/jwt/v4 v4.3.0
 	github.com/google/btree v1.1.2
 	github.com/google/renameio/v2 v2.0.0
 	github.com/gorilla/mux v1.8.0
