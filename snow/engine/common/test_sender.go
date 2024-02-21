@@ -21,6 +21,7 @@ var (
 	errAccept                = errors.New("unexpectedly called Accept")
 	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
 	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
+	errSendAppError          = errors.New("unexpectedly called SendAppError")
 	errSendAppGossip         = errors.New("unexpectedly called SendAppGossip")
 	errSendAppGossipSpecific = errors.New("unexpectedly called SendAppGossipSpecific")
 )
@@ -37,8 +38,9 @@ type SenderTest struct {
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
-	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific,
-	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse bool
+	CantSendAppRequest, CantSendAppResponse, CantSendAppError,
+	CantSendAppGossip, CantSendAppGossipSpecific,
+	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse, CantSendCrossChainAppError bool
 
 	AcceptF                      func(*snow.ConsensusContext, ids.ID, []byte) error
 	SendGetStateSummaryFrontierF func(context.Context, set.Set[ids.NodeID], uint32)
@@ -59,10 +61,12 @@ type SenderTest struct {
 	SendGossipF                  func(context.Context, []byte)
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
+	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
 	SendAppGossipF               func(context.Context, []byte) error
 	SendAppGossipSpecificF       func(context.Context, set.Set[ids.NodeID], []byte) error
 	SendCrossChainAppRequestF    func(context.Context, ids.ID, uint32, []byte)
 	SendCrossChainAppResponseF   func(context.Context, ids.ID, uint32, []byte)
+	SendCrossChainAppErrorF      func(context.Context, ids.ID, uint32, int32, string)
 }
 
 // Default set the default callable value to [cant]
@@ -308,6 +312,18 @@ func (s *SenderTest) SendCrossChainAppResponse(ctx context.Context, chainID ids.
 	return nil
 }
 
+// SendCrossChainAppError calls SendCrossChainAppErrorF if it was
+// initialized. If it wasn't initialized and this function shouldn't be called
+// and testing was initialized, then testing will fail.
+func (s *SenderTest) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
+	if s.SendCrossChainAppErrorF != nil {
+		s.SendCrossChainAppErrorF(ctx, chainID, requestID, errorCode, errorMessage)
+	} else if s.CantSendCrossChainAppError && s.T != nil {
+		require.FailNow(s.T, "Unexpectedly called SendCrossChainAppError")
+	}
+	return nil
+}
+
 // SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
@@ -332,6 +348,19 @@ func (s *SenderTest) SendAppResponse(ctx context.Context, nodeID ids.NodeID, req
 		require.FailNow(s.T, errSendAppResponse.Error())
 	}
 	return errSendAppResponse
+}
+
+// SendAppError calls SendAppErrorF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, code int32, message string) error {
+	switch {
+	case s.SendAppErrorF != nil:
+		return s.SendAppErrorF(ctx, nodeID, requestID, code, message)
+	case s.CantSendAppError && s.T != nil:
+		require.FailNow(s.T, errSendAppError.Error())
+	}
+	return errSendAppError
 }
 
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't
@@ -365,6 +394,8 @@ type FakeSender struct {
 	SentAppRequest, SentAppResponse,
 	SentAppGossip, SentAppGossipSpecific,
 	SentCrossChainAppRequest, SentCrossChainAppResponse chan []byte
+
+	SentAppError, SentCrossChainAppError chan *AppError
 }
 
 func (f FakeSender) SendAppRequest(_ context.Context, _ set.Set[ids.NodeID], _ uint32, bytes []byte) error {
@@ -382,6 +413,18 @@ func (f FakeSender) SendAppResponse(_ context.Context, _ ids.NodeID, _ uint32, b
 	}
 
 	f.SentAppResponse <- bytes
+	return nil
+}
+
+func (f FakeSender) SendAppError(_ context.Context, _ ids.NodeID, _ uint32, errorCode int32, errorMessage string) error {
+	if f.SentAppError == nil {
+		return nil
+	}
+
+	f.SentAppError <- &AppError{
+		Code:    errorCode,
+		Message: errorMessage,
+	}
 	return nil
 }
 
@@ -418,5 +461,17 @@ func (f FakeSender) SendCrossChainAppResponse(_ context.Context, _ ids.ID, _ uin
 	}
 
 	f.SentCrossChainAppResponse <- bytes
+	return nil
+}
+
+func (f FakeSender) SendCrossChainAppError(_ context.Context, _ ids.ID, _ uint32, errorCode int32, errorMessage string) error {
+	if f.SentCrossChainAppError == nil {
+		return nil
+	}
+
+	f.SentCrossChainAppError <- &AppError{
+		Code:    errorCode,
+		Message: errorMessage,
+	}
 	return nil
 }
