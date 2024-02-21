@@ -3,16 +3,24 @@
 
 package interval
 
-import "github.com/ava-labs/avalanchego/database"
+import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/database"
+)
 
 const (
 	rangePrefixByte byte = iota
 	blockPrefixByte
+
+	prefixLen = 1
 )
 
 var (
 	rangePrefix = []byte{rangePrefixByte}
 	blockPrefix = []byte{blockPrefixByte}
+
+	errInvalidKeyLength = errors.New("invalid key length")
 )
 
 func GetIntervals(db database.Iteratee) ([]*Interval, error) {
@@ -22,7 +30,11 @@ func GetIntervals(db database.Iteratee) ([]*Interval, error) {
 	var intervals []*Interval
 	for it.Next() {
 		dbKey := it.Key()
-		rangeKey := dbKey[len(rangePrefix):]
+		if len(dbKey) < prefixLen {
+			return nil, errInvalidKeyLength
+		}
+
+		rangeKey := dbKey[prefixLen:]
 		upperBound, err := database.ParseUInt64(rangeKey)
 		if err != nil {
 			return nil, err
