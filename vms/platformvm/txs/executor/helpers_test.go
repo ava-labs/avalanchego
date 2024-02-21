@@ -146,11 +146,8 @@ func newEnvironment(t *testing.T, f fork) *environment {
 	txBuilder := builder.New(
 		ctx,
 		config,
-		clk,
-		fx,
 		baseState,
 		atomicUTXOs,
-		utxoHandler,
 	)
 
 	backend := Backend{

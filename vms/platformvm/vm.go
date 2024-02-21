@@ -165,11 +165,8 @@ func (vm *VM) Initialize(
 	vm.txBuilder = txbuilder.New(
 		vm.ctx,
 		&vm.Config,
-		&vm.clock,
-		vm.fx,
 		vm.state,
 		vm.atomicUtxosManager,
-		utxoHandler,
 	)
 
 	txExecutorBackend := &txexecutor.Backend{

@@ -156,11 +156,8 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	res.txBuilder = txbuilder.New(
 		res.ctx,
 		res.config,
-		res.clk,
-		res.fx,
 		res.state,
 		res.atomicUTXOs,
-		res.utxosHandler,
 	)
 
 	genesisID := res.state.GetLastAccepted()

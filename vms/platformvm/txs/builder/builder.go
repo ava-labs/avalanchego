@@ -13,15 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/backends"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -256,32 +253,23 @@ type ProposalTxBuilder interface {
 func New(
 	ctx *snow.Context,
 	cfg *config.Config,
-	clk *mockable.Clock,
-	fx fx.Fx,
 	state state.State,
 	atomicUTXOManager avax.AtomicUTXOManager,
-	utxoSpender utxo.Spender,
 ) Builder {
 	return &builder{
 		AtomicUTXOManager: atomicUTXOManager,
-		Spender:           utxoSpender,
 		state:             state,
 		cfg:               cfg,
 		ctx:               ctx,
-		clk:               clk,
-		fx:                fx,
 	}
 }
 
 type builder struct {
 	avax.AtomicUTXOManager
-	utxo.Spender
 	state state.State
 
 	cfg *config.Config
 	ctx *snow.Context
-	clk *mockable.Clock
-	fx  fx.Fx
 }
 
 func (b *builder) NewImportTx(
