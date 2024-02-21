@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -55,7 +54,6 @@ const (
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
 
-	authDeprecationMsg                   = "Auth API is deprecated"
 	ipcDeprecationMsg                    = "IPC API is deprecated"
 	keystoreDeprecationMsg               = "keystore API is deprecated"
 	acceptedFrontierGossipDeprecationMsg = "push-based accepted frontier gossip is deprecated"
@@ -67,10 +65,6 @@ var (
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
 	commitThresholdDeprecationMsg = fmt.Sprintf("use --%s instead", SnowCommitThresholdKey)
 	deprecatedKeys                = map[string]string{
-		APIAuthRequiredKey:     authDeprecationMsg,
-		APIAuthPasswordKey:     authDeprecationMsg,
-		APIAuthPasswordFileKey: authDeprecationMsg,
-
 		IpcAPIEnabledKey: ipcDeprecationMsg,
 		IpcsChainIDsKey:  ipcDeprecationMsg,
 		IpcsPathKey:      ipcDeprecationMsg,
@@ -166,31 +160,6 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	return loggingConfig, err
 }
 
-func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
-	config := node.APIAuthConfig{
-		APIRequireAuthToken: v.GetBool(APIAuthRequiredKey),
-	}
-	if !config.APIRequireAuthToken {
-		return config, nil
-	}
-
-	if v.IsSet(APIAuthPasswordKey) {
-		config.APIAuthPassword = v.GetString(APIAuthPasswordKey)
-	} else {
-		passwordFilePath := v.GetString(APIAuthPasswordFileKey) // picks flag value or default
-		passwordBytes, err := os.ReadFile(passwordFilePath)
-		if err != nil {
-			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
-		}
-		config.APIAuthPassword = strings.TrimSpace(string(passwordBytes))
-	}
-
-	if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
-		return node.APIAuthConfig{}, errAuthPasswordTooWeak
-	}
-	return config, nil
-}
-
 func getIPCConfig(v *viper.Viper) node.IPCConfig {
 	config := node.IPCConfig{
 		IPCAPIEnabled: v.GetBool(IpcAPIEnabledKey),
@@ -241,7 +210,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	}
 
-	config := node.HTTPConfig{
+	return node.HTTPConfig{
 		HTTPConfig: server.HTTPConfig{
 			ReadTimeout:       v.GetDuration(HTTPReadTimeoutKey),
 			ReadHeaderTimeout: v.GetDuration(HTTPReadHeaderTimeoutKey),
@@ -253,6 +222,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 				IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
 				IndexAllowIncomplete: v.GetBool(IndexAllowIncompleteKey),
 			},
+			IPCConfig:          getIPCConfig(v),
 			AdminAPIEnabled:    v.GetBool(AdminAPIEnabledKey),
 			InfoAPIEnabled:     v.GetBool(InfoAPIEnabledKey),
 			KeystoreAPIEnabled: v.GetBool(KeystoreAPIEnabledKey),
@@ -268,14 +238,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		HTTPAllowedHosts:   v.GetStringSlice(HTTPAllowedHostsKey),
 		ShutdownTimeout:    v.GetDuration(HTTPShutdownTimeoutKey),
 		ShutdownWait:       v.GetDuration(HTTPShutdownWaitKey),
-	}
-
-	config.APIAuthConfig, err = getAPIAuthConfig(v)
-	if err != nil {
-		return node.HTTPConfig{}, err
-	}
-	config.IPCConfig = getIPCConfig(v)
-	return config, nil
+	}, nil
 }
 
 func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.HealthConfig, error) {
