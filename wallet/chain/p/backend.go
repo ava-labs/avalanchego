@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
@@ -22,22 +23,20 @@ var _ Backend = (*backend)(nil)
 
 // Backend defines the full interface required to support a P-chain wallet.
 type Backend interface {
-	common.ChainUTXOs
-	BuilderBackend
-	SignerBackend
+	backends.Backend
 
 	AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
 type backend struct {
-	Context
+	backends.Context
 	common.ChainUTXOs
 
 	subnetOwnerLock sync.RWMutex
 	subnetOwner     map[ids.ID]fx.Owner // subnetID -> owner
 }
 
-func NewBackend(ctx Context, utxos common.ChainUTXOs, subnetTxs map[ids.ID]*txs.Tx) Backend {
+func NewBackend(ctx backends.Context, utxos common.ChainUTXOs, subnetTxs map[ids.ID]*txs.Tx) Backend {
 	subnetOwner := make(map[ids.ID]fx.Owner)
 	for txID, tx := range subnetTxs { // first get owners from the CreateSubnetTx
 		createSubnetTx, ok := tx.Unsigned.(*txs.CreateSubnetTx)

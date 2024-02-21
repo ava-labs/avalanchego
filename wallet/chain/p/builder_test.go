@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -32,7 +33,7 @@ var (
 	avaxAssetID   = ids.Empty.Prefix(1789)
 	subnetAssetID = ids.Empty.Prefix(2024)
 
-	testCtx = NewContext(
+	testCtx = backends.NewContext(
 		constants.UnitTestID,
 		avaxAssetID,
 		units.MicroAvax,      // BaseTxFee
@@ -63,7 +64,7 @@ func TestBaseTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -123,7 +124,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 
 		// data to build the transaction
 		subnetValidator = &txs.SubnetValidator{
@@ -180,7 +181,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 	)
 
 	// build the transaction
@@ -230,7 +231,7 @@ func TestCreateChainTx(t *testing.T) {
 		backend = NewBackend(testCtx, chainUTXOs, subnets)
 
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 
 		// data to build the transaction
 		genesisBytes = []byte{'a', 'b', 'c'}
@@ -290,7 +291,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 	)
 
 	// build the transaction
@@ -338,7 +339,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 	)
 
 	// build the transaction
@@ -377,7 +378,7 @@ func TestImportTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -423,7 +424,7 @@ func TestExportTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -488,7 +489,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr, subnetAuthAddr), backend)
 
 		// data to build the transaction
 		initialSupply = 40 * units.MegaAvax
@@ -544,7 +545,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		utxoAddr   = utxosKey.Address()
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
-		builder    = NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
+		builder    = backends.NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
 
 		// data to build the transaction
 		validationRewardsOwner = &secp256k1fx.OutputOwners{
@@ -614,7 +615,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		utxoAddr   = utxosKey.Address()
 		rewardKey  = testKeys[0]
 		rewardAddr = rewardKey.Address()
-		builder    = NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
+		builder    = backends.NewBuilder(set.Of(utxoAddr, rewardAddr), backend)
 
 		// data to build the transaction
 		rewardsOwner = &secp256k1fx.OutputOwners{

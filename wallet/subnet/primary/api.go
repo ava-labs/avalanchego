@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -57,7 +58,7 @@ type UTXOClient interface {
 
 type AVAXState struct {
 	PClient platformvm.Client
-	PCTX    p.Context
+	PCTX    backends.Context
 	XClient avm.Client
 	XCTX    x.Context
 	CClient evm.Client

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package backends
 
 import (
 	"errors"
@@ -14,21 +14,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	stdcontext "context"
 )
 
 var (
 	errNoChangeAddress           = errors.New("no possible change address")
 	errUnknownOwnerType          = errors.New("unknown owner type")
 	errInsufficientAuthorization = errors.New("insufficient authorization")
-	errInsufficientFunds         = errors.New("insufficient funds")
+	ErrInsufficientFunds         = errors.New("insufficient funds")
 
 	_ Builder = (*builder)(nil)
 )
@@ -254,14 +251,6 @@ type Builder interface {
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (*txs.AddPermissionlessDelegatorTx, error)
-}
-
-// BuilderBackend specifies the required information needed to build unsigned
-// P-chain transactions.
-type BuilderBackend interface {
-	Context
-	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
 }
 
 type builder struct {
@@ -635,7 +624,7 @@ func (b *builder) NewImportTx(
 	if len(importedInputs) == 0 {
 		return nil, fmt.Errorf(
 			"%w: no UTXOs available to import",
-			errInsufficientFunds,
+			ErrInsufficientFunds,
 		)
 	}
 
@@ -900,7 +889,7 @@ func (b *builder) getBalance(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, errUnknownOutputType
+			return nil, ErrUnknownOutputType
 		}
 
 		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -982,7 +971,7 @@ func (b *builder) spend(
 
 		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1063,7 +1052,7 @@ func (b *builder) spend(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1123,7 +1112,7 @@ func (b *builder) spend(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q to stake",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)
@@ -1133,7 +1122,7 @@ func (b *builder) spend(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)
@@ -1173,7 +1162,7 @@ func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*se
 }
 
 func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
+	ctx, err := NewSnowContext(b.backend.NetworkID(), b.backend.AVAXAssetID())
 	if err != nil {
 		return err
 	}
