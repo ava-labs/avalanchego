@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
-	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
@@ -82,7 +81,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
-	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/evm"
@@ -236,12 +234,6 @@ func New(
 	if err := n.initInfoAPI(); err != nil { // Start the Info API
 		return nil, fmt.Errorf("couldn't initialize info API: %w", err)
 	}
-	if err := n.initIPCs(); err != nil { // Start the IPCs
-		return nil, fmt.Errorf("couldn't initialize IPCs: %w", err)
-	}
-	if err := n.initIPCAPI(); err != nil { // Start the IPC API
-		return nil, fmt.Errorf("couldn't initialize the IPC API: %w", err)
-	}
 	if err := n.initChainAliases(n.Config.GenesisBytes); err != nil {
 		return nil, fmt.Errorf("couldn't initialize chain aliases: %w", err)
 	}
@@ -314,8 +306,6 @@ type Node struct {
 	BlockAcceptorGroup  snow.AcceptorGroup
 	TxAcceptorGroup     snow.AcceptorGroup
 	VertexAcceptorGroup snow.AcceptorGroup
-
-	IPCs *ipcs.ChainIPCs
 
 	// Net runs the networking stack
 	networkNamespace string
@@ -835,29 +825,6 @@ func (n *Node) initEventDispatchers() {
 	n.BlockAcceptorGroup = snow.NewAcceptorGroup(n.Log)
 	n.TxAcceptorGroup = snow.NewAcceptorGroup(n.Log)
 	n.VertexAcceptorGroup = snow.NewAcceptorGroup(n.Log)
-}
-
-func (n *Node) initIPCs() error {
-	chainIDs := make([]ids.ID, len(n.Config.IPCDefaultChainIDs))
-	for i, chainID := range n.Config.IPCDefaultChainIDs {
-		id, err := ids.FromString(chainID)
-		if err != nil {
-			return err
-		}
-		chainIDs[i] = id
-	}
-
-	var err error
-	n.IPCs, err = ipcs.NewChainIPCs(
-		n.Log,
-		n.Config.IPCPath,
-		n.Config.NetworkID,
-		n.BlockAcceptorGroup,
-		n.TxAcceptorGroup,
-		n.VertexAcceptorGroup,
-		chainIDs,
-	)
-	return err
 }
 
 // Initialize [n.indexer].
@@ -1527,25 +1494,6 @@ func (n *Node) initHealthAPI() error {
 	)
 }
 
-// initIPCAPI initializes the IPC API service
-// Assumes n.log and n.chainManager already initialized
-func (n *Node) initIPCAPI() error {
-	if !n.Config.IPCAPIEnabled {
-		n.Log.Info("skipping ipc API initialization because it has been disabled")
-		return nil
-	}
-	n.Log.Warn("initializing deprecated ipc API")
-	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.IPCs)
-	if err != nil {
-		return err
-	}
-	return n.APIServer.AddRoute(
-		service,
-		"ipcs",
-		"",
-	)
-}
-
 // Give chains aliases as specified by the genesis information
 func (n *Node) initChainAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing chain aliases")
@@ -1670,13 +1618,6 @@ func (n *Node) shutdown() {
 
 	if n.resourceManager != nil {
 		n.resourceManager.Shutdown()
-	}
-	if n.IPCs != nil {
-		if err := n.IPCs.Shutdown(); err != nil {
-			n.Log.Debug("error during IPC shutdown",
-				zap.Error(err),
-			)
-		}
 	}
 	n.timeoutManager.Stop()
 	if n.chainManager != nil {
