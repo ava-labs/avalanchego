@@ -3,25 +3,25 @@
 
 package interval
 
-type interval struct {
-	lowerBound uint64
-	upperBound uint64
+type Interval struct {
+	LowerBound uint64
+	UpperBound uint64
 }
 
-func (i *interval) Less(other *interval) bool {
-	return i.upperBound < other.upperBound
+func (i *Interval) Less(other *Interval) bool {
+	return i.UpperBound < other.UpperBound
 }
 
-func (i *interval) Contains(height uint64) bool {
-	return i != nil && i.lowerBound <= height && height <= i.upperBound
+func (i *Interval) Contains(height uint64) bool {
+	return i != nil && i.LowerBound <= height && height <= i.UpperBound
 }
 
 // AdjacentToUpperBound returns true if height is 1 greater than upperBound.
-func (i *interval) AdjacentToUpperBound(height uint64) bool {
-	return i != nil && i.upperBound+1 == height
+func (i *Interval) AdjacentToUpperBound(height uint64) bool {
+	return i != nil && i.UpperBound+1 == height
 }
 
 // AdjacentToLowerBound returns true if height is 1 less than lowerBound.
-func (i *interval) AdjacentToLowerBound(height uint64) bool {
-	return i != nil && height+1 == i.lowerBound
+func (i *Interval) AdjacentToLowerBound(height uint64) bool {
+	return i != nil && height+1 == i.LowerBound
 }

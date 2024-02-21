@@ -13,7 +13,7 @@ const treeDegree = 2
 
 type Tree struct {
 	db           database.Database
-	knownHeights *btree.BTreeG[*interval]
+	knownHeights *btree.BTreeG[*Interval]
 }
 
 func NewTree(db database.Database) (*Tree, error) {
@@ -22,7 +22,7 @@ func NewTree(db database.Database) (*Tree, error) {
 		return nil, err
 	}
 
-	knownHeights := btree.NewG(treeDegree, (*interval).Less)
+	knownHeights := btree.NewG(treeDegree, (*Interval).Less)
 	for _, i := range intervals {
 		knownHeights.ReplaceOrInsert(i)
 	}
@@ -34,14 +34,14 @@ func NewTree(db database.Database) (*Tree, error) {
 
 func (t *Tree) Add(height uint64) error {
 	var (
-		newInterval = &interval{
-			lowerBound: height,
-			upperBound: height,
+		newInterval = &Interval{
+			LowerBound: height,
+			UpperBound: height,
 		}
-		upper *interval
-		lower *interval
+		upper *Interval
+		lower *Interval
 	)
-	t.knownHeights.AscendGreaterOrEqual(newInterval, func(item *interval) bool {
+	t.knownHeights.AscendGreaterOrEqual(newInterval, func(item *Interval) bool {
 		upper = item
 		return false
 	})
@@ -50,7 +50,7 @@ func (t *Tree) Add(height uint64) error {
 		return nil
 	}
 
-	t.knownHeights.DescendLessOrEqual(newInterval, func(item *interval) bool {
+	t.knownHeights.DescendLessOrEqual(newInterval, func(item *Interval) bool {
 		lower = item
 		return false
 	})
@@ -62,40 +62,92 @@ func (t *Tree) Add(height uint64) error {
 	switch {
 	case adjacentToLowerBound && adjacentToUpperBound:
 		// the upper and lower ranges should be merged
-		if err := DeleteInterval(t.db, lower.upperBound); err != nil {
+		if err := DeleteInterval(t.db, lower.UpperBound); err != nil {
 			return err
 		}
-		upper.lowerBound = lower.lowerBound
+		upper.LowerBound = lower.LowerBound
 		t.knownHeights.Delete(lower)
-		return PutInterval(t.db, upper.upperBound, lower.lowerBound)
+		return PutInterval(t.db, upper.UpperBound, lower.LowerBound)
 	case adjacentToLowerBound:
 		// the upper range should be extended by one on the lower side
-		upper.lowerBound = height
-		return PutInterval(t.db, upper.upperBound, height)
+		upper.LowerBound = height
+		return PutInterval(t.db, upper.UpperBound, height)
 	case adjacentToUpperBound:
 		// the lower range should be extended by one on the upper side
-		if err := DeleteInterval(t.db, lower.upperBound); err != nil {
+		if err := DeleteInterval(t.db, lower.UpperBound); err != nil {
 			return err
 		}
-		lower.upperBound = height
-		return PutInterval(t.db, height, lower.lowerBound)
+		lower.UpperBound = height
+		return PutInterval(t.db, height, lower.LowerBound)
 	default:
 		t.knownHeights.ReplaceOrInsert(newInterval)
 		return PutInterval(t.db, height, height)
 	}
 }
 
+func (t *Tree) Remove(height uint64) error {
+	var (
+		newInterval = &Interval{
+			LowerBound: height,
+			UpperBound: height,
+		}
+		higher *Interval
+	)
+	t.knownHeights.AscendGreaterOrEqual(newInterval, func(item *Interval) bool {
+		higher = item
+		return false
+	})
+	if !higher.Contains(height) {
+		// height isn't in the tree
+		return nil
+	}
+
+	switch {
+	case higher.LowerBound == higher.UpperBound:
+		t.knownHeights.Delete(higher)
+		return DeleteInterval(t.db, higher.UpperBound)
+	case higher.LowerBound == height:
+		higher.LowerBound++
+		return PutInterval(t.db, higher.UpperBound, higher.LowerBound)
+	case higher.UpperBound == height:
+		if err := DeleteInterval(t.db, higher.UpperBound); err != nil {
+			return err
+		}
+		higher.UpperBound--
+		return PutInterval(t.db, higher.UpperBound, higher.LowerBound)
+	default:
+		newInterval.LowerBound = higher.LowerBound
+		newInterval.UpperBound = height - 1
+		t.knownHeights.ReplaceOrInsert(newInterval)
+		if err := PutInterval(t.db, newInterval.UpperBound, newInterval.LowerBound); err != nil {
+			return err
+		}
+
+		higher.LowerBound = height + 1
+		return PutInterval(t.db, higher.UpperBound, higher.LowerBound)
+	}
+}
+
 func (t *Tree) Contains(height uint64) bool {
 	var (
-		i = &interval{
-			lowerBound: height,
-			upperBound: height,
+		i = &Interval{
+			LowerBound: height,
+			UpperBound: height,
 		}
-		higher *interval
+		higher *Interval
 	)
-	t.knownHeights.AscendGreaterOrEqual(i, func(item *interval) bool {
+	t.knownHeights.AscendGreaterOrEqual(i, func(item *Interval) bool {
 		higher = item
 		return false
 	})
 	return higher.Contains(height)
+}
+
+func (t *Tree) Flatten() []*Interval {
+	intervals := make([]*Interval, 0, t.knownHeights.Len())
+	t.knownHeights.Ascend(func(item *Interval) bool {
+		intervals = append(intervals, item)
+		return true
+	})
+	return intervals
 }

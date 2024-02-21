@@ -15,11 +15,11 @@ var (
 	blockPrefix = []byte{blockPrefixByte}
 )
 
-func GetIntervals(db database.Iteratee) ([]*interval, error) {
+func GetIntervals(db database.Iteratee) ([]*Interval, error) {
 	it := db.NewIteratorWithPrefix(rangePrefix)
 	defer it.Release()
 
-	var intervals []*interval
+	var intervals []*Interval
 	for it.Next() {
 		dbKey := it.Key()
 		rangeKey := dbKey[len(rangePrefix):]
@@ -34,9 +34,9 @@ func GetIntervals(db database.Iteratee) ([]*interval, error) {
 			return nil, err
 		}
 
-		intervals = append(intervals, &interval{
-			lowerBound: lowerBound,
-			upperBound: upperBound,
+		intervals = append(intervals, &Interval{
+			LowerBound: lowerBound,
+			UpperBound: upperBound,
 		})
 	}
 	return intervals, it.Error()
@@ -55,6 +55,13 @@ func DeleteInterval(db database.KeyValueDeleter, upperBound uint64) error {
 	rangeKey := database.PackUInt64(upperBound)
 	return db.Delete(
 		append(rangePrefix, rangeKey...),
+	)
+}
+
+func GetBlock(db database.KeyValueReader, height uint64) ([]byte, error) {
+	blockKey := database.PackUInt64(height)
+	return db.Get(
+		append(blockPrefix, blockKey...),
 	)
 }
 

@@ -6,28 +6,18 @@ package interval
 import (
 	"testing"
 
-	"github.com/google/btree"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
-func flatten(tree *btree.BTreeG[*interval]) []*interval {
-	intervals := make([]*interval, 0, tree.Len())
-	tree.Ascend(func(item *interval) bool {
-		intervals = append(intervals, item)
-		return true
-	})
-	return intervals
-}
-
-func newTree(require *require.Assertions, db database.Database, intervals []*interval) *Tree {
+func newTree(require *require.Assertions, db database.Database, intervals []*Interval) *Tree {
 	tree, err := NewTree(db)
 	require.NoError(err)
 
 	for _, toAdd := range intervals {
-		for i := toAdd.lowerBound; i <= toAdd.upperBound; i++ {
+		for i := toAdd.LowerBound; i <= toAdd.UpperBound; i++ {
 			require.NoError(tree.Add(i))
 		}
 	}
@@ -37,97 +27,97 @@ func newTree(require *require.Assertions, db database.Database, intervals []*int
 func TestTreeAdd(t *testing.T) {
 	tests := []struct {
 		name     string
-		toAdd    []*interval
-		expected []*interval
+		toAdd    []*Interval
+		expected []*Interval
 	}{
 		{
 			name: "single addition",
-			toAdd: []*interval{
+			toAdd: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 10,
+					LowerBound: 10,
+					UpperBound: 10,
 				},
 			},
-			expected: []*interval{
+			expected: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 10,
+					LowerBound: 10,
+					UpperBound: 10,
 				},
 			},
 		},
 		{
 			name: "extend above",
-			toAdd: []*interval{
+			toAdd: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 11,
+					LowerBound: 10,
+					UpperBound: 11,
 				},
 			},
-			expected: []*interval{
+			expected: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 11,
+					LowerBound: 10,
+					UpperBound: 11,
 				},
 			},
 		},
 		{
 			name: "extend below",
-			toAdd: []*interval{
+			toAdd: []*Interval{
 				{
-					lowerBound: 11,
-					upperBound: 11,
+					LowerBound: 11,
+					UpperBound: 11,
 				},
 				{
-					lowerBound: 10,
-					upperBound: 10,
+					LowerBound: 10,
+					UpperBound: 10,
 				},
 			},
-			expected: []*interval{
+			expected: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 11,
+					LowerBound: 10,
+					UpperBound: 11,
 				},
 			},
 		},
 		{
 			name: "merge",
-			toAdd: []*interval{
+			toAdd: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 10,
+					LowerBound: 10,
+					UpperBound: 10,
 				},
 				{
-					lowerBound: 12,
-					upperBound: 12,
+					LowerBound: 12,
+					UpperBound: 12,
 				},
 				{
-					lowerBound: 11,
-					upperBound: 11,
+					LowerBound: 11,
+					UpperBound: 11,
 				},
 			},
-			expected: []*interval{
+			expected: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 12,
+					LowerBound: 10,
+					UpperBound: 12,
 				},
 			},
 		},
 		{
 			name: "ignore duplicate",
-			toAdd: []*interval{
+			toAdd: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 11,
+					LowerBound: 10,
+					UpperBound: 11,
 				},
 				{
-					lowerBound: 11,
-					upperBound: 11,
+					LowerBound: 11,
+					UpperBound: 11,
 				},
 			},
-			expected: []*interval{
+			expected: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 11,
+					LowerBound: 10,
+					UpperBound: 11,
 				},
 			},
 		},
@@ -138,10 +128,141 @@ func TestTreeAdd(t *testing.T) {
 
 			db := memdb.New()
 			treeFromAdditions := newTree(require, db, test.toAdd)
-			require.Equal(test.expected, flatten(treeFromAdditions.knownHeights))
+			require.Equal(test.expected, treeFromAdditions.Flatten())
 
 			treeFromDB := newTree(require, db, nil)
-			require.Equal(test.expected, flatten(treeFromDB.knownHeights))
+			require.Equal(test.expected, treeFromDB.Flatten())
+		})
+	}
+}
+
+func TestTreeRemove(t *testing.T) {
+	tests := []struct {
+		name     string
+		toAdd    []*Interval
+		toRemove []*Interval
+		expected []*Interval
+	}{
+		{
+			name: "single removal",
+			toAdd: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 10,
+				},
+			},
+			toRemove: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 10,
+				},
+			},
+			expected: []*Interval{},
+		},
+		{
+			name: "reduce above",
+			toAdd: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 11,
+				},
+			},
+			toRemove: []*Interval{
+				{
+					LowerBound: 11,
+					UpperBound: 11,
+				},
+			},
+			expected: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 10,
+				},
+			},
+		},
+		{
+			name: "reduce below",
+			toAdd: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 11,
+				},
+			},
+			toRemove: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 10,
+				},
+			},
+			expected: []*Interval{
+				{
+					LowerBound: 11,
+					UpperBound: 11,
+				},
+			},
+		},
+		{
+			name: "split",
+			toAdd: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 12,
+				},
+			},
+			toRemove: []*Interval{
+				{
+					LowerBound: 11,
+					UpperBound: 11,
+				},
+			},
+			expected: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 10,
+				},
+				{
+					LowerBound: 12,
+					UpperBound: 12,
+				},
+			},
+		},
+		{
+			name: "ignore missing",
+			toAdd: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 10,
+				},
+			},
+			toRemove: []*Interval{
+				{
+					LowerBound: 11,
+					UpperBound: 11,
+				},
+			},
+			expected: []*Interval{
+				{
+					LowerBound: 10,
+					UpperBound: 10,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			db := memdb.New()
+			treeFromModifications := newTree(require, db, test.toAdd)
+			for _, toRemove := range test.toRemove {
+				for i := toRemove.LowerBound; i <= toRemove.UpperBound; i++ {
+					require.NoError(treeFromModifications.Remove(i))
+				}
+			}
+			require.Equal(test.expected, treeFromModifications.Flatten())
+
+			treeFromDB := newTree(require, db, nil)
+			require.Equal(test.expected, treeFromDB.Flatten())
 		})
 	}
 }
@@ -149,16 +270,16 @@ func TestTreeAdd(t *testing.T) {
 func TestTreeContains(t *testing.T) {
 	tests := []struct {
 		name     string
-		tree     []*interval
+		tree     []*Interval
 		height   uint64
 		expected bool
 	}{
 		{
 			name: "below",
-			tree: []*interval{
+			tree: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 10,
+					LowerBound: 10,
+					UpperBound: 10,
 				},
 			},
 			height:   9,
@@ -166,10 +287,10 @@ func TestTreeContains(t *testing.T) {
 		},
 		{
 			name: "above",
-			tree: []*interval{
+			tree: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 10,
+					LowerBound: 10,
+					UpperBound: 10,
 				},
 			},
 			height:   11,
@@ -177,10 +298,10 @@ func TestTreeContains(t *testing.T) {
 		},
 		{
 			name: "equal both",
-			tree: []*interval{
+			tree: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 10,
+					LowerBound: 10,
+					UpperBound: 10,
 				},
 			},
 			height:   10,
@@ -188,10 +309,10 @@ func TestTreeContains(t *testing.T) {
 		},
 		{
 			name: "equal lower",
-			tree: []*interval{
+			tree: []*Interval{
 				{
-					lowerBound: 10,
-					upperBound: 11,
+					LowerBound: 10,
+					UpperBound: 11,
 				},
 			},
 			height:   10,
@@ -199,10 +320,10 @@ func TestTreeContains(t *testing.T) {
 		},
 		{
 			name: "equal upper",
-			tree: []*interval{
+			tree: []*Interval{
 				{
-					lowerBound: 9,
-					upperBound: 10,
+					LowerBound: 9,
+					UpperBound: 10,
 				},
 			},
 			height:   10,
@@ -210,10 +331,10 @@ func TestTreeContains(t *testing.T) {
 		},
 		{
 			name: "inside",
-			tree: []*interval{
+			tree: []*Interval{
 				{
-					lowerBound: 9,
-					upperBound: 11,
+					LowerBound: 9,
+					UpperBound: 11,
 				},
 			},
 			height:   10,
