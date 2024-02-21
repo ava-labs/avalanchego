@@ -603,7 +603,7 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
 
         let cache = &self.obj_cache;
 
-        let mut obj_ref = ObjRef::new(Some(obj), cache);
+        let mut obj_ref = ObjRef::new(obj, cache);
 
         // should this use a `?` instead of `unwrap`?
         #[allow(clippy::unwrap_used)]
@@ -628,7 +628,7 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
         let cache = &self.obj_cache;
 
         if let Some(obj) = obj {
-            return Ok(ObjRef::new(Some(obj), cache));
+            return Ok(ObjRef::new(obj, cache));
         }
 
         #[allow(clippy::unwrap_used)]
@@ -645,7 +645,7 @@ impl<T: Storable + Debug + 'static + PartialEq, M: CachedStore + Send + Sync> Sh
         let obj = self.obj_cache.put(inner.get_data_ref(ptr, payload_size)?);
         let cache = &self.obj_cache;
 
-        Ok(ObjRef::new(Some(obj), cache))
+        Ok(ObjRef::new(obj, cache))
     }
 
     #[allow(clippy::unwrap_used)]
