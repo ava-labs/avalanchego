@@ -140,7 +140,7 @@ impl<'a, S: ShaleStore<Node> + Send + Sync, T> Stream for MerkleNodeStream<'a, S
 
                             // The child's key is its parent's key, followed by the child's index,
                             // followed by the child's partial path (if any).
-                            let child_key: Box<[u8]> = key
+                            let child_key: Key = key
                                 .iter()
                                 .copied()
                                 .chain(once(pos))
@@ -599,7 +599,7 @@ mod tests {
         pub(crate) fn node_iter_from(
             &self,
             root: DiskAddress,
-            key: Box<[u8]>,
+            key: Key,
         ) -> MerkleNodeStream<'_, S, T> {
             MerkleNodeStream::new(self, root, key)
         }

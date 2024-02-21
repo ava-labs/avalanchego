@@ -31,7 +31,7 @@ type NodeObjRef<'a> = shale::ObjRef<'a, Node>;
 type ParentRefs<'a> = Vec<(NodeObjRef<'a>, u8)>;
 type ParentAddresses = Vec<(DiskAddress, u8)>;
 
-type Key = Box<[u8]>;
+pub type Key = Box<[u8]>;
 type Value = Vec<u8>;
 
 #[derive(Debug, Error)]
@@ -1381,7 +1381,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T> Merkle<S, T> {
     pub(crate) fn key_value_iter_from_key(
         &self,
         root: DiskAddress,
-        key: Box<[u8]>,
+        key: Key,
     ) -> MerkleKeyValueStream<'_, S, T> {
         MerkleKeyValueStream::from_key(self, root, key)
     }

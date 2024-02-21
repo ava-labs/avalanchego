@@ -8,7 +8,7 @@ pub use crate::{
 };
 use crate::{
     file,
-    merkle::{Bincode, Merkle, MerkleError, Node, Proof, ProofError, TrieHash, TRIE_HASH_LEN},
+    merkle::{Bincode, Key, Merkle, MerkleError, Node, Proof, ProofError, TrieHash, TRIE_HASH_LEN},
     storage::{
         buffer::{DiskBuffer, DiskBufferRequester},
         CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut, StoreRevShared,
@@ -323,10 +323,7 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
         self.merkle.key_value_iter(self.header.kv_root)
     }
 
-    pub fn stream_from(
-        &self,
-        start_key: Box<[u8]>,
-    ) -> merkle::MerkleKeyValueStream<'_, S, Bincode> {
+    pub fn stream_from(&self, start_key: Key) -> merkle::MerkleKeyValueStream<'_, S, Bincode> {
         self.merkle
             .key_value_iter_from_key(self.header.kv_root, start_key)
     }

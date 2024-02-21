@@ -1,15 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::borrow::Cow;
-
 use clap::Args;
 use firewood::{
     db::{Db, DbConfig, WalConfig},
+    merkle::Key,
     v2::api::{self, Db as _},
 };
 use futures_util::StreamExt;
 use log;
+use std::borrow::Cow;
 
 #[derive(Debug, Args)]
 pub struct Options {
@@ -30,7 +30,7 @@ pub struct Options {
         value_parser = key_parser,
         help = "Start dumping from this key (inclusive)."
     )]
-    pub start_key: Option<Box<[u8]>>,
+    pub start_key: Option<Key>,
 }
 
 pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
