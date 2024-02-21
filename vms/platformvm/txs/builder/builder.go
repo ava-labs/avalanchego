@@ -470,14 +470,7 @@ func (b *builder) NewCreateChainTx(
 	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state)
 	pBuilder := backends.NewBuilder(addrs, builderBackend)
 
-	opts := common.UnionOptions(
-		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		})},
-		[]common.Option{common.WithMemo(memo)},
-	)
-	utx, err := pBuilder.NewCreateChainTx(subnetID, genesisData, vmID, fxIDs, chainName, opts...)
+	utx, err := pBuilder.NewCreateChainTx(subnetID, genesisData, vmID, fxIDs, chainName, options(changeAddr, memo)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create chain tx: %w", err)
 	}
@@ -512,14 +505,7 @@ func (b *builder) NewCreateSubnetTx(
 		Addrs:     ownerAddrs,
 	}
 
-	opts := common.UnionOptions(
-		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		})},
-		[]common.Option{common.WithMemo(memo)},
-	)
-	utx, err := pBuilder.NewCreateSubnetTx(subnetOwner, opts...)
+	utx, err := pBuilder.NewCreateSubnetTx(subnetOwner, options(changeAddr, memo)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
 	}
@@ -636,14 +622,7 @@ func (b *builder) NewAddValidatorTx(
 		Addrs:     []ids.ShortID{rewardAddress},
 	}
 
-	opts := common.UnionOptions(
-		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		})},
-		[]common.Option{common.WithMemo(memo)},
-	)
-	utx, err := pBuilder.NewAddValidatorTx(vdr, rewardOwner, shares, opts...)
+	utx, err := pBuilder.NewAddValidatorTx(vdr, rewardOwner, shares, options(changeAddr, memo)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
 	}
@@ -1032,4 +1011,14 @@ func (b *builder) NewBaseTx(
 		return nil, err
 	}
 	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func options(changeAddr ids.ShortID, memo []byte) []common.Option {
+	return common.UnionOptions(
+		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		})},
+		[]common.Option{common.WithMemo(memo)},
+	)
 }
