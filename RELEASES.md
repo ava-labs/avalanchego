@@ -53,6 +53,36 @@ The plugin version is updated to `33` all plugins must update to be compatible.
 - Remove unused chains#beacons field by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2692
 - x/sync: Remove duplicated call to TrackBandwidth by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2694
 - Move VMAliaser into node from config by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2689
+- Fix minor errors in x/sync tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2709
+- Update minimum golang version to v1.21.7 by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2710
+- Check for github action updates in dependabot by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2715
+- Update `golangci-lint` to `v1.56.1` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/2714
+- Add stringer to warp types by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2712
+- Refactor `p2p.PeerTracker` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2701
+- Bump actions/stale from 8 to 9 by @dependabot in https://github.com/ava-labs/avalanchego/pull/2719
+- Bump github/codeql-action from 2 to 3 by @dependabot in https://github.com/ava-labs/avalanchego/pull/2720
+- Bump bufbuild/buf-setup-action from 1.26.1 to 1.29.0 by @dependabot in https://github.com/ava-labs/avalanchego/pull/2721
+- Bump aws-actions/configure-aws-credentials from 1 to 4 by @dependabot in https://github.com/ava-labs/avalanchego/pull/2722
+- Manually setup golang in codeql action by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2725
+- Provide pgo file during compilation by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2724
+- P-chain - Tx builder cleanup by @abi87 in https://github.com/ava-labs/avalanchego/pull/2718
+- Refactor chain manager subnets by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2711
+- Replace snowball/snowflake interface with single shared snow interface by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/2717
+- Remove duplicate IP length constant by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2733
+- Add `platform.getSubnet` API by @felipemadero in https://github.com/ava-labs/avalanchego/pull/2704
+- Provide BLS signature in Handshake message by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2730
+- Verify BLS signature provided in Handshake messages by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2735
+- Move UTXOs definition from primary to primary/common by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2741
+- Minimize Signer interface and document Sign by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2740
+- Revert setup-go during unit tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2744
+- P-chain wallet fees UTs by @abi87 in https://github.com/ava-labs/avalanchego/pull/2734
+- `merkledb` -- generalize error case to check state that should never occur by @danlaine in https://github.com/ava-labs/avalanchego/pull/2743
+- Revert setup-go to v3 on all arm actions by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2749
+- Add AppError to Sender interface by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2737
+- P-chain - Cleaned up fork switch in UTs by @abi87 in https://github.com/ava-labs/avalanchego/pull/2746
+- X-chain wallet fees UTs by @abi87 in https://github.com/ava-labs/avalanchego/pull/2747
+- Add keys values to bimap by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2754
+- fix test sender by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2755
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.19...v1.11.0-fuji
 
