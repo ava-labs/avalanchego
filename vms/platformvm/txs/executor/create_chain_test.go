@@ -204,7 +204,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
-			backend := builder.NewBackend(env.ctx, &cfg, addrs, env.state, env.atomicUTXOs)
+			backend := builder.NewBackend(env.ctx, &cfg, env.state, env.atomicUTXOs)
+			backend.ResetAddresses(addrs)
 			pBuilder := backends.NewBuilder(addrs, backend)
 
 			utx, err := pBuilder.NewCreateChainTx(
