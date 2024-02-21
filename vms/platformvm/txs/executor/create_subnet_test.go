@@ -65,8 +65,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			cfg := *env.config
 			cfg.CreateSubnetTxFee = test.fee
-			builderBackend := builder.NewBuilderBackend(env.ctx, &cfg, addrs, env.state, env.atomicUTXOs)
-			pBuilder := backends.NewBuilder(addrs, builderBackend)
+			backend := builder.NewBackend(env.ctx, &cfg, addrs, env.state, env.atomicUTXOs)
+			pBuilder := backends.NewBuilder(addrs, backend)
 
 			utx, err := pBuilder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{}, // owner
@@ -74,10 +74,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			require.NoError(err)
 
 			kc := secp256k1fx.NewKeychain(preFundedKeys...)
-			s := backends.NewSigner(
-				kc,
-				builder.NewSignerBackend(env.state, env.atomicUTXOs, kc.Addresses()),
-			)
+			s := backends.NewSigner(kc, backend)
 			tx, err := backends.SignUnsigned(context.Background(), s, utx)
 			require.NoError(err)
 

@@ -5,7 +5,9 @@ package builder
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -17,15 +19,15 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 )
 
-var _ backends.BuilderBackend = (*buiderBackend)(nil)
+var _ backends.Backend = (*backend)(nil)
 
-func NewBuilderBackend(
+func NewBackend(
 	ctx *snow.Context,
 	cfg *config.Config,
 	addrs set.Set[ids.ShortID],
 	state state.State,
 	atomicUTXOsMan avax.AtomicUTXOManager,
-) backends.BuilderBackend {
+) backends.Backend {
 	backendCtx := backends.NewContext(
 		ctx.NetworkID,
 		ctx.AVAXAssetID,
@@ -38,7 +40,7 @@ func NewBuilderBackend(
 		cfg.AddSubnetValidatorFee,
 		cfg.AddSubnetDelegatorFee,
 	)
-	return &buiderBackend{
+	return &backend{
 		Context:        backendCtx,
 		addrs:          addrs,
 		state:          state,
@@ -46,7 +48,7 @@ func NewBuilderBackend(
 	}
 }
 
-type buiderBackend struct {
+type backend struct {
 	backends.Context
 
 	addrs          set.Set[ids.ShortID]
@@ -54,7 +56,7 @@ type buiderBackend struct {
 	atomicUTXOsMan avax.AtomicUTXOManager
 }
 
-func (b *buiderBackend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+func (b *backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
 	if sourceChainID == constants.PlatformChainID {
 		return avax.GetAllUTXOs(b.state, b.addrs) // The UTXOs controlled by [keys]
 	}
@@ -63,6 +65,23 @@ func (b *buiderBackend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.
 	return atomicUTXOs, err
 }
 
-func (b *buiderBackend) GetSubnetOwner(_ context.Context, subnetID ids.ID) (fx.Owner, error) {
+func (b *backend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
+	if chainID == constants.PlatformChainID {
+		return b.state.GetUTXO(utxoID)
+	}
+
+	atomicUTXOs, _, _, err := b.atomicUTXOsMan.GetAtomicUTXOs(chainID, b.addrs, ids.ShortEmpty, ids.Empty, MaxPageSize)
+	if err != nil {
+		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
+	}
+	for _, utxo := range atomicUTXOs {
+		if utxo.InputID() == utxoID {
+			return utxo, nil
+		}
+	}
+	return nil, database.ErrNotFound
+}
+
+func (b *backend) GetSubnetOwner(_ context.Context, subnetID ids.ID) (fx.Owner, error) {
 	return b.state.GetSubnetOwner(subnetID)
 }

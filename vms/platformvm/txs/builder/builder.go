@@ -283,8 +283,8 @@ func (b *builder) NewImportTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	outOwner := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -302,10 +302,7 @@ func (b *builder) NewImportTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -326,8 +323,8 @@ func (b *builder) NewExportTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	outputs := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
@@ -351,10 +348,7 @@ func (b *builder) NewExportTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -376,8 +370,8 @@ func (b *builder) NewCreateChainTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	utx, err := pBuilder.NewCreateChainTx(subnetID, genesisData, vmID, fxIDs, chainName, options(changeAddr, memo)...)
 	if err != nil {
@@ -385,10 +379,7 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -407,8 +398,8 @@ func (b *builder) NewCreateSubnetTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	subnetOwner := &secp256k1fx.OutputOwners{
 		Threshold: threshold,
@@ -421,10 +412,7 @@ func (b *builder) NewCreateSubnetTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -455,8 +443,8 @@ func (b *builder) NewTransformSubnetTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	utx, err := pBuilder.NewTransformSubnetTx(
 		subnetID,
@@ -480,10 +468,7 @@ func (b *builder) NewTransformSubnetTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -506,8 +491,8 @@ func (b *builder) NewAddValidatorTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	vdr := &txs.Validator{
 		NodeID: nodeID,
@@ -527,10 +512,7 @@ func (b *builder) NewAddValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -554,8 +536,8 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	vdr := &txs.SubnetValidator{
 		Validator: txs.Validator{
@@ -586,10 +568,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -611,8 +590,8 @@ func (b *builder) NewAddDelegatorTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	vdr := &txs.Validator{
 		NodeID: nodeID,
@@ -636,10 +615,7 @@ func (b *builder) NewAddDelegatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -661,8 +637,8 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	vdr := &txs.SubnetValidator{
 		Validator: txs.Validator{
@@ -690,10 +666,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -715,8 +688,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	vdr := &txs.SubnetValidator{
 		Validator: txs.Validator{
@@ -737,10 +710,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -759,8 +729,8 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
@@ -772,10 +742,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -795,8 +762,8 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	newOwner := &secp256k1fx.OutputOwners{
 		Threshold: threshold,
@@ -813,10 +780,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
@@ -835,8 +799,8 @@ func (b *builder) NewBaseTx(
 	for _, key := range keys {
 		addrs.Add(key.Address())
 	}
-	builderBackend := NewBuilderBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
-	pBuilder := backends.NewBuilder(addrs, builderBackend)
+	backend := NewBackend(b.ctx, b.cfg, addrs, b.state, b.AtomicUTXOManager)
+	pBuilder := backends.NewBuilder(addrs, backend)
 
 	out := &avax.TransferableOutput{
 		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
@@ -855,10 +819,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.NewSigner(
-		kc,
-		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
-	)
+	s := backends.NewSigner(kc, backend)
 	tx, err := backends.SignUnsigned(context.Background(), s, utx)
 	if err != nil {
 		return nil, err
