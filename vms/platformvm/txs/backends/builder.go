@@ -25,7 +25,7 @@ var (
 	errNoChangeAddress           = errors.New("no possible change address")
 	errUnknownOwnerType          = errors.New("unknown owner type")
 	errInsufficientAuthorization = errors.New("insufficient authorization")
-	errInsufficientFunds         = errors.New("insufficient funds")
+	ErrInsufficientFunds         = errors.New("insufficient funds")
 
 	_ Builder = (*builder)(nil)
 )
@@ -624,7 +624,7 @@ func (b *builder) NewImportTx(
 	if len(importedInputs) == 0 {
 		return nil, fmt.Errorf(
 			"%w: no UTXOs available to import",
-			errInsufficientFunds,
+			ErrInsufficientFunds,
 		)
 	}
 
@@ -1112,7 +1112,7 @@ func (b *builder) spend(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q to stake",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)
@@ -1122,7 +1122,7 @@ func (b *builder) spend(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)

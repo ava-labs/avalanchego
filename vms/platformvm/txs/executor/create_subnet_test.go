@@ -74,9 +74,11 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				}},
 				Owner: &secp256k1fx.OutputOwners{},
 			}
+
+			kc := secp256k1fx.NewKeychain(preFundedKeys...)
 			s := backends.New(
-				secp256k1fx.NewKeychain(preFundedKeys...),
-				builder.NewSignerBackend(env.state, ids.Empty, nil),
+				kc,
+				builder.NewSignerBackend(env.state, env.atomicUTXOs, kc.Addresses()),
 			)
 			tx, err := backends.SignUnsigned(context.Background(), s, utx)
 			require.NoError(err)

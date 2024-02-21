@@ -220,9 +220,11 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				VMID:       constants.AVMID,
 				SubnetAuth: subnetAuth,
 			}
+
+			kc := secp256k1fx.NewKeychain(preFundedKeys...)
 			s := backends.New(
-				secp256k1fx.NewKeychain(preFundedKeys...),
-				builder.NewSignerBackend(env.state, ids.Empty, nil),
+				kc,
+				builder.NewSignerBackend(env.state, env.atomicUTXOs, kc.Addresses()),
 			)
 			tx, err := backends.SignUnsigned(context.Background(), s, utx)
 			require.NoError(err)

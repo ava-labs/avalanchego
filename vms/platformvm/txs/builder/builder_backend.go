@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -23,6 +24,7 @@ func NewBuilderBackend(
 	cfg *config.Config,
 	addrs set.Set[ids.ShortID],
 	state state.State,
+	atomicUTXOsMan avax.AtomicUTXOManager,
 ) backends.BuilderBackend {
 	backendCtx := backends.NewContext(
 		ctx.NetworkID,
@@ -37,22 +39,28 @@ func NewBuilderBackend(
 		cfg.AddSubnetDelegatorFee,
 	)
 	return &buiderBackend{
-		Context: backendCtx,
-		addrs:   addrs,
-		state:   state,
+		Context:        backendCtx,
+		addrs:          addrs,
+		state:          state,
+		atomicUTXOsMan: atomicUTXOsMan,
 	}
 }
 
 type buiderBackend struct {
 	backends.Context
 
-	addrs set.Set[ids.ShortID]
-	state state.State
+	addrs          set.Set[ids.ShortID]
+	state          state.State
+	atomicUTXOsMan avax.AtomicUTXOManager
 }
 
-// TODO ABENEGIA: handle non-P-chain UTXOs case
-func (b *buiderBackend) UTXOs(_ context.Context /*sourceChainID*/, _ ids.ID) ([]*avax.UTXO, error) {
-	return avax.GetAllUTXOs(b.state, b.addrs) // The UTXOs controlled by [keys]
+func (b *buiderBackend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+	if sourceChainID == constants.PlatformChainID {
+		return avax.GetAllUTXOs(b.state, b.addrs) // The UTXOs controlled by [keys]
+	}
+
+	atomicUTXOs, _, _, err := b.atomicUTXOsMan.GetAtomicUTXOs(sourceChainID, b.addrs, ids.ShortEmpty, ids.Empty, MaxPageSize)
+	return atomicUTXOs, err
 }
 
 func (b *buiderBackend) GetSubnetOwner(_ context.Context, subnetID ids.ID) (fx.Owner, error) {
