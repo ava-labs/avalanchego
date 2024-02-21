@@ -18,7 +18,7 @@ const (
 	// RPCChainVMProtocol should be bumped anytime changes are made which
 	// require the plugin vm to upgrade to latest avalanchego release to be
 	// compatible.
-	RPCChainVMProtocol uint = 32
+	RPCChainVMProtocol uint = 33
 )
 
 // These are globals that describe network upgrades and node versions
@@ -136,9 +136,8 @@ var (
 		constants.FujiID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
 	}
 
-	// TODO: update this before release
 	DurangoTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.MainnetID: time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
 	}
 )

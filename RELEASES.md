@@ -1,8 +1,6 @@
 # Release Notes
 
-## [v1.11.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0-fuji)
-
-**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+## [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)
 
 This upgrade consists of the following Avalanche Community Proposals (ACPs):
 
@@ -14,11 +12,15 @@ This upgrade consists of the following Avalanche Community Proposals (ACPs):
 - [ACP-41](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/41-remove-pending-stakers.md) Remove Pending Stakers
 - [ACP-62](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/62-disable-addvalidatortx-and-adddelegatortx.md) Disable AddValidatorTx and AddDelegatorTx
 
-The changes in the upgrade go into effect at 11 AM ET (4 PM UTC) on Tuesday, February 13th, 2024 on the Fuji testnet.
+The changes in the upgrade go into effect at 11 AM ET (4 PM UTC) on Wednesday, March 6th, 2024 on Mainnet.
 
-**All Fuji nodes must upgrade before 11 AM ET, February 13th 2024.**
+**All supporting Mainnet nodes should upgrade before 11 AM ET, March 6th 2024.**
 
-The plugin version is updated to `32` all plugins must update to be compatible.
+The plugin version is updated to `33` all plugins must update to be compatible.
+
+### APIs
+
+- Added `platform.getSubnet` API
 
 ### Configs
 
