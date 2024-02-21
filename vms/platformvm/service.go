@@ -281,36 +281,6 @@ func newJSONBalanceMap(balanceMap map[ids.ID]uint64) map[ids.ID]avajson.Uint64 {
 	return jsonBalanceMap
 }
 
-// CreateAddress creates an address controlled by [args.Username]
-// Returns the newly created address
-func (s *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JSONAddress) error {
-	s.vm.ctx.Log.Warn("deprecated API called",
-		zap.String("service", "platform"),
-		zap.String("method", "createAddress"),
-		logging.UserString("username", args.Username),
-	)
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	key, err := keystore.NewKey(user)
-	if err != nil {
-		return err
-	}
-
-	response.Address, err = s.addrManager.FormatLocalAddress(key.PublicKey().Address())
-	if err != nil {
-		return fmt.Errorf("problem formatting address: %w", err)
-	}
-	return user.Close()
-}
-
 // ListAddresses returns the addresses controlled by [args.Username]
 func (s *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
 	s.vm.ctx.Log.Warn("deprecated API called",
