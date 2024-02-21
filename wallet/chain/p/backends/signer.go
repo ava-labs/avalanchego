@@ -37,7 +37,7 @@ func New(kc keychain.Keychain, backend SignerBackend) Signer {
 }
 
 func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
-	return tx.Unsigned.Visit(&Visitor{
+	return tx.Unsigned.Visit(&signerVisitor{
 		kc:      s.kc,
 		backend: s.backend,
 		ctx:     ctx,
@@ -47,9 +47,9 @@ func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 
 func SignUnsigned(
 	ctx stdcontext.Context,
-	s Signer,
+	signer Signer,
 	utx txs.UnsignedTx,
 ) (*txs.Tx, error) {
 	tx := &txs.Tx{Unsigned: utx}
-	return tx, s.Sign(ctx, tx)
+	return tx, signer.Sign(ctx, tx)
 }

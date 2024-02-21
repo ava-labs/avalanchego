@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	_ txs.Visitor = (*Visitor)(nil)
+	_ txs.Visitor = (*signerVisitor)(nil)
 
 	ErrUnknownOwnerType      = errors.New("unknown owner type")
 	ErrUnknownOutputType     = errors.New("unknown output type")
@@ -35,23 +35,23 @@ var (
 	emptySig [secp256k1.SignatureLen]byte
 )
 
-// Visitor handles signing transactions for the signer
-type Visitor struct {
+// signerVisitor handles signing transactions for the signer
+type signerVisitor struct {
 	kc      keychain.Keychain
 	backend SignerBackend
 	ctx     context.Context
 	tx      *txs.Tx
 }
 
-func (*Visitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*signerVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (*Visitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*signerVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (s *Visitor) BaseTx(tx *txs.BaseTx) error {
+func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (s *Visitor) BaseTx(tx *txs.BaseTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (s *signerVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -67,7 +67,7 @@ func (s *Visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (s *signerVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -80,7 +80,7 @@ func (s *Visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (s *signerVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func (s *Visitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) CreateChainTx(tx *txs.CreateChainTx) error {
+func (s *signerVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -101,7 +101,7 @@ func (s *Visitor) CreateChainTx(tx *txs.CreateChainTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (s *signerVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (s *Visitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) ImportTx(tx *txs.ImportTx) error {
+func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (s *Visitor) ImportTx(tx *txs.ImportTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) ExportTx(tx *txs.ExportTx) error {
+func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -130,7 +130,7 @@ func (s *Visitor) ExportTx(tx *txs.ExportTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *Visitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -143,7 +143,7 @@ func (s *Visitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *Visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+func (s *signerVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func (s *Visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) e
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *Visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (s *signerVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -169,7 +169,7 @@ func (s *Visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *Visitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -177,7 +177,7 @@ func (s *Visitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidato
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *Visitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (s *Visitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegato
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *Visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
+func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {
 		inIntf := transferInput.In
@@ -240,7 +240,7 @@ func (s *Visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput
 	return txSigners, nil
 }
 
-func (s *Visitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable) ([]keychain.Signer, error) {
+func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable) ([]keychain.Signer, error) {
 	subnetInput, ok := subnetAuth.(*secp256k1fx.Input)
 	if !ok {
 		return nil, errUnknownSubnetAuthType
