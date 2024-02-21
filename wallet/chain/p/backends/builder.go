@@ -218,7 +218,7 @@ type Builder interface {
 	// - [vdr] specifies all the details of the validation period such as the
 	//   subnetID, startTime, endTime, stake weight, and nodeID.
 	// - [signer] if the subnetID is the primary network, this is the BLS key
-	//   for this validator. Otherwise, this value should be the empty backends.
+	//   for this validator. Otherwise, this value should be the empty signer.
 	// - [assetID] specifies the asset to stake.
 	// - [validationRewardsOwner] specifies the owner of all the rewards this
 	//   validator earns for its validation period.

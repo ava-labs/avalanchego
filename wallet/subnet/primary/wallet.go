@@ -121,7 +121,7 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
 	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
 	pBuilder := pbackends.NewBuilder(avaxAddrs, pBackend)
-	pSigner := pbackends.New(config.AVAXKeychain, pBackend)
+	pSigner := pbackends.NewSigner(config.AVAXKeychain, pBackend)
 
 	xChainID := avaxState.XCTX.BlockchainID()
 	xUTXOs := common.NewChainUTXOs(xChainID, avaxState.UTXOs)

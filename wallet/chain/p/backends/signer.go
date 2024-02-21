@@ -29,7 +29,7 @@ type txSigner struct {
 	backend SignerBackend
 }
 
-func New(kc keychain.Keychain, backend SignerBackend) Signer {
+func NewSigner(kc keychain.Keychain, backend SignerBackend) Signer {
 	return &txSigner{
 		kc:      kc,
 		backend: backend,

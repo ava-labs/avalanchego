@@ -302,7 +302,7 @@ func (b *builder) NewImportTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -351,7 +351,7 @@ func (b *builder) NewExportTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -385,7 +385,7 @@ func (b *builder) NewCreateChainTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -421,7 +421,7 @@ func (b *builder) NewCreateSubnetTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -480,7 +480,7 @@ func (b *builder) NewTransformSubnetTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -527,7 +527,7 @@ func (b *builder) NewAddValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -586,7 +586,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -636,7 +636,7 @@ func (b *builder) NewAddDelegatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -690,7 +690,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -737,7 +737,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -772,7 +772,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -813,7 +813,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)
@@ -855,7 +855,7 @@ func (b *builder) NewBaseTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	s := backends.New(
+	s := backends.NewSigner(
 		kc,
 		NewSignerBackend(b.state, b.AtomicUTXOManager, addrs),
 	)

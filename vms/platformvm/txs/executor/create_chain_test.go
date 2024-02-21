@@ -217,7 +217,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			require.NoError(err)
 
 			kc := secp256k1fx.NewKeychain(preFundedKeys...)
-			s := backends.New(
+			s := backends.NewSigner(
 				kc,
 				builder.NewSignerBackend(env.state, env.atomicUTXOs, kc.Addresses()),
 			)
