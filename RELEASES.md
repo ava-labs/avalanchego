@@ -14,7 +14,7 @@ This upgrade consists of the following Avalanche Community Proposals (ACPs):
 
 The changes in the upgrade go into effect at 11 AM ET (4 PM UTC) on Wednesday, March 6th, 2024 on Mainnet.
 
-**All supporting Mainnet nodes should upgrade before 11 AM ET, March 6th 2024.**
+**All Durango supporting Mainnet nodes should upgrade before 11 AM ET, March 6th 2024.**
 
 The plugin version is updated to `33` all plugins must update to be compatible.
 
