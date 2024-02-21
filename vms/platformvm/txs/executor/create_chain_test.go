@@ -202,6 +202,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				addrs.Add(key.Address())
 			}
 
+			env.state.SetTimestamp(test.time) // to duly set fee
+
 			cfg := *env.config
 			cfg.CreateBlockchainTxFee = test.fee
 			backend := builder.NewBackend(env.ctx, &cfg, env.state, env.atomicUTXOs)

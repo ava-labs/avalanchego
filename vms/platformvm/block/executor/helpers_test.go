@@ -169,7 +169,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosHandler = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
-		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).Times(1) // to initialize createSubnetTx fee
+		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).Times(2) // to initialize createSubnet/BlockchainTx fee
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
 			res.config,

@@ -33,7 +33,7 @@ func NewBackend(
 		cfg.TxFee,
 		cfg.GetCreateSubnetTxFee(state.GetTimestamp()),
 		cfg.TransformSubnetTxFee,
-		cfg.CreateBlockchainTxFee,
+		cfg.GetCreateBlockchainTxFee(state.GetTimestamp()),
 		cfg.AddPrimaryNetworkValidatorFee,
 		cfg.AddPrimaryNetworkDelegatorFee,
 		cfg.AddSubnetValidatorFee,
@@ -57,8 +57,15 @@ type Backend struct {
 }
 
 // Override [backend.Context.CreateSubnetTxFee] to refresh fee
+// relevant in unit tests only
 func (b *Backend) CreateSubnetTxFee() uint64 {
 	return b.cfg.GetCreateSubnetTxFee(b.state.GetTimestamp())
+}
+
+// Override [backend.Context.GetCreateBlockchainTxFee] to refresh fee
+// relevant in unit tests only
+func (b *Backend) GetCreateBlockchainTxFee() uint64 {
+	return b.cfg.GetCreateBlockchainTxFee(b.state.GetTimestamp())
 }
 
 func (b *Backend) ResetAddresses(addrs set.Set[ids.ShortID]) {
