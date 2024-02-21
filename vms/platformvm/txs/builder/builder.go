@@ -273,12 +273,7 @@ func (b *builder) NewImportTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	outOwner := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -295,8 +290,7 @@ func (b *builder) NewImportTx(
 		return nil, fmt.Errorf("failed building import tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -312,12 +306,7 @@ func (b *builder) NewExportTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	outputs := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
@@ -340,8 +329,7 @@ func (b *builder) NewExportTx(
 		return nil, fmt.Errorf("failed building export tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -358,20 +346,14 @@ func (b *builder) NewCreateChainTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewCreateChainTx(subnetID, genesisData, vmID, fxIDs, chainName, options(changeAddr, memo)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed building create chain tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -385,12 +367,7 @@ func (b *builder) NewCreateSubnetTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	subnetOwner := &secp256k1fx.OutputOwners{
 		Threshold: threshold,
@@ -402,8 +379,7 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, fmt.Errorf("failed building create subnet tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -429,12 +405,7 @@ func (b *builder) NewTransformSubnetTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewTransformSubnetTx(
 		subnetID,
@@ -457,8 +428,7 @@ func (b *builder) NewTransformSubnetTx(
 		return nil, fmt.Errorf("failed building transform subnet tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -476,12 +446,7 @@ func (b *builder) NewAddValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	vdr := &txs.Validator{
 		NodeID: nodeID,
@@ -500,8 +465,7 @@ func (b *builder) NewAddValidatorTx(
 		return nil, fmt.Errorf("failed building add validator tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -520,12 +484,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	vdr := &txs.SubnetValidator{
 		Validator: txs.Validator{
@@ -555,8 +514,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		return nil, fmt.Errorf("failed building add permissionless validator tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -573,12 +531,7 @@ func (b *builder) NewAddDelegatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	vdr := &txs.Validator{
 		NodeID: nodeID,
@@ -601,8 +554,7 @@ func (b *builder) NewAddDelegatorTx(
 		return nil, fmt.Errorf("failed building add delegator tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -619,12 +571,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	vdr := &txs.SubnetValidator{
 		Validator: txs.Validator{
@@ -651,8 +598,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		return nil, fmt.Errorf("failed building add permissionless delegator tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -669,12 +615,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	vdr := &txs.SubnetValidator{
 		Validator: txs.Validator{
@@ -694,8 +635,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, fmt.Errorf("failed building add subnet validator tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -709,12 +649,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	utx, err := pBuilder.NewRemoveSubnetValidatorTx(
 		nodeID,
@@ -725,8 +660,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, fmt.Errorf("failed building remove subnet validator tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -741,12 +675,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	newOwner := &secp256k1fx.OutputOwners{
 		Threshold: threshold,
@@ -762,8 +691,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, fmt.Errorf("failed building transfer subnet ownership tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
@@ -777,12 +705,7 @@ func (b *builder) NewBaseTx(
 	changeAddr ids.ShortID,
 	memo []byte,
 ) (*txs.Tx, error) {
-	var (
-		kc       = secp256k1fx.NewKeychain(keys...)
-		addrs    = kc.Addresses()
-		pBuilder = backends.NewBuilder(addrs, b.backend)
-	)
-	b.backend.ResetAddresses(addrs)
+	pBuilder, pSigner := b.builders(keys)
 
 	out := &avax.TransferableOutput{
 		Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
@@ -800,12 +723,23 @@ func (b *builder) NewBaseTx(
 		return nil, fmt.Errorf("failed building base tx: %w", err)
 	}
 
-	s := backends.NewSigner(kc, b.backend)
-	tx, err := backends.SignUnsigned(context.Background(), s, utx)
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, err
 	}
 	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) builders(keys []*secp256k1.PrivateKey) (backends.Builder, backends.Signer) {
+	var (
+		kc      = secp256k1fx.NewKeychain(keys...)
+		addrs   = kc.Addresses()
+		builder = backends.NewBuilder(addrs, b.backend)
+		signer  = backends.NewSigner(kc, b.backend)
+	)
+	b.backend.ResetAddresses(addrs)
+
+	return builder, signer
 }
 
 func options(changeAddr ids.ShortID, memo []byte) []common.Option {
