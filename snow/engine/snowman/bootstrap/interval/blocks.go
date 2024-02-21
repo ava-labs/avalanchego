@@ -53,10 +53,7 @@ func Add(tree *Tree, lastAcceptedHeight uint64, blk snowman.Block) (bool, error)
 		height            = blk.Height()
 		lastHeightToFetch = lastAcceptedHeight + 1
 	)
-	if height < lastHeightToFetch {
-		return false, nil
-	}
-	if tree.Contains(height) {
+	if height < lastHeightToFetch || tree.Contains(height) {
 		return false, nil
 	}
 
@@ -69,12 +66,7 @@ func Add(tree *Tree, lastAcceptedHeight uint64, blk snowman.Block) (bool, error)
 		return false, err
 	}
 
-	if height == lastHeightToFetch {
-		return false, nil
-	}
-
-	parentHeight := height - 1
-	return !tree.Contains(parentHeight), nil
+	return height != lastHeightToFetch && !tree.Contains(height-1), nil
 }
 
 func Execute(
