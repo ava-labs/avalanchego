@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -108,6 +110,17 @@ func (m *BiMap[K, V]) DeleteValue(val V) (K, bool) {
 	delete(m.keyToValue, key)
 	delete(m.valueToKey, val)
 	return key, true
+}
+
+// Keys returns the keys of the map. The keys will be in an indeterminate order.
+func (m *BiMap[K, _]) Keys() []K {
+	return maps.Keys(m.keyToValue)
+}
+
+// Values returns the values of the map. The values will be in an indeterminate
+// order.
+func (m *BiMap[_, V]) Values() []V {
+	return maps.Values(m.keyToValue)
 }
 
 // Len return the number of entries in this map.
