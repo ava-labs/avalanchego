@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	_ BuilderBackend = WalletBackend(nil)
-	_ SignerBackend  = WalletBackend(nil)
+	_ BuilderBackend = Backend(nil)
+	_ SignerBackend  = Backend(nil)
 )
 
-type WalletBackend interface {
+type Backend interface {
 	Context
 	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
 	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)

@@ -23,7 +23,7 @@ var _ Backend = (*backend)(nil)
 
 // Backend defines the full interface required to support a P-chain wallet.
 type Backend interface {
-	backends.WalletBackend
+	backends.Backend
 
 	AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error
 }
