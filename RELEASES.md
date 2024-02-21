@@ -84,7 +84,7 @@ The plugin version is updated to `33` all plugins must update to be compatible.
 - Add keys values to bimap by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2754
 - fix test sender by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/2755
 
-**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.19...v1.11.0-fuji
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.19...v1.11.0
 
 ## [v1.10.19](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.19)
 
