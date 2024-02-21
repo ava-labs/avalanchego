@@ -161,6 +161,14 @@ impl NodeType {
         }
     }
 
+    pub fn set_path(&mut self, path: PartialPath) {
+        match self {
+            NodeType::Branch(u) => u.path = path,
+            NodeType::Leaf(node) => node.path = path,
+            NodeType::Extension(node) => node.path = path,
+        }
+    }
+
     pub fn set_data(&mut self, data: Data) {
         match self {
             NodeType::Branch(u) => u.value = Some(data),

@@ -4,7 +4,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-use crate::shale::ObjWriteError;
+use crate::shale::ObjWriteSizeError;
 use crate::shale::{disk_address::DiskAddress, ShaleError, ShaleStore};
 use crate::v2::api::HashKey;
 use nix::errno::Errno;
@@ -58,7 +58,7 @@ pub enum ProofError {
     #[error("invalid root hash")]
     InvalidRootHash,
     #[error("{0}")]
-    WriteError(#[from] ObjWriteError),
+    WriteError(#[from] ObjWriteSizeError),
 }
 
 impl From<DataStoreError> for ProofError {

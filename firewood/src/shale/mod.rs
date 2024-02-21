@@ -42,8 +42,8 @@ pub enum ShaleError {
 // this could probably included with ShaleError,
 // but keeping it separate for now as Obj/ObjRef might change in the near future
 #[derive(Debug, Error)]
-#[error("write error")]
-pub struct ObjWriteError;
+#[error("object cannot be written in the space provided")]
+pub struct ObjWriteSizeError;
 
 pub type SpaceId = u8;
 pub const INVALID_SPACE_ID: SpaceId = 0xff;
@@ -115,13 +115,13 @@ impl<T: Storable> Obj<T> {
 
     /// Write to the underlying object. Returns `Ok(())` on success.
     #[inline]
-    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteError> {
+    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteSizeError> {
         modify(self.value.write());
 
         // if `estimate_mem_image` gives overflow, the object will not be written
         self.dirty = match self.value.estimate_mem_image() {
             Some(len) => Some(len),
-            None => return Err(ObjWriteError),
+            None => return Err(ObjWriteSizeError),
         };
 
         Ok(())
@@ -181,7 +181,7 @@ impl<'a, T: Storable + Debug> ObjRef<'a, T> {
     }
 
     #[inline]
-    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteError> {
+    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteSizeError> {
         #[allow(clippy::unwrap_used)]
         let inner = self.inner.as_mut().unwrap();
         inner.write(modify)?;
