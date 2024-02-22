@@ -4,193 +4,172 @@
 package avm
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-func buildBaseTx(
-	vm *VM,
-	outs []*avax.TransferableOutput,
-	memo []byte,
-	utxos []*avax.UTXO,
+func buildCreateAssetTx(
+	backend *Backend,
+	name, symbol string,
+	denomination byte,
+	initialStates map[uint32][]verify.State,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	uTx := &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Memo:         memo,
-			Outs:         outs,
-		},
-	}
+	pBuilder, pSigner := builders(backend, kc)
 
-	toBurn := make(map[ids.ID]uint64) // UTXOs to move + fees
-	for _, out := range outs {
-		toBurn[out.AssetID()] += out.Out.Amount()
-	}
-	amountWithFee, err := safemath.Add64(toBurn[vm.feeAssetID], vm.TxFee)
-	if err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
-	}
-	toBurn[vm.feeAssetID] = amountWithFee
-
-	ins, feeOuts, keys, err := vm.Spend(
-		utxos,
-		kc,
-		toBurn,
-		changeAddr,
+	utx, err := pBuilder.NewCreateAssetTx(
+		name,
+		symbol,
+		denomination,
+		initialStates,
+		options(changeAddr, nil /*memo*/)...,
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
+	}
+
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	uTx.Ins = ins
-	uTx.Outs = append(uTx.Outs, feeOuts...)
-	codec := vm.parser.Codec()
-	avax.SortTransferableOutputs(uTx.Outs, codec)
+	return tx, changeAddr, nil
+}
 
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
+func buildBaseTx(
+	backend *Backend,
+	outs []*avax.TransferableOutput,
+	memo []byte,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, ids.ShortID, error) {
+	pBuilder, pSigner := builders(backend, kc)
+
+	utx, err := pBuilder.NewBaseTx(
+		outs,
+		options(changeAddr, memo)...,
+	)
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed building base tx: %w", err)
+	}
+
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
+	if err != nil {
+		return nil, ids.ShortEmpty, err
+	}
+
+	return tx, changeAddr, nil
 }
 
 func buildOperation(
-	vm *VM,
+	backend *Backend,
 	ops []*txs.Operation,
-	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	uTx := &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		Ops: ops,
-	}
+	pBuilder, pSigner := builders(backend, kc)
 
-	toBurn := map[ids.ID]uint64{
-		vm.feeAssetID: vm.TxFee,
-	}
-	ins, outs, keys, err := vm.Spend(
-		utxos,
-		kc,
-		toBurn,
-		changeAddr,
+	utx, err := pBuilder.NewOperationTx(
+		ops,
+		options(changeAddr, nil /*memo*/)...,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed building import tx: %w", err)
 	}
 
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
+	return backends.SignUnsigned(context.Background(), pSigner, utx)
 }
 
 func buildImportTx(
-	vm *VM,
+	backend *Backend,
 	sourceChain ids.ID,
-	atomicUTXOs []*avax.UTXO,
 	to ids.ShortID,
-	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 ) (*txs.Tx, error) {
-	toBurn, importInputs, importKeys, err := vm.SpendAll(atomicUTXOs, kc)
-	if err != nil {
-		return nil, err
+	pBuilder, pSigner := builders(backend, kc)
+
+	outOwner := &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{to},
 	}
 
-	uTx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		SourceChain: sourceChain,
-		ImportedIns: importInputs,
-	}
-
-	if importedAmt := toBurn[vm.feeAssetID]; importedAmt < vm.TxFee {
-		toBurn[vm.feeAssetID] = vm.TxFee - importedAmt
-	} else {
-		toBurn[vm.feeAssetID] = importedAmt - vm.TxFee
-	}
-	ins, outs, keys, err := vm.Spend(
-		utxos,
-		kc,
-		toBurn,
-		to,
+	utx, err := pBuilder.NewImportTx(
+		sourceChain,
+		outOwner,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed building import tx: %w", err)
 	}
-	keys = append(keys, importKeys...)
 
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
+	return backends.SignUnsigned(context.Background(), pSigner, utx)
 }
 
 func buildExportTx(
-	vm *VM,
+	backend *Backend,
 	destinationChain ids.ID,
 	to ids.ShortID,
 	exportedAssetID ids.ID,
 	exportedAmt uint64,
-	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, ids.ShortID, error) {
-	uTx := &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		DestinationChain: destinationChain,
-		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: exportedAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: exportedAmt,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
-				},
+	pBuilder, pSigner := builders(backend, kc)
+
+	outputs := []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: exportedAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: exportedAmt,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
 			},
-		}},
-	}
-	toBurn := map[ids.ID]uint64{}
-	if exportedAssetID == vm.feeAssetID {
-		amountWithFee, err := safemath.Add64(exportedAmt, vm.TxFee)
-		if err != nil {
-			return nil, ids.ShortEmpty, fmt.Errorf("problem calculating required spend amount: %w", err)
-		}
-		toBurn[vm.feeAssetID] = amountWithFee
-	} else {
-		toBurn[exportedAssetID] = exportedAmt
-		toBurn[vm.feeAssetID] = vm.TxFee
-	}
-	ins, outs, keys, err := vm.Spend(
-		utxos,
-		kc,
-		toBurn,
-		changeAddr,
+		},
+	}}
+
+	utx, err := pBuilder.NewExportTx(
+		destinationChain,
+		outputs,
+		options(changeAddr, nil /*memo*/)...,
 	)
+	if err != nil {
+		return nil, ids.ShortEmpty, fmt.Errorf("failed building export tx: %w", err)
+	}
+
+	tx, err := backends.SignUnsigned(context.Background(), pSigner, utx)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
+	return tx, changeAddr, nil
+}
 
-	codec := vm.parser.Codec()
+func builders(backend *Backend, kc *secp256k1fx.Keychain) (backends.Builder, backends.Signer) {
+	var (
+		addrs   = kc.Addresses()
+		builder = backends.NewBuilder(addrs, backend)
+		signer  = backends.NewSigner(kc, backend)
+	)
+	backend.ResetAddresses(addrs)
 
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
+	return builder, signer
+}
+
+func options(changeAddr ids.ShortID, memo []byte) []common.Option {
+	return common.UnionOptions(
+		[]common.Option{common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{changeAddr},
+		})},
+		[]common.Option{common.WithMemo(memo)},
+	)
 }

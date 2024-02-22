@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -39,42 +38,35 @@ func TestVerifyFxUsage(t *testing.T) {
 		kc  = secp256k1fx.NewKeychain()
 	)
 	kc.Add(key)
-	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
-	require.NoError(err)
 
-	// Create the asset
-	createAssetTx, _, err := buildCreateAssetTx(
-		env.vm,
-		"Team Rocket", // name
-		"TR",          // symbol
-		0,             // denomination
-		[]*txs.InitialState{
-			{
-				FxIndex: 0,
-				Outs: []verify.State{
-					&secp256k1fx.TransferOutput{
-						Amt: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
-				},
-			},
-			{
-				FxIndex: 1,
-				Outs: []verify.State{
-					&nftfx.MintOutput{
-						GroupID: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
+	initialStates := map[uint32][]verify.State{
+		uint32(0): {
+			&secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
 			},
 		},
-		utxos,
+		uint32(1): {
+			&nftfx.MintOutput{
+				GroupID: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+
+	// Create the asset
+	createAssetTx, _, err := buildCreateAssetTx(
+		env.vm.txBuilderBackend,
+		"Team Rocket", // name
+		"TR",          // symbol
+		0,             // denomination
+		initialStates,
 		kc,
 		key.Address(),
 	)
@@ -82,9 +74,9 @@ func TestVerifyFxUsage(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	// Mint the NFT
-	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
-	mintOp, nftKeys, err := env.vm.MintNFT(
+	mintOp, _, err := env.vm.MintNFT(
 		utxos,
 		kc,
 		createAssetTx.ID(),
@@ -93,24 +85,21 @@ func TestVerifyFxUsage(t *testing.T) {
 	)
 	require.NoError(err)
 
+	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
 	mintNFTTx, err := buildOperation(
-		env.vm,
+		env.vm.txBuilderBackend,
 		mintOp,
-		utxos,
 		kc,
 		key.Address(),
 	)
 	require.NoError(err)
-	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), nftKeys))
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	// move the NFT
-	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
-	require.NoError(err)
-
 	to := keys[2].PublicKey().Address()
+	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
 	spendTx, _, err := buildBaseTx(
-		env.vm,
+		env.vm.txBuilderBackend,
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
@@ -122,7 +111,6 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		}},
 		nil, // memo
-		utxos,
 		kc,
 		key.Address(),
 	)

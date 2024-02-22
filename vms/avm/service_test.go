@@ -899,8 +899,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildNFTxMintOp(createAssetTx, key, 2, 1)
-	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{op}, nil)
-	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
@@ -1002,8 +1001,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
-	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{mintOp1, mintOp2}, nil)
-	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
+	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{mintOp1, mintOp2})
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
@@ -1140,7 +1138,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildSecpMintOp(createAssetTx, key, 0)
-	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op}, [][]*secp256k1.PrivateKey{{key}})
+	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
@@ -1246,7 +1244,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
 	op2 := buildSecpMintOp(createAssetTx, key, 1)
-	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2}, [][]*secp256k1.PrivateKey{{key}, {key}})
+	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
@@ -1391,8 +1389,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildPropertyFxMintOp(createAssetTx, key, 4)
-	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op}, nil)
-	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
@@ -1495,8 +1492,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
-	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2}, nil)
-	require.NoError(mintPropertyFxOpTx.SignPropertyFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
+	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
@@ -1619,11 +1615,10 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 		kc        = secp256k1fx.NewKeychain()
 	)
 	kc.Add(key)
-	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
-	require.NoError(t, err)
 
+	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildBaseTx(
-		env.vm,
+		env.vm.txBuilderBackend,
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1635,7 +1630,6 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 			},
 		}},
 		memo,
-		utxos,
 		kc,
 		changeKey.PublicKey().Address(),
 	)
@@ -1649,68 +1643,59 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 		kc  = secp256k1fx.NewKeychain()
 	)
 	kc.Add(key)
-	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
-	require.NoError(t, err)
-	tx, _, err := buildCreateAssetTx(
-		env.vm,
-		"Team Rocket", // name
-		"TR",          // symbol
-		0,             // denomination
-		[]*txs.InitialState{
-			{
-				FxIndex: 0,
-				Outs: []verify.State{
-					&secp256k1fx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					}, &secp256k1fx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
+
+	initialStates := map[uint32][]verify.State{
+		uint32(0): {
+			&secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
 				},
-			},
-			{
-				FxIndex: 1,
-				Outs: []verify.State{
-					&nftfx.MintOutput{
-						GroupID: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-					&nftfx.MintOutput{
-						GroupID: 2,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
-					},
-				},
-			},
-			{
-				FxIndex: 2,
-				Outs: []verify.State{
-					&propertyfx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
-					&propertyfx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
-					},
+			}, &secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
 				},
 			},
 		},
-		utxos,
+		uint32(1): {
+			&nftfx.MintOutput{
+				GroupID: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+			&nftfx.MintOutput{
+				GroupID: 2,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		},
+		uint32(2): {
+			&propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+			&propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+
+	tx, _, err := buildCreateAssetTx(
+		env.vm.txBuilderBackend,
+		"Team Rocket", // name
+		"TR",          // symbol
+		0,             // denomination
+		initialStates,
 		kc,
 		key.Address(),
 	)
@@ -1725,15 +1710,14 @@ func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 		to  = key.PublicKey().Address()
 	)
 	kc.Add(key)
-	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
-	require.NoError(t, err)
+
+	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildExportTx(
-		env.vm,
+		env.vm.txBuilderBackend,
 		chainID,
 		to,
 		env.vm.feeAssetID,
 		units.MicroAvax,
-		utxos,
 		kc,
 		key.Address(),
 	)
@@ -1814,24 +1798,21 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 	}
 }
 
-func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation, opsKeys [][]*secp256k1.PrivateKey) *txs.Tx {
+func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation) *txs.Tx {
 	var (
 		key = keys[0]
 		kc  = secp256k1fx.NewKeychain()
 	)
 	kc.Add(key)
-	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
-	require.NoError(t, err)
 
+	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, err := buildOperation(
-		env.vm,
+		env.vm.txBuilderBackend,
 		ops,
-		utxos,
 		kc,
 		key.Address(),
 	)
 	require.NoError(t, err)
-	require.NoError(t, tx.SignSECP256K1Fx(env.vm.parser.Codec(), opsKeys))
 	return tx
 }
 
