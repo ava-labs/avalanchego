@@ -3,9 +3,7 @@
 
 package trace
 
-import (
-	"go.opentelemetry.io/otel/trace/noop"
-)
+import "go.opentelemetry.io/otel/trace/noop"
 
 var Noop Tracer = noOpTracer{}
 
