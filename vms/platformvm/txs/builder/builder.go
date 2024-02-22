@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -369,6 +370,7 @@ func (b *builder) NewCreateSubnetTx(
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
+	utils.Sort(ownerAddrs) // sort control addresses
 	subnetOwner := &secp256k1fx.OutputOwners{
 		Threshold: threshold,
 		Addrs:     ownerAddrs,
@@ -677,6 +679,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 ) (*txs.Tx, error) {
 	pBuilder, pSigner := b.builders(keys)
 
+	utils.Sort(ownerAddrs) // sort control addresses
 	newOwner := &secp256k1fx.OutputOwners{
 		Threshold: threshold,
 		Addrs:     ownerAddrs,
