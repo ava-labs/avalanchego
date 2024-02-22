@@ -4,8 +4,8 @@ go 1.21
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0
-	github.com/ava-labs/avalanche-network-runner v1.7.4-rc.0
-	github.com/ava-labs/avalanchego v1.11.0-rc.2
+	github.com/ava-labs/avalanche-network-runner v1.7.6
+	github.com/ava-labs/avalanchego v1.11.0
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.1.0
@@ -55,7 +55,7 @@ require (
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
-	github.com/ava-labs/coreth v0.12.11-rc.3.0.20240207021717-15431782181b // indirect
+	github.com/ava-labs/coreth v0.13.0-rc.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.3 // indirect
