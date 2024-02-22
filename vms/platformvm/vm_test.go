@@ -61,6 +61,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -69,7 +70,6 @@ import (
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -237,7 +237,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.NoError(fmt.Errorf("unhandled fork %d", f))
+		require.FailNow(fmt.Sprintf("unhandled fork %d", f))
 	}
 
 	vm := &VM{Config: config.Config{
@@ -1020,7 +1020,7 @@ func TestAtomicImport(t *testing.T) {
 		ids.ShortEmpty, // change addr
 		nil,
 	)
-	require.ErrorIs(err, txbuilder.ErrNoFunds)
+	require.ErrorIs(err, backends.ErrInsufficientFunds)
 
 	// Provide the avm UTXO
 
@@ -2182,6 +2182,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[0].PublicKey().Address(),
 		},
 	}
+	ctx, err := backends.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
+	require.NoError(err)
+	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
 
 	transferSubnetOwnershipTx, err := vm.txBuilder.NewTransferSubnetOwnershipTx(
@@ -2217,6 +2220,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			keys[1].PublicKey().Address(),
 		},
 	}
+	expectedOwner.InitCtx(ctx)
 	require.Equal(expectedOwner, subnetOwner)
 }
 

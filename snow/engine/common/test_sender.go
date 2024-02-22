@@ -360,7 +360,7 @@ func (s *SenderTest) SendAppError(ctx context.Context, nodeID ids.NodeID, reques
 	case s.CantSendAppError && s.T != nil:
 		require.FailNow(s.T, errSendAppError.Error())
 	}
-	return errSendAppResponse
+	return errSendAppError
 }
 
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't

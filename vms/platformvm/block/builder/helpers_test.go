@@ -118,7 +118,7 @@ type environment struct {
 	state          state.State
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
+	utxosHandler   utxo.Verifier
 	txBuilder      txbuilder.Builder
 	backend        txexecutor.Backend
 }
@@ -153,16 +153,13 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+	res.utxosHandler = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
 	res.txBuilder = txbuilder.New(
 		res.ctx,
 		res.config,
-		res.clk,
-		res.fx,
 		res.state,
 		res.atomicUTXOs,
-		res.utxosHandler,
 	)
 
 	genesisID := res.state.GetLastAccepted()
@@ -345,7 +342,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
+		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
 	}
 
 	return &config.Config{

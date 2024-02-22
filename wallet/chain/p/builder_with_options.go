@@ -12,13 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ Builder = (*builderWithOptions)(nil)
+var _ backends.Builder = (*builderWithOptions)(nil)
 
 type builderWithOptions struct {
-	Builder
+	backends.Builder
 	options []common.Option
 }
 
@@ -29,7 +30,7 @@ type builderWithOptions struct {
 //     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
-func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
+func NewBuilderWithOptions(builder backends.Builder, options ...common.Option) backends.Builder {
 	return &builderWithOptions{
 		Builder: builder,
 		options: options,

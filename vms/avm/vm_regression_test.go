@@ -6,15 +6,12 @@ package avm
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -25,12 +22,7 @@ import (
 func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime:  time.Time{},
-			EUpgradeTime: mockable.MaxTime,
-		},
-	})
+	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()

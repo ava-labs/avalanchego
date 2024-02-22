@@ -104,7 +104,7 @@ type environment struct {
 	states         map[ids.ID]state.Chain
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
+	utxosHandler   utxo.Verifier
 	txBuilder      builder.Builder
 	backend        Backend
 }
@@ -143,16 +143,13 @@ func newEnvironment(t *testing.T, f fork) *environment {
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
-	utxoHandler := utxo.NewHandler(ctx, clk, fx)
+	utxoHandler := utxo.NewVerifier(ctx, clk, fx)
 
 	txBuilder := builder.New(
 		ctx,
 		config,
-		clk,
-		fx,
 		baseState,
 		atomicUTXOs,
-		utxoHandler,
 	)
 
 	backend := Backend{
@@ -319,7 +316,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
+		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
 	}
 
 	return &config.Config{

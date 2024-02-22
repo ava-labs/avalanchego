@@ -4,19 +4,21 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -57,32 +59,41 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			feeCfg := env.config.GetDynamicFeesConfig(env.state.GetTimestamp())
-			feeCalc := &fees.Calculator{
-				IsEUpgradeActive: false,
-				Config:           env.config,
-				ChainTime:        test.time,
-				FeeManager:       commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
-				ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+			env.state.SetTimestamp(test.time) // to duly set fee
 
-				Fee: test.fee,
+			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
+			for _, key := range preFundedKeys {
+				addrs.Add(key.Address())
 			}
 
-			ins, outs, _, signers, err := env.utxosHandler.FinanceTx(env.state, preFundedKeys, 0, feeCalc, ids.ShortEmpty)
+			cfg := *env.config
+			cfg.CreateSubnetTxFee = test.fee
+			var (
+				backend  = builder.NewBackend(env.ctx, &cfg, env.state, env.atomicUTXOs)
+				pBuilder = backends.NewBuilder(addrs, backend)
+				feeCfg   = cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
+				feeCalc  = &fees.Calculator{
+					IsEUpgradeActive: false,
+					Config:           &cfg,
+					ChainTime:        test.time,
+					FeeManager:       commonfees.NewManager(feeCfg.InitialUnitFees, commonfees.EmptyWindows),
+					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
+
+					Fee: test.fee,
+				}
+			)
+			backend.ResetAddresses(addrs)
+
+			utx, err := pBuilder.NewCreateSubnetTx(
+				&secp256k1fx.OutputOwners{}, // owner
+				feeCalc,
+			)
 			require.NoError(err)
 
-			// Create the tx
-			utx := &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         outs,
-				}},
-				Owner: &secp256k1fx.OutputOwners{},
-			}
-			tx := &txs.Tx{Unsigned: utx}
-			require.NoError(tx.Sign(txs.Codec, signers))
+			kc := secp256k1fx.NewKeychain(preFundedKeys...)
+			s := backends.NewSigner(kc, backend)
+			tx, err := backends.SignUnsigned(context.Background(), s, utx)
+			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
