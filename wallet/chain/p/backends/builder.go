@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package backends
 
 import (
 	"errors"
@@ -15,22 +15,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	stdcontext "context"
 )
 
 var (
 	errNoChangeAddress           = errors.New("no possible change address")
 	errUnknownOwnerType          = errors.New("unknown owner type")
 	errInsufficientAuthorization = errors.New("insufficient authorization")
-	errInsufficientFunds         = errors.New("insufficient funds")
+	ErrInsufficientFunds         = errors.New("insufficient funds")
 
 	_ Builder = (*builder)(nil)
 )
@@ -66,7 +63,7 @@ type Builder interface {
 	) (*txs.BaseTx, error)
 
 	// TODO: Drop once E upgrade is activated
-	newBaseTxPreEUpgrade(
+	NewBaseTxPreEUpgrade(
 		outputs []*avax.TransferableOutput,
 		feeCalc *fees.Calculator,
 		options ...common.Option,
@@ -278,14 +275,6 @@ type Builder interface {
 	) (*txs.AddPermissionlessDelegatorTx, error)
 }
 
-// BuilderBackend specifies the required information needed to build unsigned
-// P-chain transactions.
-type BuilderBackend interface {
-	Context
-	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
-}
-
 type builder struct {
 	addrs   set.Set[ids.ShortID]
 	backend BuilderBackend
@@ -366,7 +355,7 @@ func (b *builder) NewBaseTx(
 	return utx, b.initCtx(utx)
 }
 
-func (b *builder) newBaseTxPreEUpgrade(
+func (b *builder) NewBaseTxPreEUpgrade(
 	outputs []*avax.TransferableOutput,
 	feeCalc *fees.Calculator,
 	options ...common.Option,
@@ -806,7 +795,7 @@ func (b *builder) NewImportTx(
 	if len(importedInputs) == 0 {
 		return nil, fmt.Errorf(
 			"%w: no UTXOs available to import",
-			errInsufficientFunds,
+			ErrInsufficientFunds,
 		)
 	}
 
@@ -1152,7 +1141,7 @@ func (b *builder) getBalance(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, errUnknownOutputType
+			return nil, ErrUnknownOutputType
 		}
 
 		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1250,7 +1239,7 @@ func (b *builder) financeTx(
 
 		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1360,7 +1349,7 @@ func (b *builder) financeTx(
 
 		out, ok := outIntf.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return nil, nil, nil, errUnknownOutputType
+			return nil, nil, nil, ErrUnknownOutputType
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1394,18 +1383,10 @@ func (b *builder) financeTx(
 
 		inputs = append(inputs, input)
 
-		// Burn any value that should be burned
-		amountToBurn := min(
-			amountsToBurn[assetID], // Amount we still need to burn
-			out.Amt,                // Amount available to burn
-		)
-		amountsToBurn[assetID] -= amountToBurn
-
-		amountAvalibleToStake := out.Amt - amountToBurn
-		// Burn any value that should be burned
+		// Stake any value that should be staked
 		amountToStake := min(
 			amountsToStake[assetID], // Amount we still need to stake
-			amountAvalibleToStake,   // Amount available to stake
+			out.Amt,                 // Amount available to stake
 		)
 		amountsToStake[assetID] -= amountToStake
 		if amountToStake > 0 {
@@ -1427,7 +1408,14 @@ func (b *builder) financeTx(
 			amountsToBurn[avaxAssetID] += addedFees
 		}
 
-		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
+		// Burn any value that should be burned
+		amountAvalibleToBurn := out.Amt - amountToStake
+		amountToBurn := min(
+			amountsToBurn[assetID], // Amount we still need to burn
+			amountAvalibleToBurn,   // Amount available to burn
+		)
+		amountsToBurn[assetID] -= amountToBurn
+		if remainingAmount := amountAvalibleToBurn - amountToBurn; remainingAmount > 0 {
 			// This input had extra value, so some of it must be returned, once fees are removed
 			changeOut := &avax.TransferableOutput{
 				Asset: utxo.Asset,
@@ -1463,7 +1451,7 @@ func (b *builder) financeTx(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q to stake",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)
@@ -1473,7 +1461,7 @@ func (b *builder) financeTx(
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
 				"%w: provided UTXOs need %d more units of asset %q",
-				errInsufficientFunds,
+				ErrInsufficientFunds,
 				amount,
 				assetID,
 			)
@@ -1516,7 +1504,7 @@ func (b *builder) authorizeSubnet(
 }
 
 func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
+	ctx, err := NewSnowContext(b.backend.NetworkID(), b.backend.AVAXAssetID())
 	if err != nil {
 		return err
 	}

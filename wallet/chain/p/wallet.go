@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -30,13 +31,13 @@ var (
 )
 
 type Wallet interface {
-	Context
+	backends.Context
 
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() Builder
+	Builder() backends.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() Signer
+	Signer() backends.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	// Because the P-chain doesn't intend for balance transfers to occur, this
@@ -263,8 +264,8 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder Builder,
-	signer Signer,
+	builder backends.Builder,
+	signer backends.Signer,
 	client platformvm.Client,
 	backend Backend,
 ) Wallet {
@@ -278,19 +279,19 @@ func NewWallet(
 
 type wallet struct {
 	Backend
-	signer Signer
 	client platformvm.Client
 
 	isEForkActive      bool
-	builder            Builder
+	builder            backends.Builder
+	signer             backends.Signer
 	unitFees, unitCaps commonfees.Dimensions
 }
 
-func (w *wallet) Builder() Builder {
+func (w *wallet) Builder() backends.Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() Signer {
+func (w *wallet) Signer() backends.Signer {
 	return w.signer
 }
 
@@ -319,7 +320,7 @@ func (w *wallet) IssueBaseTx(
 	if w.isEForkActive {
 		utx, err = w.builder.NewBaseTx(outputs, feeCalc, options...)
 	} else {
-		utx, err = w.builder.newBaseTxPreEUpgrade(outputs, feeCalc, options...)
+		utx, err = w.builder.NewBaseTxPreEUpgrade(outputs, feeCalc, options...)
 	}
 	if err != nil {
 		return nil, err
@@ -697,7 +698,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := SignUnsigned(ctx, w.signer, utx)
+	tx, err := backends.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
