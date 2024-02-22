@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package x
+package backends
 
 import (
 	"errors"
@@ -18,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	stdcontext "context"
 )
 
 var (
@@ -152,14 +150,6 @@ type Builder interface {
 		outputs []*avax.TransferableOutput,
 		options ...common.Option,
 	) (*txs.ExportTx, error)
-}
-
-// BuilderBackend specifies the required information needed to build unsigned
-// X-chain transactions.
-type BuilderBackend interface {
-	Context
-
-	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
 }
 
 type builder struct {
@@ -868,7 +858,7 @@ func (b *builder) burnProperty(
 }
 
 func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := newSnowContext(b.backend)
+	ctx, err := NewSnowContext(b.backend)
 	if err != nil {
 		return err
 	}

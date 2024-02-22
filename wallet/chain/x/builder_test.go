@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -31,7 +32,7 @@ var (
 	nftAssetID      = ids.Empty.Prefix(2022)
 	propertyAssetID = ids.Empty.Prefix(2023)
 
-	testCtx = NewContext(
+	testCtx = backends.NewContext(
 		constants.UnitTestID,
 		xChainID,
 		avaxAssetID,
@@ -60,7 +61,7 @@ func TestBaseTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -109,7 +110,7 @@ func TestCreateAssetTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		assetName          = "Team Rocket"
@@ -198,7 +199,7 @@ func TestMintNFTOperation(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		payload  = []byte{'h', 'e', 'l', 'l', 'o'}
@@ -243,7 +244,7 @@ func TestMintFTOperation(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		outputs = map[ids.ID]*secp256k1fx.TransferOutput{
@@ -290,7 +291,7 @@ func TestMintPropertyOperation(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		propertyOwner = &secp256k1fx.OutputOwners{
@@ -333,7 +334,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 	)
 
 	utx, err := builder.NewOperationTxBurnProperty(
@@ -373,7 +374,7 @@ func TestImportTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -421,7 +422,7 @@ func TestExportTx(t *testing.T) {
 
 		// builder
 		utxoAddr = utxosKey.Address()
-		builder  = NewBuilder(set.Of(utxoAddr), backend)
+		builder  = backends.NewBuilder(set.Of(utxoAddr), backend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
