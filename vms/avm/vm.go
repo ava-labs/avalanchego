@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -110,7 +109,6 @@ type VM struct {
 
 	addressTxsIndexer index.AddressTxsIndexer
 
-	txBuilderBackend  *Backend
 	txExecutorBackend *txexecutor.Backend
 
 	// Cancelled on shutdown
@@ -248,8 +246,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.walletService.vm = vm
-	vm.walletService.pendingTxs = linkedhashmap.New[ids.ID, *txs.Tx]()
+	vm.walletService.walletServiceBackend = NewWalletServiceBackend(vm)
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
@@ -265,8 +262,6 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
-
-	vm.txBuilderBackend = NewBackend(vm.feeAssetID, vm.ctx, &vm.Config, vm.state, vm.AtomicUTXOManager)
 
 	vm.txExecutorBackend = &txexecutor.Backend{
 		Ctx:           ctx,
@@ -344,7 +339,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	rpcServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "avm"
-	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
+	if err := rpcServer.RegisterService(&Service{
+		vm:               vm,
+		txBuilderBackend: newServiceBackend(vm.feeAssetID, vm.ctx, &vm.Config, vm.state, vm.AtomicUTXOManager),
+	}, "avm"); err != nil {
 		return nil, err
 	}
 

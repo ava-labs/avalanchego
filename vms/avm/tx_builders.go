@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -16,8 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
+type txBuilderBackend interface {
+	backends.Backend
+
+	ResetAddresses(addrs set.Set[ids.ShortID])
+}
+
 func buildCreateAssetTx(
-	backend *Backend,
+	backend txBuilderBackend,
 	name, symbol string,
 	denomination byte,
 	initialStates map[uint32][]verify.State,
@@ -46,7 +53,7 @@ func buildCreateAssetTx(
 }
 
 func buildBaseTx(
-	backend *Backend,
+	backend txBuilderBackend,
 	outs []*avax.TransferableOutput,
 	memo []byte,
 	kc *secp256k1fx.Keychain,
@@ -70,8 +77,50 @@ func buildBaseTx(
 	return tx, changeAddr, nil
 }
 
+func mintNFT(
+	backend txBuilderBackend,
+	assetID ids.ID,
+	payload []byte,
+	owners []*secp256k1fx.OutputOwners,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	pBuilder, pSigner := builders(backend, kc)
+
+	utx, err := pBuilder.NewOperationTxMintNFT(
+		assetID,
+		payload,
+		owners,
+		options(changeAddr, nil /*memo*/)...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed minting NFTs: %w", err)
+	}
+
+	return backends.SignUnsigned(context.Background(), pSigner, utx)
+}
+
+func mintFTs(
+	backend txBuilderBackend,
+	outputs map[ids.ID]*secp256k1fx.TransferOutput,
+	kc *secp256k1fx.Keychain,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	pBuilder, pSigner := builders(backend, kc)
+
+	utx, err := pBuilder.NewOperationTxMintFT(
+		outputs,
+		options(changeAddr, nil /*memo*/)...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed minting FTs: %w", err)
+	}
+
+	return backends.SignUnsigned(context.Background(), pSigner, utx)
+}
+
 func buildOperation(
-	backend *Backend,
+	backend txBuilderBackend,
 	ops []*txs.Operation,
 	kc *secp256k1fx.Keychain,
 	changeAddr ids.ShortID,
@@ -83,14 +132,14 @@ func buildOperation(
 		options(changeAddr, nil /*memo*/)...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed building import tx: %w", err)
+		return nil, fmt.Errorf("failed building operation tx: %w", err)
 	}
 
 	return backends.SignUnsigned(context.Background(), pSigner, utx)
 }
 
 func buildImportTx(
-	backend *Backend,
+	backend txBuilderBackend,
 	sourceChain ids.ID,
 	to ids.ShortID,
 	kc *secp256k1fx.Keychain,
@@ -115,7 +164,7 @@ func buildImportTx(
 }
 
 func buildExportTx(
-	backend *Backend,
+	backend txBuilderBackend,
 	destinationChain ids.ID,
 	to ids.ShortID,
 	exportedAssetID ids.ID,
@@ -153,7 +202,7 @@ func buildExportTx(
 	return tx, changeAddr, nil
 }
 
-func builders(backend *Backend, kc *secp256k1fx.Keychain) (backends.Builder, backends.Signer) {
+func builders(backend txBuilderBackend, kc *secp256k1fx.Keychain) (backends.Builder, backends.Signer) {
 	var (
 		addrs   = kc.Addresses()
 		builder = backends.NewBuilder(addrs, backend)

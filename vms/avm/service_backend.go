@@ -17,15 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 )
 
-var _ backends.Backend = (*Backend)(nil)
+var _ txBuilderBackend = (*serviceBackend)(nil)
 
-func NewBackend(
+func newServiceBackend(
 	feeAssetID ids.ID,
 	ctx *snow.Context,
 	cfg *config.Config,
 	state state.State,
 	atomicUTXOsMan avax.AtomicUTXOManager,
-) *Backend {
+) *serviceBackend {
 	backendCtx := backends.NewContext(
 		ctx.NetworkID,
 		ctx.XChainID,
@@ -33,7 +33,7 @@ func NewBackend(
 		cfg.TxFee,
 		cfg.CreateAssetTxFee,
 	)
-	return &Backend{
+	return &serviceBackend{
 		Context:        backendCtx,
 		xchainID:       ctx.XChainID,
 		cfg:            cfg,
@@ -42,7 +42,7 @@ func NewBackend(
 	}
 }
 
-type Backend struct {
+type serviceBackend struct {
 	backends.Context
 
 	xchainID       ids.ID
@@ -52,11 +52,11 @@ type Backend struct {
 	atomicUTXOsMan avax.AtomicUTXOManager
 }
 
-func (b *Backend) ResetAddresses(addrs set.Set[ids.ShortID]) {
+func (b *serviceBackend) ResetAddresses(addrs set.Set[ids.ShortID]) {
 	b.addrs = addrs
 }
 
-func (b *Backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
+func (b *serviceBackend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error) {
 	if sourceChainID == b.xchainID {
 		return avax.GetAllUTXOs(b.state, b.addrs)
 	}
@@ -65,7 +65,7 @@ func (b *Backend) UTXOs(_ context.Context, sourceChainID ids.ID) ([]*avax.UTXO, 
 	return atomicUTXOs, err
 }
 
-func (b *Backend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
+func (b *serviceBackend) GetUTXO(_ context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
 	if chainID == b.xchainID {
 		return b.state.GetUTXO(utxoID)
 	}

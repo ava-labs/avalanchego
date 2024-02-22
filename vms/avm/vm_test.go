@@ -163,7 +163,7 @@ func TestIssueNFT(t *testing.T) {
 	}
 
 	createAssetTx, _, err := buildCreateAssetTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -175,21 +175,15 @@ func TestIssueNFT(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	// Mint the NFT
-	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
-	require.NoError(err)
-	mintOp, _, err := env.vm.MintNFT(
-		utxos,
-		kc,
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
+	mintNFTTx, err := mintNFT(
+		env.service.txBuilderBackend,
 		createAssetTx.ID(),
 		[]byte{'h', 'e', 'l', 'l', 'o'}, // payload
-		key.Address(),
-	)
-	require.NoError(err)
-
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
-	mintNFTTx, err := buildOperation(
-		env.vm.txBuilderBackend,
-		mintOp,
+		[]*secp256k1fx.OutputOwners{{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{key.Address()},
+		}},
 		kc,
 		key.Address(),
 	)
@@ -197,7 +191,7 @@ func TestIssueNFT(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	// Move the NFT
-	utxos, err = avax.GetAllUTXOs(env.vm.state, kc.Addresses())
+	utxos, err := avax.GetAllUTXOs(env.vm.state, kc.Addresses())
 	require.NoError(err)
 	transferOp, _, err := env.vm.SpendNFT(
 		utxos,
@@ -208,9 +202,9 @@ func TestIssueNFT(t *testing.T) {
 	)
 	require.NoError(err)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	transferNFTTx, err := buildOperation(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		transferOp,
 		kc,
 		key.Address(),
@@ -258,7 +252,7 @@ func TestIssueProperty(t *testing.T) {
 	}
 
 	createAssetTx, _, err := buildCreateAssetTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -290,9 +284,9 @@ func TestIssueProperty(t *testing.T) {
 		},
 	}
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	mintPropertyTx, err := buildOperation(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		[]*txs.Operation{mintPropertyOp},
 		kc,
 		key.Address(),
@@ -310,9 +304,9 @@ func TestIssueProperty(t *testing.T) {
 		Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
 	}
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	burnPropertyTx, err := buildOperation(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		[]*txs.Operation{burnPropertyOp},
 		kc,
 		key.Address(),
@@ -362,9 +356,9 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	)
 	kc.Add(key)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildBaseTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{
 			{ // fee asset
 				Asset: avax.Asset{ID: feeAssetCreateTx.ID()},
@@ -441,9 +435,9 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	)
 	kc.Add(key)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	firstTx, _, err := buildBaseTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
@@ -564,9 +558,9 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}))
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, err := buildImportTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		constants.PlatformChainID, // source chain
 		key.Address(),
 		kc,
@@ -687,9 +681,9 @@ func TestIssueExportTx(t *testing.T) {
 
 	kc.Add(key)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildExportTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		constants.PlatformChainID,
 		to, // to
 		avaxID,
@@ -753,9 +747,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	kc.Add(key)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildExportTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		constants.PlatformChainID,
 		to, // to
 		avaxID,

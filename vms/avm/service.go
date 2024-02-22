@@ -60,7 +60,10 @@ type FormattedAssetID struct {
 }
 
 // Service defines the base service for the asset vm
-type Service struct{ vm *VM }
+type Service struct {
+	vm               *VM
+	txBuilderBackend *serviceBackend
+}
 
 // GetBlock returns the requested block.
 func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.GetBlockResponse) error {
@@ -787,9 +790,9 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 		initialStateOuts = append(initialStateOuts, minter)
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
 	return buildCreateAssetTx(
-		s.vm.txBuilderBackend,
+		s.txBuilderBackend,
 		args.Name,
 		args.Symbol,
 		args.Denomination,
@@ -908,9 +911,9 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		initialStateOuts = append(initialStateOuts, minter)
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
 	return buildCreateAssetTx(
-		s.vm.txBuilderBackend,
+		s.txBuilderBackend,
 		args.Name,
 		args.Symbol,
 		0, // NFTs are non-fungible
@@ -1226,8 +1229,8 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		})
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
-	return buildBaseTx(s.vm.txBuilderBackend, outs, memoBytes, kc, changeAddr)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	return buildBaseTx(s.txBuilderBackend, outs, memoBytes, kc, changeAddr)
 }
 
 // MintArgs are arguments for passing into Mint requests
@@ -1307,25 +1310,23 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 	}
 
 	// Get all UTXOs/keys for the user
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	ops, _, err := s.vm.Mint(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			assetID: uint64(args.Amount),
+	outputs := map[ids.ID]*secp256k1fx.TransferOutput{
+		assetID: {
+			Amt: uint64(args.Amount),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
 		},
-		to,
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
-	tx, err := buildOperation(s.vm.txBuilderBackend, ops, feeKc, changeAddr)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	tx, err := mintFTs(s.txBuilderBackend, outputs, feeKc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1411,8 +1412,8 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
-	tx, err := buildOperation(s.vm.txBuilderBackend, ops, kc, changeAddr)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	tx, err := buildOperation(s.txBuilderBackend, ops, kc, changeAddr)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1493,23 +1494,23 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 	}
 
 	// Get all UTXOs/keys
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	ops, _, err := s.vm.MintNFT(
-		utxos,
-		kc,
-		assetID,
-		payloadBytes,
-		to,
-	)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
-	tx, err := buildOperation(s.vm.txBuilderBackend, ops, feeKc, changeAddr)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	tx, err := mintNFT(
+		s.txBuilderBackend,
+		assetID,
+		payloadBytes,
+		[]*secp256k1fx.OutputOwners{{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{to},
+		}},
+		kc,
+		changeAddr,
+	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1571,8 +1572,8 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 		return nil, err
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
-	return buildImportTx(s.vm.txBuilderBackend, chainID, to, kc)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	return buildImportTx(s.txBuilderBackend, chainID, to, kc)
 }
 
 // ExportArgs are arguments for passing into ExportAVA requests
@@ -1665,6 +1666,6 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	s.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
-	return buildExportTx(s.vm.txBuilderBackend, chainID, to, assetID, uint64(args.Amount), kc, changeAddr)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	return buildExportTx(s.txBuilderBackend, chainID, to, assetID, uint64(args.Amount), kc, changeAddr)
 }

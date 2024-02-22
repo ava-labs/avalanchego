@@ -10,12 +10,10 @@ import (
 	"net/http"
 
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -27,8 +25,7 @@ import (
 var errMissingUTXO = errors.New("missing utxo")
 
 type WalletService struct {
-	vm         *VM
-	pendingTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	*walletServiceBackend
 }
 
 func (w *WalletService) decided(txID ids.ID) {
@@ -99,35 +96,6 @@ func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 	return txID, nil
 }
 
-func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
-	utxoMap := make(map[ids.ID]*avax.UTXO, len(utxos))
-	for _, utxo := range utxos {
-		utxoMap[utxo.InputID()] = utxo
-	}
-
-	iter := w.pendingTxs.NewIterator()
-
-	for iter.Next() {
-		tx := iter.Value()
-		for _, inputUTXO := range tx.Unsigned.InputUTXOs() {
-			if inputUTXO.Symbolic() {
-				continue
-			}
-			utxoID := inputUTXO.InputID()
-			if _, exists := utxoMap[utxoID]; !exists {
-				return nil, errMissingUTXO
-			}
-			delete(utxoMap, utxoID)
-		}
-
-		for _, utxo := range tx.UTXOs() {
-			utxoMap[utxo.InputID()] = utxo
-		}
-	}
-
-	return maps.Values(utxoMap), nil
-}
-
 // IssueTx attempts to issue a transaction into consensus
 func (w *WalletService) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	w.vm.ctx.Log.Warn("deprecated API called",
@@ -196,8 +164,7 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		return err
 	}
 
-	utxos, err = w.update(utxos)
-	if err != nil {
+	if err = w.vm.walletService.update(utxos); err != nil {
 		return err
 	}
 
@@ -256,41 +223,9 @@ func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	uTx := &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    w.vm.ctx.NetworkID,
-			BlockchainID: w.vm.ctx.ChainID,
-			Memo:         memoBytes,
-		},
-	}
-
-	toBurn := make(map[ids.ID]uint64) // UTXOs to move + fees
-	for _, out := range outs {
-		toBurn[out.AssetID()] += out.Out.Amount()
-	}
-	amountWithFee, err := math.Add64(toBurn[w.vm.feeAssetID], w.vm.TxFee)
+	w.walletServiceBackend.ResetAddresses(kc.Addresses())
+	tx, _, err := buildBaseTx(w.walletServiceBackend, outs, memoBytes, kc, changeAddr)
 	if err != nil {
-		return fmt.Errorf("problem calculating required spend amount: %w", err)
-	}
-	toBurn[w.vm.feeAssetID] = amountWithFee
-
-	ins, feeOuts, keys, err := w.vm.Spend(
-		utxos,
-		kc,
-		toBurn,
-		changeAddr,
-	)
-	if err != nil {
-		return err
-	}
-
-	uTx.Ins = ins
-	uTx.Outs = append(uTx.Outs, feeOuts...)
-	codec := w.vm.parser.Codec()
-	avax.SortTransferableOutputs(uTx.Outs, codec)
-
-	tx := &txs.Tx{Unsigned: uTx}
-	if err := tx.SignSECP256K1Fx(codec, keys); err != nil {
 		return err
 	}
 

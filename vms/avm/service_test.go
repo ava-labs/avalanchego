@@ -1616,9 +1616,9 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 	)
 	kc.Add(key)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildBaseTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1691,7 +1691,7 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 	}
 
 	tx, _, err := buildCreateAssetTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -1711,9 +1711,9 @@ func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 	)
 	kc.Add(key)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, _, err := buildExportTx(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		chainID,
 		to,
 		env.vm.feeAssetID,
@@ -1805,9 +1805,9 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 	)
 	kc.Add(key)
 
-	env.vm.txBuilderBackend.ResetAddresses(kc.Addresses())
+	env.service.txBuilderBackend.ResetAddresses(kc.Addresses())
 	tx, err := buildOperation(
-		env.vm.txBuilderBackend,
+		env.service.txBuilderBackend,
 		ops,
 		kc,
 		key.Address(),
