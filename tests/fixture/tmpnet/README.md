@@ -52,11 +52,11 @@ $ ./scripts/build_tmpnetctl.sh
 # Start a new network
 $ ./build/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
 ...
-Started network 1000 @ /home/me/.tmpnet/networks/1000
+Started network /home/me/.tmpnet/networks/c975a433-503d-4d66-957d-643b79f0a7dd
 
 Configure tmpnetctl to target this network by default with one of the following statements:
- - source /home/me/.tmpnet/networks/1000/network.env
- - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/1000
+ - source /home/me/.tmpnet/networks/c975a433-503d-4d66-957d-643b79f0a7dd/network.env
+ - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/c975a433-503d-4d66-957d-643b79f0a7dd
  - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/latest
 
 # Stop the network
@@ -129,7 +129,7 @@ A temporary network relies on configuration written to disk in the following str
 HOME
 └── .tmpnet                                              // Root path for the temporary network fixture
     └── networks                                         // Default parent directory for temporary networks
-        └── 1000                                         // The networkID is used to name the network dir and starts at 1000
+        └── c975a433-503d-4d66-957d-643b79f0a7dd         // The UUID of the temporary network is the name of its directory
             ├── NodeID-37E8UK3x2YFsHE3RdALmfWcppcZ1eTuj9 // The ID of a node is the name of its data dir
             │   ├── chainData
             │   │   └── ...
