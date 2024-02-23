@@ -235,7 +235,7 @@ func defaultVM(t *testing.T, f fork) (*VM, database.Database, *mutableSharedMemo
 	case apricotPhase3:
 		apricotPhase3Time = latestForkTime
 	default:
-		require.NoError(fmt.Errorf("unhandled fork %d", f))
+		require.FailNow(fmt.Sprintf("unhandled fork %d", f))
 	}
 
 	vm := &VM{Config: config.Config{

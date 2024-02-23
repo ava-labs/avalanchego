@@ -309,23 +309,33 @@ func TestBiMapDeleteValue(t *testing.T) {
 	}
 }
 
-func TestBiMapLen(t *testing.T) {
+func TestBiMapLenAndLists(t *testing.T) {
 	require := require.New(t)
 
 	m := New[int, int]()
 	require.Zero(m.Len())
+	require.Empty(m.Keys())
+	require.Empty(m.Values())
 
 	m.Put(1, 2)
 	require.Equal(1, m.Len())
+	require.ElementsMatch([]int{1}, m.Keys())
+	require.ElementsMatch([]int{2}, m.Values())
 
 	m.Put(2, 3)
 	require.Equal(2, m.Len())
+	require.ElementsMatch([]int{1, 2}, m.Keys())
+	require.ElementsMatch([]int{2, 3}, m.Values())
 
 	m.Put(1, 3)
 	require.Equal(1, m.Len())
+	require.ElementsMatch([]int{1}, m.Keys())
+	require.ElementsMatch([]int{3}, m.Values())
 
 	m.DeleteKey(1)
 	require.Zero(m.Len())
+	require.Empty(m.Keys())
+	require.Empty(m.Values())
 }
 
 func TestBiMapJSON(t *testing.T) {
