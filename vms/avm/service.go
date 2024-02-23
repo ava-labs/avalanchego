@@ -683,7 +683,7 @@ type GetUnitFeesReply struct {
 // GetTimestamp returns the current timestamp on chain.
 func (s *Service) GetUnitFees(_ *http.Request, _ *struct{}, reply *GetUnitFeesReply) error {
 	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "platform"),
+		zap.String("service", "avm"),
 		zap.String("method", "getUnitFees"),
 	)
 
@@ -704,7 +704,7 @@ type GetFeeWindowsReply struct {
 // GetTimestamp returns the current timestamp on chain.
 func (s *Service) GetFeeWindows(_ *http.Request, _ *struct{}, reply *GetFeeWindowsReply) error {
 	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "platform"),
+		zap.String("service", "avm"),
 		zap.String("method", "getBlockUnitsCap"),
 	)
 

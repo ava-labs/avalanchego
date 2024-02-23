@@ -414,13 +414,13 @@ func (c *client) GetAllBalances(
 
 func (c *client) GetUnitFees(ctx context.Context, options ...rpc.Option) (commonfees.Dimensions, error) {
 	res := &GetUnitFeesReply{}
-	err := c.requester.SendRequest(ctx, "platform.getUnitFees", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "avm.getUnitFees", struct{}{}, res, options...)
 	return res.UnitFees, err
 }
 
 func (c *client) GetFeeWindows(ctx context.Context, options ...rpc.Option) (commonfees.Windows, error) {
 	res := &GetFeeWindowsReply{}
-	err := c.requester.SendRequest(ctx, "platform.getFeeWindows", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "avm.getFeeWindows", struct{}{}, res, options...)
 	return res.FeeWindows, err
 }
 
