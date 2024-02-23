@@ -80,9 +80,6 @@ type Factory struct {
 	resourceTracker       tracker.ResourceTracker
 	subnets               *Subnets
 	unblockChainCreatorCh chan struct{}
-
-	// snowman++ related interface to allow validators retrieval
-	validatorState validators.State
 }
 
 // NewFactory returns an instance of Factory

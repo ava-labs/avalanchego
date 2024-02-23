@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -33,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/chaincreator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -57,6 +59,7 @@ var (
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
+	_ chaincreator.Interface     = (*VM)(nil)
 )
 
 type VM struct {
@@ -174,6 +177,7 @@ func (vm *VM) Initialize(
 
 	txExecutorBackend := &txexecutor.Backend{
 		Config:       &vm.Config,
+		ChainCreator: vm,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
@@ -356,7 +360,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
-		vm.Config.CreateChain(chain.ID(), tx)
+		vm.CreateChain(tx.SubnetID, chain.ID(), tx.VMID, tx.GenesisData, tx.FxIDs)
 	}
 	return nil
 }
@@ -552,4 +556,39 @@ func (vm *VM) issueTx(ctx context.Context, tx *txs.Tx) error {
 	}
 
 	return nil
+}
+
+func (vm *VM) CreateChain(
+	subnetID ids.ID,
+	chainID ids.ID,
+	vmID ids.ID,
+	genesis []byte,
+	fxIDs []ids.ID,
+) {
+	// Create the chain described , but only if this node is a member of
+	// the subnet that validates the chain
+	if vm.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains
+		constants.PrimaryNetworkID != subnetID && // All nodes must validate the primary network
+		!vm.TrackedSubnets.Contains(subnetID) { // This node doesn't validate this blockchain
+		return
+	}
+
+	validatorState := validators.NewLockedState(&vm.ctx.Lock, vm)
+
+	if vm.TracingEnabled {
+		validatorState = validators.Trace(validatorState, "lockedState", vm.Config.Tracer)
+	}
+
+	if !vm.SybilProtectionEnabled {
+		validatorState = validators.NewNoValidatorsState(validatorState)
+	}
+
+	vm.Chains.QueueChainCreation(chains.ChainParameters{
+		ID:          chainID,
+		SubnetID:    subnetID,
+		GenesisData: genesis,
+		VMID:        vmID,
+		FxIDs:       fxIDs,
+		Validators:  validatorState,
+	})
 }
