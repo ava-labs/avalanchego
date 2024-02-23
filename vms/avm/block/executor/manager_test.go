@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
@@ -125,10 +124,7 @@ func TestManagerVerifyTx(t *testing.T) {
 			managerF: func(*gomock.Controller) *manager {
 				return &manager{
 					backend: &executor.Backend{
-						Config: &config.Config{
-							DurangoTime:  time.Time{},
-							EUpgradeTime: time.Time{},
-						},
+						Config: noFeesTestConfig,
 					},
 				}
 			},
@@ -147,10 +143,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
-						Config: &config.Config{
-							DurangoTime:  time.Time{},
-							EUpgradeTime: time.Time{},
-						},
+						Config:       noFeesTestConfig,
 					},
 				}
 			},
@@ -179,10 +172,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
-						Config: &config.Config{
-							DurangoTime:  time.Time{},
-							EUpgradeTime: time.Time{},
-						},
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -215,10 +205,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
-						Config: &config.Config{
-							DurangoTime:  time.Time{},
-							EUpgradeTime: time.Time{},
-						},
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -251,10 +238,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
-						Config: &config.Config{
-							DurangoTime:  time.Time{},
-							EUpgradeTime: time.Time{},
-						},
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,

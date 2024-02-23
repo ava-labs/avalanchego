@@ -6,6 +6,7 @@ package avm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -39,7 +41,12 @@ import (
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
+type fork uint8
+
 const (
+	durango fork = iota
+	eUpgrade
+
 	testTxFee    uint64 = units.MicroAvax
 	startBalance uint64 = 1000 * units.MicroAvax
 
@@ -69,6 +76,13 @@ var (
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
+
+	noFeesTestConfig = &config.Config{
+		DurangoTime:      time.Time{},
+		EUpgradeTime:     mockable.MaxTime,
+		TxFee:            0,
+		CreateAssetTxFee: 0,
+	}
 )
 
 func init() {
@@ -85,6 +99,7 @@ type user struct {
 }
 
 type envConfig struct {
+	fork             fork
 	isCustomFeeAsset bool
 	keystoreUsers    []*user
 	vmStaticConfig   *config.Config
@@ -145,12 +160,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		require.NoError(keystoreUser.Close())
 	}
 
-	vmStaticConfig := config.Config{
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
-		DurangoTime:      time.Time{},
-		EUpgradeTime:     time.Time{},
-	}
+	vmStaticConfig := staticConfig(tb, c.fork)
 	if c.vmStaticConfig != nil {
 		vmStaticConfig = *c.vmStaticConfig
 	}
@@ -228,6 +238,30 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 	return env
+}
+
+func staticConfig(tb testing.TB, f fork) config.Config {
+	var (
+		durangoTime  = mockable.MaxTime
+		eUpgradeTime = mockable.MaxTime
+	)
+
+	switch f {
+	case eUpgrade:
+		eUpgradeTime = time.Time{}
+		fallthrough
+	case durango:
+		durangoTime = time.Time{}
+	default:
+		require.FailNow(tb, fmt.Sprintf("unhandled fork %d", f))
+	}
+
+	return config.Config{
+		TxFee:            testTxFee,
+		CreateAssetTxFee: testTxFee,
+		DurangoTime:      durangoTime,
+		EUpgradeTime:     eUpgradeTime,
+	}
 }
 
 // Returns:

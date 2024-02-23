@@ -30,6 +30,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
+var noFeesTestConfig = &config.Config{
+	DurangoTime:      time.Time{},
+	EUpgradeTime:     mockable.MaxTime,
+	TxFee:            0,
+	CreateAssetTxFee: 0,
+}
+
 func TestBlockVerify(t *testing.T) {
 	type test struct {
 		name        string
@@ -47,10 +54,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{},
 					},
@@ -72,10 +76,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 					},
 				}
@@ -97,10 +98,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						clk: clk,
 					},
@@ -120,10 +118,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{},
 						clk:          &mockable.Clock{},
@@ -152,10 +147,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						mempool:      mempool,
 						metrics:      metrics.NewMockMetrics(ctrl),
@@ -190,10 +182,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						state:        mockState,
 						blkIDToState: map[ids.ID]*blockState{},
@@ -232,10 +221,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						state:        mockState,
 						blkIDToState: map[ids.ID]*blockState{},
@@ -277,10 +263,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -330,10 +313,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
@@ -388,10 +368,7 @@ func TestBlockVerify(t *testing.T) {
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -471,10 +448,7 @@ func TestBlockVerify(t *testing.T) {
 						mempool: mempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -534,10 +508,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -591,10 +562,7 @@ func TestBlockVerify(t *testing.T) {
 						mempool: mockMempool,
 						metrics: metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -673,10 +641,7 @@ func TestBlockAccept(t *testing.T) {
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{},
 					},
@@ -711,10 +676,7 @@ func TestBlockAccept(t *testing.T) {
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -759,10 +721,7 @@ func TestBlockAccept(t *testing.T) {
 								SharedMemory: mockSharedMemory,
 								Log:          logging.NoLog{},
 							},
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -811,10 +770,7 @@ func TestBlockAccept(t *testing.T) {
 								SharedMemory: mockSharedMemory,
 								Log:          logging.NoLog{},
 							},
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -866,10 +822,7 @@ func TestBlockAccept(t *testing.T) {
 								SharedMemory: mockSharedMemory,
 								Log:          logging.NoLog{},
 							},
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
@@ -967,10 +920,7 @@ func TestBlockReject(t *testing.T) {
 						metrics:      metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
 							Bootstrapped: true,
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config:       noFeesTestConfig,
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
@@ -1032,10 +982,7 @@ func TestBlockReject(t *testing.T) {
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						state: mockState,
 						blkIDToState: map[ids.ID]*blockState{
@@ -1086,10 +1033,7 @@ func TestBlockStatus(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						lastAccepted: blockID,
 					},
@@ -1107,10 +1051,7 @@ func TestBlockStatus(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {},
@@ -1134,10 +1075,7 @@ func TestBlockStatus(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{},
 						state:        mockState,
@@ -1160,10 +1098,7 @@ func TestBlockStatus(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						backend: &executor.Backend{
-							Config: &config.Config{
-								DurangoTime:  time.Time{},
-								EUpgradeTime: time.Time{},
-							},
+							Config: noFeesTestConfig,
 						},
 						blkIDToState: map[ids.ID]*blockState{},
 						state:        mockState,
