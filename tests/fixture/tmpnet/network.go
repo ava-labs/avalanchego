@@ -230,7 +230,7 @@ func (n *Network) Create(rootDir string) error {
 	if len(rootDir) == 0 {
 		// Use the default root dir
 		var err error
-		rootDir, err = getDefaultRootDir()
+		rootDir, err = getDefaultRootNetworkDir()
 		if err != nil {
 			return err
 		}
@@ -319,6 +319,9 @@ func (n *Network) Start(ctx context.Context, w io.Writer) error {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?var-network_uuid=%s\n", n.UUID); err != nil {
 		return err
 	}
 
@@ -454,6 +457,9 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 // TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	flags := node.Flags
+
+	// Ensure nodes can write include the network uuid in their monitoring configuration
+	node.NetworkUUID = n.UUID
 
 	// Set the network name if available
 	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
@@ -674,10 +680,20 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 
 // Retrieves the default root dir for storing networks and their
 // configuration.
-func getDefaultRootDir() (string, error) {
+func getDefaultRootNetworkDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
+}
+
+// Retrieves the default dir for writing service discovery
+// configuration for prometheus.
+func getPrometheusServiceDiscoveryDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".tmpnet", "prometheus", "file_sd_configs"), nil
 }

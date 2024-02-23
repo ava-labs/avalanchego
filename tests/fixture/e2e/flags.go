@@ -12,10 +12,11 @@ import (
 )
 
 type FlagVars struct {
-	avalancheGoExecPath string
-	pluginDir           string
-	networkDir          string
-	useExistingNetwork  bool
+	avalancheGoExecPath  string
+	pluginDir            string
+	networkDir           string
+	useExistingNetwork   bool
+	networkShutdownDelay uint
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -38,6 +39,10 @@ func (v *FlagVars) NetworkDir() string {
 
 func (v *FlagVars) UseExistingNetwork() bool {
 	return v.useExistingNetwork
+}
+
+func (v *FlagVars) NetworkShutdownDelay() uint {
+	return v.networkShutdownDelay
 }
 
 func RegisterFlags() *FlagVars {
@@ -65,6 +70,12 @@ func RegisterFlags() *FlagVars {
 		"use-existing-network",
 		false,
 		"[optional] whether to target the existing network identified by --network-dir.",
+	)
+	flag.UintVar(
+		&vars.networkShutdownDelay,
+		"network-shutdown-delay",
+		0,
+		"[optional] the number of seconds to wait before shutting down the test network at the end of the test run. If collecting metrics, a value greater than the scrape interval is suggested.",
 	)
 
 	return &vars

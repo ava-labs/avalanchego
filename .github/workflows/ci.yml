@@ -21,7 +21,7 @@ concurrency:
 
 env:
   go_version: '~1.21.8'
-  tmpnet_data_path: ~/.tmpnet/networks
+  tmpnet_data_path: ~/.tmpnet
 
 jobs:
   Unit:
@@ -67,9 +67,22 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
+      - name: Start prometheus
+        shell: bash
+        run: bash -x ./scripts/run_prometheus.sh
+        env:
+          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Run e2e tests
         shell: bash
+        # TODO(maru) Ensure network stays up for final metrics scrape
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_JOB_ID: ${{ github.job }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_id }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
       - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v4
         if: always()
@@ -88,9 +101,21 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
+      - name: Start prometheus
+        shell: bash
+        run: bash -x ./scripts/run_prometheus.sh
+        env:
+          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Run e2e tests with existing network
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_JOB_ID: ${{ github.job }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_id }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
       - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v4
         if: always()
@@ -109,9 +134,21 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
+      - name: Start prometheus
+        shell: bash
+        run: bash -x ./scripts/run_prometheus.sh
+        env:
+          PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
       - name: Run e2e tests
         shell: bash
         run: ./scripts/tests.upgrade.sh
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_JOB_ID: ${{ github.job }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_id }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
       - name: Upload tmpnet network dir
         uses: actions/upload-artifact@v4
         if: always()

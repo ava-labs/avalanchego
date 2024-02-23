@@ -14,12 +14,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const (
@@ -142,8 +145,12 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	_, err = fmt.Fprintf(w, "Started %s\n", nodeDescription)
-	return err
+	if _, err = fmt.Fprintf(w, "Started %s\n", nodeDescription); err != nil {
+		return err
+	}
+
+	// Configure prometheus to target the new process's metrics endpoint
+	return p.writePrometheusConfig()
 }
 
 // Signals the node process to stop.
@@ -154,7 +161,7 @@ func (p *NodeProcess) InitiateStop() error {
 	}
 	if proc == nil {
 		// Already stopped
-		return nil
+		return p.removePrometheusConfig()
 	}
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", p.pid, err)
@@ -172,7 +179,7 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 			return fmt.Errorf("failed to retrieve process: %w", err)
 		}
 		if proc == nil {
-			return nil
+			return p.removePrometheusConfig()
 		}
 
 		select {
@@ -255,4 +262,67 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 		return nil, nil
 	}
 	return nil, fmt.Errorf("failed to determine process status: %w", err)
+}
+
+// Return the path for this node's prometheus configuration.
+func (p *NodeProcess) getPrometheusConfigPath(promDir string) string {
+	// Ensure a unique filename to allow config files to be added and removed
+	// by multiple nodes without conflict.
+	return filepath.Join(promDir, fmt.Sprintf("%s_%s.json", p.node.NetworkUUID, p.node.NodeID))
+}
+
+// Ensure the removal of the prometheus configuration file for this node.
+func (p *NodeProcess) removePrometheusConfig() error {
+	promDir, err := getPrometheusServiceDiscoveryDir()
+	if err != nil {
+		return err
+	}
+	configPath := p.getPrometheusConfigPath(promDir)
+	if err := os.Remove(configPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("failed to remove prometheus config: %w", err)
+	}
+	return nil
+}
+
+// Ensure the existence of a file configuring prometheus to target the node
+// process's metrics endpoint for collection.
+func (p *NodeProcess) writePrometheusConfig() error {
+	// Ensure the prometheus service discovery dir exists
+	promDir, err := getPrometheusServiceDiscoveryDir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(promDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create prometheus service discovery dir: %w", err)
+	}
+
+	// Ensure a configuration that uniquely identifies the node and its network
+	promConfig := []FlagsMap{
+		{
+			"targets": []string{strings.TrimPrefix(p.node.URI, "http://")},
+			"labels": FlagsMap{
+				"network_uuid": p.node.NetworkUUID,
+				"node_id":      p.node.NodeID,
+				"is_ephemeral": strconv.FormatBool(p.node.IsEphemeral),
+				// Prometheus ignores empty values so running this outside
+				// of a github worker will have no ill-effect.
+				"gh_repo":        os.Getenv("GH_REPO"),
+				"gh_job_id":      os.Getenv("GH_JOB_ID"),
+				"gh_run_id":      os.Getenv("GH_RUN_ID"),
+				"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
+				"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
+			},
+		},
+	}
+
+	configBytes, err := DefaultJSONMarshal(promConfig)
+	if err != nil {
+		return fmt.Errorf("failed to prometheus config: %w", err)
+	}
+
+	configPath := p.getPrometheusConfigPath(promDir)
+	if err := os.WriteFile(configPath, configBytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write prometheus config: %w", err)
+	}
+	return nil
 }
