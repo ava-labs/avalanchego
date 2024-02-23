@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
@@ -29,13 +30,13 @@ var (
 )
 
 type Wallet interface {
-	Context
+	backends.Context
 
 	// Builder returns the builder that will be used to create the transactions.
-	Builder() Builder
+	Builder() backends.Builder
 
 	// Signer returns the signer that will be used to sign the transactions.
-	Signer() Signer
+	Signer() backends.Signer
 
 	// IssueBaseTx creates, signs, and issues a new simple value transfer.
 	//
@@ -151,8 +152,8 @@ type Wallet interface {
 }
 
 func NewWallet(
-	builder Builder,
-	signer Signer,
+	builder backends.Builder,
+	signer backends.Signer,
 	client avm.Client,
 	backend Backend,
 ) Wallet {
@@ -166,19 +167,20 @@ func NewWallet(
 
 type wallet struct {
 	Backend
-	signer Signer
-	client avm.Client
+
+	builder backends.Builder
+	signer  backends.Signer
+	client  avm.Client
 
 	isEForkActive      bool
-	builder            Builder
 	unitFees, unitCaps commonfees.Dimensions
 }
 
-func (w *wallet) Builder() Builder {
+func (w *wallet) Builder() backends.Builder {
 	return w.builder
 }
 
-func (w *wallet) Signer() Signer {
+func (w *wallet) Signer() backends.Signer {
 	return w.signer
 }
 
@@ -197,7 +199,7 @@ func (w *wallet) IssueBaseTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -226,7 +228,7 @@ func (w *wallet) IssueCreateAssetTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -252,7 +254,7 @@ func (w *wallet) IssueOperationTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -278,7 +280,7 @@ func (w *wallet) IssueOperationTxMintFT(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -306,7 +308,7 @@ func (w *wallet) IssueOperationTxMintNFT(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -333,7 +335,7 @@ func (w *wallet) IssueOperationTxMintProperty(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -359,7 +361,7 @@ func (w *wallet) IssueOperationTxBurnProperty(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -386,7 +388,7 @@ func (w *wallet) IssueImportTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -413,7 +415,7 @@ func (w *wallet) IssueExportTx(
 			},
 			FeeManager:       feesMan,
 			ConsumedUnitsCap: w.unitCaps,
-			Codec:            Parser.Codec(),
+			Codec:            backends.Parser.Codec(),
 		}
 	)
 
@@ -430,7 +432,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := SignUnsigned(ctx, w.signer, utx)
+	tx, err := backends.SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}

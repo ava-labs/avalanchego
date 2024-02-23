@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -31,7 +30,6 @@ import (
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 const (
@@ -62,7 +60,10 @@ type FormattedAssetID struct {
 }
 
 // Service defines the base service for the asset vm
-type Service struct{ vm *VM }
+type Service struct {
+	vm               *VM
+	txBuilderBackend *serviceBackend
+}
 
 // GetBlock returns the requested block.
 func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.GetBlockResponse) error {
@@ -741,7 +742,7 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 	defer s.vm.ctx.Lock.Unlock()
 
 	// Get the UTXOs/keys for the from addresses
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -755,16 +756,17 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 		return nil, ids.ShortEmpty, err
 	}
 
-	initialState := &txs.InitialState{
-		FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs:    make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
-	}
+	var (
+		fxIndex          = uint32(0) // TODO: Should lookup secp256k1fx FxID
+		initialStateOuts = make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets))
+	)
+
 	for _, holder := range args.InitialHolders {
 		addr, err := avax.ParseServiceAddress(s.vm, holder.Address)
 		if err != nil {
 			return nil, ids.ShortEmpty, err
 		}
-		initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
+		initialStateOuts = append(initialStateOuts, &secp256k1fx.TransferOutput{
 			Amt: uint64(holder.Amount),
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -785,77 +787,19 @@ func (s *Service) buildCreateAssetTx(args *CreateAssetArgs) (*txs.Tx, ids.ShortI
 		}
 		minter.Addrs = minterAddrsSet.List()
 		utils.Sort(minter.Addrs)
-		initialState.Outs = append(initialState.Outs, minter)
+		initialStateOuts = append(initialStateOuts, minter)
 	}
 
-	codec := s.vm.parser.Codec()
-	initialState.Sort(codec)
-
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
 	return buildCreateAssetTx(
-		s.vm,
+		s.txBuilderBackend,
 		args.Name,
 		args.Symbol,
 		args.Denomination,
-		[]*txs.InitialState{initialState},
-		utxos,
+		map[uint32][]verify.State{fxIndex: initialStateOuts},
 		kc,
 		changeAddr,
 	)
-}
-
-func buildCreateAssetTx(
-	vm *VM,
-	name, symbol string,
-	denomination byte,
-	initialStates []*txs.InitialState,
-	utxos []*avax.UTXO,
-	kc *secp256k1fx.Keychain,
-	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
-	var (
-		chainTime = vm.state.GetTimestamp()
-		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
-			Config:           &vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.CreateAssetTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		Name:         name,
-		Symbol:       symbol,
-		Denomination: denomination,
-		States:       initialStates,
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toBurn := make(map[ids.ID]uint64)
-	ins, outs, keys, err := vm.FinanceTx(
-		utxos,
-		vm.feeAssetID,
-		kc,
-		toBurn,
-		feeCalc,
-		changeAddr,
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // CreateFixedCapAsset returns ID of the newly created asset
@@ -932,7 +876,7 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 	defer s.vm.ctx.Lock.Unlock()
 
 	// Get the UTXOs/keys for the from addresses
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -946,10 +890,11 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		return nil, ids.ShortEmpty, err
 	}
 
-	initialState := &txs.InitialState{
-		FxIndex: 1, // TODO: Should lookup nftfx FxID
-		Outs:    make([]verify.State, 0, len(args.MinterSets)),
-	}
+	var (
+		fxIndex          = uint32(1) // TODO: Should lookup nftfx FxID
+		initialStateOuts = make([]verify.State, 0, len(args.MinterSets))
+	)
+
 	for i, owner := range args.MinterSets {
 		minter := &nftfx.MintOutput{
 			GroupID: uint32(i),
@@ -963,18 +908,16 @@ func (s *Service) buildCreateNFTAsset(args *CreateNFTAssetArgs) (*txs.Tx, ids.Sh
 		}
 		minter.Addrs = minterAddrsSet.List()
 		utils.Sort(minter.Addrs)
-		initialState.Outs = append(initialState.Outs, minter)
+		initialStateOuts = append(initialStateOuts, minter)
 	}
 
-	codec := s.vm.parser.Codec()
-	initialState.Sort(codec)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
 	return buildCreateAssetTx(
-		s.vm,
+		s.txBuilderBackend,
 		args.Name,
 		args.Symbol,
 		0, // NFTs are non-fungible
-		[]*txs.InitialState{initialState},
-		utxos,
+		map[uint32][]verify.State{fxIndex: initialStateOuts},
 		kc,
 		changeAddr,
 	)
@@ -1226,7 +1169,7 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 	defer s.vm.ctx.Lock.Unlock()
 
 	// Load user's UTXOs/keys
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1286,64 +1229,14 @@ func (s *Service) buildSendMultiple(args *SendMultipleArgs) (*txs.Tx, ids.ShortI
 		})
 	}
 
-	return buildBaseTx(s.vm, outs, memoBytes, utxos, kc, changeAddr)
-}
-
-func buildBaseTx(
-	vm *VM,
-	outs []*avax.TransferableOutput,
-	memo []byte,
-	utxos []*avax.UTXO,
-	kc *secp256k1fx.Keychain,
-	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
-	var (
-		chainTime = vm.state.GetTimestamp()
-		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
-			Config:           &vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            vm.parser.Codec(),
-		}
-	)
-	uTx := &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Memo:         memo,
-			Outs:         outs,
-		},
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toBurn := make(map[ids.ID]uint64)
-	for _, out := range outs {
-		toBurn[out.AssetID()] += out.Out.Amount()
-	}
-	ins, feeOuts, keys, err := vm.FinanceTx(
-		utxos,
-		vm.feeAssetID,
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	return buildBaseTx(
+		s.txBuilderBackend,
+		outs,
+		memoBytes,
 		kc,
-		toBurn,
-		feeCalc,
 		changeAddr,
 	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	uTx.Ins = ins
-	uTx.Outs = append(uTx.Outs, feeOuts...)
-	codec := vm.parser.Codec()
-	avax.SortTransferableOutputs(uTx.Outs, codec)
-
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }
 
 // MintArgs are arguments for passing into Mint requests
@@ -1408,7 +1301,7 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 	defer s.vm.ctx.Lock.Unlock()
 
 	// Get the UTXOs/keys for the from addresses
-	feeUTXOs, feeKc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	_, feeKc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1423,78 +1316,32 @@ func (s *Service) buildMint(args *MintArgs) (*txs.Tx, ids.ShortID, error) {
 	}
 
 	// Get all UTXOs/keys for the user
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	ops, opKeys, err := s.vm.Mint(
-		utxos,
-		kc,
-		map[ids.ID]uint64{
-			assetID: uint64(args.Amount),
+	outputs := map[ids.ID]*secp256k1fx.TransferOutput{
+		assetID: {
+			Amt: uint64(args.Amount),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
 		},
-		to,
-	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
 	}
 
-	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	return tx, changeAddr, tx.SignSECP256K1Fx(s.vm.parser.Codec(), opKeys)
-}
-
-func buildOperation(
-	vm *VM,
-	ops []*txs.Operation,
-	utxos []*avax.UTXO,
-	kc *secp256k1fx.Keychain,
-	changeAddr ids.ShortID,
-) (*txs.Tx, error) {
-	var (
-		chainTime = vm.state.GetTimestamp()
-		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
-			Config:           &vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.OperationTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		Ops: ops,
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, err
-	}
-
-	toBurn := make(map[ids.ID]uint64)
-	ins, outs, keys, err := vm.FinanceTx(
-		utxos,
-		vm.feeAssetID,
-		kc,
-		toBurn,
-		feeCalc,
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	tx, err := mintFTs(
+		s.txBuilderBackend,
+		outputs,
+		feeKc,
 		changeAddr,
 	)
 	if err != nil {
-		return nil, err
+		return nil, ids.ShortEmpty, err
 	}
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
+	return tx, changeAddr, nil
 }
 
 // SendNFTArgs are arguments for passing into SendNFT requests
@@ -1565,7 +1412,7 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	ops, nftKeys, err := s.vm.SpendNFT(
+	ops, _, err := s.vm.SpendNFT(
 		utxos,
 		kc,
 		assetID,
@@ -1576,12 +1423,18 @@ func (s *Service) buildSendNFT(args *SendNFTArgs) (*txs.Tx, ids.ShortID, error) 
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx, err := buildOperation(s.vm, ops, utxos, kc, changeAddr)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	tx, err := buildOperation(
+		s.txBuilderBackend,
+		ops,
+		kc,
+		changeAddr,
+	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
+	return tx, changeAddr, nil
 }
 
 // MintNFTArgs are arguments for passing into MintNFT requests
@@ -1642,7 +1495,7 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 	defer s.vm.ctx.Lock.Unlock()
 
 	// Get the UTXOs/keys for the from addresses
-	feeUTXOs, feeKc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	_, feeKc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1657,26 +1510,27 @@ func (s *Service) buildMintNFT(args *MintNFTArgs) (*txs.Tx, ids.ShortID, error) 
 	}
 
 	// Get all UTXOs/keys
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-	ops, nftKeys, err := s.vm.MintNFT(
-		utxos,
-		kc,
-		assetID,
-		payloadBytes,
-		to,
-	)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
 
-	tx, err := buildOperation(s.vm, ops, feeUTXOs, feeKc, changeAddr)
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	tx, err := mintNFT(
+		s.txBuilderBackend,
+		assetID,
+		payloadBytes,
+		[]*secp256k1fx.OutputOwners{{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{to},
+		}},
+		kc,
+		changeAddr,
+	)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-	return tx, changeAddr, tx.SignNFTFx(s.vm.parser.Codec(), nftKeys)
+	return tx, changeAddr, nil
 }
 
 // ImportArgs are arguments for passing into Import requests
@@ -1729,81 +1583,18 @@ func (s *Service) buildImport(args *ImportArgs) (*txs.Tx, error) {
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	atomicUTXOs, _, _, err := s.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, int(maxPageSize))
-	if err != nil {
-		return nil, fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
-	}
-
-	return buildImportTx(s.vm, chainID, atomicUTXOs, to, utxos, kc)
-}
-
-func buildImportTx(
-	vm *VM,
-	sourceChain ids.ID,
-	atomicUTXOs []*avax.UTXO,
-	to ids.ShortID,
-	utxos []*avax.UTXO,
-	kc *secp256k1fx.Keychain,
-) (*txs.Tx, error) {
-	toBurn, importInputs, importKeys, err := vm.SpendAll(atomicUTXOs, kc)
-	if err != nil {
-		return nil, err
-	}
-
-	var (
-		chainTime = vm.state.GetTimestamp()
-		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
-			Config:           &vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		SourceChain: sourceChain,
-		ImportedIns: importInputs,
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, err
-	}
-
-	if importedAmt := toBurn[vm.feeAssetID]; importedAmt < feeCalc.Fee {
-		feeCalc.Fee -= importedAmt
-		toBurn[vm.feeAssetID] = 0
-	} else {
-		feeCalc.Fee = 0
-		toBurn[vm.feeAssetID] -= feeCalc.Fee
-	}
-	ins, outs, keys, err := vm.FinanceTx(
-		utxos,
-		vm.feeAssetID,
-		kc,
-		toBurn,
-		feeCalc,
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	return buildImportTx(
+		s.txBuilderBackend,
+		chainID,
 		to,
+		kc,
 	)
-	if err != nil {
-		return nil, err
-	}
-	keys = append(keys, importKeys...)
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, tx.SignSECP256K1Fx(vm.parser.Codec(), keys)
 }
 
 // ExportArgs are arguments for passing into ExportAVA requests
@@ -1882,7 +1673,7 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 	defer s.vm.ctx.Lock.Unlock()
 
 	// Get the UTXOs/keys for the from addresses
-	utxos, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
+	_, kc, err := s.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
@@ -1896,73 +1687,14 @@ func (s *Service) buildExport(args *ExportArgs) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, err
 	}
 
-	return buildExportTx(s.vm, chainID, to, assetID, uint64(args.Amount), utxos, kc, changeAddr)
-}
-
-func buildExportTx(
-	vm *VM,
-	destinationChain ids.ID,
-	to ids.ShortID,
-	exportedAssetID ids.ID,
-	exportedAmt uint64,
-	utxos []*avax.UTXO,
-	kc *secp256k1fx.Keychain,
-	changeAddr ids.ShortID,
-) (*txs.Tx, ids.ShortID, error) {
-	var (
-		chainTime = vm.state.GetTimestamp()
-		feeCfg    = vm.GetDynamicFeesConfig(chainTime)
-		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
-		feeCalc   = &fees.Calculator{
-			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
-			Config:           &vm.Config,
-			FeeManager:       feeMan,
-			ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-			Codec:            vm.parser.Codec(),
-		}
-	)
-
-	uTx := &txs.ExportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		DestinationChain: destinationChain,
-		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: exportedAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: exportedAmt,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
-				},
-			},
-		}},
-	}
-	if err := uTx.Visit(feeCalc); err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	toBurn := map[ids.ID]uint64{
-		exportedAssetID: exportedAmt,
-	}
-	ins, outs, keys, err := vm.FinanceTx(
-		utxos,
-		vm.feeAssetID,
+	s.txBuilderBackend.ResetAddresses(kc.Addresses())
+	return buildExportTx(
+		s.txBuilderBackend,
+		chainID,
+		to,
+		assetID,
+		uint64(args.Amount),
 		kc,
-		toBurn,
-		feeCalc,
 		changeAddr,
 	)
-	if err != nil {
-		return nil, ids.ShortEmpty, err
-	}
-
-	codec := vm.parser.Codec()
-
-	uTx.Ins = ins
-	uTx.Outs = outs
-	tx := &txs.Tx{Unsigned: uTx}
-	return tx, changeAddr, tx.SignSECP256K1Fx(codec, keys)
 }

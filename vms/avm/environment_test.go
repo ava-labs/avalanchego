@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -203,10 +202,17 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm: vm,
+			txBuilderBackend: newServiceBackend(
+				vm.feeAssetID,
+				vm.parser.Codec(),
+				vm.ctx,
+				&vm.Config,
+				vm.state,
+				vm.AtomicUTXOManager,
+			),
 		},
 		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+			walletServiceBackend: NewWalletServiceBackend(vm),
 		},
 	}
 

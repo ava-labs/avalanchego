@@ -23,9 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/x"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -188,7 +188,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					IsEUpgradeActive: true,
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
 					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-					Codec:            x.Parser.Codec(),
+					Codec:            xbackends.Parser.Codec(),
 					Credentials:      tx.Creds,
 				}
 

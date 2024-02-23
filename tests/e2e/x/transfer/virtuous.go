@@ -21,11 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
+	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -192,7 +192,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					IsEUpgradeActive: true,
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
 					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
-					Codec:            x.Parser.Codec(),
+					Codec:            xbackends.Parser.Codec(),
 					Credentials:      tx.Creds,
 				}
 
