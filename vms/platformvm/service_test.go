@@ -76,10 +76,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, mutableSharedMemory := defaultVM(t, latestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks := keystore.New(logging.NoLog{}, memdb.New())
-	require.NoError(t, ks.CreateUser(testUsername, testPassword))
 
-	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
@@ -94,6 +91,10 @@ func TestExportKey(t *testing.T) {
 
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
+
+	ks := keystore.New(logging.NoLog{}, memdb.New())
+	require.NoError(ks.CreateUser(testUsername, testPassword))
+	service.vm.ctx.Keystore = ks.NewBlockchainKeyStore(service.vm.ctx.ChainID)
 
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
 	require.NoError(err)
