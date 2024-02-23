@@ -228,7 +228,7 @@ func (n *Network) Create(rootDir string, networkDirSuffix string) error {
 	if len(rootDir) == 0 {
 		// Use the default root dir
 		var err error
-		rootDir, err = getDefaultRootDir()
+		rootDir, err = getDefaultRootNetworkDir()
 		if err != nil {
 			return err
 		}
@@ -452,6 +452,9 @@ func (n *Network) Restart(ctx context.Context, w io.Writer) error {
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	flags := node.Flags
 
+	// Ensure nodes can write include the network uuid in their monitoring configuration
+	node.NetworkUUID = n.UUID
+
 	// Set the network name if available
 	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
 		// Convert the network id to a string to ensure consistency in JSON round-tripping.
@@ -671,10 +674,20 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 
 // Retrieves the default root dir for storing networks and their
 // configuration.
-func getDefaultRootDir() (string, error) {
+func getDefaultRootNetworkDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
+}
+
+// Retrieves the default dir for writing service discovery
+// configuration for prometheus.
+func getPrometheusServiceDiscoveryDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".tmpnet", "prometheus", "file_sd_configs"), nil
 }

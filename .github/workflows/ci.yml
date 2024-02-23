@@ -67,6 +67,17 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
+      - name: Start prometheus
+        shell: bash
+        run: ./scripts/run_prometheus.sh
+        env:
+          PROMETHEUS_ID: ${{ secrets.PROMETHUS_ID }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+          GH_REPO: {{ github.repository }}
+          GH_JOB_ID: {{ github.job }}
+          GH_RUN_ID: {{ github.run_id }}
+          GH_RUN_NUMBER: {{ github.run_id }}
+          GH_RUN_ATTEMPT: {{ github.run_attempt }}
       - name: Run e2e tests
         shell: bash
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh

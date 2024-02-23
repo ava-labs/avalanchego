@@ -14,18 +14,28 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const (
 	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
 
 	defaultNodeInitTimeout = 10 * time.Second
+
+	prometheusTemplate = `- targets:
+  - "%s"
+  labels:
+    network_uuid: "%s"
+    node_id: "%s"
+    is_ephemeral: %t
+`
 )
 
 var errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
@@ -142,8 +152,12 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	_, err = fmt.Fprintf(w, "Started %s\n", nodeDescription)
-	return err
+	if _, err = fmt.Fprintf(w, "Started %s\n", nodeDescription); err != nil {
+		return err
+	}
+
+	// Configure prometheus to target the new process's metrics endpoint
+	return p.writePrometheusConfig()
 }
 
 // Signals the node process to stop.
@@ -154,7 +168,7 @@ func (p *NodeProcess) InitiateStop() error {
 	}
 	if proc == nil {
 		// Already stopped
-		return nil
+		return p.removePrometheusConfig()
 	}
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", p.pid, err)
@@ -172,7 +186,7 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 			return fmt.Errorf("failed to retrieve process: %w", err)
 		}
 		if proc == nil {
-			return nil
+			return p.removePrometheusConfig()
 		}
 
 		select {
@@ -255,4 +269,48 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 		return nil, nil
 	}
 	return nil, fmt.Errorf("failed to determine process status: %w", err)
+}
+
+// Return the path for this node's prometheus configuration.
+func (p *NodeProcess) getPrometheusConfigPath(promDir string) string {
+	// Ensure a unique filename to allow config files to be added and removed
+	// by multiple nodes without conflict.
+	return filepath.Join(promDir, fmt.Sprintf("%s_%s.yaml", p.node.NetworkUUID, p.node.NodeID))
+}
+
+// Ensure the removal of the prometheus configuration file for this node.
+func (p *NodeProcess) removePrometheusConfig() error {
+	promDir, err := getPrometheusServiceDiscoveryDir()
+	if err != nil {
+		return err
+	}
+	configPath := p.getPrometheusConfigPath(promDir)
+	if err := os.Remove(configPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("failed to remove prometheus config: %w", err)
+	}
+	return nil
+}
+
+// Ensure the existence of a file configuring prometheus to target the node
+// process's metrics endpoint for collection.
+func (p *NodeProcess) writePrometheusConfig() error {
+	// Ensure the prometheus service discovery dir exists
+	promDir, err := getPrometheusServiceDiscoveryDir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(promDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create prometheus service discovery dir: %w", err)
+	}
+
+	// Ensure a configuration that uniquely identifies the node and its network
+	nodeAddress := strings.TrimPrefix(p.node.URI, "http://")
+	promConfig := fmt.Sprintf(prometheusTemplate, nodeAddress, p.node.NetworkUUID, p.node.NodeID, p.node.IsEphemeral)
+
+	configPath := p.getPrometheusConfigPath(promDir)
+	if err := os.WriteFile(configPath, []byte(promConfig), perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write prometheus config: %w", err)
+	}
+
+	return nil
 }
