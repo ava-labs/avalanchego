@@ -97,7 +97,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	return MarshalAppResponse(gossipBytes)
 }
 
-func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	gossip, err := ParseAppGossip(gossipBytes)
 	if err != nil {
 		h.log.Debug("failed to unmarshal gossip", zap.Error(err))
@@ -123,16 +123,7 @@ func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipByte
 				zap.Stringer("id", gossipable.GossipID()),
 				zap.Error(err),
 			)
-			continue
 		}
-
-		// continue gossiping messages we have not seen to other peers
-		h.accumulator.Add(gossipable)
-	}
-
-	if err := h.accumulator.Gossip(ctx); err != nil {
-		h.log.Error("failed to forward gossip", zap.Error(err))
-		return
 	}
 
 	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(pushLabels)

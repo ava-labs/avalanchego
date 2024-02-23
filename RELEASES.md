@@ -1,5 +1,17 @@
 # Release Notes
 
+## [v1.11.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.1)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `33` and is compatible with version `v1.11.0`.
+
+### Fixes
+
+- Suspended transaction re-push gossip in the p2p SDK
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.0...v1.11.1
+
 ## [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)
 
 This upgrade consists of the following Avalanche Community Proposals (ACPs):
