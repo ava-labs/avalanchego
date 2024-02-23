@@ -485,7 +485,8 @@ func (s *state) InitFees() error {
 		// fork introducing dynamic fees may not be active yet,
 		// hence we may have never stored unit fees. Load from config
 		// TODO: remove once fork is active
-		s.unitFees = config.EUpgradeDynamicFeesConfig.InitialUnitFees
+		feeCfg := s.cfg.GetDynamicFeesConfig(s.GetTimestamp())
+		s.unitFees = feeCfg.InitialUnitFees
 
 	default:
 		return err

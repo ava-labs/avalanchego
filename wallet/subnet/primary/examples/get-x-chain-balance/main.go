@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 )
 
 func main() {
@@ -39,7 +41,7 @@ func main() {
 
 	xUTXOs := common.NewChainUTXOs(xChainID, state.UTXOs)
 	xBackend := x.NewBackend(state.XCTX, xUTXOs)
-	xBuilder := x.NewBuilder(addresses, xBackend)
+	xBuilder := xbackends.NewBuilder(addresses, xBackend)
 
 	currentBalances, err := xBuilder.GetFTBalance()
 	if err != nil {

@@ -5,6 +5,7 @@ package x
 
 import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
@@ -15,18 +16,18 @@ var _ Backend = (*backend)(nil)
 // Backend defines the full interface required to support an X-chain wallet.
 type Backend interface {
 	common.ChainUTXOs
-	BuilderBackend
-	SignerBackend
+	backends.BuilderBackend
+	backends.SignerBackend
 
 	AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
 type backend struct {
-	Context
+	backends.Context
 	common.ChainUTXOs
 }
 
-func NewBackend(ctx Context, utxos common.ChainUTXOs) Backend {
+func NewBackend(ctx backends.Context, utxos common.ChainUTXOs) Backend {
 	return &backend{
 		Context:    ctx,
 		ChainUTXOs: utxos,

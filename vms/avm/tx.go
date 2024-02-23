@@ -46,7 +46,7 @@ func (tx *Tx) Accept(context.Context) error {
 	}
 
 	executor := &executor.Executor{
-		Codec: tx.vm.txBackend.Codec,
+		Codec: tx.vm.txExecutorBackend.Codec,
 		State: tx.vm.state,
 		Tx:    tx.tx,
 	}
@@ -137,11 +137,11 @@ func (tx *Tx) Verify(context.Context) error {
 	}
 
 	var (
-		feeCfg     = tx.vm.txBackend.Config.GetDynamicFeesConfig(tx.vm.state.GetTimestamp())
+		feeCfg     = tx.vm.txExecutorBackend.Config.GetDynamicFeesConfig(tx.vm.state.GetTimestamp())
 		feeManager = fees.NewManager(unitFees, feeWindows)
 	)
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend:       tx.vm.txBackend,
+		Backend:       tx.vm.txExecutorBackend,
 		BlkFeeManager: feeManager,
 		UnitCaps:      feeCfg.BlockUnitsCap,
 		State:         tx.vm.state,
