@@ -47,7 +47,7 @@ import (
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -73,7 +73,7 @@ func TestServiceIssueTx(t *testing.T) {
 func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -108,7 +108,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -264,7 +264,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	require.NoError(err)
@@ -306,7 +306,7 @@ func TestServiceGetTxs(t *testing.T) {
 func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -504,7 +504,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -532,7 +532,7 @@ func TestServiceGetTx(t *testing.T) {
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -627,7 +627,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -725,10 +725,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			CreateAssetTxFee: testTxFee,
-			DurangoTime:      time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -759,34 +756,8 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": [
-			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"output": {
-					"addresses": [
-						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-					],
-					"amount": 49000,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		],
-		"inputs": [
-			{
-				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
-				"outputIndex": 2,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"input": {
-					"amount": 50000,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		],
+		"outputs": null,
+		"inputs": null,
 		"memo": "0x",
 		"name": "Team Rocket",
 		"symbol": "TR",
@@ -856,16 +827,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			}
 		]
 	},
-	"credentials": [
-		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"0xa036832b708b377ef9719ffbc834a3fb933191a467994f844c23f4a44350e86a7151cdbbbfa479d93a4906cc22254dcc5ccc2a6099492e7a9f9e8b575048d69701"
-				]
-			}
-		}
-	],
+	"credentials": null,
 	"id": "PLACEHOLDER_TX_ID"
 }`
 
@@ -879,9 +841,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -980,9 +940,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1118,9 +1076,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1223,9 +1179,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1369,9 +1323,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1471,9 +1423,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1819,7 +1769,7 @@ func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation
 func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -1836,7 +1786,7 @@ func TestServiceGetNilTx(t *testing.T) {
 func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -1851,7 +1801,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		env.vm.ctx.Lock.Lock()
 		require.NoError(t, env.vm.Shutdown(context.Background()))
@@ -2106,7 +2056,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: eUpgrade})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -2129,7 +2079,7 @@ func TestGetAssetDescription(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {

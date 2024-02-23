@@ -7,7 +7,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -115,7 +113,7 @@ func TestFxInitializationFailure(t *testing.T) {
 func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -131,11 +129,7 @@ func TestIssueTx(t *testing.T) {
 func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
-	})
+	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -218,9 +212,7 @@ func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		vmStaticConfig: noFeesTestConfig,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -319,6 +311,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork:             durango,
 		isCustomFeeAsset: true,
 	})
 	env.vm.ctx.Lock.Unlock()
@@ -337,6 +330,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork:             durango,
 		isCustomFeeAsset: true,
 	})
 	env.vm.ctx.Lock.Unlock()
@@ -390,7 +384,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 }
 
 func TestVMFormat(t *testing.T) {
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(t, env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -419,9 +413,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{
-			DurangoTime: time.Time{},
-		},
+		fork:          durango,
 		notLinearized: true,
 	})
 	defer func() {
@@ -501,9 +493,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
-	})
+	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -586,7 +576,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: &config.Config{},
+		vmStaticConfig: noFeesTestConfig,
 		notLinearized:  true,
 	})
 	defer func() {
@@ -663,7 +653,7 @@ func TestImportTxNotState(t *testing.T) {
 func TestIssueExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -728,7 +718,7 @@ func TestIssueExportTx(t *testing.T) {
 func TestClearForceAcceptedExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()

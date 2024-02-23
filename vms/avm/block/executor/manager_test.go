@@ -123,7 +123,9 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(*gomock.Controller) *manager {
 				return &manager{
-					backend: &executor.Backend{},
+					backend: &executor.Backend{
+						Config: noFeesTestConfig,
+					},
 				}
 			},
 			expectedErr: ErrChainNotSynced,
@@ -141,6 +143,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 				}
 			},
@@ -169,6 +172,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -201,6 +205,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,
@@ -233,6 +238,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &manager{
 					backend: &executor.Backend{
 						Bootstrapped: true,
+						Config:       noFeesTestConfig,
 					},
 					state:        state,
 					lastAccepted: lastAcceptedID,

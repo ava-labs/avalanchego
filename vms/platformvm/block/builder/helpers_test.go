@@ -64,6 +64,7 @@ const (
 	banff
 	cortina
 	durango
+	eUpgrade
 
 	latestFork = durango
 )
@@ -311,9 +312,13 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
 		durangoTime       = mockable.MaxTime
+		eUpgradeTime      = mockable.MaxTime
 	)
 
 	switch f {
+	case eUpgrade:
+		eUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+		fallthrough
 	case durango:
 		durangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
@@ -329,7 +334,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	case apricotPhase3:
 		apricotPhase3Time = defaultValidateEndTime
 	default:
-		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
+		require.FailNow(t, fmt.Sprintf("unhandled fork %d", f))
 	}
 
 	return &config.Config{
@@ -355,6 +360,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,
+		EUpgradeTime:      eUpgradeTime,
 	}
 }
 
