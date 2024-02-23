@@ -94,7 +94,6 @@ func TestExportKey(t *testing.T) {
 
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
-	defer service.vm.ctx.Lock.Unlock()
 
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
 	require.NoError(err)
@@ -103,6 +102,8 @@ func TestExportKey(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(user.PutKeys(pk, keys[0]))
+
+	service.vm.ctx.Lock.Unlock()
 
 	jsonString := `{"username":"` + testUsername + `","password":"` + testPassword + `","address":"` + testAddress + `"}`
 	args := ExportKeyArgs{}
