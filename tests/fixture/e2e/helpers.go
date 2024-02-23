@@ -216,7 +216,7 @@ func CheckBootstrapIsPossible(network *tmpnet.Network) {
 }
 
 // Start a temporary network with the provided avalanchego binary.
-func StartNetwork(network *tmpnet.Network, rootNetworkDir string, avalancheGoExecPath string, pluginDir string) {
+func StartNetwork(network *tmpnet.Network, avalancheGoExecPath string, pluginDir string) {
 	require := require.New(ginkgo.GinkgoT())
 
 	require.NoError(
@@ -224,7 +224,7 @@ func StartNetwork(network *tmpnet.Network, rootNetworkDir string, avalancheGoExe
 			DefaultContext(),
 			ginkgo.GinkgoWriter,
 			network,
-			rootNetworkDir,
+			DefaultNetworkDir,
 			avalancheGoExecPath,
 			pluginDir,
 			tmpnet.DefaultNodeCount,
