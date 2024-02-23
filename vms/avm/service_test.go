@@ -47,7 +47,7 @@ import (
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: eUpgrade})
+	env := setup(t, &envConfig{fork: durango})
 	env.vm.ctx.Lock.Unlock()
 
 	defer func() {
@@ -725,7 +725,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -738,7 +738,52 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
+	initialStates := map[uint32][]verify.State{
+		uint32(0): {
+			&nftfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			}, &secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+		uint32(1): {
+			&nftfx.MintOutput{
+				GroupID: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+			&nftfx.MintOutput{
+				GroupID: 2,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+		uint32(2): {
+			&propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+			&propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	reply := api.GetTxReply{}
@@ -756,8 +801,34 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 49000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"outputIndex": 2,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 50000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
 		"memo": "0x",
 		"name": "Team Rocket",
 		"symbol": "TR",
@@ -778,6 +849,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 						"addresses": [
 							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 						],
+						"groupID": 0,
 						"locktime": 0,
 						"threshold": 1
 					}
@@ -827,7 +899,16 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			}
 		]
 	},
-	"credentials": null,
+	"credentials": [
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"0xbbdff720789320b7f2b47e230ba8eb2e4b72c7eea52afe4ea1ae2e78ab1b611a318d21160a83bbd5a147848b909ad3859b0b1110e2401fa1c958d42dd6800ed501"
+				]
+			}
+		}
+	],
 	"id": "PLACEHOLDER_TX_ID"
 }`
 
@@ -841,7 +922,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -855,10 +936,28 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
+	initialStates := map[uint32][]verify.State{
+		uint32(1): {
+			&nftfx.MintOutput{
+				GroupID: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+			&nftfx.MintOutput{
+				GroupID: 2,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	op := buildNFTxMintOp(createAssetTx, key, 2, 1)
+	op := buildNFTxMintOp(createAssetTx, key, 1, 1)
 	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
@@ -877,8 +976,34 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 48000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "rSiY2aqcahSU5vyJeMiNBnwtPwfJFxsxskAGbU3HxHvAkrdpy",
+				"outputIndex": 0,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 49000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
 		"memo": "0x",
 		"operations": [
 			{
@@ -886,7 +1011,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 				"inputIDs": [
 					{
 						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-						"outputIndex": 2
+						"outputIndex": 1
 					}
 				],
 				"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
@@ -913,10 +1038,18 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	},
 	"credentials": [
 		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"0x9e9b81e54fa10c25d772a5efaa2bda3173a2cf59b74ed4d022f08cf2bed1506c2384300827e3a0a3af39dc7b827157d55699a07d559f189890555b0272794afd00"
+				]
+			}
+		},
+		{
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
+					"0x9e9b81e54fa10c25d772a5efaa2bda3173a2cf59b74ed4d022f08cf2bed1506c2384300827e3a0a3af39dc7b827157d55699a07d559f189890555b0272794afd00"
 				]
 			}
 		}
@@ -928,7 +1061,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintNFTTx.ID().String(), 1)
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
 
-	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[0].Credential.(*nftfx.Credential).Sigs[0][:])
+	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[1].Credential.(*nftfx.Credential).Sigs[0][:])
 	require.NoError(err)
 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
@@ -940,7 +1073,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -954,11 +1087,31 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
+	initialStates := map[uint32][]verify.State{
+		uint32(0): {
+			&nftfx.MintOutput{
+				GroupID: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+		uint32(1): {
+			&nftfx.MintOutput{
+				GroupID: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
-	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
+	mintOp1 := buildNFTxMintOp(createAssetTx, key, 1, 0)
+	mintOp2 := buildNFTxMintOp(createAssetTx, key, 2, 1)
 	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{mintOp1, mintOp2})
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
@@ -977,10 +1130,64 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 48000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "BBhSA95iv6ueXc7xrMSka1bByBqcwJxyvMiyjy5H8ccAgxy4P",
+				"outputIndex": 0,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 49000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
 		"memo": "0x",
 		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 1
+					}
+				],
+				"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"groupID": 0,
+					"payload": "0x68656c6c6f",
+					"outputs": [
+						{
+							"addresses": [
+								"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+							],
+							"locktime": 0,
+							"threshold": 1
+						}
+					]
+				}
+			},
 			{
 				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
 				"inputIDs": [
@@ -1008,43 +1215,23 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 						}
 					]
 				}
-			},
-			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-				"inputIDs": [
-					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-						"outputIndex": 3
-					}
-				],
-				"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
-				"operation": {
-					"mintInput": {
-						"signatureIndices": [
-							0
-						]
-					},
-					"groupID": 2,
-					"payload": "0x68656c6c6f",
-					"outputs": [
-						{
-							"addresses": [
-								"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-							],
-							"locktime": 0,
-							"threshold": 1
-						}
-					]
-				}
 			}
 		]
 	},
 	"credentials": [
 		{
-			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
 					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		},
+		{
+			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
+			"credential": {
+				"signatures": [
+					"0xc958811e7430677ed15c40ac1d7f6232e8f5060aecf4cd8c45ef1614d9c9a5be5b5d5e697da4e40c743c010bab7bca58d9970b1cc5f3dc15b2f6d9adc712289f00"
 				]
 			}
 		},
@@ -1064,7 +1251,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintNFTTx.ID().String(), 1)
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintNFTTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
 
-	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[0].Credential.(*nftfx.Credential).Sigs[0][:])
+	sigStr, err := formatting.Encode(formatting.HexNC, mintNFTTx.Creds[1].Credential.(*nftfx.Credential).Sigs[0][:])
 	require.NoError(err)
 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
@@ -1076,7 +1263,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1090,10 +1277,25 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
+	initialStates := map[uint32][]verify.State{
+		uint32(0): {
+			&nftfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			}, &secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	op := buildSecpMintOp(createAssetTx, key, 0)
+	op := buildSecpMintOp(createAssetTx, key, 1)
 	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
@@ -1112,146 +1314,36 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
-		"memo": "0x",
-		"operations": [
+		"outputs": [
 			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-				"inputIDs": [
-					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-						"outputIndex": 0
-					}
-				],
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"operation": {
-					"mintInput": {
-						"signatureIndices": [
-							0
-						]
-					},
-					"mintOutput": {
-						"addresses": [
-							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-						],
-						"locktime": 0,
-						"threshold": 1
-					},
-					"transferOutput": {
-						"addresses": [
-							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-						],
-						"amount": 1,
-						"locktime": 0,
-						"threshold": 1
-					}
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 48000,
+					"locktime": 0,
+					"threshold": 1
 				}
 			}
-		]
-	},
-	"credentials": [
-		{
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"credential": {
-				"signatures": [
-					"PLACEHOLDER_SIGNATURE"
-				]
+		],
+		"inputs": [
+			{
+				"txID": "2YhAg3XUdub5syHHePZG7q3yFjKAy7ahsvQDxq5SMrYbN1s5Gn",
+				"outputIndex": 0,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 49000,
+					"signatureIndices": [
+						0
+					]
+				}
 			}
-		}
-	],
-	"id": "PLACEHOLDER_TX_ID"
-}`
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintSecpOpTx.ID().String(), 1)
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
-
-	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
-	require.NoError(err)
-
-	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
-
-	require.Equal(expectedReplyTxString, string(replyTxBytes))
-}
-
-func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
-	require := require.New(t)
-
-	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
-		additionalFxs: []*common.Fx{{
-			ID: propertyfx.ID,
-			Fx: &propertyfx.Fx{},
-		}},
-	})
-	env.vm.ctx.Lock.Unlock()
-	defer func() {
-		env.vm.ctx.Lock.Lock()
-		require.NoError(env.vm.Shutdown(context.Background()))
-		env.vm.ctx.Lock.Unlock()
-	}()
-
-	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
-	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
-
-	op1 := buildSecpMintOp(createAssetTx, key, 0)
-	op2 := buildSecpMintOp(createAssetTx, key, 1)
-	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
-	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
-
-	reply := api.GetTxReply{}
-	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
-		TxID:     mintSecpOpTx.ID(),
-		Encoding: formatting.JSON,
-	}, &reply))
-
-	require.Equal(formatting.JSON, reply.Encoding)
-
-	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
-	require.NoError(err)
-
-	expectedReplyTxString := `{
-	"unsignedTx": {
-		"networkID": 10,
-		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		],
 		"memo": "0x",
 		"operations": [
-			{
-				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-				"inputIDs": [
-					{
-						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-						"outputIndex": 0
-					}
-				],
-				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-				"operation": {
-					"mintInput": {
-						"signatureIndices": [
-							0
-						]
-					},
-					"mintOutput": {
-						"addresses": [
-							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-						],
-						"locktime": 0,
-						"threshold": 1
-					},
-					"transferOutput": {
-						"addresses": [
-							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
-						],
-						"amount": 1,
-						"locktime": 0,
-						"threshold": 1
-					}
-				}
-			},
 			{
 				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
 				"inputIDs": [
@@ -1299,7 +1391,203 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
+					"0xad7f3f3cd2667eda64e6f9ca3ab0db21238c20a0174f590b5d9fdf69fa009d073b50d7e0db156cb3678c23509cb7adf767fc98119a683560950a1e8f3299d17800"
+				]
+			}
+		}
+	],
+	"id": "PLACEHOLDER_TX_ID"
+}`
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_CREATE_ASSET_TX_ID", createAssetTx.ID().String(), 2)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintSecpOpTx.ID().String(), 1)
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintSecpOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
+
+	sigStr, err := formatting.Encode(formatting.HexNC, mintSecpOpTx.Creds[0].Credential.(*secp256k1fx.Credential).Sigs[0][:])
+	require.NoError(err)
+
+	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
+
+	require.Equal(expectedReplyTxString, string(replyTxBytes))
+}
+
+func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
+	require := require.New(t)
+
+	env := setup(t, &envConfig{
+		fork: durango,
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
+	})
+	env.vm.ctx.Lock.Unlock()
+	defer func() {
+		env.vm.ctx.Lock.Lock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
+	}()
+
+	key := keys[0]
+	initialStates := map[uint32][]verify.State{
+		uint32(0): {
+			&secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		},
+		uint32(1): {
+			&secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		},
+	}
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
+	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
+
+	op1 := buildSecpMintOp(createAssetTx, key, 1)
+	op2 := buildSecpMintOp(createAssetTx, key, 2)
+	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
+	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
+
+	reply := api.GetTxReply{}
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
+		TxID:     mintSecpOpTx.ID(),
+		Encoding: formatting.JSON,
+	}, &reply))
+
+	require.Equal(formatting.JSON, reply.Encoding)
+
+	replyTxBytes, err := json.MarshalIndent(reply.Tx, "", "\t")
+	require.NoError(err)
+
+	expectedReplyTxString := `{
+	"unsignedTx": {
+		"networkID": 10,
+		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 48000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "2vxorPLUw5sneb7Mdhhjuws3H5AqaDp1V8ETz6fEuzvn835rVX",
+				"outputIndex": 0,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 49000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
+		"memo": "0x",
+		"operations": [
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 1
+					}
+				],
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"transferOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"amount": 1,
+						"locktime": 0,
+						"threshold": 1
+					}
+				}
+			},
+			{
+				"assetID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+				"inputIDs": [
+					{
+						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
+						"outputIndex": 2
+					}
+				],
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"operation": {
+					"mintInput": {
+						"signatureIndices": [
+							0
+						]
+					},
+					"mintOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"locktime": 0,
+						"threshold": 1
+					},
+					"transferOutput": {
+						"addresses": [
+							"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+						],
+						"amount": 1,
+						"locktime": 0,
+						"threshold": 1
+					}
+				}
+			}
+		]
+	},
+	"credentials": [
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
 					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		},
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"PLACEHOLDER_SIGNATURE"
+				]
+			}
+		},
+		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"0xeada420035b6ad5e658e96abab39622c5aa730bda266374af4ddb264696fa998584823d34f7df3a5cb03c5cec3068365ece9a5b7242193a862e9e0459a8865b801"
 				]
 			}
 		}
@@ -1323,7 +1611,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1337,10 +1625,20 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
+	initialStates := map[uint32][]verify.State{
+		uint32(2): {
+			&propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	op := buildPropertyFxMintOp(createAssetTx, key, 4)
+	op := buildPropertyFxMintOp(createAssetTx, key, 1)
 	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
@@ -1359,8 +1657,34 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 48000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "nNUGBjszswU3ZmhCb8hBNWmg335UZqGWmNrYTAGyMF4bFpMXm",
+				"outputIndex": 0,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 49000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
 		"memo": "0x",
 		"operations": [
 			{
@@ -1368,7 +1692,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 				"inputIDs": [
 					{
 						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-						"outputIndex": 4
+						"outputIndex": 1
 					}
 				],
 				"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
@@ -1396,6 +1720,14 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	},
 	"credentials": [
 		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"0xa5c7a3fac9f87479fafc347510e270e86da9e99ad606f31342baf1440674b1b53ea836b9a1cfee11eb85b96e1b8e547e2206758d3e902d9e14f6dd784172363401"
+				]
+			}
+		},
+		{
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {
 				"signatures": [
@@ -1411,7 +1743,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
 
-	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[0].Credential.(*propertyfx.Credential).Sigs[0][:])
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[1].Credential.(*propertyfx.Credential).Sigs[0][:])
 	require.NoError(err)
 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 1)
@@ -1423,7 +1755,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1437,11 +1769,27 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	}()
 
 	key := keys[0]
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env)
+	initialStates := map[uint32][]verify.State{
+		uint32(2): {
+			&propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+			&propertyfx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
-	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
-	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
+	op1 := buildPropertyFxMintOp(createAssetTx, key, 1)
+	op2 := buildPropertyFxMintOp(createAssetTx, key, 2)
 	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
@@ -1460,8 +1808,34 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	"unsignedTx": {
 		"networkID": 10,
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
-		"outputs": null,
-		"inputs": null,
+		"outputs": [
+			{
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"output": {
+					"addresses": [
+						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
+					],
+					"amount": 48000,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		],
+		"inputs": [
+			{
+				"txID": "2NV5AGoQQHVRY6VkT8sht8bhZDHR7uwta7fk7JwAZpacqMRWCa",
+				"outputIndex": 0,
+				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+				"input": {
+					"amount": 49000,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		],
 		"memo": "0x",
 		"operations": [
 			{
@@ -1469,7 +1843,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 				"inputIDs": [
 					{
 						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-						"outputIndex": 4
+						"outputIndex": 1
 					}
 				],
 				"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
@@ -1498,7 +1872,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 				"inputIDs": [
 					{
 						"txID": "PLACEHOLDER_CREATE_ASSET_TX_ID",
-						"outputIndex": 5
+						"outputIndex": 2
 					}
 				],
 				"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
@@ -1526,6 +1900,14 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	},
 	"credentials": [
 		{
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"credential": {
+				"signatures": [
+					"0xbf14b82775f2b260d77d4d790b0873e8cdb243e20bc95ca65bd08645f70845bd662ec4437b6599b0e4f86ad3d68ddfcd058bf0c729054aad609a26ba539b3b3300"
+				]
+			}
+		},
+		{
 			"fxID": "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy",
 			"credential": {
 				"signatures": [
@@ -1549,7 +1931,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_TX_ID", mintPropertyFxOpTx.ID().String(), 1)
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_BLOCKCHAIN_ID", mintPropertyFxOpTx.Unsigned.(*txs.OperationTx).BlockchainID.String(), 1)
 
-	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[0].Credential.(*propertyfx.Credential).Sigs[0][:])
+	sigStr, err := formatting.Encode(formatting.HexNC, mintPropertyFxOpTx.Creds[1].Credential.(*propertyfx.Credential).Sigs[0][:])
 	require.NoError(err)
 
 	expectedReplyTxString = strings.Replace(expectedReplyTxString, "PLACEHOLDER_SIGNATURE", sigStr, 2)
@@ -1587,58 +1969,12 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 	return tx
 }
 
-func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
+func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStates map[uint32][]verify.State) *txs.Tx {
 	var (
 		key = keys[0]
 		kc  = secp256k1fx.NewKeychain()
 	)
 	kc.Add(key)
-
-	initialStates := map[uint32][]verify.State{
-		uint32(0): {
-			&secp256k1fx.MintOutput{
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			}, &secp256k1fx.MintOutput{
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-		},
-		uint32(1): {
-			&nftfx.MintOutput{
-				GroupID: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-			&nftfx.MintOutput{
-				GroupID: 2,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-		},
-		uint32(2): {
-			&propertyfx.MintOutput{
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-			&propertyfx.MintOutput{
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		},
-	}
 
 	tx, _, err := buildCreateAssetTx(
 		env.service.txBuilderBackend,
