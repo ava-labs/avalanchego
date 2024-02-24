@@ -130,6 +130,8 @@ HOME
 └── .tmpnet                                              // Root path for the temporary network fixture
     ├── prometheus                                       // Working directory for a metrics-scraping prometheus instance
     │   └── file_sd_configs                              // Directory containing file-based service discovery config for prometheus
+    ├── promtail                                         // Working directory for a log-collecting promtail instance
+    │   └── file_sd_configs                              // Directory containing file-based service discovery config for promtail
     └── networks                                         // Default parent directory for temporary networks
         └── 20240306-152305.924531                       // The timestamp of creation is the name of a network's directory
             ├── NodeID-37E8UK3x2YFsHE3RdALmfWcppcZ1eTuj9 // The ID of a node is the name of its data dir

@@ -687,22 +687,21 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	return bootstrapIPs, bootstrapIDs, nil
 }
 
+// Retrieves the default path of the given network child dir.
+func getTmpnetPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".tmpnet"), nil
+}
+
 // Retrieves the default root dir for storing networks and their
 // configuration.
 func getDefaultRootNetworkDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	tmpnetPath, err := getTmpnetPath()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, ".tmpnet", "networks"), nil
-}
-
-// Retrieves the default dir for writing service discovery
-// configuration for prometheus.
-func getPrometheusServiceDiscoveryDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(homeDir, ".tmpnet", "prometheus", "file_sd_configs"), nil
+	return filepath.Join(tmpnetPath, "networks"), nil
 }

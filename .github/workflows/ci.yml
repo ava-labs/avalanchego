@@ -73,6 +73,12 @@ jobs:
         env:
           PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+      - name: Start promtail
+        shell: bash
+        run: bash -x ./scripts/run_promtail.sh
+        env:
+          PROMTAIL_ID: ${{ secrets.PROMTAIL_ID }}
+          PROMTAIL_PASSWORD: ${{ secrets.PROMTAIL_PASSWORD }}
       - name: Notify of metrics availability
         shell: bash
         run: .github/workflows/notify-metrics-availability.sh
@@ -98,6 +104,7 @@ jobs:
           path: |
             ~/.tmpnet/networks
             ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
           if-no-files-found: error
   e2e_existing_network:
     runs-on: ubuntu-latest
