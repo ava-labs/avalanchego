@@ -19,19 +19,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var utxoAmt = 10 * units.MilliAvax
-
 func TestIndexTransaction_Ordered(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -73,7 +70,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -119,7 +116,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -160,7 +157,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -254,7 +251,7 @@ func buildUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax
 		UTXOID: utxoID,
 		Asset:  txAssetID,
 		Out: &secp256k1fx.TransferOutput{
-			Amt: utxoAmt,
+			Amt: startBalance,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
@@ -272,14 +269,14 @@ func buildTX(chainID ids.ID, utxoID avax.UTXOID, txAssetID avax.Asset, address .
 				UTXOID: utxoID,
 				Asset:  txAssetID,
 				In: &secp256k1fx.TransferInput{
-					Amt:   utxoAmt,
+					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
 				Out: &secp256k1fx.TransferOutput{
-					Amt: units.MilliAvax, // TODO ABENEGIA: fix this to pay the exact amount of fees needed
+					Amt: startBalance - testTxFee,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     address,

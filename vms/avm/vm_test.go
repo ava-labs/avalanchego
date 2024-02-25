@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -129,7 +130,7 @@ func TestIssueTx(t *testing.T) {
 func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
+	env := setup(t, &envConfig{fork: durango})
 	env.vm.ctx.Lock.Unlock()
 	defer func() {
 		env.vm.ctx.Lock.Lock()
@@ -212,7 +213,7 @@ func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
+		fork: durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -260,7 +261,7 @@ func TestIssueProperty(t *testing.T) {
 		Asset: avax.Asset{ID: createAssetTx.ID()},
 		UTXOIDs: []*avax.UTXOID{{
 			TxID:        createAssetTx.ID(),
-			OutputIndex: 0,
+			OutputIndex: 1,
 		}},
 		Op: &propertyfx.MintOperation{
 			MintInput: secp256k1fx.Input{
@@ -291,7 +292,7 @@ func TestIssueProperty(t *testing.T) {
 		Asset: avax.Asset{ID: createAssetTx.ID()},
 		UTXOIDs: []*avax.UTXOID{{
 			TxID:        mintPropertyTx.ID(),
-			OutputIndex: 1,
+			OutputIndex: 2,
 		}},
 		Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
 	}
@@ -494,7 +495,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{vmStaticConfig: noFeesTestConfig})
+	env := setup(t, &envConfig{fork: durango})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -578,8 +579,8 @@ func TestForceAcceptImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		vmStaticConfig: noFeesTestConfig,
-		notLinearized:  true,
+		fork:          durango,
+		notLinearized: true,
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -608,7 +609,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 				Outs: []*avax.TransferableOutput{{
 					Asset: txAssetID,
 					Out: &secp256k1fx.TransferOutput{
-						Amt: 1000,
+						Amt: 100 * units.NanoAvax,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
