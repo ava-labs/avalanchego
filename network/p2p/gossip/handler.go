@@ -21,7 +21,6 @@ var _ p2p.Handler = (*Handler[*testTx])(nil)
 func NewHandler[T Gossipable](
 	log logging.Logger,
 	marshaller Marshaller[T],
-	accumulator Accumulator[T],
 	set Set[T],
 	metrics Metrics,
 	targetResponseSize int,
@@ -30,7 +29,6 @@ func NewHandler[T Gossipable](
 		Handler:            p2p.NoOpHandler{},
 		log:                log,
 		marshaller:         marshaller,
-		accumulator:        accumulator,
 		set:                set,
 		metrics:            metrics,
 		targetResponseSize: targetResponseSize,
@@ -40,7 +38,6 @@ func NewHandler[T Gossipable](
 type Handler[T Gossipable] struct {
 	p2p.Handler
 	marshaller         Marshaller[T]
-	accumulator        Accumulator[T]
 	log                logging.Logger
 	set                Set[T]
 	metrics            Metrics
@@ -125,14 +122,6 @@ func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipByte
 			)
 			continue
 		}
-
-		// continue gossiping messages we have not seen to other peers
-		h.accumulator.Add(gossipable)
-	}
-
-	if err := h.accumulator.Gossip(ctx); err != nil {
-		h.log.Error("failed to forward gossip", zap.Error(err))
-		return
 	}
 
 	receivedCountMetric, err := h.metrics.receivedCount.GetMetricWith(pushLabels)
