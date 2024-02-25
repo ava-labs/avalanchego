@@ -109,17 +109,16 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
-      # TODO: Reactivate test once v1.11.0 is published
-      # - name: Run e2e tests
-      #   shell: bash
-      #   run: ./scripts/tests.upgrade.sh
-      # - name: Upload tmpnet network dir
-      #   uses: actions/upload-artifact@v4
-      #   if: always()
-      #   with:
-      #     name: upgrade-tmpnet-data
-      #     path: ${{ env.tmpnet_data_path }}
-      #     if-no-files-found: error
+      - name: Run e2e tests
+        shell: bash
+        run: ./scripts/tests.upgrade.sh
+      - name: Upload tmpnet network dir
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upgrade-tmpnet-data
+          path: ${{ env.tmpnet_data_path }}
+          if-no-files-found: error
   Lint:
     runs-on: ubuntu-latest
     steps:
