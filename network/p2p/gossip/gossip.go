@@ -231,12 +231,20 @@ func (p *PullGossiper[_]) handleResponse(
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](marshaller Marshaller[T], mempool Set[T], client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](
+	marshaller Marshaller[T],
+	mempool Set[T],
+	client *p2p.Client,
+	metrics Metrics,
+	pruneSize int,
+	targetGossipSize int,
+) *PushGossiper[T] {
 	return &PushGossiper[T]{
 		marshaller:       marshaller,
 		set:              mempool,
 		client:           client,
 		metrics:          metrics,
+		pruneSize:        pruneSize,
 		targetGossipSize: targetGossipSize,
 
 		tracking: make(map[ids.ID]time.Time),
@@ -251,6 +259,7 @@ type PushGossiper[T Gossipable] struct {
 	set              Set[T]
 	client           *p2p.Client
 	metrics          Metrics
+	pruneSize        int // size at which we clean everything we are tracking (may no longer be in mempool)
 	targetGossipSize int
 
 	lock     sync.Mutex
@@ -266,7 +275,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if p.pending.Len() == 0 && p.issued.Len() == 0 {
+	if len(p.tracking) == 0 {
 		return nil
 	}
 
@@ -303,8 +312,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	}
 
 	// Iterate over all issued gossipables (have been sent before)
-	//
-	// TODO: ensure starvation of this section doesn't allow [issued] to grow indefinitely
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.issued.PeekLeft()
 		if !ok {
@@ -357,7 +364,39 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	sentCountMetric.Add(float64(len(gossip)))
 	sentBytesMetric.Add(float64(sentBytes))
 
-	return p.client.AppGossip(ctx, msgBytes)
+	if err := p.client.AppGossip(ctx, msgBytes); err != nil {
+		return fmt.Errorf("failed to gossip: %w", err)
+	}
+
+	// Attempt to prune gossipables that are no longer in the mempool
+	if len(p.tracking) < p.pruneSize {
+		return nil
+	}
+	for i := 0; i < p.pending.Len(); i++ {
+		gossipable, ok := p.pending.PopLeft()
+		if !ok {
+			// Should never happen
+			break
+		}
+		if !p.set.Has(gossipable) {
+			delete(p.tracking, gossipable.GossipID())
+		} else {
+			p.pending.PushRight(gossipable)
+		}
+	}
+	for i := 0; i < p.issued.Len(); i++ {
+		gossipable, ok := p.issued.PopLeft()
+		if !ok {
+			// Should never happen
+			break
+		}
+		if !p.set.Has(gossipable) {
+			delete(p.tracking, gossipable.GossipID())
+		} else {
+			p.issued.PushRight(gossipable)
+		}
+	}
+	return nil
 }
 
 // Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
