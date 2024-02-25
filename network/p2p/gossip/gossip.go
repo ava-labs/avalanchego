@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils"
@@ -247,9 +248,10 @@ func NewPushGossiper[T Gossipable](
 		pruneSize:        pruneSize,
 		targetGossipSize: targetGossipSize,
 
-		tracking: make(map[ids.ID]time.Time),
-		pending:  buffer.NewUnboundedDeque[T](0),
-		issued:   buffer.NewUnboundedDeque[T](0),
+		tracking:  make(map[ids.ID]time.Time),
+		pending:   buffer.NewUnboundedDeque[T](0),
+		issued:    buffer.NewUnboundedDeque[T](0),
+		discarded: &cache.LRU[ids.ID, interface{}]{Size: 1024},
 	}
 }
 
@@ -259,15 +261,14 @@ type PushGossiper[T Gossipable] struct {
 	set              Set[T]
 	client           *p2p.Client
 	metrics          Metrics
-	pruneSize        int // size at which we clean everything we are tracking (may no longer be in mempool)
+	pruneSize        int // size at which we check that everything we are tracking is still in the mempool
 	targetGossipSize int
 
-	lock     sync.Mutex
-	tracking map[ids.ID]time.Time
-	pending  buffer.Deque[T]
-	issued   buffer.Deque[T]
-	// TODO: handle case of txs that keep getting added/dropped from mempool (will keep landing on pending queue)
-	// -> may not actually want to handle this here...
+	lock      sync.Mutex
+	tracking  map[ids.ID]time.Time
+	pending   buffer.Deque[T]
+	issued    buffer.Deque[T]
+	discarded *cache.LRU[ids.ID, interface{}] // discarded ensures we don't overgossip transactions that are frequently dropped
 }
 
 // Gossip flushes any queued gossipables
@@ -322,6 +323,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		if !p.set.Has(gossipable) {
 			delete(p.tracking, gossipable.GossipID())
 			_, _ = p.issued.PopLeft()
+			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if issued once
 			continue
 		}
 
@@ -392,6 +394,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		}
 		if !p.set.Has(gossipable) {
 			delete(p.tracking, gossipable.GossipID())
+			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if issued once
 		} else {
 			p.issued.PushRight(gossipable)
 		}
@@ -410,8 +413,14 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		if _, contains := p.tracking[gid]; contains {
 			continue
 		}
-		p.tracking[gid] = time.Time{}
-		p.pending.PushRight(gossipable)
+		if _, contains := p.discarded.Get(gid); !contains {
+			p.tracking[gid] = time.Time{}
+			p.pending.PushRight(gossipable)
+		} else {
+			// Pretend that recently discarded transactions were just gossiped.
+			p.tracking[gid] = time.Now()
+			p.issued.PushRight(gossipable)
+		}
 	}
 }
 
