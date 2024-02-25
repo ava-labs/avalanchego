@@ -302,6 +302,8 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	}
 
 	// Iterate over all issued gossipables (have been sent before)
+	//
+	// TODO: ensure starvation of this section doesn't allow [issued] to grow indefinitely
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.issued.PeekLeft()
 		if !ok {
