@@ -419,6 +419,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 		if _, contains := p.discarded.Get(gid); !contains {
 			p.tracking[gid] = time.Time{}
+			// TODO: sort pending by fee?
 			p.pending.PushRight(gossipable)
 		} else {
 			// Pretend that recently discarded transactions were just gossiped.
