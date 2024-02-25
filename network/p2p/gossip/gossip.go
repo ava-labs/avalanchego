@@ -74,6 +74,7 @@ type Metrics struct {
 	sentBytes     *prometheus.CounterVec
 	receivedCount *prometheus.CounterVec
 	receivedBytes *prometheus.CounterVec
+	tracking      prometheus.Gauge
 }
 
 // NewMetrics returns a common set of metrics
@@ -102,6 +103,11 @@ func NewMetrics(
 			Name:      "gossip_received_bytes",
 			Help:      "amount of gossip received (bytes)",
 		}, metricLabels),
+		tracking: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "gossip_tracking",
+			Help:      "number of gossipables being tracked",
+		}),
 	}
 	err := utils.Err(
 		metrics.Register(m.sentCount),
@@ -352,24 +358,21 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		p.tracking[gossipable.GossipID()] = time.Now()
 	}
 
+	// Send gossipables to peers
 	msgBytes, err := MarshalAppGossip(gossip)
 	if err != nil {
 		return err
 	}
-
 	sentCountMetric, err := p.metrics.sentCount.GetMetricWith(pushLabels)
 	if err != nil {
 		return fmt.Errorf("failed to get sent count metric: %w", err)
 	}
-
 	sentBytesMetric, err := p.metrics.sentBytes.GetMetricWith(pushLabels)
 	if err != nil {
 		return fmt.Errorf("failed to get sent bytes metric: %w", err)
 	}
-
 	sentCountMetric.Add(float64(len(gossip)))
 	sentBytesMetric.Add(float64(sentBytes))
-
 	if err := p.client.AppGossip(ctx, msgBytes); err != nil {
 		return fmt.Errorf("failed to gossip: %w", err)
 	}
@@ -403,6 +406,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 			p.issued.PushRight(gossipable)
 		}
 	}
+	p.metrics.tracking.Set(float64(len(p.tracking)))
 	return nil
 }
 
@@ -427,6 +431,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 			p.issued.PushRight(gossipable)
 		}
 	}
+	p.metrics.tracking.Set(float64(len(p.tracking)))
 }
 
 // Every calls [Gossip] every [frequency] amount of time.
