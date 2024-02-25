@@ -238,31 +238,35 @@ func NewPushGossiper[T Gossipable](
 	client *p2p.Client,
 	metrics Metrics,
 	pruneSize int,
+	discardedSize int,
 	targetGossipSize int,
+	maxRegossipFrequency time.Duration,
 ) *PushGossiper[T] {
 	return &PushGossiper[T]{
-		marshaller:       marshaller,
-		set:              mempool,
-		client:           client,
-		metrics:          metrics,
-		pruneSize:        pruneSize,
-		targetGossipSize: targetGossipSize,
+		marshaller:           marshaller,
+		set:                  mempool,
+		client:               client,
+		metrics:              metrics,
+		pruneSize:            pruneSize,
+		targetGossipSize:     targetGossipSize,
+		maxRegossipFrequency: maxRegossipFrequency,
 
 		tracking:  make(map[ids.ID]time.Time),
 		pending:   buffer.NewUnboundedDeque[T](0),
 		issued:    buffer.NewUnboundedDeque[T](0),
-		discarded: &cache.LRU[ids.ID, interface{}]{Size: 1024},
+		discarded: &cache.LRU[ids.ID, interface{}]{Size: discardedSize},
 	}
 }
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
-	marshaller       Marshaller[T]
-	set              Set[T]
-	client           *p2p.Client
-	metrics          Metrics
-	pruneSize        int // size at which we check that everything we are tracking is still in the mempool
-	targetGossipSize int
+	marshaller           Marshaller[T]
+	set                  Set[T]
+	client               *p2p.Client
+	metrics              Metrics
+	pruneSize            int // size at which we check that everything we are tracking is still in the mempool
+	targetGossipSize     int
+	maxRegossipFrequency time.Duration
 
 	lock      sync.Mutex
 	tracking  map[ids.ID]time.Time
@@ -329,8 +333,8 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 		// Ensure not gossiped too recently
 		lastGossipTime := p.tracking[gossipable.GossipID()]
-		if time.Since(lastGossipTime) < 1*time.Second { // TODO: make this a const
-			continue
+		if time.Since(lastGossipTime) < p.maxRegossipFrequency {
+			break // items are sorted by last issuance time, so we can stop here
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
