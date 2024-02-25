@@ -214,6 +214,8 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSO
 	}
 
 	reply.TxID, err = s.vm.issueTx(tx)
+
+	// TODO: enqueue push gossip
 	return err
 }
 
