@@ -264,6 +264,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	sentBytes := 0
 	gossip := make([][]byte, 0, p.pending.Len())
 	for sentBytes < p.targetGossipSize {
+		// TODO: ensure tx still in the mempool
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
 			break
@@ -302,6 +303,8 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	return p.client.AppGossip(ctx, msgBytes)
 }
 
+// Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
+// use PullGossip. This is only for getting transactions into the hands of validators to begin with.
 func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
