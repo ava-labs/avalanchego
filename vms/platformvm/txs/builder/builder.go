@@ -976,6 +976,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		}
 	)
 
+	utils.Sort(ownerAddrs) // sort control addresses
 	newOwner := &secp256k1fx.OutputOwners{
 		Threshold: threshold,
 		Addrs:     ownerAddrs,
