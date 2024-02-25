@@ -266,12 +266,15 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	sentBytes := 0
 	gossip := make([][]byte, 0, p.pending.Len())
 	for sentBytes < p.targetGossipSize {
-		// TODO: ensure tx still in the mempool
-		if p.set.Has() {
-		}
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
 			break
+		}
+
+		// Ensure item is still in the set before we gossip.
+		if !p.set.Has(gossipable) {
+			_, _ = p.pending.PopLeft()
+			continue
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
