@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils"
@@ -240,10 +239,9 @@ func NewPushGossiper[T Gossipable](marshaller Marshaller[T], mempool Set[T], cli
 		metrics:          metrics,
 		targetGossipSize: targetGossipSize,
 
-		tracking:  make(map[ids.ID]time.Time),
-		pending:   buffer.NewUnboundedDeque[T](0),
-		issued:    buffer.NewUnboundedDeque[T](0),
-		discarded: &cache.LRU[ids.ID, interface{}]{Size: 1024},
+		tracking: make(map[ids.ID]time.Time),
+		pending:  buffer.NewUnboundedDeque[T](0),
+		issued:   buffer.NewUnboundedDeque[T](0),
 	}
 }
 
@@ -255,11 +253,12 @@ type PushGossiper[T Gossipable] struct {
 	metrics          Metrics
 	targetGossipSize int
 
-	lock      sync.Mutex
-	tracking  map[ids.ID]time.Time
-	pending   buffer.Deque[T]
-	issued    buffer.Deque[T]
-	discarded *cache.LRU[ids.ID, interface{}]
+	lock     sync.Mutex
+	tracking map[ids.ID]time.Time
+	pending  buffer.Deque[T]
+	issued   buffer.Deque[T]
+	// TODO: handle case of txs that keep getting added/dropped from mempool (will keep landing on pending queue)
+	// -> may not actually want to handle this here...
 }
 
 // Gossip flushes any queued gossipables
@@ -316,7 +315,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		if !p.set.Has(gossipable) {
 			delete(p.tracking, gossipable.GossipID())
 			_, _ = p.issued.PopLeft()
-			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if we sent at least once
 			continue
 		}
 
@@ -371,9 +369,6 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	for _, gossipable := range gossipables {
 		gid := gossipable.GossipID()
 		if _, contains := p.tracking[gid]; contains {
-			continue
-		}
-		if _, contains := p.discarded.Get(gid); contains {
 			continue
 		}
 		p.tracking[gid] = time.Time{}
