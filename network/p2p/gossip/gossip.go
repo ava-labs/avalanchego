@@ -231,9 +231,10 @@ func (p *PullGossiper[_]) handleResponse(
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](marshaller Marshaller[T], client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](marshaller Marshaller[T], set Set[T], client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
 	return &PushGossiper[T]{
 		marshaller:       marshaller,
+		set:              set,
 		client:           client,
 		metrics:          metrics,
 		targetGossipSize: targetGossipSize,
@@ -244,6 +245,7 @@ func NewPushGossiper[T Gossipable](marshaller Marshaller[T], client *p2p.Client,
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
 	marshaller       Marshaller[T]
+	set              Set[T]
 	client           *p2p.Client
 	metrics          Metrics
 	targetGossipSize int
@@ -265,6 +267,8 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	gossip := make([][]byte, 0, p.pending.Len())
 	for sentBytes < p.targetGossipSize {
 		// TODO: ensure tx still in the mempool
+		if p.set.Has() {
+		}
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
 			break
