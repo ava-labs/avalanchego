@@ -231,14 +231,17 @@ func (p *PullGossiper[_]) handleResponse(
 }
 
 // NewPushGossiper returns an instance of PushGossiper
-func NewPushGossiper[T Gossipable](marshaller Marshaller[T], set Set[T], client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
+func NewPushGossiper[T Gossipable](marshaller Marshaller[T], mempool Set[T], client *p2p.Client, metrics Metrics, targetGossipSize int) *PushGossiper[T] {
 	return &PushGossiper[T]{
 		marshaller:       marshaller,
-		set:              set,
+		set:              mempool,
 		client:           client,
 		metrics:          metrics,
 		targetGossipSize: targetGossipSize,
-		pending:          buffer.NewUnboundedDeque[T](0),
+
+		tracking: make(map[ids.ID]time.Time),
+		pending:  buffer.NewUnboundedDeque[T](0),
+		issued:   buffer.NewUnboundedDeque[T](0),
 	}
 }
 
@@ -250,8 +253,11 @@ type PushGossiper[T Gossipable] struct {
 	metrics          Metrics
 	targetGossipSize int
 
-	lock    sync.Mutex
-	pending buffer.Deque[T]
+	lock     sync.Mutex
+	tracking map[ids.ID]time.Time
+	pending  buffer.Deque[T]
+	issued   buffer.Deque[T]
+	// TODO: handle case of txs that keep getting added/dropped from mempool (will keep landing on pending queue)
 }
 
 // Gossip flushes any queued gossipables
@@ -259,12 +265,14 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if p.pending.Len() == 0 {
+	if p.pending.Len() == 0 && p.issued.Len() == 0 {
 		return nil
 	}
 
 	sentBytes := 0
 	gossip := make([][]byte, 0, p.pending.Len())
+
+	// Iterate over all pending gossipables (never been sent before)
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
@@ -273,6 +281,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 		// Ensure item is still in the set before we gossip.
 		if !p.set.Has(gossipable) {
+			delete(p.tracking, gossipable.GossipID())
 			_, _ = p.pending.PopLeft()
 			continue
 		}
@@ -280,6 +289,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			// remove this item so we don't get stuck in a loop
+			delete(p.tracking, gossipable.GossipID())
 			_, _ = p.pending.PopLeft()
 			return err
 		}
@@ -287,6 +297,43 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
 		p.pending.PopLeft()
+		p.issued.PushRight(gossipable)
+		p.tracking[gossipable.GossipID()] = time.Now()
+	}
+
+	// Iterate over all issued gossipables (have been sent before)
+	for sentBytes < p.targetGossipSize {
+		gossipable, ok := p.issued.PeekLeft()
+		if !ok {
+			break
+		}
+
+		// Ensure item is still in the set before we gossip.
+		if !p.set.Has(gossipable) {
+			delete(p.tracking, gossipable.GossipID())
+			_, _ = p.issued.PopLeft()
+			continue
+		}
+
+		// Ensure not gossiped too recently
+		lastGossipTime := p.tracking[gossipable.GossipID()]
+		if time.Since(lastGossipTime) < 1*time.Second { // TODO: make this a const
+			continue
+		}
+
+		bytes, err := p.marshaller.MarshalGossip(gossipable)
+		if err != nil {
+			// Should never happen because we've already issued this once.
+			delete(p.tracking, gossipable.GossipID())
+			_, _ = p.issued.PopLeft()
+			return err
+		}
+
+		gossip = append(gossip, bytes)
+		sentBytes += len(bytes)
+		_, _ = p.issued.PopLeft()
+		p.issued.PushRight(gossipable)
+		p.tracking[gossipable.GossipID()] = time.Now()
 	}
 
 	msgBytes, err := MarshalAppGossip(gossip)
@@ -317,6 +364,12 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	defer p.lock.Unlock()
 
 	for _, gossipable := range gossipables {
+		gid := gossipable.GossipID()
+		_, contains := p.tracking[gid]
+		if contains {
+			continue
+		}
+		p.tracking[gid] = time.Time{}
 		p.pending.PushRight(gossipable)
 	}
 }
