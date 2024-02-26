@@ -1,6 +1,6 @@
 # Block Composition and Formation Logic
 
-AvalancheGo v1.9.0 (Banff) slightly changes the way the P-chain selects transactions to be included in next block and deals with block timestamps. In this brief document we detail the process and the changes.
+The blocks types, content and the way a node builds P-chain blocks have changed over time. In this brief document we detail the changes.
 
 ## Apricot
 
@@ -96,6 +96,62 @@ Operations are carried out in the following order:
 - We try to move chain time ahead to the current local time or the earliest staker set change event. Unlike Apricot, here we issue either a Standard Block or a Proposal Block to advance the time.
 - We check if any staker needs to be rewarded, issuing as many Proposal Blocks as needed, as above.
 - We try to fill a Standard Block with mempool decision transactions.
+
+## Cortina
+
+### Cortina Block Content
+
+Cortina did not change the allowed block types, block content and block formation logic.
+
+For completeness we list here Cortina blocks content:
+
+- _Standard Blocks_ may contain multiple transactions of the following types:
+  - CreateChainTx
+  - CreateSubnetTx
+  - ImportTx
+  - ExportTx
+  - AddValidatorTx
+  - AddDelegatorTx
+  - AddSubnetValidatorTx
+  - RemoveSubnetValidatorTx
+  - TransformSubnetTx
+  - AddPermissionlessValidatorTx
+  - AddPermissionlessDelegatorTx
+- _Proposal Blocks_ may contain a single transaction of the following types:
+  - RewardValidatorTx
+- _Options blocks_, i.e. _Commit Block_ and _Abort Block_ do not contain any transactions.
+
+### Cortina Block Formation Logic
+
+Cortina did not introduced any change to block formation logic.
+
+## Durango
+
+### Durango Block Content
+
+Durango introduced a couple of new transactions type, BaseTx and TrasferSubnetOwnershipTx. Moreover it banned a couple of other transactions, AddValidatorTx and AddDelegatorTx.
+
+Durango allows the following block types with the following content:
+
+- _Standard Blocks_ may contain multiple transactions of the following types:
+  - CreateChainTx
+  - CreateSubnetTx
+  - ImportTx
+  - ExportTx
+  - AddSubnetValidatorTx
+  - RemoveSubnetValidatorTx
+  - TransformSubnetTx
+  - AddPermissionlessValidatorTx
+  - AddPermissionlessDelegatorTx
+  - BaseTx
+  - TransferSubnetOwnershipTx
+- _Proposal Blocks_ may contain a single transaction of the following types:
+  - RewardValidatorTx
+- _Options blocks_, i.e. _Commit Block_ and _Abort Block_ do not contain any transactions.
+
+### Durango Block Formation Logic
+
+Durango did not introduced any change to block formation logic.
 
 [^1]: Proposal transactions whose start time is too close to local time are dropped first and won't be included in any block.
 [^2]: Advance time transactions are proposal transactions and they do change chain time. But advance time transactions are generated just in time and never stored in the mempool. Here mempool proposal transactions refer to AddValidator, AddDelegator and AddSubnetValidator transactions. Reward validator transactions are proposal transactions which do not change chain time but which never in mempool (they are generated just in time).
