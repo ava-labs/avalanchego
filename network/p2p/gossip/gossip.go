@@ -245,7 +245,7 @@ func NewPushGossiper[T Gossipable](
 	mempool Set[T],
 	client *p2p.Client,
 	metrics Metrics,
-	pruneSize int,
+	earlyGossipSize int,
 	discardedSize int,
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
@@ -255,7 +255,7 @@ func NewPushGossiper[T Gossipable](
 		set:                  mempool,
 		client:               client,
 		metrics:              metrics,
-		pruneSize:            pruneSize,
+		earlyGossipSize:      earlyGossipSize,
 		targetGossipSize:     targetGossipSize,
 		maxRegossipFrequency: maxRegossipFrequency,
 
@@ -272,7 +272,7 @@ type PushGossiper[T Gossipable] struct {
 	set                  Set[T]
 	client               *p2p.Client
 	metrics              Metrics
-	pruneSize            int // size at which we check that everything we are tracking is still in the mempool
+	earlyGossipSize      int // size at which we attempt gossip during [Add] to avoid unbounded memory use
 	targetGossipSize     int
 	maxRegossipFrequency time.Duration
 
@@ -288,6 +288,10 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	return p.gossip(ctx)
+}
+
+func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 	if len(p.tracking) == 0 {
 		return nil
 	}
@@ -371,48 +375,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return fmt.Errorf("failed to gossip: %w", err)
 	}
 
-	// Cleanup stale gossipables
-	p.prune()
 	return nil
-}
-
-// prune drops gossipables that are no longer in the mempool
-//
-// TODO: should we require that `Set` removes items that are dropped
-// to avoid an iteration over everything we are tracking? We would need
-// to switch away from buffer, which doesn't support arbitrary deletes.
-func (p *PushGossiper[T]) prune() {
-	if len(p.tracking) < p.pruneSize {
-		return
-	}
-	pendingSize := p.pending.Len()
-	for i := 0; i < pendingSize; i++ {
-		gossipable, ok := p.pending.PopLeft()
-		if !ok {
-			// Should never happen
-			break
-		}
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
-		} else {
-			p.pending.PushRight(gossipable)
-		}
-	}
-	issuedSize := p.issued.Len()
-	for i := 0; i < issuedSize; i++ {
-		gossipable, ok := p.issued.PopLeft()
-		if !ok {
-			// Should never happen
-			break
-		}
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
-			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if issued once
-		} else {
-			p.issued.PushRight(gossipable)
-		}
-	}
-	p.metrics.tracking.Set(float64(len(p.tracking)))
 }
 
 // Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
@@ -421,6 +384,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	// Add new gossipables to the tracker
 	for _, gossipable := range gossipables {
 		gid := gossipable.GossipID()
 		if _, contains := p.tracking[gid]; contains {
@@ -428,7 +392,6 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 		if _, contains := p.discarded.Get(gid); !contains {
 			p.tracking[gid] = time.Time{}
-			// TODO: sort pending by priority fee
 			p.pending.PushRight(gossipable)
 		} else {
 			// Pretend that recently discarded transactions were just gossiped.
@@ -436,10 +399,15 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 			p.issued.PushRight(gossipable)
 		}
 	}
-	p.metrics.tracking.Set(float64(len(p.tracking)))
 
-	// Cleanup stale gossipables
-	p.prune()
+	// If we have too many pending gossipables, trigger gossip
+	if len(p.tracking) > p.earlyGossipSize {
+		if err := p.gossip(context.TODO()); err != nil {
+			// TODO: log error
+		}
+	}
+
+	p.metrics.tracking.Set(float64(len(p.tracking)))
 }
 
 // Every calls [Gossip] every [frequency] amount of time.
