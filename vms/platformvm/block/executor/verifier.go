@@ -73,7 +73,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent(), b.Timestamp())
+	inputs, feesMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent(), b.Timestamp())
 	if err != nil {
 		return err
 	}
@@ -93,6 +93,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		onDecisionState,
 		onCommitState,
 		onAbortState,
+		feesMan.GetCumulatedUnits(),
 		inputs,
 		atomicRequests,
 		onAcceptFunc,
@@ -158,7 +159,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(b, nil, onCommitState, onAbortState, nil, nil, nil)
+	return v.proposalBlock(b, nil, onCommitState, onAbortState, fees.Empty, nil, nil, nil)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -221,9 +222,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		onAcceptState: atomicExecutor.OnAccept,
 
-		inputs:         atomicExecutor.Inputs,
-		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
-		atomicRequests: atomicExecutor.AtomicRequests,
+		inputs:          atomicExecutor.Inputs,
+		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
+		blockComplexity: fees.Empty,
+		atomicRequests:  atomicExecutor.AtomicRequests,
 	}
 	return nil
 }
@@ -336,6 +338,9 @@ func (v *verifier) abortBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onAbortState,
 		timestamp:      onAbortState.GetTimestamp(),
+
+		// blockComplexity not set. We'll assign same complexity
+		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -353,6 +358,9 @@ func (v *verifier) commitBlock(b block.Block) error {
 		statelessBlock: b,
 		onAcceptState:  onCommitState,
 		timestamp:      onCommitState.GetTimestamp(),
+
+		// blockComplexity not set. We'll assign same complexity
+		// as proposal blocks upon acceptance
 	}
 	return nil
 }
@@ -363,6 +371,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
+	blockComplexity fees.Dimensions,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -401,8 +410,9 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp:      onAbortState.GetTimestamp(),
-		atomicRequests: atomicRequests,
+		timestamp:       onAbortState.GetTimestamp(),
+		blockComplexity: blockComplexity,
+		atomicRequests:  atomicRequests,
 	}
 	return nil
 }
@@ -413,7 +423,7 @@ func (v *verifier) standardBlock(
 	blkTimestamp time.Time,
 	onAcceptState state.Diff,
 ) error {
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent(), blkTimestamp)
+	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent(), blkTimestamp)
 	if err != nil {
 		return err
 	}
@@ -427,26 +437,28 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:      onAcceptState.GetTimestamp(),
-		inputs:         inputs,
-		atomicRequests: atomicRequests,
+		timestamp:       onAcceptState.GetTimestamp(),
+		blockComplexity: feeMan.GetCumulatedUnits(),
+		inputs:          inputs,
+		atomicRequests:  atomicRequests,
 	}
 	return nil
 }
 
 func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID, blkTimestamp time.Time) (
 	set.Set[ids.ID],
+	*fees.Manager,
 	map[ids.ID]*atomic.Requests,
 	func(),
 	error,
 ) {
 	unitFees, err := state.GetUnitFees()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	unitWindows, err := state.GetFeeWindows()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	var (
@@ -482,11 +494,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		// ensure it doesn't overlap with current input batch
 		if inputs.Overlaps(txExecutor.Inputs) {
-			return nil, nil, nil, ErrConflictingBlockTxs
+			return nil, nil, nil, nil, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
 		inputs.Union(txExecutor.Inputs)
@@ -510,7 +522,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	if isEForkActive {
@@ -528,5 +540,5 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 		}
 	}
 
-	return inputs, atomicRequests, onAcceptFunc, nil
+	return inputs, feeManager, atomicRequests, onAcceptFunc, nil
 }
