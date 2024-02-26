@@ -26,6 +26,8 @@ const (
 	typeLabel = "type"
 	pushType  = "push"
 	pullType  = "pull"
+
+	defaultGossipableCount = 64
 )
 
 var (
@@ -236,21 +238,23 @@ func (p *PullGossiper[_]) handleResponse(
 
 // NewPushGossiper returns an instance of PushGossiper
 func NewPushGossiper[T Gossipable](
+	log logging.Logger,
 	marshaller Marshaller[T],
 	mempool Set[T],
 	client *p2p.Client,
 	metrics Metrics,
-	pruneSize int,
+	earlyGossipSize int,
 	discardedSize int,
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
 ) *PushGossiper[T] {
 	return &PushGossiper[T]{
+		log:                  log,
 		marshaller:           marshaller,
 		set:                  mempool,
 		client:               client,
 		metrics:              metrics,
-		pruneSize:            pruneSize,
+		earlyGossipSize:      earlyGossipSize,
 		targetGossipSize:     targetGossipSize,
 		maxRegossipFrequency: maxRegossipFrequency,
 
@@ -263,11 +267,13 @@ func NewPushGossiper[T Gossipable](
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
-	marshaller           Marshaller[T]
-	set                  Set[T]
-	client               *p2p.Client
-	metrics              Metrics
-	pruneSize            int // size at which we check that everything we are tracking is still in the mempool
+	log        logging.Logger
+	marshaller Marshaller[T]
+	set        Set[T]
+	client     *p2p.Client
+	metrics    Metrics
+
+	earlyGossipSize      int // size at which we attempt gossip during [Add] to avoid unbounded memory use
 	targetGossipSize     int
 	maxRegossipFrequency time.Duration
 
@@ -283,13 +289,17 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	return p.gossip(ctx)
+}
+
+func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 	if len(p.tracking) == 0 {
 		return nil
 	}
 
 	var (
 		sentBytes = 0
-		gossip    = make([][]byte, 0, p.pending.Len())
+		gossip    = make([][]byte, 0, defaultGossipableCount)
 		now       = time.Now()
 	)
 
@@ -309,19 +319,18 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
-			// remove this item so we don't get stuck in a loop
 			delete(p.tracking, gossipID)
 			return err
 		}
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
-
 		p.issued.PushRight(gossipable)
 		p.tracking[gossipID] = now
 	}
 
-	// Iterate over all issued gossipables (have been sent before)
+	// Iterate over all issued gossipables (have been sent before) to fill
+	// undersized gossip batch
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.issued.PopLeft()
 		if !ok {
@@ -354,7 +363,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
-
 		p.issued.PushRight(gossipable)
 		p.tracking[gossipID] = now
 	}
@@ -377,49 +385,11 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	if err := p.client.AppGossip(ctx, msgBytes); err != nil {
 		return fmt.Errorf("failed to gossip: %w", err)
 	}
-
-	// Attempt to prune gossipables that are no longer in the mempool
-	if len(p.tracking) < p.pruneSize {
-		return nil
-	}
-
-	numPending := p.pending.Len()
-	for i := 0; i < numPending; i++ {
-		gossipable, ok := p.pending.PopLeft()
-		if !ok {
-			return errPruningPendingFailed // should never happen
-		}
-
-		gossipID := gossipable.GossipID()
-		if p.set.Has(gossipID) {
-			p.pending.PushRight(gossipable)
-			continue
-		}
-
-		delete(p.tracking, gossipID)
-	}
-
-	numIssued := p.issued.Len()
-	for i := 0; i < numIssued; i++ {
-		gossipable, ok := p.issued.PopLeft()
-		if !ok {
-			return errPruningIssuedFailed // should never happen
-		}
-
-		gossipID := gossipable.GossipID()
-		if p.set.Has(gossipID) {
-			p.issued.PushRight(gossipable)
-			continue
-		}
-
-		delete(p.tracking, gossipID)
-		p.discarded.Put(gossipID, nil) // only add to discarded if issued once
-	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
 	return nil
 }
 
-// Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
+// TODO: wording cleanup Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
 // use PullGossip. This is only for getting transactions into the hands of validators to begin with.
 func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
@@ -431,7 +401,6 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		if _, contains := p.tracking[gossipID]; contains {
 			continue
 		}
-
 		if _, contains := p.discarded.Get(gossipID); !contains {
 			p.tracking[gossipID] = time.Time{}
 		} else {
@@ -439,6 +408,14 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 			p.tracking[gossipID] = now
 		}
 		p.pending.PushRight(gossipable)
+	}
+
+	// If we have too many gossipables, trigger gossip to evict
+	// stale entries.
+	if len(p.tracking) > p.earlyGossipSize {
+		if err := p.gossip(context.TODO()); err != nil {
+			p.log.Error("failed to gossip", zap.Error(err))
+		}
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
 }
