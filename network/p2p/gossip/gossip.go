@@ -25,6 +25,8 @@ const (
 	typeLabel = "type"
 	pushType  = "push"
 	pullType  = "pull"
+
+	defaultGossipableCount = 64
 )
 
 var (
@@ -290,10 +292,9 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	sentBytes := 0
-	gossip := make([][]byte, 0, p.pending.Len())
-
 	// Iterate over all pending gossipables (never been sent before)
+	sentBytes := 0
+	gossip := make([][]byte, 0, defaultGossipableCount)
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.pending.PeekLeft()
 		if !ok {
@@ -375,6 +376,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return fmt.Errorf("failed to gossip: %w", err)
 	}
 
+	// Cleanup stale gossipables
 	p.prune()
 	return nil
 }
@@ -435,6 +437,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
 
+	// Cleanup stale gossipables
 	p.prune()
 }
 
