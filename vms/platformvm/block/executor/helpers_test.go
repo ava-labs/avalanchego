@@ -127,7 +127,7 @@ type environment struct {
 	mockedState    *state.MockState
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosHandler   utxo.Verifier
+	utxosVerifier  utxo.Verifier
 	txBuilder      p_tx_builder.Builder
 	backend        *executor.Backend
 }
@@ -156,7 +156,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	if ctrl == nil {
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state, res.clk)
-		res.utxosHandler = utxo.NewVerifier(res.ctx, res.clk, res.fx)
+		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
 			res.config,
@@ -167,7 +167,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		genesisBlkID = ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
-		res.utxosHandler = utxo.NewVerifier(res.ctx, res.clk, res.fx)
+		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 
 		res.mockedState.EXPECT().GetTimestamp().Return(time.Time{}).Times(2) // to initialize createSubnet/BlockchainTx fee
 		res.txBuilder = p_tx_builder.New(
@@ -187,7 +187,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
+		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
