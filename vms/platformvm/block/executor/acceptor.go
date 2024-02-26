@@ -79,6 +79,8 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 
+	a.metrics.SetBlockComplexity(blkState.blockComplexity)
+
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
@@ -136,6 +138,8 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		return err
 	}
 
+	a.metrics.SetBlockComplexity(parentState.blockComplexity)
+
 	if err := a.commonAccept(b); err != nil {
 		return err
 	}
@@ -150,6 +154,10 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
+
+	// we set option complexity at its parent block's one.
+	a.metrics.SetBlockComplexity(parentState.blockComplexity)
+
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
 	}
@@ -227,6 +235,8 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
+
+	a.metrics.SetBlockComplexity(blkState.blockComplexity)
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {

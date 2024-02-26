@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var Noop Metrics = noopMetrics{}
@@ -50,3 +52,5 @@ func (noopMetrics) SetTimeUntilSubnetUnstake(ids.ID, time.Duration) {}
 func (noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
 
 func (noopMetrics) SetPercentConnected(float64) {}
+
+func (noopMetrics) SetBlockComplexity(commonfees.Dimensions) {}
