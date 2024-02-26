@@ -29,6 +29,23 @@ enum IterationNode<'a> {
     },
 }
 
+impl<'a> std::fmt::Debug for IterationNode<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unvisited { key, node } => f
+                .debug_struct("Unvisited")
+                .field("key", key)
+                .field("node", node)
+                .finish(),
+            Self::Visited {
+                key,
+                children_iter: _,
+            } => f.debug_struct("Visited").field("key", key).finish(),
+        }
+    }
+}
+
+#[derive(Debug)]
 enum NodeStreamState<'a> {
     /// The iterator state is lazily initialized when poll_next is called
     /// for the first time. The iteration start key is stored here.
@@ -49,6 +66,7 @@ impl NodeStreamState<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct MerkleNodeStream<'a, S, T> {
     state: NodeStreamState<'a>,
     merkle_root: DiskAddress,
@@ -271,6 +289,7 @@ fn get_iterator_intial_state<'a, S: ShaleStore<Node> + Send + Sync, T>(
     }
 }
 
+#[derive(Debug)]
 enum MerkleKeyValueStreamState<'a, S, T> {
     /// The iterator state is lazily initialized when poll_next is called
     /// for the first time. The iteration start key is stored here.
@@ -295,6 +314,7 @@ impl<'a, S, T> MerkleKeyValueStreamState<'a, S, T> {
     }
 }
 
+#[derive(Debug)]
 pub struct MerkleKeyValueStream<'a, S, T> {
     state: MerkleKeyValueStreamState<'a, S, T>,
     merkle_root: DiskAddress,
