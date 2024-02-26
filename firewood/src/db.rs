@@ -8,7 +8,10 @@ pub use crate::{
 };
 use crate::{
     file,
-    merkle::{Bincode, Key, Merkle, MerkleError, Node, Proof, ProofError, TrieHash, TRIE_HASH_LEN},
+    merkle::{
+        Bincode, Key, Merkle, MerkleError, MerkleKeyValueStream, Node, Proof, ProofError, TrieHash,
+        TRIE_HASH_LEN,
+    },
     storage::{
         buffer::{DiskBuffer, DiskBufferRequester},
         CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut, StoreRevShared,
@@ -280,6 +283,8 @@ pub struct DbRev<S> {
 
 #[async_trait]
 impl<S: ShaleStore<Node> + Send + Sync> api::DbView for DbRev<S> {
+    type Stream<'a> = MerkleKeyValueStream<'a, S, Bincode> where Self: 'a;
+
     async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
         self.merkle
             .root_hash(self.header.kv_root)
@@ -315,6 +320,18 @@ impl<S: ShaleStore<Node> + Send + Sync> api::DbView for DbRev<S> {
             .range_proof(self.header.kv_root, first_key, last_key, limit)
             .await
             .map_err(|e| api::Error::InternalError(Box::new(e)))
+    }
+
+    fn iter_option<K: KeyType>(
+        &self,
+        first_key: Option<K>,
+    ) -> Result<Self::Stream<'_>, api::Error> {
+        Ok(match first_key {
+            None => self.merkle.key_value_iter(self.header.kv_root),
+            Some(key) => self
+                .merkle
+                .key_value_iter_from_key(self.header.kv_root, key.as_ref().into()),
+        })
     }
 }
 

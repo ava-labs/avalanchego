@@ -7,6 +7,7 @@ use super::{
 };
 use crate::merkle::Proof;
 use async_trait::async_trait;
+use futures::Stream;
 use std::sync::Arc;
 
 /// An EmptyDb is a simple implementation of api::Db
@@ -55,6 +56,8 @@ impl Db for EmptyDb {
 
 #[async_trait]
 impl DbView for HistoricalImpl {
+    type Stream<'a> = EmptyStreamer;
+
     async fn root_hash(&self) -> Result<HashKey, Error> {
         Ok(ROOT_HASH)
     }
@@ -75,11 +78,30 @@ impl DbView for HistoricalImpl {
     ) -> Result<Option<RangeProof<Vec<u8>, Vec<u8>>>, Error> {
         Ok(None)
     }
+
+    fn iter_option<K: KeyType>(&self, _first_key: Option<K>) -> Result<EmptyStreamer, Error> {
+        Ok(EmptyStreamer {})
+    }
+}
+
+pub struct EmptyStreamer;
+
+impl Stream for EmptyStreamer {
+    type Item = Result<(Box<[u8]>, Vec<u8>), Error>;
+
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::task::Poll::Ready(None)
+    }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use futures::StreamExt;
+
     use super::*;
     use crate::v2::api::{BatchOp, Proposal};
 
@@ -144,6 +166,24 @@ mod tests {
         // now consume proposal1 and proposal2
         proposal2.commit().await?;
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn empty_streamer() -> Result<(), Error> {
+        let emptydb = EmptyDb {};
+        let rev = emptydb.revision(ROOT_HASH).await?;
+        let mut iter = rev.iter()?;
+        assert!(iter.next().await.is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn empty_streamer_start_at() -> Result<(), Error> {
+        let emptydb = EmptyDb {};
+        let rev = emptydb.revision(ROOT_HASH).await?;
+        let mut iter = rev.iter_from(b"ignored")?;
+        assert!(iter.next().await.is_none());
         Ok(())
     }
 }

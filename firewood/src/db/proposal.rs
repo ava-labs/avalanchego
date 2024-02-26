@@ -5,8 +5,10 @@ use super::{
     get_sub_universe_from_deltas, Db, DbConfig, DbError, DbHeader, DbInner, DbRev, DbRevInner,
     MutStore, SharedStore, Universe, MERKLE_META_SPACE, MERKLE_PAYLOAD_SPACE, ROOT_HASH_SPACE,
 };
-use crate::merkle::Proof;
+use crate::merkle::{Bincode, MerkleKeyValueStream, Node, Proof};
+use crate::shale::compact::CompactSpace;
 use crate::shale::CachedStore;
+use crate::storage;
 use crate::{
     merkle::{TrieHash, TRIE_HASH_LEN},
     storage::{buffer::BufferWrite, AshRecord, StoreRevMut},
@@ -264,6 +266,8 @@ impl Proposal {
 
 #[async_trait]
 impl api::DbView for Proposal {
+    type Stream<'a> = MerkleKeyValueStream<'a, CompactSpace<Node, storage::StoreRevMut>, Bincode>;
+
     async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
         self.get_revision()
             .kv_root_hash()
@@ -298,5 +302,17 @@ impl api::DbView for Proposal {
         K: api::KeyType,
     {
         todo!();
+    }
+
+    fn iter_option<K: KeyType>(
+        &self,
+        first_key: Option<K>,
+    ) -> Result<Self::Stream<'_>, api::Error> {
+        let rev = self.get_revision();
+        let iter = match first_key {
+            None => rev.stream(),
+            Some(first_key) => rev.stream_from(first_key.as_ref().into()),
+        };
+        Ok(iter)
     }
 }

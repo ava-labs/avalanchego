@@ -4,6 +4,7 @@
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
+use futures::stream::Empty;
 
 use crate::{merkle::Proof, v2::api};
 
@@ -101,6 +102,9 @@ impl<T> Proposal<T> {
 
 #[async_trait]
 impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
+    // TODO: Replace with the correct stream type for an in-memory proposal implementation
+    type Stream<'a> = Empty<Result<(Box<[u8]>, Vec<u8>), api::Error>> where T: 'a;
+
     async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
         todo!();
     }
@@ -134,6 +138,13 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         _last_key: Option<KT>,
         _limit: Option<usize>,
     ) -> Result<Option<api::RangeProof<Vec<u8>, Vec<u8>>>, api::Error> {
+        todo!();
+    }
+
+    fn iter_option<K: KeyType>(
+        &self,
+        _first_key: Option<K>,
+    ) -> Result<Self::Stream<'_>, api::Error> {
         todo!();
     }
 }
