@@ -296,7 +296,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	sentBytes := 0
 	gossip := make([][]byte, 0, defaultGossipableCount)
 	for sentBytes < p.targetGossipSize {
-		gossipable, ok := p.pending.PeekLeft()
+		gossipable, ok := p.pending.PopLeft()
 		if !ok {
 			break
 		}
@@ -304,7 +304,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		// Ensure item is still in the set before we gossip.
 		if !p.set.Has(gossipable) {
 			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.pending.PopLeft()
 			continue
 		}
 
@@ -312,18 +311,16 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		if err != nil {
 			// remove this item so we don't get stuck in a loop
 			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.pending.PopLeft()
 			return err
 		}
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
-		p.pending.PopLeft()
 		p.issued.PushRight(gossipable)
 		p.tracking[gossipable.GossipID()] = time.Now()
 	}
 	for sentBytes < p.targetGossipSize {
-		gossipable, ok := p.issued.PeekLeft()
+		gossipable, ok := p.issued.PopLeft()
 		if !ok {
 			break
 		}
@@ -331,7 +328,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		// Ensure item is still in the set before we gossip.
 		if !p.set.Has(gossipable) {
 			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.issued.PopLeft()
 			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if issued once
 			continue
 		}
@@ -339,6 +335,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		// Ensure not gossiped too recently
 		lastGossipTime := p.tracking[gossipable.GossipID()]
 		if time.Since(lastGossipTime) < p.maxRegossipFrequency {
+			p.issued.PushLeft(gossipable)
 			break // items are sorted by last issuance time, so we can stop here
 		}
 
@@ -346,13 +343,11 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		if err != nil {
 			// Should never happen because we've already issued this once.
 			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.issued.PopLeft()
 			return err
 		}
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
-		_, _ = p.issued.PopLeft()
 		p.issued.PushRight(gossipable)
 		p.tracking[gossipable.GossipID()] = time.Now()
 	}
