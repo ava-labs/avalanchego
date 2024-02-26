@@ -392,6 +392,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	// Add new gossipables to the tracker
 	now := time.Now()
 	for _, gossipable := range gossipables {
 		gossipID := gossipable.GossipID()
