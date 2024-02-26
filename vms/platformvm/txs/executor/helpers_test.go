@@ -144,7 +144,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState, clk)
-	utxoHandler := utxo.NewVerifier(ctx, clk, fx)
+	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
 	txBuilder := builder.New(
 		ctx,
@@ -159,7 +159,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
 		Fx:           fx,
-		FlowChecker:  utxoHandler,
+		FlowChecker:  utxosVerifier,
 		Uptimes:      uptimes,
 		Rewards:      rewards,
 	}
@@ -176,7 +176,7 @@ func newEnvironment(t *testing.T, f fork) *environment {
 		states:         make(map[ids.ID]state.Chain),
 		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
-		utxosHandler:   utxoHandler,
+		utxosHandler:   utxosVerifier,
 		txBuilder:      txBuilder,
 		backend:        backend,
 	}
