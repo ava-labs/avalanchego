@@ -377,9 +377,14 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return fmt.Errorf("failed to gossip: %w", err)
 	}
 
-	// Attempt to prune gossipables that are no longer in the mempool
+	p.prune()
+	return nil
+}
+
+// prune drops gossipables that are no longer in the mempool
+func (p *PushGossiper[T]) prune() {
 	if len(p.tracking) < p.pruneSize {
-		return nil
+		return
 	}
 	for i := 0; i < p.pending.Len(); i++ {
 		gossipable, ok := p.pending.PopLeft()
@@ -407,7 +412,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		}
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
-	return nil
 }
 
 // Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
@@ -432,6 +436,8 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
+
+	p.prune()
 }
 
 // Every calls [Gossip] every [frequency] amount of time.
