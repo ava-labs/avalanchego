@@ -523,6 +523,7 @@ impl<T> EncodedNode<T> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum EncodedNodeType {
     Leaf(LeafNode),
     Branch {
@@ -679,10 +680,9 @@ impl Serialize for EncodedNode<Bincode> {
                     Encoded::default()
                 };
 
-                let serialized_path = Bincode::serialize(&path.encode(false))
-                    .map_err(|e| S::Error::custom(format!("bincode error: {e}")))?;
+                let serialized_path = from_nibbles(&path.encode(true)).collect();
 
-                list[BranchNode::MAX_CHILDREN + 1] = Encoded::Data(serialized_path);
+                list[BranchNode::MAX_CHILDREN + 1] = Encoded::Raw(serialized_path);
 
                 let mut seq = serializer.serialize_seq(Some(list.len()))?;
 
@@ -878,7 +878,7 @@ mod tests {
     use super::*;
     use crate::shale::cached::PlainMem;
     use std::iter::repeat;
-    use test_case::test_matrix;
+    use test_case::{test_case, test_matrix};
 
     #[test_matrix(
         [Nil, [0x00; TRIE_HASH_LEN]],
@@ -932,6 +932,30 @@ mod tests {
         ));
 
         check_node_encoding(node);
+    }
+
+    #[test_case(&[])]
+    #[test_case(&[0x00])]
+    #[test_case(&[0x0F])]
+    #[test_case(&[0x00, 0x00])]
+    #[test_case(&[0x01, 0x02])]
+    #[test_case(&[0x00,0x0F])]
+    #[test_case(&[0x0F,0x0F])]
+    #[test_case(&[0x0F,0x01,0x0F])]
+    fn encoded_branch_node_bincode_serialize(path_nibbles: &[u8]) -> Result<(), Error> {
+        let node = EncodedNode::<Bincode>::new(EncodedNodeType::Branch {
+            path: PartialPath(path_nibbles.to_vec()),
+            children: Default::default(),
+            value: Some(Data(vec![1, 2, 3, 4])),
+        });
+
+        let node_bytes = Bincode::serialize(&node)?;
+
+        let deserialized_node: EncodedNode<Bincode> = Bincode::deserialize(&node_bytes)?;
+
+        assert_eq!(&node.node, &deserialized_node.node);
+
+        Ok(())
     }
 
     #[test_matrix(
