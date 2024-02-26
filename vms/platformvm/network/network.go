@@ -42,9 +42,10 @@ type network struct {
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
 
-	txPushGossiper    *gossip.PushGossiper[*txs.Tx]
-	txPullGossiper    gossip.Gossiper
-	txGossipFrequency time.Duration
+	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
+	txPushGossipFrequency time.Duration
+	txPullGossiper        gossip.Gossiper
+	txPullGossipFrequency time.Duration
 }
 
 func New(
@@ -163,8 +164,9 @@ func New(
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		appSender:                 appSender,
 		txPushGossiper:            txPushGossiper,
+		txPushGossipFrequency:     config.PushGossipFrequency,
 		txPullGossiper:            txPullGossiper,
-		txGossipFrequency:         config.PullGossipFrequency,
+		txPullGossipFrequency:     config.PullGossipFrequency,
 	}, nil
 }
 
