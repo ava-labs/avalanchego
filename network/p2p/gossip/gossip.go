@@ -44,6 +44,9 @@ var (
 	pullLabels = prometheus.Labels{
 		typeLabel: pullType,
 	}
+
+	errPruningPendingFailed = errors.New("pruning pending failed")
+	errPruningIssuedFailed  = errors.New("pruning issued failed")
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -204,17 +207,17 @@ func (p *PullGossiper[_]) handleResponse(
 			continue
 		}
 
-		hash := gossipable.GossipID()
+		gossipID := gossipable.GossipID()
 		p.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("id", hash),
+			zap.Stringer("id", gossipID),
 		)
 		if err := p.set.Add(gossipable); err != nil {
 			p.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", hash),
+				zap.Stringer("id", gossipID),
 				zap.Error(err),
 			)
 			continue
@@ -290,72 +293,76 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	sentBytes := 0
-	gossip := make([][]byte, 0, p.pending.Len())
+	var (
+		sentBytes = 0
+		gossip    = make([][]byte, 0, p.pending.Len())
+		now       = time.Now()
+	)
 
 	// Iterate over all pending gossipables (never been sent before)
 	for sentBytes < p.targetGossipSize {
-		gossipable, ok := p.pending.PeekLeft()
+		gossipable, ok := p.pending.PopLeft()
 		if !ok {
 			break
 		}
 
 		// Ensure item is still in the set before we gossip.
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.pending.PopLeft()
+		gossipID := gossipable.GossipID()
+		if !p.set.Has(gossipID) {
+			delete(p.tracking, gossipID)
 			continue
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			// remove this item so we don't get stuck in a loop
-			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.pending.PopLeft()
+			delete(p.tracking, gossipID)
 			return err
 		}
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
-		p.pending.PopLeft()
+
 		p.issued.PushRight(gossipable)
-		p.tracking[gossipable.GossipID()] = time.Now()
+		p.tracking[gossipID] = now
 	}
 
 	// Iterate over all issued gossipables (have been sent before)
 	for sentBytes < p.targetGossipSize {
-		gossipable, ok := p.issued.PeekLeft()
+		gossipable, ok := p.issued.PopLeft()
 		if !ok {
 			break
 		}
 
 		// Ensure item is still in the set before we gossip.
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.issued.PopLeft()
-			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if issued once
+		gossipID := gossipable.GossipID()
+		if !p.set.Has(gossipID) {
+			delete(p.tracking, gossipID)
+			p.discarded.Put(gossipID, nil) // only add to discarded if issued once
 			continue
 		}
 
 		// Ensure not gossiped too recently
-		lastGossipTime := p.tracking[gossipable.GossipID()]
+		lastGossipTime := p.tracking[gossipID]
 		if time.Since(lastGossipTime) < p.maxRegossipFrequency {
+			// Put the entry back onto the front of the queue to keep the
+			// issuance time sorted.
+			p.issued.PushLeft(gossipable)
 			break // items are sorted by last issuance time, so we can stop here
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			// Should never happen because we've already issued this once.
-			delete(p.tracking, gossipable.GossipID())
-			_, _ = p.issued.PopLeft()
+			delete(p.tracking, gossipID)
 			return err
 		}
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
-		_, _ = p.issued.PopLeft()
+
 		p.issued.PushRight(gossipable)
-		p.tracking[gossipable.GossipID()] = time.Now()
+		p.tracking[gossipID] = now
 	}
 
 	// Send gossipables to peers
@@ -381,30 +388,38 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	if len(p.tracking) < p.pruneSize {
 		return nil
 	}
-	for i := 0; i < p.pending.Len(); i++ {
+
+	numPending := p.pending.Len()
+	for i := 0; i < numPending; i++ {
 		gossipable, ok := p.pending.PopLeft()
 		if !ok {
-			// Should never happen
-			break
+			return errPruningPendingFailed // should never happen
 		}
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
-		} else {
+
+		gossipID := gossipable.GossipID()
+		if p.set.Has(gossipID) {
 			p.pending.PushRight(gossipable)
+			continue
 		}
+
+		delete(p.tracking, gossipID)
 	}
-	for i := 0; i < p.issued.Len(); i++ {
+
+	numIssued := p.issued.Len()
+	for i := 0; i < numIssued; i++ {
 		gossipable, ok := p.issued.PopLeft()
 		if !ok {
-			// Should never happen
-			break
+			return errPruningIssuedFailed // should never happen
 		}
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
-			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if issued once
-		} else {
+
+		gossipID := gossipable.GossipID()
+		if p.set.Has(gossipID) {
 			p.issued.PushRight(gossipable)
+			continue
 		}
+
+		delete(p.tracking, gossipID)
+		p.discarded.Put(gossipID, nil) // only add to discarded if issued once
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
 	return nil
@@ -416,20 +431,20 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	now := time.Now()
 	for _, gossipable := range gossipables {
-		gid := gossipable.GossipID()
-		if _, contains := p.tracking[gid]; contains {
+		gossipID := gossipable.GossipID()
+		if _, contains := p.tracking[gossipID]; contains {
 			continue
 		}
-		if _, contains := p.discarded.Get(gid); !contains {
-			p.tracking[gid] = time.Time{}
-			// TODO: sort pending by priority fee?
-			p.pending.PushRight(gossipable)
+
+		if _, contains := p.discarded.Get(gossipID); !contains {
+			p.tracking[gossipID] = time.Time{}
 		} else {
 			// Pretend that recently discarded transactions were just gossiped.
-			p.tracking[gid] = time.Now()
-			p.issued.PushRight(gossipable)
+			p.tracking[gossipID] = now
 		}
+		p.pending.PushRight(gossipable)
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
 }

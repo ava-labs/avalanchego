@@ -22,7 +22,7 @@ type Set[T Gossipable] interface {
 	// added.
 	Add(gossipable T) error
 	// Has returns true if the gossipable is in the set.
-	Has(gossipable T) bool
+	Has(gossipID ids.ID) bool
 	// Iterate iterates over elements until [f] returns false
 	Iterate(f func(gossipable T) bool)
 	// GetFilter returns the byte representation of bloom filter and its
