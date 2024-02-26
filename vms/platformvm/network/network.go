@@ -95,14 +95,15 @@ func New(
 	}
 
 	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
+		log,
 		marshaller,
 		gossipMempool,
 		txGossipClient,
 		txGossipMetrics,
-		0, // pruneSize
-		0, // discardedSize
+		0,    // earlyGossipSize (IF THIS IS SMALLER THAN MAX SIZE, COULD LEAD TO GOSSIP EACH ADD)
+		1024, // discardedSize
 		config.TargetGossipSize,
-		time.Nanosecond, // maxRegossipFrequency
+		time.Second, // maxRegossipFrequency
 	)
 
 	var txPullGossiper gossip.Gossiper
