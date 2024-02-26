@@ -197,7 +197,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, accepted ids.ID) {
+	sender.SendChitsF = func(_ context.Context, _ ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, accepted ids.ID) {
 		require.False(*chitted)
 		*chitted = true
 		require.Equal(uint32(15), requestID)
@@ -705,7 +705,7 @@ func TestEngineBuildBlock(t *testing.T) {
 		}
 	}
 
-	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ ids.ID, _ uint64) {
+	sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64) {
 		require.FailNow("should not be sending pulls when we are the block producer")
 	}
 
@@ -2919,5 +2919,119 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	require.NoError(te.QueryFailed(context.Background(), vdr, *queryRequestID))
 
+	require.Equal(choices.Accepted, blk.Status())
+}
+
+func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
+	require := require.New(t)
+
+	engCfg := DefaultConfig(t)
+	engCfg.Params = snowball.Parameters{
+		K:                     1,
+		AlphaPreference:       1,
+		AlphaConfidence:       1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+
+	// Setup the engine with no validators. When a block is issued, the poll
+	// should fail to be created because there is nobody to poll.
+	vals := validators.NewManager()
+	engCfg.Validators = vals
+
+	sender := &common.SenderTest{T: t}
+	engCfg.Sender = sender
+
+	sender.Default(true)
+
+	vm := &block.TestVM{}
+	vm.T = t
+	engCfg.VM = vm
+
+	vm.Default(true)
+	vm.CantSetState = false
+	vm.CantSetPreference = false
+
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+		require.Equal(gBlk.ID(), id)
+		return gBlk, nil
+	}
+
+	te, err := newTransitive(engCfg)
+	require.NoError(err)
+	require.NoError(te.Start(context.Background(), 0))
+
+	vm.LastAcceptedF = nil
+
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk.IDV,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+
+	// Issue the block. This shouldn't call the sender, because creating the
+	// poll should fail.
+	require.NoError(te.issue(
+		context.Background(),
+		te.Ctx.NodeID,
+		blk,
+		true,
+		te.metrics.issued.WithLabelValues(unknownSource),
+	))
+
+	// The block should have successfully been added into consensus.
+	require.Equal(1, te.Consensus.NumProcessing())
+
+	// Fix the subnet configuration by adding a validator.
+	vdr := ids.GenerateTestNodeID()
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
+
+	var (
+		queryRequestID uint32
+		queried        bool
+	)
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
+		queryRequestID = requestID
+		require.Contains(inVdrs, vdr)
+		require.Equal(blk.ID(), blkID)
+		require.Equal(uint64(1), requestedHeight)
+		queried = true
+	}
+
+	// Because there is now a validator that can be queried, gossip should
+	// trigger creation of the poll.
+	require.NoError(te.Gossip(context.Background()))
+	require.True(queried)
+
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+		switch id {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk.ID():
+			return blk, nil
+		}
+		require.FailNow(errUnknownBlock.Error())
+		return nil, errUnknownBlock
+	}
+
+	// Voting for the block that was issued during the period when the validator
+	// set was misconfigured should result in it being accepted successfully.
+	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
 	require.Equal(choices.Accepted, blk.Status())
 }

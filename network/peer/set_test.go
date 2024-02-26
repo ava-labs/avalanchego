@@ -128,10 +128,10 @@ func TestSetSample(t *testing.T) {
 	require.Empty(peers)
 
 	peers = set.Sample(1, NoPrecondition)
-	require.Equal(peers, []Peer{peer1})
+	require.Equal([]Peer{peer1}, peers)
 
 	peers = set.Sample(2, NoPrecondition)
-	require.Equal(peers, []Peer{peer1})
+	require.Equal([]Peer{peer1}, peers)
 
 	// Case: 2 peers
 	set.Add(peer2)

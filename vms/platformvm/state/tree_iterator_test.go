@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/btree"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"

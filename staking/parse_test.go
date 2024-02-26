@@ -6,9 +6,9 @@ package staking
 import (
 	"testing"
 
-	_ "embed"
-
 	"github.com/stretchr/testify/require"
+
+	_ "embed"
 )
 
 var (

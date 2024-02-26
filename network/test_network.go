@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -187,6 +188,10 @@ func NewTestNetwork(
 	tlsConfig := peer.TLSConfig(*tlsCert, nil)
 	networkConfig.TLSConfig = tlsConfig
 	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
+	networkConfig.BLSKey, err = bls.NewSecretKey()
+	if err != nil {
+		return nil, err
+	}
 
 	networkConfig.Validators = currentValidators
 	networkConfig.Beacons = validators.NewManager()

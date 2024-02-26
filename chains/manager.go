@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -64,16 +63,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
-	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-
+	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
-
-	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 )
 
 const (
@@ -97,7 +94,6 @@ var (
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
 	errNotBootstrapped         = errors.New("subnets not bootstrapped")
-	errNoPrimaryNetworkConfig  = errors.New("no subnet config for primary network found")
 	errPartialSyncAsAValidator = errors.New("partial sync should not be configured for a validator")
 
 	fxs = map[ids.ID]fx.Factory{
@@ -165,7 +161,6 @@ type chain struct {
 	Context *snow.ConsensusContext
 	VM      common.VM
 	Handler handler.Handler
-	Beacons validators.Manager
 }
 
 // ChainConfig is configuration settings for the current execution.
@@ -234,6 +229,8 @@ type ManagerConfig struct {
 	StateSyncBeacons []ids.NodeID
 
 	ChainDataDir string
+
+	Subnets *Subnets
 }
 
 type manager struct {
@@ -257,11 +254,6 @@ type manager struct {
 	chainCreatorShutdownCh chan struct{}
 	chainCreatorExited     sync.WaitGroup
 
-	subnetsLock sync.RWMutex
-	// Key: Subnet's ID
-	// Value: Subnet description
-	subnets map[ids.ID]subnets.Subnet
-
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
@@ -278,7 +270,6 @@ func New(config *ManagerConfig) Manager {
 		ManagerConfig:          *config,
 		stakingSigner:          config.StakingTLSCert.PrivateKey.(crypto.Signer),
 		stakingCert:            staking.CertificateFromX509(config.StakingTLSCert.Leaf),
-		subnets:                make(map[ids.ID]subnets.Subnet),
 		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
@@ -289,25 +280,10 @@ func New(config *ManagerConfig) Manager {
 // QueueChainCreation queues a chain creation request
 // Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
-	m.subnetsLock.Lock()
-	subnetID := chainParams.SubnetID
-	sb, exists := m.subnets[subnetID]
-	if !exists {
-		sbConfig, ok := m.SubnetConfigs[subnetID]
-		if !ok {
-			// default to primary subnet config
-			sbConfig = m.SubnetConfigs[constants.PrimaryNetworkID]
-		}
-		sb = subnets.New(m.NodeID, sbConfig)
-		m.subnets[chainParams.SubnetID] = sb
-	}
-	addedChain := sb.AddChain(chainParams.ID)
-	m.subnetsLock.Unlock()
-
-	if !addedChain {
+	if sb, _ := m.Subnets.GetOrCreate(chainParams.SubnetID); !sb.AddChain(chainParams.ID) {
 		m.Log.Debug("skipping chain creation",
 			zap.String("reason", "chain already staged"),
-			zap.Stringer("subnetID", subnetID),
+			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),
 			zap.Stringer("vmID", chainParams.VMID),
 		)
@@ -317,7 +293,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	if ok := m.chainsQueue.PushRight(chainParams); !ok {
 		m.Log.Warn("skipping chain creation",
 			zap.String("reason", "couldn't enqueue chain"),
-			zap.Stringer("subnetID", subnetID),
+			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),
 			zap.Stringer("vmID", chainParams.VMID),
 		)
@@ -335,9 +311,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	m.subnetsLock.RLock()
-	sb := m.subnets[chainParams.SubnetID]
-	m.subnetsLock.RUnlock()
+	sb, _ := m.Subnets.GetOrCreate(chainParams.SubnetID)
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -1308,23 +1282,9 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 	return chain.Context().State.Get().State == snow.NormalOp
 }
 
-func (m *manager) subnetsNotBootstrapped() []ids.ID {
-	m.subnetsLock.RLock()
-	defer m.subnetsLock.RUnlock()
-
-	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
-	for subnetID, subnet := range m.subnets {
-		if !subnet.IsBootstrapped() {
-			subnetsBootstrapping = append(subnetsBootstrapping, subnetID)
-		}
-	}
-	return subnetsBootstrapping
-}
-
 func (m *manager) registerBootstrappedHealthChecks() error {
 	bootstrappedCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
-		subnetIDs := m.subnetsNotBootstrapped()
-		if len(subnetIDs) != 0 {
+		if subnetIDs := m.Subnets.Bootstrapping(); len(subnetIDs) != 0 {
 			return subnetIDs, errNotBootstrapped
 		}
 		return []ids.ID{}, nil
@@ -1342,7 +1302,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		return nil
 	}
 
-	partialSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
+	partialSyncCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		// Note: The health check is skipped during bootstrapping to allow a
 		// node to sync the network even if it was previously a validator.
 		if !m.IsBootstrapped(constants.PlatformChainID) {
@@ -1366,18 +1326,9 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
-	// Get the Primary Network's subnet config. If it wasn't registered, then we
-	// throw a fatal error.
-	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
-	if !ok {
-		return errNoPrimaryNetworkConfig
-	}
-
-	sb := subnets.New(m.NodeID, sbConfig)
-	m.subnetsLock.Lock()
-	m.subnets[platformParams.SubnetID] = sb
+	// Add the P-Chain to the Primary Network
+	sb, _ := m.Subnets.GetOrCreate(constants.PrimaryNetworkID)
 	sb.AddChain(platformParams.ID)
-	m.subnetsLock.Unlock()
 
 	// The P-chain is created synchronously to ensure that `VM.Initialize` has
 	// finished before returning from this function. This is required because

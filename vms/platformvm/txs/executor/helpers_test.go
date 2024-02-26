@@ -4,12 +4,12 @@
 package executor
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -45,12 +45,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const (
+	apricotPhase3 fork = iota
+	apricotPhase5
+	banff
+	cortina
+	durango
+)
+
 var (
 	defaultTxFee   = uint64(100)
 	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1 *txs.Tx
 )
+
+type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -85,12 +95,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, postBanff, postCortina, postDurango bool) *environment {
+func newEnvironment(t *testing.T, f fork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina, postDurango)
-	clk := defaultClock(postBanff || postCortina || postDurango)
+	config := defaultConfig(t, f)
+	clk := defaultClock(f)
 
 	baseDB := versiondb.New(memdb.New())
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -194,6 +204,7 @@ func addSubnet(
 		},
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		genesistest.Keys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -246,18 +257,32 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = genesistest.ValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
-	}
-	durangoTime := mockable.MaxTime
-	if postDurango {
+func defaultConfig(t *testing.T, f fork) *config.Config {
+	var (
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+		durangoTime       = mockable.MaxTime
+	)
+
+	switch f {
+	case durango:
 		durangoTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case cortina:
+		cortinaTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case banff:
+		banffTime = genesistest.ValidateStartTime.Add(-2 * time.Second)
+		fallthrough
+	case apricotPhase5:
+		apricotPhase5Time = genesistest.ValidateEndTime
+		fallthrough
+	case apricotPhase3:
+		apricotPhase3Time = genesistest.ValidateEndTime
+	default:
+		require.NoError(t, fmt.Errorf("unhandled fork %d", f))
 	}
 
 	return &config.Config{
@@ -278,18 +303,18 @@ func defaultConfig(postBanff, postCortina, postDurango bool) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: genesistest.ValidateEndTime,
-		ApricotPhase5Time: genesistest.ValidateEndTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 		DurangoTime:       durangoTime,
 	}
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
+func defaultClock(f fork) *mockable.Clock {
 	now := genesistest.GenesisTime
-	if postFork {
-		// 1 second after Banff fork
+	if f >= banff {
+		// 1 second after active fork
 		now = genesistest.ValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}

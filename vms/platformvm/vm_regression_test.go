@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -20,28 +20,32 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config/configtest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -49,7 +53,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -69,6 +73,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -103,6 +108,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		changeAddr,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -139,6 +145,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		changeAddr,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1], genesistest.Keys[3]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -165,6 +172,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		changeAddr,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1], genesistest.Keys[4]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -237,6 +245,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -261,6 +270,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				genesistest.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -285,6 +295,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				genesistest.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -309,6 +320,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				genesistest.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -333,6 +345,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				genesistest.Keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 				changeAddr,
+				nil,
 			)
 			require.NoError(err)
 
@@ -410,6 +423,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr0},
 		[]*secp256k1.PrivateKey{key0},
 		addr0,
+		nil,
 	)
 	require.NoError(err)
 
@@ -418,6 +432,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
 		addr1,
+		nil,
 	)
 	require.NoError(err)
 
@@ -426,6 +441,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
 		addr0,
+		nil,
 	)
 	require.NoError(err)
 
@@ -481,7 +497,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, cortinaFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -499,6 +515,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -686,7 +703,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, cortinaFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -707,6 +724,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -879,6 +897,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 
@@ -998,7 +1017,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1034,6 +1053,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		ids.GenerateTestShortID(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1134,7 +1154,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * configtest.MinStakingDuration)
 	delegator2Stake := configtest.MaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1155,6 +1175,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1179,6 +1200,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		genesistest.Keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1203,6 +1225,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		genesistest.Keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1220,7 +1243,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1240,6 +1263,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1259,6 +1283,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1281,6 +1306,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1308,6 +1334,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1341,7 +1368,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1361,6 +1388,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1380,6 +1408,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1402,6 +1431,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1421,6 +1451,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		changeAddr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1445,7 +1476,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1475,51 +1506,20 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 
 	// build primary network validator with BLS key
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
-		vm.state,
-		genesistest.Keys,
+	primaryTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
-		vm.Config.AddPrimaryNetworkValidatorFee,
-		addr, // change Addresss
+		uint64(primaryStartTime.Unix()),
+		uint64(primaryEndTime.Unix()),
+		nodeID,
+		signer.NewProofOfPossession(sk1),
+		addr, // reward address
+		reward.PercentDenominator,
+		genesistest.Keys,
+		addr, // change address
+		nil,
 	)
 	require.NoError(err)
-
-	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(primaryStartTime.Unix()),
-			End:    uint64(primaryEndTime.Unix()),
-			Wght:   vm.MinValidatorStake,
-		},
-		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk1),
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegationShares: reward.PercentDenominator,
-	}
-	primaryTx, err := txs.NewSigned(uPrimaryTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(primaryTx.SyntacticVerify(vm.ctx))
+	uPrimaryTx := primaryTx.Unsigned.(*txs.AddPermissionlessValidatorTx)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTx(context.Background(), primaryTx))
@@ -1547,6 +1547,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1611,50 +1612,20 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 	require.NotEqual(sk1, sk2)
 
-	ins, unstakedOuts, stakedOuts, signers, err = utxoHandler.Spend(
-		vm.state,
-		genesistest.Keys,
+	primaryRestartTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
-		vm.Config.AddPrimaryNetworkValidatorFee,
-		addr, // change Addresss
+		uint64(primaryReStartTime.Unix()),
+		uint64(primaryReEndTime.Unix()),
+		nodeID,
+		signer.NewProofOfPossession(sk2),
+		addr, // reward address
+		reward.PercentDenominator,
+		genesistest.Keys,
+		addr, // change address
+		nil,
 	)
 	require.NoError(err)
-
-	uPrimaryRestartTx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(primaryReStartTime.Unix()),
-			End:    uint64(primaryReEndTime.Unix()),
-			Wght:   vm.MinValidatorStake,
-		},
-		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk2),
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegationShares: reward.PercentDenominator,
-	}
-	primaryRestartTx, err := txs.NewSigned(uPrimaryRestartTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
+	uPrimaryRestartTx := primaryRestartTx.Unsigned.(*txs.AddPermissionlessValidatorTx)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTx(context.Background(), primaryRestartTx))
@@ -1730,7 +1701,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1759,6 +1730,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1810,51 +1782,19 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	sk2, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
-		vm.state,
-		genesistest.Keys,
+	primaryRestartTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
-		vm.Config.AddPrimaryNetworkValidatorFee,
-		addr, // change Addresss
+		uint64(primaryStartTime2.Unix()),
+		uint64(primaryEndTime2.Unix()),
+		nodeID,
+		signer.NewProofOfPossession(sk2),
+		addr, // reward address
+		reward.PercentDenominator,
+		genesistest.Keys,
+		addr, // change address
+		nil,
 	)
 	require.NoError(err)
-
-	uPrimaryRestartTx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(primaryStartTime2.Unix()),
-			End:    uint64(primaryEndTime2.Unix()),
-			Wght:   vm.MinValidatorStake,
-		},
-		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk2),
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegationShares: reward.PercentDenominator,
-	}
-	primaryRestartTx, err := txs.NewSigned(uPrimaryRestartTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTx(context.Background(), primaryRestartTx))
@@ -1890,7 +1830,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1923,6 +1863,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -1952,6 +1893,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2015,51 +1957,19 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	sk2, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
-		vm.state,
-		genesistest.Keys,
+	primaryRestartTx, err := vm.txBuilder.NewAddPermissionlessValidatorTx(
 		vm.MinValidatorStake,
-		vm.Config.AddPrimaryNetworkValidatorFee,
-		addr, // change Addresss
+		uint64(primaryStartTime2.Unix()),
+		uint64(primaryEndTime2.Unix()),
+		nodeID,
+		signer.NewProofOfPossession(sk2),
+		addr, // reward address
+		reward.PercentDenominator,
+		genesistest.Keys,
+		addr, // change address
+		nil,
 	)
 	require.NoError(err)
-
-	uPrimaryRestartTx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(primaryStartTime2.Unix()),
-			End:    uint64(primaryEndTime2.Unix()),
-			Wght:   vm.MinValidatorStake,
-		},
-		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk2),
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				addr,
-			},
-		},
-		DelegationShares: reward.PercentDenominator,
-	}
-	primaryRestartTx, err := txs.NewSigned(uPrimaryRestartTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTx(context.Background(), primaryRestartTx))
@@ -2104,7 +2014,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, cortinaFork)
+	vm, _, _ := defaultVM(t, cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2135,6 +2045,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2161,6 +2072,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		subnetID,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0], genesistest.Keys[1]},
 		addr,
+		nil,
 	)
 	require.NoError(err)
 
@@ -2218,6 +2130,72 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	// subnet validator whose primary network validator was also removed.
 	_, err = vm.State.GetValidatorSet(context.Background(), subnetStartHeight, subnetID)
 	require.NoError(err)
+}
+
+func TestValidatorSetRaceCondition(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, cortina)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	nodeID := ids.GenerateTestNodeID()
+	require.NoError(vm.Connected(context.Background(), nodeID, version.CurrentApp))
+
+	protocolAppRequestBytest, err := gossip.MarshalAppRequest(
+		bloom.EmptyFilter.Marshal(),
+		ids.Empty[:],
+	)
+	require.NoError(err)
+
+	appRequestBytes := p2p.PrefixMessage(
+		p2p.ProtocolPrefix(network.TxGossipHandlerID),
+		protocolAppRequestBytest,
+	)
+
+	var (
+		eg          errgroup.Group
+		ctx, cancel = context.WithCancel(context.Background())
+	)
+	// keep 10 workers running
+	for i := 0; i < 10; i++ {
+		eg.Go(func() error {
+			for ctx.Err() == nil {
+				err := vm.AppRequest(
+					context.Background(),
+					nodeID,
+					0,
+					time.Now().Add(time.Hour),
+					appRequestBytes,
+				)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+
+	// If the validator set lock isn't held, the race detector should fail here.
+	for i := uint64(0); i < 1000; i++ {
+		blk, err := block.NewBanffStandardBlock(
+			time.Now(),
+			vm.state.GetLastAccepted(),
+			i,
+			nil,
+		)
+		require.NoError(err)
+
+		vm.state.SetLastAccepted(blk.ID())
+		vm.state.SetHeight(blk.Height())
+		vm.state.AddStatelessBlock(blk)
+	}
+
+	// If the validator set lock is grabbed, we need to make sure to release the
+	// lock to avoid a deadlock.
+	vm.ctx.Lock.Unlock()
+	cancel() // stop and wait for workers
+	require.NoError(eg.Wait())
+	vm.ctx.Lock.Lock()
 }
 
 func buildAndAcceptStandardBlock(vm *VM) error {

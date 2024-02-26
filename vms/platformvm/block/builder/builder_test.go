@@ -10,18 +10,19 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -32,7 +33,7 @@ import (
 func TestBuildBlockBasic(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -45,6 +46,7 @@ func TestBuildBlockBasic(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -74,7 +76,7 @@ func TestBuildBlockBasic(t *testing.T) {
 func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -91,7 +93,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 func TestBuildBlockShouldReward(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -104,16 +106,21 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
 	)
 
-	// Create a valid [AddValidatorTx]
-	tx, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	// Create a valid [AddPermissionlessValidatorTx]
+	tx, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		nodeID,
+		signer.NewProofOfPossession(sk),
 		genesistest.Keys[0].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		genesistest.Keys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -155,7 +162,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(blk.Verify(context.Background()))
 		require.IsType(&block.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
 
-		expectedTx, err := env.txBuilder.NewRewardValidatorTx(staker.TxID)
+		expectedTx, err := NewRewardValidatorTx(env.ctx, staker.TxID)
 		require.NoError(err)
 		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
 
@@ -188,7 +195,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 func TestBuildBlockAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -221,7 +228,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -234,6 +241,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -275,7 +283,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -301,6 +309,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		genesistest.Keys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -321,6 +330,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[1]},
 		genesistest.Keys[1].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -341,6 +351,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[2]},
 		genesistest.Keys[2].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx3))
@@ -378,7 +389,7 @@ func TestBuildBlockDropExpiredStakerTxs(t *testing.T) {
 func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -394,15 +405,20 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		validatorEndTime = now.Add(env.config.MaxStakeDuration)
 	)
 
-	tx1, err := env.txBuilder.NewAddValidatorTx(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	tx1, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.GenerateTestNodeID(),
+		signer.NewProofOfPossession(sk),
 		genesistest.Keys[0].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[0]},
 		genesistest.Keys[0].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -413,15 +429,20 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	// Add a validator ending past [MaxStakeDuration]
 	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
 
-	tx2, err := env.txBuilder.NewAddValidatorTx(
+	sk, err = bls.NewSecretKey()
+	require.NoError(err)
+
+	tx2, err := env.txBuilder.NewAddPermissionlessValidatorTx(
 		defaultValidatorStake,
 		uint64(now.Unix()),
 		uint64(validator2EndTime.Unix()),
 		ids.GenerateTestNodeID(),
+		signer.NewProofOfPossession(sk),
 		genesistest.Keys[2].PublicKey().Address(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{genesistest.Keys[2]},
 		genesistest.Keys[2].PublicKey().Address(),
+		nil,
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
@@ -454,7 +475,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -467,6 +488,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 		"chain name",
 		[]*secp256k1.PrivateKey{genesistest.SubnetControlKeys[0], genesistest.SubnetControlKeys[1]},
 		ids.ShortEmpty,
+		nil,
 	)
 	require.NoError(err)
 	txID := tx.ID()
@@ -497,7 +519,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, latestFork)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 

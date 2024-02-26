@@ -122,6 +122,18 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueTransferSubnetOwnershipTx creates, signs, and issues a transaction that
+	// changes the owner of the named subnet.
+	//
+	// - [subnetID] specifies the subnet to be modified
+	// - [owner] specifies who has the ability to create new chains and add new
+	//   validators to the subnet.
+	IssueTransferSubnetOwnershipTx(
+		subnetID ids.ID,
+		owner *secp256k1fx.OutputOwners,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
 	// IssueImportTx creates, signs, and issues an import transaction that
 	// attempts to consume all the available UTXOs and import the funds to [to].
 	//
@@ -359,6 +371,18 @@ func (w *wallet) IssueCreateSubnetTx(
 	return w.IssueUnsignedTx(utx, options...)
 }
 
+func (w *wallet) IssueTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewTransferSubnetOwnershipTx(subnetID, owner, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
 func (w *wallet) IssueImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
@@ -471,7 +495,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := w.signer.SignUnsigned(ctx, utx)
+	tx, err := SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}

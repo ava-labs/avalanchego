@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -21,7 +20,7 @@ import (
 // and prints the ID of the block and its transactions.
 func main() {
 	var (
-		uri       = fmt.Sprintf("%s/ext/index/P/block", primary.LocalAPIURI)
+		uri       = primary.LocalAPIURI + "/ext/index/P/block"
 		client    = indexer.NewClient(uri)
 		ctx       = context.Background()
 		nextIndex uint64

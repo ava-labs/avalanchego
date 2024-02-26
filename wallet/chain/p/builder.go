@@ -8,24 +8,24 @@ import (
 	"fmt"
 	"time"
 
-	stdcontext "context"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	stdcontext "context"
 )
 
 var (
 	errNoChangeAddress           = errors.New("no possible change address")
-	errWrongTxType               = errors.New("wrong tx type")
 	errUnknownOwnerType          = errors.New("unknown owner type")
 	errInsufficientAuthorization = errors.New("insufficient authorization")
 	errInsufficientFunds         = errors.New("insufficient funds")
@@ -133,6 +133,17 @@ type Builder interface {
 		owner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (*txs.CreateSubnetTx, error)
+
+	// NewTransferSubnetOwnershipTx changes the owner of the named subnet.
+	//
+	// - [subnetID] specifies the subnet to be modified
+	// - [owner] specifies who has the ability to create new chains and add new
+	//   validators to the subnet.
+	NewTransferSubnetOwnershipTx(
+		subnetID ids.ID,
+		owner *secp256k1fx.OutputOwners,
+		options ...common.Option,
+	) (*txs.TransferSubnetOwnershipTx, error)
 
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
@@ -250,7 +261,7 @@ type Builder interface {
 type BuilderBackend interface {
 	Context
 	UTXOs(ctx stdcontext.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetTx(ctx stdcontext.Context, txID ids.ID) (*txs.Tx, error)
+	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
 }
 
 type builder struct {
@@ -528,6 +539,42 @@ func (b *builder) NewCreateSubnetTx(
 			Memo:         ops.Memo(),
 		}},
 		Owner: owner,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewTransferSubnetOwnershipTx(
+	subnetID ids.ID,
+	owner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.TransferSubnetOwnershipTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+	}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Sort(owner.Addrs)
+	tx := &txs.TransferSubnetOwnershipTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         ops.Memo(),
+		}},
+		Subnet:     subnetID,
+		Owner:      owner,
+		SubnetAuth: subnetAuth,
 	}
 	return tx, b.initCtx(tx)
 }
@@ -959,7 +1006,7 @@ func (b *builder) spend(
 		})
 
 		// Stake any value that should be staked
-		amountToStake := math.Min(
+		amountToStake := min(
 			remainingAmountToStake, // Amount we still need to stake
 			out.Amt,                // Amount available to stake
 		)
@@ -1037,7 +1084,7 @@ func (b *builder) spend(
 		})
 
 		// Burn any value that should be burned
-		amountToBurn := math.Min(
+		amountToBurn := min(
 			remainingAmountToBurn, // Amount we still need to burn
 			out.Amt,               // Amount available to burn
 		)
@@ -1045,7 +1092,7 @@ func (b *builder) spend(
 
 		amountAvalibleToStake := out.Amt - amountToBurn
 		// Burn any value that should be burned
-		amountToStake := math.Min(
+		amountToStake := min(
 			remainingAmountToStake, // Amount we still need to stake
 			amountAvalibleToStake,  // Amount available to stake
 		)
@@ -1100,20 +1147,15 @@ func (b *builder) spend(
 }
 
 func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	subnetTx, err := b.backend.GetTx(options.Context(), subnetID)
+	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to fetch subnet %q: %w",
+			"failed to fetch subnet owner for %q: %w",
 			subnetID,
 			err,
 		)
 	}
-	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, errWrongTxType
-	}
-
-	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
+	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
 	if !ok {
 		return nil, errUnknownOwnerType
 	}
