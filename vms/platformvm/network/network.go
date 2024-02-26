@@ -44,7 +44,7 @@ type network struct {
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
 
-	txPushGossiper    gossip.Accumulator[*txs.Tx]
+	txPushGossiper    *gossip.PushGossiper[*txs.Tx]
 	txPullGossiper    gossip.Gossiper
 	txGossipFrequency time.Duration
 
@@ -87,13 +87,6 @@ func New(
 		return nil, err
 	}
 
-	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
-		marshaller,
-		txGossipClient,
-		txGossipMetrics,
-		config.TargetGossipSize,
-	)
-
 	gossipMempool, err := newGossipMempool(
 		mempool,
 		registerer,
@@ -106,6 +99,17 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+
+	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
+		marshaller,
+		gossipMempool,
+		txGossipClient,
+		txGossipMetrics,
+		0, // pruneSize
+		0, // discardedSize
+		config.TargetGossipSize,
+		time.Nanosecond, // maxRegossipFrequency
+	)
 
 	var txPullGossiper gossip.Gossiper
 	txPullGossiper = gossip.NewPullGossiper[*txs.Tx](
@@ -127,7 +131,6 @@ func New(
 	handler := gossip.NewHandler[*txs.Tx](
 		log,
 		marshaller,
-		txPushGossiper,
 		gossipMempool,
 		txGossipMetrics,
 		config.TargetGossipSize,

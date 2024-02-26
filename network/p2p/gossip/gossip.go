@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -31,11 +32,9 @@ var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[*testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
-	_ Gossiper = (*TestGossiper)(nil)
 
-	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
-	_ Accumulator[*testTx] = (*NoOpAccumulator[*testTx])(nil)
-	_ Accumulator[*testTx] = (*TestAccumulator[*testTx])(nil)
+	_ Set[*testTx] = (*EmptySet[*testTx])(nil)
+	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
 	metricLabels = []string{typeLabel}
 	pushLabels   = prometheus.Labels{
@@ -47,19 +46,14 @@ var (
 
 	errPruningPendingFailed = errors.New("pruning pending failed")
 	errPruningIssuedFailed  = errors.New("pruning issued failed")
+
+	errEmptySetCantAdd = errors.New("empty set can not add")
 )
 
 // Gossiper gossips Gossipables to other nodes
 type Gossiper interface {
 	// Gossip runs a cycle of gossip. Returns an error if we failed to gossip.
 	Gossip(ctx context.Context) error
-}
-
-// Accumulator allows a caller to accumulate gossipables to be gossiped
-type Accumulator[T Gossipable] interface {
-	Gossiper
-	// Add queues gossipables to be gossiped
-	Add(gossipables ...T)
 }
 
 // ValidatorGossiper only calls [Gossip] if the given node is a validator
@@ -344,7 +338,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 		// Ensure not gossiped too recently
 		lastGossipTime := p.tracking[gossipID]
-		if time.Since(lastGossipTime) < p.maxRegossipFrequency {
+		if now.Sub(lastGossipTime) < p.maxRegossipFrequency {
 			// Put the entry back onto the front of the queue to keep the
 			// issuance time sorted.
 			p.issued.PushLeft(gossipable)
@@ -473,14 +467,6 @@ func (NoOpGossiper) Gossip(context.Context) error {
 	return nil
 }
 
-type NoOpAccumulator[T Gossipable] struct{}
-
-func (NoOpAccumulator[_]) Gossip(context.Context) error {
-	return nil
-}
-
-func (NoOpAccumulator[T]) Add(...T) {}
-
 type TestGossiper struct {
 	GossipF func(ctx context.Context) error
 }
@@ -489,23 +475,42 @@ func (t *TestGossiper) Gossip(ctx context.Context) error {
 	return t.GossipF(ctx)
 }
 
-type TestAccumulator[T Gossipable] struct {
-	GossipF func(ctx context.Context) error
-	AddF    func(...T)
+type EmptySet[T Gossipable] struct{}
+
+func (EmptySet[_]) Gossip(context.Context) error {
+	return nil
 }
 
-func (t TestAccumulator[T]) Gossip(ctx context.Context) error {
-	if t.GossipF == nil {
-		return nil
-	}
-
-	return t.GossipF(ctx)
+func (EmptySet[T]) Add(T) error {
+	return errEmptySetCantAdd
 }
 
-func (t TestAccumulator[T]) Add(gossipables ...T) {
-	if t.AddF == nil {
-		return
-	}
+func (EmptySet[T]) Has(ids.ID) bool {
+	return false
+}
 
-	t.AddF(gossipables...)
+func (EmptySet[T]) Iterate(func(gossipable T) bool) {}
+
+func (EmptySet[_]) GetFilter() ([]byte, []byte) {
+	return bloom.EmptyFilter.Marshal(), ids.Empty[:]
+}
+
+type FullSet[T Gossipable] struct{}
+
+func (FullSet[_]) Gossip(context.Context) error {
+	return nil
+}
+
+func (FullSet[T]) Add(T) error {
+	return nil
+}
+
+func (FullSet[T]) Has(ids.ID) bool {
+	return true
+}
+
+func (FullSet[T]) Iterate(func(gossipable T) bool) {}
+
+func (FullSet[_]) GetFilter() ([]byte, []byte) {
+	return bloom.FullFilter.Marshal(), ids.Empty[:]
 }
