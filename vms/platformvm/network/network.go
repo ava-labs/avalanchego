@@ -26,10 +26,12 @@ const TxGossipHandlerID = 0
 type Network interface {
 	common.AppHandler
 
-	// Gossip starts gossiping transactions and blocks until it completes.
-	Gossip(ctx context.Context)
-	// IssueTx verifies the transaction at the currently preferred state, adds
-	// it to the mempool, and gossips it to the network.
+	// PushGossip starts push gossiping transactions and blocks until it completes.
+	PushGossip(ctx context.Context)
+	// PullGossip starts pull gossiping transactions and blocks until it completes.
+	PullGossip(ctx context.Context)
+	// IssueTx verifies the transaction at the currently preferred state and adds
+	// it to the mempool.
 	IssueTx(context.Context, *txs.Tx) error
 }
 
@@ -170,15 +172,24 @@ func New(
 	}, nil
 }
 
-func (n *network) Gossip(ctx context.Context) {
+func (n *network) PushGossip(ctx context.Context) {
 	// If the node is running partial sync, we should not perform any pull
 	// gossip.
 	if n.partialSyncPrimaryNetwork {
 		return
 	}
 
-	// TODO: need to also start txPushGossiper
-	gossip.Every(ctx, n.log, n.txPullGossiper, n.txGossipFrequency)
+	gossip.Every(ctx, n.log, n.txPushGossiper, n.txPushGossipFrequency)
+}
+
+func (n *network) PullGossip(ctx context.Context) {
+	// If the node is running partial sync, we should not perform any pull
+	// gossip.
+	if n.partialSyncPrimaryNetwork {
+		return
+	}
+
+	gossip.Every(ctx, n.log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
 func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
