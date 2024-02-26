@@ -403,11 +403,12 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 		if _, contains := p.discarded.Get(gossipID); !contains {
 			p.tracking[gossipID] = time.Time{}
+			p.pending.PushRight(gossipable)
 		} else {
 			// Pretend that recently discarded transactions were just gossiped.
 			p.tracking[gossipID] = now
+			p.issued.PushRight(gossipable)
 		}
-		p.pending.PushRight(gossipable)
 	}
 
 	// If we have too many gossipables, trigger gossip to evict
