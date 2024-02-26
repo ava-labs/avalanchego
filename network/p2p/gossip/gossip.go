@@ -241,6 +241,7 @@ func (p *PullGossiper[_]) handleResponse(
 
 // NewPushGossiper returns an instance of PushGossiper
 func NewPushGossiper[T Gossipable](
+	log logging.Logger,
 	marshaller Marshaller[T],
 	mempool Set[T],
 	client *p2p.Client,
@@ -251,6 +252,7 @@ func NewPushGossiper[T Gossipable](
 	maxRegossipFrequency time.Duration,
 ) *PushGossiper[T] {
 	return &PushGossiper[T]{
+		log:                  log,
 		marshaller:           marshaller,
 		set:                  mempool,
 		client:               client,
@@ -268,10 +270,12 @@ func NewPushGossiper[T Gossipable](
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
-	marshaller           Marshaller[T]
-	set                  Set[T]
-	client               *p2p.Client
-	metrics              Metrics
+	log        logging.Logger
+	marshaller Marshaller[T]
+	set        Set[T]
+	client     *p2p.Client
+	metrics    Metrics
+
 	earlyGossipSize      int // size at which we attempt gossip during [Add] to avoid unbounded memory use
 	targetGossipSize     int
 	maxRegossipFrequency time.Duration
@@ -378,7 +382,7 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 	return nil
 }
 
-// Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
+// TODO: wording cleanup Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
 // use PullGossip. This is only for getting transactions into the hands of validators to begin with.
 func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
@@ -400,13 +404,13 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 	}
 
-	// If we have too many pending gossipables, trigger gossip
+	// If we have too many gossipables, trigger gossip to evict
+	// stale entries.
 	if len(p.tracking) > p.earlyGossipSize {
 		if err := p.gossip(context.TODO()); err != nil {
-			// TODO: log error
+			p.log.Error("failed to gossip", zap.Error(err))
 		}
 	}
-
 	p.metrics.tracking.Set(float64(len(p.tracking)))
 }
 
