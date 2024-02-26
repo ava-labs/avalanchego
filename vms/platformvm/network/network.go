@@ -5,13 +5,11 @@ package network
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -47,10 +45,6 @@ type network struct {
 	txPushGossiper    *gossip.PushGossiper[*txs.Tx]
 	txPullGossiper    gossip.Gossiper
 	txGossipFrequency time.Duration
-
-	// gossip related attributes
-	recentTxsLock sync.Mutex
-	recentTxs     *cache.LRU[ids.ID, struct{}]
 }
 
 func New(
@@ -170,7 +164,6 @@ func New(
 		txPushGossiper:            txPushGossiper,
 		txPullGossiper:            txPullGossiper,
 		txGossipFrequency:         config.PullGossipFrequency,
-		recentTxs:                 &cache.LRU[ids.ID, struct{}]{Size: config.LegacyPushGossipCacheSize},
 	}, nil
 }
 
@@ -181,6 +174,7 @@ func (n *network) Gossip(ctx context.Context) {
 		return
 	}
 
+	// TODO: need to also start txPushGossiper
 	gossip.Every(ctx, n.log, n.txPullGossiper, n.txGossipFrequency)
 }
 
@@ -223,35 +217,18 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		)
 		return nil
 	}
-	txID := tx.ID()
 
-	if err := n.issueTx(tx); err == nil {
-		n.legacyGossipTx(ctx, txID, msgBytes)
-
-		n.txPushGossiper.Add(tx)
-		return n.txPushGossiper.Gossip(ctx)
-	}
-	return nil
+	return n.issueTx(tx)
 }
 
+// TODO: is this only invoked by user submissions?
 func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.issueTx(tx); err != nil {
 		return err
 	}
 
-	txBytes := tx.Bytes()
-	msg := &message.Tx{
-		Tx: txBytes,
-	}
-	msgBytes, err := message.Build(msg)
-	if err != nil {
-		return err
-	}
-
-	txID := tx.ID()
-	n.legacyGossipTx(ctx, txID, msgBytes)
 	n.txPushGossiper.Add(tx)
-	return n.txPushGossiper.Gossip(ctx)
+	return nil
 }
 
 // returns nil if the tx is in the mempool
@@ -272,27 +249,4 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	return nil
-}
-
-func (n *network) legacyGossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
-	n.recentTxsLock.Lock()
-	_, has := n.recentTxs.Get(txID)
-	n.recentTxs.Put(txID, struct{}{})
-	n.recentTxsLock.Unlock()
-
-	// Don't gossip a transaction if it has been recently gossiped.
-	if has {
-		return
-	}
-
-	n.log.Debug("gossiping tx",
-		zap.Stringer("txID", txID),
-	)
-
-	if err := n.appSender.SendAppGossip(ctx, msgBytes); err != nil {
-		n.log.Error("failed to gossip tx",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-	}
 }
