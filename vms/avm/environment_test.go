@@ -47,8 +47,8 @@ const (
 	durango fork = iota
 	eUpgrade
 
-	testTxFee    uint64 = units.MicroAvax
-	startBalance uint64 = 1000 * units.MicroAvax
+	testTxFee    uint64 = units.MilliAvax
+	startBalance uint64 = 1000 * units.MilliAvax
 
 	username       = "bobby"
 	password       = "StrnasfqewiurPasswdn56d" //#nosec G101

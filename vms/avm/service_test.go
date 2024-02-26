@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fees"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -42,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 func TestServiceIssueTx(t *testing.T) {
@@ -560,7 +562,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
@@ -572,13 +574,13 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 				}
 			},
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd"
 					],
-					"amount": 993673,
+					"amount": 999993673,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -586,12 +588,12 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"txID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"outputIndex": 2,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 1000000,
+					"amount": 1000000000,
 					"signatureIndices": [
 						0
 					]
@@ -654,13 +656,13 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 993645,
+					"amount": 999993645,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -668,12 +670,12 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"txID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"outputIndex": 2,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 1000000,
+					"amount": 1000000000,
 					"signatureIndices": [
 						0
 					]
@@ -684,7 +686,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		"destinationChain": "2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w",
 		"exportedOutputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
@@ -803,13 +805,13 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 994709,
+					"amount": 999994709,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -817,12 +819,12 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"txID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"outputIndex": 2,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 1000000,
+					"amount": 1000000000,
 					"signatureIndices": [
 						0
 					]
@@ -904,7 +906,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0x3ecec628982bc67bf516a13d06e17a481def1dfabbc0654a069df3271be5cc9b7f47f169eff6c958578706a20529f652033e034e4df9cb6b824fa8bef58a4d8a00"
+					"0xa8e66a5d264a8ffcde2cdb882bfa7a66346f86d252ba8c802e8c6a899c6c96fd3aa940fe09eb702dd7aa878adeb0e9c9783a64534a0d2082c5b50142cd45974801"
 				]
 			}
 		}
@@ -978,13 +980,13 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 989755,
+					"amount": 999989755,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -992,12 +994,12 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2StmcEmuUfPms11GW7PgnAy24iHhLdexv2ibkEXHW6pp1K8H8G",
+				"txID": "fmwdbeEvaoZxqQ1CffQbABeKwLhKjHJyY2k7cFhDjmuAX6yCn",
 				"outputIndex": 0,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 994889,
+					"amount": 999994889,
 					"signatureIndices": [
 						0
 					]
@@ -1041,7 +1043,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xe4bd11751035dde23d5645577c3497c0e7334a333d280f1e39378472fdd4213b1fa66cb910881ab076f611050385a1521d3edfef31e5e6d4e4c9460e04c7864600"
+					"0xda85a73a3981e5a53c097a1c41ca9900f623b150af4dc745175cecf80ee007a3232f107a76c1b68996c6c9a319036495ec7763fc17dca030d34a43e6e465ccf701"
 				]
 			}
 		},
@@ -1049,7 +1051,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0xe4bd11751035dde23d5645577c3497c0e7334a333d280f1e39378472fdd4213b1fa66cb910881ab076f611050385a1521d3edfef31e5e6d4e4c9460e04c7864600"
+					"0xda85a73a3981e5a53c097a1c41ca9900f623b150af4dc745175cecf80ee007a3232f107a76c1b68996c6c9a319036495ec7763fc17dca030d34a43e6e465ccf701"
 				]
 			}
 		}
@@ -1132,13 +1134,13 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 989610,
+					"amount": 999989610,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1146,12 +1148,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2TF7sqvBFTg9fwDKUedW77AHxuU6E4dz8eYKDCoVq4EgvMzNqD",
+				"txID": "242j2DppY6ivQ9VRpK7K34pFTwvLdDJ8qoR3dKNDuL1299A1tD",
 				"outputIndex": 0,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 994881,
+					"amount": 999994881,
 					"signatureIndices": [
 						0
 					]
@@ -1231,7 +1233,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			"fxID": "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT",
 			"credential": {
 				"signatures": [
-					"0xe8c13946baf3a7abd435f2e1be68caad81680b18eafa154c30486fa5c9762c0c1a2da2622edaa2da7536c01112be7ce1054675d06280f26bcfcbc01e9d7931f001"
+					"0x7ffa7f3e7e7fd567ca888932fc5f7d3946a168f5b7fe0f03fcc1cece66ef046c15e7e3524b51d38fd6c8aecc7800bd01e8ca122228e513728047ced3f5a18cba00"
 				]
 			}
 		},
@@ -1316,13 +1318,13 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 989732,
+					"amount": 999989732,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1330,12 +1332,12 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2YC6bzdwLAuU47WG2iDDj4kwUQWgMjhzdrSryrbwmEftEoAdFt",
+				"txID": "2V6JT8iKGj8e8kquziCiJnhq4EbfZpSoy64WTpSPwVoTJN1Nzy",
 				"outputIndex": 0,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 994893,
+					"amount": 999994893,
 					"signatureIndices": [
 						0
 					]
@@ -1391,7 +1393,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xf7c0b52b04097b46bfb4cded0c566429622055211f1041dbc4c72faa4dd8da593551e9b26fb77b2aebfcbe359a7096ea06fdeb2e11f41d144c65f5769d41761701"
+					"0x06f4963b62555034c66f5ebd8a654effc9a0a1fce3b13b227e2d71c99fa3630c554ce94754c25cd2e2a16e2c1c09fc9234c902dbf3a7816bfebcf7fb8181baf801"
 				]
 			}
 		}
@@ -1472,13 +1474,13 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 989564,
+					"amount": 999989564,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1486,12 +1488,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "4eSv46etciE4ccueU3FtPvovy6YrJnVXpeXdhbkfkxXpPdYMr",
+				"txID": "27K46oMaq92J3EbkLxzhqqNAvYyMbHQE5AmbjHa5GGZ6uQ9oqW",
 				"outputIndex": 0,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 994889,
+					"amount": 999994889,
 					"signatureIndices": [
 						0
 					]
@@ -1587,7 +1589,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xdfb6dd4c4bcb2fbfdd46f00680d39ce30fb1e6693937f74bb5bc85325d35fb5e73b7a6b71b0d2f48bfbc1e60af1221ed6f138c84a498627cc8aa22aad12a1edc01"
+					"0x31826158f0f5db02d7ebde9ae2726cfbc5b59693065bce80448f089a31e83d2477cc193ed74e870c643668024a177acf862ba537c46e22c4ef8ed8332f05618401"
 				]
 			}
 		}
@@ -1659,13 +1661,13 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 989804,
+					"amount": 999989804,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1673,12 +1675,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "shHtFBtSC8vuZZDMexxja85NPVJmYhHwkwNthQFZdo8jBm36S",
+				"txID": "2AkCR4agFVbDqhBsmEtdNMW3P4v18v6UqKAJqEounv5ayyKec3",
 				"outputIndex": 0,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 994937,
+					"amount": 999994937,
 					"signatureIndices": [
 						0
 					]
@@ -1723,7 +1725,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xcd9e79f5712ac19dc0bf7f101d515def0ccfeb73803ff9d732df800ea22c2e8a573014ece642aad912e91e0beb63f2ab9ddd30a97e2e52e96f9c520807f4caf501"
+					"0x772626548a885e46e556288f8dfb70b7ba0d160fa43c1b4995649a000deb73a063da7f5162f2379a7aedf192c55069782b0f712523cdaf0bfef6509b71c46f5b00"
 				]
 			}
 		},
@@ -1810,13 +1812,13 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		"blockchainID": "PLACEHOLDER_BLOCKCHAIN_ID",
 		"outputs": [
 			{
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 989628,
+					"amount": 999989628,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1824,12 +1826,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		],
 		"inputs": [
 			{
-				"txID": "2gtcaYeBKakTJd1GAFRoSM1kJV1oVKiCDE1FC8y7RhFYjmQmna",
+				"txID": "uxCyRqRgK1MtyxLVw2m4Axti2fZAub8m9d5BJzySpEKX3t39b",
 				"outputIndex": 0,
-				"assetID": "hKpKvXBRoD5RXk5oGrENJ4sasMH8qfVFBKZ5mQ576ys2559JC",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 994897,
+					"amount": 999994897,
 					"signatureIndices": [
 						0
 					]
@@ -1903,7 +1905,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 			"credential": {
 				"signatures": [
-					"0xb082b63e2ab4a7ce4ae9bd6b793d8d6c0782c3bdd57eb09a43cd1eaf9c566a9a77409048c8b67faf693d2e661177bbcb4f3a6f08b6b394d24fb0d3562e9ffb4200"
+					"0x7631837d04fabb247fe13d492bc950890ea5b1617a60d4700c07f199fd66899d05aed813f02bbab55ac50ec0d24a1de8fcafa224b91d8049e9f77d15114ad9e501"
 				]
 			}
 		},
@@ -2587,7 +2589,7 @@ func TestNFTWorkflow(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
-				vmStaticConfig:   noFeesTestConfig,
+				fork:             eUpgrade,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2659,8 +2661,28 @@ func TestNFTWorkflow(t *testing.T) {
 				fromAddrsTotalBalance += balances[addr]
 			}
 
+			// retrieve tx fee
+			lastAcceptedBlkID := env.vm.chainManager.LastAccepted()
+			lastAcceptedBlk, err := env.vm.chainManager.GetStatelessBlock(lastAcceptedBlkID)
+			require.NoError(err)
+			txs := lastAcceptedBlk.Txs()
+			require.Len(txs, 1)
+			createAssetTx := txs[0]
+
+			feesCfg := env.vm.Config.GetDynamicFeesConfig(env.vm.state.GetTimestamp())
+			feeCalc := &fees.Calculator{
+				IsEUpgradeActive: true,
+				Config:           &env.vm.Config,
+				FeeManager:       commonfees.NewManager(feesCfg.InitialUnitFees, commonfees.EmptyWindows),
+				ConsumedUnitsCap: feesCfg.BlockUnitsCap,
+				Codec:            env.service.txBuilderBackend.codec,
+				Credentials:      createAssetTx.Creds,
+			}
+
+			require.NoError(createAssetTx.Unsigned.Visit(feeCalc))
+			expectedFee := feeCalc.Fee
+
 			fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
-			expectedFee := uint64(0)
 			require.Equal(fromAddrsStartBalance-expectedFee, fromAddrsTotalBalance)
 
 			assetID := createReply.AssetID
