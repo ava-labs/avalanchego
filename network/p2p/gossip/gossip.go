@@ -281,7 +281,7 @@ type PushGossiper[T Gossipable] struct {
 	discarded *cache.LRU[ids.ID, interface{}] // discarded ensures we don't overgossip transactions that are frequently dropped
 }
 
-// Gossip flushes any queued gossipables
+// Gossip flushes any queued gossipables.
 func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -300,7 +300,7 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 		now       = time.Now()
 	)
 
-	// Iterate over all pending gossipables (never been sent before)
+	// Iterate over all pending gossipables (never been sent before).
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.pending.PopLeft()
 		if !ok {
@@ -327,7 +327,7 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 	}
 
 	// Iterate over all issued gossipables (have been sent before) to fill
-	// undersized gossip batch
+	// any remaining space in gossip batch.
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.issued.PopLeft()
 		if !ok {
@@ -342,13 +342,13 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 			continue
 		}
 
-		// Ensure not gossiped too recently
+		// Ensure we don't attempt to send a gossipable too frequently.
 		lastGossipTime := p.tracking[gossipID]
 		if now.Sub(lastGossipTime) < p.maxRegossipFrequency {
-			// Put the entry back onto the front of the queue to keep the
-			// issuance time sorted.
+			// Put the gossipable on the front of the queue to keep items sorted
+			// by last issuance time.
 			p.issued.PushLeft(gossipable)
-			break // items are sorted by last issuance time, so we can stop here
+			break
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
@@ -363,6 +363,7 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 		p.issued.PushRight(gossipable)
 		p.tracking[gossipID] = now
 	}
+	p.metrics.tracking.Set(float64(len(p.tracking)))
 
 	// Send gossipables to peers
 	msgBytes, err := MarshalAppGossip(gossip)
@@ -382,17 +383,16 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 	if err := p.client.AppGossip(ctx, msgBytes); err != nil {
 		return fmt.Errorf("failed to gossip: %w", err)
 	}
-	p.metrics.tracking.Set(float64(len(p.tracking)))
 	return nil
 }
 
-// TODO: wording cleanup Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
-// use PullGossip. This is only for getting transactions into the hands of validators to begin with.
+// Add enqueues new gossipables to be pushed. If a gossiable is already tracked,
+// it is not added again.
 func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// Add new gossipables to the tracker
+	// Add new gossipables to the pending queue.
 	now := time.Now()
 	for _, gossipable := range gossipables {
 		gossipID := gossipable.GossipID()
@@ -409,11 +409,12 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 	}
 
-	// If we have too many gossipables, trigger gossip to evict
-	// stale entries.
+	// If we have too many gossipables, trigger gossip to issue pending gossipables
+	// and/or evict stale entries.
 	//
-	// TODO: this iteration may not actually clear any stale entries (if there are a bunch
-	// of pending txs)
+	// This invocation of [gossip] may not clear any stale entries (if there are
+	// a bunch of pending, valid gossipables), however, successive calls eventually
+	// will.
 	if len(p.tracking) > p.earlyGossipSize {
 		if err := p.gossip(context.TODO()); err != nil {
 			p.log.Error("failed to gossip", zap.Error(err))
