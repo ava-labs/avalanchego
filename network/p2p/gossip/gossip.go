@@ -409,7 +409,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 	}
 
-	// If we have too many gossipables, trigger gossip to issue pending gossipables
+	// If we have too many gossipables, trigger gossip to push pending gossipables
 	// and/or evict stale entries.
 	//
 	// This invocation of [gossip] may not clear any stale entries (if there are
