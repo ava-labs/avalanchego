@@ -377,6 +377,10 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 }
 
 // prune drops gossipables that are no longer in the mempool
+//
+// TODO: should we require that `Set` removes items that are dropped
+// to avoid an iteration over everything we are tracking? We would need
+// to switch away from buffer, which doesn't support arbitrary deletes.
 func (p *PushGossiper[T]) prune() {
 	if len(p.tracking) < p.pruneSize {
 		return
@@ -422,7 +426,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		}
 		if _, contains := p.discarded.Get(gid); !contains {
 			p.tracking[gid] = time.Time{}
-			// TODO: sort pending by priority fee?
+			// TODO: sort pending by priority fee
 			p.pending.PushRight(gossipable)
 		} else {
 			// Pretend that recently discarded transactions were just gossiped.
