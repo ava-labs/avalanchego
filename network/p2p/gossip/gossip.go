@@ -46,9 +46,6 @@ var (
 		typeLabel: pullType,
 	}
 
-	errPruningPendingFailed = errors.New("pruning pending failed")
-	errPruningIssuedFailed  = errors.New("pruning issued failed")
-
 	errEmptySetCantAdd = errors.New("empty set can not add")
 )
 
