@@ -385,7 +385,8 @@ func (p *PushGossiper[T]) prune() {
 	if len(p.tracking) < p.pruneSize {
 		return
 	}
-	for i := 0; i < p.pending.Len(); i++ {
+	pendingSize := p.pending.Len()
+	for i := 0; i < pendingSize; i++ {
 		gossipable, ok := p.pending.PopLeft()
 		if !ok {
 			// Should never happen
@@ -397,7 +398,8 @@ func (p *PushGossiper[T]) prune() {
 			p.pending.PushRight(gossipable)
 		}
 	}
-	for i := 0; i < p.issued.Len(); i++ {
+	issuedSize := p.issued.Len()
+	for i := 0; i < issuedSize; i++ {
 		gossipable, ok := p.issued.PopLeft()
 		if !ok {
 			// Should never happen
