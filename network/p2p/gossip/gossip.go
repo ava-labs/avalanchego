@@ -411,6 +411,9 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 
 	// If we have too many gossipables, trigger gossip to evict
 	// stale entries.
+	//
+	// TODO: this iteration may not actually clear any stale entries (if there are a bunch
+	// of pending txs)
 	if len(p.tracking) > p.earlyGossipSize {
 		if err := p.gossip(context.TODO()); err != nil {
 			p.log.Error("failed to gossip", zap.Error(err))
