@@ -321,8 +321,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		p.issued.PushRight(gossipable)
 		p.tracking[gossipable.GossipID()] = time.Now()
 	}
-
-	// Iterate over all issued gossipables (have been sent before)
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.issued.PeekLeft()
 		if !ok {
