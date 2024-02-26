@@ -7,16 +7,22 @@ import "google/protobuf/empty.proto";
 // Methods on this service return status code NOT_FOUND if a requested
 // view, iterator or root hash is not found.
 service Merkle {
+  // --- Proposals ---
   rpc NewProposal(NewProposalRequest) returns (NewProposalResponse);
   rpc ProposalCommit(ProposalCommitRequest) returns (google.protobuf.Empty);
   
+  // --- Views ---
   rpc NewView(NewViewRequest) returns (NewViewResponse);
+
+  // --- Reads ---
   // The methods below may be called with an ID that corresponds to either a (committable) proposal
   // or (non-committable) historical view.
   rpc ViewHas(ViewHasRequest) returns (ViewHasResponse);
   rpc ViewGet(ViewGetRequest) returns (ViewGetResponse);
+
+  // --- Iterators ---
   rpc ViewNewIteratorWithStartAndPrefix(ViewNewIteratorWithStartAndPrefixRequest) returns (ViewNewIteratorWithStartAndPrefixResponse);
-  // Returns status code NOT_FOUND when the iterator is done.
+  // Returns status code OUT_OF_RANGE when the iterator is done
   rpc IteratorNext(IteratorNextRequest) returns (IteratorNextResponse);
   rpc IteratorError(IteratorErrorRequest) returns (google.protobuf.Empty);
   // Iterator can't be used (even to check error) after release.
@@ -67,17 +73,17 @@ message ViewGetResponse {
 }
 
 message ViewNewIteratorWithStartAndPrefixRequest {
-  uint32 id = 1;
+  uint64 id = 1;
   bytes start = 2;
   bytes prefix = 3;
 }
 
 message ViewNewIteratorWithStartAndPrefixResponse {
-  uint32 id = 1;
+  uint64 id = 1;
 }
 
 message IteratorNextRequest {
-  uint32 id = 1;
+  uint64 id = 1;
 }
 
 message IteratorNextResponse {
@@ -85,11 +91,11 @@ message IteratorNextResponse {
 }
 
 message IteratorErrorRequest {
-  uint32 id = 1;
+  uint64 id = 1;
 }
 
 message IteratorReleaseRequest {
-  uint32 id = 1;
+  uint64 id = 1;
 }
 
 message ViewReleaseRequest {
