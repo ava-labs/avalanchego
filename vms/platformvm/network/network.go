@@ -5,13 +5,11 @@ package network
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -28,10 +26,12 @@ const TxGossipHandlerID = 0
 type Network interface {
 	common.AppHandler
 
-	// Gossip starts gossiping transactions and blocks until it completes.
-	Gossip(ctx context.Context)
-	// IssueTx verifies the transaction at the currently preferred state, adds
-	// it to the mempool, and gossips it to the network.
+	// PushGossip starts push gossiping transactions and blocks until it completes.
+	PushGossip(ctx context.Context)
+	// PullGossip starts pull gossiping transactions and blocks until it completes.
+	PullGossip(ctx context.Context)
+	// IssueTx verifies the transaction at the currently preferred state and adds
+	// it to the mempool.
 	IssueTx(context.Context, *txs.Tx) error
 }
 
@@ -44,13 +44,10 @@ type network struct {
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
 
-	txPushGossiper    gossip.Accumulator[*txs.Tx]
-	txPullGossiper    gossip.Gossiper
-	txGossipFrequency time.Duration
-
-	// gossip related attributes
-	recentTxsLock sync.Mutex
-	recentTxs     *cache.LRU[ids.ID, struct{}]
+	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
+	txPushGossipFrequency time.Duration
+	txPullGossiper        gossip.Gossiper
+	txPullGossipFrequency time.Duration
 }
 
 func New(
@@ -87,13 +84,6 @@ func New(
 		return nil, err
 	}
 
-	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
-		marshaller,
-		txGossipClient,
-		txGossipMetrics,
-		config.TargetGossipSize,
-	)
-
 	gossipMempool, err := newGossipMempool(
 		mempool,
 		registerer,
@@ -106,6 +96,18 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+
+	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
+		log,
+		marshaller,
+		gossipMempool,
+		txGossipClient,
+		txGossipMetrics,
+		0,    // earlyGossipSize (IF THIS IS SMALLER THAN MAX SIZE, COULD LEAD TO GOSSIP EACH ADD)
+		1024, // discardedSize
+		config.TargetGossipSize,
+		time.Second, // maxRegossipFrequency
+	)
 
 	var txPullGossiper gossip.Gossiper
 	txPullGossiper = gossip.NewPullGossiper[*txs.Tx](
@@ -127,7 +129,6 @@ func New(
 	handler := gossip.NewHandler[*txs.Tx](
 		log,
 		marshaller,
-		txPushGossiper,
 		gossipMempool,
 		txGossipMetrics,
 		config.TargetGossipSize,
@@ -165,20 +166,30 @@ func New(
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		appSender:                 appSender,
 		txPushGossiper:            txPushGossiper,
+		txPushGossipFrequency:     config.PushGossipFrequency,
 		txPullGossiper:            txPullGossiper,
-		txGossipFrequency:         config.PullGossipFrequency,
-		recentTxs:                 &cache.LRU[ids.ID, struct{}]{Size: config.LegacyPushGossipCacheSize},
+		txPullGossipFrequency:     config.PullGossipFrequency,
 	}, nil
 }
 
-func (n *network) Gossip(ctx context.Context) {
+func (n *network) PushGossip(ctx context.Context) {
 	// If the node is running partial sync, we should not perform any pull
 	// gossip.
 	if n.partialSyncPrimaryNetwork {
 		return
 	}
 
-	gossip.Every(ctx, n.log, n.txPullGossiper, n.txGossipFrequency)
+	gossip.Every(ctx, n.log, n.txPushGossiper, n.txPushGossipFrequency)
+}
+
+func (n *network) PullGossip(ctx context.Context) {
+	// If the node is running partial sync, we should not perform any pull
+	// gossip.
+	if n.partialSyncPrimaryNetwork {
+		return
+	}
+
+	gossip.Every(ctx, n.log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
 func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
@@ -220,35 +231,19 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		)
 		return nil
 	}
-	txID := tx.ID()
 
-	if err := n.issueTx(tx); err == nil {
-		n.legacyGossipTx(ctx, txID, msgBytes)
-
-		n.txPushGossiper.Add(tx)
-		return n.txPushGossiper.Gossip(ctx)
-	}
-	return nil
+	return n.issueTx(tx)
 }
 
+// TODO: is this only invoked by user submissions?
+// TODO: naming here is confusing (should be clearer about which functions invoke push gossip if mempool addition is successful)
 func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.issueTx(tx); err != nil {
 		return err
 	}
 
-	txBytes := tx.Bytes()
-	msg := &message.Tx{
-		Tx: txBytes,
-	}
-	msgBytes, err := message.Build(msg)
-	if err != nil {
-		return err
-	}
-
-	txID := tx.ID()
-	n.legacyGossipTx(ctx, txID, msgBytes)
 	n.txPushGossiper.Add(tx)
-	return n.txPushGossiper.Gossip(ctx)
+	return nil
 }
 
 // returns nil if the tx is in the mempool
@@ -269,27 +264,4 @@ func (n *network) issueTx(tx *txs.Tx) error {
 	}
 
 	return nil
-}
-
-func (n *network) legacyGossipTx(ctx context.Context, txID ids.ID, msgBytes []byte) {
-	n.recentTxsLock.Lock()
-	_, has := n.recentTxs.Get(txID)
-	n.recentTxs.Put(txID, struct{}{})
-	n.recentTxsLock.Unlock()
-
-	// Don't gossip a transaction if it has been recently gossiped.
-	if has {
-		return
-	}
-
-	n.log.Debug("gossiping tx",
-		zap.Stringer("txID", txID),
-	)
-
-	if err := n.appSender.SendAppGossip(ctx, msgBytes); err != nil {
-		n.log.Error("failed to gossip tx",
-			zap.Stringer("txID", txID),
-			zap.Error(err),
-		)
-	}
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -33,11 +34,9 @@ var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[*testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
-	_ Gossiper = (*TestGossiper)(nil)
 
-	_ Accumulator[*testTx] = (*PushGossiper[*testTx])(nil)
-	_ Accumulator[*testTx] = (*NoOpAccumulator[*testTx])(nil)
-	_ Accumulator[*testTx] = (*TestAccumulator[*testTx])(nil)
+	_ Set[*testTx] = (*EmptySet[*testTx])(nil)
+	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
 	metricLabels = []string{typeLabel}
 	pushLabels   = prometheus.Labels{
@@ -46,19 +45,14 @@ var (
 	pullLabels = prometheus.Labels{
 		typeLabel: pullType,
 	}
+
+	errEmptySetCantAdd = errors.New("empty set can not add")
 )
 
 // Gossiper gossips Gossipables to other nodes
 type Gossiper interface {
 	// Gossip runs a cycle of gossip. Returns an error if we failed to gossip.
 	Gossip(ctx context.Context) error
-}
-
-// Accumulator allows a caller to accumulate gossipables to be gossiped
-type Accumulator[T Gossipable] interface {
-	Gossiper
-	// Add queues gossipables to be gossiped
-	Add(gossipables ...T)
 }
 
 // ValidatorGossiper only calls [Gossip] if the given node is a validator
@@ -206,17 +200,17 @@ func (p *PullGossiper[_]) handleResponse(
 			continue
 		}
 
-		hash := gossipable.GossipID()
+		gossipID := gossipable.GossipID()
 		p.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("id", hash),
+			zap.Stringer("id", gossipID),
 		)
 		if err := p.set.Add(gossipable); err != nil {
 			p.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", hash),
+				zap.Stringer("id", gossipID),
 				zap.Error(err),
 			)
 			continue
@@ -287,7 +281,7 @@ type PushGossiper[T Gossipable] struct {
 	discarded *cache.LRU[ids.ID, interface{}] // discarded ensures we don't overgossip transactions that are frequently dropped
 }
 
-// Gossip flushes any queued gossipables
+// Gossip flushes any queued gossipables.
 func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -300,9 +294,13 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 		return nil
 	}
 
-	// Iterate over all pending gossipables (never been sent before)
-	sentBytes := 0
-	gossip := make([][]byte, 0, defaultGossipableCount)
+	var (
+		sentBytes = 0
+		gossip    = make([][]byte, 0, defaultGossipableCount)
+		now       = time.Now()
+	)
+
+	// Iterate over all pending gossipables (never been sent before).
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.pending.PopLeft()
 		if !ok {
@@ -310,23 +308,26 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 		}
 
 		// Ensure item is still in the set before we gossip.
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
+		gossipID := gossipable.GossipID()
+		if !p.set.Has(gossipID) {
+			delete(p.tracking, gossipID)
 			continue
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
-			// remove this item so we don't get stuck in a loop
-			delete(p.tracking, gossipable.GossipID())
+			delete(p.tracking, gossipID)
 			return err
 		}
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
 		p.issued.PushRight(gossipable)
-		p.tracking[gossipable.GossipID()] = time.Now()
+		p.tracking[gossipID] = now
 	}
+
+	// Iterate over all issued gossipables (have been sent before) to fill
+	// any remaining space in gossip batch.
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.issued.PopLeft()
 		if !ok {
@@ -334,31 +335,35 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 		}
 
 		// Ensure item is still in the set before we gossip.
-		if !p.set.Has(gossipable) {
-			delete(p.tracking, gossipable.GossipID())
-			p.discarded.Put(gossipable.GossipID(), nil) // only add to discarded if issued once
+		gossipID := gossipable.GossipID()
+		if !p.set.Has(gossipID) {
+			delete(p.tracking, gossipID)
+			p.discarded.Put(gossipID, nil) // only add to discarded if issued once
 			continue
 		}
 
-		// Ensure not gossiped too recently
-		lastGossipTime := p.tracking[gossipable.GossipID()]
-		if time.Since(lastGossipTime) < p.maxRegossipFrequency {
+		// Ensure we don't attempt to send a gossipable too frequently.
+		lastGossipTime := p.tracking[gossipID]
+		if now.Sub(lastGossipTime) < p.maxRegossipFrequency {
+			// Put the gossipable on the front of the queue to keep items sorted
+			// by last issuance time.
 			p.issued.PushLeft(gossipable)
-			break // items are sorted by last issuance time, so we can stop here
+			break
 		}
 
 		bytes, err := p.marshaller.MarshalGossip(gossipable)
 		if err != nil {
 			// Should never happen because we've already issued this once.
-			delete(p.tracking, gossipable.GossipID())
+			delete(p.tracking, gossipID)
 			return err
 		}
 
 		gossip = append(gossip, bytes)
 		sentBytes += len(bytes)
 		p.issued.PushRight(gossipable)
-		p.tracking[gossipable.GossipID()] = time.Now()
+		p.tracking[gossipID] = now
 	}
+	p.metrics.tracking.Set(float64(len(p.tracking)))
 
 	// Send gossipables to peers
 	msgBytes, err := MarshalAppGossip(gossip)
@@ -378,34 +383,38 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 	if err := p.client.AppGossip(ctx, msgBytes); err != nil {
 		return fmt.Errorf("failed to gossip: %w", err)
 	}
-
 	return nil
 }
 
-// TODO: wording cleanup Add should only be called when accepting transactions over RPC. Gossip between validators (of txs from the p2p layer) should
-// use PullGossip. This is only for getting transactions into the hands of validators to begin with.
+// Add enqueues new gossipables to be pushed. If a gossiable is already tracked,
+// it is not added again.
 func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// Add new gossipables to the tracker
+	// Add new gossipables to the pending queue.
+	now := time.Now()
 	for _, gossipable := range gossipables {
-		gid := gossipable.GossipID()
-		if _, contains := p.tracking[gid]; contains {
+		gossipID := gossipable.GossipID()
+		if _, contains := p.tracking[gossipID]; contains {
 			continue
 		}
-		if _, contains := p.discarded.Get(gid); !contains {
-			p.tracking[gid] = time.Time{}
+		if _, contains := p.discarded.Get(gossipID); !contains {
+			p.tracking[gossipID] = time.Time{}
 			p.pending.PushRight(gossipable)
 		} else {
 			// Pretend that recently discarded transactions were just gossiped.
-			p.tracking[gid] = time.Now()
+			p.tracking[gossipID] = now
 			p.issued.PushRight(gossipable)
 		}
 	}
 
-	// If we have too many gossipables, trigger gossip to evict
-	// stale entries.
+	// If we have too many gossipables, trigger gossip to push pending gossipables
+	// and/or evict stale entries.
+	//
+	// This invocation of [gossip] may not clear any stale entries (if there are
+	// a bunch of pending, valid gossipables), however, successive calls eventually
+	// will.
 	if len(p.tracking) > p.earlyGossipSize {
 		if err := p.gossip(context.TODO()); err != nil {
 			p.log.Error("failed to gossip", zap.Error(err))
@@ -438,14 +447,6 @@ func (NoOpGossiper) Gossip(context.Context) error {
 	return nil
 }
 
-type NoOpAccumulator[T Gossipable] struct{}
-
-func (NoOpAccumulator[_]) Gossip(context.Context) error {
-	return nil
-}
-
-func (NoOpAccumulator[T]) Add(...T) {}
-
 type TestGossiper struct {
 	GossipF func(ctx context.Context) error
 }
@@ -454,23 +455,42 @@ func (t *TestGossiper) Gossip(ctx context.Context) error {
 	return t.GossipF(ctx)
 }
 
-type TestAccumulator[T Gossipable] struct {
-	GossipF func(ctx context.Context) error
-	AddF    func(...T)
+type EmptySet[T Gossipable] struct{}
+
+func (EmptySet[_]) Gossip(context.Context) error {
+	return nil
 }
 
-func (t TestAccumulator[T]) Gossip(ctx context.Context) error {
-	if t.GossipF == nil {
-		return nil
-	}
-
-	return t.GossipF(ctx)
+func (EmptySet[T]) Add(T) error {
+	return errEmptySetCantAdd
 }
 
-func (t TestAccumulator[T]) Add(gossipables ...T) {
-	if t.AddF == nil {
-		return
-	}
+func (EmptySet[T]) Has(ids.ID) bool {
+	return false
+}
 
-	t.AddF(gossipables...)
+func (EmptySet[T]) Iterate(func(gossipable T) bool) {}
+
+func (EmptySet[_]) GetFilter() ([]byte, []byte) {
+	return bloom.EmptyFilter.Marshal(), ids.Empty[:]
+}
+
+type FullSet[T Gossipable] struct{}
+
+func (FullSet[_]) Gossip(context.Context) error {
+	return nil
+}
+
+func (FullSet[T]) Add(T) error {
+	return nil
+}
+
+func (FullSet[T]) Has(ids.ID) bool {
+	return true
+}
+
+func (FullSet[T]) Iterate(func(gossipable T) bool) {}
+
+func (FullSet[_]) GetFilter() ([]byte, []byte) {
+	return bloom.FullFilter.Marshal(), ids.Empty[:]
 }

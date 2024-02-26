@@ -124,7 +124,6 @@ func TestGossiperGossip(t *testing.T) {
 			handler := NewHandler[*testTx](
 				logging.NoLog{},
 				marshaller,
-				NoOpAccumulator[*testTx]{},
 				responseSet,
 				metrics,
 				tt.targetResponseSize,
@@ -235,71 +234,96 @@ func TestValidatorGossiper(t *testing.T) {
 
 // Tests that the outgoing gossip is equivalent to what was accumulated
 func TestPushGossiper(t *testing.T) {
+	type cycle struct {
+		toAdd    []*testTx
+		expected []*testTx
+	}
 	tests := []struct {
 		name   string
-		cycles [][]*testTx
+		cycles []cycle
 	}{
 		{
 			name: "single cycle",
-			cycles: [][]*testTx{
+			cycles: []cycle{
 				{
-					&testTx{
-						id: ids.ID{0},
+					toAdd: []*testTx{
+						{
+							id: ids.ID{0},
+						},
+						{
+							id: ids.ID{1},
+						},
+						{
+							id: ids.ID{2},
+						},
 					},
-					&testTx{
-						id: ids.ID{1},
-					},
-					&testTx{
-						id: ids.ID{2},
+					expected: []*testTx{
+						{
+							id: ids.ID{0},
+						},
+						{
+							id: ids.ID{1},
+						},
+						{
+							id: ids.ID{2},
+						},
 					},
 				},
 			},
 		},
 		{
 			name: "multiple cycles",
-			cycles: [][]*testTx{
+			cycles: []cycle{
 				{
-					&testTx{
-						id: ids.ID{0},
+					toAdd: []*testTx{
+						{
+							id: ids.ID{0},
+						},
+					},
+					expected: []*testTx{
+						{
+							id: ids.ID{0},
+						},
 					},
 				},
 				{
-					&testTx{
-						id: ids.ID{1},
+					toAdd: []*testTx{
+						{
+							id: ids.ID{1},
+						},
 					},
-					&testTx{
-						id: ids.ID{2},
-					},
-				},
-				{
-					&testTx{
-						id: ids.ID{3},
-					},
-					&testTx{
-						id: ids.ID{4},
-					},
-					&testTx{
-						id: ids.ID{5},
+					expected: []*testTx{
+						{
+							id: ids.ID{1},
+						},
+						{
+							id: ids.ID{0},
+						},
 					},
 				},
 				{
-					&testTx{
-						id: ids.ID{6},
+					toAdd: []*testTx{
+						{
+							id: ids.ID{2},
+						},
 					},
-					&testTx{
-						id: ids.ID{7},
-					},
-					&testTx{
-						id: ids.ID{8},
-					},
-					&testTx{
-						id: ids.ID{9},
+					expected: []*testTx{
+						{
+							id: ids.ID{2},
+						},
+						{
+							id: ids.ID{1},
+						},
+						{
+							id: ids.ID{0},
+						},
 					},
 				},
 			},
 		},
 	}
 
+	const regossipTime = time.Nanosecond
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
@@ -321,20 +345,24 @@ func TestPushGossiper(t *testing.T) {
 			marshaller := testMarshaller{}
 			gossiper := NewPushGossiper[*testTx](
 				marshaller,
+				FullSet[*testTx]{},
 				client,
 				metrics,
+				0,
+				0,
 				units.MiB,
+				regossipTime,
 			)
 
-			for _, gossipables := range tt.cycles {
-				gossiper.Add(gossipables...)
+			for _, cycle := range tt.cycles {
+				gossiper.Add(cycle.toAdd...)
 				require.NoError(gossiper.Gossip(ctx))
 
 				want := &sdk.PushGossip{
-					Gossip: make([][]byte, 0, len(tt.cycles)),
+					Gossip: make([][]byte, 0, len(cycle.expected)),
 				}
 
-				for _, gossipable := range gossipables {
+				for _, gossipable := range cycle.expected {
 					bytes, err := marshaller.MarshalGossip(gossipable)
 					require.NoError(err)
 
@@ -347,111 +375,13 @@ func TestPushGossiper(t *testing.T) {
 				require.NoError(proto.Unmarshal(sentMsg[1:], got))
 
 				require.Equal(want.Gossip, got.Gossip)
+
+				// Ensure that subsequent calls to `time.Now()` are sufficient
+				// for regossip.
+				time.Sleep(regossipTime)
 			}
 		})
 	}
-}
-
-// Tests that gossip to a peer should forward the gossip if it was not
-// previously known
-func TestPushGossipE2E(t *testing.T) {
-	require := require.New(t)
-
-	// tx known by both the sender and the receiver which should not be
-	// forwarded
-	knownTx := &testTx{id: ids.GenerateTestID()}
-
-	log := logging.NoLog{}
-	bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 100, 0.01, 0.05)
-	require.NoError(err)
-	set := &testSet{
-		txs:   make(map[ids.ID]*testTx),
-		bloom: bloom,
-	}
-	require.NoError(set.Add(knownTx))
-
-	forwarder := &common.FakeSender{
-		SentAppGossip: make(chan []byte, 1),
-	}
-	forwarderNetwork, err := p2p.NewNetwork(log, forwarder, prometheus.NewRegistry(), "")
-	require.NoError(err)
-	handlerID := uint64(123)
-	client := forwarderNetwork.NewClient(handlerID)
-
-	metrics, err := NewMetrics(prometheus.NewRegistry(), "")
-	require.NoError(err)
-	marshaller := testMarshaller{}
-	forwarderGossiper := NewPushGossiper[*testTx](
-		marshaller,
-		client,
-		metrics,
-		units.MiB,
-	)
-
-	handler := NewHandler[*testTx](
-		log,
-		marshaller,
-		forwarderGossiper,
-		set,
-		metrics,
-		0,
-	)
-	require.NoError(err)
-	require.NoError(forwarderNetwork.AddHandler(handlerID, handler))
-
-	issuer := &common.FakeSender{
-		SentAppGossip: make(chan []byte, 1),
-	}
-	issuerNetwork, err := p2p.NewNetwork(log, issuer, prometheus.NewRegistry(), "")
-	require.NoError(err)
-	issuerClient := issuerNetwork.NewClient(handlerID)
-	require.NoError(err)
-	issuerGossiper := NewPushGossiper[*testTx](
-		marshaller,
-		issuerClient,
-		metrics,
-		units.MiB,
-	)
-
-	want := []*testTx{
-		{id: ids.GenerateTestID()},
-		{id: ids.GenerateTestID()},
-		{id: ids.GenerateTestID()},
-	}
-
-	// gossip both some unseen txs and one the receiver already knows about
-	var gossiped []*testTx
-	gossiped = append(gossiped, want...)
-	gossiped = append(gossiped, knownTx)
-
-	issuerGossiper.Add(gossiped...)
-	addedToSet := make([]*testTx, 0, len(want))
-	set.onAdd = func(tx *testTx) {
-		addedToSet = append(addedToSet, tx)
-	}
-
-	ctx := context.Background()
-	require.NoError(issuerGossiper.Gossip(ctx))
-
-	// make sure that we only add new txs someone gossips to us
-	require.NoError(forwarderNetwork.AppGossip(ctx, ids.EmptyNodeID, <-issuer.SentAppGossip))
-	require.Equal(want, addedToSet)
-
-	// make sure that we only forward txs we have not already seen before
-	forwardedBytes := <-forwarder.SentAppGossip
-	forwardedMsg := &sdk.PushGossip{}
-	require.NoError(proto.Unmarshal(forwardedBytes[1:], forwardedMsg))
-	require.Len(forwardedMsg.Gossip, len(want))
-
-	gotForwarded := make([]*testTx, 0, len(addedToSet))
-
-	for _, bytes := range forwardedMsg.Gossip {
-		tx, err := marshaller.UnmarshalGossip(bytes)
-		require.NoError(err)
-		gotForwarded = append(gotForwarded, tx)
-	}
-
-	require.Equal(want, gotForwarded)
 }
 
 type testValidatorSet struct {

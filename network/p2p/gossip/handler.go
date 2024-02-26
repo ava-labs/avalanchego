@@ -94,7 +94,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	return MarshalAppResponse(gossipBytes)
 }
 
-func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 	gossip, err := ParseAppGossip(gossipBytes)
 	if err != nil {
 		h.log.Debug("failed to unmarshal gossip", zap.Error(err))

@@ -219,7 +219,8 @@ func (vm *VM) Initialize(
 	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	// TODO: Wait for this goroutine to exit during Shutdown once the platformvm
 	// has better control of the context lock.
-	go vm.Network.Gossip(vm.onShutdownCtx)
+	go vm.Network.PushGossip(vm.onShutdownCtx)
+	go vm.Network.PullGossip(vm.onShutdownCtx)
 
 	vm.Builder = blockbuilder.New(
 		mempool,
