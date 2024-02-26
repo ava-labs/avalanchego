@@ -236,6 +236,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 }
 
 // TODO: is this only invoked by user submissions?
+// TODO: naming here is confusing (should be clearer about which functions invoke push gossip if mempool addition is successful)
 func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.issueTx(tx); err != nil {
 		return err
