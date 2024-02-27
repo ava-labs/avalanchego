@@ -89,7 +89,7 @@ func New(
 		return nil, err
 	}
 
-	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
+	txPushGossiper, err := gossip.NewPushGossiper[*txs.Tx](
 		marshaller,
 		gossipMempool,
 		txGossipClient,
@@ -98,6 +98,9 @@ func New(
 		config.TargetGossipSize,
 		config.PushGossipMaxRegossipFrequency,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	var txPullGossiper gossip.Gossiper = gossip.NewPullGossiper[*txs.Tx](
 		ctx.Log,
