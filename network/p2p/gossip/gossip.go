@@ -408,10 +408,10 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 	now := time.Now()
 	for _, gossipable := range gossipables {
 		gossipID := gossipable.GossipID()
-		if _, contains := p.tracking[gossipID]; contains {
+		if _, ok := p.tracking[gossipID]; ok {
 			continue
 		}
-		if _, contains := p.discarded.Get(gossipID); !contains {
+		if _, ok := p.discarded.Get(gossipID); !ok {
 			p.tracking[gossipID] = time.Time{}
 			p.pending.PushRight(gossipable)
 		} else {
