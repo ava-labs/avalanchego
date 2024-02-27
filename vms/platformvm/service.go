@@ -1400,7 +1400,7 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 	return nil
 }
 
-func (s *Service) IssueTx(req *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
+func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "issueTx"),
