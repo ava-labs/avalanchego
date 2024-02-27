@@ -26,23 +26,7 @@ const TxGossipHandlerID = 0
 
 var errMempoolDisabledWithPartialSync = errors.New("mempool is disabled partial syncing")
 
-type Network interface {
-	common.AppHandler
-
-	// PushGossip starts push gossiping transactions and blocks until it
-	// completes.
-	PushGossip(ctx context.Context)
-	// PullGossip starts pull gossiping transactions and blocks until it
-	// completes.
-	PullGossip(ctx context.Context)
-	// IssueTxFromRPC issues a transaction that was received from the local RPC.
-	// The transaction will be verified against the currently preferred state.
-	// If transaction verification passes, it will be added to the mempool and
-	// periodically pushed to validators until it is removed from the mempool.
-	IssueTxFromRPC(*txs.Tx) error
-}
-
-type network struct {
+type Network struct {
 	*p2p.Network
 
 	log                       logging.Logger
@@ -68,7 +52,7 @@ func New(
 	appSender common.AppSender,
 	registerer prometheus.Registerer,
 	config Config,
-) (Network, error) {
+) (*Network, error) {
 	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
 	if err != nil {
 		return nil, err
@@ -165,7 +149,7 @@ func New(
 		return nil, err
 	}
 
-	return &network{
+	return &Network{
 		Network:                   p2pNetwork,
 		log:                       log,
 		txVerifier:                txVerifier,
@@ -179,7 +163,7 @@ func New(
 	}, nil
 }
 
-func (n *network) PushGossip(ctx context.Context) {
+func (n *Network) PushGossip(ctx context.Context) {
 	// TODO: Even though the node is running partial sync, we should support
 	// issuing transactions from the RPC.
 	if n.partialSyncPrimaryNetwork {
@@ -189,7 +173,7 @@ func (n *network) PushGossip(ctx context.Context) {
 	gossip.Every(ctx, n.log, n.txPushGossiper, n.txPushGossipFrequency)
 }
 
-func (n *network) PullGossip(ctx context.Context) {
+func (n *Network) PullGossip(ctx context.Context) {
 	// If the node is running partial sync, we should not perform any pull
 	// gossip.
 	if n.partialSyncPrimaryNetwork {
@@ -199,7 +183,7 @@ func (n *network) PullGossip(ctx context.Context) {
 	gossip.Every(ctx, n.log, n.txPullGossiper, n.txPullGossipFrequency)
 }
 
-func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
@@ -246,7 +230,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	return nil
 }
 
-func (n *network) IssueTxFromRPC(tx *txs.Tx) error {
+func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 	// TODO: We should still push the transaction to some peers when partial
 	// syncing.
 	if err := n.addTxToMempool(tx); err != nil {
@@ -256,7 +240,7 @@ func (n *network) IssueTxFromRPC(tx *txs.Tx) error {
 	return nil
 }
 
-func (n *network) addTxToMempool(tx *txs.Tx) error {
+func (n *Network) addTxToMempool(tx *txs.Tx) error {
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
 	if n.partialSyncPrimaryNetwork {

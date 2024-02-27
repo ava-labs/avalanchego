@@ -288,7 +288,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			snowCtx := snowtest.Context(t, ids.Empty)
-			nIntf, err := New(
+			n, err := New(
 				snowCtx.Log,
 				snowCtx.NodeID,
 				snowCtx.SubnetID,
@@ -302,10 +302,9 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			)
 			require.NoError(err)
 
-			err = nIntf.IssueTxFromRPC(tx)
+			err = n.IssueTxFromRPC(tx)
 			require.ErrorIs(err, tt.expectedErr)
 
-			n := nIntf.(*network)
 			require.NoError(n.txPushGossiper.Gossip(context.Background()))
 		})
 	}

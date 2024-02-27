@@ -62,7 +62,7 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
-	network.Network
+	*network.Network
 	validators.State
 
 	metrics            metrics.Metrics
