@@ -213,9 +213,9 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	return nil
 }
 
-// IssueTx attempts to add a tx to the mempool, after verifying it. If the tx is
-// added to the mempool, it will attempt to push gossip the tx to random peers
-// in the network using both the legacy and p2p SDK.
+// IssueTxFromRPC attempts to add a tx to the mempool, after verifying it. If
+// the tx is added to the mempool, it will attempt to push gossip the tx to
+// random peers in the network.
 //
 // If the tx is already in the mempool, mempool.ErrDuplicateTx will be
 // returned.
@@ -228,9 +228,9 @@ func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 	return nil
 }
 
-// IssueVerifiedTx attempts to add a tx to the mempool, without first verifying
-// it. If the tx is added to the mempool, it will attempt to push gossip the tx
-// to random peers in the network using both the legacy and p2p SDK.
+// IssueTxFromRPCWithoutVerification attempts to add a tx to the mempool,
+// without first verifying it. If the tx is added to the mempool, it will
+// attempt to push gossip the tx to random peers in the network.
 //
 // If the tx is already in the mempool, mempool.ErrDuplicateTx will be
 // returned.

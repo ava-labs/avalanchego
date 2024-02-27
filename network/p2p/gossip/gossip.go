@@ -46,10 +46,11 @@ var (
 		typeLabel: pullType,
 	}
 
-	errEmptySetCantAdd          = errors.New("empty set can not add")
 	ErrInvalidDiscardedSize     = errors.New("discarded size cannot be negative")
 	ErrInvalidTargetGossipSize  = errors.New("target gossip size cannot be negative")
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
+
+	errEmptySetCantAdd = errors.New("empty set can not add")
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -246,15 +247,12 @@ func NewPushGossiper[T Gossipable](
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
 ) (*PushGossiper[T], error) {
-	if discardedSize < 0 {
+	switch {
+	case discardedSize < 0:
 		return nil, ErrInvalidDiscardedSize
-	}
-
-	if targetGossipSize < 0 {
+	case targetGossipSize < 0:
 		return nil, ErrInvalidTargetGossipSize
-	}
-
-	if maxRegossipFrequency < 0 {
+	case maxRegossipFrequency < 0:
 		return nil, ErrInvalidRegossipFrequency
 	}
 
@@ -269,7 +267,7 @@ func NewPushGossiper[T Gossipable](
 		tracking:  make(map[ids.ID]time.Time),
 		pending:   buffer.NewUnboundedDeque[T](0),
 		issued:    buffer.NewUnboundedDeque[T](0),
-		discarded: &cache.LRU[ids.ID, interface{}]{Size: discardedSize},
+		discarded: &cache.LRU[ids.ID, struct{}]{Size: discardedSize},
 	}, nil
 }
 
@@ -287,7 +285,7 @@ type PushGossiper[T Gossipable] struct {
 	tracking  map[ids.ID]time.Time
 	pending   buffer.Deque[T]
 	issued    buffer.Deque[T]
-	discarded *cache.LRU[ids.ID, interface{}] // discarded attempts to avoid overgossiping transactions that are frequently dropped
+	discarded *cache.LRU[ids.ID, struct{}] // discarded attempts to avoid overgossiping transactions that are frequently dropped
 }
 
 // Gossip flushes any queued gossipables.
@@ -345,7 +343,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		gossipID := gossipable.GossipID()
 		if !p.set.Has(gossipID) {
 			delete(p.tracking, gossipID)
-			p.discarded.Put(gossipID, nil) // only add to discarded if issued once
+			p.discarded.Put(gossipID, struct{}{}) // only add to discarded if issued once
 			continue
 		}
 
