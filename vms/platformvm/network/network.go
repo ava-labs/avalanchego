@@ -178,6 +178,12 @@ func New(
 }
 
 func (n *network) PushGossip(ctx context.Context) {
+	// TODO: Even though the node is running partial sync, we should support
+	// issuing transactions from the RPC.
+	if n.partialSyncPrimaryNetwork {
+		return
+	}
+
 	gossip.Every(ctx, n.log, n.txPushGossiper, n.txPushGossipFrequency)
 }
 
