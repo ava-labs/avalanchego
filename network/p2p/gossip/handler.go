@@ -120,7 +120,6 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 				zap.Stringer("id", gossipable.GossipID()),
 				zap.Error(err),
 			)
-			continue
 		}
 	}
 
