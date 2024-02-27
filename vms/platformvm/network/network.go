@@ -98,7 +98,6 @@ func New(
 	}
 
 	txPushGossiper := gossip.NewPushGossiper[*txs.Tx](
-		log,
 		marshaller,
 		gossipMempool,
 		txGossipClient,
@@ -241,9 +240,7 @@ func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	if err := n.issueTx(tx); err != nil {
 		return err
 	}
-
-	n.txPushGossiper.Add(tx)
-	return nil
+	return n.txPushGossiper.Add(ctx, tx)
 }
 
 // returns nil if the tx is in the mempool

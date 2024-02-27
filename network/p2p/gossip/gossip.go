@@ -235,7 +235,6 @@ func (p *PullGossiper[_]) handleResponse(
 
 // NewPushGossiper returns an instance of PushGossiper
 func NewPushGossiper[T Gossipable](
-	log logging.Logger,
 	marshaller Marshaller[T],
 	mempool Set[T],
 	client *p2p.Client,
@@ -246,7 +245,6 @@ func NewPushGossiper[T Gossipable](
 	maxRegossipFrequency time.Duration,
 ) *PushGossiper[T] {
 	return &PushGossiper[T]{
-		log:                  log,
 		marshaller:           marshaller,
 		set:                  mempool,
 		client:               client,
@@ -264,7 +262,6 @@ func NewPushGossiper[T Gossipable](
 
 // PushGossiper broadcasts gossip to peers randomly in the network
 type PushGossiper[T Gossipable] struct {
-	log        logging.Logger
 	marshaller Marshaller[T]
 	set        Set[T]
 	client     *p2p.Client
@@ -344,6 +341,8 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 
 		// Ensure we don't attempt to send a gossipable too frequently.
 		lastGossipTime := p.tracking[gossipID]
+		// Invariant: maxRegossipFrequency must be greater than 0 to prevent
+		// gossiping the same transaction multiple times in the same message.
 		if now.Sub(lastGossipTime) < p.maxRegossipFrequency {
 			// Put the gossipable on the front of the queue to keep items sorted
 			// by last issuance time.
@@ -388,7 +387,7 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 
 // Add enqueues new gossipables to be pushed. If a gossiable is already tracked,
 // it is not added again.
-func (p *PushGossiper[T]) Add(gossipables ...T) {
+func (p *PushGossiper[T]) Add(ctx context.Context, gossipables ...T) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -408,19 +407,19 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 			p.issued.PushRight(gossipable)
 		}
 	}
+	p.metrics.tracking.Set(float64(len(p.tracking)))
 
-	// If we have too many gossipables, trigger gossip to push pending gossipables
-	// and/or evict stale entries.
+	// If we have too many gossipables, trigger gossip to issue pending
+	// gossipables and/or evict stale entries.
 	//
 	// This invocation of [gossip] may not clear any stale entries (if there are
-	// a bunch of pending, valid gossipables), however, successive calls eventually
-	// will.
-	if len(p.tracking) > p.earlyGossipSize {
-		if err := p.gossip(context.TODO()); err != nil {
-			p.log.Error("failed to gossip", zap.Error(err))
-		}
+	// a bunch of pending, valid gossipables), however, successive calls
+	// eventually will.
+	if p.pending.Len() < p.earlyGossipSize {
+		return nil
 	}
-	p.metrics.tracking.Set(float64(len(p.tracking)))
+
+	return p.gossip(ctx)
 }
 
 // Every calls [Gossip] every [frequency] amount of time.
