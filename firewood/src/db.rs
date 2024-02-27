@@ -345,16 +345,6 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
             .key_value_iter_from_key(self.header.kv_root, start_key)
     }
 
-    fn flush_dirty(&mut self) -> Option<()> {
-        self.header.flush_dirty();
-        self.merkle.flush_dirty()?;
-        Some(())
-    }
-
-    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle<S, Bincode>) {
-        (&mut self.header, &mut self.merkle)
-    }
-
     /// Get root hash of the generic key-value storage.
     pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
         self.merkle
@@ -395,6 +385,23 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
         let valid =
             proof.verify_range_proof::<K, V, Bincode>(hash, first_key, last_key, keys, values)?;
         Ok(valid)
+    }
+}
+
+impl DbRev<MutStore> {
+    fn borrow_split(
+        &mut self,
+    ) -> (
+        &mut shale::Obj<DbHeader>,
+        &mut Merkle<CompactSpace<Node, StoreRevMut>, Bincode>,
+    ) {
+        (&mut self.header, &mut self.merkle)
+    }
+
+    fn flush_dirty(&mut self) -> Option<()> {
+        self.header.flush_dirty();
+        self.merkle.flush_dirty()?;
+        Some(())
     }
 }
 
