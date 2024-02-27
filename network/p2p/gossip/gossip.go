@@ -411,13 +411,13 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 		if _, ok := p.tracking[gossipID]; ok {
 			continue
 		}
-		if _, ok := p.discarded.Get(gossipID); !ok {
-			p.tracking[gossipID] = time.Time{}
-			p.pending.PushRight(gossipable)
-		} else {
+		if _, ok := p.discarded.Get(gossipID); ok {
 			// Pretend that recently discarded transactions were just gossiped.
 			p.tracking[gossipID] = now
 			p.issued.PushRight(gossipable)
+		} else {
+			p.tracking[gossipID] = time.Time{}
+			p.pending.PushRight(gossipable)
 		}
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
