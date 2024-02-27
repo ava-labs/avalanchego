@@ -33,8 +33,8 @@ type Config struct {
 	// sent when pushing transactions and when responded to transaction pull
 	// requests.
 	TargetGossipSize int `json:"target-gossip-size"`
-	// PushGossipFrequency is how frequently rounds of push gossip are
-	// performed.
+	// PushGossipDiscardedCacheSize is the number of txIDs to cache to avoid
+	// pushing transactions that were recently dropped from the mempool.
 	PushGossipDiscardedCacheSize int `json:"push-gossip-discarded-cache-size"`
 	// PushGossipMaxRegossipFrequency is the limit for how frequently a
 	// transaction will be push gossiped.
