@@ -1415,7 +1415,7 @@ func (s *Service) IssueTx(req *http.Request, args *api.FormattedTx, response *ap
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 
-	if err := s.vm.issueTx(tx); err != nil {
+	if err := s.vm.issueTxFromRPC(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 

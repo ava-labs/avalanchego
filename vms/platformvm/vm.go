@@ -542,7 +542,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-func (vm *VM) issueTx(tx *txs.Tx) error {
+func (vm *VM) issueTxFromRPC(tx *txs.Tx) error {
 	err := vm.Network.IssueTxFromRPC(tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
