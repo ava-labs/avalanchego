@@ -5,7 +5,6 @@ package gossip
 
 import (
 	"context"
-	"math"
 	"sync"
 	"testing"
 	"time"
@@ -349,14 +348,13 @@ func TestPushGossiper(t *testing.T) {
 				FullSet[*testTx]{},
 				client,
 				metrics,
-				math.MaxInt, // never gossip during Add
-				0,           // the discarded cache size doesn't matter for this test
+				0, // the discarded cache size doesn't matter for this test
 				units.MiB,
 				regossipTime,
 			)
 
 			for _, cycle := range tt.cycles {
-				require.NoError(gossiper.Add(context.Background(), cycle.toAdd...))
+				gossiper.Add(cycle.toAdd...)
 				require.NoError(gossiper.Gossip(ctx))
 
 				want := &sdk.PushGossip{

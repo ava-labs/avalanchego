@@ -329,44 +329,8 @@ func TestNetworkIssueTx(t *testing.T) {
 			)
 			require.NoError(err)
 
-			err = n.IssueTx(context.Background(), tx)
+			err = n.IssueTx(tx)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
-}
-
-func TestNetworkGossipTx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	appSender := common.NewMockSender(ctrl)
-
-	snowCtx := snowtest.Context(t, ids.Empty)
-	nIntf, err := New(
-		snowCtx.Log,
-		snowCtx.NodeID,
-		snowCtx.SubnetID,
-		snowCtx.ValidatorState,
-		testTxVerifier{},
-		mempool.NewMockMempool(ctrl),
-		false,
-		appSender,
-		prometheus.NewRegistry(),
-		testConfig,
-	)
-	require.NoError(err)
-	require.IsType(&network{}, nIntf)
-	n := nIntf.(*network)
-
-	// Case: Tx was recently gossiped
-	txID := ids.GenerateTestID()
-	n.recentTxs.Put(txID, struct{}{})
-	n.legacyGossipTx(context.Background(), txID, []byte{})
-	// Didn't make a call to SendAppGossip
-
-	// Case: Tx was not recently gossiped
-	msgBytes := []byte{1, 2, 3}
-	appSender.EXPECT().SendAppGossip(gomock.Any(), msgBytes).Return(nil)
-	n.legacyGossipTx(context.Background(), ids.GenerateTestID(), msgBytes)
-	// Did make a call to SendAppGossip
 }

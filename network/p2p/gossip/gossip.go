@@ -239,7 +239,6 @@ func NewPushGossiper[T Gossipable](
 	mempool Set[T],
 	client *p2p.Client,
 	metrics Metrics,
-	earlyGossipSize int,
 	discardedSize int,
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
@@ -249,7 +248,6 @@ func NewPushGossiper[T Gossipable](
 		set:                  mempool,
 		client:               client,
 		metrics:              metrics,
-		earlyGossipSize:      earlyGossipSize,
 		targetGossipSize:     targetGossipSize,
 		maxRegossipFrequency: maxRegossipFrequency,
 
@@ -267,7 +265,6 @@ type PushGossiper[T Gossipable] struct {
 	client     *p2p.Client
 	metrics    Metrics
 
-	earlyGossipSize      int // size at which we attempt gossip during [Add] to reduce memory use
 	targetGossipSize     int
 	maxRegossipFrequency time.Duration
 
@@ -387,7 +384,7 @@ func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 
 // Add enqueues new gossipables to be pushed. If a gossiable is already tracked,
 // it is not added again.
-func (p *PushGossiper[T]) Add(ctx context.Context, gossipables ...T) error {
+func (p *PushGossiper[T]) Add(gossipables ...T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -408,18 +405,6 @@ func (p *PushGossiper[T]) Add(ctx context.Context, gossipables ...T) error {
 		}
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
-
-	// If we have too many gossipables, trigger gossip to issue pending
-	// gossipables and/or evict stale entries.
-	//
-	// This invocation of [gossip] may not clear any stale entries (if there are
-	// a bunch of pending, valid gossipables), however, successive calls
-	// eventually will.
-	if p.pending.Len() < p.earlyGossipSize {
-		return nil
-	}
-
-	return p.gossip(ctx)
 }
 
 // Every calls [Gossip] every [frequency] amount of time.

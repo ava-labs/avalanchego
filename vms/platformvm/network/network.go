@@ -26,13 +26,15 @@ const TxGossipHandlerID = 0
 type Network interface {
 	common.AppHandler
 
-	// PushGossip starts push gossiping transactions and blocks until it completes.
+	// PushGossip starts push gossiping transactions and blocks until it
+	// completes.
 	PushGossip(ctx context.Context)
-	// PullGossip starts pull gossiping transactions and blocks until it completes.
+	// PullGossip starts pull gossiping transactions and blocks until it
+	// completes.
 	PullGossip(ctx context.Context)
-	// IssueTx verifies the transaction at the currently preferred state and adds
-	// it to the mempool.
-	IssueTx(context.Context, *txs.Tx) error
+	// IssueTx verifies the transaction at the currently preferred state and
+	// adds it to the mempool.
+	IssueTx(*txs.Tx) error
 }
 
 type network struct {
@@ -102,10 +104,9 @@ func New(
 		gossipMempool,
 		txGossipClient,
 		txGossipMetrics,
-		0,    // earlyGossipSize (IF THIS IS SMALLER THAN MAX SIZE, COULD LEAD TO GOSSIP EACH ADD)
-		1024, // discardedSize
+		config.PushGossipDiscardedCacheSize,
 		config.TargetGossipSize,
-		time.Second, // maxRegossipFrequency
+		config.PushGossipMaxRegossipFrequency,
 	)
 
 	var txPullGossiper gossip.Gossiper
@@ -228,13 +229,14 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	return n.issueTx(tx)
 }
 
-// TODO: is this only invoked by user submissions?
 // TODO: naming here is confusing (should be clearer about which functions invoke push gossip if mempool addition is successful)
-func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
+// TODO: issueTx doesn't add the tx to the mempool if partial sync is enabled, so the push gossiper will always drop the tx before broadcasting it
+func (n *network) IssueTx(tx *txs.Tx) error {
 	if err := n.issueTx(tx); err != nil {
 		return err
 	}
-	return n.txPushGossiper.Add(ctx, tx)
+	n.txPushGossiper.Add(tx)
+	return nil
 }
 
 // returns nil if the tx is in the mempool

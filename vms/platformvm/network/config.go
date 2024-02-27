@@ -12,7 +12,9 @@ import (
 var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
-	PushGossipFrequency:                         1500 * time.Millisecond,
+	PushGossipDiscardedCacheSize:                1024,
+	PushGossipMaxRegossipFrequency:              2000 * time.Millisecond,
+	PushGossipFrequency:                         500 * time.Millisecond,
 	PullGossipPollSize:                          1,
 	PullGossipFrequency:                         1500 * time.Millisecond,
 	PullGossipThrottlingPeriod:                  10 * time.Second,
@@ -31,6 +33,12 @@ type Config struct {
 	// sent when pushing transactions and when responded to transaction pull
 	// requests.
 	TargetGossipSize int `json:"target-gossip-size"`
+	// PushGossipFrequency is how frequently rounds of push gossip are
+	// performed.
+	PushGossipDiscardedCacheSize int `json:"push-gossip-discarded-cache-size"`
+	// PushGossipMaxRegossipFrequency is the limit for how frequently a
+	// transaction will be push gossiped.
+	PushGossipMaxRegossipFrequency time.Duration `json:"push-gossip-max-regossip-frequency"`
 	// PushGossipFrequency is how frequently rounds of push gossip are
 	// performed.
 	PushGossipFrequency time.Duration `json:"push-gossip-frequency"`
