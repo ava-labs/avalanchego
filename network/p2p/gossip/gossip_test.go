@@ -349,8 +349,8 @@ func TestPushGossiper(t *testing.T) {
 				FullSet[*testTx]{},
 				client,
 				metrics,
-				math.MaxInt,
-				0,
+				math.MaxInt, // never gossip during Add
+				0,           // the discarded cache size doesn't matter for this test
 				units.MiB,
 				regossipTime,
 			)
