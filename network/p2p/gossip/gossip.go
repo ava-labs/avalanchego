@@ -316,8 +316,12 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		p.tracking[gossipID] = now
 	}
 
-	// Iterate over all issued gossipables (have been sent before) to fill
-	// any remaining space in gossip batch.
+	// Invariant: maxRegossipFrequency must be non-negative to prevent gossiping
+	// the same transaction multiple times in the same message.
+	maxLastGossipTimeToRegossip := now.Add(-p.maxRegossipFrequency)
+
+	// Iterate over all issued gossipables (have been sent before) to fill any
+	// remaining space in gossip batch.
 	for sentBytes < p.targetGossipSize {
 		gossipable, ok := p.issued.PopLeft()
 		if !ok {
@@ -334,9 +338,7 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 
 		// Ensure we don't attempt to send a gossipable too frequently.
 		lastGossipTime := p.tracking[gossipID]
-		// Invariant: maxRegossipFrequency must be greater than 0 to prevent
-		// gossiping the same transaction multiple times in the same message.
-		if now.Sub(lastGossipTime) < p.maxRegossipFrequency {
+		if maxLastGossipTimeToRegossip.Before(lastGossipTime) {
 			// Put the gossipable on the front of the queue to keep items sorted
 			// by last issuance time.
 			p.issued.PushLeft(gossipable)

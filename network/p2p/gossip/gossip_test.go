@@ -377,7 +377,7 @@ func TestPushGossiper(t *testing.T) {
 
 				// Ensure that subsequent calls to `time.Now()` are sufficient
 				// for regossip.
-				time.Sleep(regossipTime)
+				time.Sleep(regossipTime + time.Nanosecond)
 			}
 		})
 	}
