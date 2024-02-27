@@ -22,7 +22,6 @@ var DefaultConfig = Config{
 	ExpectedBloomFilterElements:                 8 * 1024,
 	ExpectedBloomFilterFalsePositiveProbability: .01,
 	MaxBloomFilterFalsePositiveProbability:      .05,
-	LegacyPushGossipCacheSize:                   512,
 }
 
 type Config struct {
@@ -69,10 +68,4 @@ type Config struct {
 	// The smaller this number is, the more frequently that the bloom filter
 	// will be regenerated.
 	MaxBloomFilterFalsePositiveProbability float64 `json:"max-bloom-filter-false-positive-probability"`
-	// LegacyPushGossipCacheSize tracks the most recently received transactions
-	// and ensures to only gossip them once.
-	//
-	// Deprecated: The legacy push gossip mechanism is deprecated in favor of
-	// the p2p SDK's push gossip mechanism.
-	LegacyPushGossipCacheSize int `json:"legacy-push-gossip-cache-size"`
 }

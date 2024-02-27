@@ -359,6 +359,11 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	}
 	p.metrics.tracking.Set(float64(len(p.tracking)))
 
+	// If there is nothing to gossip, we can exit early.
+	if len(gossip) == 0 {
+		return nil
+	}
+
 	// Send gossipables to peers
 	msgBytes, err := MarshalAppGossip(gossip)
 	if err != nil {

@@ -114,8 +114,7 @@ func New(
 		config.PushGossipMaxRegossipFrequency,
 	)
 
-	var txPullGossiper gossip.Gossiper
-	txPullGossiper = gossip.NewPullGossiper[*txs.Tx](
+	var txPullGossiper gossip.Gossiper = gossip.NewPullGossiper[*txs.Tx](
 		log,
 		marshaller,
 		gossipMempool,
@@ -237,9 +236,9 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	// Returning an error here would result in shutting down the P-chain.
-	// Logging is already included inside addTxToMempool, so there's nothing to
-	// do with the returned error here.
+	// Returning an error here would result in shutting down the chain. Logging
+	// is already included inside addTxToMempool, so there's nothing to do with
+	// the returned error here.
 	_ = n.addTxToMempool(tx)
 	return nil
 }
