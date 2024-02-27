@@ -232,6 +232,11 @@ func TestValidatorGossiper(t *testing.T) {
 	require.Equal(2, calls)
 }
 
+func TestPushGossiperNew(t *testing.T) {
+	_, err := NewPushGossiper[*testTx](nil, nil, nil, Metrics{}, 0, 0, -1)
+	require.ErrorIs(t, err, ErrInvalidRegossipFrequency)
+}
+
 // Tests that the outgoing gossip is equivalent to what was accumulated
 func TestPushGossiper(t *testing.T) {
 	type cycle struct {
@@ -343,7 +348,7 @@ func TestPushGossiper(t *testing.T) {
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
 			marshaller := testMarshaller{}
-			gossiper := NewPushGossiper[*testTx](
+			gossiper, err := NewPushGossiper[*testTx](
 				marshaller,
 				FullSet[*testTx]{},
 				client,
@@ -352,6 +357,7 @@ func TestPushGossiper(t *testing.T) {
 				units.MiB,
 				regossipTime,
 			)
+			require.NoError(err)
 
 			for _, cycle := range tt.cycles {
 				gossiper.Add(cycle.toAdd...)

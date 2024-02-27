@@ -46,7 +46,8 @@ var (
 		typeLabel: pullType,
 	}
 
-	errEmptySetCantAdd = errors.New("empty set can not add")
+	errEmptySetCantAdd          = errors.New("empty set can not add")
+	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -242,7 +243,13 @@ func NewPushGossiper[T Gossipable](
 	discardedSize int,
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
-) *PushGossiper[T] {
+) (*PushGossiper[T], error) {
+	// maxRegossipFrequency must be non-negative to prevent gossiping
+	// the same transaction multiple times in the same message.
+	if maxRegossipFrequency < 0 {
+		return nil, ErrInvalidRegossipFrequency
+	}
+
 	return &PushGossiper[T]{
 		marshaller:           marshaller,
 		set:                  mempool,
@@ -255,7 +262,7 @@ func NewPushGossiper[T Gossipable](
 		pending:   buffer.NewUnboundedDeque[T](0),
 		issued:    buffer.NewUnboundedDeque[T](0),
 		discarded: &cache.LRU[ids.ID, interface{}]{Size: discardedSize},
-	}
+	}, nil
 }
 
 // PushGossiper broadcasts gossip to peers randomly in the network
@@ -316,8 +323,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 		p.tracking[gossipID] = now
 	}
 
-	// Invariant: maxRegossipFrequency must be non-negative to prevent gossiping
-	// the same transaction multiple times in the same message.
 	maxLastGossipTimeToRegossip := now.Add(-p.maxRegossipFrequency)
 
 	// Iterate over all issued gossipables (have been sent before) to fill any
