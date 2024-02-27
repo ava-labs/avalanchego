@@ -280,10 +280,6 @@ func (p *PushGossiper[T]) Gossip(ctx context.Context) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	return p.gossip(ctx)
-}
-
-func (p *PushGossiper[T]) gossip(ctx context.Context) error {
 	if len(p.tracking) == 0 {
 		return nil
 	}
