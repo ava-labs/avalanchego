@@ -19,3 +19,7 @@ Here is a list of technical details about the way `PlatformVM` works:
 - Validators are versioned to support the Warp protocol. You can read [here](./docs/validators_versioning.md) details of how the P-chain stores validator set versions.
 - Subnets lifetime is tracked and managed in the P-chain. You can read [here](./docs/subnets.md) details of what transactions can be used to affect a Subnet.
 - The P-chain can process different kind of blocks. You can read [here](./docs/block_formation_logic.md) details of how blocks have changed across forks.
+
+Note that you can find details about P-chain transactions list and details [here](https://docs.avax.network/reference/avalanchego/p-chain/txn-format).
+
+Note that transactions dissemination has been consolidated into an sdk package. You can find the relevant code [here](../../network/p2p/).
