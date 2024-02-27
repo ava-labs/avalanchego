@@ -4,11 +4,11 @@
 use crate::{
     merkle::{
         proof::{Proof, ProofError},
-        BinarySerde, Bincode, Merkle, Node, Ref, RefMut, TrieHash,
+        BinarySerde, EncodedNode, Merkle, Node, Ref, RefMut, TrieHash,
     },
     shale::{
         self, cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore,
-        ShaleStore, StoredView,
+        StoredView,
     },
 };
 use std::num::NonZeroUsize;
@@ -36,12 +36,53 @@ pub enum DataStoreError {
     ProofEmptyKeyValuesError,
 }
 
-pub struct MerkleSetup<S, T> {
+type InMemoryStore = CompactSpace<Node, DynamicMem>;
+
+pub struct InMemoryMerkle<T> {
     root: DiskAddress,
-    merkle: Merkle<S, T>,
+    merkle: Merkle<InMemoryStore, T>,
 }
 
-impl<S: ShaleStore<Node> + Send + Sync, T: BinarySerde> MerkleSetup<S, T> {
+impl<T> InMemoryMerkle<T>
+where
+    T: BinarySerde,
+    EncodedNode<T>: serde::Serialize + serde::de::DeserializeOwned,
+{
+    pub fn new(meta_size: u64, compact_size: u64) -> Self {
+        const RESERVED: usize = 0x1000;
+        assert!(meta_size as usize > RESERVED);
+        assert!(compact_size as usize > RESERVED);
+        let mut dm = DynamicMem::new(meta_size, 0);
+        let compact_header = DiskAddress::null();
+        #[allow(clippy::unwrap_used)]
+        dm.write(
+            compact_header.into(),
+            &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+                NonZeroUsize::new(RESERVED).unwrap(),
+                #[allow(clippy::unwrap_used)]
+                NonZeroUsize::new(RESERVED).unwrap(),
+            ))
+            .unwrap(),
+        );
+        #[allow(clippy::unwrap_used)]
+        let compact_header =
+            StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE)
+                .unwrap();
+        let mem_meta = dm;
+        let mem_payload = DynamicMem::new(compact_size, 0x1);
+
+        let cache = shale::ObjCache::new(1);
+        let space =
+            shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
+                .expect("CompactSpace init fail");
+
+        let merkle = Merkle::new(Box::new(space));
+        #[allow(clippy::unwrap_used)]
+        let root = merkle.init_root().unwrap();
+
+        InMemoryMerkle { root, merkle }
+    }
+
     pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, val: Vec<u8>) -> Result<(), DataStoreError> {
         self.merkle
             .insert(key, val, self.root)
@@ -63,7 +104,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T: BinarySerde> MerkleSetup<S, T> {
     pub fn get_mut<K: AsRef<[u8]>>(
         &mut self,
         key: K,
-    ) -> Result<Option<RefMut<S, T>>, DataStoreError> {
+    ) -> Result<Option<RefMut<InMemoryStore, T>>, DataStoreError> {
         self.merkle
             .get_mut(key, self.root)
             .map_err(|_err| DataStoreError::GetError)
@@ -73,7 +114,7 @@ impl<S: ShaleStore<Node> + Send + Sync, T: BinarySerde> MerkleSetup<S, T> {
         self.root
     }
 
-    pub fn get_merkle_mut(&mut self) -> &mut Merkle<S, T> {
+    pub fn get_merkle_mut(&mut self) -> &mut Merkle<InMemoryStore, T> {
         &mut self.merkle
     }
 
@@ -119,41 +160,4 @@ impl<S: ShaleStore<Node> + Send + Sync, T: BinarySerde> MerkleSetup<S, T> {
         let hash: [u8; 32] = *self.root_hash()?;
         proof.verify_range_proof(hash, first_key, last_key, keys, vals)
     }
-}
-
-pub fn new_merkle(
-    meta_size: u64,
-    compact_size: u64,
-) -> MerkleSetup<CompactSpace<Node, DynamicMem>, Bincode> {
-    const RESERVED: usize = 0x1000;
-    assert!(meta_size as usize > RESERVED);
-    assert!(compact_size as usize > RESERVED);
-    let mut dm = DynamicMem::new(meta_size, 0);
-    let compact_header = DiskAddress::null();
-    #[allow(clippy::unwrap_used)]
-    dm.write(
-        compact_header.into(),
-        &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
-            NonZeroUsize::new(RESERVED).unwrap(),
-            #[allow(clippy::unwrap_used)]
-            NonZeroUsize::new(RESERVED).unwrap(),
-        ))
-        .unwrap(),
-    );
-    #[allow(clippy::unwrap_used)]
-    let compact_header =
-        StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
-    let mem_meta = dm;
-    let mem_payload = DynamicMem::new(compact_size, 0x1);
-
-    let cache = shale::ObjCache::new(1);
-    let space =
-        shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
-            .expect("CompactSpace init fail");
-
-    let merkle = Merkle::new(Box::new(space));
-    #[allow(clippy::unwrap_used)]
-    let root = merkle.init_root().unwrap();
-
-    MerkleSetup { root, merkle }
 }

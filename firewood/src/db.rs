@@ -392,7 +392,8 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
         values: Vec<V>,
     ) -> Result<bool, ProofError> {
         let hash: [u8; 32] = *self.kv_root_hash()?;
-        let valid = proof.verify_range_proof(hash, first_key, last_key, keys, values)?;
+        let valid =
+            proof.verify_range_proof::<K, V, Bincode>(hash, first_key, last_key, keys, values)?;
         Ok(valid)
     }
 }

@@ -16,10 +16,10 @@ use crate::nibbles::NibblesIterator;
 use crate::{
     db::DbError,
     merkle::{to_nibble_array, Merkle, MerkleError, Node, NodeType},
-    merkle_util::{new_merkle, DataStoreError, MerkleSetup},
+    merkle_util::{DataStoreError, InMemoryMerkle},
 };
 
-use super::{BinarySerde, NodeObjRef};
+use super::{BinarySerde, EncodedNode, NodeObjRef};
 
 #[derive(Debug, Error)]
 pub enum ProofError {
@@ -146,14 +146,20 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         self.0.extend(other.0)
     }
 
-    pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
+    pub fn verify_range_proof<K, V, T>(
         &self,
         root_hash: HashKey,
         first_key: K,
         last_key: K,
         keys: Vec<K>,
         vals: Vec<V>,
-    ) -> Result<bool, ProofError> {
+    ) -> Result<bool, ProofError>
+    where
+        K: AsRef<[u8]>,
+        V: AsRef<[u8]>,
+        T: BinarySerde,
+        EncodedNode<T>: serde::Serialize + serde::de::DeserializeOwned,
+    {
         if keys.len() != vals.len() {
             return Err(ProofError::InconsistentProofData);
         }
@@ -165,17 +171,17 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         }
 
         // Use in-memory merkle
-        let mut merkle_setup = new_merkle(0x10000, 0x10000);
+        let mut in_mem_merkle = InMemoryMerkle::new(0x10000, 0x10000);
 
         // Special case, there is no edge proof at all. The given range is expected
         // to be the whole leaf-set in the trie.
         if self.0.is_empty() {
             for (index, k) in keys.iter().enumerate() {
                 #[allow(clippy::indexing_slicing)]
-                merkle_setup.insert(k, vals[index].as_ref().to_vec())?;
+                in_mem_merkle.insert(k, vals[index].as_ref().to_vec())?;
             }
 
-            let merkle_root = &*merkle_setup.root_hash()?;
+            let merkle_root = &*in_mem_merkle.root_hash()?;
 
             return if merkle_root == &root_hash {
                 Ok(false)
@@ -188,7 +194,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         // ensure there are no more accounts / slots in the trie.
         if keys.is_empty() {
             let proof_to_path =
-                self.proof_to_path(first_key, root_hash, &mut merkle_setup, true)?;
+                self.proof_to_path(first_key, root_hash, &mut in_mem_merkle, true)?;
             return match proof_to_path {
                 Some(_) => Err(ProofError::InvalidData),
                 None => Ok(false),
@@ -199,7 +205,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         // In this case, we can't construct two edge paths. So handle it here.
         if keys.len() == 1 && first_key.as_ref() == last_key.as_ref() {
             let data =
-                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, false)?;
+                self.proof_to_path(first_key.as_ref(), root_hash, &mut in_mem_merkle, false)?;
 
             #[allow(clippy::indexing_slicing)]
             return if first_key.as_ref() != keys[0].as_ref() {
@@ -224,29 +230,29 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
         // Convert the edge proofs to edge trie paths. Then we can
         // have the same tree architecture with the original one.
         // For the first edge proof, non-existent proof is allowed.
-        self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?;
+        self.proof_to_path(first_key.as_ref(), root_hash, &mut in_mem_merkle, true)?;
 
         // Pass the root node here, the second path will be merged
         // with the first one. For the last edge proof, non-existent
         // proof is also allowed.
-        self.proof_to_path(last_key.as_ref(), root_hash, &mut merkle_setup, true)?;
+        self.proof_to_path(last_key.as_ref(), root_hash, &mut in_mem_merkle, true)?;
 
         // Remove all internal caculated values. All the removed parts should
         // be re-filled(or re-constructed) by the given leaves range.
         let fork_at_root =
-            unset_internal(&mut merkle_setup, first_key.as_ref(), last_key.as_ref())?;
+            unset_internal(&mut in_mem_merkle, first_key.as_ref(), last_key.as_ref())?;
 
         // If the fork point is the root, the trie should be empty, start with a new one.
         if fork_at_root {
-            merkle_setup = new_merkle(0x100000, 0x100000);
+            in_mem_merkle = InMemoryMerkle::new(0x100000, 0x100000);
         }
 
         for (key, val) in keys.iter().zip(vals.iter()) {
-            merkle_setup.insert(key.as_ref(), val.as_ref().to_vec())?;
+            in_mem_merkle.insert(key.as_ref(), val.as_ref().to_vec())?;
         }
 
         // Calculate the hash
-        let merkle_root = &*merkle_setup.root_hash()?;
+        let merkle_root = &*in_mem_merkle.root_hash()?;
 
         if merkle_root == &root_hash {
             Ok(true)
@@ -260,16 +266,21 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
     /// necessary nodes will be resolved and leave the remaining as hashnode.
     ///
     /// The given edge proof is allowed to be an existent or non-existent proof.
-    fn proof_to_path<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySerde>(
+    fn proof_to_path<K, T>(
         &self,
         key: K,
         root_hash: HashKey,
-        merkle_setup: &mut MerkleSetup<S, T>,
+        in_mem_merkle: &mut InMemoryMerkle<T>,
         allow_non_existent_node: bool,
-    ) -> Result<Option<Vec<u8>>, ProofError> {
+    ) -> Result<Option<Vec<u8>>, ProofError>
+    where
+        K: AsRef<[u8]>,
+        T: BinarySerde,
+        EncodedNode<T>: serde::Serialize + serde::de::DeserializeOwned,
+    {
         // Start with the sentinel root
-        let sentinel = merkle_setup.get_sentinel_address();
-        let merkle = merkle_setup.get_merkle_mut();
+        let sentinel = in_mem_merkle.get_sentinel_address();
+        let merkle = in_mem_merkle.get_merkle_mut();
         let mut parent_node_ref = merkle
             .get_node(sentinel)
             .map_err(|_| ProofError::NoSuchNode)?;
@@ -472,19 +483,24 @@ fn generate_subproof(encoded: &[u8]) -> Result<SubProof, ProofError> {
 //
 // The return value indicates if the fork point is root node. If so, unset the
 // entire trie.
-fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync, T: BinarySerde>(
-    merkle_setup: &mut MerkleSetup<S, T>,
+fn unset_internal<K, T>(
+    in_mem_merkle: &mut InMemoryMerkle<T>,
     left: K,
     right: K,
-) -> Result<bool, ProofError> {
+) -> Result<bool, ProofError>
+where
+    K: AsRef<[u8]>,
+    T: BinarySerde,
+    EncodedNode<T>: serde::Serialize + serde::de::DeserializeOwned,
+{
     // Add the sentinel root
     let mut left_chunks = vec![0];
     left_chunks.extend(left.as_ref().iter().copied().flat_map(to_nibble_array));
     // Add the sentinel root
     let mut right_chunks = vec![0];
     right_chunks.extend(right.as_ref().iter().copied().flat_map(to_nibble_array));
-    let root = merkle_setup.get_sentinel_address();
-    let merkle = merkle_setup.get_merkle_mut();
+    let root = in_mem_merkle.get_sentinel_address();
+    let merkle = in_mem_merkle.get_merkle_mut();
     let mut u_ref = merkle.get_node(root).map_err(|_| ProofError::NoSuchNode)?;
     let mut parent = DiskAddress::null();
 
