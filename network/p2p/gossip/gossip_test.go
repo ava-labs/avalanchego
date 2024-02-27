@@ -278,11 +278,12 @@ func TestPushGossiper(t *testing.T) {
 		expected []*testTx
 	}
 	tests := []struct {
-		name   string
-		cycles []cycle
+		name           string
+		cycles         []cycle
+		shouldRegossip bool
 	}{
 		{
-			name: "single cycle",
+			name: "single cycle with regossip",
 			cycles: []cycle{
 				{
 					toAdd: []*testTx{
@@ -309,9 +310,10 @@ func TestPushGossiper(t *testing.T) {
 					},
 				},
 			},
+			shouldRegossip: true,
 		},
 		{
-			name: "multiple cycles",
+			name: "multiple cycles with regossip",
 			cycles: []cycle{
 				{
 					toAdd: []*testTx{
@@ -359,10 +361,32 @@ func TestPushGossiper(t *testing.T) {
 					},
 				},
 			},
+			shouldRegossip: true,
+		},
+		{
+			name: "verify that we don't gossip empty messages",
+			cycles: []cycle{
+				{
+					toAdd: []*testTx{
+						{
+							id: ids.ID{0},
+						},
+					},
+					expected: []*testTx{
+						{
+							id: ids.ID{0},
+						},
+					},
+				},
+				{
+					toAdd:    []*testTx{},
+					expected: []*testTx{},
+				},
+			},
+			shouldRegossip: false,
 		},
 	}
 
-	const regossipTime = time.Nanosecond
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
@@ -382,6 +406,12 @@ func TestPushGossiper(t *testing.T) {
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
 			marshaller := testMarshaller{}
+
+			regossipTime := time.Hour
+			if tt.shouldRegossip {
+				regossipTime = time.Nanosecond
+			}
+
 			gossiper, err := NewPushGossiper[*testTx](
 				marshaller,
 				FullSet[*testTx]{},
@@ -408,16 +438,26 @@ func TestPushGossiper(t *testing.T) {
 					want.Gossip = append(want.Gossip, bytes)
 				}
 
-				// remove the handler prefix
-				sentMsg := <-sender.SentAppGossip
-				got := &sdk.PushGossip{}
-				require.NoError(proto.Unmarshal(sentMsg[1:], got))
+				if len(want.Gossip) > 0 {
+					// remove the handler prefix
+					sentMsg := <-sender.SentAppGossip
+					got := &sdk.PushGossip{}
+					require.NoError(proto.Unmarshal(sentMsg[1:], got))
 
-				require.Equal(want.Gossip, got.Gossip)
+					require.Equal(want.Gossip, got.Gossip)
+				} else {
+					select {
+					case <-sender.SentAppGossip:
+						require.FailNow("unexpectedly sent gossip message")
+					default:
+					}
+				}
 
-				// Ensure that subsequent calls to `time.Now()` are sufficient
-				// for regossip.
-				time.Sleep(regossipTime + time.Nanosecond)
+				if tt.shouldRegossip {
+					// Ensure that subsequent calls to `time.Now()` are
+					// sufficient for regossip.
+					time.Sleep(regossipTime + time.Nanosecond)
+				}
 			}
 		})
 	}
