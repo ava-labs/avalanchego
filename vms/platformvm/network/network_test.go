@@ -329,7 +329,7 @@ func TestNetworkIssueTx(t *testing.T) {
 			)
 			require.NoError(err)
 
-			err = n.IssueTx(tx)
+			err = n.IssueTxFromRPC(tx)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}

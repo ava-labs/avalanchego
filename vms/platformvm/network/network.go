@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,6 +24,8 @@ import (
 
 const TxGossipHandlerID = 0
 
+var errMempoolDisabledWithPartialSync = errors.New("mempool is disabled partial syncing")
+
 type Network interface {
 	common.AppHandler
 
@@ -32,9 +35,11 @@ type Network interface {
 	// PullGossip starts pull gossiping transactions and blocks until it
 	// completes.
 	PullGossip(ctx context.Context)
-	// IssueTx verifies the transaction at the currently preferred state and
-	// adds it to the mempool.
-	IssueTx(*txs.Tx) error
+	// IssueTxFromRPC issues a transaction that was received from the local RPC.
+	// The transaction will be verified against the currently preferred state.
+	// If transaction verification passes, it will be added to the mempool and
+	// periodically pushed to validators until it is removed from the mempool.
+	IssueTxFromRPC(*txs.Tx) error
 }
 
 type network struct {
@@ -226,35 +231,33 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	return n.issueTx(tx)
+	_ = n.addTxToMempool(tx)
+	return nil
 }
 
-// TODO: naming here is confusing (should be clearer about which functions invoke push gossip if mempool addition is successful)
-// TODO: issueTx doesn't add the tx to the mempool if partial sync is enabled, so the push gossiper will always drop the tx before broadcasting it
-func (n *network) IssueTx(tx *txs.Tx) error {
-	if err := n.issueTx(tx); err != nil {
+func (n *network) IssueTxFromRPC(tx *txs.Tx) error {
+	// TODO: We should still push the transaction to some peers when partial
+	// syncing.
+	if err := n.addTxToMempool(tx); err != nil {
 		return err
 	}
 	n.txPushGossiper.Add(tx)
 	return nil
 }
 
-// returns nil if the tx is in the mempool
-func (n *network) issueTx(tx *txs.Tx) error {
+func (n *network) addTxToMempool(tx *txs.Tx) error {
 	// If we are partially syncing the Primary Network, we should not be
 	// maintaining the transaction mempool locally.
 	if n.partialSyncPrimaryNetwork {
-		return nil
+		return errMempoolDisabledWithPartialSync
 	}
 
-	if err := n.mempool.Add(tx); err != nil {
+	err := n.mempool.Add(tx)
+	if err != nil {
 		n.log.Debug("tx failed to be added to the mempool",
 			zap.Stringer("txID", tx.ID()),
 			zap.Error(err),
 		)
-
-		return err
 	}
-
-	return nil
+	return err
 }
