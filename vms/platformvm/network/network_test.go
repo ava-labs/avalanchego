@@ -251,7 +251,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			expectedErr: errTest,
 		},
 		{
-			name: "mempool is disalbed if primary network is not being fully synced",
+			name: "mempool is disabled if primary network is not being fully synced",
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
 				return mempool.NewMockMempool(ctrl)
 			},
