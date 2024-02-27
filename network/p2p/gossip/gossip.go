@@ -267,7 +267,7 @@ type PushGossiper[T Gossipable] struct {
 	client     *p2p.Client
 	metrics    Metrics
 
-	earlyGossipSize      int // size at which we attempt gossip during [Add] to avoid unbounded memory use
+	earlyGossipSize      int // size at which we attempt gossip during [Add] to reduce memory use
 	targetGossipSize     int
 	maxRegossipFrequency time.Duration
 
@@ -275,7 +275,7 @@ type PushGossiper[T Gossipable] struct {
 	tracking  map[ids.ID]time.Time
 	pending   buffer.Deque[T]
 	issued    buffer.Deque[T]
-	discarded *cache.LRU[ids.ID, interface{}] // discarded ensures we don't overgossip transactions that are frequently dropped
+	discarded *cache.LRU[ids.ID, interface{}] // discarded attempts to avoid overgossiping transactions that are frequently dropped
 }
 
 // Gossip flushes any queued gossipables.
