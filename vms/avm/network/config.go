@@ -43,8 +43,6 @@ type Config struct {
 	PushGossipFrequency time.Duration `json:"push-gossip-frequency"`
 	// PullGossipPollSize is the number of validators to sample when performing
 	// a round of pull gossip.
-	// PullGossipPollSize is the number of validators to sample when performing
-	// a round of pull gossip.
 	PullGossipPollSize int `json:"pull-gossip-poll-size"`
 	// PullGossipFrequency is how frequently rounds of pull gossip are
 	// performed.
