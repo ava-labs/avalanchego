@@ -13,7 +13,7 @@ var DefaultConfig = Config{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
 	PushGossipDiscardedCacheSize:                1024,
-	PushGossipMaxRegossipFrequency:              2000 * time.Millisecond,
+	PushGossipMaxRegossipFrequency:              10 * time.Second,
 	PushGossipFrequency:                         500 * time.Millisecond,
 	PullGossipPollSize:                          1,
 	PullGossipFrequency:                         1500 * time.Millisecond,
