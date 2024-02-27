@@ -233,8 +233,42 @@ func TestValidatorGossiper(t *testing.T) {
 }
 
 func TestPushGossiperNew(t *testing.T) {
-	_, err := NewPushGossiper[*testTx](nil, nil, nil, Metrics{}, 0, 0, -1)
-	require.ErrorIs(t, err, ErrInvalidRegossipFrequency)
+	tests := []struct {
+		name                 string
+		discardedSize        int
+		targetGossipSize     int
+		maxRegossipFrequency time.Duration
+		expected             error
+	}{
+		{
+			name:          "invalid discarded size",
+			discardedSize: -1,
+			expected:      ErrInvalidDiscardedSize,
+		},
+		{
+			name:             "invalid target gossip size",
+			targetGossipSize: -1,
+			expected:         ErrInvalidTargetGossipSize,
+		},
+		{
+			name:                 "invalid max re-gossip frequency",
+			maxRegossipFrequency: -1,
+			expected:             ErrInvalidRegossipFrequency,
+		},
+	}
+
+	for _, tt := range tests {
+		_, err := NewPushGossiper[*testTx](
+			nil,
+			nil,
+			nil,
+			Metrics{},
+			tt.discardedSize,
+			tt.targetGossipSize,
+			tt.maxRegossipFrequency,
+		)
+		require.ErrorIs(t, err, tt.expected)
+	}
 }
 
 // Tests that the outgoing gossip is equivalent to what was accumulated

@@ -47,6 +47,8 @@ var (
 	}
 
 	errEmptySetCantAdd          = errors.New("empty set can not add")
+	ErrInvalidDiscardedSize     = errors.New("discarded size cannot be negative")
+	ErrInvalidTargetGossipSize  = errors.New("target gossip size cannot be negative")
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
 )
 
@@ -244,8 +246,14 @@ func NewPushGossiper[T Gossipable](
 	targetGossipSize int,
 	maxRegossipFrequency time.Duration,
 ) (*PushGossiper[T], error) {
-	// maxRegossipFrequency must be non-negative to prevent gossiping
-	// the same transaction multiple times in the same message.
+	if discardedSize < 0 {
+		return nil, ErrInvalidDiscardedSize
+	}
+
+	if targetGossipSize < 0 {
+		return nil, ErrInvalidTargetGossipSize
+	}
+
 	if maxRegossipFrequency < 0 {
 		return nil, ErrInvalidRegossipFrequency
 	}
