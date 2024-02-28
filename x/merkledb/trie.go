@@ -92,7 +92,7 @@ type View interface {
 	CommitToDB(ctx context.Context) error
 }
 
-// Calles [visitNode] on the nodes along the path to [key].
+// Calls [visitNode] on the nodes along the path to [key].
 // The first node is the root, and the last node is either the node with the
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
