@@ -735,7 +735,7 @@ func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
 		nodeKey := currentProofNode.Key
 
 		// Because the interface only support []byte keys,
-		// a key with a partial byte should store a value
+		// a key with a partial byte may not store a value
 		if nodeKey.hasPartialByte() && proof[i].ValueOrHash.HasValue() {
 			return ErrPartialByteLengthWithValue
 		}
