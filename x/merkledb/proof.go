@@ -789,6 +789,7 @@ func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byt
 // Adds each key/value pair in [proofPath] to [t].
 // For each proof node, adds the children that are
 // < [insertChildrenLessThan] or > [insertChildrenGreaterThan].
+// The children have only their ID populated.
 // If [insertChildrenLessThan] is Nothing, no children are < [insertChildrenLessThan].
 // If [insertChildrenGreaterThan] is Nothing, no children are > [insertChildrenGreaterThan].
 // Assumes [v.lock] is held.
@@ -829,21 +830,20 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedKey := Key{}
 		for index, childID := range proofNode.Children {
+			var compressedKey Key
 			if existingChild, ok := n.children[index]; ok {
 				compressedKey = existingChild.compressedKey
 			}
 			childKey := key.Extend(ToToken(index, v.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
-				// We didn't set the other values on the child entry, but it doesn't matter.
-				// We only need the IDs to be correct so that the calculated hash is correct.
+				// We don't set all the fields of the child entry but it doesn't matter.
+				// We only need the ID to be correct so that the calculated hash is correct.
 				n.setChildEntry(
 					index,
 					&child{
-						id:            childID,
-						compressedKey: compressedKey,
+						id: childID,
 					})
 			}
 		}
