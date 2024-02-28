@@ -121,7 +121,7 @@ func (v *view) NewView(
 		return nil, err
 	}
 
-	newView, err := newView(v.db, v, changes)
+	childView, err := newView(v.db, v, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -132,9 +132,9 @@ func (v *view) NewView(
 	if v.invalidated {
 		return nil, ErrInvalid
 	}
-	v.childViews = append(v.childViews, newView)
+	v.childViews = append(v.childViews, childView)
 
-	return newView, nil
+	return childView, nil
 }
 
 // Creates a new view with the given [parentTrie].
@@ -143,7 +143,7 @@ func newView(
 	parentTrie View,
 	changes ViewChanges,
 ) (*view, error) {
-	newView := &view{
+	v := &view{
 		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
 		db:         db,
 		parentTrie: parentTrie,
@@ -164,7 +164,7 @@ func newView(
 				newVal = maybe.Some(slices.Clone(op.Value))
 			}
 		}
-		if err := newView.recordValueChange(toKey(key), newVal); err != nil {
+		if err := v.recordValueChange(toKey(key), newVal); err != nil {
 			return nil, err
 		}
 	}
@@ -172,11 +172,11 @@ func newView(
 		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
+		if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
 			return nil, err
 		}
 	}
-	return newView, nil
+	return v, nil
 }
 
 // Creates a view of the db at a historical root using the provided [changes].
@@ -189,7 +189,7 @@ func newViewWithChanges(
 		return nil, ErrNoChanges
 	}
 
-	newView := &view{
+	v := &view{
 		root:       changes.rootChange.after,
 		db:         db,
 		parentTrie: db,
@@ -198,9 +198,9 @@ func newViewWithChanges(
 	}
 	// since this is a set of historical changes, all nodes have already been calculated
 	// since no new changes have occurred, no new calculations need to be done
-	newView.calculateNodesOnce.Do(func() {})
-	newView.nodesAlreadyCalculated.Set(true)
-	return newView, nil
+	v.calculateNodesOnce.Do(func() {})
+	v.nodesAlreadyCalculated.Set(true)
+	return v, nil
 }
 
 func (v *view) getTokenSize() int {
