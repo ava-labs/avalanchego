@@ -735,7 +735,7 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                     .map_err(D::Error::custom)?;
                 let path = PartialPath::from_nibbles(Nibbles::<0>::new(&path).into_iter()).0;
 
-                let mut value = items
+                let value = items
                     .pop()
                     .unwrap_or_default()
                     .deserialize::<Bincode>()
@@ -747,26 +747,13 @@ impl<'de> Deserialize<'de> for EncodedNode<Bincode> {
                 let mut children: [Option<Vec<u8>>; BranchNode::MAX_CHILDREN] = Default::default();
 
                 for (i, chd) in items.into_iter().enumerate() {
-                    if i == len - 1 {
-                        let data = match chd {
-                            Encoded::Raw(data) => Err(D::Error::custom(format!(
-                                "incorrect encoded type for branch node value {:?}",
-                                data
-                            )))?,
-                            Encoded::Data(data) => Bincode::deserialize(data.as_ref())
-                                .map_err(|e| D::Error::custom(format!("bincode error: {e}")))?,
-                        };
-                        // Extract the value of the branch node and set to None if it's an empty Vec
-                        value = Some(Data(data)).filter(|data| !data.is_empty());
-                    } else {
-                        let chd = match chd {
-                            Encoded::Raw(chd) => chd,
-                            Encoded::Data(chd) => Bincode::deserialize(chd.as_ref())
-                                .map_err(|e| D::Error::custom(format!("bincode error: {e}")))?,
-                        };
-                        #[allow(clippy::indexing_slicing)]
-                        (children[i] = Some(chd).filter(|chd| !chd.is_empty()));
-                    }
+                    let chd = match chd {
+                        Encoded::Raw(chd) => chd,
+                        Encoded::Data(chd) => Bincode::deserialize(chd.as_ref())
+                            .map_err(|e| D::Error::custom(format!("bincode error: {e}")))?,
+                    };
+                    #[allow(clippy::indexing_slicing)]
+                    (children[i] = Some(chd).filter(|chd| !chd.is_empty()));
                 }
 
                 let node = EncodedNodeType::Branch {
