@@ -14,7 +14,7 @@ scan_fmt = "0.2.6"
 regex = "1.10.3"
 async-trait = "0.1.77"
 futures = "0.3.30"
-nix = {version = "0.27.1", features = ["fs", "uio"]}
+nix = {version = "0.28.0", features = ["fs", "uio"]}
 libc = "0.2.153"
 bytemuck = {version = "1.14.3", features = ["derive"]}
 thiserror = "1.0.57"

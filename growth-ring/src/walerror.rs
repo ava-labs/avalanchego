@@ -22,7 +22,7 @@ pub enum WalError {
 
 impl From<i32> for WalError {
     fn from(value: i32) -> Self {
-        Self::UnixError(Errno::from_i32(value))
+        Self::UnixError(Errno::from_raw(value))
     }
 }
 

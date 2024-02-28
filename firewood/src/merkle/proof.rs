@@ -82,7 +82,7 @@ impl From<DbError> for ProofError {
             // TODO: fix better by adding a new error to ProofError
             #[allow(clippy::unwrap_used)]
             DbError::IO(e) => {
-                ProofError::SystemError(nix::errno::Errno::from_i32(e.raw_os_error().unwrap()))
+                ProofError::SystemError(nix::errno::Errno::from_raw(e.raw_os_error().unwrap()))
             }
             DbError::Shale(e) => ProofError::Shale(e),
             DbError::InvalidProposal => ProofError::InvalidProof,

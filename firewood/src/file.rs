@@ -5,14 +5,26 @@
 
 use std::fs::{create_dir, remove_dir_all};
 use std::ops::Deref;
-use std::os::fd::OwnedFd;
+use std::os::fd::{AsRawFd, OwnedFd};
 
 use std::path::{Path, PathBuf};
 use std::{io::ErrorKind, os::unix::prelude::OpenOptionsExt};
 
+use nix::fcntl::Flockable;
+
 pub struct File {
     fd: OwnedFd,
 }
+
+impl AsRawFd for File {
+    fn as_raw_fd(&self) -> std::os::unix::prelude::RawFd {
+        self.fd.as_raw_fd()
+    }
+}
+
+// SAFETY: Docs for Flockable say it's safe if T is not Clone,
+// and File is not clone
+unsafe impl Flockable for File {}
 
 #[derive(PartialEq, Eq)]
 pub enum Options {
