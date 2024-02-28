@@ -789,7 +789,6 @@ func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byt
 // Adds each key/value pair in [proofPath] to [t].
 // For each proof node, adds the children that are
 // < [insertChildrenLessThan] or > [insertChildrenGreaterThan].
-// The children have only their ID populated.
 // If [insertChildrenLessThan] is Nothing, no children are < [insertChildrenLessThan].
 // If [insertChildrenGreaterThan] is Nothing, no children are > [insertChildrenGreaterThan].
 // Assumes [v.lock] is held.
@@ -838,12 +837,14 @@ func addPathInfo(
 			childKey := key.Extend(ToToken(index, v.tokenSize), compressedKey)
 			if (shouldInsertLeftChildren && childKey.Less(insertChildrenLessThan.Value())) ||
 				(shouldInsertRightChildren && childKey.Greater(insertChildrenGreaterThan.Value())) {
-				// We don't set all the fields of the child entry but it doesn't matter.
-				// We only need the ID to be correct so that the calculated hash is correct.
+				// We don't set the [hasValue] field of the child but that's OK.
+				// We only need the compressed key and ID to be correct so that the
+				// calculated hash is correct.
 				n.setChildEntry(
 					index,
 					&child{
-						id: childID,
+						id:            childID,
+						compressedKey: compressedKey,
 					})
 			}
 		}
