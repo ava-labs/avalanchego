@@ -25,10 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -47,8 +47,8 @@ const (
 	durango fork = iota
 	eUpgrade
 
-	testTxFee    uint64 = 1000
-	startBalance uint64 = 50000
+	testTxFee    uint64 = units.MilliAvax
+	startBalance uint64 = 1000 * units.MilliAvax
 
 	username       = "bobby"
 	password       = "StrnasfqewiurPasswdn56d" //#nosec G101
@@ -76,13 +76,6 @@ var (
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
-
-	noFeesTestConfig = &config.Config{
-		DurangoTime:      time.Time{},
-		EUpgradeTime:     mockable.MaxTime,
-		TxFee:            0,
-		CreateAssetTxFee: 0,
-	}
 )
 
 func init() {
@@ -212,10 +205,17 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		vm:           vm,
 		service: &Service{
 			vm: vm,
+			txBuilderBackend: newServiceBackend(
+				vm.feeAssetID,
+				vm.parser.Codec(),
+				vm.ctx,
+				&vm.Config,
+				vm.state,
+				vm.AtomicUTXOManager,
+			),
 		},
 		walletService: &WalletService{
-			vm:         vm,
-			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+			walletServiceBackend: NewWalletServiceBackend(vm),
 		},
 	}
 

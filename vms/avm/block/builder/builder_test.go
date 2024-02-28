@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
@@ -141,6 +142,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				return New(
 					&txexecutor.Backend{
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -186,6 +190,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				return New(
 					&txexecutor.Backend{
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -232,6 +239,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 				return New(
 					&txexecutor.Backend{
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -325,6 +335,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Codec: codec,
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -397,6 +410,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Codec: codec,
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -471,6 +487,9 @@ func TestBuilderBuildBlock(t *testing.T) {
 				return New(
 					&txexecutor.Backend{
 						Codec: codec,
+						Config: &config.Config{
+							EUpgradeTime: time.Time{},
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -523,6 +542,9 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	backend := &txexecutor.Backend{
 		Ctx: &snow.Context{
 			Log: logging.NoLog{},
+		},
+		Config: &config.Config{
+			EUpgradeTime: time.Time{},
 		},
 		Codec: parser.Codec(),
 	}

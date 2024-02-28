@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/backends"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 
+	xbackends "github.com/ava-labs/avalanchego/wallet/chain/x/backends"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -60,7 +61,7 @@ type AVAXState struct {
 	PClient platformvm.Client
 	PCTX    backends.Context
 	XClient avm.Client
-	XCTX    x.Context
+	XCTX    xbackends.Context
 	CClient evm.Client
 	CCTX    c.Context
 	UTXOs   walletcommon.UTXOs
@@ -109,7 +110,7 @@ func FetchState(
 		{
 			id:     xCTX.BlockchainID(),
 			client: xClient,
-			codec:  x.Parser.Codec(),
+			codec:  xbackends.Parser.Codec(),
 		},
 		{
 			id:     cCTX.BlockchainID(),

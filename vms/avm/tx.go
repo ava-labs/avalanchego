@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
 var (
@@ -45,7 +46,7 @@ func (tx *Tx) Accept(context.Context) error {
 	}
 
 	executor := &executor.Executor{
-		Codec: tx.vm.txBackend.Codec,
+		Codec: tx.vm.txExecutorBackend.Codec,
 		State: tx.vm.state,
 		Tx:    tx.tx,
 	}
@@ -125,9 +126,14 @@ func (tx *Tx) Verify(context.Context) error {
 	if s := tx.Status(); s != choices.Processing {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
+
+	feeCfg := tx.vm.txExecutorBackend.Config.GetDynamicFeesConfig(tx.vm.state.GetTimestamp())
+	feeManager := fees.NewManager(feeCfg.UnitFees)
 	return tx.tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend: tx.vm.txBackend,
-		State:   tx.vm.state,
-		Tx:      tx.tx,
+		Backend:       tx.vm.txExecutorBackend,
+		BlkFeeManager: feeManager,
+		UnitCaps:      feeCfg.BlockUnitsCap,
+		State:         tx.vm.state,
+		Tx:            tx.tx,
 	})
 }
