@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
+
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
 
@@ -102,6 +104,7 @@ func TestBaseTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -116,6 +119,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -138,6 +142,7 @@ func TestBaseTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
@@ -155,6 +160,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
@@ -231,6 +237,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -242,6 +249,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			Config: &config.Config{
 				AddSubnetValidatorFee: units.MilliAvax,
@@ -266,6 +274,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				AddSubnetValidatorFee: testCtx.AddSubnetValidatorFee(),
@@ -280,6 +289,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				AddSubnetValidatorFee: testCtx.AddSubnetValidatorFee(),
@@ -347,6 +357,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -362,6 +373,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -384,6 +396,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -402,6 +415,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -475,6 +489,7 @@ func TestCreateChainTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -493,6 +508,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -514,6 +530,7 @@ func TestCreateChainTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				CreateBlockchainTxFee: testCtx.CreateBlockchainTxFee(),
@@ -535,6 +552,7 @@ func TestCreateChainTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				CreateBlockchainTxFee: testCtx.CreateBlockchainTxFee(),
@@ -601,6 +619,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -615,6 +634,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -636,6 +656,7 @@ func TestCreateSubnetTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
@@ -653,6 +674,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				CreateSubnetTxFee: testCtx.CreateSubnetTxFee(),
@@ -720,6 +742,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -735,6 +758,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -756,6 +780,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -774,6 +799,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -835,6 +861,7 @@ func TestImportTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -850,6 +877,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -873,6 +901,7 @@ func TestImportTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -891,6 +920,7 @@ func TestImportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -954,6 +984,7 @@ func TestExportTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -969,6 +1000,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -991,6 +1023,7 @@ func TestExportTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -1009,6 +1042,7 @@ func TestExportTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TxFee: testCtx.BaseTxFee(),
@@ -1081,6 +1115,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -1108,6 +1143,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -1132,6 +1168,7 @@ func TestTransformSubnetTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TransformSubnetTxFee: testCtx.TransformSubnetTxFee(),
@@ -1162,6 +1199,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				TransformSubnetTxFee: testCtx.TransformSubnetTxFee(),
@@ -1232,6 +1270,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -1258,6 +1297,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -1284,6 +1324,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkValidatorFee: testCtx.AddPrimaryNetworkValidatorFee(),
@@ -1313,6 +1354,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkValidatorFee: testCtx.AddPrimaryNetworkValidatorFee(),
@@ -1376,6 +1418,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 	{ // Post E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -1399,6 +1442,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: true,
 			FeeManager:       commonfees.NewManager(testUnitFees),
 			ConsumedUnitsCap: testBlockMaxConsumedUnits,
@@ -1425,6 +1469,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 
 	{ // Pre E-Upgrade
 		feeCalc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkDelegatorFee: testCtx.AddPrimaryNetworkDelegatorFee(),
@@ -1451,6 +1496,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		require.NoError(err)
 
 		fc := &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: false,
 			Config: &config.Config{
 				AddPrimaryNetworkDelegatorFee: testCtx.AddPrimaryNetworkDelegatorFee(),

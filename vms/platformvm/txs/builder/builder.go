@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -288,6 +289,7 @@ func (b *builder) NewImportTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -335,6 +337,7 @@ func (b *builder) NewExportTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -389,6 +392,7 @@ func (b *builder) NewCreateChainTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -431,6 +435,7 @@ func (b *builder) NewCreateSubnetTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -487,6 +492,7 @@ func (b *builder) NewTransformSubnetTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -542,6 +548,7 @@ func (b *builder) NewAddValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -599,6 +606,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -660,6 +668,7 @@ func (b *builder) NewAddDelegatorTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -714,6 +723,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -772,6 +782,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -820,6 +831,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -860,6 +872,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,
@@ -905,6 +918,7 @@ func (b *builder) NewBaseTx(
 		isEUpgradeActive  = b.cfg.IsEUpgradeActivated(chainTime)
 
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: isEUpgradeActive,
 			Config:           b.cfg,
 			ChainTime:        chainTime,

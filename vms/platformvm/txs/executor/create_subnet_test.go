@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -74,6 +75,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				feeCfg   = cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				feeCalc  = &fees.Calculator{
 					IsEUpgradeActive: false,
+					Log:              logging.NoLog{},
 					Config:           &cfg,
 					ChainTime:        test.time,
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),

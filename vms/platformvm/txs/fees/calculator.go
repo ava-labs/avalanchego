@@ -8,8 +8,12 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -29,6 +33,8 @@ var (
 type Calculator struct {
 	// setup
 	IsEUpgradeActive bool
+	TxID             ids.ID
+	Log              logging.Logger
 
 	// Pre E-fork inputs
 	Config    *config.Config
@@ -45,17 +51,48 @@ type Calculator struct {
 	Fee uint64
 }
 
-func (fc *Calculator) AddValidatorTx(*txs.AddValidatorTx) error {
+func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
 	fc.Fee = fc.Config.AddPrimaryNetworkValidatorFee
+
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "AddValidatorTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
 	return nil
 }
 
-func (fc *Calculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// AddValidatorTx is banned following Durango activation, so we
 	// only return the pre EUpgrade fee here
 	fc.Fee = fc.Config.AddPrimaryNetworkDelegatorFee
+
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+
+	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "AddDelegatorTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
 	return nil
 }
 
@@ -68,14 +105,20 @@ func (*Calculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.AddSubnetValidatorFee
-		return nil
-	}
-
 	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "AddSubnetValidatorTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
+	if !fc.IsEUpgradeActive {
+		fc.Fee = fc.Config.AddSubnetValidatorFee
+		return nil
 	}
 
 	_, err = fc.AddFeesFor(consumedUnits)
@@ -83,14 +126,20 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 }
 
 func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
-		return nil
-	}
-
 	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "CreateChainTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
+	if !fc.IsEUpgradeActive {
+		fc.Fee = fc.Config.GetCreateBlockchainTxFee(fc.ChainTime)
+		return nil
 	}
 
 	_, err = fc.AddFeesFor(consumedUnits)
@@ -98,14 +147,20 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
-		return nil
-	}
-
 	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "CreateSubnetTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
+	if !fc.IsEUpgradeActive {
+		fc.Fee = fc.Config.GetCreateSubnetTxFee(fc.ChainTime)
+		return nil
 	}
 
 	_, err = fc.AddFeesFor(consumedUnits)
@@ -113,14 +168,20 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 }
 
 func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
 	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "RemoveSubnetValidatorTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
+	if !fc.IsEUpgradeActive {
+		fc.Fee = fc.Config.TxFee
+		return nil
 	}
 
 	_, err = fc.AddFeesFor(consumedUnits)
@@ -143,14 +204,20 @@ func (fc *Calculator) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 }
 
 func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
 	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "TransferSubnetOwnershipTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
+	if !fc.IsEUpgradeActive {
+		fc.Fee = fc.Config.TxFee
+		return nil
 	}
 
 	_, err = fc.AddFeesFor(consumedUnits)
@@ -158,6 +225,21 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 }
 
 func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+
+	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "AddPermissionlessValidatorTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
 	if !fc.IsEUpgradeActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetValidatorFee
@@ -167,6 +249,11 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 		return nil
 	}
 
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
+}
+
+func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
@@ -176,11 +263,12 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
-	return err
-}
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "AddPermissionlessDelegatorTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
 
-func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if !fc.IsEUpgradeActive {
 		if tx.Subnet != constants.PrimaryNetworkID {
 			fc.Fee = fc.Config.AddSubnetDelegatorFee
@@ -190,28 +278,25 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 		return nil
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
-
-	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
-	if err != nil {
-		return err
-	}
-
 	_, err = fc.AddFeesFor(consumedUnits)
 	return err
 }
 
 func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
 	consumedUnits, err := fc.meterTx(tx, tx.Outs, tx.Ins)
 	if err != nil {
 		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "BaseTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
+	if !fc.IsEUpgradeActive {
+		fc.Fee = fc.Config.TxFee
+		return nil
 	}
 
 	_, err = fc.AddFeesFor(consumedUnits)
@@ -219,11 +304,6 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
-	if !fc.IsEUpgradeActive {
-		fc.Fee = fc.Config.TxFee
-		return nil
-	}
-
 	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
@@ -233,16 +313,22 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	_, err = fc.AddFeesFor(consumedUnits)
-	return err
-}
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "ImportTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
 
-func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	if !fc.IsEUpgradeActive {
 		fc.Fee = fc.Config.TxFee
 		return nil
 	}
 
+	_, err = fc.AddFeesFor(consumedUnits)
+	return err
+}
+
+func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
@@ -250,6 +336,17 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 	consumedUnits, err := fc.meterTx(tx, outs, tx.Ins)
 	if err != nil {
 		return err
+	}
+
+	fc.Log.Warn("metered tx complexity",
+		zap.Stringer("txID", fc.TxID),
+		zap.String("txType", "ExportTx"),
+		zap.Any("consumedUnits", consumedUnits),
+	)
+
+	if !fc.IsEUpgradeActive {
+		fc.Fee = fc.Config.TxFee
+		return nil
 	}
 
 	_, err = fc.AddFeesFor(consumedUnits)

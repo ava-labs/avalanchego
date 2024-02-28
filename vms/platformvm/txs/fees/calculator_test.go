@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fees"
@@ -922,6 +923,8 @@ func TestTxFees(t *testing.T) {
 
 			fc := &Calculator{
 				IsEUpgradeActive: cfg.IsEUpgradeActivated(chainTime),
+				TxID:             sTx.ID(),
+				Log:              logging.NoLog{},
 				Config:           cfg,
 				ChainTime:        chainTime,
 				FeeManager:       fees.NewManager(testUnitFees),

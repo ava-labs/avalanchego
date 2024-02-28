@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -228,6 +229,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				feeCfg   = cfg.GetDynamicFeesConfig(env.state.GetTimestamp())
 				feeCalc  = &fees.Calculator{
 					IsEUpgradeActive: false,
+					Log:              logging.NoLog{},
 					Config:           &cfg,
 					ChainTime:        test.time,
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),

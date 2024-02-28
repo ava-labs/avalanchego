@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -309,6 +310,7 @@ func (w *wallet) IssueBaseTx(
 
 		feesMan = commonfees.NewManager(w.unitFees)
 		feeCalc = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: w.isEForkActive,
 			Config: &config.Config{
 				CreateSubnetTxFee: w.CreateSubnetTxFee(),
@@ -340,6 +342,7 @@ func (w *wallet) IssueAddValidatorTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
@@ -365,6 +368,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
@@ -391,6 +395,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
@@ -417,6 +422,7 @@ func (w *wallet) IssueAddDelegatorTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),
@@ -446,6 +452,7 @@ func (w *wallet) IssueCreateChainTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateBlockchainTxFee: w.CreateBlockchainTxFee(),
@@ -471,6 +478,7 @@ func (w *wallet) IssueCreateSubnetTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			CreateSubnetTxFee: w.CreateSubnetTxFee(),
@@ -497,6 +505,7 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
@@ -523,6 +532,7 @@ func (w *wallet) IssueImportTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
@@ -549,6 +559,7 @@ func (w *wallet) IssueExportTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TxFee: w.BaseTxFee(),
@@ -587,6 +598,7 @@ func (w *wallet) IssueTransformSubnetTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			TransformSubnetTxFee: w.TransformSubnetTxFee(),
@@ -633,6 +645,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkValidatorFee: w.AddPrimaryNetworkValidatorFee(),
@@ -670,6 +683,7 @@ func (w *wallet) IssueAddPermissionlessDelegatorTx(
 
 	feesMan := commonfees.NewManager(w.unitFees)
 	feeCalc := &fees.Calculator{
+		Log:              logging.NoLog{},
 		IsEUpgradeActive: w.isEForkActive,
 		Config: &config.Config{
 			AddPrimaryNetworkDelegatorFee: w.AddPrimaryNetworkDelegatorFee(),

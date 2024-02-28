@@ -380,6 +380,7 @@ func TestGenesis(t *testing.T) {
 				feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
 				feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 				feeCalc   = &fees.Calculator{
+					Log:              logging.NoLog{},
 					IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
 					Config:           &vm.Config,
 					ChainTime:        chainTime,
@@ -2280,6 +2281,7 @@ func TestBaseTx(t *testing.T) {
 		feeCfg    = vm.Config.GetDynamicFeesConfig(chainTime)
 		feeMan    = commonfees.NewManager(feeCfg.UnitFees)
 		feeCalc   = &fees.Calculator{
+			Log:              logging.NoLog{},
 			IsEUpgradeActive: vm.IsEUpgradeActivated(chainTime),
 			Config:           &vm.Config,
 			ChainTime:        chainTime,

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -150,6 +151,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				feeCfg := pconfig.EUpgradeDynamicFeesConfig
 				feeCalc := pfee.Calculator{
 					IsEUpgradeActive: true,
+					Log:              logging.NoLog{},
 					FeeManager:       commonfees.NewManager(feeCfg.UnitFees),
 					ConsumedUnitsCap: feeCfg.BlockUnitsCap,
 					Credentials:      tx.Creds,
