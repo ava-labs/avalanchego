@@ -108,6 +108,13 @@ The image should be tagged as `avaplatform/avalanchego:xxxxxxxx`, where `xxxxxxx
 docker run -ti -p 9650:9650 -p 9651:9651 avaplatform/avalanchego:xxxxxxxx /avalanchego/build/avalanchego
 ```
 
+Note: you dont normally run docker image only in overlay(2) image like this example, but you would like to create volume mapping for log and database. In this example we are running image so that it takes whole /root/.avalanchego -directory out of container.
+
+```sh
+docker run -ti -v /path/on/host:/root/.avalanchego -p 9650:9650 -p 9651:9651 avaplatform/avalanchego:master-race 
+```
+
+
 ## Running Avalanche
 
 ### Connecting to Mainnet
