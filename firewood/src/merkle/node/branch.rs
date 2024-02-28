@@ -1,9 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{Data, Encoded, Node};
+use super::{Data, Node};
 use crate::{
-    merkle::{from_nibbles, to_nibble_array, PartialPath, TRIE_HASH_LEN},
+    merkle::{from_nibbles, to_nibble_array, PartialPath},
     nibbles::Nibbles,
     shale::{DiskAddress, ShaleError, ShaleStore, Storable},
 };
@@ -96,18 +96,15 @@ impl BranchNode {
     }
 
     pub(super) fn decode(buf: &[u8]) -> Result<Self, Error> {
-        let mut items: Vec<Encoded<Vec<u8>>> = bincode::DefaultOptions::new().deserialize(buf)?;
+        let mut items: Vec<Vec<u8>> = bincode::DefaultOptions::new().deserialize(buf)?;
 
-        let path = items
-            .pop()
-            .ok_or(Error::custom("Invalid Branch Node"))?
-            .decode()?;
+        let path = items.pop().ok_or(Error::custom("Invalid Branch Node"))?;
         let path = Nibbles::<0>::new(&path);
         let (path, _term) = PartialPath::from_nibbles(path.into_iter());
 
         // we've already validated the size, that's why we can safely unwrap
         #[allow(clippy::unwrap_used)]
-        let data = items.pop().unwrap().decode()?;
+        let data = items.pop().unwrap();
         // Extract the value of the branch node and set to None if it's an empty Vec
         let value = Some(data).filter(|data| !data.is_empty());
 
@@ -116,9 +113,8 @@ impl BranchNode {
 
         // we popped the last element, so their should only be NBRANCH items left
         for (i, chd) in items.into_iter().enumerate() {
-            let data = chd.decode()?;
             #[allow(clippy::indexing_slicing)]
-            (chd_encoded[i] = Some(data).filter(|data| !data.is_empty()));
+            (chd_encoded[i] = Some(chd).filter(|data| !data.is_empty()));
         }
 
         Ok(BranchNode::new(
@@ -131,7 +127,7 @@ impl BranchNode {
 
     pub(super) fn encode<S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         // path + children + value
-        let mut list = <[Encoded<Vec<u8>>; Self::MSIZE]>::default();
+        let mut list = <[Vec<u8>; Self::MSIZE]>::default();
 
         for (i, c) in self.children.iter().enumerate() {
             match c {
@@ -142,11 +138,7 @@ impl BranchNode {
                     #[allow(clippy::unwrap_used)]
                     if c_ref.is_encoded_longer_than_hash_len::<S>(store) {
                         #[allow(clippy::indexing_slicing)]
-                        (list[i] = Encoded::Data(
-                            bincode::DefaultOptions::new()
-                                .serialize(&&(*c_ref.get_root_hash::<S>(store))[..])
-                                .unwrap(),
-                        ));
+                        (list[i] = c_ref.get_root_hash::<S>(store).to_vec());
 
                         // See struct docs for ordering requirements
                         if c_ref.is_dirty() {
@@ -154,9 +146,9 @@ impl BranchNode {
                             c_ref.set_dirty(false);
                         }
                     } else {
-                        let child_encoded = &c_ref.get_encoded::<S>(store);
+                        let child_encoded = c_ref.get_encoded::<S>(store);
                         #[allow(clippy::indexing_slicing)]
-                        (list[i] = Encoded::Raw(child_encoded.to_vec()));
+                        (list[i] = child_encoded.to_vec());
                     }
                 }
 
@@ -171,15 +163,8 @@ impl BranchNode {
                     // can happen when manually constructing a trie from proof.
                     #[allow(clippy::indexing_slicing)]
                     if let Some(v) = &self.children_encoded[i] {
-                        if v.len() == TRIE_HASH_LEN {
-                            #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
-                            (list[i] = Encoded::Data(
-                                bincode::DefaultOptions::new().serialize(v).unwrap(),
-                            ));
-                        } else {
-                            #[allow(clippy::indexing_slicing)]
-                            (list[i] = Encoded::Raw(v.clone()));
-                        }
+                        #[allow(clippy::indexing_slicing)]
+                        (list[i] = v.clone());
                     }
                 }
             };
@@ -187,18 +172,13 @@ impl BranchNode {
 
         #[allow(clippy::unwrap_used)]
         if let Some(Data(val)) = &self.value {
-            list[Self::MAX_CHILDREN] =
-                Encoded::Data(bincode::DefaultOptions::new().serialize(val).unwrap());
+            list[Self::MAX_CHILDREN] = val.clone();
         }
 
         #[allow(clippy::unwrap_used)]
         let path = from_nibbles(&self.path.encode(false)).collect::<Vec<_>>();
 
-        list[Self::MAX_CHILDREN + 1] = Encoded::Data(
-            bincode::DefaultOptions::new()
-                .serialize(&path)
-                .expect("serializing raw bytes to always succeed"),
-        );
+        list[Self::MAX_CHILDREN + 1] = path;
 
         bincode::DefaultOptions::new()
             .serialize(list.as_slice())

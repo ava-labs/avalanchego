@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{Data, Encoded};
+use super::Data;
 use crate::{
     merkle::{from_nibbles, PartialPath},
     nibbles::Nibbles,
@@ -53,8 +53,8 @@ impl LeafNode {
         bincode::DefaultOptions::new()
             .serialize(
                 [
-                    Encoded::Raw(from_nibbles(&self.path.encode(true)).collect()),
-                    Encoded::Raw(self.data.to_vec()),
+                    from_nibbles(&self.path.encode(true)).collect(),
+                    self.data.to_vec(),
                 ]
                 .as_slice(),
             )
@@ -156,9 +156,8 @@ mod tests {
         let data = vec![5, 6, 7, 8];
 
         let serialized_path = [vec![prefix], path.clone()].concat();
-        // 0 represents Encoded::Raw
-        let serialized_path = [vec![0, serialized_path.len() as u8], serialized_path].concat();
-        let serialized_data = [vec![0, data.len() as u8], data.clone()].concat();
+        let serialized_path = [vec![serialized_path.len() as u8], serialized_path].concat();
+        let serialized_data = [vec![data.len() as u8], data.clone()].concat();
 
         let serialized = [vec![2], serialized_path, serialized_data].concat();
 
