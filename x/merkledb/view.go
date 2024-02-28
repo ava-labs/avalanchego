@@ -271,8 +271,7 @@ func (v *view) calculateNodeIDsHelper(n *node) ids.ID {
 	// We use [wg] to wait until all descendants of [n] have been updated.
 	var wg sync.WaitGroup
 
-	for childIndex := range n.children {
-		childEntry := n.children[childIndex]
+	for childIndex, childEntry := range n.children {
 		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
