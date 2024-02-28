@@ -114,6 +114,7 @@ func NewMetrics(
 		metrics.Register(m.sentBytes),
 		metrics.Register(m.receivedCount),
 		metrics.Register(m.receivedBytes),
+		metrics.Register(m.tracking),
 	)
 	return m, err
 }
