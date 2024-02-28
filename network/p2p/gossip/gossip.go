@@ -461,7 +461,7 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 			p.toGossip.PushRight(gossipable)
 		}
 		p.tracking[gossipID] = tracking
-		p.addedTimeSum -= nowUnixNano
+		p.addedTimeSum += nowUnixNano
 	}
 }
 
