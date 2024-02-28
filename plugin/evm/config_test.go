@@ -28,8 +28,8 @@ func TestUnmarshalConfig(t *testing.T) {
 	}{
 		{
 			"string durations parsed",
-			[]byte(`{"api-max-duration": "1m", "continuous-profiler-frequency": "2m", "tx-pool-rejournal": "3m30s"}`),
-			Config{APIMaxDuration: Duration{1 * time.Minute}, ContinuousProfilerFrequency: Duration{2 * time.Minute}, TxPoolRejournal: Duration{3*time.Minute + 30*time.Second}},
+			[]byte(`{"api-max-duration": "1m", "continuous-profiler-frequency": "2m"}`),
+			Config{APIMaxDuration: Duration{1 * time.Minute}, ContinuousProfilerFrequency: Duration{2 * time.Minute}},
 			false,
 		},
 		{
@@ -40,8 +40,8 @@ func TestUnmarshalConfig(t *testing.T) {
 		},
 		{
 			"nanosecond durations parsed",
-			[]byte(`{"api-max-duration": 5000000000, "continuous-profiler-frequency": 5000000000, "tx-pool-rejournal": 9000000000}`),
-			Config{APIMaxDuration: Duration{5 * time.Second}, ContinuousProfilerFrequency: Duration{5 * time.Second}, TxPoolRejournal: Duration{9 * time.Second}},
+			[]byte(`{"api-max-duration": 5000000000, "continuous-profiler-frequency": 5000000000}`),
+			Config{APIMaxDuration: Duration{5 * time.Second}, ContinuousProfilerFrequency: Duration{5 * time.Second}},
 			false,
 		},
 		{
@@ -53,9 +53,8 @@ func TestUnmarshalConfig(t *testing.T) {
 
 		{
 			"tx pool configurations",
-			[]byte(`{"tx-pool-journal": "hello", "tx-pool-price-limit": 1, "tx-pool-price-bump": 2, "tx-pool-account-slots": 3, "tx-pool-global-slots": 4, "tx-pool-account-queue": 5, "tx-pool-global-queue": 6}`),
+			[]byte(`{"tx-pool-price-limit": 1, "tx-pool-price-bump": 2, "tx-pool-account-slots": 3, "tx-pool-global-slots": 4, "tx-pool-account-queue": 5, "tx-pool-global-queue": 6}`),
 			Config{
-				TxPoolJournal:      "hello",
 				TxPoolPriceLimit:   1,
 				TxPoolPriceBump:    2,
 				TxPoolAccountSlots: 3,

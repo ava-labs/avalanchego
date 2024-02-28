@@ -206,7 +206,6 @@ func setupPoolWithConfig(t *testing.T, config *params.ChainConfig, fundedAddress
 	chain, err := core.NewBlockChain(diskdb, core.DefaultCacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 	require.NoError(t, err)
 	testTxPoolConfig := txpool.DefaultConfig
-	testTxPoolConfig.Journal = ""
 	pool := txpool.NewTxPool(testTxPoolConfig, config, chain)
 
 	return pool

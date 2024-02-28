@@ -128,14 +128,12 @@ type Config struct {
 	// API Settings
 	LocalTxsEnabled bool `json:"local-txs-enabled"`
 
-	TxPoolJournal      string   `json:"tx-pool-journal"`
-	TxPoolRejournal    Duration `json:"tx-pool-rejournal"`
-	TxPoolPriceLimit   uint64   `json:"tx-pool-price-limit"`
-	TxPoolPriceBump    uint64   `json:"tx-pool-price-bump"`
-	TxPoolAccountSlots uint64   `json:"tx-pool-account-slots"`
-	TxPoolGlobalSlots  uint64   `json:"tx-pool-global-slots"`
-	TxPoolAccountQueue uint64   `json:"tx-pool-account-queue"`
-	TxPoolGlobalQueue  uint64   `json:"tx-pool-global-queue"`
+	TxPoolPriceLimit   uint64 `json:"tx-pool-price-limit"`
+	TxPoolPriceBump    uint64 `json:"tx-pool-price-bump"`
+	TxPoolAccountSlots uint64 `json:"tx-pool-account-slots"`
+	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
+	TxPoolAccountQueue uint64 `json:"tx-pool-account-queue"`
+	TxPoolGlobalQueue  uint64 `json:"tx-pool-global-queue"`
 
 	APIMaxDuration           Duration      `json:"api-max-duration"`
 	WSCPURefillRate          Duration      `json:"ws-cpu-refill-rate"`
@@ -229,8 +227,6 @@ func (c *Config) SetDefaults() {
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
 
-	c.TxPoolJournal = txpool.DefaultConfig.Journal
-	c.TxPoolRejournal = Duration{txpool.DefaultConfig.Rejournal}
 	c.TxPoolPriceLimit = txpool.DefaultConfig.PriceLimit
 	c.TxPoolPriceBump = txpool.DefaultConfig.PriceBump
 	c.TxPoolAccountSlots = txpool.DefaultConfig.AccountSlots

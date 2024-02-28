@@ -511,8 +511,6 @@ func (vm *VM) Initialize(
 	vm.ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 
 	vm.ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
-	vm.ethConfig.TxPool.Journal = vm.config.TxPoolJournal
-	vm.ethConfig.TxPool.Rejournal = vm.config.TxPoolRejournal.Duration
 	vm.ethConfig.TxPool.PriceLimit = vm.config.TxPoolPriceLimit
 	vm.ethConfig.TxPool.PriceBump = vm.config.TxPoolPriceBump
 	vm.ethConfig.TxPool.AccountSlots = vm.config.TxPoolAccountSlots
