@@ -272,6 +272,7 @@ func (v *view) calculateNodeIDsHelper(n *node) ids.ID {
 	var wg sync.WaitGroup
 
 	for childIndex, childEntry := range n.children {
+		childEntry := childEntry // New variable so goroutine doesn't capture loop variable.
 		childKey := n.key.Extend(ToToken(childIndex, v.tokenSize), childEntry.compressedKey)
 		childNodeChange, ok := v.changes.nodes[childKey]
 		if !ok {
