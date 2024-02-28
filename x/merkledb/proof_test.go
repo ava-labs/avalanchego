@@ -1595,6 +1595,61 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
+func TestAddPathInfo(t *testing.T) {
+	var (
+		now     = time.Now().UnixNano()
+		rand    = rand.New(rand.NewSource(now)) // #nosec G404
+		require = require.New(t)
+	)
+	t.Logf("seed: %d", now)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	// Insert a bunch of random key values.
+	insertRandomKeyValues(
+		require,
+		rand,
+		[]database.Database{db},
+		100, /* numKeyValues */
+		0,   /* deletePortion */
+	)
+
+	viewIntf, err := db.NewView(context.Background(), ViewChanges{})
+	require.NoError(err)
+
+	view, ok := viewIntf.(*view)
+	require.True(ok)
+
+	// Generate a proof for a random key.
+	key := make([]byte, 32)
+	_, _ = rand.Read(key) // #nosec G404
+	proof, err := db.GetProof(context.Background(), key)
+	require.NoError(err)
+
+	// Add path info to the proof.
+	require.NoError(
+		addPathInfo(
+			view,
+			proof.Path,
+			maybe.Some(proof.Key),
+			maybe.Some(proof.Key),
+		),
+	)
+
+	// Assert that we added the left and right children of each node.
+	for _, proofNode := range proof.Path {
+		node, err := view.getNode(proofNode.Key, false /* hasValue */)
+		require.NoError(err)
+
+		require.Equal(proofNode.ValueOrHash, node.valueDigest)
+
+		for index, childID := range proofNode.Children {
+			require.Equal(childID, node.children[index].id)
+		}
+	}
+}
+
 func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
