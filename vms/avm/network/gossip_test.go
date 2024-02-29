@@ -128,6 +128,6 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 		TxID: ids.GenerateTestID(),
 	}
 
-	require.NoError(mempool.AddVerified(tx))
+	require.NoError(mempool.AddWithoutVerification(tx))
 	require.True(mempool.bloom.Has(tx))
 }
