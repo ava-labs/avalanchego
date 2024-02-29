@@ -217,7 +217,7 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSO
 		return err
 	}
 
-	reply.TxID, err = s.vm.issueTx(tx)
+	reply.TxID, err = s.vm.issueTxFromRPC(tx)
 	return err
 }
 
@@ -760,7 +760,7 @@ func (s *Service) CreateAsset(_ *http.Request, args *CreateAssetArgs, reply *Ass
 		return err
 	}
 
-	assetID, err := s.vm.issueTx(tx)
+	assetID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -894,7 +894,7 @@ func (s *Service) CreateNFTAsset(_ *http.Request, args *CreateNFTAssetArgs, repl
 		return err
 	}
 
-	assetID, err := s.vm.issueTx(tx)
+	assetID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1183,7 +1183,7 @@ func (s *Service) SendMultiple(_ *http.Request, args *SendMultipleArgs, reply *a
 		return err
 	}
 
-	txID, err := s.vm.issueTx(tx)
+	txID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1303,7 +1303,7 @@ func (s *Service) Mint(_ *http.Request, args *MintArgs, reply *api.JSONTxIDChang
 		return err
 	}
 
-	txID, err := s.vm.issueTx(tx)
+	txID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1408,7 +1408,7 @@ func (s *Service) SendNFT(_ *http.Request, args *SendNFTArgs, reply *api.JSONTxI
 		return err
 	}
 
-	txID, err := s.vm.issueTx(tx)
+	txID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1502,7 +1502,7 @@ func (s *Service) MintNFT(_ *http.Request, args *MintNFTArgs, reply *api.JSONTxI
 		return err
 	}
 
-	txID, err := s.vm.issueTx(tx)
+	txID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1603,7 +1603,7 @@ func (s *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSONTxID)
 		return err
 	}
 
-	txID, err := s.vm.issueTx(tx)
+	txID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1672,7 +1672,7 @@ func (s *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSONTxIDC
 		return err
 	}
 
-	txID, err := s.vm.issueTx(tx)
+	txID, err := s.vm.issueTxFromRPC(tx)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

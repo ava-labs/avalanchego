@@ -183,7 +183,13 @@ type NetworkAppSender interface {
 	// SendAppError sends an application-level error to an AppRequest
 	SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error
 	// Gossip an application-level message.
-	SendAppGossip(ctx context.Context, appGossipBytes []byte) error
+	SendAppGossip(
+		ctx context.Context,
+		appGossipBytes []byte,
+		numValidators int,
+		numNonValidators int,
+		numPeers int,
+	) error
 	SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error
 }
 

@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 
 	commonfees "github.com/ava-labs/avalanchego/vms/components/fees"
 )
@@ -125,9 +124,7 @@ func TestManagerVerifyTx(t *testing.T) {
 			},
 			managerF: func(*gomock.Controller) *manager {
 				return &manager{
-					backend: &executor.Backend{
-						Config: noFeesTestConfig,
-					},
+					backend: defaultTestBackend(false, nil),
 				}
 			},
 			expectedErr: ErrChainNotSynced,
@@ -148,11 +145,8 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
 
 				return &manager{
-					backend: &executor.Backend{
-						Bootstrapped: true,
-						Config:       noFeesTestConfig,
-					},
-					state: state,
+					backend: defaultTestBackend(true, nil),
+					state:   state,
 				}
 			},
 			expectedErr: errTestSyntacticVerifyFail,
@@ -180,10 +174,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
 
 				return &manager{
-					backend: &executor.Backend{
-						Bootstrapped: true,
-						Config:       noFeesTestConfig,
-					},
+					backend:      defaultTestBackend(true, nil),
 					state:        state,
 					lastAccepted: lastAcceptedID,
 				}
@@ -215,10 +206,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
 
 				return &manager{
-					backend: &executor.Backend{
-						Bootstrapped: true,
-						Config:       noFeesTestConfig,
-					},
+					backend:      defaultTestBackend(true, nil),
 					state:        state,
 					lastAccepted: lastAcceptedID,
 				}
@@ -250,10 +238,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetFeeWindows().Return(commonfees.EmptyWindows, nil).AnyTimes()
 
 				return &manager{
-					backend: &executor.Backend{
-						Bootstrapped: true,
-						Config:       noFeesTestConfig,
-					},
+					backend:      defaultTestBackend(true, nil),
 					state:        state,
 					lastAccepted: lastAcceptedID,
 				}
