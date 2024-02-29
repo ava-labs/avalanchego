@@ -22,9 +22,6 @@ type GossipConfig struct {
 	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize"            yaml:"gossipOnAcceptValidatorSize"`
 	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize"         yaml:"gossipOnAcceptNonValidatorSize"`
 	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize"                 yaml:"gossipOnAcceptPeerSize"`
-	AppGossipValidatorSize           uint `json:"appGossipValidatorSize"                 yaml:"appGossipValidatorSize"`
-	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize"              yaml:"appGossipNonValidatorSize"`
-	AppGossipPeerSize                uint `json:"appGossipPeerSize"                      yaml:"appGossipPeerSize"`
 }
 
 type Config struct {
