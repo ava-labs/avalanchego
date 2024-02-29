@@ -49,6 +49,7 @@ type ProposalTxExecutor struct {
 	*Backend
 	BlkFeeManager *commonfees.Manager
 	Tx            *txs.Tx
+	Height        uint64
 	// [OnCommitState] is the state used for validation.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
@@ -120,6 +121,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		e.OnCommitState,
 		e.Tx,
 		tx,
+		e.Height,
 	)
 	if err != nil {
 		return err
@@ -169,6 +171,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		e.OnCommitState,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -215,6 +218,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		e.OnCommitState,
 		e.Tx,
 		tx,
+		e.Height,
 	)
 	if err != nil {
 		return err

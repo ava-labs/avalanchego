@@ -35,6 +35,7 @@ type Calculator struct {
 	IsEUpgradeActive bool
 	TxID             ids.ID
 	Log              logging.Logger
+	Height           uint64
 
 	// Pre E-fork inputs
 	Config    *config.Config
@@ -66,6 +67,7 @@ func (fc *Calculator) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "AddValidatorTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -89,6 +91,7 @@ func (fc *Calculator) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "AddDelegatorTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -112,6 +115,7 @@ func (fc *Calculator) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "AddSubnetValidatorTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -133,6 +137,7 @@ func (fc *Calculator) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "CreateChainTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -154,6 +159,7 @@ func (fc *Calculator) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "CreateSubnetTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -175,6 +181,7 @@ func (fc *Calculator) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) e
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "RemoveSubnetValidatorTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -211,6 +218,7 @@ func (fc *Calculator) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipT
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "TransferSubnetOwnershipTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -236,6 +244,7 @@ func (fc *Calculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVali
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "AddPermissionlessValidatorTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -265,6 +274,7 @@ func (fc *Calculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDele
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "AddPermissionlessDelegatorTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -290,6 +300,7 @@ func (fc *Calculator) BaseTx(tx *txs.BaseTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "BaseTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -315,6 +326,7 @@ func (fc *Calculator) ImportTx(tx *txs.ImportTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "ImportTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)
@@ -340,6 +352,7 @@ func (fc *Calculator) ExportTx(tx *txs.ExportTx) error {
 
 	fc.Log.Warn("metered tx complexity",
 		zap.Stringer("txID", fc.TxID),
+		zap.Uint64("height", fc.Height),
 		zap.String("txType", "ExportTx"),
 		zap.Any("consumedUnits", consumedUnits),
 	)

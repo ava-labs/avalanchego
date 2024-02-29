@@ -39,6 +39,7 @@ type StandardTxExecutor struct {
 	UnitCaps      commonFees.Dimensions
 	State         state.Diff // state is expected to be modified
 	Tx            *txs.Tx
+	Height        uint64
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
@@ -77,6 +78,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             e.Tx.ID(),
 		Log:              e.Ctx.Log,
+		Height:           e.Height,
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
@@ -136,6 +138,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             e.Tx.ID(),
 		Log:              e.Ctx.Log,
+		Height:           e.Height,
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
@@ -198,6 +201,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
 		TxID:             e.Tx.ID(),
 		Log:              e.Ctx.Log,
+		Height:           e.Height,
 		Config:           cfg,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
@@ -291,6 +295,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             e.Tx.ID(),
 		Log:              e.Ctx.Log,
+		Height:           e.Height,
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
@@ -377,6 +382,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -408,6 +414,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -428,6 +435,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -455,6 +463,7 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	)
 	if err != nil {
 		return err
@@ -502,6 +511,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		IsEUpgradeActive: e.Backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             e.Tx.ID(),
 		Log:              e.Ctx.Log,
+		Height:           e.Height,
 		Config:           e.Backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,
@@ -550,6 +560,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -584,6 +595,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	); err != nil {
 		return err
 	}
@@ -610,6 +622,7 @@ func (e *StandardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 		e.State,
 		e.Tx,
 		tx,
+		e.Height,
 	)
 	if err != nil {
 		return err
@@ -646,6 +659,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		IsEUpgradeActive: cfg.IsEUpgradeActivated(currentTimestamp),
 		TxID:             e.Tx.ID(),
 		Log:              e.Ctx.Log,
+		Height:           e.Height,
 		Config:           cfg,
 		ChainTime:        currentTimestamp,
 		FeeManager:       e.BlkFeeManager,

@@ -24,6 +24,7 @@ type AtomicTxExecutor struct {
 	ParentID      ids.ID
 	StateVersions state.Versions
 	Tx            *txs.Tx
+	Height        uint64
 
 	// outputs of visitor execution
 	OnAccept       state.Diff
@@ -108,6 +109,7 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 		UnitCaps:      feesCfg.BlockUnitsCap,
 		State:         e.OnAccept,
 		Tx:            e.Tx,
+		Height:        e.Height,
 	}
 	err = tx.Visit(&executor)
 	e.Inputs = executor.Inputs

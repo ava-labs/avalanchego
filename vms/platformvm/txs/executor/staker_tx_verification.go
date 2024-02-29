@@ -95,6 +95,7 @@ func verifyAddValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddValidatorTx,
+	height uint64,
 ) (
 	[]*avax.TransferableOutput,
 	error,
@@ -148,6 +149,7 @@ func verifyAddValidatorTx(
 		IsEUpgradeActive: false,
 		TxID:             sTx.ID(),
 		Log:              backend.Ctx.Log,
+		Height:           height,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		Credentials:      sTx.Creds,
@@ -208,6 +210,7 @@ func verifyAddSubnetValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
+	height uint64,
 ) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -242,6 +245,7 @@ func verifyAddSubnetValidatorTx(
 		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             sTx.ID(),
 		Log:              backend.Ctx.Log,
+		Height:           height,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -320,6 +324,7 @@ func verifyRemoveSubnetValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
+	height uint64,
 ) (*state.Staker, bool, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -359,6 +364,7 @@ func verifyRemoveSubnetValidatorTx(
 		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             sTx.ID(),
 		Log:              backend.Ctx.Log,
+		Height:           height,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -404,6 +410,7 @@ func verifyAddDelegatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddDelegatorTx,
+	height uint64,
 ) (
 	[]*avax.TransferableOutput,
 	error,
@@ -452,6 +459,7 @@ func verifyAddDelegatorTx(
 		IsEUpgradeActive: false,
 		TxID:             sTx.ID(),
 		Log:              backend.Ctx.Log,
+		Height:           height,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		Credentials:      sTx.Creds,
@@ -537,6 +545,7 @@ func verifyAddPermissionlessValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
+	height uint64,
 ) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -555,6 +564,7 @@ func verifyAddPermissionlessValidatorTx(
 		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             sTx.ID(),
 		Log:              backend.Ctx.Log,
+		Height:           height,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -672,6 +682,7 @@ func verifyAddPermissionlessDelegatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
+	height uint64,
 ) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -690,6 +701,7 @@ func verifyAddPermissionlessDelegatorTx(
 		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             sTx.ID(),
 		Log:              backend.Ctx.Log,
+		Height:           height,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,
@@ -835,6 +847,7 @@ func verifyTransferSubnetOwnershipTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.TransferSubnetOwnershipTx,
+	height uint64,
 ) error {
 	if !backend.Config.IsDurangoActivated(chainState.GetTimestamp()) {
 		return ErrDurangoUpgradeNotActive
@@ -854,6 +867,7 @@ func verifyTransferSubnetOwnershipTx(
 		IsEUpgradeActive: backend.Config.IsEUpgradeActivated(currentTimestamp),
 		TxID:             sTx.ID(),
 		Log:              backend.Ctx.Log,
+		Height:           height,
 		Config:           backend.Config,
 		ChainTime:        currentTimestamp,
 		FeeManager:       feeManager,

@@ -72,7 +72,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	inputs, feesMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent())
+	inputs, feesMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onDecisionState, b.Parent(), b.Height())
 	if err != nil {
 		return err
 	}
@@ -199,6 +199,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		ParentID:      parentID,
 		StateVersions: v,
 		Tx:            b.Tx,
+		Height:        b.Height(),
 	}
 
 	if err := b.Tx.Unsigned.Visit(&atomicExecutor); err != nil {
@@ -380,6 +381,7 @@ func (v *verifier) proposalBlock(
 		OnAbortState:  onAbortState,
 		Backend:       v.txExecutorBackend,
 		Tx:            b.Tx,
+		Height:        b.Height(),
 	}
 
 	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
@@ -421,7 +423,7 @@ func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
 	onAcceptState state.Diff,
 ) error {
-	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent())
+	inputs, feeMan, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, onAcceptState, b.Parent(), b.Height())
 	if err != nil {
 		return err
 	}
@@ -443,7 +445,7 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID ids.ID, blkHeight uint64) (
 	set.Set[ids.ID],
 	*fees.Manager,
 	map[ids.ID]*atomic.Requests,
@@ -466,6 +468,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, state state.Diff, parentID 
 			UnitCaps:      feesCfg.BlockUnitsCap,
 			State:         state,
 			Tx:            tx,
+			Height:        blkHeight,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
