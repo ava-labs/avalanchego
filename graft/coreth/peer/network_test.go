@@ -503,49 +503,6 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 	assert.EqualValues(t, requestHandler.calls, 1)
 }
 
-func TestGossip(t *testing.T) {
-	codecManager := buildCodec(t, HelloGossip{})
-	crossChainCodecManager := buildCodec(t, ExampleCrossChainRequest{}, ExampleCrossChainResponse{})
-
-	nodeID := ids.GenerateTestNodeID()
-	var clientNetwork Network
-	wg := &sync.WaitGroup{}
-	sentGossip := false
-	wg.Add(1)
-	sender := testAppSender{
-		sendAppGossipFn: func(msg []byte) error {
-			go func() {
-				defer wg.Done()
-				err := clientNetwork.AppGossip(context.Background(), nodeID, msg)
-				assert.NoError(t, err)
-			}()
-			sentGossip = true
-			return nil
-		},
-	}
-
-	gossipHandler := &testGossipHandler{}
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
-	require.NoError(t, err)
-	clientNetwork = NewNetwork(p2pNetwork, sender, codecManager, crossChainCodecManager, ids.EmptyNodeID, 1, 1)
-	clientNetwork.SetGossipHandler(gossipHandler)
-
-	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
-
-	client := NewNetworkClient(clientNetwork)
-	defer clientNetwork.Shutdown()
-
-	b, err := buildGossip(codecManager, HelloGossip{Msg: "hello there!"})
-	assert.NoError(t, err)
-
-	err = client.Gossip(b)
-	assert.NoError(t, err)
-
-	wg.Wait()
-	assert.True(t, sentGossip)
-	assert.True(t, gossipHandler.received)
-}
-
 func TestHandleInvalidMessages(t *testing.T) {
 	codecManager := buildCodec(t, HelloGossip{}, TestMessage{})
 	crossChainCodecManager := buildCodec(t, ExampleCrossChainRequest{}, ExampleCrossChainResponse{})

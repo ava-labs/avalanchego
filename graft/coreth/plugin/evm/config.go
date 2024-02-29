@@ -35,8 +35,9 @@ const (
 	defaultMaxBlocksPerRequest                        = 0 // Default to no maximum on the number of blocks per getLogs request
 	defaultContinuousProfilerFrequency                = 15 * time.Minute
 	defaultContinuousProfilerMaxFiles                 = 5
-	defaultTxRegossipFrequency                        = 1 * time.Minute
-	defaultTxRegossipMaxSize                          = 15
+	defaultPushGossipFrequency                        = 100 * time.Millisecond
+	defaultPullGossipFrequency                        = 10 * time.Second
+	defaultTxRegossipFrequency                        = 10 * time.Second
 	defaultOfflinePruningBloomFilterSize       uint64 = 512 // Default size (MB) for the offline pruner to use
 	defaultLogLevel                                   = "info"
 	defaultLogJSONFormat                              = false
@@ -149,12 +150,10 @@ type Config struct {
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
 
 	// Gossip Settings
-	RemoteGossipOnlyEnabled   bool     `json:"remote-gossip-only-enabled"`
-	RegossipFrequency         Duration `json:"regossip-frequency"`
-	RegossipMaxTxs            int      `json:"regossip-max-txs"`
-	RemoteTxGossipOnlyEnabled bool     `json:"remote-tx-gossip-only-enabled"` // Deprecated: use RemoteGossipOnlyEnabled instead
-	TxRegossipFrequency       Duration `json:"tx-regossip-frequency"`         // Deprecated: use RegossipFrequency instead
-	TxRegossipMaxSize         int      `json:"tx-regossip-max-size"`          // Deprecated: use RegossipMaxTxs instead
+	PushGossipFrequency Duration `json:"push-gossip-frequency"`
+	PullGossipFrequency Duration `json:"pull-gossip-frequency"`
+	RegossipFrequency   Duration `json:"regossip-frequency"`
+	TxRegossipFrequency Duration `json:"tx-regossip-frequency"` // Deprecated: use RegossipFrequency instead
 
 	// Log
 	LogLevel      string `json:"log-level"`
@@ -250,7 +249,8 @@ func (c *Config) SetDefaults() {
 	c.CommitInterval = defaultCommitInterval
 	c.SnapshotWait = defaultSnapshotWait
 	c.RegossipFrequency.Duration = defaultTxRegossipFrequency
-	c.RegossipMaxTxs = defaultTxRegossipMaxSize
+	c.PushGossipFrequency.Duration = defaultPushGossipFrequency
+	c.PullGossipFrequency.Duration = defaultPullGossipFrequency
 	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize
 	c.LogLevel = defaultLogLevel
 	c.LogJSONFormat = defaultLogJSONFormat
@@ -315,17 +315,9 @@ func (c *Config) Deprecate() string {
 		msg += "coreth-admin-api-dir is deprecated, use admin-api-dir instead. "
 		c.AdminAPIDir = c.CorethAdminAPIDir
 	}
-	if c.RemoteTxGossipOnlyEnabled {
-		msg += "remote-tx-gossip-only-enabled is deprecated, use tx-gossip-enabled instead. "
-		c.RemoteGossipOnlyEnabled = c.RemoteTxGossipOnlyEnabled
-	}
 	if c.TxRegossipFrequency != (Duration{}) {
 		msg += "tx-regossip-frequency is deprecated, use regossip-frequency instead. "
 		c.RegossipFrequency = c.TxRegossipFrequency
-	}
-	if c.TxRegossipMaxSize != 0 {
-		msg += "tx-regossip-max-size is deprecated, use regossip-max-txs instead. "
-		c.RegossipMaxTxs = c.TxRegossipMaxSize
 	}
 
 	return msg

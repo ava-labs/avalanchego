@@ -94,6 +94,7 @@ import (
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 
+	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -144,6 +145,7 @@ const (
 	atomicTxGossipProtocol = 0x1
 
 	// gossip constants
+	pushGossipDiscardedElements          = 16_384
 	txGossipBloomMinTargetElements       = 8 * 1024
 	txGossipBloomTargetFalsePositiveRate = 0.01
 	txGossipBloomResetFalsePositiveRate  = 0.05
@@ -152,7 +154,6 @@ const (
 	maxValidatorSetStaleness             = time.Minute
 	txGossipThrottlingPeriod             = 10 * time.Second
 	txGossipThrottlingLimit              = 2
-	gossipFrequency                      = 10 * time.Second
 	txGossipPollSize                     = 10
 )
 
@@ -293,8 +294,6 @@ type VM struct {
 
 	builder *blockBuilder
 
-	gossiper Gossiper
-
 	baseCodec codec.Registry
 	codec     codec.Manager
 	clock     mockable.Clock
@@ -334,11 +333,11 @@ type VM struct {
 	// Initialize only sets these if nil so they can be overridden in tests
 	p2pSender             commonEng.AppSender
 	ethTxGossipHandler    p2p.Handler
-	atomicTxGossipHandler p2p.Handler
+	ethTxPushGossiper     avalancheUtils.Atomic[*gossip.PushGossiper[*GossipEthTx]]
 	ethTxPullGossiper     gossip.Gossiper
+	atomicTxGossipHandler p2p.Handler
+	atomicTxPushGossiper  *gossip.PushGossiper[*GossipAtomicTx]
 	atomicTxPullGossiper  gossip.Gossiper
-	ethTxPushGossiper     gossip.Accumulator[*GossipEthTx]
-	atomicTxPushGossiper  gossip.Accumulator[*GossipAtomicTx]
 }
 
 // Codec implements the secp256k1fx interface
@@ -704,6 +703,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 		node,
 		&vm.ethConfig,
 		vm.createConsensusCallbacks(),
+		&EthPushGossiper{vm: vm},
 		vm.chaindb,
 		vm.config.EthBackendSettings(),
 		lastAcceptedHash,
@@ -1075,46 +1075,11 @@ func (vm *VM) initBlockBuilding() error {
 	vm.cancel = cancel
 
 	ethTxGossipMarshaller := GossipEthTxMarshaller{}
-	atomicTxGossipMarshaller := GossipAtomicTxMarshaller{}
-
 	ethTxGossipClient := vm.Network.NewClient(ethTxGossipProtocol, p2p.WithValidatorSampling(vm.validators))
-	atomicTxGossipClient := vm.Network.NewClient(atomicTxGossipProtocol, p2p.WithValidatorSampling(vm.validators))
-
 	ethTxGossipMetrics, err := gossip.NewMetrics(vm.sdkMetrics, ethTxGossipNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to initialize eth tx gossip metrics: %w", err)
 	}
-
-	atomicTxGossipMetrics, err := gossip.NewMetrics(vm.sdkMetrics, atomicTxGossipNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to initialize atomic tx gossip metrics: %w", err)
-	}
-
-	if vm.ethTxPushGossiper == nil {
-		vm.ethTxPushGossiper = gossip.NewPushGossiper[*GossipEthTx](
-			ethTxGossipMarshaller,
-			ethTxGossipClient,
-			ethTxGossipMetrics,
-			txGossipTargetMessageSize,
-		)
-	}
-
-	if vm.atomicTxPushGossiper == nil {
-		vm.atomicTxPushGossiper = gossip.NewPushGossiper[*GossipAtomicTx](
-			atomicTxGossipMarshaller,
-			atomicTxGossipClient,
-			atomicTxGossipMetrics,
-			txGossipTargetMessageSize,
-		)
-	}
-
-	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
-	gossipStats := NewGossipStats()
-	vm.gossiper = vm.createGossiper(gossipStats, vm.ethTxPushGossiper, vm.atomicTxPushGossiper)
-	vm.builder = vm.NewBlockBuilder(vm.toEngine)
-	vm.builder.awaitSubmittedTxs()
-	vm.Network.SetGossipHandler(NewGossipHandler(vm, gossipStats))
-
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
 		return err
@@ -1124,6 +1089,51 @@ func (vm *VM) initBlockBuilding() error {
 		ethTxPool.Subscribe(ctx)
 		vm.shutdownWg.Done()
 	}()
+
+	atomicTxGossipMarshaller := GossipAtomicTxMarshaller{}
+	atomicTxGossipClient := vm.Network.NewClient(atomicTxGossipProtocol, p2p.WithValidatorSampling(vm.validators))
+	atomicTxGossipMetrics, err := gossip.NewMetrics(vm.sdkMetrics, atomicTxGossipNamespace)
+	if err != nil {
+		return fmt.Errorf("failed to initialize atomic tx gossip metrics: %w", err)
+	}
+
+	ethTxPushGossiper := vm.ethTxPushGossiper.Get()
+	if ethTxPushGossiper == nil {
+		ethTxPushGossiper, err = gossip.NewPushGossiper[*GossipEthTx](
+			ethTxGossipMarshaller,
+			ethTxPool,
+			ethTxGossipClient,
+			ethTxGossipMetrics,
+			pushGossipDiscardedElements,
+			txGossipTargetMessageSize,
+			vm.config.RegossipFrequency.Duration,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to initialize eth tx push gossiper: %w", err)
+		}
+		vm.ethTxPushGossiper.Set(ethTxPushGossiper)
+	}
+
+	if vm.atomicTxPushGossiper == nil {
+		vm.atomicTxPushGossiper, err = gossip.NewPushGossiper[*GossipAtomicTx](
+			atomicTxGossipMarshaller,
+			vm.mempool,
+			atomicTxGossipClient,
+			atomicTxGossipMetrics,
+			pushGossipDiscardedElements,
+			txGossipTargetMessageSize,
+			vm.config.RegossipFrequency.Duration,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to initialize atomic tx push gossiper: %w", err)
+		}
+	}
+
+	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
+	gossipStats := NewGossipStats()
+	vm.builder = vm.NewBlockBuilder(vm.toEngine)
+	vm.builder.awaitSubmittedTxs()
+	vm.Network.SetGossipHandler(NewGossipHandler(vm, gossipStats))
 
 	if vm.ethTxGossipHandler == nil {
 		vm.ethTxGossipHandler = newTxGossipHandler[*GossipEthTx](
@@ -1176,9 +1186,13 @@ func (vm *VM) initBlockBuilding() error {
 		}
 	}
 
-	vm.shutdownWg.Add(1)
+	vm.shutdownWg.Add(2)
 	go func() {
-		gossip.Every(ctx, vm.ctx.Log, vm.ethTxPullGossiper, gossipFrequency)
+		gossip.Every(ctx, vm.ctx.Log, ethTxPushGossiper, vm.config.PushGossipFrequency.Duration)
+		vm.shutdownWg.Done()
+	}()
+	go func() {
+		gossip.Every(ctx, vm.ctx.Log, vm.ethTxPullGossiper, vm.config.PullGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 
@@ -1199,9 +1213,13 @@ func (vm *VM) initBlockBuilding() error {
 		}
 	}
 
-	vm.shutdownWg.Add(1)
+	vm.shutdownWg.Add(2)
 	go func() {
-		gossip.Every(ctx, vm.ctx.Log, vm.atomicTxPullGossiper, gossipFrequency)
+		gossip.Every(ctx, vm.ctx.Log, vm.atomicTxPushGossiper, vm.config.PushGossipFrequency.Duration)
+		vm.shutdownWg.Done()
+	}()
+	go func() {
+		gossip.Every(ctx, vm.ctx.Log, vm.atomicTxPullGossiper, vm.config.PullGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 

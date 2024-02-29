@@ -37,19 +37,16 @@ type mempoolMetrics struct {
 
 	addedTxs     metrics.Counter // Count of all transactions added to the mempool
 	discardedTxs metrics.Counter // Count of all discarded transactions
-
-	newTxsReturned metrics.Counter // Count of transactions returned from GetNewTxs
 }
 
 // newMempoolMetrics constructs metrics for the atomic mempool
 func newMempoolMetrics() *mempoolMetrics {
 	return &mempoolMetrics{
-		pendingTxs:     metrics.GetOrRegisterGauge("atomic_mempool_pending_txs", nil),
-		currentTxs:     metrics.GetOrRegisterGauge("atomic_mempool_current_txs", nil),
-		issuedTxs:      metrics.GetOrRegisterGauge("atomic_mempool_issued_txs", nil),
-		addedTxs:       metrics.GetOrRegisterCounter("atomic_mempool_added_txs", nil),
-		discardedTxs:   metrics.GetOrRegisterCounter("atomic_mempool_discarded_txs", nil),
-		newTxsReturned: metrics.GetOrRegisterCounter("atomic_mempool_new_txs_returned", nil),
+		pendingTxs:   metrics.GetOrRegisterGauge("atomic_mempool_pending_txs", nil),
+		currentTxs:   metrics.GetOrRegisterGauge("atomic_mempool_current_txs", nil),
+		issuedTxs:    metrics.GetOrRegisterGauge("atomic_mempool_issued_txs", nil),
+		addedTxs:     metrics.GetOrRegisterCounter("atomic_mempool_added_txs", nil),
+		discardedTxs: metrics.GetOrRegisterCounter("atomic_mempool_discarded_txs", nil),
 	}
 }
 
@@ -70,8 +67,6 @@ type Mempool struct {
 	// Pending is a channel of length one, which the mempool ensures has an item on
 	// it as long as there is an unissued transaction remaining in [txs]
 	Pending chan struct{}
-	// newTxs is an array of [Tx] that are ready to be gossiped.
-	newTxs []*Tx
 	// txHeap is a sorted record of all txs in the mempool by [gasPrice]
 	// NOTE: [txHeap] ONLY contains pending txs
 	txHeap *txHeap
@@ -359,7 +354,6 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 	// been set to something other than [dontBuild], this will be ignored and won't be
 	// reset until the engine calls BuildBlock. This case is handled in IssueCurrentTx
 	// and CancelCurrentTx.
-	m.newTxs = append(m.newTxs, tx)
 	m.addPending()
 
 	return nil
@@ -432,6 +426,14 @@ func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
 	}
 
 	return nil, false, false
+}
+
+// Has returns true if the mempool contains [txID] or it was issued.
+func (m *Mempool) Has(txID ids.ID) bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.has(txID)
 }
 
 // IssueCurrentTx marks [currentTx] as issued if there is one
@@ -593,15 +595,4 @@ func (m *Mempool) addPending() {
 	case m.Pending <- struct{}{}:
 	default:
 	}
-}
-
-// GetNewTxs returns the array of [newTxs] and replaces it with an empty array.
-func (m *Mempool) GetNewTxs() []*Tx {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	cpy := m.newTxs
-	m.newTxs = nil
-	m.metrics.newTxsReturned.Inc(int64(len(cpy))) // Increment the number of newTxs
-	return cpy
 }

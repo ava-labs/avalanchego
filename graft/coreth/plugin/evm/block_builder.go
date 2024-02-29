@@ -27,9 +27,8 @@ type blockBuilder struct {
 	ctx         *snow.Context
 	chainConfig *params.ChainConfig
 
-	txPool   *txpool.TxPool
-	mempool  *Mempool
-	gossiper Gossiper
+	txPool  *txpool.TxPool
+	mempool *Mempool
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -58,7 +57,6 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		chainConfig:          vm.chainConfig,
 		txPool:               vm.txPool,
 		mempool:              vm.mempool,
-		gossiper:             vm.gossiper,
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
@@ -154,33 +152,12 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 		for {
 			select {
-			case ethTxsEvent := <-txSubmitChan:
+			case <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
-
-				if b.gossiper != nil && len(ethTxsEvent.Txs) > 0 {
-					// [GossipEthTxs] will block unless [gossiper.ethTxsToGossipChan] (an
-					// unbuffered channel) is listened on
-					if err := b.gossiper.GossipEthTxs(ethTxsEvent.Txs); err != nil {
-						log.Warn(
-							"failed to gossip new eth transactions",
-							"err", err,
-						)
-					}
-				}
 			case <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
 				b.signalTxsReady()
-
-				newTxs := b.mempool.GetNewTxs()
-				if b.gossiper != nil && len(newTxs) > 0 {
-					if err := b.gossiper.GossipAtomicTxs(newTxs); err != nil {
-						log.Warn(
-							"failed to gossip new atomic transactions",
-							"err", err,
-						)
-					}
-				}
 			case <-b.shutdownChan:
 				b.buildBlockTimer.Stop()
 				return
